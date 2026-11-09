@@ -148,26 +148,19 @@ describe('the owner department of a subscription: the finance gate of a change a
 
       return (await stored(created.id)).unit_price_minor ?? '';
     };
-    const priceOf = (planId: string, departmentId: string) =>
-      h.ctx.app.get(CatalogApi, { strict: false }).getPlanPrice(planId, departmentId);
+    const priceOf = (planId: string) => h.ctx.app.get(CatalogApi, { strict: false }).getPlanPrice(planId);
 
-    it('is read only from an active subscription of that department, never from another department', async () => {
+    it('BR-MF1-07: is the price of the main subscription of the plan, whichever department owns it (S1-02)', async () => {
       const planId = await h.plan('K2');
-      const other = await h.bareDepartment();
-      const ownPrice = await declare(planId, h.seed.departmentId, '1000000');
-      const otherPrice = await declare(planId, other.id, '7000000');
+      const price = await declare(planId, h.seed.departmentId, '1000000');
 
-      expect(ownPrice).not.toBe(otherPrice);
-      expect((await priceOf(planId, h.seed.departmentId))?.unitPrice.amountMinor.toString()).toBe(ownPrice);
-      expect((await priceOf(planId, other.id))?.unitPrice.amountMinor.toString()).toBe(otherPrice);
+      expect((await priceOf(planId))?.unitPrice.amountMinor.toString()).toBe(price);
     });
 
-    it('is null for a department that owns no subscription of the plan, even when another department has a price', async () => {
+    it('is null for a plan with no priced subscription', async () => {
       const planId = await h.plan('K2');
-      const third = await h.bareDepartment();
-      await declare(planId, h.seed.departmentId, '2000000');
 
-      expect(await priceOf(planId, third.id)).toBeNull();
+      expect(await priceOf(planId)).toBeNull();
     });
   });
 });

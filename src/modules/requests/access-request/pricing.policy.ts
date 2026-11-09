@@ -41,16 +41,6 @@ export interface PricingInput {
 
 export type MissingPriceReason = 'NO_PRICED_SUBSCRIPTION' | 'CYCLE_UNKNOWN' | 'AMOUNT_TOO_LARGE' | 'AWAITING_QUOTE';
 
-/** One payment of the cost of a request; a request has one, for the year it is counted in. */
-export interface PaymentPeriod {
-  dueOn: BusinessDate;
-  amountMinor: bigint;
-  /** The calendar year the amount falls in. */
-  budgetYear: number;
-  /** Whether the amount binds the company; every amount worked out from the catalog does. */
-  binding: boolean;
-}
-
 export type Pricing =
   | {
       status: 'PRICED';
@@ -60,8 +50,6 @@ export type Pricing =
       kind: 'RECURRING' | 'ONE_TIME';
       /** The months of the year the amount covers; null for a one-time price. 0 for a start in a year after the check date. */
       months: number | null;
-      /** One payment, so the budget check and the commitment read the same shape as before. */
-      periods: PaymentPeriod[];
       budgetYear: number;
       /** The cost of the part that falls in the year after the check date, for a request that starts then (`QĐ-109b`); null otherwise. */
       nextYearAmount: Money | null;
@@ -88,6 +76,34 @@ function lastDayCounted(year: number, endDate: BusinessDate | null): BusinessDat
 /** The latest day a right asked for may end: a year from `today`, the day before the same day twelve months later (`QĐ-104a`, `US-05-23` AC-9). */
 export const maxEndDateOf = (today: BusinessDate): BusinessDate => addDays(addMonths(today, 12), -1);
 
+/** What one person costs a month, rounded up, for showing only: the price of a recurring plan over the months of its billing cycle. */
+export function monthlyPriceOf(price: { unitPrice: Money; billingCycle: BillingCycleCode | null }): Money | null {
+  if (price.billingCycle === null || price.billingCycle === 'OTHER') return null;
+
+  return {
+    amountMinor: ceilDiv(price.unitPrice.amountMinor, BigInt(CYCLE_MONTHS[price.billingCycle])),
+    currency: price.unitPrice.currency,
+  };
+}
+
+/**
+ * What one person costs a year at the vendor, whatever month the right begins in: the price of a year of a recurring plan, or the price
+ * of the purchase for a one-time one (`P2-02`). Shown beside the amount of the months left, so the sender sees both.
+ */
+export function annualVendorAmountOf(price: {
+  kind: 'RECURRING' | 'ONE_TIME';
+  unitPrice: Money;
+  billingCycle: BillingCycleCode | null;
+}): Money | null {
+  if (price.kind === 'ONE_TIME') return price.unitPrice;
+  if (price.billingCycle === null || price.billingCycle === 'OTHER') return null;
+
+  return {
+    amountMinor: ceilDiv(price.unitPrice.amountMinor * 12n, BigInt(CYCLE_MONTHS[price.billingCycle])),
+    currency: price.unitPrice.currency,
+  };
+}
+
 export function requestAmountOf(input: PricingInput): Pricing {
   const year = fiscalYearOf(input.checkDate);
   // A price of nothing is no price: a paid request never costs 0 (`FR-3.2`), so the price data is incomplete and the request is not
@@ -101,7 +117,6 @@ export function requestAmountOf(input: PricingInput): Pricing {
     amountMinor: bigint;
     cycle: BillingCycleCode;
     months: number | null;
-    start: BusinessDate;
     nextYearAmountMinor: bigint | null;
   }): Pricing => {
     if (facts.amountMinor > MAX_AMOUNT_MINOR)
@@ -114,7 +129,6 @@ export function requestAmountOf(input: PricingInput): Pricing {
       billingCycle: facts.cycle,
       kind: input.kind,
       months: facts.months,
-      periods: [{ dueOn: facts.start, amountMinor: facts.amountMinor, budgetYear: year, binding: true }],
       budgetYear: year,
       nextYearAmount:
         facts.nextYearAmountMinor === null
@@ -129,7 +143,6 @@ export function requestAmountOf(input: PricingInput): Pricing {
       amountMinor: unitPrice.amountMinor * people,
       cycle: 'OTHER',
       months: null,
-      start: input.checkDate,
       nextYearAmountMinor: null,
     });
   }
@@ -150,7 +163,6 @@ export function requestAmountOf(input: PricingInput): Pricing {
       amountMinor: 0n,
       cycle: input.billingCycle,
       months: 0,
-      start,
       nextYearAmountMinor: costOf(nextMonths),
     });
   }
@@ -161,7 +173,6 @@ export function requestAmountOf(input: PricingInput): Pricing {
     amountMinor: costOf(months),
     cycle: input.billingCycle,
     months,
-    start,
     nextYearAmountMinor: null,
   });
 }

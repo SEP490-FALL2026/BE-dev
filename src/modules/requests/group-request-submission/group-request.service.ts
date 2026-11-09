@@ -35,8 +35,8 @@ export interface GroupBody {
   planId: string;
   lines: readonly GroupLineInput[];
   businessReason: string;
-  termMonths: number;
-  expectedSpendOn?: string;
+  /** The day the access of every person named ends; absent for no end. */
+  expectedEndDate?: string;
 }
 
 /** What `POST /group-requests/check` says: every reason at once, and nothing written. */
@@ -44,8 +44,8 @@ export interface GroupCheck {
   plan: { eligible: boolean; reason: PlanRefusal | null };
   tooManyLines: { max: number } | null;
   tooFewLines: { min: number } | null;
-  termLimit: { maxMonths: number };
-  termBeyondLimit: boolean;
+  maxEndDate: string;
+  endDateOutOfRange: boolean;
   lines: { employeeId: string; ok: boolean; reason: LineReason | 'DUPLICATE_LINE' | null }[];
   pricing: PricingRecord;
   lineCount: number;
@@ -85,8 +85,8 @@ export class GroupRequestService {
         plan: { eligible: judged.planRefusal === null, reason: judged.planRefusal },
         tooManyLines: judged.count.tooMany,
         tooFewLines: judged.count.tooFew,
-        termLimit: judged.assessed.termLimit,
-        termBeyondLimit: judged.assessed.termBeyondLimit,
+        maxEndDate: judged.assessed.maxEndDate,
+        endDateOutOfRange: judged.assessed.endDateOutOfRange,
         lines: judged.lines.map((line) => {
           const duplicate = judged.count.duplicates.includes(line.employeeId);
           const reason = duplicate ? ('DUPLICATE_LINE' as const) : (refused.get(line.employeeId) ?? null);
@@ -153,8 +153,7 @@ export class GroupRequestService {
     return {
       senderEmployeeId: actor.employeeId,
       planId: body.planId,
-      termMonths: body.termMonths,
-      expectedSpendOn: body.expectedSpendOn,
+      expectedEndDate: body.expectedEndDate ?? null,
       lines: body.lines,
       now: new Date(),
       settings,
@@ -175,9 +174,7 @@ export class GroupRequestService {
   private refuse(judged: GroupJudgement): void {
     if (judged.planRefusal !== null) throw new GroupRequestPlanNotEligibleError(judged.planRefusal);
     if (judged.count.tooMany !== null) throw new GroupRequestTooManyLinesError(judged.count.tooMany.max);
-    if (judged.assessed.termBeyondLimit) {
-      throw new GroupRequestTermBeyondLimitError(judged.assessed.termLimit.maxMonths);
-    }
+    if (judged.assessed.endDateOutOfRange) throw new GroupRequestTermBeyondLimitError(judged.assessed.maxEndDate);
     if (judged.count.tooFew !== null) throw new GroupRequestTooFewLinesError(judged.count.tooFew.min);
     if (judged.count.duplicates.length > 0) throw new GroupRequestDuplicateLineError(judged.count.duplicates);
     if (judged.refused.length > 0) throw new GroupRequestLinesRefusedError(judged.refused);

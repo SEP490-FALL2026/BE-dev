@@ -69,7 +69,7 @@ export class RequestDraftService {
         requesterEmployeeId: actor.employeeId,
         departmentId: unit.departmentId,
         businessReason: body.businessReason,
-        termMonths: body.termMonths,
+        termMonths: null,
         content: toContentJson(body),
         createdByAppUserId: actor.appUserId,
       });

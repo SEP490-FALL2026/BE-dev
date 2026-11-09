@@ -19,7 +19,6 @@ export interface GroupWritten {
   body: {
     planId: string;
     businessReason: string;
-    termMonths: number;
   };
   draftId: string | null;
 }
@@ -56,7 +55,7 @@ export class GroupRequestWriter {
       departmentId: unit.departmentId,
       costCenterId: unit.costCenter?.id ?? null,
       businessReason: body.businessReason,
-      termMonths: body.termMonths,
+      termMonths: null,
       pricing: judged.pricing,
       policy,
       createdByAppUserId: actor.appUserId,
@@ -87,7 +86,7 @@ export class GroupRequestWriter {
       organizationId,
       requestId: created.id,
       planId: body.planId,
-      termMonths: body.termMonths,
+      expectedEndDate: judged.pricing.expectedEndDate,
       state,
       judged,
       planned,

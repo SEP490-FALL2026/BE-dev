@@ -14,9 +14,6 @@ const quote: Quote = {
   billingCycle: 'MONTHLY',
   validFrom: '2026-10-01',
   validUntil: null,
-  commitmentMonths: null,
-  paymentFrequency: null,
-  firstPaymentOn: null,
 };
 const complete = (over: Partial<AssessmentFields> = {}): AssessmentFields => ({
   classification: 'PAID_LICENSED',

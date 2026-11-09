@@ -93,7 +93,6 @@ export function renewalSubmittedDetail(facts: RenewalSubmission, seat: RenewedSe
     amountMinor: pricing.amount?.amountMinor.toString() ?? null,
     amountCurrency: pricing.amount?.currency ?? null,
     budgetYear: pricing.budgetYear,
-    expectedSpendOn: pricing.expectedSpendOn,
     assignmentId: seat.assignmentId,
     previousExpectedEndDate: seat.previousEnd,
     newExpectedEndDate: facts.newEnd,

@@ -10,6 +10,15 @@ import type { PreviewBodyDto, PreviewWire } from './request-preview.dto';
 import { buildChain, spendSubmissionOf } from './request-preview.policy';
 import { PricingViewService } from '../request-view/pricing-view.service';
 import { RequestFactsService } from '../access-request/request-facts.service';
+import type { PricingRecord } from '../access-request/access-request.types';
+import { annualVendorAmountOf } from '../access-request/pricing.policy';
+
+/** The request can be sent as it is: nobody holds it already, nothing blocks the parties, and the end date fits (`FR-2.8`, `US-05-23` AC-9). */
+const canSubmitOf = (
+  assessed: { heldAccess: unknown; endDateOutOfRange: boolean; termRequired: boolean },
+  blockedBy: unknown,
+): boolean =>
+  assessed.heldAccess === null && blockedBy === null && !assessed.endDateOutOfRange && !assessed.termRequired;
 
 /**
  * What a person is shown before they send a request (`US-05-01`): the cost with its estimated tax, the chain of people who
@@ -60,13 +69,15 @@ export class RequestPreviewService {
         applicationName: target.applicationName,
       },
       branch: policy.branch,
-      termMonths: body.termMonths,
+      expectedEndDate: body.expectedEndDate ?? null,
       department: { id: department.id, code: department.code, name: department.name },
       costCenter: costCenter && { id: costCenter.id, code: costCenter.code, name: costCenter.name },
-      termLimit: assessed.termLimit,
+      maxEndDate: assessed.maxEndDate,
+      termRequired: assessed.termRequired,
+      annualVendorAmount: await this.annualVendorAmountOf(pricing),
       existingAccess: assessed.heldAccess,
       blockedBy,
-      canSubmit: assessed.heldAccess === null && blockedBy === null && !assessed.termBeyondLimit,
+      canSubmit: canSubmitOf(assessed, blockedBy),
       budgetYear: pricing.budgetYear,
       pricing: priceView,
       costEstimate,
@@ -75,6 +86,18 @@ export class RequestPreviewService {
       possibleExtraSteps: paid ? [{ kind: 'FINANCE_REVIEW', beforeStep: 'SPEND_APPROVAL' }] : [],
       totalExpectedWorkingDays: chain.reduce((sum, step) => sum + step.expectedWorkingDays, 0),
     };
+  }
+
+  /** The year of the price of the plan at the vendor, written for a reader; null when nothing is priced. */
+  private async annualVendorAmountOf(pricing: PricingRecord) {
+    if (pricing.status !== 'PRICED' || pricing.kind === null || pricing.unitPrice === null) return null;
+    const annual = annualVendorAmountOf({
+      kind: pricing.kind,
+      unitPrice: pricing.unitPrice,
+      billingCycle: pricing.billingCycle,
+    });
+
+    return annual && (await this.pricing.moneyView(annual));
   }
 
   /** What the preview is made of, read in one transaction that locks nothing: who is refused (before the department is read), the facts of sending and the vendor. */
@@ -90,7 +113,7 @@ export class RequestPreviewService {
       const assessed = await this.assessment.assess(tx, {
         employeeId: actor.employeeId,
         planId: body.planId,
-        termMonths: body.termMonths,
+        expectedEndDate: body.expectedEndDate ?? null,
         now: new Date(),
         settings,
         lockDepartment: false,

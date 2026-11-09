@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { normalizeAccountIdentifier } from '../public/account-identifier.policy';
 import type { BusinessDate } from '../../../core/business-date';
+import { TERM_LIMIT_MONTHS, termEndOf } from '../../../core/term-limit';
 import { DbTx, TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../../audit/public/audit.api';
@@ -282,6 +283,23 @@ export class AssignmentService {
         { [failed ? 'failedAt' : 'cancelledAt']: input.now.toISOString(), requestId: input.requestId },
       ),
     );
+  }
+
+  /**
+   * The task of the grant is completed on `grantedOn`: that is the day the right begins, and the end it asked for is cut to a year from
+   * it at the latest (`BR-MF1-06a`, `QĐ-106b`). A seat with no end asked for keeps none. `valid_from` is not touched (the database keeps it).
+   */
+  async recordGranted(tx: DbTx, assignmentId: string, grantedOn: BusinessDate): Promise<void> {
+    const current = await this.repo.find(assignmentId, tx);
+    if (!current) throw new AssignmentNotFoundError();
+    const cap = termEndOf(grantedOn, TERM_LIMIT_MONTHS);
+    const expectedEndDate =
+      current.expectedEndDate === null || current.expectedEndDate > cap ? cap : current.expectedEndDate;
+
+    await this.repo.markGranted(tx, assignmentId, {
+      grantedOn,
+      expectedEndDate: current.expectedEndDate === null ? null : expectedEndDate,
+    });
   }
 
   /** The seats bought, taken and free on today in the organization calendar. Throws SeatTargetNotFoundError. */

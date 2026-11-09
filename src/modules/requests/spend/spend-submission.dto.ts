@@ -1,6 +1,7 @@
 import { createZodDto } from '../../../infrastructure/http/dto/zod-dto';
 import { z } from 'zod';
 import { successEnvelopeSchema } from '../../../infrastructure/http/dto/success-envelope.dto';
+import { businessDate } from '../../../infrastructure/http/dto/business-date.dto';
 import { requestStateSchema } from '../access-request/access-request.dto';
 
 const text = (max: number) => z.string().trim().min(1).max(max);
@@ -27,10 +28,16 @@ export const supplementBodySchema = z
       .min(1)
       .max(100)
       .refine((ids) => new Set(ids).size === ids.length, { message: 'A person is named once.' })
-      .meta({ uniqueItems: true }),
+      .meta({ uniqueItems: true })
+      .optional(),
+    /** An earlier day the right ends than the request has (a request with no end may be given one); the price is made again for it. */
+    expectedEndDate: businessDate.optional(),
     reason: text(1000),
   })
-  .meta({ description: 'The people of the group the head leaves out, and why.' });
+  .refine((body) => body.dropEmployeeIds !== undefined || body.expectedEndDate !== undefined, {
+    message: 'Name the people to leave out, an earlier end date, or both.',
+  })
+  .meta({ description: 'The people of the group the head leaves out and/or an earlier end date, and why.' });
 
 const pageQuery = {
   page: z.coerce.number().int().positive().default(1),
@@ -109,6 +116,8 @@ const supplementSchema = z.strictObject({
   changedBy: employeeRef,
   createdAt: z.iso.datetime(),
   budgetYear: z.strictObject({ before: z.number().int(), after: z.number().int() }),
+  /** The day the right ends before and after the file; null for a right with no end. */
+  expectedEndDate: z.strictObject({ before: z.string().nullable(), after: z.string().nullable() }),
   amount: z.strictObject({ before: money, after: money }),
   /** How many people of a request for a group the file left out (who they are: the lines that ended as DROPPED); 0 for any other file. */
   droppedCount: z.number().int().nonnegative(),

@@ -58,8 +58,8 @@ export class SupplementRecorder {
           request.id,
           {
             number: saved.number,
-            beforeExpectedSpendOn: saved.beforeExpectedSpendOn ?? '',
-            afterExpectedSpendOn: saved.afterExpectedSpendOn ?? '',
+            beforeExpectedEndDate: saved.beforeExpectedEndDate,
+            afterExpectedEndDate: saved.afterExpectedEndDate,
             beforeBudgetYear: saved.beforeBudgetYear ?? 0,
             afterBudgetYear: saved.afterBudgetYear ?? 0,
             beforeAmountMinor: saved.beforeAmountMinor ?? 0n,

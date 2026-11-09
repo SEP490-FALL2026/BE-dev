@@ -8,7 +8,6 @@ import {
   AccessRequestNotDraftError,
   AccessRequestNotFoundError,
   AccessRequestSuperAdminCannotRequestError,
-  AccessRequestTermBeyondLimitError,
 } from '../access-request/access-request.errors';
 import { hasSpendStep, mayRequest } from '../access-request/access-request.policy';
 import { AccessRequestRepo } from '../access-request/access-request.repo';
@@ -73,16 +72,12 @@ export class ServiceAccountRequestService {
       const assessed = await this.assessment.assess(tx, {
         employeeId: actor.employeeId,
         planId: body.planId,
-        termMonths: body.termMonths,
         now,
         settings,
         lockDepartment: true,
         // The seat it ends in is charged to the Unit of the department, free or not (`QĐ-86a`).
         chargedToUnit: true,
       });
-      if (assessed.termBeyondLimit) {
-        throw new AccessRequestTermBeyondLimitError(assessed.termLimit.maxMonths);
-      }
       const refusal = submitRefusal({
         baselineClosed: baseline.closed,
         provisioningType: assessed.target.provisioningType,
@@ -105,7 +100,7 @@ export class ServiceAccountRequestService {
         departmentId: unit.departmentId,
         costCenterId: unit.costCenter?.id ?? null,
         businessReason: body.businessReason,
-        termMonths: body.termMonths,
+        termMonths: null,
         pricing,
         policy,
         createdByAppUserId: actor.appUserId,
@@ -140,7 +135,6 @@ export class ServiceAccountRequestService {
             branch: policy.branch,
             state,
             planId: body.planId,
-            termMonths: body.termMonths,
             requesterEmployeeId: actor.employeeId,
             beneficiaryEmployeeIds: [actor.employeeId],
             departmentId: unit.departmentId,
@@ -152,7 +146,7 @@ export class ServiceAccountRequestService {
             amountMinor: pricing.amount?.amountMinor.toString() ?? null,
             amountCurrency: pricing.amount?.currency ?? null,
             budgetYear: pricing.budgetYear,
-            expectedSpendOn: pricing.expectedSpendOn,
+            expectedEndDate: pricing.expectedEndDate,
           },
         ),
       );

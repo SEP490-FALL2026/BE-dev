@@ -1,7 +1,7 @@
 import type { Money } from '../../../core/money/money';
 import type { BusinessDate } from '../../../core/business-date';
 import type { AccessRequestBranchCode, RequestPolicy } from './access-request.policy';
-import type { BillingCycleCode, MissingPriceReason, PaymentPeriod } from './pricing.policy';
+import type { BillingCycleCode, MissingPriceReason } from './pricing.policy';
 import type { WaitingReason } from './routing.policy';
 
 export type ReadableNeedWaitingReason = WaitingReason;
@@ -36,19 +36,22 @@ export type AccessRequestState =
 export type NeedStepState = 'PENDING' | 'WAITING' | 'APPROVED' | 'REJECTED' | 'CLOSED';
 export type DeciderRole = 'MANAGER' | 'SPENDING_APPROVER' | 'FALLBACK_APPROVER' | 'CONFLICT_SUBSTITUTE';
 
-/** What the request costs: nothing for internal software, a priced amount and its payments, or a missing price. */
+/** What the request costs: nothing for internal software, one amount for the year it is counted in (`QĐ-109`), or a missing price. */
 export interface PricingRecord {
   status: 'NOT_APPLICABLE' | 'PRICED' | 'MISSING';
   missingReason: MissingPriceReason | null;
   kind: 'RECURRING' | 'ONE_TIME' | null; // Pricing model: BR-MF1-07
-  expectedSpendOn: BusinessDate | null;
   budgetYear: number | null;
   expectedEndDate: BusinessDate | null; // Date the right ends; BR-MF1-06a
   amountMonths: number | null; // Months of term for calculation; BR-MF1-06
   amount: Money | null;
   unitPrice: Money | null;
   billingCycle: BillingCycleCode | null;
-  schedule: PaymentPeriod[] | null;
+  /**
+   * What the first year of a request to go on using would cost when it begins in the year after the day it is judged (`QĐ-109b`):
+   * shown to the approver, never held against a budget. Worked out when the amount is, not stored; null for any other request.
+   */
+  nextYearAmount: Money | null;
 }
 
 /** What the request of a service account adds to a request (`US-05-21`); neither a password nor a key is kept. */
@@ -95,7 +98,8 @@ export interface NewAccessRequest {
   /** Null only for a free internal request of a department that has no Cost Center in use (`QĐ-87g(2)`). */
   costCenterId: string | null;
   businessReason: string;
-  termMonths: number;
+  /** Written only by a request made before `QĐ-104a` (a term in months); a new request has an end date instead, or none. */
+  termMonths: number | null;
   pricing: PricingRecord;
   policy: RequestPolicy;
   expectedEndDate?: BusinessDate | null;

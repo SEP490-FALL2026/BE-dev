@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import type { BusinessDate } from '../../../core/business-date';
 import { fiscalYearOf } from '../../../core/fiscal-year';
+import { renewalStartOf } from '../../../core/term-limit';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { pricedPeople } from '../access-request/group-request.types';
 import { AccessRequestNotPriceableError } from '../access-request/access-request.errors';
@@ -17,10 +18,10 @@ const peopleOf = (request: AccessRequestRecord): number =>
     : request.beneficiaryEmployeeIds.length;
 
 /**
- * What a request costs when the day the money goes out is another day (`US-05-04` AC-16, `US-06-14` AC-13, AC-15): the price
- * of its plan in the catalog laid out from the new day, or the quote the IT Admin recorded, which may fix the day itself.
- * Software that is not priced yet stays so, with the new day and its budget year. It decides nothing: the head's supplementary
- * file and the approval of the need write what this returns.
+ * What a request costs on another day (`US-05-04` AC-16, `US-06-14` AC-13, AC-15, `QĐ-109e`): the price of its plan in the catalog
+ * worked out for the months left of the year of that day, or the quote the IT Admin recorded. Software that is not priced yet stays
+ * so, with the new day and its budget year. It decides nothing: the head's supplementary file and the approval of the need write
+ * what this returns.
  */
 @Injectable()
 export class RepricingService {
@@ -30,22 +31,20 @@ export class RepricingService {
     private readonly assessments: AssessmentReadRepo,
   ) {}
 
-  /** Throws AccessRequestNotPriceableError when the request has no price for that day. */
-  async reprice(
-    tx: DbTx,
-    request: AccessRequestRecord,
-    expectedSpendOn: BusinessDate,
-    context: { today: BusinessDate },
-  ): Promise<PricingRecord> {
+  /** Throws AccessRequestNotPriceableError when the request has no price for that day. `asOf` is the day the amount is worked out on. */
+  async reprice(tx: DbTx, request: AccessRequestRecord, asOf: BusinessDate): Promise<PricingRecord> {
     if (request.branch === 'PAID_IN_CATALOG' && request.planId !== null) {
+      // A request to go on using counts from the day the new period begins, to the end it asked for; there is no month in a year the period
+      // has not reached yet (`QĐ-109b`).
+      const { renewal } = request;
+
       return this.assessment.priceFor(tx, {
         planId: request.planId,
-        departmentId: request.departmentId,
         free: false,
-        termMonths: request.termMonths,
         beneficiaries: peopleOf(request),
-        expectedSpendOn,
-        today: context.today,
+        checkDate: asOf,
+        endDate: renewal ? renewal.newExpectedEndDate : request.expectedEndDate,
+        from: renewal ? renewalStartOf({ previousEnd: renewal.previousExpectedEndDate, today: asOf }) : undefined,
       });
     }
     if (request.branch !== 'NEW_SOFTWARE') throw new AccessRequestNotPriceableError();
@@ -56,21 +55,20 @@ export class RepricingService {
         status: 'MISSING',
         missingReason: 'AWAITING_QUOTE',
         kind: null,
-        expectedSpendOn,
-        expectedEndDate: null,
+        expectedEndDate: request.expectedEndDate,
         amountMonths: null,
-        budgetYear: fiscalYearOf(expectedSpendOn),
+        budgetYear: fiscalYearOf(asOf),
         amount: null,
         unitPrice: null,
         billingCycle: null,
-        schedule: null,
+        nextYearAmount: null,
       };
     }
     try {
       return this.quotes.price(
         assessment.quote,
-        { termMonths: request.termMonths, beneficiaries: peopleOf(request), expectedSpendOn },
-        context,
+        { beneficiaries: peopleOf(request), endDate: request.expectedEndDate },
+        { checkDate: asOf },
       );
     } catch (error) {
       if (error instanceof AssessmentIncompleteError || error instanceof AssessmentQuoteRefusedError) {

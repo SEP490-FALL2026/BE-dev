@@ -41,6 +41,8 @@ model LicenseAssignment {
   validFromBasis              AssignmentDateBasis @map("valid_from_basis")
   validUntil                  DateTime?           @map("valid_until") @db.Date
   expectedEndDate             DateTime?           @map("expected_end_date") @db.Date
+  // The day the task of the grant was completed: the day the right really begins (`BR-MF1-06a`); null until then and for a seat that was not granted by a task.
+  grantedOn                   DateTime?           @map("granted_on") @db.Date
   // Set once when the grant it was made for is closed as failed: the period is then empty, so no seat is taken.
   failedAt                    DateTime?           @map("failed_at") @db.Timestamptz(3)
   // Set once when the grant it was made for was cancelled because the request was withdrawn: the period is empty as well.

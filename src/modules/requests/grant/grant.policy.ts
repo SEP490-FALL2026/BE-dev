@@ -50,8 +50,9 @@ export function grantAnswerFor(
           departmentId: request.departmentId,
           expectedEndDate,
           termMonths: request.termMonths,
-          // Free internal software has no end by term; anything that costs money ends with its term.
-          termBound: request.branch !== 'INTERNAL_FREE',
+          // A right ends only when the request names the day (`QĐ-104a`); a request made before that, with a term in months, keeps ending
+          // with its term unless it is free internal software.
+          termBound: expectedEndDate !== null || (request.termMonths > 0 && request.branch !== 'INTERNAL_FREE'),
         };
       }
       if (serviceAccount.boundaryState !== 'ACCEPTED') return { status: 'BOUNDARY_NOT_CHECKED' };

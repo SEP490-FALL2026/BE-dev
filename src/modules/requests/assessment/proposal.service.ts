@@ -3,7 +3,11 @@ import { TransactionRunner } from '../../../infrastructure/database/transaction-
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../../audit/public/audit.api';
 import { accessRequestAuditEvent } from '../access-request/access-request-audit-event.mapper';
-import { AccessRequestSuperAdminCannotRequestError } from '../access-request/access-request.errors';
+import {
+  AccessRequestEndDateOutOfRangeError,
+  AccessRequestSuperAdminCannotRequestError,
+  AccessRequestTermRequiredError,
+} from '../access-request/access-request.errors';
 import { hasSpendStep, mayRequest } from '../access-request/access-request.policy';
 import { AccessRequestRepo } from '../access-request/access-request.repo';
 import type { AccessRequestRecord } from '../access-request/access-request.types';
@@ -11,6 +15,12 @@ import { RequestSenderService } from '../request-intake/request-sender.service';
 import { AssessmentRepo } from './assessment.repo';
 import { RequestFactsService } from '../access-request/request-facts.service';
 import type { ProposalBodyDto } from './assessment.dto';
+
+/** Throws AccessRequestEndDateOutOfRangeError and AccessRequestTermRequiredError (`US-05-23` AC-9, `FR-2.8`). */
+function assertTermAllowed(assessed: { endDateOutOfRange: boolean; maxEndDate: string; termRequired: boolean }): void {
+  if (assessed.endDateOutOfRange) throw new AccessRequestEndDateOutOfRangeError(assessed.maxEndDate);
+  if (assessed.termRequired) throw new AccessRequestTermRequiredError();
+}
 
 /**
  * Sending a proposal of software that is not in the catalog (`US-05-06` AC-1, `US-05-02` AC-8): the Employee names it,
@@ -39,12 +49,15 @@ export class ProposalService {
       const employee = await this.sender.lockEligible(tx, actor);
 
       const now = new Date();
+      const expectedEndDate = body.expectedEndDate ?? null;
       const assessed = await this.assessment.assessProposal(tx, {
         employeeId: actor.employeeId,
+        expectedEndDate: expectedEndDate,
         now,
         settings,
         lockDepartment: true,
       });
+      assertTermAllowed(assessed);
       const { unit, policy, pricing, routing } = assessed;
       const { decision, departmentHeadEmployeeId } = routing;
       const assigned = decision.outcome === 'ASSIGNED';
@@ -60,7 +73,8 @@ export class ProposalService {
         departmentId: unit.departmentId,
         costCenterId: unit.costCenter.id,
         businessReason: body.purpose,
-        termMonths: body.termMonths,
+        termMonths: null,
+        expectedEndDate: expectedEndDate,
         pricing,
         policy,
         createdByAppUserId: actor.appUserId,
@@ -96,7 +110,7 @@ export class ProposalService {
             planId: null,
             softwareName: body.softwareName,
             expectedUsers: body.expectedUsers,
-            termMonths: body.termMonths,
+            expectedEndDate: expectedEndDate,
             requesterEmployeeId: actor.employeeId,
             beneficiaryEmployeeIds: [actor.employeeId],
             departmentId: unit.departmentId,
@@ -106,7 +120,6 @@ export class ProposalService {
             slaWorkingDays: policy.slaWorkingDays,
             pricingStatus: pricing.status,
             budgetYear: pricing.budgetYear,
-            expectedSpendOn: pricing.expectedSpendOn,
           },
         ),
       );

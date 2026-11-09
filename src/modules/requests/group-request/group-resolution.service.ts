@@ -87,18 +87,11 @@ export class GroupResolutionService {
   private async keepPriceInStep(tx: DbTx, request: AccessRequestRecord, now: Date): Promise<void> {
     const { pricing } = request;
     const people = pricedPeople(request.lines.map((line) => line.state));
-    if (pricing.status !== 'PRICED' || pricing.unitPrice === null || pricing.schedule === null || people === 0) return;
-    const first = pricing.schedule[0];
-    if (
-      !first ||
-      pricing.expectedSpendOn === null ||
-      first.amountMinor / pricing.unitPrice.amountMinor === BigInt(people)
-    )
-      return;
+    if (pricing.status !== 'PRICED' || people === 0) return;
 
-    const repriced = await this.repricing.reprice(tx, request, pricing.expectedSpendOn, {
-      today: await this.organizationReads.businessToday(now, tx),
-    });
+    // The amount of the day for those who remain (`QĐ-109e`); written only when it differs from what the request already holds.
+    const repriced = await this.repricing.reprice(tx, request, await this.organizationReads.businessToday(now, tx));
+    if (repriced.status === 'PRICED' && repriced.amount?.amountMinor === pricing.amount?.amountMinor) return;
     await this.requests.setPricing(tx, request.id, repriced);
   }
 

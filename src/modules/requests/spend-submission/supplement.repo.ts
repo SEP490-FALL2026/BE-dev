@@ -8,8 +8,8 @@ export interface SupplementRecord {
   reason: string;
   changedByEmployeeId: string;
   createdAt: Date;
-  beforeExpectedSpendOn: BusinessDate | null;
-  afterExpectedSpendOn: BusinessDate | null;
+  beforeExpectedEndDate: BusinessDate | null;
+  afterExpectedEndDate: BusinessDate | null;
   beforeBudgetYear: number | null;
   afterBudgetYear: number | null;
   beforeAmountMinor: bigint | null;
@@ -41,8 +41,8 @@ export class SupplementRepo {
         reason: input.reason,
         changedByEmployeeId: input.changedByEmployeeId,
         createdAt: input.now,
-        beforeExpectedSpendOn: input.beforeExpectedSpendOn ? toDateColumn(input.beforeExpectedSpendOn) : null,
-        afterExpectedSpendOn: input.afterExpectedSpendOn ? toDateColumn(input.afterExpectedSpendOn) : null,
+        beforeExpectedEndDate: input.beforeExpectedEndDate ? toDateColumn(input.beforeExpectedEndDate) : null,
+        afterExpectedEndDate: input.afterExpectedEndDate ? toDateColumn(input.afterExpectedEndDate) : null,
         beforeBudgetYear: input.beforeBudgetYear,
         afterBudgetYear: input.afterBudgetYear,
         beforeAmountMinor: input.beforeAmountMinor,
@@ -69,8 +69,8 @@ export class SupplementRepo {
     reason: string;
     changedByEmployeeId: string;
     createdAt: Date;
-    beforeExpectedSpendOn: Date | null;
-    afterExpectedSpendOn: Date | null;
+    beforeExpectedEndDate: Date | null;
+    afterExpectedEndDate: Date | null;
     beforeBudgetYear: number | null;
     afterBudgetYear: number | null;
     beforeAmountMinor: bigint | null;
@@ -82,8 +82,8 @@ export class SupplementRepo {
       reason: row.reason,
       changedByEmployeeId: row.changedByEmployeeId,
       createdAt: row.createdAt,
-      beforeExpectedSpendOn: row.beforeExpectedSpendOn ? fromDateColumn(row.beforeExpectedSpendOn) : null,
-      afterExpectedSpendOn: row.afterExpectedSpendOn ? fromDateColumn(row.afterExpectedSpendOn) : null,
+      beforeExpectedEndDate: row.beforeExpectedEndDate ? fromDateColumn(row.beforeExpectedEndDate) : null,
+      afterExpectedEndDate: row.afterExpectedEndDate ? fromDateColumn(row.afterExpectedEndDate) : null,
       beforeBudgetYear: row.beforeBudgetYear ?? 0,
       afterBudgetYear: row.afterBudgetYear ?? 0,
       beforeAmountMinor: row.beforeAmountMinor ?? null,

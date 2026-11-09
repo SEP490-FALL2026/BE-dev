@@ -8,7 +8,8 @@ import {
   AccessRequestNotDraftError,
   AccessRequestNotFoundError,
   AccessRequestSuperAdminCannotRequestError,
-  AccessRequestTermBeyondLimitError,
+  AccessRequestEndDateOutOfRangeError,
+  AccessRequestTermRequiredError,
 } from '../access-request/access-request.errors';
 import { mayRequest } from '../access-request/access-request.policy';
 import { AccessRequestRepo } from '../access-request/access-request.repo';
@@ -87,7 +88,7 @@ export class AccessRequestService {
     const assessed = await this.assessment.assess(tx, {
       employeeId: actor.employeeId,
       planId: body.planId,
-      termMonths: body.termMonths,
+      expectedEndDate: body.expectedEndDate ?? null,
       now,
       settings,
       lockDepartment: true,
@@ -95,9 +96,8 @@ export class AccessRequestService {
     if (assessed.heldAccess && assessed.heldAccess.assignmentId !== options.toleratedSeatId) {
       throw new AccessRequestAlreadyHoldsAccessError(assessed.heldAccess);
     }
-    if (assessed.termBeyondLimit) {
-      throw new AccessRequestTermBeyondLimitError(assessed.termLimit.maxMonths);
-    }
+    if (assessed.endDateOutOfRange) throw new AccessRequestEndDateOutOfRangeError(assessed.maxEndDate);
+    if (assessed.termRequired) throw new AccessRequestTermRequiredError();
     const sent: SubmittedRequest = {
       actor,
       organizationId: employee.organizationId,

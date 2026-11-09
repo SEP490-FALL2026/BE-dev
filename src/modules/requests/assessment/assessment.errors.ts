@@ -32,11 +32,9 @@ export class AssessmentUncontrollableError extends Error {
   }
 }
 
-/** The quote cannot give the request an amount (`US-05-06` AC-14, AC-15): it is not in force, or it cannot be laid out. */
+/** The quote cannot give the request an amount (`US-05-06` AC-14): it is not in force, or it is too large. */
 export class AssessmentQuoteRefusedError extends Error {
-  constructor(
-    readonly reason: 'QUOTE_NOT_IN_FORCE' | 'QUOTE_PERIOD_INVALID' | 'PAYMENT_FREQUENCY_INVALID' | 'AMOUNT_TOO_LARGE',
-  ) {
+  constructor(readonly reason: 'QUOTE_NOT_IN_FORCE' | 'QUOTE_PERIOD_INVALID' | 'AMOUNT_TOO_LARGE') {
     super(`The quote cannot price the request: ${reason}.`);
     this.name = 'AssessmentQuoteRefusedError';
   }

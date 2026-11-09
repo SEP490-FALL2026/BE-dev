@@ -57,10 +57,11 @@ export class RenewalRequestWriter {
       employeeId: facts.employeeId,
       requesterEmployeeId: actor.employeeId,
       planId: facts.planId,
-      termMonths,
+      // The new period is priced from the day it begins to the end it asks for, in the year it is judged in (`QĐ-109b`, `QĐ-109e`).
+      expectedEndDate: newEnd,
+      pricingFrom: input.spendStartsOn,
       now,
       settings: input.settings,
-      expectedSpendOn: input.spendStartsOn,
       lockDepartment: true,
     });
     const organizationId = (await this.requireOrganization(tx)).id;

@@ -11,7 +11,7 @@ describe('draftPolicyJson (access_requests.policy of a draft)', () => {
     expect(draftPolicyJson.decode(JSON.parse(JSON.stringify(stored)))).toEqual(stored);
   });
 
-  it('reads an old draft without forwarding the retired project label', () => {
+  it('reads an old draft without forwarding the retired project label or the retired term in months (QĐ-104a)', () => {
     const policy = {
       draft: {
         kind: 'INDIVIDUAL',
@@ -23,7 +23,7 @@ describe('draftPolicyJson (access_requests.policy of a draft)', () => {
     };
     expect(contentOf({ id: 'draft-1', policy })).toEqual({
       kind: 'INDIVIDUAL',
-      body: { planId: policy.draft.planId, businessReason: 'Work', termMonths: 3 },
+      body: { planId: policy.draft.planId, businessReason: 'Work' },
     });
     expect(policy.draft.projectLabel).toBe('old');
   });

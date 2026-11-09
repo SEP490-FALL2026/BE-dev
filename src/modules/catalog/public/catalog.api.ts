@@ -100,11 +100,11 @@ export class CatalogApi {
   }
 
   /**
-   * What a plan is bought at for a department (unit price and billing cycle), from the newest priced active subscription that
-   * department owns; null when it has none. The price of another department's subscription is never used.
+   * What a plan is bought at (kind, unit price and billing cycle), from the main subscription of the plan: the newest priced
+   * active one; null when it has none. It is the plan's price whatever department asks (S1-02).
    */
-  getPlanPrice(planId: string, ownerDepartmentId: string, tx?: DbTx) {
-    return this.subscriptions.priceOfPlan(planId, ownerDepartmentId, tx);
+  getPlanPrice(planId: string, tx?: DbTx) {
+    return this.subscriptions.priceOfPlan(planId, tx);
   }
 
   /** The subscriptions of the plan a seat can be taken from today: the shared pool of the plan (`QĐ-103d`). */

@@ -13,7 +13,8 @@ import {
   AccessRequestNotDraftError,
   AccessRequestRoleRequiredError,
   AccessRequestSuperAdminCannotRequestError,
-  AccessRequestTermBeyondLimitError,
+  AccessRequestEndDateOutOfRangeError,
+  AccessRequestTermRequiredError,
   AccessRequestGroupUsesLinesError,
   AccessRequestApplicationRetiredError,
   AccessRequestDecisionRefusedError,
@@ -72,12 +73,15 @@ export function toAccessRequestApiException(error: unknown): unknown {
     );
   }
 
-  if (error instanceof AccessRequestTermBeyondLimitError) {
+  if (error instanceof AccessRequestEndDateOutOfRangeError) {
     return new ApiException(HttpStatus.UNPROCESSABLE_ENTITY, {
-      code: 'ACCESS_REQUEST.TERM_BEYOND_LIMIT',
+      code: 'ACCESS_REQUEST.END_DATE_OUT_OF_RANGE',
       message: error.message,
-      details: { maxMonths: error.maxMonths },
+      details: { maxEndDate: error.maxEndDate },
     });
+  }
+  if (error instanceof AccessRequestTermRequiredError) {
+    return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'ACCESS_REQUEST.TERM_REQUIRED', error.message);
   }
   if (error instanceof AccessRequestAlreadyHoldsAccessError) {
     return new ApiException(HttpStatus.CONFLICT, {
@@ -146,7 +150,8 @@ export const ACCESS_REQUEST_ERROR_EXAMPLES = {
   NOT_FOUND: example(new AccessRequestNotFoundError()),
   PLAN_NOT_FOUND: example(new AccessRequestPlanNotFoundError()),
   APPLICATION_RETIRED: example(new AccessRequestApplicationRetiredError()),
-  TERM_BEYOND_LIMIT: example(new AccessRequestTermBeyondLimitError(12)),
+  END_DATE_OUT_OF_RANGE: example(new AccessRequestEndDateOutOfRangeError('2027-11-09')),
+  TERM_REQUIRED: example(new AccessRequestTermRequiredError()),
   NO_DEPARTMENT: example(new AccessRequestNoDepartmentError()),
   REQUEST_PARTY_INELIGIBLE: example(
     new RequestPartyIneligibleError({

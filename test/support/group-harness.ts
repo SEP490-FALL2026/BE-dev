@@ -84,8 +84,7 @@ export class GroupHarness extends StatusHarness {
     planId,
     lines: people.map((person) => ({ employeeId: person.employeeId })),
     businessReason: 'The new brand needs the shared workspace',
-    termMonths: 12,
-    ...extra,
+    ...this.endDated(extra),
   });
 
   checkGroup = (body: object, account: ApiAccount) =>

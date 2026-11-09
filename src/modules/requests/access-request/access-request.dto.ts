@@ -1,23 +1,21 @@
 import { createZodDto } from '../../../infrastructure/http/dto/zod-dto';
 import { z } from 'zod';
 import { successEnvelopeSchema } from '../../../infrastructure/http/dto/success-envelope.dto';
+import { businessDate } from '../../../infrastructure/http/dto/business-date.dto';
 
 /** The longest note of a reason or a label a request keeps; the DTO bounds the request with them. */
 export const REASON_MAX_LENGTH = 1000;
-/** The longest term a request may ask for, in months (`QĐ-98`): a year, so a long stay is renewed, not confirmed. */
-export const TERM_MONTHS_MAX = 12;
-/** The longest commitment of a quote the IT Admin enters, in months: a bound against a typo. */
-export const COMMITMENT_MONTHS_MAX = 120;
 
 /**
- * `BM-01` as the person sending it fills it (`US-01-12` AC-1, `US-05-02` AC-6): the plan, the reason and the term are
- * required, and the project is context only. Nothing
- * here chooses the branch, the Cost Center or who decides: the system fixes them from the plan and the department.
+ * `BM-01` as the person sending it fills it (`US-01-12` AC-1, `US-05-02` AC-6): the plan and the reason are required, the day the
+ * right ends is optional (a right has no end unless the sender gives one, at most a year away, and a contractor, a freelancer or an
+ * intern must give it, `QĐ-104a`, `FR-2.8`). Nothing here chooses the branch, the Cost Center or who decides: the system fixes
+ * them from the plan and the department.
  */
 export const submitBodySchema = z.strictObject({
   planId: z.uuid(),
   businessReason: z.string().trim().min(1).max(REASON_MAX_LENGTH),
-  termMonths: z.number().int().min(1).max(TERM_MONTHS_MAX),
+  expectedEndDate: businessDate.optional(),
 });
 /**
  * The decision of the need step: a refusal gives its reason (`BR-07.5`), and nothing else is accepted: there is no signature or certificate to attach
@@ -93,10 +91,10 @@ export const pricingSchema = z.strictObject({
   amount: moneySchema.nullable(),
   unitPrice: moneySchema.nullable(),
   billingCycle: z.enum(['MONTHLY', 'QUARTERLY', 'ANNUAL', 'OTHER']).nullable(),
-  periodCount: z.number().int().positive().nullable(),
-  bindingPeriodCount: z.number().int().nonnegative().nullable(),
-  firstDueOn: z.string().nullable(),
-  lastDueOn: z.string().nullable(),
+  kind: z.enum(['RECURRING', 'ONE_TIME']).nullable(),
+  months: z.number().int().min(0).max(12).nullable(),
+  monthlyPrice: moneySchema.nullable(),
+  nextYearAmount: moneySchema.nullable(),
 });
 
 export const requestStateSchema = z.enum([
@@ -151,8 +149,9 @@ export const requestSchema = z.strictObject({
   /** How many people the request is for: 1 for any request but one for a group. */
   lineCount: z.number().int().positive(),
   businessReason: z.string(),
-  termMonths: z.number().int().positive(),
-  /** The day the access of a person who is not staff ends; null for staff. */
+  /** Only a request made before `QĐ-104a` has a term in months; a new one has an end date or none. */
+  termMonths: z.number().int().positive().nullable(),
+  /** The day the right ends, as the sender chose it; null for a right with no end. */
   expectedEndDate: z.string().nullable(),
   /**
    * What a request for a service account adds: why the account exists, the identifier its sender expects (a hint: the IT

@@ -1,4 +1,7 @@
 import request from 'supertest';
+import { addDays } from '../../../src/core/business-date';
+import { effectiveEndOf } from '../../../src/core/term-limit';
+import { maxEndDateOf, monthsBetween } from '../../../src/modules/requests/access-request/pricing.policy';
 import { AccessRequestWire, Department, Person, RequestHarness } from '../../support/request-harness';
 
 const h = new RequestHarness();
@@ -40,12 +43,23 @@ describe('requests over HTTP: the preview before sending (integration, real Post
 
   describe('paid software that has a price (AC-1, AC-3)', () => {
     it('shows the amount, the chain with who holds each step, and the time of every step', async () => {
+      const today = h.today();
+      const end = effectiveEndOf({ start: today, months: 6 });
+      const yearEnd = `${today.slice(0, 4)}-12-31`;
+      // BR-MF1-06: the months left of the year, the month it starts counted whole, to the end date at the latest.
+      const months = monthsBetween(today, end < yearEnd ? end : yearEnd);
       const preview = await h.previewed(designer, paidPlan, { termMonths: 6 });
 
       expect(preview).toMatchObject({
         branch: 'PAID_IN_CATALOG',
-        termMonths: 6,
-        pricing: { status: 'PRICED', amount: { amount: '6000000', currency: 'VND' }, periodCount: 6 },
+        expectedEndDate: end,
+        pricing: {
+          status: 'PRICED',
+          kind: 'RECURRING',
+          months,
+          amount: { amount: String(1_000_000 * months), currency: 'VND' },
+        },
+        annualVendorAmount: { amount: '12000000', currency: 'VND' },
         spendSubmission: 'ALLOWED',
         canSubmit: true,
         totalExpectedWorkingDays: 8,
@@ -148,14 +162,17 @@ describe('requests over HTTP: the preview before sending (integration, real Post
     });
   });
 
-  describe('a term over twelve months (AC-4)', () => {
-    it('is refused by the body (422), and a year or less shows the limit of the plan', async () => {
-      const edge = await h.previewed(designer, paidPlan, { termMonths: 12 });
+  describe('an end date more than a year away (US-05-23 AC-9)', () => {
+    it('shows the last day a right may end, and sending a later one is refused (422)', async () => {
+      const edge = await h.previewed(designer, paidPlan, { expectedEndDate: maxEndDateOf(h.today()) });
       const short = await h.previewed(designer, paidPlan, { termMonths: 6 });
 
-      const over = await h.previewRequest({ planId: paidPlan, termMonths: 13 }, designer.account).expect(422);
-      expect(h.codeOf(over)).toBe('VALIDATION_ERROR');
-      expect(edge.termLimit.maxMonths).toBe(12);
+      const over = await h.submit(
+        h.form(paidPlan, { expectedEndDate: addDays(maxEndDateOf(h.today()), 1) }),
+        designer.account,
+      );
+      expect([over.status, h.codeOf(over)]).toEqual([422, 'ACCESS_REQUEST.END_DATE_OUT_OF_RANGE']);
+      expect(edge.maxEndDate).toBe(maxEndDateOf(h.today()));
       expect(edge.canSubmit).toBe(true);
       expect(kinds(edge)).toEqual(kinds(short));
     });
@@ -206,7 +223,7 @@ describe('requests over HTTP: the preview before sending (integration, real Post
       const sent = await h.sent(designer, paidPlan);
 
       expect(Object.keys(preview)).not.toContain('outsideStandard');
-      expect(preview.termLimit.maxMonths).toBe(12);
+      expect(preview.maxEndDate).toBe(maxEndDateOf(h.today()));
       expect([old.status, h.codeOf(old)]).toEqual([422, 'VALIDATION_ERROR']);
       expect([bare.status, h.codeOf(bare)]).toEqual([422, 'VALIDATION_ERROR']);
       expect(await h.requestRows()).toBe(rows + 1);

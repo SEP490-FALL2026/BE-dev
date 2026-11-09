@@ -23,9 +23,6 @@ function toQuote(row: Row): Quote | null {
     billingCycle: row.quoteBillingCycle,
     validFrom: fromDateColumn(row.quoteValidFrom),
     validUntil: row.quoteValidUntil ? fromDateColumn(row.quoteValidUntil) : null,
-    commitmentMonths: row.commitmentMonths,
-    paymentFrequency: row.paymentFrequency,
-    firstPaymentOn: row.firstPaymentOn ? fromDateColumn(row.firstPaymentOn) : null,
   };
 }
 

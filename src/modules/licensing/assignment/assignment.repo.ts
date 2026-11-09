@@ -144,6 +144,20 @@ export class AssignmentRepo {
     return this.find(id, tx);
   }
 
+  /**
+   * Records the day the task of the grant was completed, with the end the seat has from then on: the end it asked for, at the latest a
+   * year after that day (`QĐ-106b`). The only write of `granted_on`, once, when the task completes.
+   */
+  async markGranted(tx: DbTx, id: string, input: { grantedOn: BusinessDate; expectedEndDate: BusinessDate | null }) {
+    await tx.licenseAssignment.update({
+      where: { id },
+      data: {
+        grantedOn: toDateColumn(input.grantedOn),
+        expectedEndDate: input.expectedEndDate ? toDateColumn(input.expectedEndDate) : null,
+      },
+    });
+  }
+
   /** Ends the assignment the day `until` (that day no longer counts). */
   async end(tx: DbTx, id: string, until: BusinessDate): Promise<void> {
     await tx.licenseAssignment.update({ where: { id }, data: { validUntil: toDateColumn(until) } });

@@ -8,7 +8,7 @@ import {
 const base = (decision: unknown, extra: Partial<SubmittedRequest> = {}): SubmittedRequest => ({
   actor: { employeeId: 'emp-1', appUserId: 'user-1' },
   organizationId: 'org-1',
-  body: { planId: 'plan-1', termMonths: 6, businessReason: 'Cần cho dự án' },
+  body: { planId: 'plan-1', businessReason: 'Cần cho dự án' },
   assessed: {
     unit: { departmentId: 'dep-1', costCenter: { id: 'cc-1' } },
     policy: { branch: 'PAID_IN_CATALOG', version: 3, slaWorkingDays: 2, chain: ['NEED', 'SPEND_APPROVAL'] },
@@ -16,7 +16,6 @@ const base = (decision: unknown, extra: Partial<SubmittedRequest> = {}): Submitt
       status: 'COMPUTED',
       amount: { amountMinor: 1200n, currency: 'VND' },
       budgetYear: 2026,
-      expectedSpendOn: '2026-11-01',
     },
     routing: { decision, departmentHeadEmployeeId: 'head-1' },
   } as unknown as SubmittedRequest['assessed'],
@@ -83,7 +82,7 @@ describe('the row, and the audit entries, of a request that is sent (US-05-02, U
       branch: 'PAID_IN_CATALOG',
       state: 'PENDING',
       planId: 'plan-1',
-      termMonths: 6,
+      expectedEndDate: null,
       requesterEmployeeId: 'emp-1',
       beneficiaryEmployeeIds: ['emp-1'],
       departmentId: 'dep-1',
@@ -95,7 +94,6 @@ describe('the row, and the audit entries, of a request that is sent (US-05-02, U
       amountMinor: '1200',
       amountCurrency: 'VND',
       budgetYear: 2026,
-      expectedSpendOn: '2026-11-01',
     });
   });
 

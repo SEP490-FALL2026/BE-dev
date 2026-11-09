@@ -8,7 +8,7 @@ import type { Assessment } from '../access-request/request-facts.service';
 export interface SubmittedRequest {
   actor: { employeeId: string; appUserId: string };
   organizationId: string;
-  body: Pick<SubmitBodyDto, 'planId' | 'termMonths' | 'businessReason'>;
+  body: Pick<SubmitBodyDto, 'planId' | 'expectedEndDate' | 'businessReason'>;
   assessed: Pick<Assessment, 'unit' | 'policy' | 'pricing' | 'routing'>;
   now: Date;
   /** The draft the request is sent from: its row becomes the request. */
@@ -36,8 +36,8 @@ export function newRequestOf(facts: SubmittedRequest): NewAccessRequest {
     departmentId: unit.departmentId,
     costCenterId: unit.costCenter?.id ?? null,
     businessReason: body.businessReason,
-    termMonths: body.termMonths,
-    expectedEndDate: null,
+    termMonths: null,
+    expectedEndDate: body.expectedEndDate ?? null,
     pricing,
     policy,
     createdByAppUserId: actor.appUserId,
@@ -63,7 +63,7 @@ export function submittedAuditDetail(facts: SubmittedRequest): { [key: string]: 
     branch: policy.branch,
     state: startState(assessed.routing),
     planId: body.planId,
-    termMonths: body.termMonths,
+    expectedEndDate: body.expectedEndDate ?? null,
     requesterEmployeeId: actor.employeeId,
     beneficiaryEmployeeIds: [actor.employeeId],
     departmentId: unit.departmentId,
@@ -75,7 +75,6 @@ export function submittedAuditDetail(facts: SubmittedRequest): { [key: string]: 
     amountMinor: pricing.amount?.amountMinor.toString() ?? null,
     amountCurrency: pricing.amount?.currency ?? null,
     budgetYear: pricing.budgetYear,
-    expectedSpendOn: pricing.expectedSpendOn,
   };
 }
 

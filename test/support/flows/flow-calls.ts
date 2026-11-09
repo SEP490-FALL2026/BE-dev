@@ -89,7 +89,6 @@ export class FlowCalls {
     const response = await this.post(code, '/access-requests', {
       planId,
       businessReason: 'Cần cho công việc của nhóm',
-      termMonths: 1,
       ...extra,
     });
     if (response.status !== 201)

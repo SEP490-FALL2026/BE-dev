@@ -306,8 +306,7 @@ export class SpendHarness extends BudgetHarness {
         planId,
         lines: people.map((person) => ({ employeeId: person.employeeId })),
         businessReason: 'The new designers need the tool',
-        termMonths: 1,
-        ...extra,
+        ...this.endDated({ termMonths: 1, ...extra }),
       });
   }
 

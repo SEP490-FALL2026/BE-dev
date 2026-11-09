@@ -10,7 +10,9 @@ import {
   assertDeclarableCycle,
   assertPoolTerms,
   assertResponsibleNamed,
+  pickPriceSource,
   poolWarnings,
+  type PriceSource,
 } from './subscription-pool.policy';
 
 describe('the rules of the shared pool on a write (QĐ-103e, QĐ-104d(3), R-E01, R-G01)', () => {
@@ -89,5 +91,53 @@ describe('the rules of the shared pool on a write (QĐ-103e, QĐ-104d(3), R-E01,
       'RESPONSIBLE_MISSING',
       'BILLING_CYCLE_LEGACY',
     ]);
+  });
+});
+
+describe('BR-MF1-07: the subscription that gives a plan its price (Q-04 C)', () => {
+  const source = (over: Partial<PriceSource> & { id: string }): PriceSource => ({
+    isPrimaryForPlan: false,
+    unitPriceMinor: 1000n,
+    billingCycle: 'MONTHLY',
+    startDate: '2026-01-01',
+    ...over,
+  });
+
+  it('is the one flagged primary, whatever the others cost', () => {
+    const chosen = pickPriceSource([
+      source({ id: 'a', unitPriceMinor: 9000n }),
+      source({ id: 'b', isPrimaryForPlan: true, unitPriceMinor: 100n }),
+    ]);
+
+    expect(chosen?.id).toBe('b');
+  });
+
+  it('with no flag is the one with the highest price a month: an annual price is compared by a twelfth', () => {
+    expect(
+      pickPriceSource([
+        source({ id: 'monthly', unitPriceMinor: 1000n }),
+        source({ id: 'annual', billingCycle: 'ANNUAL', unitPriceMinor: 15_000n }),
+        source({ id: 'quarterly', billingCycle: 'QUARTERLY', unitPriceMinor: 2000n }),
+      ])?.id,
+    ).toBe('annual');
+  });
+
+  it('on a tie takes the older start date, a missing one last, then the smaller id', () => {
+    expect(
+      pickPriceSource([
+        source({ id: 'new', startDate: '2026-06-01' }),
+        source({ id: 'old', startDate: '2026-02-01' }),
+        source({ id: 'none', startDate: null }),
+      ])?.id,
+    ).toBe('old');
+    expect(pickPriceSource([source({ id: 'b' }), source({ id: 'a' })])?.id).toBe('a');
+  });
+
+  it('puts a cycle that is not in months after the ones that are, and is null for no subscription', () => {
+    expect(
+      pickPriceSource([source({ id: 'other', billingCycle: 'OTHER', unitPriceMinor: 10n ** 9n }), source({ id: 'm' })])
+        ?.id,
+    ).toBe('m');
+    expect(pickPriceSource([])).toBeNull();
   });
 });

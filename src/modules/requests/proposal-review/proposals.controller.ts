@@ -190,14 +190,8 @@ export class ProposalsController {
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
-        'The assessment lacks fields, with the names in details.missing (ASSESSMENT.INCOMPLETE), or the quote cannot price the request (ASSESSMENT.QUOTE_NOT_IN_FORCE, PAYMENT_FREQUENCY_INVALID, AMOUNT_TOO_LARGE). Nothing is written and the request stays with the IT Admin.',
-      examples: [
-        VALIDATION_EXAMPLE,
-        EXAMPLES.INCOMPLETE,
-        EXAMPLES.QUOTE_NOT_IN_FORCE,
-        EXAMPLES.PAYMENT_FREQUENCY_INVALID,
-        EXAMPLES.AMOUNT_TOO_LARGE,
-      ],
+        'The assessment lacks fields, with the names in details.missing (ASSESSMENT.INCOMPLETE), or the quote cannot price the request (ASSESSMENT.QUOTE_NOT_IN_FORCE, AMOUNT_TOO_LARGE). Nothing is written and the request stays with the IT Admin.',
+      examples: [VALIDATION_EXAMPLE, EXAMPLES.INCOMPLETE, EXAMPLES.QUOTE_NOT_IN_FORCE, EXAMPLES.AMOUNT_TOO_LARGE],
     },
   )
   async completeAssessment(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Param() params: RequestIdParamDto) {
@@ -269,7 +263,6 @@ export class ProposalsController {
         EXAMPLES.INCOMPLETE_DATA_SENSITIVITY,
         EXAMPLES.QUOTE_PERIOD_INVALID,
         EXAMPLES.QUOTE_NOT_IN_FORCE,
-        EXAMPLES.PAYMENT_FREQUENCY_INVALID,
         EXAMPLES.AMOUNT_TOO_LARGE,
         EXAMPLES.MONEY_SCALE_EXCEEDED,
         EXAMPLES.MONEY_OUT_OF_RANGE,

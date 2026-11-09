@@ -1,6 +1,4 @@
-import { JsonColumnShapeError } from '../../../infrastructure/database/json-column.errors';
-import { paymentScheduleJson } from './access-request.json';
-import { maxEndDateOf, monthsBetween, requestAmountOf, type PaymentPeriod, type PricingInput } from './pricing.policy';
+import { maxEndDateOf, monthsBetween, requestAmountOf, type PricingInput } from './pricing.policy';
 
 const SEAT = { amountMinor: 2000n, currency: 'USD' }; // 20.00 per seat per month
 
@@ -82,14 +80,6 @@ describe('BR-MF1-06: the amount of a request is the price of the months left of 
   it('is counted in the year of the check date: the day of 31/12 and the day of 01/01 fall in two years (R-I01)', () => {
     expect(requestAmountOf(input({ checkDate: '2026-12-31' }))).toMatchObject({ budgetYear: 2026, months: 1 });
     expect(requestAmountOf(input({ checkDate: '2027-01-01' }))).toMatchObject({ budgetYear: 2027, months: 12 });
-  });
-
-  it('is one payment, in the year it is counted in', () => {
-    const priced = requestAmountOf(input({ checkDate: '2026-11-10' }));
-
-    expect(priced.status === 'PRICED' && priced.periods).toEqual([
-      { dueOn: '2026-11-10', amountMinor: 4000n, budgetYear: 2026, binding: true },
-    ]);
   });
 });
 
@@ -202,64 +192,5 @@ describe('the months and the last day a right may end', () => {
   it('is the day before the same day twelve months later (US-05-23 AC-9)', () => {
     expect(maxEndDateOf('2026-11-10')).toBe('2027-11-09');
     expect(maxEndDateOf('2028-02-29')).toBe('2029-02-27');
-  });
-});
-
-describe('paymentScheduleJson (the codec of access_requests.payment_schedule)', () => {
-  const stored = [
-    { dueOn: '2026-11-30', amountMinor: '1200000', budgetYear: 2026, binding: true },
-    { dueOn: '2027-11-30', amountMinor: '1200000', budgetYear: 2027, binding: false },
-  ];
-
-  it('reads each payment with its amount as a big integer', () => {
-    const schedule: PaymentPeriod[] | null = paymentScheduleJson.decode(stored);
-
-    expect(schedule).toEqual([
-      { dueOn: '2026-11-30', amountMinor: 1_200_000n, budgetYear: 2026, binding: true },
-      { dueOn: '2027-11-30', amountMinor: 1_200_000n, budgetYear: 2027, binding: false },
-    ]);
-  });
-
-  it('lets a payment of a schedule written before quotes existed bind: the default is `true`, here and nowhere else', () => {
-    const [legacy] = paymentScheduleJson.decode([{ dueOn: '2025-03-31', amountMinor: '500', budgetYear: 2025 }]) ?? [];
-
-    expect(legacy.binding).toBe(true);
-  });
-
-  it('reads NULL as no schedule and an empty schedule as an empty one', () => {
-    expect(paymentScheduleJson.decode(null)).toBeNull();
-    expect(paymentScheduleJson.decode([])).toEqual([]);
-  });
-
-  it.each([
-    ['a missing field', [{ amountMinor: '1', budgetYear: 2026, binding: true }]],
-    ['an amount that is a number', [{ dueOn: '2026-11-30', amountMinor: 1200000, budgetYear: 2026 }]],
-    [
-      'an amount that is not a whole number of minor units',
-      [{ dueOn: '2026-11-30', amountMinor: '12.5', budgetYear: 2026 }],
-    ],
-    ['a date that is not a date', [{ dueOn: '2026-13-45', amountMinor: '1', budgetYear: 2026 }]],
-    ['a year that is text', [{ dueOn: '2026-11-30', amountMinor: '1', budgetYear: '2026' }]],
-    ['a schedule that is an object', { dueOn: '2026-11-30' }],
-  ])('refuses %s with the table and the column, and never the value', (_label, value) => {
-    expect(() => paymentScheduleJson.decode(value)).toThrow(JsonColumnShapeError);
-    expect(() => paymentScheduleJson.decode(value)).toThrow('access_requests.payment_schedule');
-    expect(() => paymentScheduleJson.decode(value)).not.toThrow(/12\.5|2026-13-45/);
-  });
-
-  // JSON has no big integers: the amounts go out as text, key for key as they were written before the codec.
-  it('writes the amounts as text and the same keys as the schedule has always been written with', () => {
-    const schedule: PaymentPeriod[] = [
-      { dueOn: '2026-11-30', amountMinor: 1_200_000n, budgetYear: 2026, binding: true },
-      { dueOn: '2027-11-30', amountMinor: 9_007_199_254_740_993n, budgetYear: 2027, binding: false },
-    ];
-
-    expect(paymentScheduleJson.encode(schedule)).toEqual([
-      { dueOn: '2026-11-30', amountMinor: '1200000', budgetYear: 2026, binding: true },
-      { dueOn: '2027-11-30', amountMinor: '9007199254740993', budgetYear: 2027, binding: false },
-    ]);
-    expect(paymentScheduleJson.decode(JSON.parse(JSON.stringify(paymentScheduleJson.encode(schedule))))).toEqual(
-      schedule,
-    );
   });
 });

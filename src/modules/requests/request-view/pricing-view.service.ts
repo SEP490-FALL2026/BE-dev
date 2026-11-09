@@ -4,6 +4,7 @@ import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { FinanceApi } from '../../finance/public/finance.api';
 import type { TaxEstimateBasis, TaxGroup } from '../../finance/public/finance.types';
 import type { PricingRecord } from '../access-request/access-request.types';
+import { monthlyPriceOf } from '../access-request/pricing.policy';
 
 export interface MoneyView {
   amount: string;
@@ -17,11 +18,14 @@ export interface PricingView {
   amount: MoneyView | null;
   unitPrice: MoneyView | null;
   billingCycle: 'MONTHLY' | 'QUARTERLY' | 'ANNUAL' | 'OTHER' | null;
-  periodCount: number | null;
-  /** The payments that bind the company; the others are forecasts that go the way of a renewal (`US-05-06` AC-15). */
-  bindingPeriodCount: number | null;
-  firstDueOn: string | null;
-  lastDueOn: string | null;
+  /** How the price is counted: by the month (`RECURRING`) or once (`ONE_TIME`, a key or a perpetual license). */
+  kind: 'RECURRING' | 'ONE_TIME' | null;
+  /** The months of the year the amount covers; null for a one-time price, 0 for a right that begins in a later year (`QĐ-109b`). */
+  months: number | null;
+  /** What one person costs a month, for showing; null for a one-time price. */
+  monthlyPrice: MoneyView | null;
+  /** The first year of a request to go on using that begins in the year after the day it is judged, shown and never held (`QĐ-109b`). */
+  nextYearAmount: MoneyView | null;
 }
 
 /**
@@ -50,7 +54,6 @@ export class PricingViewService {
     const units = await this.minorUnits(pricing.amount?.currency ?? pricing.unitPrice?.currency);
     const money = (value: { amountMinor: bigint; currency: string } | null): MoneyView | null =>
       value && { amount: formatAmount(value.amountMinor, units), currency: value.currency };
-    const schedule = pricing.schedule;
 
     return {
       status: pricing.status,
@@ -58,10 +61,13 @@ export class PricingViewService {
       amount: money(pricing.amount),
       unitPrice: money(pricing.unitPrice),
       billingCycle: pricing.billingCycle,
-      periodCount: schedule?.length ?? null,
-      bindingPeriodCount: schedule ? schedule.filter((period) => period.binding).length : null,
-      firstDueOn: schedule?.[0]?.dueOn ?? null,
-      lastDueOn: schedule?.[schedule.length - 1]?.dueOn ?? null,
+      kind: pricing.kind,
+      months: pricing.amountMonths,
+      monthlyPrice:
+        pricing.kind === 'RECURRING' && pricing.unitPrice
+          ? money(monthlyPriceOf({ unitPrice: pricing.unitPrice, billingCycle: pricing.billingCycle }))
+          : null,
+      nextYearAmount: money(pricing.nextYearAmount),
     };
   }
 

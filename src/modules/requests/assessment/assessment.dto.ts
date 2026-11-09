@@ -1,14 +1,7 @@
 import { createZodDto } from '../../../infrastructure/http/dto/zod-dto';
 import { z } from 'zod';
 import { successEnvelopeSchema } from '../../../infrastructure/http/dto/success-envelope.dto';
-import {
-  REASON_MAX_LENGTH,
-  TERM_MONTHS_MAX,
-  COMMITMENT_MONTHS_MAX,
-  employeeRef,
-  moneySchema,
-  pricingSchema,
-} from '../access-request/access-request.dto';
+import { REASON_MAX_LENGTH, employeeRef, moneySchema, pricingSchema } from '../access-request/access-request.dto';
 import { businessDate } from '../../../infrastructure/http/dto/business-date.dto';
 
 /** A web address with a host: the homepage of the software, which a screen links to. */
@@ -37,20 +30,18 @@ export const proposalBodySchema = z.strictObject({
   purpose: text(REASON_MAX_LENGTH),
   dataDescription: text(REASON_MAX_LENGTH),
   expectedUsers: z.number().int().min(1).max(1_000_000),
-  termMonths: z.number().int().min(1).max(TERM_MONTHS_MAX),
+  /** The day the right ends; optional, at most a year from today, and required for a contractor, a freelancer or an intern. */
+  expectedEndDate: businessDate.optional(),
 });
 
 const moneyInput = z.strictObject({ amount: z.string().max(40), currency: z.string().regex(/^[A-Z]{3}$/) });
 
-/** The quote the IT Admin records: what one person costs for one billing cycle, and how the contract binds and is paid. */
+/** The quote the IT Admin records: what one person costs for one billing cycle and the days it is in force (`BR-MF1-06`). */
 const quoteInput = z.strictObject({
   unitPrice: moneyInput,
   billingCycle: z.enum(['MONTHLY', 'QUARTERLY', 'ANNUAL']),
   validFrom: businessDate,
   validUntil: businessDate.nullable().optional(),
-  commitmentMonths: z.number().int().min(1).max(COMMITMENT_MONTHS_MAX).nullable().optional(),
-  paymentFrequency: z.enum(['MONTHLY', 'QUARTERLY', 'ANNUAL', 'UPFRONT_ONCE']).nullable().optional(),
-  firstPaymentOn: businessDate.nullable().optional(),
 });
 
 /**
@@ -118,9 +109,6 @@ const quoteView = z.strictObject({
   billingCycle: z.enum(['MONTHLY', 'QUARTERLY', 'ANNUAL']),
   validFrom: z.string(),
   validUntil: z.string().nullable(),
-  commitmentMonths: z.number().int().positive().nullable(),
-  paymentFrequency: z.enum(['MONTHLY', 'QUARTERLY', 'ANNUAL', 'UPFRONT_ONCE']).nullable(),
-  firstPaymentOn: z.string().nullable(),
 });
 
 const assessmentSchema = z.strictObject({

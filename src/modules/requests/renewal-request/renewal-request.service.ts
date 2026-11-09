@@ -15,7 +15,7 @@ import { RenewalRequestWriter, type RenewalSubmitted } from './renewal-request-w
 import { RenewalSeatFactsService } from './renewal-seat-facts.service';
 import type { RenewalBodyDto } from './renewal-request.dto';
 import { RenewalRequestRefusedError } from './renewal-request.errors';
-import { renewalEndOf, renewalStartOf } from '../../../core/term-limit';
+import { effectiveEndOf, renewalEndOf, renewalStartOf } from '../../../core/term-limit';
 import { checkRenewable, checkRenewalSender, routeRenewal } from './renewal-request.policy';
 
 /**
@@ -55,7 +55,7 @@ export class RenewalRequestService {
 
       const renewing = routeRenewal({ today, previousEnd }) === 'RENEWAL';
       // A late request is a request like any other: its end is worked out when the IT Admin grants it (`QĐ-98`, R-M4).
-      if (!renewing) return this.redirect(tx, actor, { body, facts, settings, previousEnd });
+      if (!renewing) return this.redirect(tx, actor, { body, facts, settings, previousEnd, today });
       if (await this.renewals.hasOpenFor(facts.assignmentId, tx))
         throw new RenewalRequestRefusedError('ALREADY_REQUESTED');
       // The new end runs from the day after the right ends, for the months asked, never cut at the end of a year (`QĐ-98`, R-15).
@@ -96,6 +96,7 @@ export class RenewalRequestService {
       facts: AssignmentFacts;
       settings: RequestSettings;
       previousEnd: BusinessDate;
+      today: BusinessDate;
     },
   ): Promise<RenewalSubmitted> {
     const { body, facts } = input;
@@ -106,7 +107,8 @@ export class RenewalRequestService {
       {
         planId: facts.planId,
         businessReason: body.businessReason,
-        termMonths,
+        // The term asked for runs from today, the day before the same day `termMonths` later (`QĐ-104a`).
+        expectedEndDate: effectiveEndOf({ start: input.today, months: termMonths }),
       },
       input.settings,
       { toleratedSeatId: facts.assignmentId },

@@ -18,6 +18,7 @@ const person = (over: Partial<LineFacts> = {}): LineFacts => ({
   holdsAccess: false,
   hasOpenRequest: false,
   isHeadOwnLine: false,
+  termRequired: false,
   spendingApprover: false,
   ...over,
 });

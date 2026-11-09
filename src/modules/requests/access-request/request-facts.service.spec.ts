@@ -24,6 +24,7 @@ describe('RequestFactsService.assess', () => {
     getOwningUnits: jest.fn(),
     requireUnitCostCenter: jest.fn(),
     lockDepartmentShared: jest.fn(),
+    getEmployee: jest.fn(),
   };
   const catalog = { findPlanSeatTargets: jest.fn(), getPlanPrice: jest.fn() };
   const routing = { gather: jest.fn() };
@@ -34,8 +35,6 @@ describe('RequestFactsService.assess', () => {
   const input = (over: Partial<AssessmentInput> = {}): AssessmentInput => ({
     employeeId: 'e-1',
     planId: 'p-1',
-    termMonths: 6,
-    expectedSpendOn: undefined,
     now: new Date('2026-10-28T03:00:00Z'),
     settings: { slaWorkingDays: 2 },
     lockDepartment: true,
@@ -61,6 +60,7 @@ describe('RequestFactsService.assess', () => {
 
       return unit;
     });
+    organization.getEmployee.mockResolvedValue({ employmentType: 'STAFF' });
     catalog.getPlanPrice.mockResolvedValue(null);
     routing.gather.mockResolvedValue({
       facts: {
@@ -132,5 +132,71 @@ describe('RequestFactsService.assess', () => {
     catalog.findPlanSeatTargets.mockResolvedValue([undefined]);
 
     await expect(service.assess(tx, input())).rejects.toBeInstanceOf(AccessRequestPlanNotFoundError);
+  });
+
+  describe('the amount and the end date of a request for paid software (BR-MF1-06, BR-MF1-07, FR-2.8)', () => {
+    const monthly = { kind: 'RECURRING', unitPrice: { amountMinor: 2000n, currency: 'USD' }, billingCycle: 'MONTHLY' };
+
+    it("BR-MF1-07: the price is the plan's from the catalog, not a department's: no department is asked for it", async () => {
+      given(COST_CENTER, 'SAAS');
+      catalog.getPlanPrice.mockResolvedValue(monthly);
+
+      await service.assess(tx, input());
+
+      expect(catalog.getPlanPrice).toHaveBeenCalledWith('p-1', tx);
+    });
+
+    it('BR-MF1-06a: a request sent on 28/10 with no end date costs the months left of the year, the month it starts counted whole', async () => {
+      given(COST_CENTER, 'SAAS');
+      catalog.getPlanPrice.mockResolvedValue(monthly);
+
+      const { pricing } = await service.assess(tx, input());
+
+      expect(pricing).toMatchObject({ status: 'PRICED', kind: 'RECURRING', amountMonths: 3, budgetYear: 2026 });
+      expect(pricing.amount).toEqual({ amountMinor: 6000n, currency: 'USD' });
+    });
+
+    it('BR-MF1-06c: an end date inside the year stops the amount in its month', async () => {
+      given(COST_CENTER, 'SAAS');
+      catalog.getPlanPrice.mockResolvedValue(monthly);
+
+      const { pricing } = await service.assess(tx, input({ expectedEndDate: '2026-11-15' }));
+
+      expect(pricing).toMatchObject({ amountMonths: 2, expectedEndDate: '2026-11-15' });
+    });
+
+    it('BR-MF1-07: a one-time price (a key) is the price of the purchase, with no months', async () => {
+      given(COST_CENTER, 'SAAS');
+      catalog.getPlanPrice.mockResolvedValue({
+        kind: 'ONE_TIME',
+        unitPrice: { amountMinor: 50_000n, currency: 'USD' },
+        billingCycle: 'OTHER',
+      });
+
+      const { pricing } = await service.assess(tx, input());
+
+      expect(pricing).toMatchObject({ kind: 'ONE_TIME', amountMonths: null });
+      expect(pricing.amount).toEqual({ amountMinor: 50_000n, currency: 'USD' });
+    });
+
+    it('FR-2.8: a contractor, a freelancer or an intern needs an end date; a staff member does not', async () => {
+      given(COST_CENTER, 'SAAS');
+      organization.getEmployee.mockResolvedValue({ employmentType: 'INTERN' });
+      expect((await service.assess(tx, input())).termRequired).toBe(true);
+      expect((await service.assess(tx, input({ expectedEndDate: '2026-12-31' }))).termRequired).toBe(false);
+
+      organization.getEmployee.mockResolvedValue({ employmentType: 'STAFF' });
+      expect((await service.assess(tx, input())).termRequired).toBe(false);
+    });
+
+    it('US-05-23 AC-9: an end date before today or past a year from today is out of range (28/10/2026 ⟹ at most 27/10/2027)', async () => {
+      given(COST_CENTER, 'SAAS');
+
+      const limit = await service.assess(tx, input({ expectedEndDate: '2027-10-27' }));
+      expect(limit.maxEndDate).toBe('2027-10-27');
+      expect(limit.endDateOutOfRange).toBe(false);
+      expect((await service.assess(tx, input({ expectedEndDate: '2027-10-28' }))).endDateOutOfRange).toBe(true);
+      expect((await service.assess(tx, input({ expectedEndDate: '2026-10-27' }))).endDateOutOfRange).toBe(true);
+    });
   });
 });

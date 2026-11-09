@@ -20,14 +20,15 @@ import {
 
 export interface GroupLineInput {
   employeeId: string;
-  /** The day the access of this person ends, when they are not staff (`US-05-17` AC-8). */
+  /** The day the access of this person ends: the one the group names, for every person of it (`US-05-17` AC-8). */
+  expectedEndDate?: BusinessDate | null;
 }
 
 export interface GroupSubmissionInput {
   senderEmployeeId: string;
   planId: string;
-  termMonths: number;
-  expectedSpendOn: BusinessDate | undefined;
+  /** The day the access of every person named ends; null for no end. */
+  expectedEndDate: BusinessDate | null;
   lines: readonly GroupLineInput[];
   now: Date;
   settings: RequestSettings;
@@ -86,8 +87,7 @@ export class GroupSubmissionFactsService {
     const assessed = await this.assessment.assess(tx, {
       employeeId: input.senderEmployeeId,
       planId: input.planId,
-      termMonths: input.termMonths,
-      expectedSpendOn: input.expectedSpendOn,
+      expectedEndDate: input.expectedEndDate,
       now: input.now,
       settings: input.settings,
       lockDepartment: input.lockPeople,
@@ -99,7 +99,9 @@ export class GroupSubmissionFactsService {
     const planRefusal = checkGroupPlan(target);
     const requested = input.lines.map((line) => line.employeeId);
     const count = checkLineCount({ senderIsHead, requested });
-    const lines = input.lines.filter((line, index) => requested.indexOf(line.employeeId) === index);
+    const lines = input.lines
+      .filter((line, index) => requested.indexOf(line.employeeId) === index)
+      .map((line) => ({ employeeId: line.employeeId, expectedEndDate: input.expectedEndDate }));
     const ids = lines.map((line) => line.employeeId);
 
     const people = await this.organizationReads.getEmployees(ids, tx);
@@ -127,6 +129,7 @@ export class GroupSubmissionFactsService {
         holdsAccess: person ? await this.holds(line.employeeId, input.planId) : false,
         hasOpenRequest: open.has(line.employeeId),
         isHeadOwnLine: senderIsHead && line.employeeId === input.senderEmployeeId,
+        termRequired: input.expectedEndDate === null && (person?.employmentType ?? 'STAFF') !== 'STAFF',
         spendingApprover: party.get(line.employeeId) === 'SPENDING_APPROVER',
       });
     }
@@ -136,12 +139,10 @@ export class GroupSubmissionFactsService {
       planRefusal === null
         ? await this.assessment.priceFor(tx, {
             planId: input.planId,
-            departmentId: unit.departmentId,
             free: false,
-            termMonths: input.termMonths,
             beneficiaries: lines.length,
-            expectedSpendOn: input.expectedSpendOn,
-            today,
+            checkDate: today,
+            endDate: input.expectedEndDate,
           })
         : assessed.pricing;
 

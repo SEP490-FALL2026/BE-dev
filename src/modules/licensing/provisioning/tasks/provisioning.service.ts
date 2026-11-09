@@ -12,6 +12,7 @@ import { toRevocationFacts } from '../provisioning-task.types';
 import { ProvisioningTaskRepo } from '../provisioning-task.repo';
 import { ProvisioningTaskViewService, type TaskSummaryView, type TaskView } from '../provisioning-task-view.service';
 import { SharedPoolService } from '../../shared-pool/shared-pool.service';
+import { AssignmentService } from '../../assignment/assignment.service';
 
 export type TaskScope = 'ALL' | 'MINE' | 'GENERAL';
 
@@ -30,6 +31,7 @@ export class ProvisioningService {
     private readonly gate: GrantRequestGateHook,
     private readonly revocation: RevocationListeners,
     private readonly sharedPool: SharedPoolService,
+    private readonly assignments: AssignmentService,
   ) {}
 
   /** The queue, the oldest first: `MINE` the tasks this IT Admin is in charge of, `GENERAL` those nobody works by default. */
@@ -103,7 +105,8 @@ export class ProvisioningService {
    * Completes the task of a grant with the note of what was done; a revocation has its own completion. Throws
    * ProvisioningEvidenceRequiredError, the errors of `claim` except the departed beneficiary, and ProvisioningTaskStateError
    * (`IS_REVOCATION` for a revocation).
-   * A grant taken from the pool, with nothing bought for it, records the cost it avoided once (`BR-MF1-09c`).
+   * A grant taken from the pool, with nothing bought for it, records the cost it avoided once (`BR-MF1-09c`). The day it is completed is
+   * the day the right begins (`BR-MF1-06a`).
    */
   async complete(actor: AuthenticatedPrincipal, id: string, input: { evidence: string }): Promise<TaskView> {
     const evidence = cleanEvidence(input.evidence);
@@ -114,11 +117,13 @@ export class ProvisioningService {
       },
       write: async ({ tx, task: locked, now, organizationId }) => {
         await this.repo.markCompleted(tx, locked.id, actor.appUserId, evidence, now);
+        const completedOn = await this.organizationReads.businessToday(now, tx);
+        await this.assignments.recordGranted(tx, locked.assignmentId, completedOn);
         if (locked.requestId !== null) {
           await this.gate.get().reportOutcome(tx, locked.requestId, 'COMPLETED', locked.assignment.employeeId);
           await this.sharedPool.recordAvoided(tx, {
             organizationId,
-            completedOn: await this.organizationReads.businessToday(),
+            completedOn,
             task: {
               id: locked.id,
               assignmentId: locked.assignmentId,

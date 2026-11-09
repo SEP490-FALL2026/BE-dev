@@ -1,6 +1,7 @@
 import type { AssessmentWire } from '../../src/modules/requests/assessment/assessment.dto';
 import type { PreviewWire } from '../../src/modules/requests/request-submission/request-preview.dto';
 import request from 'supertest';
+import { effectiveEndOf } from '../../src/core/term-limit';
 import { ApiAccount } from './api-accounts';
 import { declareSubscription } from './builders/catalog.builder';
 import { clearSpendingApprover, insertEmployeeWithoutPlacement, setSpendingApprover } from './builders/account.builder';
@@ -46,7 +47,8 @@ export interface AccessRequestWire {
   requester: EmployeeRefWire;
   beneficiary: EmployeeRefWire;
   businessReason: string;
-  termMonths: number;
+  termMonths: number | null;
+  expectedEndDate: string | null;
   expectedSpendOn: string | null;
   budgetYear: number | null;
   pricing: {
@@ -55,6 +57,10 @@ export interface AccessRequestWire {
     amount: { amount: string; currency: string } | null;
     unitPrice: { amount: string; currency: string } | null;
     billingCycle: 'MONTHLY' | 'QUARTERLY' | 'ANNUAL' | 'OTHER' | null;
+    kind: 'RECURRING' | 'ONE_TIME' | null;
+    months: number | null;
+    monthlyPrice: { amount: string; currency: string } | null;
+    nextYearAmount: { amount: string; currency: string } | null;
     periodCount: number | null;
     bindingPeriodCount: number | null;
     firstDueOn: string | null;
@@ -209,7 +215,7 @@ export class RequestHarness extends ProvisioningHarness {
 
   /** The preview of a request for the plan, failing on anything but 200. */
   async previewed(person: Person, planId: string, extra: Record<string, unknown> = {}): Promise<PreviewWire> {
-    const response = await this.previewRequest({ planId, termMonths: 6, ...extra }, person.account);
+    const response = await this.previewRequest({ planId, ...this.endDated(extra) }, person.account);
     if (response.status !== 200) throw new Error(`preview: ${response.status} ${JSON.stringify(response.body)}`);
 
     return this.dataOf<{ preview: PreviewWire }>(response).preview;
@@ -304,12 +310,23 @@ export class RequestHarness extends ProvisioningHarness {
       .set(this.as(this.finance))
       .send({ group: 'T2', lines });
 
-  /** A form of `BM-01` for the plan, complete. */
+  /**
+   * A test that still says how long in months, said in the way the API takes it: the day the right ends, `termMonths` months from
+   * today (`QĐ-104a`). No `termMonths` is no end date.
+   */
+  endDated = (extra: Record<string, unknown>): Record<string, unknown> => {
+    const { termMonths, ...rest } = extra;
+
+    return typeof termMonths === 'number'
+      ? { ...rest, expectedEndDate: effectiveEndOf({ start: this.today(), months: termMonths }) }
+      : rest;
+  };
+
+  /** A form of `BM-01` for the plan, complete: a right with no end unless `extra` gives an end date or `termMonths`. */
   form = (planId: string, extra: Record<string, unknown> = {}) => ({
     planId,
     businessReason: 'Design the new brand',
-    termMonths: 6,
-    ...extra,
+    ...this.endDated(extra),
   });
 
   /** Sends the request and returns it, failing on anything but 201. */

@@ -17,13 +17,12 @@ export class SubscriptionFactsService {
   }
 
   /**
-   * What a plan is bought at for a department, from the newest priced active subscription that department owns; null when it
-   * has none, and never the price of another department's subscription (`FR-3.2`). The pricing model (RECURRING or ONE_TIME)
-   * determines how Request calculates amount and schedule.
+   * What a plan is bought at, from the main subscription of the plan: the newest priced active one; null when it has none
+   * (`FR-3.2`, S1-02). It is the plan's price, never a department's. The pricing model (RECURRING or ONE_TIME) determines
+   * how a request counts its amount.
    */
   async priceOfPlan(
     planId: string,
-    ownerDepartmentId: string,
     tx?: DbTx,
   ): Promise<{
     kind: 'RECURRING' | 'ONE_TIME';
@@ -32,7 +31,7 @@ export class SubscriptionFactsService {
     /** The subscription may be cut before its term ends (`QĐ-96f`): a request on it runs to the end of the fiscal year at most. */
     allowsMidTermReduction: boolean;
   } | null> {
-    const priced = await this.subscriptions.findPricedOfPlan(planId, ownerDepartmentId, tx);
+    const priced = await this.subscriptions.findPricedOfPlan(planId, tx);
 
     return (
       priced && {
@@ -69,15 +68,14 @@ export class SubscriptionFactsService {
   }
 
   /**
-   * For each of these plans that the department can price, the billing cycle of the subscription `priceOfPlan` would use, in
-   * one read: what tells whether a price exists for a plan without reading or showing the price itself.
+   * For each of these plans that has a price, the billing cycle of the subscription `priceOfPlan` would use, in one read: what
+   * tells whether a price exists for a plan without reading or showing the price itself.
    */
   pricedCyclesOfPlans(
     planIds: readonly string[],
-    ownerDepartmentId: string,
     tx?: DbTx,
   ): Promise<ReadonlyMap<string, 'MONTHLY' | 'QUARTERLY' | 'ANNUAL' | 'OTHER'>> {
-    return this.subscriptions.findPricedCyclesOfPlans(planIds, ownerDepartmentId, tx);
+    return this.subscriptions.findPricedCyclesOfPlans(planIds, tx);
   }
 
   /** The ids of every subscription and purchase a department owns, by id (what a rule about the department's work reads). */

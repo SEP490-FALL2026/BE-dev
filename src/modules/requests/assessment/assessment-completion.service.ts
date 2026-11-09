@@ -104,8 +104,7 @@ function completedAuditDetail(
     equivalentPlanId: assessment.equivalentPlanId,
     amountMinor: pricing.amount?.amountMinor.toString() ?? null,
     amountCurrency: pricing.amount?.currency ?? null,
-    periods: pricing.schedule?.length ?? null,
-    bindingPeriods: pricing.schedule?.filter((period) => period.binding).length ?? null,
+    months: pricing.amountMonths,
     budgetYear: pricing.budgetYear,
     actingForAssignee,
   };

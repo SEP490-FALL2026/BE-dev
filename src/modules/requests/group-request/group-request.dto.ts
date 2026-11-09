@@ -1,9 +1,9 @@
 import { createZodDto } from '../../../infrastructure/http/dto/zod-dto';
 import { z } from 'zod';
 import { successEnvelopeSchema } from '../../../infrastructure/http/dto/success-envelope.dto';
+import { businessDate } from '../../../infrastructure/http/dto/business-date.dto';
 import {
   REASON_MAX_LENGTH,
-  TERM_MONTHS_MAX,
   employeeRef,
   moneySchema,
   pricingSchema,
@@ -31,7 +31,8 @@ export const groupBodySchema = z.strictObject({
     .min(1)
     .max(GROUP_BODY_LINES_MAX),
   businessReason: reason,
-  termMonths: z.number().int().min(1).max(TERM_MONTHS_MAX),
+  /** The day the access of every person named ends; absent for no end, and then each person who is not staff is refused (`FR-2.8`). */
+  expectedEndDate: businessDate.optional(),
 });
 
 const LINE_REASONS = [
@@ -41,6 +42,7 @@ const LINE_REASONS = [
   'EMAIL_REQUIRED',
   'HAS_ACCESS',
   'HAS_OPEN_REQUEST',
+  'TERM_REQUIRED',
 ] as const;
 
 /** What the check of a group says: every reason of every person at once, and what it would cost; nothing is written. */
@@ -53,9 +55,9 @@ const checkSchema = z.strictObject({
   tooManyLines: z.strictObject({ max: z.number().int().positive() }).nullable(),
   /** The fewest different people a request for a group names, when fewer were named. */
   tooFewLines: z.strictObject({ min: z.number().int().positive() }).nullable(),
-  /** The longest term the plan takes from today, and whether the term asked for is beyond it. */
-  termLimit: z.strictObject({ maxMonths: z.number().int().positive() }),
-  termBeyondLimit: z.boolean(),
+  /** The last day a right asked for today may end, and whether the end date asked for is outside it (`US-05-23` AC-9). */
+  maxEndDate: z.string(),
+  endDateOutOfRange: z.boolean(),
   lines: z.array(
     z.strictObject({
       employeeId: z.uuid(),
@@ -66,7 +68,7 @@ const checkSchema = z.strictObject({
   lineCount: z.number().int().nonnegative(),
   hasSpendStep: z.boolean(),
   pricing: pricingSchema,
-  /** The unit price for the whole term, for one person; null when the plan has no price. */
+  /** What one person of the request costs for the months counted; null when the plan has no price or nobody is named. */
   amountPerPerson: moneySchema.nullable(),
 });
 

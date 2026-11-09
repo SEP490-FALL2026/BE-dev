@@ -65,13 +65,24 @@ export class AccessRequestNotPriceableError extends Error {
   }
 }
 
-/** The term asked for is longer than a request may ask for (`US-05-01` AC-4, `QĐ-98`). */
-export class AccessRequestTermBeyondLimitError extends Error {
-  constructor(readonly maxMonths: number) {
+/**
+ * The end date asked for is before today or later than a year from today (`US-05-23` AC-9, `QĐ-104a`): the last day a right may
+ * end is the day before the same day twelve months later. A draft saved with a date that no longer fits must be saved again.
+ */
+export class AccessRequestEndDateOutOfRangeError extends Error {
+  constructor(readonly maxEndDate: string) {
     super(
-      'The term is longer than a request may ask for: at most 12 months. A draft saved with a longer term must be saved again with a shorter one.',
+      'The end date is before today or more than a year from today. A draft saved with such a date must be saved again with a date inside the year.',
     );
-    this.name = 'AccessRequestTermBeyondLimitError';
+    this.name = 'AccessRequestEndDateOutOfRangeError';
+  }
+}
+
+/** The person it is for is not staff (a contractor, a freelancer, an intern) and the request names no end date (`FR-2.8`). */
+export class AccessRequestTermRequiredError extends Error {
+  constructor() {
+    super('A contractor, a freelancer or an intern gets access for a term: give the end date.');
+    this.name = 'AccessRequestTermRequiredError';
   }
 }
 

@@ -39,7 +39,6 @@ export class ServiceAccountHarness extends SpendHarness {
     purpose: 'Build bot of the CI pipeline',
     expectedIdentifier: 'ci-bot-2',
     businessReason: 'Run the builds of the product',
-    termMonths: 1,
     ...extra,
   });
 

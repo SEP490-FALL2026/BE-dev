@@ -72,3 +72,57 @@ export function poolWarnings(record: {
 
   return warnings;
 }
+
+/** A live priced subscription of a plan, as far as choosing which of them gives the plan its price needs. */
+export interface PriceSource {
+  id: string;
+  /** The flag that says this subscription prices the plan when there are several (`Q-04`). */
+  isPrimaryForPlan: boolean;
+  unitPriceMinor: bigint;
+  billingCycle: BillingCycle;
+  startDate: string | null;
+}
+
+/** The months a billing cycle spans; null for a cycle that cannot be counted in months. */
+const CYCLE_MONTHS: Readonly<Record<BillingCycle, number | null>> = {
+  MONTHLY: 1,
+  QUARTERLY: 3,
+  ANNUAL: 12,
+  OTHER: null,
+};
+
+/**
+ * The subscription that gives a plan its price (`Q-04` C, `BR-MF1-07`): the one flagged `is_primary_for_plan`; with no flag, the one with
+ * the highest price a month (the price over the months of its cycle, compared without rounding; a cycle that is not in months comes last);
+ * on a tie the older `start_date` (none last), then the smaller id. Null when there is none.
+ */
+export function pickPriceSource<T extends PriceSource>(sources: readonly T[]): T | null {
+  const primary = sources.find((source) => source.isPrimaryForPlan);
+  if (primary) return primary;
+
+  return [...sources].sort(compareSources)[0] ?? null;
+}
+
+/** Highest price a month first, then the older start date (none last), then the smaller id. */
+function compareSources(a: PriceSource, b: PriceSource): number {
+  return comparePrice(a, b) || compareStart(a.startDate, b.startDate) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
+}
+
+function comparePrice(a: PriceSource, b: PriceSource): number {
+  const am = CYCLE_MONTHS[a.billingCycle];
+  const bm = CYCLE_MONTHS[b.billingCycle];
+  if (am === null || bm === null) return am === bm ? 0 : am === null ? 1 : -1;
+  // a.unit / am versus b.unit / bm, as a.unit * bm versus b.unit * am: both months are positive.
+  const left = a.unitPriceMinor * BigInt(bm);
+  const right = b.unitPriceMinor * BigInt(am);
+
+  return left === right ? 0 : left > right ? -1 : 1;
+}
+
+function compareStart(a: string | null, b: string | null): number {
+  if (a === b) return 0;
+  if (a === null) return 1;
+  if (b === null) return -1;
+
+  return a < b ? -1 : 1;
+}

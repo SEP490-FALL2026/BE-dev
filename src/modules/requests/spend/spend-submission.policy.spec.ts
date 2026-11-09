@@ -14,11 +14,17 @@ describe('where an approved request goes (US-06-14 AC-8)', () => {
   });
 });
 
-describe('the supplementary file (US-06-14 AC-13, AC-15; US-05-04 AC-16)', () => {
+describe('the supplementary file (US-06-14 AC-13, AC-15; US-05-04 AC-16; L2-38)', () => {
   const facts = {
     state: 'AWAITING_SPEND_SUBMISSION',
     priced: true,
   };
+  const term = (requested: string, current: string | null) => ({
+    requested,
+    current,
+    today: '2026-11-10',
+    maxEndDate: '2027-11-09',
+  });
 
   it('leaves people of a group out of a request back in the queue', () => {
     expect(checkSupplement({ ...facts, leavesPeopleOut: true })).toBeNull();
@@ -31,34 +37,49 @@ describe('the supplementary file (US-06-14 AC-13, AC-15; US-05-04 AC-16)', () =>
     },
   );
 
-  it('is not for a request with no price, nor to the same day', () => {
+  it('is not for a request with no price, nor for a file that changes nothing', () => {
     expect(checkSupplement({ ...facts, priced: false })).toBe('NOT_PRICED');
     expect(checkSupplement({ ...facts })).toBe('NO_CHANGE');
   });
+
+  it('L2-38: shortens a term to an earlier end date, and gives an end to a right that had none', () => {
+    expect(checkSupplement({ ...facts, term: term('2026-12-31', '2027-03-31') })).toBeNull();
+    expect(checkSupplement({ ...facts, term: term('2027-09-30', null) })).toBeNull();
+  });
+
+  it('L2-38: refuses an end date that is not earlier than the one the request has', () => {
+    expect(checkSupplement({ ...facts, term: term('2027-03-31', '2027-03-31') })).toBe('TERM_NOT_REDUCED');
+    expect(checkSupplement({ ...facts, term: term('2027-06-30', '2027-03-31') })).toBe('TERM_NOT_REDUCED');
+  });
+
+  it('L2-38: refuses an end date before today or more than a year from today', () => {
+    expect(checkSupplement({ ...facts, term: term('2026-11-09', null) })).toBe('END_DATE_OUT_OF_RANGE');
+    expect(checkSupplement({ ...facts, term: term('2027-11-10', null) })).toBe('END_DATE_OUT_OF_RANGE');
+  });
 });
 
-describe('what a supplementary file changes, and what it says (QĐ-82n, US-06-14 AC-13, AC-15)', () => {
+describe('what a supplementary file changes, and what it says (QĐ-82n, US-06-14 AC-13, AC-15, P1-06)', () => {
   const before = {
     status: 'PRICED' as const,
-    expectedSpendOn: '2026-11-01',
+    expectedEndDate: null,
     budgetYear: 2026,
     amount: { amountMinor: 1000n, currency: 'VND' },
   };
   const after = {
     status: 'PRICED' as const,
-    expectedSpendOn: '2027-01-15',
-    budgetYear: 2027,
-    amount: { amountMinor: 1200n, currency: 'VND' },
+    expectedEndDate: '2026-12-31',
+    budgetYear: 2026,
+    amount: { amountMinor: 800n, currency: 'VND' },
   };
 
-  it('puts what the request was beside what it became: the day, the year, the amount and the currency it keeps', () => {
+  it('puts what the request was beside what it became: the end date, the year, the amount and the currency it keeps', () => {
     expect(supplementChangeOf(before, after)).toEqual({
-      beforeExpectedSpendOn: '2026-11-01',
-      afterExpectedSpendOn: '2027-01-15',
+      beforeExpectedEndDate: null,
+      afterExpectedEndDate: '2026-12-31',
       beforeBudgetYear: 2026,
-      afterBudgetYear: 2027,
+      afterBudgetYear: 2026,
       beforeAmountMinor: 1000n,
-      afterAmountMinor: 1200n,
+      afterAmountMinor: 800n,
       currency: 'VND',
     });
   });
@@ -66,10 +87,8 @@ describe('what a supplementary file changes, and what it says (QĐ-82n, US-06-14
   it.each([
     ['is not priced again', { ...after, status: 'MISSING' as const }, before],
     ['has no amount again', { ...after, amount: null }, before],
-    ['has no day again', { ...after, expectedSpendOn: null }, before],
     ['has no year again', { ...after, budgetYear: null }, before],
     ['had no amount', after, { ...before, amount: null }],
-    ['had no day', after, { ...before, expectedSpendOn: null }],
     ['had no year', after, { ...before, budgetYear: null }],
   ])('is not a change that can be recorded when the request %s', (_label, repriced, original) => {
     expect(supplementChangeOf(original, repriced)).toBeNull();
@@ -81,24 +100,24 @@ describe('what a supplementary file changes, and what it says (QĐ-82n, US-06-14
         'req-1',
         {
           number: 2,
-          beforeExpectedSpendOn: '2026-11-01',
-          afterExpectedSpendOn: '2027-01-15',
+          beforeExpectedEndDate: null,
+          afterExpectedEndDate: '2026-12-31',
           beforeBudgetYear: 2026,
-          afterBudgetYear: 2027,
+          afterBudgetYear: 2026,
           beforeAmountMinor: 1000n,
-          afterAmountMinor: 1200n,
+          afterAmountMinor: 800n,
         },
         ['emp-3'],
       ),
     ).toEqual({
       requestId: 'req-1',
       number: 2,
-      before: '2026-11-01',
-      after: '2027-01-15',
+      beforeExpectedEndDate: null,
+      afterExpectedEndDate: '2026-12-31',
       beforeBudgetYear: 2026,
-      afterBudgetYear: 2027,
+      afterBudgetYear: 2026,
       beforeAmountMinor: '1000',
-      afterAmountMinor: '1200',
+      afterAmountMinor: '800',
       droppedEmployeeIds: ['emp-3'],
     });
   });

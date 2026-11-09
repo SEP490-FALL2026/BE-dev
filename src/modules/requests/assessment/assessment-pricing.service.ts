@@ -9,20 +9,19 @@ const NOT_APPLICABLE: PricingRecord = {
   status: 'NOT_APPLICABLE',
   missingReason: null,
   kind: null,
-  expectedSpendOn: null,
   expectedEndDate: null,
   amountMonths: null,
   budgetYear: null,
   amount: null,
   unitPrice: null,
   billingCycle: null,
-  schedule: null,
+  nextYearAmount: null,
 };
 
 /**
- * The request priced by the quote of its assessment, on the business day of the completion (`US-05-06` AC-3, AC-11): for the term it
- * asked for and the people it is for, the day the money goes out being the one it named, or the day itself when it named none.
- * Throws the errors of QuoteService.price for a quote that is not in force or does not say how a term is paid.
+ * The request priced by the quote of its assessment, on the business day of the completion (`US-05-06` AC-3, AC-11, `QĐ-109e`): the
+ * months left of the year of that day, to the end date it asked for, for the people it is for.
+ * Throws the errors of QuoteService.price for a quote that is not in force or has no price.
  */
 @Injectable()
 export class AssessmentPricingService {
@@ -41,12 +40,8 @@ export class AssessmentPricingService {
 
     return this.quotes.price(
       quote,
-      {
-        termMonths: request.termMonths,
-        beneficiaries: request.beneficiaryEmployeeIds.length,
-        expectedSpendOn: request.pricing.expectedSpendOn ?? today,
-      },
-      { today },
+      { beneficiaries: request.beneficiaryEmployeeIds.length, endDate: request.expectedEndDate },
+      { checkDate: today },
     );
   }
 
@@ -65,12 +60,8 @@ export class AssessmentPricingService {
     if (!quote) return { quote, pricing: NOT_APPLICABLE };
     const pricing = this.quotes.price(
       quote,
-      {
-        termMonths: request.termMonths,
-        beneficiaries: request.beneficiaryEmployeeIds.length,
-        expectedSpendOn: request.pricing.expectedSpendOn ?? today,
-      },
-      { today },
+      { beneficiaries: request.beneficiaryEmployeeIds.length, endDate: request.expectedEndDate },
+      { checkDate: today },
     );
 
     return { quote, pricing };

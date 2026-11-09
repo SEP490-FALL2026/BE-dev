@@ -29,9 +29,6 @@ const QUOTE_CLEARED = {
   quoteBillingCycle: null,
   quoteValidFrom: null,
   quoteValidUntil: null,
-  commitmentMonths: null,
-  paymentFrequency: null,
-  firstPaymentOn: null,
 } satisfies Prisma.AccessRequestAssessmentUncheckedUpdateInput;
 
 function quoteColumns(quote: Quote | null): Prisma.AccessRequestAssessmentUncheckedUpdateInput {
@@ -43,9 +40,6 @@ function quoteColumns(quote: Quote | null): Prisma.AccessRequestAssessmentUnchec
     quoteBillingCycle: quote.billingCycle,
     quoteValidFrom: toDateColumn(quote.validFrom),
     quoteValidUntil: quote.validUntil ? toDateColumn(quote.validUntil) : null,
-    commitmentMonths: quote.commitmentMonths,
-    paymentFrequency: quote.paymentFrequency,
-    firstPaymentOn: quote.firstPaymentOn ? toDateColumn(quote.firstPaymentOn) : null,
   };
 }
 
