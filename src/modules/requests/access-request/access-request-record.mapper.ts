@@ -27,6 +27,7 @@ export const SELECT_REQUEST = {
   unitPriceMinor: true,
   billingCycle: true,
   expectedEndDate: true,
+  nextYearAmountMinor: true,
   planLineVersionId: true,
   planLinePosition: true,
   planLineConfirmed: true,
@@ -154,7 +155,7 @@ export function toRecord(row: RequestRow): AccessRequestRecord {
     departmentId: row.departmentId,
     costCenterId: sent.costCenterId,
     businessReason: row.businessReason,
-    termMonths: row.termMonths ?? 0,
+    termMonths: row.termMonths,
     pricing: toPricing(row),
     planLine:
       row.planLineVersionId !== null && row.planLinePosition !== null

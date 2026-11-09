@@ -138,7 +138,7 @@ describe('RequestsDashboardApi facts agree with source lists (integration, real 
       await request(h.server())
         .post('/api/v1/access-requests/drafts')
         .set(h.as(person.account))
-        .send({ kind: 'INDIVIDUAL', planId: paid, businessReason: 'Design the new brand', termMonths: 6 })
+        .send({ kind: 'INDIVIDUAL', planId: paid, businessReason: 'Design the new brand' })
         .expect(201);
       // Somebody else's request is not theirs, and nor is one the head sent for them and a colleague: it is the head's.
       await h.sent(colleague, await freshInternal());

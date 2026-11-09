@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { LicensingApi } from '../../../src/modules/licensing/public/licensing.api';
 import { LicensingRenewalApi } from '../../../src/modules/licensing/public/licensing-renewal.api';
-import { renewalEndOf } from '../../../src/core/term-limit';
+import { effectiveEndOf, renewalEndOf } from '../../../src/core/term-limit';
 import { monthsBetween } from '../../../src/modules/requests/renewal-request/renewal-request.policy';
 import { ReturnHarness, type RenewalWire } from '../../support/return-harness';
 import type { Unit } from '../../support/spend-harness';
@@ -166,14 +166,18 @@ describe('the renewal of a right that ends on a day over PostgreSQL (US-05-14)',
       ).toMatchObject({ predecessorId: assignmentId, requestId: request.id });
     });
 
-    it('prices and charges a renewal that begins in the next fiscal year to that year, from the day it begins, not from today (R-M3)', async () => {
+    it('QĐ-109b: a renewal that begins in the next fiscal year costs nothing this year and shows the first year it would cost (R-M3)', async () => {
+      // Rewritten from "charges it to the next year from the day it begins": this year it is 0, the next year's amount is shown, never held.
       const year = Number(h.today().slice(0, 4));
       const days = Math.round((Date.UTC(year, 11, 31) - Date.parse(`${h.today()}T00:00:00Z`)) / 86_400_000);
       const { unit, assignmentId } = await holder(paid, days);
 
       const { request } = await h.renewed(unit.member.account, body(assignmentId, 3));
 
-      expect(request).toMatchObject({ budgetYear: year + 1, pricing: { firstDueOn: `${year + 1}-01-01` } });
+      expect(request).toMatchObject({
+        budgetYear: year,
+        pricing: { months: 0, amount: { amount: '0' }, nextYearAmount: { amount: String(3 * 1_000_000) } },
+      });
     });
 
     it('ends the old record today when the decision comes after the day the right was to end, and never leaves a period empty', async () => {
@@ -286,8 +290,8 @@ describe('the renewal of a right that ends on a day over PostgreSQL (US-05-14)',
       expect(request).toMatchObject({
         type: 'GRANT',
         state: 'PENDING',
-        termMonths: 2,
-        expectedEndDate: null,
+        termMonths: null,
+        expectedEndDate: effectiveEndOf({ start: h.today(), months: 2 }),
         renewal: null,
         plan: { planId: internalPlan },
       });

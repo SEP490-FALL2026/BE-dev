@@ -46,8 +46,7 @@ describe('the Employee on the phone: own software, own requests, send and withdr
   const form = (planId: string, extra: Record<string, unknown> = {}) => ({
     planId,
     businessReason: 'Design the new brand',
-    termMonths: 6,
-    ...extra,
+    ...h.endDated(extra),
   });
   const sent = async (person: Person, planId: string, extra: Record<string, unknown> = {}, label?: Label) =>
     h.dataOf<{ request: AccessRequestWire }>(
@@ -150,7 +149,7 @@ describe('the Employee on the phone: own software, own requests, send and withdr
     it('does not send a request with no business reason, or a blank one, and keeps nothing (AC-4)', async () => {
       const before = await h.requestRows();
 
-      const missing = await post('/access-requests', e1.account, { planId: paidPlan, termMonths: 6 }).expect(422);
+      const missing = await post('/access-requests', e1.account, { planId: paidPlan }).expect(422);
       const blank = await post('/access-requests', e1.account, form(paidPlan, { businessReason: '   ' })).expect(422);
 
       for (const answer of [missing, blank]) {
@@ -169,7 +168,7 @@ describe('the Employee on the phone: own software, own requests, send and withdr
       expect(JSON.stringify(plans.body)).not.toMatch(/standard|toolset|outsideStandard/i);
 
       const preview = h.dataOf<{ preview: PreviewWire }>(
-        await post('/access-requests/preview', e1.account, { planId: paidPlan, termMonths: 1 }).expect(200),
+        await post('/access-requests/preview', e1.account, { planId: paidPlan }).expect(200),
       ).preview;
 
       expect(preview).toMatchObject({
@@ -193,9 +192,7 @@ describe('the Employee on the phone: own software, own requests, send and withdr
       const fromWeb = await employee();
       const previewOf = async (person: Person, label: Label) =>
         h.dataOf<{ preview: PreviewWire }>(
-          await post('/access-requests/preview', person.account, { planId: paidPlan, termMonths: 1 }, label).expect(
-            200,
-          ),
+          await post('/access-requests/preview', person.account, { planId: paidPlan }, label).expect(200),
         ).preview;
 
       expect(await previewOf(fromPhone, MOBILE)).toEqual(await previewOf(fromWeb, WEB));
@@ -240,7 +237,7 @@ describe('the Employee on the phone: own software, own requests, send and withdr
       const before = await h.requestRows();
 
       const preview = h.dataOf<{ preview: PreviewWire }>(
-        await post('/access-requests/preview', person.account, { planId: internalPlan, termMonths: 6 }).expect(200),
+        await post('/access-requests/preview', person.account, { planId: internalPlan }).expect(200),
       ).preview;
       const refused = await post('/access-requests', person.account, form(internalPlan)).expect(409);
 

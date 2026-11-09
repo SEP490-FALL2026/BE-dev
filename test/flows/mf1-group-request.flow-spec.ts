@@ -57,7 +57,6 @@ describe('F1-08 Request nhóm: nhu cầu → trình lô → duyệt chi → cấ
     const response = await call().post('NV-DEV2', '/group-requests', {
       planId: jira,
       businessReason: 'Một mình',
-      termMonths: 1,
       lines: [{ employeeId: dev2 }],
     });
 
@@ -72,7 +71,6 @@ describe('F1-08 Request nhóm: nhu cầu → trình lô → duyệt chi → cấ
     const sent = await call().post('NV-DEV2', '/group-requests', {
       planId: jira,
       businessReason: 'Cả nhóm cần Jira',
-      termMonths: 1,
       lines: [{ employeeId: dev2 }, { employeeId: dev3 }],
     });
     expect(sent.status).toBe(201);
@@ -116,10 +114,10 @@ describe('F1-08 Request nhóm: nhu cầu → trình lô → duyệt chi → cấ
         WHERE a.employee_id = ANY($1::uuid[]) AND a.plan_id = $2 ORDER BY e.employee_code`,
       [[dev2, dev3], jira],
     );
-    const end = await oneMonthTerm();
+    // R-D01: the group named no end date, so the seats have none (a right has no end unless the sender gives one, QĐ-104a).
     expect(rows).toEqual([
-      { employee_code: 'NV-DEV2', expected_end_date: end },
-      { employee_code: 'NV-DEV3', expected_end_date: end },
+      { employee_code: 'NV-DEV2', expected_end_date: null },
+      { employee_code: 'NV-DEV3', expected_end_date: null },
     ]);
     expect(await world.facts.count('provisioning_tasks', "request_id = $1 AND status = 'COMPLETED'", [id])).toBe(2);
   });
@@ -137,10 +135,11 @@ describe('F1-08 Request nhóm: nhu cầu → trình lô → duyệt chi → cấ
     expect(created.status).toBe(201);
     const [contractor, dev1] = [await world.facts.employeeId('NV-CTR1'), await world.facts.employeeId('NV-DEV1')];
 
+    const end = await oneMonthTerm();
     const sent = await call().post('NV-ENGH', '/group-requests', {
       planId: figma,
       businessReason: 'Nhà thầu và một đồng nghiệp cần Figma',
-      termMonths: 1,
+      expectedEndDate: end,
       lines: [{ employeeId: contractor }, { employeeId: dev1 }],
     });
     expect(sent.status).toBe(201);
@@ -167,6 +166,6 @@ describe('F1-08 Request nhóm: nhu cầu → trình lô → duyệt chi → cấ
         WHERE a.employee_id = $1 AND a.plan_id = $2`,
       [contractor, figma],
     );
-    expect(rows).toEqual([{ employment_type: 'CONTRACTOR', expected_end_date: await oneMonthTerm() }]);
+    expect(rows).toEqual([{ employment_type: 'CONTRACTOR', expected_end_date: end }]);
   });
 });

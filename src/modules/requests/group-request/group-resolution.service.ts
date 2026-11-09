@@ -4,7 +4,7 @@ import type { AuthenticatedPrincipal } from '../../../infrastructure/security/to
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { AccessRequestRepo } from '../access-request/access-request.repo';
 import type { AccessRequestRecord } from '../access-request/access-request.types';
-import { RepricingService } from '../assessment/repricing.service';
+import { RepricingService } from '../repricing/repricing.service';
 import { RequestFactsService } from '../access-request/request-facts.service';
 import { SpendEntryService } from '../spend/spend-entry.service';
 import { SpendStepRepo } from '../spend/spend-step.repo';

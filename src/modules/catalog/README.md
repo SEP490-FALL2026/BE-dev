@@ -12,7 +12,9 @@ personnel, onboarding, data-import (chỉ type); gốc `src/app/app.module.ts` v
   - `findSeatTarget`, `findPlanSeatTargets`, `lockSeatTarget` — đích ghế (một subscription hoặc một plan nội bộ).
   - `getPlanSummaries`, `getPlanRevocationInfo`, `getSimilarPlanIds`, `getPlanVendorId`, `getPlanVendorIds` (nhiều plan trong một lần đọc), `getPlanBusinessOwnerId` — đọc
     plan.
-  - `getPlanPrice` — đơn giá plan cho một phòng ban, chỉ từ subscription phòng ban đó sở hữu.
+  - `getPlanPrice(planId, tx?)` — giá của plan từ thuê bao chính (`pickPriceSource`: cờ `is_primary_for_plan`, không có thì giá tháng quy đổi cao nhất,
+    hòa thì `start_date` cũ hơn rồi `id`), không theo phòng (S1-02, `BR-MF1-07`); trả `{ kind: RECURRING | ONE_TIME, unitPrice, billingCycle }`, thuê bao
+    `PERPETUAL` có giá ⟹ `ONE_TIME` (khóa `K4`).
   - `getSubscriptionIdsOwnedBy`, `getApplicationsOwnedBy`, `getWorkspaceDutiesOf` — thứ một phòng ban/người đang giữ.
   - `registerInternalSoftware` — đăng ký phần mềm nội bộ trong transaction của bên gọi (US-05-20).
   - `getVendorName`, `getOnboardingFacts` — tên vendor; số ứng dụng/plan/subscription cho checklist onboarding.

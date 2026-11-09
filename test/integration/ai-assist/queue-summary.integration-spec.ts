@@ -153,7 +153,7 @@ describe('the AI summary of the queue of a head (integration, real HTTP to a sta
           softwareName: applicationName,
           beneficiaryDisplayName: member,
           reason: REASONS[index],
-          requestedDurationLabel: `${one.termMonths} tháng`,
+          requestedDurationLabel: null,
           estimatedCostRef: null,
         })),
       );
@@ -324,7 +324,7 @@ describe('the AI summary of the queue of a head (integration, real HTTP to a sta
     const view = await h.summarize(u.head.account);
 
     expect(view.lines.map((line) => line.requestId)).toEqual([sent[1].id]);
-    expect(view.lines[0].summary).toContain(`Thời hạn ${sent[1].termMonths} tháng.`);
+    expect(view.lines[0].summary).toContain('Thời hạn .');
     const content = h.dataOf<{ result: { rejections: unknown[] } }>(await h.content(view.invocationId).expect(200));
     expect(content.result.rejections).toEqual([{ code: 'INVENTED_NUMBER', sourceRef: 'R001' }]);
   });

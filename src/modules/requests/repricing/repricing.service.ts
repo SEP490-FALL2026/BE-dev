@@ -6,9 +6,8 @@ import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { pricedPeople } from '../access-request/group-request.types';
 import { AccessRequestNotPriceableError } from '../access-request/access-request.errors';
 import type { AccessRequestRecord, PricingRecord } from '../access-request/access-request.types';
-import { AssessmentIncompleteError, AssessmentQuoteRefusedError } from './assessment.errors';
 import { AssessmentReadRepo } from '../access-request/assessment-read.repo';
-import { QuoteService } from './quote.service';
+import { priceFromQuote, pricingRecordOfQuote } from './quote-pricing.policy';
 import { RequestFactsService } from '../access-request/request-facts.service';
 
 /** The people a request is priced for: all of them, and for a group those who have not been refused, withdrawn or left out. */
@@ -27,7 +26,6 @@ const peopleOf = (request: AccessRequestRecord): number =>
 export class RepricingService {
   constructor(
     private readonly assessment: RequestFactsService,
-    private readonly quotes: QuoteService,
     private readonly assessments: AssessmentReadRepo,
   ) {}
 
@@ -64,17 +62,15 @@ export class RepricingService {
         nextYearAmount: null,
       };
     }
-    try {
-      return this.quotes.price(
-        assessment.quote,
-        { beneficiaries: peopleOf(request), endDate: request.expectedEndDate },
-        { checkDate: asOf },
-      );
-    } catch (error) {
-      if (error instanceof AssessmentIncompleteError || error instanceof AssessmentQuoteRefusedError) {
-        throw new AccessRequestNotPriceableError();
-      }
-      throw error;
-    }
+    const priced = priceFromQuote({
+      quote: assessment.quote,
+      beneficiaries: peopleOf(request),
+      checkDate: asOf,
+      endDate: request.expectedEndDate,
+    });
+    // A quote that is not in force, has no price or is too large is a request that cannot be priced that day.
+    if (priced.status === 'REFUSED') throw new AccessRequestNotPriceableError();
+
+    return pricingRecordOfQuote(priced, request.expectedEndDate);
   }
 }

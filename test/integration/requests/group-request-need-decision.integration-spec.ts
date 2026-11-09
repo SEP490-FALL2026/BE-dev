@@ -2,6 +2,9 @@ import { GroupHarness, type LineWire } from '../../support/group-harness';
 import type { Unit } from '../../support/spend-harness';
 
 const h = new GroupHarness();
+const M = 1_000_000;
+/** The months of a request that names no end date: the months left of the year, the month of today counted whole (`BR-MF1-06`). */
+const monthsLeft = h.monthsOf(12);
 
 interface RequestWire {
   id: string;
@@ -61,7 +64,7 @@ describe('the need of the people of a request for a group, decided one by one ov
 
       expect(h.dataOf<{ request: RequestWire }>(decided).request).toMatchObject({
         state: 'AWAITING_SPEND_SUBMISSION',
-        pricing: { amount: { amount: '24000000' } },
+        pricing: { amount: { amount: String(2 * M * monthsLeft) } },
       });
       expect(await h.lineStates(request.id)).toEqual(['NEED_CONFIRMED', 'NEED_CONFIRMED', 'NEED_REJECTED']);
       const lines = await lineList(request.id, e1.account);
@@ -177,7 +180,8 @@ describe('the need of the people of a request for a group, decided one by one ov
         .decideLines(request.id, { lines: both, termConfirmation: { reason: 'A long project' } }, u.head.account)
         .expect(422);
 
-      expect(h.codeOf(long)).toBe('VALIDATION_ERROR');
+      // An end date past a year from today is the domain's refusal (`US-05-23` AC-9); the confirmation in words is a field that is gone.
+      expect(h.codeOf(long)).toBe('GROUP_REQUEST.TERM_BEYOND_LIMIT');
       expect(h.codeOf(confirmed)).toBe('VALIDATION_ERROR');
       expect(await h.lineStates(request.id)).toEqual(['AWAITING_NEED', 'AWAITING_NEED']);
     });
@@ -251,7 +255,7 @@ describe('the need of the people of a request for a group, decided one by one ov
       const request2 = h.dataOf<{ request: RequestWire }>(
         await h.fetch(request.id, u.head.account).expect(200),
       ).request;
-      expect(request2.pricing.amount?.amount).toBe('24000000');
+      expect(request2.pricing.amount?.amount).toBe(String(2 * M * monthsLeft));
     });
 
     it('sends the group on once both steps are decided, when an Employee sent it with the head among the people', async () => {

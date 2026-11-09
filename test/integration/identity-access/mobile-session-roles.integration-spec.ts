@@ -239,11 +239,7 @@ describe('the mobile channel signs in, keeps its session and reads its roles exa
       const planId = await h.plan('K5');
       const token = employee.account.accessToken;
       await get('/api/v1/notifications', token).expect(200);
-      await request(h.server())
-        .post('/api/v1/access-requests/preview')
-        .set(bearer(token))
-        .send({ planId, termMonths: 6 })
-        .expect(200);
+      await request(h.server()).post('/api/v1/access-requests/preview').set(bearer(token)).send({ planId }).expect(200);
       const requests = await h.requestRows();
 
       await adminPost(`/api/v1/app-users/${employee.account.appUserId}/lock`, {
@@ -255,7 +251,7 @@ describe('the mobile channel signs in, keeps its session and reads its roles exa
         get('/api/v1/notifications', token),
         get('/api/v1/notifications/unread-count', token),
         get('/api/v1/access-requests/drafts', token),
-        request(h.server()).post('/api/v1/access-requests/preview').set(bearer(token)).send({ planId, termMonths: 6 }),
+        request(h.server()).post('/api/v1/access-requests/preview').set(bearer(token)).send({ planId }),
         request(h.server()).post('/api/v1/access-requests').set(bearer(token)).send(h.form(planId)),
         request(h.server()).post('/api/v1/notifications/read-all').set(bearer(token)),
       ];

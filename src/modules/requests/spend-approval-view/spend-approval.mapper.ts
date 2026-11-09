@@ -171,6 +171,7 @@ function requestView(facts: DetailFacts): ApprovalDetailWire['request'] {
     costCenter: { id: center.id, code: center.code },
     businessReason: request.businessReason,
     termMonths: request.termMonths,
+    expectedEndDate: request.expectedEndDate,
     budgetYear: request.pricing.budgetYear,
   };
 }

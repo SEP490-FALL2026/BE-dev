@@ -190,7 +190,8 @@ export interface AccessRequestRecord {
   /** Null only for a free internal request of a department that has no Cost Center in use (`QĐ-87g(2)`): nothing is charged. */
   costCenterId: string | null;
   businessReason: string;
-  termMonths: number;
+  /** Null for a request made after `QĐ-104a`: it has an end date or none, never months. */
+  termMonths: number | null;
   pricing: PricingRecord;
   /** The line of the plan of the budget it is attached to; null when it is attached to none. */
   planLine: { versionId: string; position: number; confirmed: boolean } | null;

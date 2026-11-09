@@ -129,15 +129,11 @@ describe('the lock of the Cost Center and the year under the check of a request 
     expect(await checks(id)).toEqual([{ number: 1, route: 'FINANCE_REVIEW' }]);
   });
 
-  it('takes the lock of every year that binds, not only the first', async () => {
+  it('QĐ-109: takes the lock of the year the amount is counted in, whichever year that is', async () => {
+    // Rewritten from "the lock of every year that binds": a request has one year now, which may be the next.
     const { u } = await unit();
     const id = await h.paidRequest(u, plan, { amount: 10 * M });
-    await h.setPayments(id, {
-      schedule: [
-        { dueOn: `${h.year}-06-15`, amount: 10 * M, year: h.year },
-        { dueOn: `${h.next}-03-15`, amount: 10 * M, year: h.next },
-      ],
-    });
+    await h.setPayments(id, { amount: 10 * M, year: h.next });
     const holder = await hold(u.department.unitId, h.next);
     let routed: Promise<unknown> = Promise.resolve();
     try {

@@ -1,3 +1,4 @@
+import { fromDateColumn } from '../../../core/business-date';
 import { formatAmount } from '../../../core/money/money';
 import type { CatalogApi } from '../../catalog/public/catalog.api';
 import type { DepartmentBrief } from '../../organization/public/organization.types';
@@ -69,7 +70,8 @@ export function needQueueItemOf(row: NeedQueueRow, lookups: NeedQueueLookups): N
     lineCount: isGroup ? row._count.lines : request._count.beneficiaries,
     department: { id: department.id, code: department.code, name: department.name },
     businessReasonExcerpt: reasonExcerptOf(request.businessReason),
-    termMonths: request.termMonths ?? 0,
+    termMonths: request.termMonths,
+    expectedEndDate: request.expectedEndDate ? fromDateColumn(request.expectedEndDate) : null,
     pricing: pricingOf(request, lookups.units),
     samePersonAsSpend: row.samePersonAsSpend,
   };

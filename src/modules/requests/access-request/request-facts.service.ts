@@ -277,7 +277,7 @@ export class RequestFactsService {
       from?: BusinessDate;
     },
   ): Promise<PricingRecord> {
-    if (input.free) return NOT_APPLICABLE_PRICING;
+    if (input.free) return { ...NOT_APPLICABLE_PRICING, expectedEndDate: input.endDate };
     const price = await this.catalog.getPlanPrice(input.planId, tx);
     const kind = price?.kind ?? 'RECURRING';
     const priced = requestAmountOf({

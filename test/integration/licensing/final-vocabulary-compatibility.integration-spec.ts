@@ -102,7 +102,7 @@ describe('the vocabulary and the unnamed actors of the next release, read by the
     it('reads the check of the budget that Finance’s outcome made again, with its trigger (F65)', async () => {
       const unit = await h.departmentWithHead(`P-VC-${(sequence += 1)}`);
       await h.budgetFor(unit, { total: 100 * M });
-      const requestId = await h.paidRequest(unit, paidPlan, { year: h.year, dueOn: `${h.year}-12-15`, amount: 10 * M });
+      const requestId = await h.paidRequest(unit, paidPlan, { year: h.year, amount: 10 * M });
       const outcome = await h.route(requestId, unit.head.account);
       if (outcome.status !== 'ROUTED') throw new Error(`not checkable: ${outcome.reason}`);
       const updated = await rewrite(

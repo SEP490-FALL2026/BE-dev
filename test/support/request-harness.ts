@@ -1,7 +1,8 @@
 import type { AssessmentWire } from '../../src/modules/requests/assessment/assessment.dto';
 import type { PreviewWire } from '../../src/modules/requests/request-submission/request-preview.dto';
 import request from 'supertest';
-import { effectiveEndOf } from '../../src/core/term-limit';
+import { addDays } from '../../src/core/business-date';
+import { addMonths } from '../../src/core/fiscal-year';
 import { ApiAccount } from './api-accounts';
 import { declareSubscription } from './builders/catalog.builder';
 import { clearSpendingApprover, insertEmployeeWithoutPlacement, setSpendingApprover } from './builders/account.builder';
@@ -49,7 +50,6 @@ export interface AccessRequestWire {
   businessReason: string;
   termMonths: number | null;
   expectedEndDate: string | null;
-  expectedSpendOn: string | null;
   budgetYear: number | null;
   pricing: {
     status: 'NOT_APPLICABLE' | 'PRICED' | 'MISSING';
@@ -61,10 +61,6 @@ export interface AccessRequestWire {
     months: number | null;
     monthlyPrice: { amount: string; currency: string } | null;
     nextYearAmount: { amount: string; currency: string } | null;
-    periodCount: number | null;
-    bindingPeriodCount: number | null;
-    firstDueOn: string | null;
-    lastDueOn: string | null;
   };
   policy: { version: number; hasSpendStep: boolean; slaWorkingDays: number };
   submittedAt: string;
@@ -196,7 +192,7 @@ export class RequestHarness extends ProvisioningHarness {
   }
 
   submit = (body: object, account: ApiAccount) =>
-    request(this.server()).post('/api/v1/access-requests').set(this.as(account)).send(body);
+    request(this.server()).post('/api/v1/access-requests').set(this.as(account)).send(this.endDated(body));
   /** Notes the department of a request made through `sent` and `proposed`, so that the seat it takes is on the subscription the department owns (F20). */
   private remember(wire: AccessRequestWire): AccessRequestWire {
     this.owned.noteRequest(wire.id, wire.department.id);
@@ -211,7 +207,7 @@ export class RequestHarness extends ProvisioningHarness {
     request(this.server()).get(`/api/v1/access-requests/${id}`).set(this.as(account));
 
   previewRequest = (body: object, account: ApiAccount) =>
-    request(this.server()).post('/api/v1/access-requests/preview').set(this.as(account)).send(body);
+    request(this.server()).post('/api/v1/access-requests/preview').set(this.as(account)).send(this.endDated(body));
 
   /** The preview of a request for the plan, failing on anything but 200. */
   async previewed(person: Person, planId: string, extra: Record<string, unknown> = {}): Promise<PreviewWire> {
@@ -228,11 +224,10 @@ export class RequestHarness extends ProvisioningHarness {
     purpose: 'Whiteboards for design reviews',
     dataDescription: 'Product design boards',
     expectedUsers: 5,
-    termMonths: 6,
-    ...extra,
+    ...this.endDated(extra),
   });
   propose = (body: object, account: ApiAccount) =>
-    request(this.server()).post('/api/v1/access-requests/proposals').set(this.as(account)).send(body);
+    request(this.server()).post('/api/v1/access-requests/proposals').set(this.as(account)).send(this.endDated(body));
 
   /** Sends the proposal and returns the request, failing on anything but 201. */
   async proposed(person: Person, extra: Record<string, unknown> = {}): Promise<AccessRequestWire> {
@@ -279,8 +274,6 @@ export class RequestHarness extends ProvisioningHarness {
       billingCycle: 'MONTHLY',
       validFrom: '2026-01-01',
       validUntil: null,
-      commitmentMonths: 6,
-      paymentFrequency: 'MONTHLY',
     },
     ...extra,
   });
@@ -311,16 +304,19 @@ export class RequestHarness extends ProvisioningHarness {
       .send({ group: 'T2', lines });
 
   /**
-   * A test that still says how long in months, said in the way the API takes it: the day the right ends, `termMonths` months from
-   * today (`QĐ-104a`). No `termMonths` is no end date.
+   * A test that still says how long in months, said in the way the API takes it: the last day of the `termMonths`th month from the month
+   * of today (`QĐ-104a`; the month of today and the month of the end are counted whole, `BR-MF1-06`). No `termMonths` is no end date.
    */
-  endDated = (extra: Record<string, unknown>): Record<string, unknown> => {
-    const { termMonths, ...rest } = extra;
+  endDated = <T extends object>(extra: T): Record<string, unknown> => {
+    const { termMonths, ...rest } = extra as Record<string, unknown>;
 
     return typeof termMonths === 'number'
-      ? { ...rest, expectedEndDate: effectiveEndOf({ start: this.today(), months: termMonths }) }
+      ? { ...rest, expectedEndDate: addDays(addMonths(`${this.today().slice(0, 8)}01`, termMonths), -1) }
       : rest;
   };
+
+  /** The months of the amount of a request that runs `months` months from the month of today: the months left of the year at most (`BR-MF1-06`). */
+  monthsOf = (months: number): number => Math.min(months, 12 - Number(this.today().slice(5, 7)) + 1);
 
   /** A form of `BM-01` for the plan, complete: a right with no end unless `extra` gives an end date or `termMonths`. */
   form = (planId: string, extra: Record<string, unknown> = {}) => ({

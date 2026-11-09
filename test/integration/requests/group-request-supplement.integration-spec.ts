@@ -2,6 +2,9 @@ import { GroupHarness } from '../../support/group-harness';
 import type { Unit } from '../../support/spend-harness';
 
 const h = new GroupHarness();
+const M = 1_000_000;
+/** The months of a request that names no end date: the months left of the year, the month of today counted whole (`BR-MF1-06`). */
+const monthsLeft = h.monthsOf(12);
 
 interface SupplementWire {
   number: number;
@@ -61,7 +64,7 @@ describe('the head leaves people of a group out of the supplementary file over P
       number: 1,
       reason: 'Left the team',
       droppedCount: 1,
-      amount: { before: { amount: '60000000' }, after: { amount: '48000000' } },
+      amount: { before: { amount: String(5 * M * monthsLeft) }, after: { amount: String(4 * M * monthsLeft) } },
     });
     expect(file).not.toHaveProperty('expectedSpendOn');
     expect(await h.lineStates(id)).toEqual([
@@ -71,7 +74,7 @@ describe('the head leaves people of a group out of the supplementary file over P
       'NEED_CONFIRMED',
       'DROPPED',
     ]);
-    expect(await amountOf(id, u.head.account)).toBe('48000000');
+    expect(await amountOf(id, u.head.account)).toBe(String(4 * M * monthsLeft));
     expect(await h.state(id)).toBe('AWAITING_SPEND_SUBMISSION');
     const dropped = await h.ctx.sql.query<{ employee_id: string }>(
       `SELECT employee_id FROM request_supplement_drops WHERE request_id = $1 AND number = 1`,
@@ -118,7 +121,7 @@ describe('the head leaves people of a group out of the supplementary file over P
       )
       .expect(422);
     expect(h.codeOf(withDay)).toBe('VALIDATION_ERROR');
-    expect(await amountOf(id, u.head.account)).toBe('36000000');
+    expect(await amountOf(id, u.head.account)).toBe(String(3 * M * monthsLeft));
 
     const file = supplement(
       await h
@@ -127,7 +130,7 @@ describe('the head leaves people of a group out of the supplementary file over P
     );
 
     expect(file.droppedCount).toBe(1);
-    expect(await amountOf(id, u.head.account)).toBe('24000000');
+    expect(await amountOf(id, u.head.account)).toBe(String(2 * M * monthsLeft));
   });
 
   describe('what is refused', () => {

@@ -74,7 +74,7 @@ export class SubscriptionFactsService {
   pricedCyclesOfPlans(
     planIds: readonly string[],
     tx?: DbTx,
-  ): Promise<ReadonlyMap<string, 'MONTHLY' | 'QUARTERLY' | 'ANNUAL' | 'OTHER'>> {
+  ): Promise<ReadonlyMap<string, 'MONTHLY' | 'QUARTERLY' | 'ANNUAL' | 'OTHER' | 'ONE_TIME'>> {
     return this.subscriptions.findPricedCyclesOfPlans(planIds, tx);
   }
 

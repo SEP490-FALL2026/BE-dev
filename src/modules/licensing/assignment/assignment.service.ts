@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { normalizeAccountIdentifier } from '../public/account-identifier.policy';
 import type { BusinessDate } from '../../../core/business-date';
-import { TERM_LIMIT_MONTHS, termEndOf } from '../../../core/term-limit';
+import { endAfterGrant } from '../../../core/term-limit';
 import { DbTx, TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../../audit/public/audit.api';
@@ -292,13 +292,10 @@ export class AssignmentService {
   async recordGranted(tx: DbTx, assignmentId: string, grantedOn: BusinessDate): Promise<void> {
     const current = await this.repo.find(assignmentId, tx);
     if (!current) throw new AssignmentNotFoundError();
-    const cap = termEndOf(grantedOn, TERM_LIMIT_MONTHS);
-    const expectedEndDate =
-      current.expectedEndDate === null || current.expectedEndDate > cap ? cap : current.expectedEndDate;
 
     await this.repo.markGranted(tx, assignmentId, {
       grantedOn,
-      expectedEndDate: current.expectedEndDate === null ? null : expectedEndDate,
+      expectedEndDate: endAfterGrant({ expectedEndDate: current.expectedEndDate, grantedOn }),
     });
   }
 

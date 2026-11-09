@@ -1,3 +1,4 @@
+import type { BusinessDate } from '../../../core/business-date';
 import type {
   AccessRequestKind,
   AccessRequestState,
@@ -50,7 +51,8 @@ export interface MyRequestRow {
   branch: AccessRequestBranchCode;
   state: SentState;
   planId: string | null;
-  termMonths: number;
+  termMonths: number | null;
+  expectedEndDate: BusinessDate | null;
   submittedAt: Date;
   updatedAt: Date;
   /** Whether the chain of the request has a spend step: only then is there a stage on the way to the spending approver. */

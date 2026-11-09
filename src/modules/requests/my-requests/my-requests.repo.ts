@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { fromDateColumn } from '../../../core/business-date';
 import type { Prisma } from '../../../generated/prisma/client';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { requestPolicyJson } from '../access-request/access-request.json';
@@ -15,6 +16,7 @@ const SELECT_ROW = {
   state: true,
   planId: true,
   termMonths: true,
+  expectedEndDate: true,
   submittedAt: true,
   updatedAt: true,
   withdrawalRequestedAt: true,
@@ -45,7 +47,8 @@ function toRow(row: Row): MyRequestRow {
     // The filter of the page has no draft among its states.
     state: row.state as SentState,
     planId: row.planId,
-    termMonths: row.termMonths ?? 0,
+    termMonths: row.termMonths,
+    expectedEndDate: row.expectedEndDate ? fromDateColumn(row.expectedEndDate) : null,
     submittedAt: row.submittedAt,
     updatedAt: row.updatedAt,
     hasSpendStep: hasSpendStep(requestPolicyJson.decode(row.policy)),

@@ -56,7 +56,10 @@ const needQueueItemSchema = z.strictObject({
   department: z.strictObject({ id: z.uuid(), code: z.string(), name: z.string() }),
   /** The first part of the reason the sender gave; the request has all of it. */
   businessReasonExcerpt: z.string(),
-  termMonths: z.number().int().positive(),
+  /** Only a request made before `QĐ-104a` has a term in months. */
+  termMonths: z.number().int().positive().nullable(),
+  /** The day the right ends as the sender chose it; null for a right with no end (`QĐ-104a`). */
+  expectedEndDate: z.string().nullable(),
   /** Approving needs the caller to confirm the term in so many words (a term over twelve months). */
   /** What this request costs, as the request itself says; never what is left of a budget. */
   pricing: z.strictObject({

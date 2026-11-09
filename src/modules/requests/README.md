@@ -56,7 +56,7 @@ controller) và `requests-work-facade.module.ts` (phần worker chạy, API dùn
 ## Tầng trong module
 
 Đồ thị capability → capability của `requests` **không có vòng** (R6; `pnpm arch:capabilities --module requests`, gate
-`capability-graph`): 39 capability, 118 cạnh. Cạnh đi từ tầng cao xuống tầng thấp hoặc ngang tầng, không vòng. **Cột tầng do lệnh tính** từ
+`capability-graph`): 39 capability, 117 cạnh. Cạnh đi từ tầng cao xuống tầng thấp hoặc ngang tầng, không vòng. **Cột tầng do lệnh tính** từ
 cùng đồ thị gate dùng, không viết tay, và `scripts/verify/capability-graph.test.mjs` đọc bảng này so với lệnh (lệch thì test đỏ): có
 controller thì L3; còn lại, không import capability nào thì L0, chỉ import L0 thì L1, import ít nhất một L1 hoặc L2 thì L2.
 
@@ -67,7 +67,7 @@ import `spend`, nên theo luật tầng chúng là L2, và `status` (không cont
 | Tầng | Capability                                                                                                                                                                                                                                                                                                                                                                                                                                          | Quy tắc                                               |
 | ---- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------- |
 | L0   | `access-request` (lõi: bản ghi, repo, policy, types, errors, định tuyến, giá, `assessment-read.repo`, `withdrawal.policy`), `outcome`; `status` (cô lập: không import, không ai import, không controller; lệnh in `L0 (cô lập)`)                                                                                                                                                                                                                    | không import capability nào của `requests` (gate)     |
-| L1   | lõi nhánh, không controller: `step-routing`, `request-draft`, `renewal-apply`                                                                                                                                                                                                                                                                                                                                                                       | chỉ import L0                                         |
+| L1   | lõi nhánh, không controller: `step-routing`, `request-draft`, `renewal-apply`, `repricing`                                                                                                                                                                                                                                                                                                                                                          | chỉ import L0                                         |
 | L2   | dịch vụ dùng chung, không controller: `spend`, `request-intake`, `request-view`, `assessment`, `budget-information`, `group-request`, `grant`, `request-end`, `spend-approval-view`                                                                                                                                                                                                                                                                 | import ít nhất một L1 hoặc L2, không vòng             |
 | L3   | use case lá, có controller: `proposal-review`, `budget-questions`, `group-line-decisions`, `need-decision`, `need-decision-queue`, `my-requests`, `assessment-queue`, `withdraw`, `finance-review`, `spend-submission`, `spend-approval`, `request-submission`, `cancellation`, `reassignment`, `return-request`, `timing`, `grant-queue`, `renewal-request`, `service-account-request`, `group-request-submission`, `line-closure`, `draft`, `sla` | không ai import lên, trừ năm ngoại lệ dưới đây (gate) |
 
@@ -103,7 +103,9 @@ cùng cần; phần ghi nằm ở `assessment/assessment.repo.ts`.
 - **Lõi và dùng chung (không controller)**
   - `access-request/` — `access-request.repo.ts` (writer duy nhất của `access_requests`, `access_request_beneficiaries`,
     `access_request_steps`), `assessment-read.repo.ts`, `routing.policy.ts` + `routing-facts.service.ts` (định tuyến bước nhu cầu),
-    `pricing.policy.ts`, `request-facts.service.ts` (đọc mọi sự kiện mà một request được xét bởi: phòng ban, kế hoạch, giá, người
+    `pricing.policy.ts` (`requestAmountOf`: giá tháng của thuê bao chính × số tháng còn lại của năm của `asOf`, tháng đầu/cuối tính đủ; `K4` = giá mua;
+    Request tiếp tục có kỳ mới năm sau ⟹ 0 + `nextYearAmount`, QĐ-109b; mốc `asOf` theo QĐ-109e: gửi = tạm tính, mỗi lần `BudgetCheckService.run`
+    tính lại và ghi `ACCESS_REQUEST.REPRICED`), `request-facts.service.ts` (đọc mọi sự kiện mà một request được xét bởi: phòng ban, kế hoạch, giá, người
     giữ ghế, định tuyến; trước đây `request-assessment.service`), `need-decision.policy.ts`, `withdrawal.policy.ts`. Con:
     `open-request/`.
   - `outcome/` — `RequestOutcomeService`: mọi service kết thúc request phát `requests.outcome` qua đây.
@@ -135,9 +137,10 @@ cùng cần; phần ghi nằm ở `assessment/assessment.repo.ts`.
     lại, `WithdrawalWriter` ghi, `withdrawal.policy.ts` ở L0); ba controller khai báo
     ngay sau hub trong `requests.module.ts` để thứ tự path của API không đổi.
   - `draft/` — bản nháp: lưu, liệt kê, gửi, xóa; `request-drafts.controller.ts`; `RequestDraftService`.
-  - `assessment/` — thẩm định phần mềm ngoài catalog, đăng ký nội bộ, nối plan, tính lại giá (US-05-06, US-05-18, US-05-20);
+  - `repricing/` — tính lại số tiền của Request theo ngày (QĐ-109e): `RepricingService` (giá thuê bao chính hoặc báo giá của IT Admin, tính theo `asOf`), `quote-pricing.policy.ts` (số tiền từ báo giá); `spend`, `spend-submission`, `group-request`, `assessment` gọi, không import capability nào ngoài lõi `access-request`.
+  - `assessment/` — thẩm định phần mềm ngoài catalog, đăng ký nội bộ, nối plan (US-05-06, US-05-18, US-05-20);
     `AssessmentQueryService` (đọc), `AssessmentService` (lưu), `AssessmentCompletionService`, `AssessmentRejectionService`, qua cổng chung
-    `AssessmentGate` (khóa đề xuất, người thẩm định, bước của IT Admin); `ProposalService`, `RepricingService`,
+    `AssessmentGate` (khóa đề xuất, người thẩm định, bước của IT Admin); `ProposalService`,
     `need-spend.service.ts`, `internal-registration.service.ts` (đăng ký nội bộ; `internalRegistrationBasis`, `registeredShapeOf`,
     `actsForAssignee` ở `assessment.policy.ts`); `proposal-review/` — `proposals.controller.ts`.
   - `grant-queue/` — hàng đợi cấp của IT Admin (US-03-02; gửi thay một người đã gỡ, QĐ-96); `cancellation/` — IT Admin đóng request của người đã nghỉ (US-03-04).
@@ -200,6 +203,6 @@ cùng cần; phần ghi nằm ở `assessment/assessment.repo.ts`.
 ## Test
 
 - Unit: `src/modules/requests/**/*.spec.ts`; HTTP: `test/http/requests/`; integration: `test/integration/requests/`.
-- Codec của cột JSON (`.json.ts`, [database rules](../../../docs/rules/database-business.md)): `access-request/access-request.json.ts` giữ cả
-  `policy` và `payment_schedule`, nên spec của chúng nằm trong `access-request/access-request.policy.spec.ts` và
-  `access-request/pricing.policy.spec.ts` (thư mục đã đủ 25 file); `request-draft/request-draft-policy.json.ts` (`policy` của bản nháp) có spec cạnh file.
+- Codec của cột JSON (`.json.ts`, [database rules](../../../docs/rules/database-business.md)): `access-request/access-request.json.ts` giữ `policy`
+  (`payment_schedule` không còn ghi hay đọc — một số tiền một năm, QĐ-109; cột còn đó, trigger chặn ghi mới), nên spec của nó nằm trong
+  `access-request/access-request.policy.spec.ts` (thư mục đã đủ 25 file); `request-draft/request-draft-policy.json.ts` (`policy` của bản nháp) có spec cạnh file.

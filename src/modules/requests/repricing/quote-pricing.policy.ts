@@ -1,5 +1,6 @@
 import type { BusinessDate } from '../../../core/business-date';
 import type { Money } from '../../../core/money/money';
+import type { PricingRecord } from '../access-request/access-request.types';
 import type { Quote, QuoteCycle } from '../access-request/assessment-record.types';
 import { requestAmountOf } from '../access-request/pricing.policy';
 
@@ -62,5 +63,24 @@ export function priceFromQuote(input: QuotePricingInput): QuotePricing {
     billingCycle: quote.billingCycle,
     months: priced.months,
     budgetYear: priced.budgetYear,
+  };
+}
+
+/** The price a request keeps when the quote prices it: one amount for the months left of the year, the same shape as a plan of the catalog. */
+export function pricingRecordOfQuote(
+  priced: Extract<QuotePricing, { status: 'PRICED' }>,
+  endDate: BusinessDate | null,
+): PricingRecord {
+  return {
+    status: 'PRICED',
+    missingReason: null,
+    kind: 'RECURRING',
+    expectedEndDate: endDate,
+    amountMonths: priced.months,
+    budgetYear: priced.budgetYear,
+    amount: priced.amount,
+    unitPrice: priced.unitPrice,
+    billingCycle: priced.billingCycle,
+    nextYearAmount: null,
   };
 }

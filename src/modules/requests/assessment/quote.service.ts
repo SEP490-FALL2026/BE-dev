@@ -5,7 +5,7 @@ import { FinanceApi } from '../../finance/public/finance.api';
 import type { PricingRecord } from '../access-request/access-request.types';
 import { AssessmentIncompleteError, AssessmentQuoteRefusedError } from './assessment.errors';
 import type { Quote } from '../access-request/assessment-record.types';
-import { priceFromQuote } from './quote-pricing.policy';
+import { priceFromQuote, pricingRecordOfQuote } from '../repricing/quote-pricing.policy';
 import type { AssessmentPatchDto } from './assessment.dto';
 
 /**
@@ -54,17 +54,6 @@ export class QuoteService {
       throw new AssessmentQuoteRefusedError(priced.reason);
     }
 
-    return {
-      status: 'PRICED',
-      missingReason: null,
-      kind: 'RECURRING',
-      expectedEndDate: request.endDate,
-      amountMonths: priced.months,
-      budgetYear: priced.budgetYear,
-      amount: priced.amount,
-      unitPrice: priced.unitPrice,
-      billingCycle: priced.billingCycle,
-      nextYearAmount: null,
-    };
+    return pricingRecordOfQuote(priced, request.endDate);
   }
 }

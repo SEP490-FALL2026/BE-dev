@@ -1,3 +1,4 @@
+import { termEndOf } from '../../../core/term-limit';
 import { as, listAll, tag } from '../demo-step-kit';
 import type { DemoRunContext, DemoStep, StepOutcome } from '../demo-run.types';
 import type { DemoRequestScenario } from '../fixture/demo-fixture.types';
@@ -59,12 +60,12 @@ async function submit(ctx: DemoRunContext, scenario: DemoRequestScenario): Promi
     ? await ctx.api.call<{ request: RequestWire }>(requester, 'POST', '/access-requests/proposals', {
         ...scenario.proposal,
         purpose: text,
-        termMonths: scenario.termMonths,
+        expectedEndDate: termEndOf(ctx.today, scenario.termMonths),
       })
     : await ctx.api.call<{ request: RequestWire }>(requester, 'POST', '/access-requests', {
         planId: ctx.ids.plans.get(scenario.plan ?? ''),
         businessReason: text,
-        termMonths: scenario.termMonths,
+        expectedEndDate: termEndOf(ctx.today, scenario.termMonths),
       });
   ctx.ids.requests.set(scenario.key, created.request.id);
 

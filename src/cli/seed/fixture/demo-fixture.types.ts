@@ -137,6 +137,7 @@ export interface DemoRequestScenario {
   /** A plan of the catalog, or a proposal of software that is not in it. */
   plan?: string;
   proposal?: { softwareName: string; homepageUrl: string; dataDescription: string; expectedUsers: number };
+  /** The months the demo request runs from the day it is sent: the seed turns it into the end date the API takes (`QĐ-104a`). */
   termMonths: number;
   target: DemoRequestTarget;
   /** For COMPLETED: the subscription the IT Admin grants the seat from. */

@@ -184,7 +184,8 @@ describe('requests over HTTP: deciding the need step (integration, real PostgreS
 
       const response = await h.submit(h.form(internalPlan, { termMonths: 13 }), designer.account).expect(422);
 
-      expect(h.codeOf(response)).toBe('VALIDATION_ERROR');
+      // An end date past a year from today is the domain's refusal (`US-05-23` AC-9), not a malformed body.
+      expect(h.codeOf(response)).toBe('ACCESS_REQUEST.END_DATE_OUT_OF_RANGE');
       expect(await h.requestRows()).toBe(before);
     });
 

@@ -2,6 +2,9 @@ import { GroupHarness } from '../../support/group-harness';
 import type { Unit } from '../../support/spend-harness';
 
 const h = new GroupHarness();
+const M = 1_000_000;
+/** The months of a request that names no end date: the months left of the year, the month of today counted whole (`BR-MF1-06`). */
+const monthsLeft = h.monthsOf(12);
 
 interface TaskWire {
   id: string;
@@ -88,7 +91,7 @@ describe('withdrawing one person of a request for a group, or what is left of it
       const request = h.dataOf<{ request: { state: string; pricing: { amount: { amount: string } } } }>(
         await h.fetch(id, u.head.account).expect(200),
       ).request;
-      expect(request.pricing.amount.amount).toBe('24000000');
+      expect(request.pricing.amount.amount).toBe(String(2 * M * monthsLeft));
       expect(await h.commitments(id)).toEqual([]);
       const all = [e1, e2, e3].map((p) => ({ employeeId: p.employeeId, decision: 'APPROVE' }));
       expect(h.codeOf(await h.decideSpendLines(id, { lines: all }, h.boss.account).expect(422))).toBe(

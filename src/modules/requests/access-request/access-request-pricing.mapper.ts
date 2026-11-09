@@ -16,6 +16,7 @@ type PricingRow = Pick<
   | 'amountCurrency'
   | 'unitPriceMinor'
   | 'billingCycle'
+  | 'nextYearAmountMinor'
 >;
 
 export function toPricing(row: PricingRow): PricingRecord {
@@ -31,7 +32,8 @@ export function toPricing(row: PricingRow): PricingRecord {
     amount: row.amountMinor !== null && currency !== null ? { amountMinor: row.amountMinor, currency } : null,
     unitPrice: row.unitPriceMinor !== null && currency !== null ? { amountMinor: row.unitPriceMinor, currency } : null,
     billingCycle: row.billingCycle,
-    nextYearAmount: null,
+    nextYearAmount:
+      row.nextYearAmountMinor !== null && currency !== null ? { amountMinor: row.nextYearAmountMinor, currency } : null,
   };
 }
 
@@ -48,5 +50,6 @@ export function pricingColumns(pricing: PricingRecord) {
     amountCurrency: pricing.amount?.currency ?? null,
     unitPriceMinor: pricing.unitPrice?.amountMinor ?? null,
     billingCycle: pricing.billingCycle,
+    nextYearAmountMinor: pricing.nextYearAmount?.amountMinor ?? null,
   };
 }

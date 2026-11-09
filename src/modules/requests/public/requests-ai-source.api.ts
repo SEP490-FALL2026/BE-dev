@@ -22,7 +22,7 @@ interface SourceRow {
   /** The people on the step of a request for a group, as its queue counts them; null for a request for one person. */
   groupSize: number | null;
   reason: string;
-  termMonths: number;
+  termMonths: number | null;
   price: { minor: bigint; currency: string } | null;
 }
 
@@ -55,7 +55,7 @@ function fromNeedRow(row: NeedQueueRow): SourceRow {
     // The step of a head holds the people of the group still waiting on it, as the queue of the need steps counts them.
     groupSize: group ? row._count.lines : null,
     reason: request.businessReason,
-    termMonths: request.termMonths ?? 0,
+    termMonths: request.termMonths,
     price: null,
   };
 }
@@ -74,7 +74,7 @@ function fromSpendRow(row: SpendRow): SourceRow {
     beneficiaryId: group ? null : (request.beneficiaries[0]?.employeeId ?? null),
     groupSize: group ? request._count.beneficiaries : null,
     reason: request.businessReason,
-    termMonths: request.termMonths ?? 0,
+    termMonths: request.termMonths,
     price:
       request.amountMinor === null || request.amountCurrency === null
         ? null

@@ -12,6 +12,8 @@ describe('requests over HTTP: registering internal software (integration, real P
   let ownIt: Person; // an IT Admin of design who asks for software themselves
   let counter = 0;
   const year = Number(h.today().slice(0, 4));
+  /** The months left of the calendar year of today, the month of today counted whole (`BR-MF1-06a`). */
+  const monthsLeft = 12 - Number(h.today().slice(5, 7)) + 1;
 
   beforeAll(async () => {
     await h.start();
@@ -281,8 +283,6 @@ describe('requests over HTTP: registering internal software (integration, real P
       billingCycle: 'MONTHLY',
       validFrom: `${year}-01-01`,
       validUntil: null,
-      commitmentMonths: 6,
-      paymentFrequency: 'MONTHLY',
       ...over,
     });
 
@@ -296,7 +296,7 @@ describe('requests over HTTP: registering internal software (integration, real P
       expect(done).toMatchObject({
         branch: 'NEW_SOFTWARE',
         state: 'AWAITING_SPEND_SUBMISSION',
-        pricing: { status: 'PRICED', amount: { amount: '48.00', currency: 'USD' }, bindingPeriodCount: 6 },
+        pricing: { status: 'PRICED', amount: { amount: `${8 * monthsLeft}.00`, currency: 'USD' }, months: monthsLeft },
         policy: { hasSpendStep: true },
       });
       expect(done.plan?.planId).toBeTruthy();

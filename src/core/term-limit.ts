@@ -19,6 +19,20 @@ export const termLimitOf = (): TermLimit => ({ maxMonths: TERM_LIMIT_MONTHS });
 /** The last day of a term of `months` months that begins on `start`: the day before the same day `months` later. */
 export const termEndOf = (start: BusinessDate, months: number): BusinessDate => addDays(addMonths(start, months), -1);
 
+/**
+ * The end a seat has once its grant is completed on `grantedOn` (`BR-MF1-06a`, `QĐ-106b`): the end the request asked for, at the latest a
+ * year after that day, the day before the same day twelve months later. A right with no end keeps none.
+ */
+export const endAfterGrant = (facts: {
+  expectedEndDate: BusinessDate | null;
+  grantedOn: BusinessDate;
+}): BusinessDate | null => {
+  if (facts.expectedEndDate === null) return null;
+  const latest = termEndOf(facts.grantedOn, TERM_LIMIT_MONTHS);
+
+  return facts.expectedEndDate > latest ? latest : facts.expectedEndDate;
+};
+
 /** The limit when the term is longer than a request may ask for, or null when it is allowed. */
 export function checkTerm(facts: { months: number }): TermLimit | null {
   const limit = termLimitOf();

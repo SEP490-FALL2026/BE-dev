@@ -79,7 +79,7 @@ describe('the head decides the need step on the phone (US-16-02, integration)', 
 
       expect(read).toMatchObject({
         businessReason: 'The project needs a wiki',
-        termMonths: 1,
+        expectedEndDate: h.endDated({ termMonths: 1 }).expectedEndDate,
         pricing: { status: 'PRICED' },
         needStep: { state: 'PENDING', assignee: { employeeId: design.head.employeeId } },
       });
@@ -152,10 +152,13 @@ describe('the head decides the need step on the phone (US-16-02, integration)', 
         design.head.account,
       ).expect(422);
 
-      expect(h.codeOf(long)).toBe('VALIDATION_ERROR');
+      // An end date past a year from today is refused as the domain says it (`US-05-23` AC-9); the confirmation in words is a field that is gone.
+      expect(h.codeOf(long)).toBe('ACCESS_REQUEST.END_DATE_OUT_OF_RANGE');
       expect(h.codeOf(confirmed)).toBe('VALIDATION_ERROR');
       expect(await records(r1.id)).toEqual([]);
-      expect((await wire(r1.id, design.head.account)).termMonths).toBe(12);
+      expect((await wire(r1.id, design.head.account)).expectedEndDate).toBe(
+        h.endDated({ termMonths: 12 }).expectedEndDate,
+      );
     });
   });
 

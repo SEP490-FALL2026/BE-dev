@@ -164,8 +164,8 @@ describe('batches and supplementary files (integration, PostgreSQL constraints)'
         number: 1,
         reason: 'The purchase moved',
         changed_by_employee_id: unit.head.employeeId,
-        before_expected_spend_on: '2026-12-20',
-        after_expected_spend_on: '2027-01-15',
+        before_expected_end_date: null,
+        after_expected_end_date: '2026-12-20',
         before_budget_year: 2026,
         after_budget_year: 2027,
         before_amount_minor: 100,
@@ -182,13 +182,13 @@ describe('batches and supplementary files (integration, PostgreSQL constraints)'
       return { state, row };
     };
 
-    it('takes a change of day with its reason and what it cost before and after', async () => {
+    it('takes a shorter term with its reason and what it cost before and after', async () => {
       expect((await supplement()).state).toBeNull();
     });
 
     it.each([
       ['no reason', { reason: ' ' }],
-      ['the same day and the same cost', { after_expected_spend_on: '2026-12-20', after_amount_minor: 100 }],
+      ['the same end date and the same cost', { after_expected_end_date: null, after_amount_minor: 100 }],
       ['a cost below nothing', { before_amount_minor: -1 }],
       ['a number of nothing', { number: 0 }],
     ])('refuses %s', async (_name, over) => {

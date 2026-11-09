@@ -3,6 +3,8 @@ import type { Unit } from '../../support/spend-harness';
 
 const h = new GroupHarness();
 const M = 1_000_000;
+/** The months of a request that names no end date: the months left of the year, the month of today counted whole (`BR-MF1-06`). */
+const monthsLeft = h.monthsOf(12);
 
 interface Detail {
   spendApproval: { step: { state: string }; request: { beneficiary: unknown; lineCount: number } };
@@ -79,7 +81,7 @@ describe('the spend of the people of a request for a group, decided one by one o
       // the tax that is not deducted, and the commitments of the years add up to the shares of the four.
       const commitments = await h.commitments(id);
       expect(commitments.length).toBeGreaterThanOrEqual(1);
-      expect(total(commitments)).toBeGreaterThanOrEqual(BigInt(4 * 12 * M));
+      expect(total(commitments)).toBeGreaterThanOrEqual(BigInt(4 * monthsLeft * M));
       const shares = await h.shares(id);
       expect(total(shares)).toBe(total(commitments));
       expect(new Set(shares.map((share) => share.employee_id)).size).toBe(4);
@@ -226,7 +228,7 @@ describe('the spend of the people of a request for a group, decided one by one o
       expect(waitingRow).toMatchObject({ beneficiary: null, lineCount: 3 });
       expect(panel.spendApproval.request).toMatchObject({ beneficiary: null, lineCount: 3 });
       expect(lines.map((line) => [line.employee.employeeId, line.cost?.amount])).toEqual(
-        people.map((person) => [person.employeeId, '12000000']),
+        people.map((person) => [person.employeeId, String(1 * M * monthsLeft)]),
       );
     });
   });

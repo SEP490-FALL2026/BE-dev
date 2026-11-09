@@ -65,7 +65,10 @@ export const myRequestSummarySchema = z.strictObject({
   beneficiary: employeeRef.nullable(),
   /** How many people the request is for: 1 for any request but one for a group. */
   lineCount: z.number().int().positive(),
-  termMonths: z.number().int().positive(),
+  /** Only a request made before `QĐ-104a` has a term in months. */
+  termMonths: z.number().int().positive().nullable(),
+  /** The day the right ends as the sender chose it; null for a right with no end (`QĐ-104a`). */
+  expectedEndDate: z.string().nullable(),
   submittedAt: z.iso.datetime(),
   /** The last time the record of the request was changed. */
   updatedAt: z.iso.datetime(),

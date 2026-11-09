@@ -4,6 +4,9 @@ import type { Person } from '../../support/request-harness';
 import type { Unit } from '../../support/spend-harness';
 
 const h = new GroupHarness();
+const M = 1_000_000;
+/** The months of a request that names no end date: the months left of the year, the month of today counted whole (`BR-MF1-06`). */
+const monthsLeft = h.monthsOf(12);
 const CHECK = '23514';
 const FINAL = '55000';
 
@@ -113,7 +116,7 @@ describe('removing a person who left from a request for a group (integration, re
       expect(rows[0].cancel_cause).toBeNull();
       const wire = h.dataOf<{ request: { state: string; pricing: { amount: { amount: string } } } }>(closed).request;
       expect(wire.state).toBe('AWAITING_SPEND_DECISION');
-      expect(wire.pricing.amount.amount).toBe('24000000');
+      expect(wire.pricing.amount.amount).toBe(String(2 * M * monthsLeft));
       expect(await h.commitments(id)).toEqual([]);
       const all = [e1, e2, e3].map((p) => ({ employeeId: p.employeeId, decision: 'APPROVE' }));
       expect(h.codeOf(await h.decideSpendLines(id, { lines: all }, h.boss.account).expect(422))).toBe(

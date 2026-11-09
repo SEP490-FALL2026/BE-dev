@@ -3,6 +3,7 @@ import request from 'supertest';
 import type { AuthenticatedPrincipal } from '../../src/infrastructure/security/tokens/access-token-verifier.port';
 import { TransactionRunner } from '../../src/infrastructure/database/transaction-runner';
 import { AccessRequestRepo } from '../../src/modules/requests/access-request/access-request.repo';
+import { FrozenAmounts } from './frozen-amounts';
 import type { CheckTrigger } from '../../src/modules/requests/spend/budget-check.repo';
 import { SpendRoutingService, type RoutingOutcome } from '../../src/modules/requests/spend/spend-routing.service';
 import type { ApiAccount } from './api-accounts';
@@ -18,14 +19,12 @@ export interface Unit {
   member: Person;
 }
 
-/** What a request that costs money says of its payments, written over the request the real routes made. */
+/** What a request that costs money says of its amount, written over the request the real routes made (one amount for one year, `QĐ-109`). */
 export interface PaidSpec {
-  /** One payment in this year, on `dueOn` or on the 15th of June. Ignored when `schedule` is given. */
+  /** The amount of the request, in minor units. */
   amount?: number;
+  /** The year the amount is counted in. */
   year?: number;
-  dueOn?: string;
-  /** Every payment of the request, and whether it binds the company. */
-  schedule?: Array<{ dueOn: string; amount: number; year: number; binding?: boolean }>;
   currency?: string;
 }
 
@@ -123,27 +122,29 @@ export class SpendHarness extends BudgetHarness {
     return sent.id;
   }
 
-  /** Writes the payments of a request over what the real routes made of it. */
+  /**
+   * Writes the amount of a request over what the real routes made of it, and keeps it: every check of the budget works the amount out
+   * again for its day (`QĐ-109e`), which a suite about the check cannot have, since it says what the amount is. The repricing has
+   * its own suite (`request-amount-term.integration-spec.ts`); `thawAmounts` gives it back to a test that wants it.
+   */
   async setPayments(requestId: string, spec: PaidSpec): Promise<void> {
     const year = spec.year ?? this.year;
-    const schedule = spec.schedule ?? [
-      { dueOn: spec.dueOn ?? `${year}-06-15`, amount: spec.amount ?? 1_000_000, year, binding: true },
-    ];
-    const periods = schedule.map((period) => ({
-      dueOn: period.dueOn,
-      amountMinor: String(period.amount),
-      budgetYear: period.year,
-      binding: period.binding ?? true,
-    }));
-    const total = schedule.reduce((sum, period) => sum + period.amount, 0);
     await this.ctx.sql.query(
       `UPDATE access_requests
-          SET amount_minor = $2, amount_currency = $3, payment_schedule = $4::jsonb, budget_year = $5, expected_spend_on = $6,
+          SET amount_minor = $2, amount_currency = $3, budget_year = $4,
               pricing_status = 'PRICED', price_missing_reason = NULL,
               unit_price_minor = COALESCE(unit_price_minor, 1000000), billing_cycle = COALESCE(billing_cycle, 'MONTHLY')
         WHERE id = $1`,
-      [requestId, total, spec.currency ?? this.reporting, JSON.stringify(periods), schedule[0].year, schedule[0].dueOn],
+      [requestId, spec.amount ?? 1_000_000, spec.currency ?? this.reporting, year],
     );
+    this.frozen.freeze(this.ctx.app, requestId);
+  }
+
+  private readonly frozen = new FrozenAmounts();
+
+  /** The requests whose amount a test wrote are priced by the real rule again from now on. */
+  thawAmounts(): void {
+    this.frozen.thaw();
   }
 
   /**

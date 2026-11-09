@@ -1,3 +1,4 @@
+import { termEndOf } from '../../../core/term-limit';
 import { addDays, as, listAll, tag } from '../demo-step-kit';
 import type { DemoRunContext, DemoStep, StepOutcome } from '../demo-run.types';
 
@@ -13,7 +14,7 @@ async function draft(ctx: DemoRunContext): Promise<StepOutcome> {
     kind: 'INDIVIDUAL',
     planId,
     businessReason: `${tag(ctx, 'DRAFT')} Bản nháp chưa gửi.`,
-    termMonths: spec.termMonths,
+    expectedEndDate: termEndOf(ctx.today, spec.termMonths),
   });
 
   return { status: 'done', detail: spec.requester };

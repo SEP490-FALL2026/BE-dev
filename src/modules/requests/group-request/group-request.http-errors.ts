@@ -160,6 +160,8 @@ export const GROUP_REQUEST_ERROR_EXAMPLES = {
   SUPPLEMENT_NOT_IN_QUEUE: example(new SpendSupplementRefusedError('NOT_IN_QUEUE')),
   SUPPLEMENT_NOT_PRICED: example(new SpendSupplementRefusedError('NOT_PRICED')),
   SUPPLEMENT_NO_CHANGE: example(new SpendSupplementRefusedError('NO_CHANGE')),
+  SUPPLEMENT_TERM_NOT_REDUCED: example(new SpendSupplementRefusedError('TERM_NOT_REDUCED')),
+  SUPPLEMENT_END_DATE_OUT_OF_RANGE: example(new SpendSupplementRefusedError('END_DATE_OUT_OF_RANGE')),
   NOT_PRICEABLE: example(new AccessRequestNotPriceableError()),
   LINE_NOT_DROPPABLE: example(new GroupSupplementDropRefusedError('LINE_NOT_DROPPABLE', [PERSON])),
   CANNOT_DROP_LAST_LINE: example(new GroupSupplementDropRefusedError('CANNOT_DROP_LAST_LINE')),

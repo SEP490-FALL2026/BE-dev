@@ -22,7 +22,8 @@ interface QueueItem {
   beneficiary: { employeeId: string } | null;
   requester: { employeeId: string };
   department: { id: string; code: string };
-  termMonths: number;
+  termMonths: number | null;
+  expectedEndDate: string | null;
   pricing: { status: string; amount: { amount: string; currency: string } | null };
   samePersonAsSpend: boolean;
 }
@@ -115,7 +116,9 @@ describe('the queue of the need steps of the person who holds them (integration,
         requester: { employeeId: design.member.employeeId },
         beneficiary: { employeeId: design.member.employeeId },
         department: { id: design.department.id, code: design.department.code },
-        termMonths: 6,
+        // The term is the day it ends now, the last day of the sixth month (`QĐ-104a`), not months.
+        termMonths: null,
+        expectedEndDate: h.endDated({ termMonths: 6 }).expectedEndDate,
         samePersonAsSpend: false,
         pricing: { status: 'PRICED' },
       });
@@ -135,7 +138,10 @@ describe('the queue of the need steps of the person who holds them (integration,
 
       const item = (await queue(design.head.account)).find((row) => row.requestId === free.id);
 
-      expect(item).toMatchObject({ termMonths: 12, pricing: { status: 'NOT_APPLICABLE', amount: null } });
+      expect(item).toMatchObject({
+        expectedEndDate: h.endDated({ termMonths: 12 }).expectedEndDate,
+        pricing: { status: 'NOT_APPLICABLE', amount: null },
+      });
     });
 
     it('carries no figure of a budget, no use of the software and no judgement against a standard set', async () => {

@@ -137,9 +137,7 @@ describe('the draft of a request (integration, PostgreSQL constraints)', () => {
         amount_currency: reportingCurrency,
         unit_price_minor: '100000',
         billing_cycle: 'MONTHLY',
-        expected_spend_on: '2026-11-01',
         budget_year: 2026,
-        payment_schedule: JSON.stringify([{ periodIndex: 1, amountMinor: '100000' }]),
       };
 
       expect((await insertRequest({ ...priced, cost_center_id: null })).refused).toEqual(
@@ -265,7 +263,6 @@ describe('the draft of a request (integration, PostgreSQL constraints)', () => {
   });
 
   describe('a draft is judged by the price and group rules of a request when it is sent (F71)', () => {
-    const SCHEDULE = JSON.stringify([{ dueOn: '2027-01-05', amountMinor: '90', budgetYear: 2027 }]);
     // A function: the plan exists only once the suite has started.
     const priced = () => ({
       branch: 'PAID_IN_CATALOG',
@@ -275,8 +272,6 @@ describe('the draft of a request (integration, PostgreSQL constraints)', () => {
       amount_currency: 'USD',
       unit_price_minor: 15,
       billing_cycle: 'MONTHLY',
-      payment_schedule: SCHEDULE,
-      expected_spend_on: '2027-01-05',
       budget_year: 2027,
     });
 

@@ -74,6 +74,7 @@ describe('a row of the queue of the need steps', () => {
       department: { id: 'dep-1', code: 'P-DES', name: 'Design' },
       businessReasonExcerpt: 'The project needs a wiki',
       termMonths: 6,
+      expectedEndDate: null,
       pricing: { status: 'PRICED', amount: { amount: '123456', currency: 'VND' } },
       samePersonAsSpend: false,
     });
@@ -129,6 +130,16 @@ describe('a row of the queue of the need steps', () => {
 
     expect(needQueueItemOf(row({ request: renewal }), lookups())).toMatchObject({
       termMonths: 3,
+    });
+  });
+
+  it('QĐ-104a: reads the day the right ends as the sender chose it, and none for a right with no end', () => {
+    const ended = row({ request: { termMonths: null, expectedEndDate: new Date('2026-12-31T00:00:00Z') } });
+
+    expect(needQueueItemOf(ended, lookups())).toMatchObject({ termMonths: null, expectedEndDate: '2026-12-31' });
+    expect(needQueueItemOf(row({ request: { termMonths: null } }), lookups())).toMatchObject({
+      termMonths: null,
+      expectedEndDate: null,
     });
   });
 

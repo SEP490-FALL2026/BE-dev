@@ -61,9 +61,9 @@ describe('what the database refuses for the lines of a group request (g5-group-r
       `INSERT INTO access_requests
          (id, organization_id, type, branch, state, plan_id, requester_employee_id, department_id, cost_center_id,
           business_reason, term_months, policy, created_by_app_user_id, pricing_status, price_missing_reason,
-          expected_spend_on, budget_year)
+          budget_year)
        VALUES ($1, $2, $3::"AccessRequestType", $4::"AccessRequestBranch", 'PENDING', $5, $6, $7, $8, 'Design', 6,
-               '{"version":1}'::jsonb, $9, $10::"AccessRequestPricingStatus", $11, $12, $13)`,
+               '{"version":1}'::jsonb, $9, $10::"AccessRequestPricingStatus", $11, $12)`,
       [
         requestId,
         h.seed.organizationId,
@@ -76,7 +76,6 @@ describe('what the database refuses for the lines of a group request (g5-group-r
         randomUUID(),
         paid ? 'MISSING' : 'NOT_APPLICABLE',
         paid ? 'NO_PRICED_SUBSCRIPTION' : null,
-        paid ? '2026-10-24' : null,
         paid ? 2026 : null,
       ],
     );
@@ -331,8 +330,8 @@ describe('what the database refuses for the lines of a group request (g5-group-r
   describe('the supplementary file that leaves people out', () => {
     const supplement = async (made: Made, number: number, over: Record<string, unknown> = {}) => {
       const row = {
-        before_expected_spend_on: '2026-11-01',
-        after_expected_spend_on: '2026-11-01',
+        before_expected_end_date: null as string | null,
+        after_expected_end_date: null as string | null,
         before_amount_minor: 4500,
         after_amount_minor: 3600,
         ...over,
@@ -340,7 +339,7 @@ describe('what the database refuses for the lines of a group request (g5-group-r
 
       return sqlState(
         `INSERT INTO request_supplements
-           (id, organization_id, request_id, number, reason, changed_by_employee_id, before_expected_spend_on, after_expected_spend_on,
+           (id, organization_id, request_id, number, reason, changed_by_employee_id, before_expected_end_date, after_expected_end_date,
             before_budget_year, after_budget_year, before_amount_minor, after_amount_minor, currency)
          VALUES (gen_random_uuid(), $1, $2, $3, 'One person left out', $4, $5, $6, 2026, 2026, $7, $8, $9)`,
         [
@@ -348,8 +347,8 @@ describe('what the database refuses for the lines of a group request (g5-group-r
           made.requestId,
           number,
           head.employeeId,
-          row.before_expected_spend_on,
-          row.after_expected_spend_on,
+          row.before_expected_end_date,
+          row.after_expected_end_date,
           row.before_amount_minor,
           row.after_amount_minor,
           currency,
@@ -357,14 +356,14 @@ describe('what the database refuses for the lines of a group request (g5-group-r
       );
     };
 
-    it('takes a file that changes the amount with the same day, and one that changes the day with the same amount', async () => {
+    it('takes a file that changes the amount with the same end date, and one that changes the end date with the same amount', async () => {
       const made = await committed('NEED_CONFIRMED', 2);
 
       expect(await supplement(made, 1)).toBeNull();
-      expect(await supplement(made, 2, { after_expected_spend_on: '2026-12-01', after_amount_minor: 4500 })).toBeNull();
+      expect(await supplement(made, 2, { after_expected_end_date: '2026-12-01', after_amount_minor: 4500 })).toBeNull();
     });
 
-    it('refuses a file that changes neither the day nor the amount', async () => {
+    it('refuses a file that changes neither the end date nor the amount', async () => {
       const made = await committed('NEED_CONFIRMED', 2);
 
       expect(await supplement(made, 1, { after_amount_minor: 4500 })).toBe(CHECK);

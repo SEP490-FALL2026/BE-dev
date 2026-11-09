@@ -296,11 +296,6 @@
       "count": 2
     }
   },
-  "src/modules/requests/assessment/quote-pricing.policy.ts": {
-    "complexity": {
-      "count": 1
-    }
-  },
   "src/modules/requests/cancellation/departure-cancellation.service.ts": {
     "complexity": {
       "count": 1
@@ -372,11 +367,6 @@
       "count": 1
     }
   },
-  "src/modules/requests/request-view/pricing-view.service.ts": {
-    "complexity": {
-      "count": 1
-    }
-  },
   "src/modules/requests/service-account-request/service-account-request.service.ts": {
     "complexity": {
       "count": 1
@@ -397,14 +387,6 @@
   },
   "src/modules/requests/spend-submission/spend-queue.service.ts": {
     "complexity": {
-      "count": 1
-    }
-  },
-  "src/modules/requests/spend/budget-check.service.ts": {
-    "complexity": {
-      "count": 1
-    },
-    "max-lines-per-function": {
       "count": 1
     }
   },

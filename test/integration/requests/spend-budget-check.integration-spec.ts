@@ -204,7 +204,7 @@ describe('the check of the budget of a request over PostgreSQL (US-06-12)', () =
     it('a year that has ended makes no step and the request stays in the queue of its head (AC-7)', async () => {
       const u = await unit();
       await example(u);
-      const id = await h.paidRequest(u, plan, { year: h.year - 1, dueOn: `${h.year - 1}-12-20`, amount: 20 * M });
+      const id = await h.paidRequest(u, plan, { year: h.year - 1, amount: 20 * M });
 
       const outcome = await checked(id, u);
 

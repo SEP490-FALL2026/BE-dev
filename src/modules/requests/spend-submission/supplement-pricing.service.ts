@@ -4,7 +4,7 @@ import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { AccessRequestNotPriceableError } from '../access-request/access-request.errors';
 import type { AccessRequestRecord, PricingRecord } from '../access-request/access-request.types';
-import { RepricingService } from '../assessment/repricing.service';
+import { RepricingService } from '../repricing/repricing.service';
 import { GroupSupplementService } from '../group-request/group-supplement.service';
 import { supplementChangeOf } from '../spend/spend-submission.policy';
 import { SpendSupplementRefusedError } from '../spend/spend.errors';

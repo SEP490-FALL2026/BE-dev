@@ -210,9 +210,8 @@ describe('requests over HTTP: sending and routing the need step (integration, re
     it.each([
       ['a reason left blank', { businessReason: '   ' }],
       ['no reason', { businessReason: undefined }],
-      ['no term', { termMonths: undefined }],
-      ['a term of zero months', { termMonths: 0 }],
-      ['a term nobody asks for', { termMonths: 121 }],
+      ['an end date that is not a date', { expectedEndDate: 'next month' }],
+      ['an end date that is not a calendar day', { expectedEndDate: '2027-13-45' }],
       ['a branch chosen by the sender', { branch: 'INTERNAL_FREE' }],
       ['a Cost Center chosen by the sender', { costCenterId: randomUUID() }],
     ])('refuses %s and writes nothing: no request, no step, no audit event', async (_name, patch) => {
@@ -225,13 +224,11 @@ describe('requests over HTTP: sending and routing the need step (integration, re
     });
 
     it('names the field that is missing (US-01-12 AC-1)', async () => {
-      const response = await h
-        .submit({ planId: internalPlan, businessReason: '', termMonths: undefined }, designer.account)
-        .expect(422);
+      const response = await h.submit({ planId: internalPlan, businessReason: '' }, designer.account).expect(422);
 
       const paths = (h.detailsOf(response).issues as { path: string }[]).map((issue) => issue.path).sort();
 
-      expect(paths).toEqual(['businessReason', 'termMonths']);
+      expect(paths).toEqual(['businessReason']);
     });
 
     it('does not create the need step of a request that is refused (AC-1)', async () => {

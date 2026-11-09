@@ -25,7 +25,7 @@ export function grantAnswerFor(
     beneficiaryEmployeeIds: readonly string[];
     planId: string | null;
     expectedEndDate: string | null;
-    termMonths: number;
+    termMonths: number | null;
     departmentId: string;
     costCenterId: string | null;
     serviceAccount: ServiceAccountRecord | null;
@@ -49,10 +49,10 @@ export function grantAnswerFor(
           planId,
           departmentId: request.departmentId,
           expectedEndDate,
-          termMonths: request.termMonths,
+          termMonths: request.termMonths ?? 0,
           // A right ends only when the request names the day (`QĐ-104a`); a request made before that, with a term in months, keeps ending
           // with its term unless it is free internal software.
-          termBound: expectedEndDate !== null || (request.termMonths > 0 && request.branch !== 'INTERNAL_FREE'),
+          termBound: expectedEndDate !== null || ((request.termMonths ?? 0) > 0 && request.branch !== 'INTERNAL_FREE'),
         };
       }
       if (serviceAccount.boundaryState !== 'ACCEPTED') return { status: 'BOUNDARY_NOT_CHECKED' };
@@ -65,7 +65,7 @@ export function grantAnswerFor(
         employeeId: serviceAccount.responsibleEmployeeId,
         planId,
         expectedEndDate,
-        termMonths: request.termMonths,
+        termMonths: request.termMonths ?? 0,
         termBound: false,
         serviceAccount: {
           purpose: serviceAccount.purpose,
@@ -102,7 +102,7 @@ function groupAnswerFor(
     state: AccessRequestState;
     planId: string | null;
     departmentId: string;
-    termMonths: number;
+    termMonths: number | null;
     lines?: readonly { employeeId: string; state: LineState; expectedEndDate: string | null }[];
   },
   employeeId: string | undefined,
@@ -125,9 +125,10 @@ function groupAnswerFor(
         planId: request.planId,
         departmentId: request.departmentId,
         expectedEndDate: line.expectedEndDate,
-        termMonths: request.termMonths,
-        // A request for a group is only for paid software.
-        termBound: true,
+        termMonths: request.termMonths ?? 0,
+        // A request for a group is only for paid software; its seat ends with the day the line names (`QĐ-104a`), and a group made before that
+        // ends with its term in months.
+        termBound: line.expectedEndDate !== null || (request.termMonths ?? 0) > 0,
       };
     default:
       return { status: 'ENDED' };

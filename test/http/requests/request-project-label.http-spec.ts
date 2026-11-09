@@ -5,10 +5,10 @@ import { bodyOf } from '../../support/api-body';
 import { bearer, createHttpContractApp, principal } from '../../support/http-contract-app';
 
 const ID = '8a4d7c1e-2b3f-4c5d-9e6f-0a1b2c3d4e5f';
-const base = { planId: ID, businessReason: 'A valid reason', termMonths: 6 };
+const base = { planId: ID, businessReason: 'A valid reason' };
 const group = { ...base, lines: [{ employeeId: ID }] };
 const cases: Array<[string, string, string, object]> = [
-  ['preview', '/api/v1/access-requests/preview', 'EMPLOYEE', { planId: ID, termMonths: 6 }],
+  ['preview', '/api/v1/access-requests/preview', 'EMPLOYEE', { planId: ID }],
   ['submit', '/api/v1/access-requests', 'EMPLOYEE', base],
   [
     'propose',
@@ -20,7 +20,6 @@ const cases: Array<[string, string, string, object]> = [
       purpose: 'Work',
       dataDescription: 'None',
       expectedUsers: 1,
-      termMonths: 6,
     },
   ],
   ['draft', '/api/v1/access-requests/drafts', 'EMPLOYEE', { kind: 'INDIVIDUAL', ...base }],

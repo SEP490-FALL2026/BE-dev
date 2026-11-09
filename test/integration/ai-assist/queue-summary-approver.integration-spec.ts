@@ -64,6 +64,8 @@ describe('the AI summary of the queue of the spending approver (integration, rea
 
     r1 = await h.sent(design.member, internal, { businessReason: 'Nhân viên cần công cụ ghi chú' });
     r9 = await h.sent(design.head, plan, { businessReason: 'Trưởng phòng cần công cụ thiết kế' });
+    // The amount of the request is the months left of the year, which depends on the day the suite runs: it is written, so that it is more than what is left once R10 waits (40 - 21 million) and the review of Finance this suite reads stands.
+    await h.setPayments(r9.id, { amount: 25 * M });
     r10 = await h.waitingForApprover(design, plan, { amount: 21 * M });
     r11 = await h.staleRequest(engineering, 10 * M);
     await h.ctx.sql.query(
@@ -150,7 +152,8 @@ describe('the AI summary of the queue of the spending approver (integration, rea
         softwareName: applicationName,
         beneficiaryDisplayName: names[0],
         reason: r9.businessReason,
-        requestedDurationLabel: `${r9.termMonths} tháng`,
+        // A request carries an end date now, not months (`QĐ-104a`): the AI source has no duration in months to give.
+        requestedDurationLabel: null,
         estimatedCostRef: null,
       },
       {
@@ -159,7 +162,7 @@ describe('the AI summary of the queue of the spending approver (integration, rea
         softwareName: applicationName,
         beneficiaryDisplayName: names[1],
         reason: expect.any(String) as string,
-        requestedDurationLabel: '1 tháng',
+        requestedDurationLabel: null,
         estimatedCostRef: 'C001',
       },
       {
@@ -168,7 +171,7 @@ describe('the AI summary of the queue of the spending approver (integration, rea
         softwareName: 'Miro',
         beneficiaryDisplayName: names[2],
         reason: expect.any(String) as string,
-        requestedDurationLabel: expect.stringMatching(/^\d+ tháng$/) as string,
+        requestedDurationLabel: null,
         estimatedCostRef: 'C002',
       },
     ]);

@@ -39740,7 +39740,7 @@
             }
           },
           "422": {
-            "description": "The id is invalid (VALIDATION_ERROR), the sender is the spending approver (REQUEST_PARTY.INELIGIBLE), or the draft was saved with a term of more than 12 months, which no request may ask for any more: ACCESS_REQUEST.TERM_BEYOND_LIMIT (GROUP_REQUEST.TERM_BEYOND_LIMIT for a group), with details { maxMonths }. A group draft with fewer than two different people is refused as GROUP_REQUEST.TOO_FEW_LINES. Nothing changes: the draft stays, to be saved again with a shorter term.",
+            "description": "The id is invalid (VALIDATION_ERROR), the sender is the spending approver (REQUEST_PARTY.INELIGIBLE), or the draft was saved with an end date that no longer fits, before today or more than a year from today: ACCESS_REQUEST.END_DATE_OUT_OF_RANGE (GROUP_REQUEST.TERM_BEYOND_LIMIT for a group), with details { maxEndDate }, or without the end date a contractor, freelancer or intern needs: ACCESS_REQUEST.TERM_REQUIRED. A group draft with fewer than two different people is refused as GROUP_REQUEST.TOO_FEW_LINES. Nothing changes: the draft stays, to be saved again with a shorter term.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -39773,26 +39773,37 @@
                       }
                     }
                   },
-                  "ACCESS_REQUEST.TERM_BEYOND_LIMIT": {
-                    "summary": "The term is longer than a request may ask for: at most 12 months. A draft saved with a longer term must be saved again with a shorter one.",
+                  "ACCESS_REQUEST.END_DATE_OUT_OF_RANGE": {
+                    "summary": "The end date is before today or more than a year from today. A draft saved with such a date must be saved again with a date inside the year.",
                     "value": {
                       "success": false,
                       "error": {
-                        "code": "ACCESS_REQUEST.TERM_BEYOND_LIMIT",
-                        "message": "The term is longer than a request may ask for: at most 12 months. A draft saved with a longer term must be saved again with a shorter one.",
-                        "details": { "maxMonths": 12 },
+                        "code": "ACCESS_REQUEST.END_DATE_OUT_OF_RANGE",
+                        "message": "The end date is before today or more than a year from today. A draft saved with such a date must be saved again with a date inside the year.",
+                        "details": { "maxEndDate": "2027-11-09" },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "ACCESS_REQUEST.TERM_REQUIRED": {
+                    "summary": "A contractor, a freelancer or an intern gets access for a term: give the end date.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "ACCESS_REQUEST.TERM_REQUIRED",
+                        "message": "A contractor, a freelancer or an intern gets access for a term: give the end date.",
                         "requestId": "req_example"
                       }
                     }
                   },
                   "GROUP_REQUEST.TERM_BEYOND_LIMIT": {
-                    "summary": "The term is longer than a request for a group may ask for.",
+                    "summary": "The end date is before today or more than a year from today.",
                     "value": {
                       "success": false,
                       "error": {
                         "code": "GROUP_REQUEST.TERM_BEYOND_LIMIT",
-                        "message": "The term is longer than a request for a group may ask for.",
-                        "details": { "maxMonths": 12 },
+                        "message": "The end date is before today or more than a year from today.",
+                        "details": { "maxEndDate": "2027-11-09" },
                         "requestId": "req_example"
                       }
                     }
@@ -42829,7 +42840,7 @@
             }
           },
           "422": {
-            "description": "The assessment lacks fields, with the names in details.missing (ASSESSMENT.INCOMPLETE), or the quote cannot price the request (ASSESSMENT.QUOTE_NOT_IN_FORCE, PAYMENT_FREQUENCY_INVALID, AMOUNT_TOO_LARGE). Nothing is written and the request stays with the IT Admin.",
+            "description": "The assessment lacks fields, with the names in details.missing (ASSESSMENT.INCOMPLETE), or the quote cannot price the request (ASSESSMENT.QUOTE_NOT_IN_FORCE, AMOUNT_TOO_LARGE). Nothing is written and the request stays with the IT Admin.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -42865,17 +42876,6 @@
                       "error": {
                         "code": "ASSESSMENT.QUOTE_NOT_IN_FORCE",
                         "message": "The quote cannot price the request: QUOTE_NOT_IN_FORCE.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "ASSESSMENT.PAYMENT_FREQUENCY_INVALID": {
-                    "summary": "The quote cannot price the request: PAYMENT_FREQUENCY_INVALID.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "ASSESSMENT.PAYMENT_FREQUENCY_INVALID",
-                        "message": "The quote cannot price the request: PAYMENT_FREQUENCY_INVALID.",
                         "requestId": "req_example"
                       }
                     }
@@ -43516,17 +43516,6 @@
                       "error": {
                         "code": "ASSESSMENT.QUOTE_NOT_IN_FORCE",
                         "message": "The quote cannot price the request: QUOTE_NOT_IN_FORCE.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "ASSESSMENT.PAYMENT_FREQUENCY_INVALID": {
-                    "summary": "The quote cannot price the request: PAYMENT_FREQUENCY_INVALID.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "ASSESSMENT.PAYMENT_FREQUENCY_INVALID",
-                        "message": "The quote cannot price the request: PAYMENT_FREQUENCY_INVALID.",
                         "requestId": "req_example"
                       }
                     }
@@ -45911,7 +45900,7 @@
         },
         "responses": {
           "201": {
-            "description": "The head changes the day the money is expected to go out of a request back in their queue, or, for a request for a group, leaves people out of it, with the reason. The request is priced again for the day and the people who remain, and its budget year follows; the file keeps the day, the year and the amount before and after, how many people were left out, who and when. A line chosen for another year is dropped, and the head chooses again before sending the request on.",
+            "description": "The head gives an earlier end date to a request back in their queue (a request with no end may be given one), or, for a request for a group, leaves people out of it, or both, with the reason. The request is priced again for the day of the file and the people who remain (the months left of the year up to the new end date), and its budget year follows; the file keeps the end date, the year and the amount before and after, how many people were left out, who and when.",
             "content": {
               "application/json": {
                 "schema": {
@@ -46030,7 +46019,7 @@
             }
           },
           "409": {
-            "description": "The request is not back in the queue (SPEND.SUPPLEMENT_NOT_IN_QUEUE), has no price (SPEND.SUPPLEMENT_NOT_PRICED), nothing changes (SPEND.SUPPLEMENT_NO_CHANGE), cannot be priced for it (ACCESS_REQUEST.NOT_PRICEABLE), or a person to leave out is not a line whose need is confirmed (SUPPLEMENT.LINE_NOT_DROPPABLE).",
+            "description": "The request is not back in the queue (SPEND.SUPPLEMENT_NOT_IN_QUEUE), has no price (SPEND.SUPPLEMENT_NOT_PRICED), nothing changes (SPEND.SUPPLEMENT_NO_CHANGE), the end date is not earlier than the one the request has (SPEND.SUPPLEMENT_TERM_NOT_REDUCED), the end date is before today or more than a year from today (SPEND.SUPPLEMENT_END_DATE_OUT_OF_RANGE), cannot be priced for it (ACCESS_REQUEST.NOT_PRICEABLE), or a person to leave out is not a line whose need is confirmed (SUPPLEMENT.LINE_NOT_DROPPABLE).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -46064,6 +46053,28 @@
                       "error": {
                         "code": "SPEND.SUPPLEMENT_NO_CHANGE",
                         "message": "The supplementary file cannot be made: NO_CHANGE.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SPEND.SUPPLEMENT_TERM_NOT_REDUCED": {
+                    "summary": "The supplementary file cannot be made: TERM_NOT_REDUCED.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SPEND.SUPPLEMENT_TERM_NOT_REDUCED",
+                        "message": "The supplementary file cannot be made: TERM_NOT_REDUCED.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SPEND.SUPPLEMENT_END_DATE_OUT_OF_RANGE": {
+                    "summary": "The supplementary file cannot be made: END_DATE_OUT_OF_RANGE.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SPEND.SUPPLEMENT_END_DATE_OUT_OF_RANGE",
+                        "message": "The supplementary file cannot be made: END_DATE_OUT_OF_RANGE.",
                         "requestId": "req_example"
                       }
                     }
@@ -46138,7 +46149,7 @@
             }
           },
           "422": {
-            "description": "The body is invalid (VALIDATION_ERROR: neither a day nor a person, a blank reason); nobody would be left in the request (SUPPLEMENT.CANNOT_DROP_LAST_LINE); the request is not for a group (SUPPLEMENT.DROP_NOT_FOR_GROUP).",
+            "description": "The body is invalid (VALIDATION_ERROR: neither an end date nor a person, a blank reason); nobody would be left in the request (SUPPLEMENT.CANNOT_DROP_LAST_LINE); the request is not for a group (SUPPLEMENT.DROP_NOT_FOR_GROUP).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -46236,7 +46247,7 @@
           }
         },
         "security": [{ "bearer": [] }],
-        "summary": "Change the day or leave people out in a supplementary file",
+        "summary": "Shorten the term or leave people out in a supplementary file",
         "tags": ["spend-submission"]
       },
       "get": {
@@ -52146,13 +52157,13 @@
                     }
                   },
                   "GROUP_REQUEST.TERM_BEYOND_LIMIT": {
-                    "summary": "The term is longer than a request for a group may ask for.",
+                    "summary": "The end date is before today or more than a year from today.",
                     "value": {
                       "success": false,
                       "error": {
                         "code": "GROUP_REQUEST.TERM_BEYOND_LIMIT",
-                        "message": "The term is longer than a request for a group may ask for.",
-                        "details": { "maxMonths": 12 },
+                        "message": "The end date is before today or more than a year from today.",
+                        "details": { "maxEndDate": "2027-11-09" },
                         "requestId": "req_example"
                       }
                     }
@@ -91206,10 +91217,14 @@
             "properties": {
               "planId": { "type": "string", "format": "uuid" },
               "businessReason": { "type": "string", "minLength": 1, "maxLength": 1000 },
-              "termMonths": { "type": "integer", "minimum": 1, "maximum": 12 },
+              "expectedEndDate": {
+                "type": "string",
+                "format": "date",
+                "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."
+              },
               "kind": { "type": "string", "enum": ["INDIVIDUAL"] }
             },
-            "required": ["planId", "businessReason", "termMonths", "kind"],
+            "required": ["planId", "businessReason", "kind"],
             "additionalProperties": false
           },
           {
@@ -91228,10 +91243,14 @@
                 }
               },
               "businessReason": { "type": "string", "minLength": 1, "maxLength": 1000 },
-              "termMonths": { "type": "integer", "minimum": 1, "maximum": 12 },
+              "expectedEndDate": {
+                "type": "string",
+                "format": "date",
+                "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."
+              },
               "kind": { "type": "string", "enum": ["GROUP"] }
             },
-            "required": ["planId", "lines", "businessReason", "termMonths", "kind"],
+            "required": ["planId", "lines", "businessReason", "kind"],
             "additionalProperties": false
           },
           {
@@ -91241,10 +91260,9 @@
               "purpose": { "type": "string", "minLength": 1, "maxLength": 1000 },
               "expectedIdentifier": { "type": "string", "minLength": 1, "maxLength": 254 },
               "businessReason": { "type": "string", "minLength": 1, "maxLength": 1000 },
-              "termMonths": { "type": "integer", "minimum": 1, "maximum": 12 },
               "kind": { "type": "string", "enum": ["SERVICE_ACCOUNT"] }
             },
-            "required": ["planId", "purpose", "expectedIdentifier", "businessReason", "termMonths", "kind"],
+            "required": ["planId", "purpose", "expectedIdentifier", "businessReason", "kind"],
             "additionalProperties": false
           }
         ]
@@ -91453,6 +91471,7 @@
                     "type": "integer",
                     "exclusiveMinimum": true,
                     "maximum": 9007199254740991,
+                    "nullable": true,
                     "minimum": 0
                   },
                   "expectedEndDate": { "type": "string", "nullable": true },
@@ -91592,21 +91611,22 @@
                         "enum": ["MONTHLY", "QUARTERLY", "ANNUAL", "OTHER", null],
                         "nullable": true
                       },
-                      "periodCount": {
-                        "type": "integer",
-                        "exclusiveMinimum": true,
-                        "maximum": 9007199254740991,
-                        "nullable": true,
-                        "minimum": 0
-                      },
-                      "bindingPeriodCount": {
-                        "type": "integer",
-                        "minimum": 0,
-                        "maximum": 9007199254740991,
+                      "kind": { "type": "string", "enum": ["RECURRING", "ONE_TIME", null], "nullable": true },
+                      "months": { "type": "integer", "minimum": 0, "maximum": 12, "nullable": true },
+                      "monthlyPrice": {
+                        "type": "object",
+                        "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                        "required": ["amount", "currency"],
+                        "additionalProperties": false,
                         "nullable": true
                       },
-                      "firstDueOn": { "type": "string", "nullable": true },
-                      "lastDueOn": { "type": "string", "nullable": true }
+                      "nextYearAmount": {
+                        "type": "object",
+                        "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                        "required": ["amount", "currency"],
+                        "additionalProperties": false,
+                        "nullable": true
+                      }
                     },
                     "required": [
                       "status",
@@ -91614,10 +91634,10 @@
                       "amount",
                       "unitPrice",
                       "billingCycle",
-                      "periodCount",
-                      "bindingPeriodCount",
-                      "firstDueOn",
-                      "lastDueOn"
+                      "kind",
+                      "months",
+                      "monthlyPrice",
+                      "nextYearAmount"
                     ],
                     "additionalProperties": false
                   },
@@ -91804,9 +91824,13 @@
         "properties": {
           "planId": { "type": "string", "format": "uuid" },
           "businessReason": { "type": "string", "minLength": 1, "maxLength": 1000 },
-          "termMonths": { "type": "integer", "minimum": 1, "maximum": 12 }
+          "expectedEndDate": {
+            "type": "string",
+            "format": "date",
+            "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."
+          }
         },
-        "required": ["planId", "businessReason", "termMonths"],
+        "required": ["planId", "businessReason"],
         "additionalProperties": false
       },
       "AccessRequestResponseDto": {
@@ -91923,6 +91947,7 @@
                     "type": "integer",
                     "exclusiveMinimum": true,
                     "maximum": 9007199254740991,
+                    "nullable": true,
                     "minimum": 0
                   },
                   "expectedEndDate": { "type": "string", "nullable": true },
@@ -92062,21 +92087,22 @@
                         "enum": ["MONTHLY", "QUARTERLY", "ANNUAL", "OTHER", null],
                         "nullable": true
                       },
-                      "periodCount": {
-                        "type": "integer",
-                        "exclusiveMinimum": true,
-                        "maximum": 9007199254740991,
-                        "nullable": true,
-                        "minimum": 0
-                      },
-                      "bindingPeriodCount": {
-                        "type": "integer",
-                        "minimum": 0,
-                        "maximum": 9007199254740991,
+                      "kind": { "type": "string", "enum": ["RECURRING", "ONE_TIME", null], "nullable": true },
+                      "months": { "type": "integer", "minimum": 0, "maximum": 12, "nullable": true },
+                      "monthlyPrice": {
+                        "type": "object",
+                        "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                        "required": ["amount", "currency"],
+                        "additionalProperties": false,
                         "nullable": true
                       },
-                      "firstDueOn": { "type": "string", "nullable": true },
-                      "lastDueOn": { "type": "string", "nullable": true }
+                      "nextYearAmount": {
+                        "type": "object",
+                        "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                        "required": ["amount", "currency"],
+                        "additionalProperties": false,
+                        "nullable": true
+                      }
                     },
                     "required": [
                       "status",
@@ -92084,10 +92110,10 @@
                       "amount",
                       "unitPrice",
                       "billingCycle",
-                      "periodCount",
-                      "bindingPeriodCount",
-                      "firstDueOn",
-                      "lastDueOn"
+                      "kind",
+                      "months",
+                      "monthlyPrice",
+                      "nextYearAmount"
                     ],
                     "additionalProperties": false
                   },
@@ -92273,9 +92299,13 @@
         "type": "object",
         "properties": {
           "planId": { "type": "string", "format": "uuid" },
-          "termMonths": { "type": "integer", "minimum": 1, "maximum": 12 }
+          "expectedEndDate": {
+            "type": "string",
+            "format": "date",
+            "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."
+          }
         },
-        "required": ["planId", "termMonths"],
+        "required": ["planId"],
         "additionalProperties": false
       },
       "PreviewResponseDto": {
@@ -92301,12 +92331,7 @@
                     "additionalProperties": false
                   },
                   "branch": { "type": "string", "enum": ["INTERNAL_FREE", "PAID_IN_CATALOG"] },
-                  "termMonths": {
-                    "type": "integer",
-                    "exclusiveMinimum": true,
-                    "maximum": 9007199254740991,
-                    "minimum": 0
-                  },
+                  "expectedEndDate": { "type": "string", "nullable": true },
                   "department": {
                     "type": "object",
                     "properties": {
@@ -92328,18 +92353,14 @@
                     "additionalProperties": false,
                     "nullable": true
                   },
-                  "termLimit": {
+                  "maxEndDate": { "type": "string" },
+                  "termRequired": { "type": "boolean" },
+                  "annualVendorAmount": {
                     "type": "object",
-                    "properties": {
-                      "maxMonths": {
-                        "type": "integer",
-                        "exclusiveMinimum": true,
-                        "maximum": 9007199254740991,
-                        "minimum": 0
-                      }
-                    },
-                    "required": ["maxMonths"],
-                    "additionalProperties": false
+                    "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                    "required": ["amount", "currency"],
+                    "additionalProperties": false,
+                    "nullable": true
                   },
                   "existingAccess": {
                     "type": "object",
@@ -92398,21 +92419,22 @@
                         "enum": ["MONTHLY", "QUARTERLY", "ANNUAL", "OTHER", null],
                         "nullable": true
                       },
-                      "periodCount": {
-                        "type": "integer",
-                        "exclusiveMinimum": true,
-                        "maximum": 9007199254740991,
-                        "nullable": true,
-                        "minimum": 0
-                      },
-                      "bindingPeriodCount": {
-                        "type": "integer",
-                        "minimum": 0,
-                        "maximum": 9007199254740991,
+                      "kind": { "type": "string", "enum": ["RECURRING", "ONE_TIME", null], "nullable": true },
+                      "months": { "type": "integer", "minimum": 0, "maximum": 12, "nullable": true },
+                      "monthlyPrice": {
+                        "type": "object",
+                        "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                        "required": ["amount", "currency"],
+                        "additionalProperties": false,
                         "nullable": true
                       },
-                      "firstDueOn": { "type": "string", "nullable": true },
-                      "lastDueOn": { "type": "string", "nullable": true }
+                      "nextYearAmount": {
+                        "type": "object",
+                        "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                        "required": ["amount", "currency"],
+                        "additionalProperties": false,
+                        "nullable": true
+                      }
                     },
                     "required": [
                       "status",
@@ -92420,10 +92442,10 @@
                       "amount",
                       "unitPrice",
                       "billingCycle",
-                      "periodCount",
-                      "bindingPeriodCount",
-                      "firstDueOn",
-                      "lastDueOn"
+                      "kind",
+                      "months",
+                      "monthlyPrice",
+                      "nextYearAmount"
                     ],
                     "additionalProperties": false
                   },
@@ -92569,10 +92591,12 @@
                 "required": [
                   "plan",
                   "branch",
-                  "termMonths",
+                  "expectedEndDate",
                   "department",
                   "costCenter",
-                  "termLimit",
+                  "maxEndDate",
+                  "termRequired",
+                  "annualVendorAmount",
                   "existingAccess",
                   "blockedBy",
                   "canSubmit",
@@ -92711,6 +92735,7 @@
                         "type": "integer",
                         "exclusiveMinimum": true,
                         "maximum": 9007199254740991,
+                        "nullable": true,
                         "minimum": 0
                       },
                       "expectedEndDate": { "type": "string", "nullable": true },
@@ -92856,21 +92881,22 @@
                             "enum": ["MONTHLY", "QUARTERLY", "ANNUAL", "OTHER", null],
                             "nullable": true
                           },
-                          "periodCount": {
-                            "type": "integer",
-                            "exclusiveMinimum": true,
-                            "maximum": 9007199254740991,
-                            "nullable": true,
-                            "minimum": 0
-                          },
-                          "bindingPeriodCount": {
-                            "type": "integer",
-                            "minimum": 0,
-                            "maximum": 9007199254740991,
+                          "kind": { "type": "string", "enum": ["RECURRING", "ONE_TIME", null], "nullable": true },
+                          "months": { "type": "integer", "minimum": 0, "maximum": 12, "nullable": true },
+                          "monthlyPrice": {
+                            "type": "object",
+                            "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                            "required": ["amount", "currency"],
+                            "additionalProperties": false,
                             "nullable": true
                           },
-                          "firstDueOn": { "type": "string", "nullable": true },
-                          "lastDueOn": { "type": "string", "nullable": true }
+                          "nextYearAmount": {
+                            "type": "object",
+                            "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                            "required": ["amount", "currency"],
+                            "additionalProperties": false,
+                            "nullable": true
+                          }
                         },
                         "required": [
                           "status",
@@ -92878,10 +92904,10 @@
                           "amount",
                           "unitPrice",
                           "billingCycle",
-                          "periodCount",
-                          "bindingPeriodCount",
-                          "firstDueOn",
-                          "lastDueOn"
+                          "kind",
+                          "months",
+                          "monthlyPrice",
+                          "nextYearAmount"
                         ],
                         "additionalProperties": false
                       },
@@ -93188,9 +93214,13 @@
           "purpose": { "type": "string", "minLength": 1, "maxLength": 1000 },
           "dataDescription": { "type": "string", "minLength": 1, "maxLength": 1000 },
           "expectedUsers": { "type": "integer", "minimum": 1, "maximum": 1000000 },
-          "termMonths": { "type": "integer", "minimum": 1, "maximum": 12 }
+          "expectedEndDate": {
+            "type": "string",
+            "format": "date",
+            "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."
+          }
         },
-        "required": ["softwareName", "homepageUrl", "purpose", "dataDescription", "expectedUsers", "termMonths"],
+        "required": ["softwareName", "homepageUrl", "purpose", "dataDescription", "expectedUsers"],
         "additionalProperties": false
       },
       "AssessmentResponseDto": {
@@ -93324,30 +93354,9 @@
                       },
                       "billingCycle": { "type": "string", "enum": ["MONTHLY", "QUARTERLY", "ANNUAL"] },
                       "validFrom": { "type": "string" },
-                      "validUntil": { "type": "string", "nullable": true },
-                      "commitmentMonths": {
-                        "type": "integer",
-                        "exclusiveMinimum": true,
-                        "maximum": 9007199254740991,
-                        "nullable": true,
-                        "minimum": 0
-                      },
-                      "paymentFrequency": {
-                        "type": "string",
-                        "enum": ["MONTHLY", "QUARTERLY", "ANNUAL", "UPFRONT_ONCE", null],
-                        "nullable": true
-                      },
-                      "firstPaymentOn": { "type": "string", "nullable": true }
+                      "validUntil": { "type": "string", "nullable": true }
                     },
-                    "required": [
-                      "unitPrice",
-                      "billingCycle",
-                      "validFrom",
-                      "validUntil",
-                      "commitmentMonths",
-                      "paymentFrequency",
-                      "firstPaymentOn"
-                    ],
+                    "required": ["unitPrice", "billingCycle", "validFrom", "validUntil"],
                     "additionalProperties": false,
                     "nullable": true
                   },
@@ -93380,21 +93389,22 @@
                         "enum": ["MONTHLY", "QUARTERLY", "ANNUAL", "OTHER", null],
                         "nullable": true
                       },
-                      "periodCount": {
-                        "type": "integer",
-                        "exclusiveMinimum": true,
-                        "maximum": 9007199254740991,
-                        "nullable": true,
-                        "minimum": 0
-                      },
-                      "bindingPeriodCount": {
-                        "type": "integer",
-                        "minimum": 0,
-                        "maximum": 9007199254740991,
+                      "kind": { "type": "string", "enum": ["RECURRING", "ONE_TIME", null], "nullable": true },
+                      "months": { "type": "integer", "minimum": 0, "maximum": 12, "nullable": true },
+                      "monthlyPrice": {
+                        "type": "object",
+                        "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                        "required": ["amount", "currency"],
+                        "additionalProperties": false,
                         "nullable": true
                       },
-                      "firstDueOn": { "type": "string", "nullable": true },
-                      "lastDueOn": { "type": "string", "nullable": true }
+                      "nextYearAmount": {
+                        "type": "object",
+                        "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                        "required": ["amount", "currency"],
+                        "additionalProperties": false,
+                        "nullable": true
+                      }
                     },
                     "required": [
                       "status",
@@ -93402,10 +93412,10 @@
                       "amount",
                       "unitPrice",
                       "billingCycle",
-                      "periodCount",
-                      "bindingPeriodCount",
-                      "firstDueOn",
-                      "lastDueOn"
+                      "kind",
+                      "months",
+                      "monthlyPrice",
+                      "nextYearAmount"
                     ],
                     "additionalProperties": false
                   },
@@ -93611,18 +93621,6 @@
                 "format": "date",
                 "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused).",
                 "nullable": true
-              },
-              "commitmentMonths": { "type": "integer", "minimum": 1, "maximum": 120, "nullable": true },
-              "paymentFrequency": {
-                "type": "string",
-                "enum": ["MONTHLY", "QUARTERLY", "ANNUAL", "UPFRONT_ONCE", null],
-                "nullable": true
-              },
-              "firstPaymentOn": {
-                "type": "string",
-                "format": "date",
-                "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused).",
-                "nullable": true
               }
             },
             "required": ["unitPrice", "billingCycle", "validFrom"],
@@ -93673,18 +93671,6 @@
                     "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."
                   },
                   "validUntil": {
-                    "type": "string",
-                    "format": "date",
-                    "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused).",
-                    "nullable": true
-                  },
-                  "commitmentMonths": { "type": "integer", "minimum": 1, "maximum": 120, "nullable": true },
-                  "paymentFrequency": {
-                    "type": "string",
-                    "enum": ["MONTHLY", "QUARTERLY", "ANNUAL", "UPFRONT_ONCE", null],
-                    "nullable": true
-                  },
-                  "firstPaymentOn": {
                     "type": "string",
                     "format": "date",
                     "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused).",
@@ -94536,10 +94522,15 @@
             "items": { "type": "string", "format": "uuid" },
             "uniqueItems": true
           },
+          "expectedEndDate": {
+            "type": "string",
+            "format": "date",
+            "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."
+          },
           "reason": { "type": "string", "minLength": 1, "maxLength": 1000 }
         },
-        "required": ["dropEmployeeIds", "reason"],
-        "description": "The people of the group the head leaves out, and why.",
+        "required": ["reason"],
+        "description": "The people of the group the head leaves out and/or an earlier end date, and why.",
         "additionalProperties": false
       },
       "SupplementResponseDto": {
@@ -94575,6 +94566,15 @@
                     "required": ["before", "after"],
                     "additionalProperties": false
                   },
+                  "expectedEndDate": {
+                    "type": "object",
+                    "properties": {
+                      "before": { "type": "string", "nullable": true },
+                      "after": { "type": "string", "nullable": true }
+                    },
+                    "required": ["before", "after"],
+                    "additionalProperties": false
+                  },
                   "amount": {
                     "type": "object",
                     "properties": {
@@ -94596,7 +94596,16 @@
                   },
                   "droppedCount": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
                 },
-                "required": ["number", "reason", "changedBy", "createdAt", "budgetYear", "amount", "droppedCount"],
+                "required": [
+                  "number",
+                  "reason",
+                  "changedBy",
+                  "createdAt",
+                  "budgetYear",
+                  "expectedEndDate",
+                  "amount",
+                  "droppedCount"
+                ],
                 "additionalProperties": false
               }
             },
@@ -94648,6 +94657,15 @@
                       "required": ["before", "after"],
                       "additionalProperties": false
                     },
+                    "expectedEndDate": {
+                      "type": "object",
+                      "properties": {
+                        "before": { "type": "string", "nullable": true },
+                        "after": { "type": "string", "nullable": true }
+                      },
+                      "required": ["before", "after"],
+                      "additionalProperties": false
+                    },
                     "amount": {
                       "type": "object",
                       "properties": {
@@ -94669,7 +94687,16 @@
                     },
                     "droppedCount": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
                   },
-                  "required": ["number", "reason", "changedBy", "createdAt", "budgetYear", "amount", "droppedCount"],
+                  "required": [
+                    "number",
+                    "reason",
+                    "changedBy",
+                    "createdAt",
+                    "budgetYear",
+                    "expectedEndDate",
+                    "amount",
+                    "droppedCount"
+                  ],
                   "additionalProperties": false
                 }
               },
@@ -94949,8 +94976,10 @@
                         "type": "integer",
                         "exclusiveMinimum": true,
                         "maximum": 9007199254740991,
+                        "nullable": true,
                         "minimum": 0
                       },
+                      "expectedEndDate": { "type": "string", "nullable": true },
                       "budgetYear": {
                         "type": "integer",
                         "minimum": -9007199254740991,
@@ -94968,6 +94997,7 @@
                       "costCenter",
                       "businessReason",
                       "termMonths",
+                      "expectedEndDate",
                       "budgetYear"
                     ],
                     "additionalProperties": false
@@ -95341,8 +95371,10 @@
                       "type": "integer",
                       "exclusiveMinimum": true,
                       "maximum": 9007199254740991,
+                      "nullable": true,
                       "minimum": 0
                     },
+                    "expectedEndDate": { "type": "string", "nullable": true },
                     "pricing": {
                       "type": "object",
                       "properties": {
@@ -95378,6 +95410,7 @@
                     "department",
                     "businessReasonExcerpt",
                     "termMonths",
+                    "expectedEndDate",
                     "pricing",
                     "samePersonAsSpend"
                   ],
@@ -95828,10 +95861,9 @@
           "planId": { "type": "string", "format": "uuid" },
           "purpose": { "type": "string", "minLength": 1, "maxLength": 1000 },
           "expectedIdentifier": { "type": "string", "minLength": 1, "maxLength": 254 },
-          "businessReason": { "type": "string", "minLength": 1, "maxLength": 1000 },
-          "termMonths": { "type": "integer", "minimum": 1, "maximum": 12 }
+          "businessReason": { "type": "string", "minLength": 1, "maxLength": 1000 }
         },
-        "required": ["planId", "purpose", "expectedIdentifier", "businessReason", "termMonths"],
+        "required": ["planId", "purpose", "expectedIdentifier", "businessReason"],
         "additionalProperties": false
       },
       "ServiceAccountReviewBodyDto": {
@@ -96216,6 +96248,7 @@
                     "type": "integer",
                     "exclusiveMinimum": true,
                     "maximum": 9007199254740991,
+                    "nullable": true,
                     "minimum": 0
                   },
                   "expectedEndDate": { "type": "string", "nullable": true },
@@ -96355,21 +96388,22 @@
                         "enum": ["MONTHLY", "QUARTERLY", "ANNUAL", "OTHER", null],
                         "nullable": true
                       },
-                      "periodCount": {
-                        "type": "integer",
-                        "exclusiveMinimum": true,
-                        "maximum": 9007199254740991,
-                        "nullable": true,
-                        "minimum": 0
-                      },
-                      "bindingPeriodCount": {
-                        "type": "integer",
-                        "minimum": 0,
-                        "maximum": 9007199254740991,
+                      "kind": { "type": "string", "enum": ["RECURRING", "ONE_TIME", null], "nullable": true },
+                      "months": { "type": "integer", "minimum": 0, "maximum": 12, "nullable": true },
+                      "monthlyPrice": {
+                        "type": "object",
+                        "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                        "required": ["amount", "currency"],
+                        "additionalProperties": false,
                         "nullable": true
                       },
-                      "firstDueOn": { "type": "string", "nullable": true },
-                      "lastDueOn": { "type": "string", "nullable": true }
+                      "nextYearAmount": {
+                        "type": "object",
+                        "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                        "required": ["amount", "currency"],
+                        "additionalProperties": false,
+                        "nullable": true
+                      }
                     },
                     "required": [
                       "status",
@@ -96377,10 +96411,10 @@
                       "amount",
                       "unitPrice",
                       "billingCycle",
-                      "periodCount",
-                      "bindingPeriodCount",
-                      "firstDueOn",
-                      "lastDueOn"
+                      "kind",
+                      "months",
+                      "monthlyPrice",
+                      "nextYearAmount"
                     ],
                     "additionalProperties": false
                   },
@@ -97036,9 +97070,13 @@
             }
           },
           "businessReason": { "type": "string", "minLength": 1, "maxLength": 1000 },
-          "termMonths": { "type": "integer", "minimum": 1, "maximum": 12 }
+          "expectedEndDate": {
+            "type": "string",
+            "format": "date",
+            "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."
+          }
         },
-        "required": ["planId", "lines", "businessReason", "termMonths"],
+        "required": ["planId", "lines", "businessReason"],
         "additionalProperties": false
       },
       "GroupCheckResponseDto": {
@@ -97080,20 +97118,8 @@
                 "additionalProperties": false,
                 "nullable": true
               },
-              "termLimit": {
-                "type": "object",
-                "properties": {
-                  "maxMonths": {
-                    "type": "integer",
-                    "exclusiveMinimum": true,
-                    "maximum": 9007199254740991,
-                    "minimum": 0
-                  }
-                },
-                "required": ["maxMonths"],
-                "additionalProperties": false
-              },
-              "termBeyondLimit": { "type": "boolean" },
+              "maxEndDate": { "type": "string" },
+              "endDateOutOfRange": { "type": "boolean" },
               "lines": {
                 "type": "array",
                 "items": {
@@ -97110,6 +97136,7 @@
                         "EMAIL_REQUIRED",
                         "HAS_ACCESS",
                         "HAS_OPEN_REQUEST",
+                        "TERM_REQUIRED",
                         "DUPLICATE_LINE",
                         null
                       ],
@@ -97150,21 +97177,22 @@
                     "enum": ["MONTHLY", "QUARTERLY", "ANNUAL", "OTHER", null],
                     "nullable": true
                   },
-                  "periodCount": {
-                    "type": "integer",
-                    "exclusiveMinimum": true,
-                    "maximum": 9007199254740991,
-                    "nullable": true,
-                    "minimum": 0
-                  },
-                  "bindingPeriodCount": {
-                    "type": "integer",
-                    "minimum": 0,
-                    "maximum": 9007199254740991,
+                  "kind": { "type": "string", "enum": ["RECURRING", "ONE_TIME", null], "nullable": true },
+                  "months": { "type": "integer", "minimum": 0, "maximum": 12, "nullable": true },
+                  "monthlyPrice": {
+                    "type": "object",
+                    "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                    "required": ["amount", "currency"],
+                    "additionalProperties": false,
                     "nullable": true
                   },
-                  "firstDueOn": { "type": "string", "nullable": true },
-                  "lastDueOn": { "type": "string", "nullable": true }
+                  "nextYearAmount": {
+                    "type": "object",
+                    "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                    "required": ["amount", "currency"],
+                    "additionalProperties": false,
+                    "nullable": true
+                  }
                 },
                 "required": [
                   "status",
@@ -97172,10 +97200,10 @@
                   "amount",
                   "unitPrice",
                   "billingCycle",
-                  "periodCount",
-                  "bindingPeriodCount",
-                  "firstDueOn",
-                  "lastDueOn"
+                  "kind",
+                  "months",
+                  "monthlyPrice",
+                  "nextYearAmount"
                 ],
                 "additionalProperties": false
               },
@@ -97191,8 +97219,8 @@
               "plan",
               "tooManyLines",
               "tooFewLines",
-              "termLimit",
-              "termBeyondLimit",
+              "maxEndDate",
+              "endDateOutOfRange",
               "lines",
               "lineCount",
               "hasSpendStep",
@@ -97320,6 +97348,7 @@
                     "type": "integer",
                     "exclusiveMinimum": true,
                     "maximum": 9007199254740991,
+                    "nullable": true,
                     "minimum": 0
                   },
                   "expectedEndDate": { "type": "string", "nullable": true },
@@ -97459,21 +97488,22 @@
                         "enum": ["MONTHLY", "QUARTERLY", "ANNUAL", "OTHER", null],
                         "nullable": true
                       },
-                      "periodCount": {
-                        "type": "integer",
-                        "exclusiveMinimum": true,
-                        "maximum": 9007199254740991,
-                        "nullable": true,
-                        "minimum": 0
-                      },
-                      "bindingPeriodCount": {
-                        "type": "integer",
-                        "minimum": 0,
-                        "maximum": 9007199254740991,
+                      "kind": { "type": "string", "enum": ["RECURRING", "ONE_TIME", null], "nullable": true },
+                      "months": { "type": "integer", "minimum": 0, "maximum": 12, "nullable": true },
+                      "monthlyPrice": {
+                        "type": "object",
+                        "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                        "required": ["amount", "currency"],
+                        "additionalProperties": false,
                         "nullable": true
                       },
-                      "firstDueOn": { "type": "string", "nullable": true },
-                      "lastDueOn": { "type": "string", "nullable": true }
+                      "nextYearAmount": {
+                        "type": "object",
+                        "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                        "required": ["amount", "currency"],
+                        "additionalProperties": false,
+                        "nullable": true
+                      }
                     },
                     "required": [
                       "status",
@@ -97481,10 +97511,10 @@
                       "amount",
                       "unitPrice",
                       "billingCycle",
-                      "periodCount",
-                      "bindingPeriodCount",
-                      "firstDueOn",
-                      "lastDueOn"
+                      "kind",
+                      "months",
+                      "monthlyPrice",
+                      "nextYearAmount"
                     ],
                     "additionalProperties": false
                   },
@@ -98040,8 +98070,10 @@
                       "type": "integer",
                       "exclusiveMinimum": true,
                       "maximum": 9007199254740991,
+                      "nullable": true,
                       "minimum": 0
                     },
+                    "expectedEndDate": { "type": "string", "nullable": true },
                     "submittedAt": { "type": "string", "format": "date-time" },
                     "updatedAt": { "type": "string", "format": "date-time" },
                     "needStep": {
@@ -98114,6 +98146,7 @@
                     "beneficiary",
                     "lineCount",
                     "termMonths",
+                    "expectedEndDate",
                     "submittedAt",
                     "updatedAt",
                     "needStep",

@@ -204,7 +204,7 @@ describe('a request for a service account after the installation over PostgreSQL
     it('keeps the account of a non-human subject for the sender, charged to the Unit of their department (AC-1)', async () => {
       const u = await example();
 
-      const sent = await h.sentService(u.member, paidPlan, { termMonths: 12 });
+      const sent = await h.sentService(u.member, paidPlan);
 
       expect(sent).toMatchObject({
         type: 'SERVICE_ACCOUNT',
@@ -224,8 +224,8 @@ describe('a request for a service account after the installation over PostgreSQL
           boundary: { state: 'PENDING', reason: null, decidedBy: null, decidedAt: null, selfExecuted: false },
         },
       });
-      // The price of the plan for the term, for one subject: 1 million a month, twelve months, once.
-      expect(Number(sent.pricing.amount?.amount)).toBe(12 * M);
+      // The price of the plan for one subject: 1 million a month for the months left of the year, with no end (`BR-MF1-06`).
+      expect(Number(sent.pricing.amount?.amount)).toBe(h.monthsOf(12) * M);
       const submitted = await events('ACCESS_REQUEST.SUBMITTED', sent.id);
       expect(submitted).toMatchObject([{ after: { type: 'SERVICE_ACCOUNT' } }]);
       expect((await events('ACCESS_REQUEST.NEED_STEP_ROUTED', sent.id)).length).toBe(1);

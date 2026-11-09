@@ -86,7 +86,7 @@ describe('RequestsAiSourceApi: the open steps a person holds (integration, real 
         softwareName: applicationName,
         beneficiaryDisplayName: await fullNameOf(design.member),
         reason: 'The project needs a wiki',
-        termMonths: 6,
+        termMonths: null,
         estimatedCost: null,
       });
       expect(total).toBe(steps.length);
@@ -135,7 +135,7 @@ describe('RequestsAiSourceApi: the open steps a person holds (integration, real 
         softwareName: applicationName,
         beneficiaryDisplayName: await fullNameOf(design.member),
         reason: expect.any(String) as string,
-        termMonths: 1,
+        termMonths: null,
         estimatedCost: spendQueueItem?.amount ?? null,
       });
       expect(spendQueueItem?.amount).toEqual({
@@ -150,7 +150,7 @@ describe('RequestsAiSourceApi: the open steps a person holds (integration, real 
         softwareName: internalApplicationName,
         beneficiaryDisplayName: await fullNameOf(design.head),
         reason: 'The head needs the tool',
-        termMonths: 2,
+        termMonths: null,
         estimatedCost: null,
       });
     });

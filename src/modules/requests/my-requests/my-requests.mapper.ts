@@ -40,6 +40,7 @@ export function toSummary(
     beneficiary: person(row.beneficiaryEmployeeId),
     lineCount: row.lineCount,
     termMonths: row.termMonths,
+    expectedEndDate: row.expectedEndDate,
     submittedAt: row.submittedAt.toISOString(),
     updatedAt: row.updatedAt.toISOString(),
     needStep: {

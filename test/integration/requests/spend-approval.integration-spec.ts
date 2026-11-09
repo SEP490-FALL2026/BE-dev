@@ -123,27 +123,27 @@ describe('the decision of the spending approver over PostgreSQL (US-06-01)', () 
       const first = await h.waitingForApprover(u, plan, { amount: 15 * M });
       await h.waitingForApprover(other.u, plan, { amount: 30 * M });
       await h.budgetFor(u, { total: 100 * M, year: h.next });
-      await h.waitingForApprover(u, plan, { year: h.next, dueOn: `${h.next}-02-10`, amount: 10 * M });
+      await h.waitingForApprover(u, plan, { year: h.next, amount: 10 * M });
 
       expect((await years(first))[0].pending).toEqual({ amount: '0', currency: 'VND' });
       const second = await h.waitingForApprover(u, plan, { amount: 12 * M });
       expect((await years(second))[0].pending).toEqual({ amount: String(15 * M), currency: 'VND' });
     });
 
-    it('shows the cost that falls on the company, with the tax that is deducted apart, and counts that cost as waiting (AC-14)', async () => {
+    it('shows the estimate of the tax apart, and counts the price before tax as waiting (AC-14, FR-3.2, QĐ-109)', async () => {
       const { u } = await example();
       const first = await h.waitingForApprover(u, taxedPlan, { amount: 20 * M });
       const second = await h.waitingForApprover(u, taxedPlan, { amount: 5 * M });
 
       const view = await detail(first);
 
-      // 20 million before tax, 2 million of tax that is deducted and 1 million that is not: the cost is 21, not 23.
+      // 20 million before tax, 2 million of tax that is deducted and 1 million that is not: the estimate says 21, the amount that waits is 20.
       expect(view.cost).toMatchObject({
         estimatedCost: { amount: String(21 * M) },
         deductibleTax: { amount: String(2 * M) },
         nonDeductibleTax: { amount: String(1 * M) },
       });
-      expect((await years(second))[0].pending).toEqual({ amount: String(21 * M), currency: 'VND' });
+      expect((await years(second))[0].pending).toEqual({ amount: String(20 * M), currency: 'VND' });
     });
 
     it('is closed to those who do not hold the step, and nothing of a request that waits for Finance is open to the approver (AC-8, AC-17)', async () => {
@@ -389,15 +389,11 @@ describe('the decision of the spending approver over PostgreSQL (US-06-01)', () 
       expect(await records(id)).toEqual([]);
     });
 
-    it('names, for a request over several years, the year that has no budget and no other, and marks it on the years (AC-21)', async () => {
+    it('QĐ-109: names the year the amount is counted in when that year has no budget, and marks it on the years (AC-21)', async () => {
+      // Rewritten from "a request over several years": the request has one amount for one year now.
       const u = await unit();
       await h.budgetFor(u, { total: 5_000_000 });
-      const id = await h.paidRequest(u, plan, {
-        schedule: [
-          { dueOn: `${h.year}-11-01`, amount: 2_400_000, year: h.year },
-          { dueOn: `${h.next}-11-01`, amount: 2_400_000, year: h.next },
-        ],
-      });
+      const id = await h.paidRequest(u, plan, { amount: 2_400_000, year: h.next });
       await h.sendOn([id], u.head.account).expect(201);
       await h
         .completeReview(id, {
@@ -411,10 +407,7 @@ describe('the decision of the spending approver over PostgreSQL (US-06-01)', () 
 
       expect(h.codeOf(missing)).toBe('SPEND.OVERRIDE_REQUIRED');
       expect(h.detailsOf(missing)).toMatchObject({ years: [h.next] });
-      expect((await years(id)).map((year) => [year.year, year.code])).toEqual([
-        [h.year, 'BUDGET_OK'],
-        [h.next, 'NO_ACTIVE_BUDGET'],
-      ]);
+      expect((await years(id)).map((year) => [year.year, year.code])).toEqual([[h.next, 'NO_ACTIVE_BUDGET']]);
     });
   });
 

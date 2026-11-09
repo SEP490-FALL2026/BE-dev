@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { toDateColumn } from '../../../core/business-date';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { pricingColumns } from './access-request-pricing.mapper';
@@ -49,6 +50,10 @@ export class AccessRequestRepo {
       businessReason: input.businessReason,
       termMonths: input.termMonths,
       ...pricingColumns(input.pricing),
+      // The end the request names itself (a free request, a renewal) wins over the one its pricing carries.
+      ...(input.expectedEndDate === undefined
+        ? {}
+        : { expectedEndDate: input.expectedEndDate ? toDateColumn(input.expectedEndDate) : null }),
       policy: requestPolicyJson.encode(input.policy),
       createdByAppUserId: input.createdByAppUserId,
       submittedAt: input.now,

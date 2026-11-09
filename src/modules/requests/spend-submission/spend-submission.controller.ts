@@ -183,13 +183,13 @@ export class SpendSubmissionController {
   @RequireRoles('MANAGER')
   @ApiOperation({
     operationId: 'accessRequestSupplementAdd',
-    summary: 'Change the day or leave people out in a supplementary file',
+    summary: 'Shorten the term or leave people out in a supplementary file',
   })
   @ApiSuccessResponse(SupplementResponseDto, {
     status: HttpStatus.CREATED,
     message: 'ACCESS_REQUEST.SUPPLEMENT_ADDED',
     description:
-      'The head changes the day the money is expected to go out of a request back in their queue, or, for a request for a group, leaves people out of it, with the reason. The request is priced again for the day and the people who remain, and its budget year follows; the file keeps the day, the year and the amount before and after, how many people were left out, who and when. A line chosen for another year is dropped, and the head chooses again before sending the request on.',
+      'The head gives an earlier end date to a request back in their queue (a request with no end may be given one), or, for a request for a group, leaves people out of it, or both, with the reason. The request is priced again for the day of the file and the people who remain (the months left of the year up to the new end date), and its budget year follows; the file keeps the end date, the year and the amount before and after, how many people were left out, who and when.',
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,
@@ -198,11 +198,13 @@ export class SpendSubmissionController {
     {
       status: HttpStatus.CONFLICT,
       description:
-        'The request is not back in the queue (SPEND.SUPPLEMENT_NOT_IN_QUEUE), has no price (SPEND.SUPPLEMENT_NOT_PRICED), nothing changes (SPEND.SUPPLEMENT_NO_CHANGE), cannot be priced for it (ACCESS_REQUEST.NOT_PRICEABLE), or a person to leave out is not a line whose need is confirmed (SUPPLEMENT.LINE_NOT_DROPPABLE).',
+        'The request is not back in the queue (SPEND.SUPPLEMENT_NOT_IN_QUEUE), has no price (SPEND.SUPPLEMENT_NOT_PRICED), nothing changes (SPEND.SUPPLEMENT_NO_CHANGE), the end date is not earlier than the one the request has (SPEND.SUPPLEMENT_TERM_NOT_REDUCED), the end date is before today or more than a year from today (SPEND.SUPPLEMENT_END_DATE_OUT_OF_RANGE), cannot be priced for it (ACCESS_REQUEST.NOT_PRICEABLE), or a person to leave out is not a line whose need is confirmed (SUPPLEMENT.LINE_NOT_DROPPABLE).',
       examples: [
         GROUP_REQUEST_ERROR_EXAMPLES.SUPPLEMENT_NOT_IN_QUEUE,
         GROUP_REQUEST_ERROR_EXAMPLES.SUPPLEMENT_NOT_PRICED,
         GROUP_REQUEST_ERROR_EXAMPLES.SUPPLEMENT_NO_CHANGE,
+        GROUP_REQUEST_ERROR_EXAMPLES.SUPPLEMENT_TERM_NOT_REDUCED,
+        GROUP_REQUEST_ERROR_EXAMPLES.SUPPLEMENT_END_DATE_OUT_OF_RANGE,
         GROUP_REQUEST_ERROR_EXAMPLES.NOT_PRICEABLE,
         GROUP_REQUEST_ERROR_EXAMPLES.LINE_NOT_DROPPABLE,
       ],
@@ -210,7 +212,7 @@ export class SpendSubmissionController {
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
-        'The body is invalid (VALIDATION_ERROR: neither a day nor a person, a blank reason); nobody would be left in the request (SUPPLEMENT.CANNOT_DROP_LAST_LINE); the request is not for a group (SUPPLEMENT.DROP_NOT_FOR_GROUP).',
+        'The body is invalid (VALIDATION_ERROR: neither an end date nor a person, a blank reason); nobody would be left in the request (SUPPLEMENT.CANNOT_DROP_LAST_LINE); the request is not for a group (SUPPLEMENT.DROP_NOT_FOR_GROUP).',
       examples: [
         VALIDATION_EXAMPLE,
         GROUP_REQUEST_ERROR_EXAMPLES.CANNOT_DROP_LAST_LINE,

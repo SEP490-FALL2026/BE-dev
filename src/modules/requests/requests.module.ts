@@ -135,7 +135,7 @@ import { SupplementPricing } from './spend-submission/supplement-pricing.service
 import { SupplementQueryService } from './spend-submission/supplement-query.service';
 import { SupplementRecorder } from './spend-submission/supplement-recorder.service';
 import { SupplementService } from './spend-submission/supplement.service';
-import { RepricingService } from './assessment/repricing.service';
+import { RepricingService } from './repricing/repricing.service';
 import { SpendBudgetListener } from './finance-review/spend-budget.listener';
 import { SpendRequestRepo } from './spend/spend-request.repo';
 import { SpendRoutingService } from './spend/spend-routing.service';

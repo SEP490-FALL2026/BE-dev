@@ -82,7 +82,7 @@ describe('the approvers on the phone: need step, spend step and the request a he
   });
 
   it('the employee sends a paid request from the phone; the head is told the need step is theirs', async () => {
-    const body = { planId: plan, businessReason: 'Design system', termMonths: 1 };
+    const body = { planId: plan, businessReason: 'Design system' };
     paid = h.dataOf<{ request: AccessRequestWire }>(await post('/access-requests', employee.account, body).expect(201))
       .request.id;
     await h.project();
@@ -141,7 +141,7 @@ describe('the approvers on the phone: need step, spend step and the request a he
   });
 
   it('the head sends a request for themselves; the approver decides its need, then its spend, in two decisions', async () => {
-    const body = { planId: plan, businessReason: 'Own seat', termMonths: 1 };
+    const body = { planId: plan, businessReason: 'Own seat' };
     own = h.dataOf<{ request: AccessRequestWire }>(await post('/access-requests', unit.head.account, body).expect(201))
       .request.id;
     await h.project();

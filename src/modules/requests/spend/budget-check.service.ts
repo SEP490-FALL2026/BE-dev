@@ -12,7 +12,7 @@ import { AccessRequestNotPriceableError } from '../access-request/access-request
 import { chargedCostCenterId } from '../access-request/access-request.policy';
 import { AccessRequestRepo } from '../access-request/access-request.repo';
 import type { AccessRequestRecord, PricingRecord } from '../access-request/access-request.types';
-import { RepricingService } from '../assessment/repricing.service';
+import { RepricingService } from '../repricing/repricing.service';
 import { AssessmentReadRepo } from '../access-request/assessment-read.repo';
 import { scaleAmount } from './line-allocation.policy';
 import { checkBudget, type CheckResult, type YearBudget, type YearSlice } from './budget-check.policy';

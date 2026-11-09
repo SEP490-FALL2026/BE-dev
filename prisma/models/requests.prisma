@@ -161,6 +161,8 @@ model AccessRequest {
   amountMonths          Int?                       @map("amount_months") // months of the year for recurring pricing (0–12)
   priceKind             AccessRequestPriceKind?   @map("price_kind") // RECURRING or ONE_TIME
   grantedOn             DateTime?                  @map("granted_on") @db.Date // day task completed (BR-MF1-06a)
+  // What the first year of a request to go on using would cost, when it begins in the year after the day it is priced: shown, never held (QĐ-109b).
+  nextYearAmountMinor   BigInt?                    @map("next_year_amount_minor")
   // Context only: it changes neither the Cost Center nor the chain (US-05-02 AC-7).
   // Retired in QD-93h phase 1; dropped in phase 2.
   pricingStatus         AccessRequestPricingStatus @default(NOT_APPLICABLE) @map("pricing_status")

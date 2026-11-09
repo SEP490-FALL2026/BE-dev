@@ -479,4 +479,84 @@ describe('the grant of a seat over HTTP (integration, real PostgreSQL)', () => {
       ).rows[0].source,
     ).toBe('REQUEST');
   });
+
+  describe('the day the right begins is the day the task of the grant is completed (BR-MF1-06a, RV-04, S1-01)', () => {
+    const seat = async (assignmentId: string) =>
+      (
+        await h.ctx.sql.query<{ valid_from: string; granted_on: string | null; expected_end_date: string | null }>(
+          `SELECT to_char(valid_from, 'YYYY-MM-DD') AS valid_from, to_char(granted_on, 'YYYY-MM-DD') AS granted_on,
+                  to_char(expected_end_date, 'YYYY-MM-DD') AS expected_end_date
+             FROM license_assignments WHERE id = $1`,
+          [assignmentId],
+        )
+      ).rows[0];
+    const grantableTo = (employeeId: string, planId: string, expectedEndDate: string | null) =>
+      h.gate.answer({
+        status: 'GRANTABLE',
+        seat: 'PERSONAL',
+        employeeId,
+        planId,
+        departmentId: h.gate.defaultDepartmentId,
+        expectedEndDate,
+        termMonths: 0,
+        termBound: expectedEndDate !== null,
+      });
+
+    it('BR-MF1-06a: a request made on 10/11 and granted on 13/11 begins on 13/11: granted_on is written, valid_from is not touched', async () => {
+      const { subscriptionId, planId } = await k2();
+      const person = await h.member('P-DES', 'E-GRANTED', designer);
+      pretendBusinessToday(h.ctx.app, '2026-11-10');
+      let task;
+      try {
+        task = await h.granted(person, planId, { subscriptionId });
+        expect(await seat(task.assignmentId)).toMatchObject({ valid_from: '2026-11-10', granted_on: null });
+        pretendBusinessToday(h.ctx.app, '2026-11-13');
+        await h.claim(task.id).expect(200);
+        await h.complete(task.id, { evidence: 'The account was added by hand' }).expect(200);
+      } finally {
+        jest.restoreAllMocks();
+      }
+
+      expect(await seat(task.assignmentId)).toMatchObject({ valid_from: '2026-11-10', granted_on: '2026-11-13' });
+    });
+
+    it('BR-MF1-06a: the end is the end the request asked for, a year from the completion at the latest (QĐ-106b)', async () => {
+      const { subscriptionId, planId } = await k2();
+      const early = await h.member('P-DES', 'E-GRANTED-EARLY', designer);
+      const late = await h.member('P-DES', 'E-GRANTED-LATE', designer);
+      pretendBusinessToday(h.ctx.app, '2026-11-10');
+      const tasks = [];
+      try {
+        // 09/11/2027 is the longest end a request sent on 10/11/2026 may ask for; a seat asked to end later is cut a year after completion.
+        tasks.push(await h.grant({ requestId: grantableTo(early, planId, '2027-11-09'), subscriptionId }).expect(201));
+        tasks.push(await h.grant({ requestId: grantableTo(late, planId, '2028-02-01'), subscriptionId }).expect(201));
+        const [first, second] = tasks.map(
+          (response) => h.dataOf<{ task: { id: string; assignmentId: string } }>(response).task,
+        );
+        pretendBusinessToday(h.ctx.app, '2026-11-13');
+        await h.claim(first.id).expect(200);
+        await h.claim(second.id).expect(200);
+        await h.complete(first.id, { evidence: 'Done' }).expect(200);
+        await h.complete(second.id, { evidence: 'Done' }).expect(200);
+
+        expect((await seat(first.assignmentId)).expected_end_date).toBe('2027-11-09');
+        expect((await seat(second.assignmentId)).expected_end_date).toBe('2027-11-12');
+      } finally {
+        jest.restoreAllMocks();
+      }
+    });
+
+    it('BR-MF1-06a: a seat with no end asked for keeps none when it is completed', async () => {
+      const { subscriptionId, planId } = await k2();
+      const person = await h.member('P-DES', 'E-GRANTED-OPEN', designer);
+      const task = h.dataOf<{ task: { id: string; assignmentId: string } }>(
+        await h.grant({ requestId: grantableTo(person, planId, null), subscriptionId }).expect(201),
+      ).task;
+
+      await h.claim(task.id).expect(200);
+      await h.complete(task.id, { evidence: 'Done' }).expect(200);
+
+      expect(await seat(task.assignmentId)).toMatchObject({ expected_end_date: null, granted_on: h.today() });
+    });
+  });
 });

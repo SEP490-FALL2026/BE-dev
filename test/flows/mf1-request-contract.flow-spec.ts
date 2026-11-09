@@ -49,7 +49,7 @@ describe('MF-1 request contract: field cũ, sai vai, gọi lại @MF1 @D1', () =
         }),
       );
       await refusedWithNothingWritten('access_requests', () =>
-        call().post('NV-DEV3', '/access-requests', { planId: figma, businessReason: 'x', termMonths: 13 }),
+        call().post('NV-DEV3', '/access-requests', { planId: figma, businessReason: 'x', termMonths: 12 }),
       );
       const preview = await call().post('NV-DEV3', '/access-requests/preview', {
         planId: figma,
@@ -61,8 +61,13 @@ describe('MF-1 request contract: field cũ, sai vai, gọi lại @MF1 @D1', () =
       const jira = await call().planId('Jira Standard');
       const before = await count('access_requests');
       expect(
-        (await call().post('NV-DEV3', '/access-requests', { planId: jira, businessReason: 'x', termMonths: 12 }))
-          .status,
+        (
+          await call().post('NV-DEV3', '/access-requests', {
+            planId: jira,
+            businessReason: 'x',
+            expectedEndDate: call().inDays(60),
+          })
+        ).status,
       ).toBe(201);
       expect(await count('access_requests')).toBe(before + 1);
     });
@@ -137,7 +142,6 @@ describe('MF-1 request contract: field cũ, sai vai, gọi lại @MF1 @D1', () =
       const group = await call().post('NV-ENGH', '/group-requests', {
         planId: figma,
         businessReason: 'Cả nhóm',
-        termMonths: 3,
         lines: [
           { employeeId: await world.facts.employeeId('NV-DEV1'), expectedEndDate: call().inDays(60) },
           { employeeId: await world.facts.employeeId('NV-DEV2') },

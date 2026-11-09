@@ -134,7 +134,7 @@ describe('role overviews (integration, real PostgreSQL)', () => {
     await request(h.server())
       .post('/api/v1/access-requests/drafts')
       .set(h.as(e1.account))
-      .send({ kind: 'INDIVIDUAL', planId: k5Plan, businessReason: 'Design the new brand', termMonths: 6 })
+      .send({ kind: 'INDIVIDUAL', planId: k5Plan, businessReason: 'Design the new brand' })
       .expect(201);
     await h.sent(des.head, await h.plan('K5'));
   }, 300000);

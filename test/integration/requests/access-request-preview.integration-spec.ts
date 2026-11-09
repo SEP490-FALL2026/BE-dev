@@ -1,6 +1,5 @@
 import request from 'supertest';
 import { addDays } from '../../../src/core/business-date';
-import { effectiveEndOf } from '../../../src/core/term-limit';
 import { maxEndDateOf, monthsBetween } from '../../../src/modules/requests/access-request/pricing.policy';
 import { AccessRequestWire, Department, Person, RequestHarness } from '../../support/request-harness';
 
@@ -44,7 +43,7 @@ describe('requests over HTTP: the preview before sending (integration, real Post
   describe('paid software that has a price (AC-1, AC-3)', () => {
     it('shows the amount, the chain with who holds each step, and the time of every step', async () => {
       const today = h.today();
-      const end = effectiveEndOf({ start: today, months: 6 });
+      const end = h.endDated({ termMonths: 6 }).expectedEndDate as string;
       const yearEnd = `${today.slice(0, 4)}-12-31`;
       // BR-MF1-06: the months left of the year, the month it starts counted whole, to the end date at the latest.
       const months = monthsBetween(today, end < yearEnd ? end : yearEnd);
@@ -96,10 +95,12 @@ describe('requests over HTTP: the preview before sending (integration, real Post
         [
           'plan',
           'branch',
-          'termMonths',
+          'expectedEndDate',
           'department',
           'costCenter',
-          'termLimit',
+          'maxEndDate',
+          'termRequired',
+          'annualVendorAmount',
           'existingAccess',
           'blockedBy',
           'canSubmit',
@@ -302,14 +303,16 @@ describe('requests over HTTP: the preview before sending (integration, real Post
         .items.map((item) => item.id);
 
     it('with no tax profile uses the default, says so, still shows the price, and Finance sees the vendor to declare (AC-12)', async () => {
+      // The amount is the price of the months left of the year, up to the 10 months asked for (`BR-MF1-06`).
+      const net = String(1_000_000 * h.monthsOf(10));
       const preview = await h.previewed(designer, plan, { termMonths: 10 });
-      const route = h.dataOf<Record<string, string>>(await estimateRoute('10000000').expect(200));
+      const route = h.dataOf<Record<string, string>>(await estimateRoute(net).expect(200));
 
-      expect(preview.pricing).toMatchObject({ status: 'PRICED', amount: { amount: '10000000' } });
+      expect(preview.pricing).toMatchObject({ status: 'PRICED', amount: { amount: net } });
       expect(preview.costEstimate).toMatchObject({
         label: 'ESTIMATE_NO_PROFILE',
         basis: 'DEFAULT_NO_PROFILE',
-        preTax: { amount: '10000000', currency: 'VND' },
+        preTax: { amount: net, currency: 'VND' },
         tax: { amount: route.taxAmount },
         estimatedCost: { amount: route.estimatedCost },
       });
@@ -326,15 +329,17 @@ describe('requests over HTTP: the preview before sending (integration, real Post
 
       const preview = await h.previewed(designer, plan, { termMonths: 10 });
 
+      // 10 % deducted and 5 % not, of the price of the months counted (`BR-MF1-06`): in units of 1 000 000 × months a part is exact.
+      const net = 1_000_000 * h.monthsOf(10);
       expect(preview.costEstimate).toMatchObject({
         label: 'ESTIMATE',
         basis: 'PROFILE',
-        preTax: { amount: '10000000', currency: 'VND' },
-        tax: { amount: '1500000' },
-        deductibleTax: { amount: '1000000' },
-        nonDeductibleTax: { amount: '500000' },
-        estimatedCost: { amount: '10500000' },
-        totalPayable: { amount: '11500000' },
+        preTax: { amount: String(net), currency: 'VND' },
+        tax: { amount: String(net * 0.15) },
+        deductibleTax: { amount: String(net * 0.1) },
+        nonDeductibleTax: { amount: String(net * 0.05) },
+        estimatedCost: { amount: String(net * 1.05) },
+        totalPayable: { amount: String(net * 1.15) },
       });
       expect(await missingForFinance()).not.toContain(vendor.id);
     });
@@ -432,9 +437,9 @@ describe('requests over HTTP: the preview before sending (integration, real Post
         .expect(401);
       for (const body of [
         {},
-        { planId: paidPlan },
-        { planId: 'x', termMonths: 6 },
-        { planId: paidPlan, termMonths: 0 },
+        { planId: 'x' },
+        { planId: paidPlan, expectedEndDate: 'next month' },
+        { planId: paidPlan, expectedEndDate: '2027-13-45' },
       ]) {
         expect(h.codeOf(await h.previewRequest(body, designer.account).expect(422))).toBe('VALIDATION_ERROR');
       }

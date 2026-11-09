@@ -41,7 +41,8 @@ const livePricedOf = (): Prisma.SubscriptionWhereInput => ({
   renewedBy: null,
   unitPriceMinor: { not: null },
   unitPriceCurrency: { not: null },
-  billingCycle: { not: null },
+  // A perpetual purchase has a price and no billing cycle: its price is the price of the purchase (`QĐ-106d`).
+  OR: [{ billingCycle: { not: null } }, { kind: 'PERPETUAL' }],
 });
 const PRICE_FIELDS = {
   kind: true,
@@ -298,7 +299,7 @@ export class SubscriptionRepo {
       select: { id: true, startDate: true, isPrimaryForPlan: true, ...PRICE_FIELDS },
     });
     const row = pickPriceSource(rows.map(withPriceSource));
-    if (!row || row.unitPriceMinor === null || row.unitPriceCurrency === null || row.billingCycle === null) return null;
+    if (!row || row.unitPriceMinor === null || row.unitPriceCurrency === null) return null;
 
     return {
       subscriptionKind: row.kind,
@@ -309,22 +310,24 @@ export class SubscriptionRepo {
     };
   }
 
-  /** The billing cycles of the main subscriptions pricing these plans, one per plan; no department is asked. */
+  /** The billing cycles of the main subscriptions pricing these plans, one per plan (`ONE_TIME` for a perpetual purchase); no department is asked. */
   async findPricedCyclesOfPlans(
     planIds: readonly string[],
     tx?: DbTx,
-  ): Promise<Map<string, 'MONTHLY' | 'QUARTERLY' | 'ANNUAL' | 'OTHER'>> {
-    const cycles = new Map<string, 'MONTHLY' | 'QUARTERLY' | 'ANNUAL' | 'OTHER'>();
+  ): Promise<Map<string, 'MONTHLY' | 'QUARTERLY' | 'ANNUAL' | 'OTHER' | 'ONE_TIME'>> {
+    const cycles = new Map<string, 'MONTHLY' | 'QUARTERLY' | 'ANNUAL' | 'OTHER' | 'ONE_TIME'>();
     if (planIds.length === 0) return cycles;
     const rows = await (tx ?? this.prisma).subscription.findMany({
       where: { planId: { in: [...planIds] }, ...livePricedOf() },
       select: { id: true, planId: true, startDate: true, isPrimaryForPlan: true, ...PRICE_FIELDS },
     });
-    const byPlan = new Map<string, ReturnType<typeof withPriceSource>[]>();
-    for (const row of rows) byPlan.set(row.planId, [...(byPlan.get(row.planId) ?? []), withPriceSource(row)]);
+    const byPlan = new Map<string, Array<ReturnType<typeof withPriceSource> & { kind: SubscriptionKind }>>();
+    for (const row of rows) {
+      byPlan.set(row.planId, [...(byPlan.get(row.planId) ?? []), { ...withPriceSource(row), kind: row.kind }]);
+    }
     for (const [planId, sources] of byPlan) {
       const chosen = pickPriceSource(sources);
-      if (chosen) cycles.set(planId, chosen.billingCycle);
+      if (chosen) cycles.set(planId, chosen.kind === 'PERPETUAL' ? 'ONE_TIME' : chosen.billingCycle);
     }
 
     return cycles;

@@ -148,7 +148,10 @@ const approvalDetailSchema = z.strictObject({
     lineCount: z.number().int().positive(),
     costCenter: z.strictObject({ id: z.uuid(), code: z.string() }),
     businessReason: z.string(),
-    termMonths: z.number().int().positive(),
+    /** Only a request made before `QĐ-104a` has a term in months. */
+    termMonths: z.number().int().positive().nullable(),
+    /** The day the right ends as the sender chose it; null for a right with no end (`QĐ-104a`). */
+    expectedEndDate: z.string().nullable(),
     budgetYear: z.number().int().nullable(),
   }),
   /** The need the head confirmed. */

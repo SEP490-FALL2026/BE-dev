@@ -2,8 +2,8 @@ import type { Department, Person } from '../../support/request-harness';
 import { SpendHarness } from '../../support/spend-harness';
 
 /**
- * `g0-g6-final-business-baseline-remediation`, Task 4.4 (F34, F38, spec L.8): a request is priced by the subscription of its own department
- * and never by another's, and a price of nothing is no price: the request is sent all the same, with no amount and the reason, and is
+ * `g0-g6-final-business-baseline-remediation`, Task 4.4 (F34, spec L.8) and `BR-MF1-07` (S1-02): a request is priced by the main subscription of
+ * its plan, never by a department's, and a price of nothing is no price: the request is sent all the same, with no amount and the reason, and is
  * not checked against a budget as a request that costs 0. The IT Admin's quote that comes to nothing is incomplete, not a price.
  */
 const h = new SpendHarness();
@@ -42,7 +42,8 @@ describe('what a request is priced by (integration, real PostgreSQL)', () => {
     );
   };
 
-  it('prices a request by the subscription its own department owns: two departments, one plan, two prices', async () => {
+  it('BR-MF1-07: prices a request by the main subscription of the plan, the same for every department: two departments, one plan, one price (S1-02)', async () => {
+    // Rewritten from "by the subscription its own department owns": the pool is the plan's, so the price is too (QĐ-103d).
     const cheap = await department();
     const dear = await department();
     await setUnitPrice(dear.department.id, pricedPlan, 2_500_000);
@@ -50,47 +51,43 @@ describe('what a request is priced by (integration, real PostgreSQL)', () => {
     const first = await h.sent(cheap.member, pricedPlan, { termMonths: 2 });
     const second = await h.sent(dear.member, pricedPlan, { termMonths: 2 });
 
-    expect(first.pricing).toMatchObject({
-      status: 'PRICED',
-      unitPrice: { amount: '1000000' },
-      amount: { amount: '2000000' },
-    });
-    expect(second.pricing).toMatchObject({
-      status: 'PRICED',
-      unitPrice: { amount: '2500000' },
-      amount: { amount: '5000000' },
-    });
+    // No subscription is flagged primary, so the one with the highest price a month prices the plan, whoever asks.
+    for (const sent of [first, second]) {
+      expect(sent.pricing).toMatchObject({
+        status: 'PRICED',
+        unitPrice: { amount: '2500000' },
+        amount: { amount: String(2_500_000 * h.monthsOf(2)) },
+      });
+    }
   });
 
-  it('does not price a request by the subscription of another department: the plan is priced there, and here it has no price', async () => {
+  it('BR-MF1-07: prices a request by the subscription of another department when the plan has only that one (S1-02)', async () => {
+    // Rewritten from "does not price by the subscription of another department": there is no owner whose price only counts.
     const owner = await department();
     const other = await department();
     const planOfOwnerOnly = await h.planOf(await h.subscription(5, 'K2', owner.department.id));
 
     const priced = await h.sent(owner.member, planOfOwnerOnly, { termMonths: 1 });
-    const unpriced = await h.sent(other.member, planOfOwnerOnly, { termMonths: 1 });
+    const alsoPriced = await h.sent(other.member, planOfOwnerOnly, { termMonths: 1 });
 
-    expect(priced.pricing).toMatchObject({ status: 'PRICED', amount: { amount: '1000000' } });
-    expect(unpriced.pricing).toMatchObject({
-      status: 'MISSING',
-      missingReason: 'NO_PRICED_SUBSCRIPTION',
-      amount: null,
-      unitPrice: null,
-    });
+    for (const sent of [priced, alsoPriced]) {
+      expect(sent.pricing).toMatchObject({ status: 'PRICED', amount: { amount: String(1_000_000 * h.monthsOf(1)) } });
+    }
   });
 
   it('treats a price of nothing as no price: the request is sent with no amount and the reason, never as a request that costs 0', async () => {
-    const free = await department();
-    await setUnitPrice(free.department.id, pricedPlan, 0);
+    const owner = await department();
+    const planOfFree = await h.planOf(await h.subscription(5, 'K2', owner.department.id));
+    await setUnitPrice(owner.department.id, planOfFree, 0);
 
-    const sent = await h.sent(free.member, pricedPlan, { termMonths: 3 });
+    const sent = await h.sent(owner.member, planOfFree, { termMonths: 3 });
 
     expect(sent.pricing).toMatchObject({
       status: 'MISSING',
       missingReason: 'NO_PRICED_SUBSCRIPTION',
       amount: null,
       unitPrice: null,
-      periodCount: null,
+      months: null,
     });
     const { rows } = await h.ctx.sql.query<{ pricing_status: string; amount_minor: string | null }>(
       `SELECT pricing_status::text, amount_minor::text FROM access_requests WHERE id = $1`,

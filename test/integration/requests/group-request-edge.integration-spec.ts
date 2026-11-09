@@ -4,6 +4,8 @@ import type { Unit } from '../../support/spend-harness';
 
 const h = new GroupHarness();
 const M = 1_000_000;
+/** The months of a request that names no end date: the months left of the year, the month of today counted whole (`BR-MF1-06`). */
+const monthsLeft = h.monthsOf(12);
 
 interface Refused {
   error: { code: string; details?: { missing?: string[]; extra?: string[] } };
@@ -57,7 +59,7 @@ describe('the edges of a request for a group over PostgreSQL (US-05-17 AC-5, AC-
     expect(checked).toMatchObject({
       hasSpendStep: true,
       lineCount: 5,
-      pricing: { status: 'PRICED', amount: { amount: '60000000' } },
+      pricing: { status: 'PRICED', amount: { amount: String(5 * M * monthsLeft) } },
     });
     expect(sent).toMatchObject({
       branch: 'PAID_IN_CATALOG',
@@ -131,7 +133,7 @@ describe('the edges of a request for a group over PostgreSQL (US-05-17 AC-5, AC-
     ).toEqual(expect.arrayContaining(['NEED', 'SPEND_DECISION', 'GRANT']));
   });
 
-  it('gives a person who is not staff no end day of the sender: the line has none, sending one is refused, and the seat ends with the term (AC-8, Q-03, R-15)', async () => {
+  it('FR-2.8, R-D01: needs the end date of the group for a person who is not staff, gives it to every line, and the seat ends with it (AC-8)', async () => {
     const u = await unit();
     const subscription = await h.subscription(10);
     const plan = await h.planOf(subscription);
@@ -142,13 +144,18 @@ describe('the edges of a request for a group over PostgreSQL (US-05-17 AC-5, AC-
       lines: [{ employeeId: e1.employeeId }, { employeeId: e2.employeeId, expectedEndDate: '2099-12-31' }],
     };
 
+    // Rewritten from "no end day of the sender": the group names one end date for all of its people now (`QĐ-104a`, `FR-2.8`).
+    const end = effectiveEndOf({ start: h.today(), months: 3 });
+
     const refused = await h.submitGroup(withDay, u.head.account).expect(422);
+    const refusedNone = await h.submitGroup(h.groupBody(plan, [e1, e2]), u.head.account).expect(422);
     const sent = h.dataOf<{ request: { id: string } }>(
-      await h.submitGroup(h.groupBody(plan, [e1, e2]), u.head.account).expect(201),
+      await h.submitGroup(h.groupBody(plan, [e1, e2], { expectedEndDate: end }), u.head.account).expect(201),
     ).request;
 
     expect(h.codeOf(refused)).toBe('VALIDATION_ERROR');
-    expect((await h.lineRows(sent.id)).map((line) => line.expected_end_date)).toEqual([null, null]);
+    expect(h.codeOf(refusedNone)).toBe('GROUP_REQUEST.LINES_REFUSED');
+    expect((await h.lineRows(sent.id)).map((line) => line.expected_end_date)).toEqual([end, end]);
 
     await h.sendOn([sent.id], u.head.account).expect(201);
     await h
@@ -162,12 +169,11 @@ describe('the edges of a request for a group over PostgreSQL (US-05-17 AC-5, AC-
         )
         .expect(201);
     }
-    // Nobody gave the seat a day: it ends with the term the request asked for (12 months for a group), as the intern's does.
+    // The seat ends with the end date the group named.
     const seats = await h.ctx.sql.query<{ employee_id: string; expected_end_date: string | null }>(
       `SELECT employee_id, expected_end_date::text FROM license_assignments WHERE employee_id = ANY($1::uuid[])`,
       [[e1.employeeId, e2.employeeId]],
     );
-    const end = effectiveEndOf({ start: h.today(), months: 12 });
     expect(Object.fromEntries(seats.rows.map((row) => [row.employee_id, row.expected_end_date]))).toEqual({
       [e1.employeeId]: end,
       [e2.employeeId]: end,
