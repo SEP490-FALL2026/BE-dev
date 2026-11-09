@@ -5,7 +5,7 @@ import { bodyOf } from '../../support/api-body';
 import { bearer, createHttpContractApp, principal } from '../../support/http-contract-app';
 
 const ID = '3f0c7d54-9e1b-4f6a-8d2c-5b7a1e9c0d11';
-const GROUNDS = { type: 'DECISION', reference: 'QD-12/2026', issuer: 'HR Department', issuedOn: '2026-10-01' };
+const GROUNDS = { type: 'HR_DECISION', reference: 'QD-12/2026', issuer: 'HR Department', issuedOn: '2026-10-01' };
 
 type Call = (server: App) => request.Test;
 
@@ -102,6 +102,15 @@ describe('department transfer routes (e2e, no database)', () => {
       ['no day', { employeeId: ID, toDepartmentId: ID, grounds: GROUNDS }],
       ['a day that is not a date', { employeeId: ID, toDepartmentId: ID, effectiveOn: '31/12/2026', grounds: GROUNDS }],
       ['an employee that is not an id', { employeeId: 'E1', toDepartmentId: ID, effectiveOn: '2026-12-01' }],
+      ['no basis', { employeeId: ID, toDepartmentId: ID, effectiveOn: '2026-12-01' }],
+      [
+        'a basis of a kind outside the list',
+        { employeeId: ID, toDepartmentId: ID, effectiveOn: '2026-12-01', grounds: { ...GROUNDS, type: 'DECISION' } },
+      ],
+      [
+        'a basis without a number',
+        { employeeId: ID, toDepartmentId: ID, effectiveOn: '2026-12-01', grounds: { ...GROUNDS, reference: '' } },
+      ],
       ['a field the route does not know', { employeeId: ID, effectiveOn: '2026-12-01', note: 'x' }],
       ['a successor of no kind', { employeeId: ID, effectiveOn: '2026-12-01', successor: { kind: 'SOMEONE' } }],
     ])('refuses %s with 422', async (_name, payload) => {
@@ -125,6 +134,29 @@ describe('department transfer routes (e2e, no database)', () => {
         'a new day that is not a date',
         (server: App) =>
           request(server).post(`/api/v1/department-transfers/${ID}/rescheduling`).send({ newEffectiveOn: 'tomorrow' }),
+      ],
+      [
+        'a rescheduling without a reason',
+        (server: App) =>
+          request(server)
+            .post(`/api/v1/department-transfers/${ID}/rescheduling`)
+            .send({ newEffectiveOn: '2026-12-15', grounds: GROUNDS }),
+      ],
+      [
+        'a rescheduling without a basis',
+        (server: App) =>
+          request(server)
+            .post(`/api/v1/department-transfers/${ID}/rescheduling`)
+            .send({ newEffectiveOn: '2026-12-15', reason: 'Later' }),
+      ],
+      [
+        'a cancellation without a reason',
+        (server: App) =>
+          request(server).post(`/api/v1/department-transfers/${ID}/cancellation`).send({ grounds: GROUNDS }),
+      ],
+      [
+        'a cancellation without a basis',
+        (server: App) => request(server).post(`/api/v1/department-transfers/${ID}/cancellation`).send({ reason: 'No' }),
       ],
     ])('refuses %s with 422', async (_name, call) => {
       const response = await call(app.getHttpServer()).set(asAdmin()).expect(422);

@@ -49,7 +49,6 @@ export class AccessRequestRepo {
       costCenterId: input.costCenterId,
       businessReason: input.businessReason,
       termMonths: input.termMonths,
-      delegatedBatchId: input.delegatedBatchId ?? null,
       expectedEndDate: input.expectedEndDate ? toDateColumn(input.expectedEndDate) : null,
       ...pricingColumns(input.pricing),
       policy: requestPolicyJson.encode(input.policy),
@@ -145,7 +144,6 @@ export class AccessRequestRepo {
         deciderRole: record.deciderRole,
         departmentId: input.departmentId,
         reason: record.reason,
-        termConfirmationReason: record.termConfirmationReason,
         decidedAt: record.decidedAt,
       },
     });

@@ -1,3 +1,5 @@
+import type { BusinessDate } from '../../../core/business-date';
+import { isBlockInForce } from '../access-block/access-block.policy';
 import type { EmployeeStatus } from '../../organization/public/organization.types';
 
 // Account rules several capabilities share: auth, accounts, access, approval-roles (the facts of the grant) and the module root.
@@ -7,6 +9,15 @@ export function employeeHasNotLeft<T extends { status: EmployeeStatus }>(
   employee: T | null | undefined,
 ): employee is T {
   return employee != null && employee.status !== 'TERMINATED';
+}
+
+/** The one rule of the sign-in, the refresh and the guard: the Employee has not left and no block is in force on `today`. */
+export function accessAllowed<T extends { status: EmployeeStatus }>(
+  employee: T | null | undefined,
+  block: { blockedFrom: BusinessDate } | null | undefined,
+  today: BusinessDate,
+): employee is T {
+  return employeeHasNotLeft(employee) && !isBlockInForce(block, today);
 }
 
 export interface ActionLinkState {

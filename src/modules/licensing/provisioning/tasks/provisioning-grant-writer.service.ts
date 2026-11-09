@@ -18,6 +18,8 @@ import { ProvisioningTaskRepo } from '../provisioning-task.repo';
 import type { ProvisioningTaskRecord } from '../provisioning-task.types';
 import type { GrantInput, ProvisioningGrantPlanner } from './provisioning-grant-planner.service';
 import { claimMatchesAnswer, grantTaskAudit } from './provisioning-grant.policy';
+import { effectiveEndOf } from '../../../../core/term-limit';
+import type { GrantRequestAnswer } from '../../public/licensing.types';
 import { ProvisioningHolderService } from './provisioning-holder.service';
 
 type Planned = Awaited<ReturnType<ProvisioningGrantPlanner['plan']>>;
@@ -45,7 +47,8 @@ export class ProvisioningGrantWriter {
     input: GrantInput,
     planned: Planned,
   ): Promise<ProvisioningTaskRecord> {
-    const { answer, plan, serviceIdentifier, organization, today, inCharge, maxAttempts } = planned;
+    const { answer, plan, serviceIdentifier, organization, today, inCharge, maxAttempts, fiscalYearStartMonth } =
+      planned;
     // The request is locked and moved to "being carried out" here, in the transaction of the grant: a second grant of
     // the same request finds it no longer grantable, and a request that changed since the read above is refused.
     const claimed = await this.gate.get().claimForGrant(tx, input.requestId, input.beneficiaryEmployeeId);
@@ -60,7 +63,7 @@ export class ProvisioningGrantWriter {
             accountIdentifier: serviceIdentifier,
             today,
           })
-        : await this.holders.personal(tx, {
+        : await this.holders.personal(tx, actor, {
             requestId: input.requestId,
             employeeId: answer.employeeId,
             accountIdentifier: input.accountIdentifier,
@@ -74,8 +77,7 @@ export class ProvisioningGrantWriter {
       target,
       holder,
       effectiveFrom: today,
-      // The day the head gave for a person who is not staff is the end of the seat unless the IT Admin names another.
-      expectedEndDate: input.expectedEndDate ?? claimed.expectedEndDate,
+      expectedEndDate: this.endOfSeat(claimed, target, today, fiscalYearStartMonth),
     });
     const task = await this.repo.insert(tx, {
       organizationId: organization.id,
@@ -102,6 +104,27 @@ export class ProvisioningGrantWriter {
     if (holder.selfExecuted === true) await this.frame.tellSuperAdmin(tx, organization.id, task.id, actor.employeeId);
 
     return task;
+  }
+
+  /**
+   * The day the seat ends: the day the request carries (the IT Admin names none, `Q-03` c1), else the end of its term for a request that
+   * costs money, cut at the fiscal year for a flexible subscription (`QĐ-98`); free internal software and a service account have none.
+   */
+  private endOfSeat(
+    claimed: Extract<GrantRequestAnswer, { status: 'GRANTABLE' }>,
+    target: SeatTarget,
+    today: string,
+    fiscalYearStartMonth: number,
+  ): string | null {
+    if (claimed.expectedEndDate !== null) return claimed.expectedEndDate;
+    if (!claimed.termBound) return null;
+
+    return effectiveEndOf({
+      start: today,
+      months: claimed.termMonths,
+      flexible: target.allowsMidTermReduction,
+      fiscalYearStartMonth,
+    });
   }
 
   /** K5: the plan itself (no seat); K1 and K2: the subscription, which must be of the plan and have a quantity. */

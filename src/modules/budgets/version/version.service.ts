@@ -4,8 +4,10 @@ import type { AuthenticatedPrincipal } from '../../../infrastructure/security/to
 import {
   BudgetProposalStateError,
   BudgetReasonRequiredError,
+  BudgetVersionNotEditableError,
   BudgetVersionNotFoundError,
 } from '../budget/budget.errors';
+import { reserveReasonMissing } from '../budget/budget.policy';
 import { BudgetYearLockRepo } from '../budget/budget-year-lock.repo';
 import { ProposalRepo } from '../budget/proposal.repo';
 import { VersionRepo } from '../budget/version.repo';
@@ -70,7 +72,10 @@ export class VersionService {
       if (!known) throw new BudgetVersionNotFoundError();
       const proposal = known.proposalId ? await this.proposals.lockById(tx, known.proposalId) : null;
       const version = await this.access.lockEditable(tx, id, fiscalStart);
-      if (version.kind === 'REVISION' && !version.reason) throw new BudgetReasonRequiredError('REVISION');
+      // A revision of the budget of a year is gone (`QĐ-97b`): one that an older release left is neither sent nor decided.
+      if (version.kind === 'REVISION') throw new BudgetVersionNotEditableError(version.state);
+      // A reserve that is not the default share of the base says why; a version made before the share was kept asks nothing.
+      if (reserveReasonMissing(version)) throw new BudgetReasonRequiredError('RESERVE');
       if (version.proposalId && (!proposal || (proposal.state !== 'SUBMITTED' && proposal.state !== 'REVIEWED'))) {
         throw new BudgetProposalStateError('REVIEW', proposal?.state ?? 'MISSING');
       }

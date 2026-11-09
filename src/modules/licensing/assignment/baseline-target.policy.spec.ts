@@ -23,6 +23,7 @@ const subscription = (over: Partial<SeatTarget> = {}): SeatTarget => ({
   missing: [],
   purchasedQuantity: 100,
   ownerDepartmentId: 'd1',
+  allowsMidTermReduction: false,
   ...over,
 });
 const internal: SeatTarget = subscription({

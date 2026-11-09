@@ -3,11 +3,10 @@ import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { BudgetFactsRepo } from '../budget/budget-facts.repo';
 import { CommitmentService } from '../commitment/commitment.service';
 import type {
+  CommittedAmount,
   CommitmentHoldInput,
   CommitmentReleaseInput,
   HeldCommitment,
-  PlanLineFacts,
-  PlanLineSummary,
   ReleasedCommitment,
   YearBudgetFacts,
 } from './budgets.types';
@@ -30,26 +29,6 @@ export class BudgetsApi {
     return this.facts.yearFacts(costCenterId, years, tx);
   }
 
-  /** The line a request names, read from the current version of its Cost Center and year; null when it is not there. */
-  planLine(versionId: string, position: number, tx?: DbTx): Promise<PlanLineFacts | null> {
-    return this.facts.planLine(versionId, position, tx);
-  }
-
-  /** The line at the position in the current version of the Cost Center and year, or null (`US-05-04` AC-12). */
-  currentLine(costCenterId: string, year: number, position: number, tx?: DbTx): Promise<PlanLineFacts | null> {
-    return this.facts.currentLine(costCenterId, year, position, tx);
-  }
-
-  /** One page of the lines of the current plan of the Cost Center and year, or null when the year has no budget. */
-  currentLines(
-    costCenterId: string,
-    year: number,
-    skip: number,
-    take: number,
-  ): Promise<{ currency: string; items: PlanLineSummary[]; total: number } | null> {
-    return this.facts.currentLines(costCenterId, year, skip, take);
-  }
-
   /**
    * The request holds the amount of each year against the budget of its Cost Center, in the transaction of the decision that
    * approved it (`US-06-04`). Throws BudgetCommitmentExistsError when it already holds one for a year.
@@ -65,6 +44,11 @@ export class BudgetsApi {
    */
   releaseForRequest(tx: DbTx, input: CommitmentReleaseInput): Promise<ReleasedCommitment[]> {
     return this.commitments.release(tx, input);
+  }
+
+  /** What each of the requests was committed for, one entry for each commitment, in one read: for a list that counts and adds them. */
+  committedByRequests(requestIds: readonly string[]): Promise<CommittedAmount[]> {
+    return this.commitments.committedBy(requestIds);
   }
 
   /** Whether the request holds a commitment, which is what lets Finance read it (`US-06-09` AC-2). */

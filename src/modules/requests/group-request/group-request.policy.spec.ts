@@ -5,7 +5,6 @@ import {
   checkLineCount,
   checkLines,
   maxLines,
-  needsTermConfirmation,
   type LineFacts,
 } from './group-request.policy';
 
@@ -16,7 +15,6 @@ const person = (over: Partial<LineFacts> = {}): LineFacts => ({
   workEmail: 'e1@acme.vn',
   employmentType: 'STAFF',
   hireDate: '2026-01-05',
-  expectedEndDate: undefined,
   holdsAccess: false,
   hasOpenRequest: false,
   isHeadOwnLine: false,
@@ -60,6 +58,14 @@ describe('how many people a request names (US-05-17 AC-2, AC-13)', () => {
     expect(checkLineCount({ senderIsHead: true, requested: ids(101) }).tooMany).toEqual({ max: 100 });
   });
 
+  it('asks for at least two different people, whoever sends it (QĐ-100aa)', () => {
+    for (const senderIsHead of [false, true]) {
+      expect(checkLineCount({ senderIsHead, requested: ['a'] }).tooFew).toEqual({ min: 2 });
+      expect(checkLineCount({ senderIsHead, requested: ['a', 'a'] }).tooFew).toEqual({ min: 2 });
+      expect(checkLineCount({ senderIsHead, requested: ['a', 'b'] }).tooFew).toBeNull();
+    }
+  });
+
   it('names the people who are named more than once, each once', () => {
     expect(checkLineCount({ senderIsHead: false, requested: ['a', 'b', 'a', 'c', 'a', 'b'] }).duplicates).toEqual([
       'a',
@@ -70,7 +76,7 @@ describe('how many people a request names (US-05-17 AC-2, AC-13)', () => {
 });
 
 describe('what each person named must have (US-05-17 AC-2, AC-8, AC-12, AC-15)', () => {
-  const check = (people: LineFacts[]) => checkLines('P-DES', people, '2026-10-24');
+  const check = (people: LineFacts[]) => checkLines('P-DES', people);
 
   it('lists nobody when every person may be named', () => {
     expect(check([person({ employeeId: 'a' }), person({ employeeId: 'b' })])).toEqual([]);
@@ -81,12 +87,6 @@ describe('what each person named must have (US-05-17 AC-2, AC-8, AC-12, AC-15)',
     ['somebody who is in no department', { departmentId: null }, 'OUTSIDE_DEPARTMENT'],
     ['a person who left', { active: false }, 'NOT_ACTIVE'],
     ['a person with no work email', { workEmail: null }, 'EMAIL_REQUIRED'],
-    ['an intern with no day the access ends', { employmentType: 'INTERN' }, 'END_DATE_REQUIRED'],
-    [
-      'an end before the access can begin',
-      { employmentType: 'CONTRACTOR', expectedEndDate: '2026-10-01' },
-      'END_DATE_TOO_EARLY',
-    ],
     ['a person who already holds the plan', { holdsAccess: true }, 'HAS_ACCESS'],
     ['a person with a request for the plan open', { hasOpenRequest: true }, 'HAS_OPEN_REQUEST'],
   ] as const)('refuses %s', (_name, change, reason) => {
@@ -105,8 +105,8 @@ describe('what each person named must have (US-05-17 AC-2, AC-8, AC-12, AC-15)',
     ]);
   });
 
-  it('takes an intern who has a day of their own that is not before today', () => {
-    expect(check([person({ employmentType: 'INTERN', expectedEndDate: '2026-12-31' })])).toEqual([]);
+  it('takes an intern with no day of their own: the system works it out', () => {
+    expect(check([person({ employmentType: 'INTERN' })])).toEqual([]);
   });
 
   it('gives the first reason of a person in the order a caller should learn it', () => {
@@ -142,19 +142,5 @@ describe('what each person named must have (US-05-17 AC-2, AC-8, AC-12, AC-15)',
 
     expect(check([own])).toEqual([]);
     expect(check([{ ...own, active: false }])).toEqual([{ employeeId: 'e1', reason: 'NOT_ACTIVE' }]);
-  });
-});
-
-describe('the confirmation of a long term', () => {
-  const base = { senderIsHead: true, termMonths: 13, confirmed: false, longTermMonths: 12 };
-
-  it('is asked of the head who sends a term over twelve months, in so many words', () => {
-    expect(needsTermConfirmation(base)).toBe(true);
-    expect(needsTermConfirmation({ ...base, confirmed: true })).toBe(false);
-    expect(needsTermConfirmation({ ...base, termMonths: 12 })).toBe(false);
-  });
-
-  it('is left to the head who decides when an Employee sent it', () => {
-    expect(needsTermConfirmation({ ...base, senderIsHead: false })).toBe(false);
   });
 });

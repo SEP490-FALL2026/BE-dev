@@ -1,7 +1,7 @@
 import type { INestApplicationContext } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import type { AddressInfo, Server } from 'node:net';
-import { INSTALLATION } from '../../../src/cli/seed/fixture/shared-demo-v2/installation';
+import { INSTALLATION } from '../../../src/cli/seed/fixture/shared-demo-v3/installation';
 import { runSeed } from '../../../src/cli/seed/seed-run';
 import type { SeedCommandArguments } from '../../../src/cli/seed/seed.arguments';
 import { InstallationApi } from '../../../src/modules/installation/public/installation.api';
@@ -15,7 +15,7 @@ describe('seed bootstrap from an empty database (integration, real API and Postg
   const secrets = { superAdminPassword: SEED_PASSWORD, demoAccountPassword: 'a long demo test password' };
   const args = (allowBootstrap: boolean): SeedCommandArguments => ({
     mode: 'apply',
-    fixture: 'shared-demo-v2',
+    fixture: 'shared-demo-v3',
     apiUrl: baseUrl,
     operator: 'TEST-SEED-BOOTSTRAP',
     environment: 'LOCAL_TEST',
@@ -32,7 +32,7 @@ describe('seed bootstrap from an empty database (integration, real API and Postg
       await install
         .get(InstallationApi)
         .install(
-          { ...INSTALLATION, environment: 'LOCAL_TEST', operatorReference: 'SEED:shared-demo-v2:TEST' },
+          { ...INSTALLATION, environment: 'LOCAL_TEST', operatorReference: 'SEED:shared-demo-v3:TEST' },
           secrets.superAdminPassword,
         );
     } finally {
@@ -72,7 +72,7 @@ describe('seed bootstrap from an empty database (integration, real API and Postg
     expect(
       outcomes.filter((outcome) => 'refused' in outcome && outcome.refused.includes('Another apply')),
     ).toHaveLength(1);
-    expect((await ctx.sql.query("SELECT code FROM departments WHERE code = 'DS1-ADMIN'")).rowCount).toBe(1);
+    expect((await ctx.sql.query("SELECT code FROM departments WHERE code = 'ADMIN'")).rowCount).toBe(1);
     expect(
       (await ctx.sql.query("SELECT role FROM role_grants WHERE role = 'SUPER_ADMIN' AND revoked_at IS NULL")).rowCount,
     ).toBe(1);

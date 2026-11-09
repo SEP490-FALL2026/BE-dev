@@ -21,7 +21,6 @@ import {
 export interface GroupLineInput {
   employeeId: string;
   /** The day the access of this person ends, when they are not staff (`US-05-17` AC-8). */
-  expectedEndDate?: BusinessDate;
 }
 
 export interface GroupSubmissionInput {
@@ -125,7 +124,6 @@ export class GroupSubmissionFactsService {
         workEmail: person?.workEmail ?? null,
         employmentType: person?.employmentType ?? 'STAFF',
         hireDate: person?.hireDate ?? today,
-        expectedEndDate: line.expectedEndDate,
         holdsAccess: person ? await this.holds(line.employeeId, input.planId) : false,
         hasOpenRequest: open.has(line.employeeId),
         isHeadOwnLine: senderIsHead && line.employeeId === input.senderEmployeeId,
@@ -155,7 +153,7 @@ export class GroupSubmissionFactsService {
       headEmployeeId,
       planRefusal,
       count,
-      refused: checkLines(unit.departmentId, facts, today),
+      refused: checkLines(unit.departmentId, facts),
       lines,
       pricing,
     };

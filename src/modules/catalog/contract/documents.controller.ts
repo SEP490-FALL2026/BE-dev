@@ -171,8 +171,9 @@ export class DocumentsController {
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
-      description: 'The request is invalid (VALIDATION_ERROR).',
-      examples: [VALIDATION_EXAMPLE],
+      description:
+        'The request is invalid (VALIDATION_ERROR) or the document is a signed record, which belongs to the person who signed it and not to a contract (DOCUMENT.PURPOSE_MISMATCH).',
+      examples: [VALIDATION_EXAMPLE, CONTRACT_ERROR_EXAMPLES.PURPOSE_MISMATCH],
     },
   )
   async attach(

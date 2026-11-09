@@ -7,6 +7,7 @@ import { renewalDecisionSnapshotJson } from './subscription-renewal-decision-sna
 import type {
   DeadlineEventRecord,
   DeadlineOutcome,
+  DeciderRole,
   DecisionWrite,
   NewRenewal,
   OutcomeWrite,
@@ -18,6 +19,13 @@ import type {
 
 type Row = Prisma.SubscriptionRenewalGetPayload<object>;
 type EventRow = Prisma.SubscriptionDeadlineEventGetPayload<object>;
+
+/** The role stored with a decision; the two of before `QĐ-94d`(2) are kept for the cases already decided. */
+function deciderRoleOf(stored: string | null): DeciderRole {
+  if (stored === 'OWNER_DEPARTMENT_HEAD' || stored === 'CONFLICT_SUBSTITUTE') return stored;
+
+  return 'SPENDING_APPROVER';
+}
 
 function decisionOf(row: Row): RenewalRecord['decision'] {
   if (
@@ -35,7 +43,7 @@ function decisionOf(row: Row): RenewalRecord['decision'] {
     quantity: row.decidedQuantity,
     reason: row.decisionReason,
     decidedByEmployeeId: row.decidedByEmployeeId,
-    deciderRole: row.deciderRole === 'CONFLICT_SUBSTITUTE' ? 'CONFLICT_SUBSTITUTE' : 'SPENDING_APPROVER',
+    deciderRole: deciderRoleOf(row.deciderRole),
     decidedAt: row.decidedAt,
     decidedOn: fromDateColumn(row.decidedOn),
     decidedAfterDeadline: row.decidedAfterDeadline === true,
@@ -103,7 +111,7 @@ function toEvent(row: EventRow): DeadlineEventRecord {
 export class SubscriptionRenewalRepo {
   constructor(private readonly prisma: PrismaService) {}
 
-  /** Writes the proposal; null when the period already has a case (one per period, the unique index decides a race). */
+  /** Writes the proposal; null when the period already has a live case (one per period, a STALE one does not count; the unique index decides a race). */
   async insert(tx: DbTx, input: NewRenewal): Promise<RenewalRecord | null> {
     const inserted = await tx.$queryRaw<{ id: string }[]>`
       INSERT INTO subscription_renewals (id, organization_id, subscription_id, notice_basis, notice_base_date, proposed_choice,
@@ -113,7 +121,7 @@ export class SubscriptionRenewalRepo {
               ${input.noticeBasis}::"RenewalNoticeBasis", ${input.noticeBaseDate}::date,
               ${input.proposedChoice}::"RenewalChoice", ${input.proposedQuantity}::int, ${input.proposalNote},
               ${input.businessOwnerOpinion}, ${input.proposedByEmployeeId}::uuid, ${input.proposedByAppUserId}::uuid, now())
-      ON CONFLICT (subscription_id) DO NOTHING
+      ON CONFLICT (subscription_id) WHERE state <> 'STALE' DO NOTHING
       RETURNING id`;
     if (inserted.length === 0) return null;
 
@@ -126,15 +134,6 @@ export class SubscriptionRenewalRepo {
     return row ? toRecord(row) : null;
   }
 
-  /** Every case that waits for its decision, in the order of their ids: what a stretch of waiting for the spending approver tells. */
-  async awaitingDecision(tx: DbTx): Promise<{ id: string; organizationId: string; subscriptionId: string }[]> {
-    return tx.subscriptionRenewal.findMany({
-      where: { state: 'PROPOSED' },
-      select: { id: true, organizationId: true, subscriptionId: true },
-      orderBy: { id: 'asc' },
-    });
-  }
-
   /** The case, locked `FOR UPDATE` until the transaction ends, or null: what serializes a decision and an outcome of one case. */
   async lock(tx: DbTx, id: string): Promise<RenewalRecord | null> {
     const locked = await tx.$queryRaw<{ id: string }[]>`
@@ -143,14 +142,24 @@ export class SubscriptionRenewalRepo {
     return locked.length === 0 ? null : this.find(id, tx);
   }
 
-  /** The case of each of these periods, by subscription id; a period without one is absent. */
+  /** The live case of each of these periods, by subscription id; a period without one (or with only STALE ones) is absent. */
   async ofSubscriptions(subscriptionIds: readonly string[], tx?: DbTx): Promise<Map<string, RenewalRecord>> {
     if (subscriptionIds.length === 0) return new Map();
     const rows = await (tx ?? this.prisma).subscriptionRenewal.findMany({
-      where: { subscriptionId: { in: [...subscriptionIds] } },
+      where: { subscriptionId: { in: [...subscriptionIds] }, state: { not: 'STALE' } },
     });
 
     return new Map(rows.map((row) => [row.subscriptionId, toRecord(row)]));
+  }
+
+  /** Closes a proposal that waits as out of date: the period is free for a new one. False when it no longer waits. */
+  async closeStale(tx: DbTx, id: string): Promise<boolean> {
+    const { count } = await tx.subscriptionRenewal.updateMany({
+      where: { id, state: 'PROPOSED' },
+      data: { state: 'STALE' },
+    });
+
+    return count === 1;
   }
 
   async recordDecision(tx: DbTx, id: string, decision: DecisionWrite): Promise<RenewalRecord> {
@@ -234,13 +243,20 @@ export class SubscriptionRenewalRepo {
 
   /** One page of cases, the earliest milestone first, and the total of the same filter. */
   async page(
-    filter: { state?: RenewalState; subscriptionId?: string; late?: boolean },
+    filter: { state?: RenewalState; subscriptionId?: string; late?: boolean; subscriptionIds?: readonly string[] },
     skip: number,
     take: number,
   ): Promise<{ items: RenewalRecord[]; total: number }> {
     const where: Prisma.SubscriptionRenewalWhereInput = {
       ...(filter.state ? { state: filter.state } : {}),
-      ...(filter.subscriptionId ? { subscriptionId: filter.subscriptionId } : {}),
+      ...(filter.subscriptionId || filter.subscriptionIds
+        ? {
+            subscriptionId: {
+              ...(filter.subscriptionId ? { equals: filter.subscriptionId } : {}),
+              ...(filter.subscriptionIds ? { in: [...filter.subscriptionIds] } : {}),
+            },
+          }
+        : {}),
       ...(filter.late === undefined ? {} : { lateFlaggedAt: filter.late ? { not: null } : null }),
     };
     const [rows, total] = await Promise.all([

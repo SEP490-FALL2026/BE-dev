@@ -4,12 +4,10 @@ import type { AuthenticatedPrincipal } from '../../../infrastructure/security/to
 import { AuditApi } from '../../audit/public/audit.api';
 import {
   BudgetLineNotFoundError,
-  BudgetProposalIncompleteError,
   BudgetReasonRequiredError,
   BudgetVersionNotFoundError,
-  BudgetWindowBackwardsError,
 } from '../budget/budget.errors';
-import { backwardLines, incompleteLines, patchChangesLine } from '../budget/budget.policy';
+import { patchChangesLine } from '../budget/budget.policy';
 import { budgetAuditEvent, BudgetFactsService } from '../budget/budget-facts.service';
 import { VersionAccessService } from './version-access.service';
 import { VersionHistoryService } from './version-history.service';
@@ -60,7 +58,6 @@ export class VersionLineService {
       const next: LinePatch = { ...rest };
       if (amount) next.amountMinor = await this.facts.money(amount, version.currency, tx);
       const merged = { ...line, ...stripUndefined(next) };
-      if (merged.windowTo < merged.windowFrom) throw new BudgetWindowBackwardsError([position]);
       const adjusts = line.proposalPosition !== null && patchChangesLine(line, next);
       if (adjusts && !merged.adjustmentReason) throw new BudgetReasonRequiredError('ADJUSTMENT');
       await this.facts.requirePlans([next.planId]);
@@ -90,38 +87,25 @@ export class VersionLineService {
     });
   }
 
-  /** Finance adds lines of their own to a version being built; they must say what every line says. */
+  /** Finance adds lines of their own to a version being built; a line says a plan or a description (`QĐ-101n`). */
   async addLines(actor: AuthenticatedPrincipal, id: string, body: AddLinesBodyDto): Promise<VersionWire> {
     this.facts.requireFinance(actor);
     const fiscalStart = await this.facts.fiscalYearStartMonth();
 
     return this.runner.run(async (tx) => {
       const version = await this.access.lockEditable(tx, id, fiscalStart);
-      const drafts = body.lines.map((line) => ({
-        description: line.description,
-        amountMinor: 0n,
-        ...pickWindow(line),
-      }));
-      const incomplete = incompleteLines(drafts);
-      if (incomplete.length > 0) throw new BudgetProposalIncompleteError(incomplete);
-      const backwards = backwardLines(drafts);
-      if (backwards.length > 0) throw new BudgetWindowBackwardsError(backwards);
       await this.facts.requirePlans(body.lines.map((line) => line.planId));
 
       const lines: Omit<VersionLineRecord, 'position'>[] = [];
+      const names = await this.facts.planNames(body.lines.map((line) => line.planId));
       for (const line of body.lines) {
         lines.push({
           proposalId: null,
           proposalPosition: null,
-          description: line.description,
+          description: line.description ?? names.get(line.planId as string) ?? '',
           planId: line.planId ?? null,
           seats: line.seats ?? null,
           amountMinor: await this.facts.money(line.amount, version.currency, tx),
-          windowFrom: line.windowFrom as string,
-          windowTo: line.windowTo as string,
-          servicePeriodMonths: line.servicePeriodMonths as number,
-          repeatCycle: line.repeatCycle as VersionLineRecord['repeatCycle'],
-          quoteValidUntil: line.quoteValidUntil ?? null,
           financeComment: line.note ?? null,
           adjustmentReason: null,
         });
@@ -148,13 +132,6 @@ export class VersionLineService {
     return version;
   }
 }
-
-const pickWindow = (line: AddLinesBodyDto['lines'][number]) => ({
-  windowFrom: line.windowFrom,
-  windowTo: line.windowTo,
-  servicePeriodMonths: line.servicePeriodMonths,
-  repeatCycle: line.repeatCycle,
-});
 
 const stripUndefined = <T extends object>(value: T): Partial<T> =>
   Object.fromEntries(Object.entries(value).filter(([, entry]) => entry !== undefined)) as Partial<T>;

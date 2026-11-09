@@ -43,7 +43,7 @@ describe('the version after a refusal and the successor of a proposal (integrati
     proposalId,
     base: h.money(60_000_000),
     reserve: h.money(20_000_000),
-    highValuePercent: 50,
+    reserveReason: 'Test reserve',
   });
   const proposalRow = async (id: string) =>
     (
@@ -72,7 +72,7 @@ describe('the version after a refusal and the successor of a proposal (integrati
       await h.createVersion(body(r.proposal.id)).expect(201);
 
       const again = await h.createVersion(body(r.proposal.id)).expect(409);
-      const edit = await h.updateVersion(r.version.id, { highValuePercent: 10 }).expect(409);
+      const edit = await h.updateVersion(r.version.id, { base: h.money(1) }).expect(409);
 
       // Spec J.1: a reviewed proposal takes a new version only while its latest one is refused, so the second is `PROPOSAL_NOT_SUBMITTED`.
       expect(h.codeOf(again)).toBe('BUDGET.PROPOSAL_NOT_SUBMITTED');
@@ -234,36 +234,12 @@ describe('the version after a refusal and the successor of a proposal (integrati
       expect(await h.budgetRows(`budget_proposals WHERE successor_of_proposal_id = '${r.proposal.id}'`)).toBe(1);
     });
   });
-
-  describe('a revision for a department nobody heads (F64, QĐ-92d(1), US-06-09 AC-23)', () => {
-    /** A department with a current budget, whose head then leaves. */
-    const headless = async () => {
+  describe('a version for a department nobody heads (F64, QĐ-92d(1), US-06-09 AC-23)', () => {
+    it('lets a version that was begun before the head left be sent and decided', async () => {
       counter += 1;
       const u = await h.departmentWithHead(`P-SH${counter}`);
       const proposal = await h.budgetProposed(u.head, u.department.unitId);
-      const current = await h.current(proposal.id);
-
-      return { ...u, proposal, current };
-    };
-    const revise = (costCenterId: string) =>
-      h.createRevision({ costCenterId, year: h.next, reason: 'Cut to the plan' });
-
-    it('is refused with BUDGET.DEPARTMENT_HAS_NO_HEAD and writes nothing, and is made once somebody heads it again', async () => {
-      const u = await headless();
-      await h.withoutHead(u.department);
-      const before = await h.budgetRows('budget_versions');
-
-      const refusedRevision = await revise(u.department.unitId).expect(409);
-
-      expect(h.codeOf(refusedRevision)).toBe('BUDGET.DEPARTMENT_HAS_NO_HEAD');
-      expect(await h.budgetRows('budget_versions')).toBe(before);
-      await h.replaceHead(u.department, u.member);
-      await revise(u.department.unitId).expect(201);
-    });
-
-    it('lets a revision that was begun before the head left be sent and decided', async () => {
-      const u = await headless();
-      const draft = h.dataOf<{ version: VersionWire }>(await revise(u.department.unitId).expect(201)).version;
+      const draft = await h.built(proposal.id);
       await h.withoutHead(u.department);
 
       await h.sendVersion(draft.id).expect(200);

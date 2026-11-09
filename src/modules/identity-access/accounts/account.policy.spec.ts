@@ -1,4 +1,4 @@
-import { employeeHasNotLeft, isActionLinkRedeemable } from './account.policy';
+import { accessAllowed, employeeHasNotLeft, isActionLinkRedeemable } from './account.policy';
 
 describe('account policy', () => {
   describe('isActionLinkRedeemable (T-10)', () => {
@@ -48,5 +48,24 @@ describe('account policy', () => {
       expect(employeeHasNotLeft({ status: 'ACTIVE' })).toBe(true);
       expect(employeeHasNotLeft({ status: 'TERMINATED' })).toBe(false);
     });
+  });
+});
+
+describe('accessAllowed', () => {
+  const active = { status: 'ACTIVE' } as const;
+
+  it('allows an employee with no block, and one whose block starts tomorrow', () => {
+    expect(accessAllowed(active, null, '2026-11-10')).toBe(true);
+    expect(accessAllowed(active, { blockedFrom: '2026-11-11' }, '2026-11-10')).toBe(true);
+  });
+
+  it('refuses from the first day of the block, whatever the state of the case', () => {
+    expect(accessAllowed(active, { blockedFrom: '2026-11-10' }, '2026-11-10')).toBe(false);
+    expect(accessAllowed(active, { blockedFrom: '2026-11-01' }, '2026-11-10')).toBe(false);
+  });
+
+  it('still refuses an employee who has left, block or not', () => {
+    expect(accessAllowed({ status: 'TERMINATED' }, null, '2026-11-10')).toBe(false);
+    expect(accessAllowed(null, null, '2026-11-10')).toBe(false);
   });
 });

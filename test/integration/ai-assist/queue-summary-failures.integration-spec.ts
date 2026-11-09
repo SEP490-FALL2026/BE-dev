@@ -49,7 +49,7 @@ describe('the AI summary when the AI is off or failing (integration, real HTTP t
     internal = await h.plan('K5');
     plan = await h.planOf(await h.subscription(100));
     design = await h.unit('P-DES');
-    await h.budgetFor(design, { total: 100 * M, percent: 100 });
+    await h.budgetFor(design, { total: 100 * M });
     r1 = await h.sent(design.member, internal, { businessReason: 'Cần công cụ ghi chú' });
     r2 = await h.sent(design.member, internal, { businessReason: 'Cần công cụ vẽ sơ đồ' });
     spend = await h.waitingForApprover(design, plan, { amount: 5 * M });

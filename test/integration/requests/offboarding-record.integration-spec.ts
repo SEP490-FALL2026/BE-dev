@@ -56,6 +56,7 @@ describe('recording a departure (integration, real PostgreSQL)', () => {
 
     expect(wire).toMatchObject({
       state: 'HANDING_OVER',
+      accessBlockMode: 'WITH_LAST_DAY',
       abrupt: false,
       lastWorkingDay: h.day(10),
       departureEffectiveOn: h.day(11),
@@ -80,7 +81,11 @@ describe('recording a departure (integration, real PostgreSQL)', () => {
     expect(await h.taskCount()).toBe(tasks);
     expect(await h.changeKinds(wire.id)).toEqual(['RECORDED']);
     const [event] = await h.auditEventsOf('OFFBOARDING_CASE.RECORDED', wire.id);
-    expect(event.after).toMatchObject({ lastWorkingDay: h.day(10), grounds: h.grounds, abrupt: false });
+    expect(event.after).toMatchObject({
+      lastWorkingDay: h.day(10),
+      grounds: h.grounds,
+      accessBlockMode: 'WITH_LAST_DAY',
+    });
     expect((await h.auditEventsOf('PERSONNEL.EMPLOYEE_INFORMED', wire.id)).length).toBe(1);
 
     const rights = h.dataOf<{
@@ -93,21 +98,28 @@ describe('recording a departure (integration, real PostgreSQL)', () => {
     expect(detail.checklist?.accountLock).toEqual({ state: 'PENDING', urgent: false });
   });
 
-  it('refuses a record without the last working day, in both modes, and writes nothing (AC-2)', async () => {
+  it('refuses a record without the last working day or without the mode, and one with `abrupt`, and writes nothing (AC-2, Q-04 B)', async () => {
     const { person } = await leaver();
     const before = await nothingWritten(person);
     const tasks = await h.taskCount();
 
-    for (const abrupt of [false, true]) {
-      const response = await h.recordCase({ employeeId: person.employeeId, abrupt, grounds: h.grounds });
-      expect([response.status, h.codeOf(response)]).toEqual([422, 'OFFBOARDING_CASE.LAST_WORKING_DAY_REQUIRED']);
-    }
-    for (const lastWorkingDay of [h.day(-1)]) {
-      const response = await h.recordCase(h.body(person, { lastWorkingDay }));
-      expect([response.status, h.codeOf(response)]).toEqual([422, 'OFFBOARDING_CASE.LAST_WORKING_DAY_INVALID']);
-    }
-    const future = await h.recordCase(h.body(person, { abrupt: true, lastWorkingDay: h.day(3) }));
-    expect([future.status, h.codeOf(future)]).toEqual([422, 'OFFBOARDING_CASE.LAST_WORKING_DAY_INVALID']);
+    const withoutDay = await h.recordCase({
+      employeeId: person.employeeId,
+      accessBlockMode: 'WITH_LAST_DAY',
+      grounds: h.grounds,
+    });
+    const withoutMode = await h.recordCase({
+      employeeId: person.employeeId,
+      lastWorkingDay: h.day(10),
+      accessBlockMode: undefined,
+      grounds: h.grounds,
+    });
+    const retired = await h.recordCase(h.body(person, { abrupt: true }));
+    for (const response of [withoutDay, withoutMode, retired])
+      expect([response.status, h.codeOf(response)]).toEqual([422, 'VALIDATION_ERROR']);
+    // A planned handover cannot start in the past; a departure blocked now can have a last working day that has gone by.
+    const past = await h.recordCase(h.body(person, { lastWorkingDay: h.day(-1) }));
+    expect([past.status, h.codeOf(past)]).toEqual([422, 'OFFBOARDING_CASE.LAST_WORKING_DAY_INVALID']);
 
     expect(await nothingWritten(person)).toEqual(before);
     expect(await h.taskCount()).toBe(tasks);
@@ -122,13 +134,13 @@ describe('recording a departure (integration, real PostgreSQL)', () => {
 
     const none = await h.recordCase({ employeeId: person.employeeId, lastWorkingDay: h.day(10) });
     const incomplete = await h.recordCase(
-      h.body(person, { grounds: { type: 'DECISION', reference: 'QD-1/2026', issuer: '', issuedOn: '2026-10-01' } }),
+      h.body(person, { grounds: { type: 'HR_DECISION', reference: 'QD-1/2026', issuer: '', issuedOn: '2026-10-01' } }),
     );
     const notice = await h.recordCase(h.body(person, { grounds: { ...h.grounds, reference: 'BM09-2026-000123' } }));
 
     expect([none, incomplete, notice].map((response) => [response.status, h.codeOf(response)])).toEqual([
-      [422, 'OFFBOARDING_CASE.GROUNDS_REQUIRED'],
-      [422, 'OFFBOARDING_CASE.GROUNDS_INCOMPLETE'],
+      [422, 'VALIDATION_ERROR'],
+      [422, 'VALIDATION_ERROR'],
       [422, 'OFFBOARDING_CASE.GROUNDS_IS_NOTICE'],
     ]);
     expect(await nothingWritten(person)).toEqual(before);
@@ -260,9 +272,15 @@ describe('recording a departure (integration, real PostgreSQL)', () => {
       await h.seatOf(person, { subscriptionId: subscriptions[0] }, employeeCode);
       const tasks = await h.taskCount();
 
-      const wire = await h.recordedCase(person, { abrupt: true, lastWorkingDay: h.today() });
+      const wire = await h.recordedCase(person, { accessBlockMode: 'BLOCK_NOW', lastWorkingDay: h.today() });
 
-      expect(wire).toMatchObject({ state: 'LEFT', abrupt: true, handoverDueOn: null, accountLockMissing: true });
+      expect(wire).toMatchObject({
+        state: 'LEFT',
+        accessBlockMode: 'BLOCK_NOW',
+        abrupt: true,
+        handoverDueOn: null,
+        accountLockMissing: true,
+      });
       expect(wire.warnings).toMatchObject({ accountLockNotRecorded: true });
       expect(wire.checklist?.accountLock).toEqual({ state: 'PENDING', urgent: true });
       expect(await h.workState(person.employeeId)).toBe('TERMINATED/LEFT');
@@ -285,7 +303,7 @@ describe('recording a departure (integration, real PostgreSQL)', () => {
         head.employeeId,
       ]);
 
-      const wire = await h.recordedCase(head, { abrupt: true, lastWorkingDay: h.day(-1) });
+      const wire = await h.recordedCase(head, { accessBlockMode: 'BLOCK_NOW', lastWorkingDay: h.day(-1) });
 
       expect(wire.state).toBe('LEFT');
       expect(wire.warnings?.departmentWithoutHeadFrom).toBe(h.today());
@@ -301,26 +319,30 @@ describe('recording a departure (integration, real PostgreSQL)', () => {
       grounds: h.grounds,
     });
 
-    it('is cancelled in the same action when the last working day falls before it, with the reason given', async () => {
+    it('is cancelled in the same action when the last working day falls before it, on a confirmation, with the standard reason and the basis of the departure', async () => {
       const target = await h.departmentWithUnit(code('P'));
       const { person } = await leaver();
       const transfer = await h.recorded(transferBody(person, target, h.day(20)));
 
       const missing = await h.recordCase(h.body(person));
-      expect([missing.status, h.codeOf(missing)]).toEqual([
-        422,
-        'OFFBOARDING_CASE.TRANSFER_CANCELLATION_REASON_REQUIRED',
-      ]);
+      expect([missing.status, h.codeOf(missing)]).toEqual([422, 'OFFBOARDING_CASE.TRANSFER_CANCELLATION_REQUIRED']);
       expect(h.dataOf<TransferWire>(await h.readTransfer(transfer.id).expect(200)).status).toBe('PENDING');
       expect(await h.caseCount(person.employeeId)).toBe(0);
 
-      const wire = await h.recordedCase(person, {
-        pendingTransferCancellation: { reason: 'Nghỉ việc trước ngày chuyển' },
-      });
+      const retired = await h.recordCase(
+        h.body(person, { pendingTransferCancellation: { reason: 'Nghỉ việc trước ngày chuyển' } }),
+      );
+      expect([retired.status, h.codeOf(retired)]).toEqual([422, 'VALIDATION_ERROR']);
+
+      const wire = await h.recordedCase(person, { cancelPendingTransfer: true });
 
       expect(wire.state).toBe('HANDING_OVER');
       const cancelled = h.dataOf<TransferWire>(await h.readTransfer(transfer.id).expect(200));
-      expect(cancelled).toMatchObject({ status: 'CANCELLED', cancellation: { reason: 'Nghỉ việc trước ngày chuyển' } });
+      expect(cancelled).toMatchObject({
+        status: 'CANCELLED',
+        cancellation: { reason: 'DEPARTURE_BEFORE_TRANSFER' },
+        grounds: h.grounds,
+      });
       const placements = await h.placements(person.employeeId);
       expect(placements.map((placement) => placement.department_id)).toEqual([des.id]);
       expect(placements[0].valid_to).toBe(h.day(11));
@@ -347,7 +369,12 @@ describe('recording a departure (integration, real PostgreSQL)', () => {
           employeeId: person.employeeId,
           startedOn: h.day(-30),
           approvedReturnOn: h.day(60),
-          grounds: { type: 'LEAVE_APPROVAL', reference: 'DN-05/2026', issuer: 'HR Department', issuedOn: '2026-05-25' },
+          grounds: {
+            type: 'APPROVED_APPLICATION',
+            reference: 'DN-05/2026',
+            issuer: 'HR Department',
+            issuedOn: '2026-05-25',
+          },
         })
         .expect(201);
       expect(await h.workState(person.employeeId)).toBe('ACTIVE/ON_LONG_LEAVE');

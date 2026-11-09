@@ -87,7 +87,7 @@ describe('who may write and who may read the events of the personnel context (in
             h.ctx.app.get(OffboardingService, { strict: false }).record(actor, {
               employeeId: who.employeeId,
               lastWorkingDay: h.day(10),
-              abrupt: false,
+              accessBlockMode: 'WITH_LAST_DAY',
               grounds: h.grounds,
             }),
         ];
@@ -222,7 +222,7 @@ describe('who may write and who may read the events of the personnel context (in
             startedOn: h.day(-1),
             approvedReturnOn: h.day(40),
             grounds: {
-              type: 'LEAVE_APPROVAL',
+              type: 'APPROVED_APPLICATION',
               reference: 'DN-07/2026',
               issuer: 'HR Department',
               issuedOn: '2026-05-25',

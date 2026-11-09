@@ -67,7 +67,6 @@ export interface AccessRequestWire {
     decidedBy: EmployeeRefWire;
     deciderRole: string;
     reason: string | null;
-    termConfirmationReason: string | null;
     decidedAt: string;
   } | null;
   needStep: {
@@ -192,32 +191,16 @@ export class RequestHarness extends ProvisioningHarness {
 
   submit = (body: object, account: ApiAccount) =>
     request(this.server()).post('/api/v1/access-requests').set(this.as(account)).send(body);
-  /** The requests made through `sent` and `proposed` that cost money: a head approving one chooses a line of the plan (US-05-04 AC-12). */
-  private readonly costing = new Set<string>();
-
+  /** Notes the department of a request made through `sent` and `proposed`, so that the seat it takes is on the subscription the department owns (F20). */
   private remember(wire: AccessRequestWire): AccessRequestWire {
-    // Only a head who holds the need step (row 1 of the routing table) chooses a line; the others have none to choose.
-    if (wire.policy.hasSpendStep && wire.needStep.routingRow === 1) this.costing.add(wire.id);
     this.owned.noteRequest(wire.id, wire.department.id);
 
     return wire;
   }
 
-  /**
-   * The decision of the need step. A head approving a request that costs money must choose a line of the plan or say it is
-   * outside it, so an approval of such a request that says nothing of it is sent as "outside the plan"; a test that is about
-   * the choice gives `spend` itself (`spend: undefined` sends none).
-   */
-  decide = (id: string, body: object, account: ApiAccount) => {
-    const payload = body as { decision?: string };
-    const given = 'spend' in payload;
-    const sent =
-      payload.decision === 'APPROVE' && !given && this.costing.has(id)
-        ? { ...payload, spend: { offPlan: true } }
-        : body;
-
-    return request(this.server()).post(`/api/v1/access-requests/${id}/need-decision`).set(this.as(account)).send(sent);
-  };
+  /** The decision of the need step: the head approves or refuses, and no line of the plan is chosen (`QĐ-101n`). */
+  decide = (id: string, body: object, account: ApiAccount) =>
+    request(this.server()).post(`/api/v1/access-requests/${id}/need-decision`).set(this.as(account)).send(body);
   fetch = (id: string, account: ApiAccount) =>
     request(this.server()).get(`/api/v1/access-requests/${id}`).set(this.as(account));
 

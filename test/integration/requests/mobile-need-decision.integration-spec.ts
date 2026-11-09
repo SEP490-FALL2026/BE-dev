@@ -21,7 +21,7 @@ interface RecordRow {
 }
 
 /**
- * The head decides the need step on the phone (US-16-02): the request, its reason and term, the lines of the plan, approval
+ * The head decides the need step on the phone (US-16-02): the request, its reason and term, approval
  * and refusal, and every way the step can stop being theirs, on the routes of the web with a mobile label. Real HTTP and
  * PostgreSQL. The queue of the head is not here: no route lists the need steps a person holds yet (B-02), see the item spec.
  */
@@ -52,9 +52,7 @@ describe('the head decides the need step on the phone (US-16-02, integration)', 
       )
     ).rows;
   const wire = async (id: string, account: ApiAccount) =>
-    h.dataOf<{ request: AccessRequestWire & { planLineAttached: boolean } }>(
-      await get(`/access-requests/${id}`, account).expect(200),
-    ).request;
+    h.dataOf<{ request: AccessRequestWire }>(await get(`/access-requests/${id}`, account).expect(200)).request;
 
   beforeAll(async () => {
     await h.start();
@@ -63,18 +61,7 @@ describe('the head decides the need step on the phone (US-16-02, integration)', 
     internal = await h.plan('K5');
     design = await h.departmentWithHead('P-DES');
     engineering = await h.departmentWithHead('P-ENG');
-    await h.budgetFor(design, {
-      total: 100 * M,
-      lines: [
-        h.line({
-          description: 'Figma Organization 10 seats',
-          planId: plan,
-          windowFrom: `${h.year}-12-01`,
-          windowTo: `${h.year}-12-31`,
-          quoteValidUntil: undefined,
-        }),
-      ],
-    });
+    await h.budgetFor(design, { total: 100 * M });
   }, 240000);
 
   afterAll(async () => {
@@ -82,12 +69,13 @@ describe('the head decides the need step on the phone (US-16-02, integration)', 
   });
 
   describe('reading and approving (AC-1, AC-4, AC-8, AC-9)', () => {
-    it('shows the head the request, its seats of the same kind and the lines of the plan with no figure of the budget (AC-4, AC-9)', async () => {
+    it('shows the head the request and its seats of the same kind with no figure of the budget, and no line of the plan to choose (AC-4, AC-9, QĐ-101n)', async () => {
       const { request: r1 } = await sentBy(design, plan, { businessReason: 'The project needs a wiki' });
 
       const read = await wire(r1.id, design.head.account);
       const seats = await get(`/access-requests/${r1.id}/similar-seats`, design.head.account).expect(200);
-      const lines = await get(`/access-requests/${r1.id}/plan-line-suggestions`, design.head.account).expect(200);
+      // The lines of the plan are not the head's to choose any more: the route is gone.
+      const lines = await get(`/access-requests/${r1.id}/plan-line-suggestions`, design.head.account).expect(404);
 
       expect(read).toMatchObject({
         businessReason: 'The project needs a wiki',
@@ -97,29 +85,26 @@ describe('the head decides the need step on the phone (US-16-02, integration)', 
       });
       expect(JSON.stringify(read)).not.toMatch(/standard|toolset/i);
       expect(h.dataOf<{ items: unknown[] }>(seats).items).toEqual([]);
-      expect(h.dataOf<{ items: Array<{ position: number; suggested: boolean }> }>(lines).items).toEqual([
-        expect.objectContaining({ position: 1, suggested: true, overdue: false }),
-      ]);
-      expect(JSON.stringify(lines.body)).not.toMatch(/remaining|committed|spent|held|INSUFFICIENT|HIGH_VALUE/);
+      expect(JSON.stringify([read, lines.body])).not.toMatch(
+        /remaining|committed|spent|held|INSUFFICIENT|HIGH_VALUE|planLine/,
+      );
     });
 
-    it('saves nothing when the head approves without a line or "outside the plan", then approves with the line as the web does (AC-1, AC-9)', async () => {
+    it('approves a request that costs money with the decision alone: no line of the plan and no day of spending is asked or kept (AC-1, AC-9, QĐ-101n)', async () => {
       const { request: r1 } = await sentBy(design, plan);
 
-      const missing = await decide(r1.id, { decision: 'APPROVE' }, design.head.account).expect(422);
-      expect(h.codeOf(missing)).toBe('ACCESS_REQUEST.PLAN_LINE_REQUIRED');
+      const withLine = await decide(
+        r1.id,
+        { decision: 'APPROVE', spend: { planLine: { position: 1 } } },
+        design.head.account,
+      ).expect(422);
+      expect(h.codeOf(withLine)).toBe('VALIDATION_ERROR');
       expect(await records(r1.id)).toEqual([]);
 
-      const approved = await decide(
-        r1.id,
-        { decision: 'APPROVE', spend: { planLine: { position: 1 }, expectedSpendOn: `${h.year}-12-10` } },
-        design.head.account,
-      ).expect(200);
+      const approved = await decide(r1.id, { decision: 'APPROVE' }, design.head.account).expect(200);
 
       expect(h.dataOf<{ request: AccessRequestWire }>(approved).request).toMatchObject({
         state: 'AWAITING_SPEND_SUBMISSION',
-        planLineAttached: true,
-        expectedSpendOn: `${h.year}-12-10`,
         needDecision: {
           decision: 'APPROVED',
           deciderRole: 'MANAGER',
@@ -156,22 +141,21 @@ describe('the head decides the need step on the phone (US-16-02, integration)', 
       );
     });
 
-    it('needs the head to confirm a term over twelve months with a reason, as on the web (AC-4)', async () => {
-      const { request: r1 } = await sentBy(design, internal, { termMonths: 18 });
+    it('takes no term over twelve months, and no confirmation in words, as on the web (AC-4, QĐ-98)', async () => {
+      const { member } = await sentBy(design, internal);
+      const long = await h.submit(h.form(internal, { termMonths: 13 }), member.account).expect(422);
+      const { request: r1 } = await sentBy(design, internal, { termMonths: 12 });
 
-      const unconfirmed = await decide(r1.id, { decision: 'APPROVE' }, design.head.account).expect(422);
-      expect(h.codeOf(unconfirmed)).toBe('ACCESS_REQUEST.TERM_CONFIRMATION_REQUIRED');
-      expect(await records(r1.id)).toEqual([]);
-      expect((await wire(r1.id, design.head.account)).termMonths).toBe(18);
-
-      await decide(
+      const confirmed = await decide(
         r1.id,
-        { decision: 'APPROVE', termConfirmation: { reason: 'The project runs for eighteen months' } },
+        { decision: 'APPROVE', termConfirmation: { reason: 'The project runs for a year' } },
         design.head.account,
-      ).expect(200);
-      expect(await records(r1.id)).toEqual([
-        expect.objectContaining({ term_confirmation_reason: 'The project runs for eighteen months' }),
-      ]);
+      ).expect(422);
+
+      expect(h.codeOf(long)).toBe('VALIDATION_ERROR');
+      expect(h.codeOf(confirmed)).toBe('VALIDATION_ERROR');
+      expect(await records(r1.id)).toEqual([]);
+      expect((await wire(r1.id, design.head.account)).termMonths).toBe(12);
     });
   });
 

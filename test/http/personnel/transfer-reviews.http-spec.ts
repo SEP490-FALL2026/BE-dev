@@ -65,16 +65,16 @@ describe('transfer review routes (e2e, no database)', () => {
       ],
       ['a decision the route does not know', decide({ assignmentId: ID, decision: 'MAYBE' })],
       ['the pending state as a decision', decide({ assignmentId: ID, decision: 'PENDING' })],
-      ['a decision with no tool', decide({ decision: 'STILL_NEEDED' })],
+      ['a decision with no tool', decide({ decision: 'STILL_NEEDED', reason: 'x' })],
+      ['a decision with no reason', decide({ assignmentId: ID, decision: 'STILL_NEEDED' })],
+      ['a reason that is only blanks', decide({ assignmentId: ID, decision: 'NOT_NEEDED', reason: '   ' })],
+      ['a reason that is too long', decide({ assignmentId: ID, decision: 'NOT_NEEDED', reason: 'x'.repeat(501) })],
+      ['the retired decision of a new tool', decide({ assignmentId: ID, decision: 'NEEDS_NEW_TOOL', reason: 'x' })],
       [
-        'a note with a decision that takes none',
-        decide({ assignmentId: ID, decision: 'NOT_NEEDED', newToolNote: 'x' }),
+        'the retired note of a new tool',
+        decide({ assignmentId: ID, decision: 'STILL_NEEDED', reason: 'x', newToolNote: 'x' }),
       ],
-      [
-        'a note that is too long',
-        decide({ assignmentId: ID, decision: 'NEEDS_NEW_TOOL', newToolNote: 'x'.repeat(501) }),
-      ],
-      ['a field the route does not know', decide({ assignmentId: ID, decision: 'STILL_NEEDED', reason: 'x' })],
+      ['a field the route does not know', decide({ assignmentId: ID, decision: 'STILL_NEEDED', reason: 'x', term: 3 })],
     ])('refuses %s with 422', async (_name, call) => {
       const response = await call(app.getHttpServer()).set('Authorization', signedIn).expect(422);
 

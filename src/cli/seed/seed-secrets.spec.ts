@@ -1,5 +1,5 @@
 import { seedSecretsProblem } from './seed-secrets';
-import { INSTALLATION } from './fixture/shared-demo-v2/installation';
+import { INSTALLATION } from './fixture/shared-demo-v3/installation';
 import { PassThrough } from 'node:stream';
 import { DemoSecretsError, parseDemoSecrets, readDemoSecrets } from './seed-secrets';
 

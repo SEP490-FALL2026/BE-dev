@@ -172,6 +172,13 @@ export type GrantRequestAnswer =
       /** The department of the request: its seat is granted only on a subscription this department owns (`QĐ-89a`). */
       departmentId: string;
       expectedEndDate: string | null;
+      /** The months the request asked for: the end of the seat when the request names no day (`QĐ-98`). */
+      termMonths: number;
+      /**
+       * Whether the term of the request binds the seat: a request that costs money ends its seat with its term, a free internal one has no
+       * end by term (`qd96-100-approved-end-date`, `Q-03` a1).
+       */
+      termBound: boolean;
     }
   | {
       status: 'GRANTABLE';
@@ -180,6 +187,9 @@ export type GrantRequestAnswer =
       employeeId: string;
       planId: string;
       expectedEndDate: string | null;
+      termMonths: number;
+      /** A service account has no end by term. */
+      termBound: false;
       serviceAccount: ServiceAccountGrant;
     }
   | {
@@ -321,6 +331,15 @@ export interface PersonalSeat {
   effectiveFrom: BusinessDate;
   validUntil: BusinessDate | null;
   revocation: { taskId: string; status: ProvisioningTaskStatus; source: RevocationSource } | null;
+}
+
+/** A seat a person holds today, as a department head reads it: the software and the plan by name and the days the seat begins and ends. */
+export interface HeldSoftware {
+  assignmentId: string;
+  applicationName: string;
+  planName: string;
+  grantedOn: BusinessDate;
+  endsOn: BusinessDate | null;
 }
 
 /** A K1 seat whose renewal is cancelled and whose access runs on to the end of the paid period (`US-07-05` AC-19). */

@@ -21,9 +21,12 @@ export interface VersionRecord {
   reserveMinor: bigint;
   totalMinor: bigint;
   currency: string;
-  highValuePercent: number;
-  /** The amount over which a line is high value, whatever is left; null when the version sets none. */
+  /** Kept for the versions written before `QĐ-97c`; no version sets a threshold now. */
+  highValuePercent: number | null;
   highValueAmountMinor: bigint | null;
+  /** The share of the base the reserve defaulted to when the version was made; null before `QĐ-98`. */
+  reservePercent: number | null;
+  reserveReason: string | null;
   quarters: [bigint, bigint, bigint, bigint] | null;
   reason: string | null;
   createdByEmployeeId: string;
@@ -50,8 +53,8 @@ export interface NewVersion {
   baseMinor: bigint;
   reserveMinor: bigint;
   currency: string;
-  highValuePercent: number;
-  highValueAmountMinor: bigint | null;
+  reservePercent: number | null;
+  reserveReason: string | null;
   quarters: [bigint, bigint, bigint, bigint] | null;
   reason: string | null;
   createdByEmployeeId: string;
@@ -63,8 +66,7 @@ export interface NewVersion {
 export interface VersionPatch {
   baseMinor?: bigint;
   reserveMinor?: bigint;
-  highValuePercent?: number;
-  highValueAmountMinor?: bigint | null;
+  reserveReason?: string | null;
   quarters?: [bigint, bigint, bigint, bigint] | null;
   reason?: string | null;
 }
@@ -85,6 +87,8 @@ const toRecord = (row: Prisma.BudgetVersionGetPayload<object>): VersionRecord =>
   currency: row.currency,
   highValuePercent: row.highValuePercent,
   highValueAmountMinor: row.highValueAmountMinor,
+  reservePercent: row.reservePercent,
+  reserveReason: row.reserveReason,
   quarters:
     row.q1Minor === null || row.q2Minor === null || row.q3Minor === null || row.q4Minor === null
       ? null
@@ -114,6 +118,16 @@ const quarterColumns = (quarters: [bigint, bigint, bigint, bigint] | null) => ({
 export const REFERENCE_VERSION: Prisma.BudgetVersionWhereInput = {
   OR: [{ state: 'APPROVED' }, { state: 'EXPIRED', neverCurrent: false }],
 };
+
+/** What the company-wide totals of a year need of a version that is the budget of its year. */
+export interface ReferenceFigures {
+  costCenterId: string;
+  year: number;
+  currency: string;
+  baseMinor: bigint;
+  reserveMinor: bigint;
+  totalMinor: bigint;
+}
 
 export interface VersionFilter {
   costCenterIds?: readonly string[];
@@ -155,8 +169,10 @@ export class VersionRepo {
         reserveMinor: input.reserveMinor,
         totalMinor: total,
         currency: input.currency,
-        highValuePercent: input.highValuePercent,
-        highValueAmountMinor: input.highValueAmountMinor,
+        highValuePercent: null,
+        highValueAmountMinor: null,
+        reservePercent: input.reservePercent,
+        reserveReason: input.reserveReason,
         ...quarterColumns(input.quarters),
         reason: input.reason,
         createdByEmployeeId: input.createdByEmployeeId,
@@ -280,6 +296,18 @@ export class VersionRepo {
     return { items: rows.map(toRecord), total };
   }
 
+  /**
+   * The figures of every version that is the budget of its year, for the company-wide totals: the columns the totals add up and
+   * nothing else, in the order of the Cost Centers.
+   */
+  async referenceFiguresOfYear(year: number): Promise<ReferenceFigures[]> {
+    return this.prisma.budgetVersion.findMany({
+      where: { year, ...REFERENCE_VERSION },
+      select: { costCenterId: true, year: true, currency: true, baseMinor: true, reserveMinor: true, totalMinor: true },
+      orderBy: [{ costCenterId: 'asc' }, { id: 'asc' }],
+    });
+  }
+
   async pageSentOf(
     costCenterId: string,
     options: { year?: number; skip: number; take: number },
@@ -346,10 +374,8 @@ export class VersionRepo {
         baseMinor: nextBase,
         reserveMinor: nextReserve,
         totalMinor: nextBase + nextReserve,
-        ...(patch.highValuePercent !== undefined ? { highValuePercent: patch.highValuePercent } : {}),
-        ...(patch.highValueAmountMinor !== undefined ? { highValueAmountMinor: patch.highValueAmountMinor } : {}),
         ...(patch.quarters !== undefined ? quarterColumns(patch.quarters) : {}),
-        ...(patch.reason !== undefined ? { reason: patch.reason } : {}),
+        ...(patch.reserveReason !== undefined ? { reserveReason: patch.reserveReason } : {}),
       },
     });
   }

@@ -3,12 +3,11 @@ import { TransactionRunner } from '../../../infrastructure/database/transaction-
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../../audit/public/audit.api';
 import { accessRequestAuditEvent } from '../access-request/access-request-audit-event.mapper';
-import { AccessRequestDecisionRefusedError } from '../access-request/access-request.errors';
+
 import { AccessRequestRepo } from '../access-request/access-request.repo';
 import type { AccessRequestRecord } from '../access-request/access-request.types';
-import { deciderRoleOf, type SpendInput } from '../access-request/need-decision.policy';
+import { deciderRoleOf } from '../access-request/need-decision.policy';
 import { RequestFactsService } from '../access-request/request-facts.service';
-import { NeedSpendService } from '../assessment/need-spend.service';
 import { needRecordOf, verdictsOf, type LineVerdict } from '../group-request/group-line-decision.policy';
 import { GroupResolutionService } from '../group-request/group-resolution.service';
 import { GroupNeedPreconditions } from './group-need-preconditions.service';
@@ -16,8 +15,6 @@ import { GroupNeedVerdictWriter } from './group-need-verdict-writer.service';
 
 export interface LineNeedDecisionInput {
   lines: readonly LineVerdict[];
-  termConfirmationReason?: string;
-  spend?: SpendInput;
 }
 
 /**
@@ -34,7 +31,6 @@ export class GroupNeedDecisionService {
     private readonly runner: TransactionRunner,
     private readonly preconditions: GroupNeedPreconditions,
     private readonly requests: AccessRequestRepo,
-    private readonly spendChoice: NeedSpendService,
     private readonly resolution: GroupResolutionService,
     private readonly assessment: RequestFactsService,
     private readonly audit: AuditApi,
@@ -50,22 +46,12 @@ export class GroupNeedDecisionService {
     requestId: string,
     input: LineNeedDecisionInput,
   ): Promise<AccessRequestRecord> {
-    const { fiscalYearStartMonth } = await this.assessment.settings();
-
     return this.runner.run(async (tx) => {
-      const { request, step, open, approves } = await this.preconditions.require(tx, actor, requestId, input);
+      const { request, step, open } = await this.preconditions.require(tx, actor, requestId, input);
       const now = new Date();
       const deciderRole = deciderRoleOf(step.routingRow);
-      const headChoosesLine = approves && deciderRole === 'MANAGER';
-      if (input.spend !== undefined && !headChoosesLine) {
-        throw new AccessRequestDecisionRefusedError('SPEND_NOT_APPLICABLE');
-      }
-      if (headChoosesLine) {
-        await this.spendChoice.apply(tx, actor, request, input.spend, { decidedAt: now, fiscalYearStartMonth });
-      }
-
       const verdicts = verdictsOf(open, input.lines);
-      const record = needRecordOf(verdicts, input.termConfirmationReason);
+      const record = needRecordOf(verdicts);
       await this.requests.recordNeedDecision(tx, {
         organizationId: request.organizationId,
         requestId: request.id,
@@ -93,7 +79,6 @@ export class GroupNeedDecisionService {
             deciderRole,
             departmentId: request.departmentId,
             requestState: after.state,
-            termConfirmed: (input.termConfirmationReason ?? '').trim() !== '',
             lineCount: verdicts.length,
             approvedEmployeeIds: verdicts.filter((v) => v.decision === 'APPROVE').map((v) => v.employeeId),
             rejectedEmployeeIds: verdicts.filter((v) => v.decision === 'REJECT').map((v) => v.employeeId),

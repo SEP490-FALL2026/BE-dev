@@ -30,7 +30,6 @@ export const SELECT_REQUEST = {
   planLinePosition: true,
   planLineConfirmed: true,
   offPlan: true,
-  delegatedBatchId: true,
   expectedEndDate: true,
   policy: true,
   submittedAt: true,
@@ -84,7 +83,6 @@ export const SELECT_REQUEST = {
           decidedByEmployeeId: true,
           deciderRole: true,
           reason: true,
-          termConfirmationReason: true,
           decidedAt: true,
         },
       },
@@ -163,7 +161,6 @@ export function toRecord(row: RequestRow): AccessRequestRecord {
         ? { versionId: row.planLineVersionId, position: row.planLinePosition, confirmed: row.planLineConfirmed }
         : null,
     offPlan: row.offPlan,
-    delegatedBatchId: row.delegatedBatchId,
     expectedEndDate: row.expectedEndDate ? fromDateColumn(row.expectedEndDate) : null,
     policy: requestPolicyJson.decode(row.policy),
     submittedAt: sent.submittedAt,

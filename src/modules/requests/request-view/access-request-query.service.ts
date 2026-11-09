@@ -47,9 +47,9 @@ export interface AccessRequestView extends Omit<
   | 'renewal'
   | 'policy'
   | 'pricing'
-  | 'expectedSpendOn'
   | 'budgetYear'
   | 'planLine'
+  | 'offPlan'
 > {
   plan: { planId: string; planName: string; applicationId: string; applicationName: string } | null;
   /** What the Employee declared of software that is not in the catalog; null for any other request. */
@@ -64,11 +64,8 @@ export interface AccessRequestView extends Omit<
   lineCount: number;
   /** The chain of steps is not listed: whether a spend step stands in it is the one fact a reader needs. */
   policy: { version: number; hasSpendStep: boolean; slaWorkingDays: number };
-  expectedSpendOn: string | null;
   budgetYear: number | null;
   pricing: PricingView;
-  /** Whether the head attached the request to a line of the plan of the budget; the line itself is read from the budget. */
-  planLineAttached: boolean;
   /** Where the request stands on its way to the spending approver, for a request that costs money; never a figure of the budget. */
   spend: SpendStatusView | null;
   needStep: NeedStepView;
@@ -209,12 +206,8 @@ export class AccessRequestQueryService {
       lineCount: record.beneficiaryEmployeeIds.length,
       businessReason: record.businessReason,
       termMonths: record.termMonths,
-      offPlan: record.offPlan,
-      delegatedBatchId: record.delegatedBatchId,
       expectedEndDate: record.expectedEndDate,
-      planLineAttached: record.planLine !== null,
       spend,
-      expectedSpendOn: record.pricing.expectedSpendOn,
       budgetYear: record.pricing.budgetYear,
       pricing: await this.pricing.view(record.pricing),
       policy: {
@@ -255,7 +248,6 @@ export class AccessRequestQueryService {
               decidedBy: person(decision.decidedByEmployeeId),
               deciderRole: decision.deciderRole,
               reason: decision.reason,
-              termConfirmationReason: decision.termConfirmationReason,
               decidedAt: decision.decidedAt,
             },
     };

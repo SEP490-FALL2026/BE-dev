@@ -71,9 +71,6 @@ describe('the approvers on the phone: need step, spend step and the request a he
         h.line({
           description: 'Figma Organization 10 seats',
           planId: plan,
-          windowFrom: `${h.year}-12-01`,
-          windowTo: `${h.year}-12-31`,
-          quoteValidUntil: undefined,
         }),
       ],
     });
@@ -94,19 +91,14 @@ describe('the approvers on the phone: need step, spend step and the request a he
     expect(told.map((item) => [item.code, item.params.stepKind])).toEqual([['STEP_ASSIGNED', 'NEED']]);
   });
 
-  it('the head opens it from the notice, reads the lines of the plan and approves with the suggested one', async () => {
+  it('the head opens it from the notice and approves with the decision alone: no line of the plan is chosen (QĐ-101n)', async () => {
     const read = h.dataOf<{ request: AccessRequestWire }>(
       await get(`/access-requests/${paid}`, unit.head.account).expect(200),
     );
     expect(read.request).toMatchObject({ businessReason: 'Design system', pricing: { status: 'PRICED' } });
-    const lines = h.dataOf<{ items: Array<{ position: number; suggested: boolean }> }>(
-      await get(`/access-requests/${paid}/plan-line-suggestions`, unit.head.account).expect(200),
-    );
-    const line = lines.items.find((item) => item.suggested);
 
     const decided = await post(`/access-requests/${paid}/need-decision`, unit.head.account, {
       decision: 'APPROVE',
-      spend: { planLine: { position: line?.position } },
     }).expect(200);
 
     expect(h.dataOf<{ request: AccessRequestWire }>(decided).request).toMatchObject({

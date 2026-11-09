@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import request from 'supertest';
 import { ApiAccount } from '../../support/api-accounts';
+import { effectiveEndOf } from '../../../src/core/term-limit';
 import { ProvisioningHarness } from '../../support/provisioning-harness';
 
 const h = new ProvisioningHarness();
@@ -329,20 +330,91 @@ describe('the grant of a seat over HTTP (integration, real PostgreSQL)', () => {
     expect(await count(`SELECT count(*) AS n FROM license_assignments`)).toBe(before);
   });
 
-  it('asks time-limited staff for the expected end date, which the seat needs (INV-07)', async () => {
-    const { subscriptionId, planId } = await k2();
-    const contractor = await h.member('P-DES', 'E-CONTRACT', designer);
-    await h.ctx.sql.query(`UPDATE employees SET employment_type = 'CONTRACTOR' WHERE id = $1`, [contractor]);
+  describe('the end of the seat comes from the request (INV-07, R-15, QĐ-98)', () => {
+    /** The seat of a person of the request, as the database keeps it. */
+    const seatEndOf = async (employeeId: string) =>
+      (
+        await h.ctx.sql.query<{ expected_end_date: string | null }>(
+          `SELECT expected_end_date::text FROM license_assignments WHERE employee_id = $1`,
+          [employeeId],
+        )
+      ).rows.map((row) => row.expected_end_date);
+    /** The last day of the term the request asked for (6 months in `grantable`), cut at the end of the fiscal year for a flexible plan. */
+    const termEnd = (flexible: boolean) =>
+      effectiveEndOf({ start: h.today(), months: 6, flexible, fiscalYearStartMonth: 1 });
 
-    const without = await h.grant({ requestId: h.gate.grantable(contractor, planId), subscriptionId }).expect(422);
-    expect(h.codeOf(without)).toBe('LICENSE_ASSIGNMENT.EXPECTED_END_REQUIRED');
+    it.each([
+      ['a contractor', 'CONTRACTOR'],
+      ['an intern', 'INTERN'],
+      ['an employee', 'STAFF'],
+    ])('gives the seat of %s the last day of the term, today plus the months minus a day', async (_name, type) => {
+      const { subscriptionId, planId } = await k2();
+      const person = await h.member('P-DES', `E-END-${type}`, designer);
+      await h.ctx.sql.query(`UPDATE employees SET employment_type = $2 WHERE id = $1`, [person, type]);
 
-    const withDate = await h.grant({
-      requestId: h.gate.grantable(contractor, planId),
-      subscriptionId,
-      expectedEndDate: '2027-03-31',
+      await h.grant({ requestId: h.gate.grantable(person, planId), subscriptionId }).expect(201);
+
+      expect(await seatEndOf(person)).toEqual([termEnd(false)]);
     });
-    expect(withDate.status).toBe(201);
+
+    it('gives the seat of free internal software no end by term: it costs nothing and has no term to bind (R-H1)', async () => {
+      const planId = await h.plan('K5');
+      const person = await h.member('P-DES', 'E-END-FREE', designer);
+      const requestId = h.gate.answer({
+        status: 'GRANTABLE',
+        seat: 'PERSONAL',
+        employeeId: person,
+        planId,
+        departmentId: h.gate.defaultDepartmentId,
+        expectedEndDate: null,
+        termMonths: 6,
+        termBound: false,
+      });
+
+      await h.grant({ requestId }).expect(201);
+
+      expect(await seatEndOf(person)).toEqual([null]);
+    });
+
+    it('cuts the end at the end of the fiscal year when the subscription the seat is taken on is flexible, and no later (R-M1)', async () => {
+      const { subscriptionId, planId } = await k2();
+      await h.ctx.sql.query(`UPDATE subscriptions SET allows_mid_term_reduction = true WHERE id = $1`, [
+        subscriptionId,
+      ]);
+      const person = await h.member('P-DES', 'E-END-FLEX', designer);
+
+      await h.grant({ requestId: h.gate.grantable(person, planId), subscriptionId }).expect(201);
+
+      expect(await seatEndOf(person)).toEqual([termEnd(true)]);
+      expect(termEnd(true) <= `${h.today().slice(0, 4)}-12-31`).toBe(true);
+    });
+
+    it('takes no end day in the body of the grant: the IT Admin has no authority to set the approved term', async () => {
+      const { subscriptionId, planId } = await k2();
+      const contractor = await h.member('P-DES', 'E-CONTRACT', designer);
+      await h.ctx.sql.query(`UPDATE employees SET employment_type = 'CONTRACTOR' WHERE id = $1`, [contractor]);
+
+      const refused = await h
+        .grant({ requestId: h.gate.grantable(contractor, planId), subscriptionId, expectedEndDate: '2027-03-31' })
+        .expect(422);
+
+      expect(h.codeOf(refused)).toBe('VALIDATION_ERROR');
+      expect(await assignmentsOf(contractor)).toBe(0);
+    });
+  });
+
+  it('does not queue the grant of the own request of an IT Admin while another usable IT Admin can, and writes nothing (R-D1, QĐ-77m)', async () => {
+    const { subscriptionId, planId } = await k2();
+    const before = await count(`SELECT count(*) AS n FROM license_assignments`);
+    const tasks = await tasksOf(subscriptionId);
+
+    const refused = await h
+      .grant({ requestId: h.gate.grantable(h.it1.employeeId, planId), subscriptionId })
+      .expect(403);
+
+    expect(h.codeOf(refused)).toBe('PROVISIONING.ANOTHER_IT_ADMIN_NEEDED');
+    expect(await count(`SELECT count(*) AS n FROM license_assignments`)).toBe(before);
+    expect(await tasksOf(subscriptionId)).toBe(tasks);
   });
 
   it('US-01-11 AC-4: a department with no IT Admin in charge still gets the task, in the general queue, with a warning', async () => {

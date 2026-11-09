@@ -7,8 +7,6 @@ const budget = (over: Partial<YearBudget> = {}): YearBudget => ({
   totalMinor: 100n * M,
   heldMinor: 20n * M,
   spentMinor: 40n * M,
-  highValuePercent: 50,
-  highValueAmountMinor: null,
   ...over,
 });
 const slice = (costMinor: bigint, over: Partial<YearSlice> = {}): YearSlice => ({
@@ -31,26 +29,15 @@ describe('the check of the budget of a request (US-06-12)', () => {
     expect(codesOf(result)).toEqual(['BUDGET_OK']);
   });
 
-  it('is HIGH_VALUE over the share of what is left even though the money is there (AC-2)', () => {
+  it('is BUDGET_OK however large the share of what is left, as long as the money is there: no route by size (AC-2, B-M1, QĐ-97c)', () => {
     const result = check([slice(25n * M)]);
 
-    expect(result.years[0].code).toBe('HIGH_VALUE');
+    expect(result.years[0].code).toBe('BUDGET_OK');
     expect(result.years[0].shareBasisPoints).toBe(6250);
-    expect(result.route).toBe('FINANCE_REVIEW');
-  });
-
-  it('is not HIGH_VALUE at exactly the share', () => {
-    expect(check([slice(20n * M)]).years[0].code).toBe('BUDGET_OK');
-  });
-
-  it('is HIGH_VALUE over the amount of the version, whatever the share (AC-3)', () => {
-    const rich = budget({ totalMinor: 100n * M, heldMinor: 0n, spentMinor: 0n, highValueAmountMinor: 20n * M });
-
-    expect(check([slice(22n * M, { budget: rich })]).years[0]).toMatchObject({
-      code: 'HIGH_VALUE',
-      shareBasisPoints: 2200,
-    });
-    expect(check([slice(20n * M, { budget: rich })]).years[0].code).toBe('BUDGET_OK');
+    expect(result.route).toBe('SPEND_APPROVAL');
+    // Up to the last unit that is left.
+    expect(check([slice(40n * M)]).years[0].code).toBe('BUDGET_OK');
+    expect(check([slice(40n * M + 1n)]).years[0].code).toBe('INSUFFICIENT_BUDGET');
   });
 
   it('is INSUFFICIENT_BUDGET over what is left, and that is not a hard stop: it goes to Finance (AC-4)', () => {
@@ -75,13 +62,6 @@ describe('the check of the budget of a request (US-06-12)', () => {
 
     expect(result.years[0]).toMatchObject({ code: 'NO_ACTIVE_BUDGET', budgetMinor: null, remainingMinor: null });
     expect(result.route).toBe('FINANCE_REVIEW');
-  });
-
-  it('sends a plan line that is overdue to Finance even when the money is there (AC-6)', () => {
-    const result = check([slice(15n * M)], { planLineOverdue: true });
-
-    expect(result.route).toBe('FINANCE_REVIEW');
-    expect(codesOf(result)).toEqual(['PLAN_LINE_OVERDUE', 'BUDGET_OK']);
   });
 
   it('sends a year that has ended nowhere: no step for Finance or the approver (AC-7)', () => {
@@ -125,7 +105,7 @@ describe('the check of the budget of a request (US-06-12)', () => {
       slice(2_400n, { year: 2027, budget: rich(30_000n) }),
     ]);
 
-    expect(split.years.map((year) => year.code)).toEqual(['HIGH_VALUE', 'BUDGET_OK']);
+    expect(split.years.map((year) => year.code)).toEqual(['BUDGET_OK', 'BUDGET_OK']);
     expect(split.years.map((year) => year.shareBasisPoints)).toEqual([6000, 800]);
   });
 

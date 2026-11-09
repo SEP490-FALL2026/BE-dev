@@ -16,6 +16,7 @@ const PUBLIC_ALLOWLIST = [
   'AuthController.refresh',
   'AuthController.requestPasswordReset',
   'AuthController.resetPassword',
+  'DeviceEnrollmentController.create',
   'HealthController.getLiveness',
   'HealthController.getReadiness',
 ];

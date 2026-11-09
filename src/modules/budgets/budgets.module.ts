@@ -23,10 +23,17 @@ import { BudgetVersionsController } from './version/budget-versions.controller';
 import { BudgetViewService } from './budget-view/budget-view.service';
 import { BudgetsController } from './budget-view/budgets.controller';
 import { BudgetsApi } from './public/budgets.api';
-import { BudgetChangeListeners, CommitmentReleaseGuardHook } from './public/budgets.extension-points';
+import {
+  BudgetChangeListeners,
+  CommitmentReleaseGuardHook,
+  CommitmentRequestFactsHook,
+} from './public/budgets.extension-points';
 import { BudgetCommitmentsController } from './commitment/budget-commitments.controller';
 import { CommitmentRepo } from './budget/commitment.repo';
 import { CommitmentService } from './commitment/commitment.service';
+import { InvoiceRepo } from './budget/invoice.repo';
+import { BudgetInvoicesController } from './invoice/budget-invoices.controller';
+import { InvoiceService } from './invoice/invoice.service';
 import { DecisionRepo } from './budget/decision.repo';
 import { LineImportService } from './version/line-import.service';
 import { ProposalRepo } from './budget/proposal.repo';
@@ -44,11 +51,9 @@ import { VersionDecisionWriter } from './version/version-decision-writer.service
 import { VersionDecisionService } from './version/version-decision.service';
 import { VersionLineMovedNotifier } from './version/version-line-moved.service';
 import { VersionLineService } from './version/version-line.service';
-import { VersionWindowService } from './version/version-window.service';
 import { VersionRepo } from './budget/version.repo';
 import { VersionCreationService } from './version/version-creation.service';
 import { VersionFigures } from './version/version-figures.service';
-import { VersionRevisionService } from './version/version-revision.service';
 import { VersionTrail } from './version/version-trail.service';
 import { VersionService } from './version/version.service';
 import { VersionViewService } from './budget/version-view.service';
@@ -93,6 +98,7 @@ import { BudgetAttachmentExpirySweeper } from './attachment/budget-attachment-ex
     BudgetVersionLinesController,
     BudgetsController,
     BudgetCommitmentsController,
+    BudgetInvoicesController,
     BudgetAttachmentUploadsController,
     BudgetAttachmentReadsController,
   ],
@@ -103,6 +109,7 @@ import { BudgetAttachmentExpirySweeper } from './attachment/budget-attachment-ex
     VersionHistoryRepo,
     DecisionRepo,
     CommitmentRepo,
+    InvoiceRepo,
     BudgetYearLockRepo,
     BudgetFactsService,
     BudgetNotifierService,
@@ -117,11 +124,9 @@ import { BudgetAttachmentExpirySweeper } from './attachment/budget-attachment-ex
     VersionFigures,
     VersionTrail,
     VersionCreationService,
-    VersionRevisionService,
     VersionService,
     VersionLineMovedNotifier,
     VersionLineService,
-    VersionWindowService,
     VersionDecisionJudge,
     VersionDecisionWriter,
     VersionDecisionService,
@@ -141,14 +146,16 @@ import { BudgetAttachmentExpirySweeper } from './attachment/budget-attachment-ex
     BudgetFactsRepo,
     BudgetChangeListeners,
     CommitmentReleaseGuardHook,
+    CommitmentRequestFactsHook,
     BudgetCostCenterUseReader,
     BudgetHeadChangeListener,
     BudgetSpendingApproverGrantCheck,
     FiscalYearStartLockReader,
     SpendingApproverWaitListener,
     CommitmentService,
+    InvoiceService,
     BudgetsApi,
   ],
-  exports: [BudgetsApi, BudgetChangeListeners, CommitmentReleaseGuardHook],
+  exports: [BudgetsApi, BudgetChangeListeners, CommitmentReleaseGuardHook, CommitmentRequestFactsHook],
 })
 export class BudgetsModule {}

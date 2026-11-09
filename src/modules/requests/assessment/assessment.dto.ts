@@ -4,6 +4,7 @@ import { successEnvelopeSchema } from '../../../infrastructure/http/dto/success-
 import {
   REASON_MAX_LENGTH,
   TERM_MONTHS_MAX,
+  COMMITMENT_MONTHS_MAX,
   employeeRef,
   moneySchema,
   pricingSchema,
@@ -37,7 +38,6 @@ export const proposalBodySchema = z.strictObject({
   dataDescription: text(REASON_MAX_LENGTH),
   expectedUsers: z.number().int().min(1).max(1_000_000),
   termMonths: z.number().int().min(1).max(TERM_MONTHS_MAX),
-  expectedSpendOn: businessDate.optional(),
 });
 
 const moneyInput = z.strictObject({ amount: z.string().max(40), currency: z.string().regex(/^[A-Z]{3}$/) });
@@ -48,7 +48,7 @@ const quoteInput = z.strictObject({
   billingCycle: z.enum(['MONTHLY', 'QUARTERLY', 'ANNUAL']),
   validFrom: businessDate,
   validUntil: businessDate.nullable().optional(),
-  commitmentMonths: z.number().int().min(1).max(TERM_MONTHS_MAX).nullable().optional(),
+  commitmentMonths: z.number().int().min(1).max(COMMITMENT_MONTHS_MAX).nullable().optional(),
   paymentFrequency: z.enum(['MONTHLY', 'QUARTERLY', 'ANNUAL', 'UPFRONT_ONCE']).nullable().optional(),
   firstPaymentOn: businessDate.nullable().optional(),
 });

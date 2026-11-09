@@ -4,9 +4,6 @@ const facts: BeneficiaryFacts = {
   active: true,
   workEmail: 'n1@acme.vn',
   employmentType: 'STAFF',
-  hireDate: '2026-10-01',
-  today: '2026-09-20',
-  expectedEndDate: undefined,
 };
 const asked = { skipContact: false };
 
@@ -23,24 +20,13 @@ describe('what a person must have to be given access by the request of somebody 
     expect(checkBeneficiary({ ...facts, ...change }, asked)).toBe(refusal);
   });
 
-  it.each(['CONTRACTOR', 'FREELANCER', 'INTERN'])('needs the day the access ends for a %s', (employmentType) => {
-    const limited = { ...facts, employmentType };
-
-    expect(checkBeneficiary(limited, asked)).toBe('END_DATE_REQUIRED');
-    expect(checkBeneficiary({ ...limited, expectedEndDate: '2026-12-31' }, asked)).toBeNull();
+  it('does not ask a contractor, a freelancer or an intern for the day the access ends: the system works it out (QĐ-100)', () => {
+    for (const employmentType of ['CONTRACTOR', 'FREELANCER', 'INTERN']) {
+      expect(checkBeneficiary({ ...facts, employmentType }, asked)).toBeNull();
+    }
   });
 
-  it('refuses an end that comes before the access can begin, the later of today and the first day of work', () => {
-    const intern = { ...facts, employmentType: 'INTERN' };
-
-    expect(checkBeneficiary({ ...intern, expectedEndDate: '2026-09-30' }, asked)).toBe('END_DATE_TOO_EARLY');
-    expect(checkBeneficiary({ ...intern, expectedEndDate: '2026-10-01' }, asked)).toBeNull();
-    expect(checkBeneficiary({ ...intern, hireDate: '2026-01-01', expectedEndDate: '2026-09-19' }, asked)).toBe(
-      'END_DATE_TOO_EARLY',
-    );
-  });
-
-  it('asks no email and no end day when told to skip the contact, but still refuses a person who left', () => {
+  it('asks no email when told to skip the contact, but still refuses a person who left', () => {
     const own = { skipContact: true };
 
     expect(checkBeneficiary({ ...facts, workEmail: null, employmentType: 'INTERN' }, own)).toBeNull();

@@ -99,16 +99,16 @@ describe('recording the start of a long leave (integration, real PostgreSQL)', (
 
   describe('refuses what is not a basis, and writes nothing', () => {
     it.each([
-      ['no basis', undefined, 'LONG_LEAVE.GROUNDS_REQUIRED'],
-      ['an empty basis', {}, 'LONG_LEAVE.GROUNDS_REQUIRED'],
+      ['no basis', undefined, 'VALIDATION_ERROR'],
+      ['an empty basis', {}, 'VALIDATION_ERROR'],
       [
         'a basis without the issuer',
-        { type: 'X', reference: 'Y', issuedOn: '2026-05-25' },
-        'LONG_LEAVE.GROUNDS_INCOMPLETE',
+        { type: 'HR_DECISION', reference: 'Y', issuedOn: '2026-05-25' },
+        'VALIDATION_ERROR',
       ],
       [
         'only the code of a notice',
-        { ...{ type: 'X', issuer: 'HR', issuedOn: '2026-05-25' }, reference: 'BM09-2026-000123' },
+        { ...{ type: 'HR_DECISION', issuer: 'HR', issuedOn: '2026-05-25' }, reference: 'BM09-2026-000123' },
         'LONG_LEAVE.GROUNDS_IS_NOTICE',
       ],
     ])('%s', async (_name, grounds, expected) => {
@@ -121,14 +121,16 @@ describe('recording the start of a long leave (integration, real PostgreSQL)', (
       expect(await nothingWritten(person)).toEqual(before);
     });
 
-    it('names the parts the basis lacks', async () => {
+    it('names the part of the basis that is missing, as a malformed body', async () => {
       const person = await h.worker(des, code('E'));
 
       const response = await h.startLeave(
-        body(person.employeeId, { grounds: { type: 'X', reference: 'Y', issuedOn: '2026-05-25' } }),
+        body(person.employeeId, { grounds: { type: 'HR_DECISION', reference: 'Y', issuedOn: '2026-05-25' } }),
       );
 
-      expect((response.body as { error: { details: unknown } }).error.details).toEqual({ missing: ['issuer'] });
+      expect(JSON.stringify((response.body as { error: { details: unknown } }).error.details)).toContain(
+        'grounds.issuer',
+      );
     });
 
     it.each([['reason'], ['medical'], ['diagnosis']])(

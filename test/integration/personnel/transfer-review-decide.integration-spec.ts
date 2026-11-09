@@ -84,7 +84,7 @@ describe('deciding about the tools of a review after a transfer (integration, re
     const reviewId = review?.id ?? '';
 
     await say(reviewId, seats[0], 'STILL_NEEDED').expect(201);
-    await say(reviewId, seats[1], 'NEEDS_NEW_TOOL').expect(201);
+    await say(reviewId, seats[1], 'STILL_NEEDED').expect(201);
 
     expect(await rowOf(reviewId)).toMatchObject({ status: 'OPEN', due_on: review?.due_on });
     const open = h.dataOf<ReviewWire>(await h.review(reviewId, h2.account).expect(200));
@@ -94,6 +94,13 @@ describe('deciding about the tools of a review after a transfer (integration, re
     await say(reviewId, seats[2], 'STILL_NEEDED').expect(201);
 
     expect(await rowOf(reviewId)).toMatchObject({ status: 'COMPLETED' });
+    // An internal tool (K5) has no Request to ask for: keeping it asks nothing more; a tool outside still waits for the new Request.
+    const items = h.dataOf<{ items: ReviewItemWire[] }>(
+      await h.reviewItems(reviewId, '?pageSize=10', h2.account).expect(200),
+    );
+    const byProvisioning = items.items.map((item) => [item.provisioningType, item.decision, item.needsNewRequest]);
+    expect(byProvisioning).toContainEqual(['K5', 'STILL_NEEDED', false]);
+    expect(byProvisioning).toContainEqual(['K2', 'STILL_NEEDED', true]);
   });
 
   it('US-03-07 AC-4, US-07-05 AC-9: until the head decides there is no revocation; "no longer needed" for a tool that loses data holds it for the head, not the IT Admin', async () => {
@@ -166,22 +173,23 @@ describe('deciding about the tools of a review after a transfer (integration, re
     expect(await h.count('subscriptions')).toBe(subscriptions);
   });
 
-  it('US-03-07 AC-5: "a new tool is needed" is recorded with its note; no request is made and the seat stays', async () => {
+  it('US-03-07 AC-5, F17: "still needed" is recorded with the reason of the head; no request is made and the seat stays', async () => {
     const { seats, review } = await h.movedWith(des, fin, [{ subscriptionId: notes }]);
     const before = await requests();
 
-    await say(review?.id ?? '', seats[0], 'NEEDS_NEW_TOOL', { newToolNote: 'Cần bản có SSO' }).expect(201);
+    await say(review?.id ?? '', seats[0], 'STILL_NEEDED', { reason: '  Cần bản có SSO  ' }).expect(201);
 
     expect(await itemOf(review?.id ?? '', seats[0])).toMatchObject({
-      decision: 'NEEDS_NEW_TOOL',
-      new_tool_note: 'Cần bản có SSO',
+      decision: 'STILL_NEEDED',
+      reason: 'Cần bản có SSO',
+      new_tool_note: null,
     });
     expect(await requests()).toBe(before);
     expect(await h.liveTaskOf(seats[0])).toBeNull();
     expect((await h.assignmentRow(seats[0])).valid_until).toBeNull();
   });
 
-  it('refuses a decision that is not one, a note that does not go with it and a note that is too long, and writes nothing', async () => {
+  it('refuses a decision that is not one, the retired new tool and its note, and a reason that is missing, blank or too long, and writes nothing', async () => {
     const { seats, review } = await h.movedWith(des, fin, [{ subscriptionId: notes }]);
     const reviewId = review?.id ?? '';
 
@@ -189,8 +197,11 @@ describe('deciding about the tools of a review after a transfer (integration, re
       { assignmentId: seats[0], decision: 'PENDING' },
       { assignmentId: seats[0], decision: 'MAYBE' },
       { assignmentId: seats[0], decision: 'STILL_NEEDED', newToolNote: 'why' },
-      { assignmentId: seats[0], decision: 'NEEDS_NEW_TOOL', newToolNote: 'x'.repeat(501) },
-      { assignmentId: seats[0], decision: 'NEEDS_NEW_TOOL', newToolNote: '   ' },
+      { assignmentId: seats[0], decision: 'NEEDS_NEW_TOOL' },
+      { assignmentId: seats[0], decision: 'NEEDS_NEW_TOOL', newToolNote: 'x' },
+      { assignmentId: seats[0], decision: 'STILL_NEEDED', reason: undefined },
+      { assignmentId: seats[0], decision: 'STILL_NEEDED', reason: '   ' },
+      { assignmentId: seats[0], decision: 'NOT_NEEDED', reason: 'x'.repeat(501) },
       { assignmentId: 'not-a-uuid', decision: 'STILL_NEEDED' },
       { decision: 'STILL_NEEDED' },
     ]) {
@@ -221,9 +232,6 @@ describe('deciding about the tools of a review after a transfer (integration, re
     await say(reviewId, seats[0], 'STILL_NEEDED').expect(201);
 
     expect(h.codeOf(await say(reviewId, seats[0], 'STILL_NEEDED').expect(409))).toBe(
-      'TRANSFER_REVIEW.DECISION_ALREADY_RECORDED',
-    );
-    expect(h.codeOf(await say(reviewId, seats[0], 'NEEDS_NEW_TOOL', { newToolNote: 'x' }).expect(409))).toBe(
       'TRANSFER_REVIEW.DECISION_ALREADY_RECORDED',
     );
     expect(h.codeOf(await say(reviewId, other.seats[0], 'STILL_NEEDED').expect(404))).toBe(

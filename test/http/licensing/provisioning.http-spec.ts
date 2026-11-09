@@ -88,7 +88,6 @@ describe('provisioning queue routes (e2e, no database)', () => {
     ['a grant with no request', 'post', BASE, {}],
     ['a grant with a request that is not a UUID', 'post', BASE, { requestId: 'x' }],
     ['a grant that carries a password', 'post', BASE, { requestId: ID, password: 'hunter2' }],
-    ['a grant with a date that is not one', 'post', BASE, { requestId: ID, expectedEndDate: '2026-13-40' }],
     ['evidence of over two thousand characters', 'post', `${BASE}/${ID}/complete`, { evidence: 'x'.repeat(2001) }],
     ['a completion with an unknown field', 'post', `${BASE}/${ID}/complete`, { evidence: 'x', done: true }],
     ['a reason of over a thousand characters', 'post', `${BASE}/${ID}/report-failure`, { reason: 'x'.repeat(1001) }],

@@ -26,6 +26,14 @@ export const ROUTE_ERROR_CODES_BUDGETS: Readonly<Record<string, Partial<Record<R
     budgetAttachmentLink: {
       '404': ['BUDGET_ATTACHMENT.NOT_FOUND'],
     },
+    budgetCommitmentInvoiceList: {
+      '404': ['BUDGET.COMMITMENT_NOT_FOUND'],
+    },
+    budgetCommitmentInvoiceRecord: {
+      '404': ['BUDGET.COMMITMENT_NOT_FOUND'],
+      '409': ['INVOICE.COMMITMENT_RELEASED', 'INVOICE.DUPLICATE', 'INVOICE.VENDOR_UNKNOWN'],
+      '422': ['MONEY_OUT_OF_RANGE', 'MONEY_SCALE_EXCEEDED'],
+    },
     budgetCommitmentRelease: {
       '404': ['BUDGET.COMMITMENT_NOT_FOUND'],
       '409': ['BUDGET.COMMITMENT_NOT_HELD', 'BUDGET.COMMITMENT_REQUEST_OPEN'],
@@ -62,8 +70,6 @@ export const ROUTE_ERROR_CODES_BUDGETS: Readonly<Record<string, Partial<Record<R
       '422': [
         'BUDGET.CURRENCY_NOT_REPORTING',
         'BUDGET.PLAN_NOT_FOUND',
-        'BUDGET.PROPOSAL_INCOMPLETE',
-        'BUDGET.WINDOW_BACKWARDS',
         'BUDGET.YEAR_ENDED',
         'BUDGET_ATTACHMENT.NOT_ATTACHABLE',
         'CURRENCY_NOT_SUPPORTED',
@@ -83,8 +89,6 @@ export const ROUTE_ERROR_CODES_BUDGETS: Readonly<Record<string, Partial<Record<R
       '422': [
         'BUDGET.CURRENCY_NOT_REPORTING',
         'BUDGET.PLAN_NOT_FOUND',
-        'BUDGET.PROPOSAL_INCOMPLETE',
-        'BUDGET.WINDOW_BACKWARDS',
         'BUDGET.YEAR_ENDED',
         'BUDGET_ATTACHMENT.NOT_ATTACHABLE',
         'CURRENCY_NOT_SUPPORTED',
@@ -153,17 +157,11 @@ export const ROUTE_ERROR_CODES_BUDGETS: Readonly<Record<string, Partial<Record<R
       '422': [
         'BUDGET.CURRENCY_NOT_REPORTING',
         'BUDGET.PLAN_NOT_FOUND',
-        'BUDGET.PROPOSAL_INCOMPLETE',
-        'BUDGET.WINDOW_BACKWARDS',
         'BUDGET.YEAR_ENDED',
         'CURRENCY_NOT_SUPPORTED',
         'MONEY_OUT_OF_RANGE',
         'MONEY_SCALE_EXCEEDED',
       ],
-    },
-    budgetVersionLineChangeList: {
-      '403': ['AUTHORIZATION.FORBIDDEN'],
-      '404': ['BUDGET.LINE_NOT_FOUND', 'BUDGET.VERSION_NOT_FOUND'],
     },
     budgetVersionLineList: {
       '403': ['AUTHORIZATION.FORBIDDEN'],
@@ -176,20 +174,6 @@ export const ROUTE_ERROR_CODES_BUDGETS: Readonly<Record<string, Partial<Record<R
         'BUDGET.ADJUSTMENT_REASON_REQUIRED',
         'BUDGET.CURRENCY_NOT_REPORTING',
         'BUDGET.PLAN_NOT_FOUND',
-        'BUDGET.WINDOW_BACKWARDS',
-        'BUDGET.YEAR_ENDED',
-        'CURRENCY_NOT_SUPPORTED',
-        'MONEY_OUT_OF_RANGE',
-        'MONEY_SCALE_EXCEEDED',
-      ],
-    },
-    budgetVersionLineWindow: {
-      '404': ['BUDGET.LINE_NOT_FOUND', 'BUDGET.VERSION_NOT_FOUND'],
-      '409': ['BUDGET.REVISION_REQUIRED', 'BUDGET.VERSION_NOT_CURRENT'],
-      '422': [
-        'BUDGET.CURRENCY_NOT_REPORTING',
-        'BUDGET.WINDOW_BACKWARDS',
-        'BUDGET.WINDOW_REASON_REQUIRED',
         'BUDGET.YEAR_ENDED',
         'CURRENCY_NOT_SUPPORTED',
         'MONEY_OUT_OF_RANGE',
@@ -199,27 +183,10 @@ export const ROUTE_ERROR_CODES_BUDGETS: Readonly<Record<string, Partial<Record<R
     budgetVersionList: {
       '403': ['AUTHORIZATION.FORBIDDEN'],
     },
-    budgetVersionRevise: {
-      '404': ['BUDGET.COST_CENTER_NOT_FOUND'],
-      '409': [
-        'BUDGET.DEPARTMENT_HAS_NO_HEAD',
-        'BUDGET.NO_CURRENT_BUDGET',
-        'BUDGET.VERSION_IN_FLIGHT',
-        'FINANCE.SETUP_INCOMPLETE',
-      ],
-      '422': [
-        'BUDGET.CURRENCY_NOT_REPORTING',
-        'BUDGET.QUARTERS_MISMATCH',
-        'BUDGET.YEAR_ENDED',
-        'CURRENCY_NOT_SUPPORTED',
-        'MONEY_OUT_OF_RANGE',
-        'MONEY_SCALE_EXCEEDED',
-      ],
-    },
     budgetVersionSend: {
       '404': ['BUDGET.VERSION_NOT_FOUND'],
       '409': ['BUDGET.PROPOSAL_NOT_SUBMITTED', 'BUDGET.VERSION_NOT_EDITABLE'],
-      '422': ['BUDGET.REVISION_REASON_REQUIRED', 'BUDGET.YEAR_ENDED'],
+      '422': ['BUDGET.RESERVE_REASON_REQUIRED', 'BUDGET.YEAR_ENDED'],
     },
     budgetVersionUpdate: {
       '404': ['BUDGET.VERSION_NOT_FOUND'],
@@ -227,7 +194,6 @@ export const ROUTE_ERROR_CODES_BUDGETS: Readonly<Record<string, Partial<Record<R
       '422': [
         'BUDGET.CURRENCY_NOT_REPORTING',
         'BUDGET.QUARTERS_MISMATCH',
-        'BUDGET.REVISION_REASON_REQUIRED',
         'BUDGET.YEAR_ENDED',
         'CURRENCY_NOT_SUPPORTED',
         'MONEY_OUT_OF_RANGE',

@@ -1,7 +1,9 @@
+import { DemoApiError } from '../demo-api-client';
 import { calendarFor } from '../seed-calendar';
-import { as, listAll, summarize } from '../demo-step-kit';
+import { addDays, as, listAll, summarize, yearOf } from '../demo-step-kit';
 import type { DemoRunContext, DemoStep, StepOutcome } from '../demo-run.types';
-import type { DemoBudget } from '../fixture/demo-fixture.types';
+import type { DemoBudget, DemoFixture, DemoInvoice } from '../fixture/demo-fixture.types';
+import { percentOf } from './invoice-amounts';
 
 type Result = { status: StepOutcome['status']; label: string };
 
@@ -9,7 +11,7 @@ function personWith(ctx: DemoRunContext, role: 'FINANCE'): string {
   return ctx.fixture.people.find((person) => person.account === role)?.code ?? '';
 }
 
-const money = (ctx: DemoRunContext, amount: string) => ({ amount, currency: ctx.fixture.currency });
+const money = (amount: string) => ({ amount });
 
 interface CostCenterRow {
   id: string;
@@ -136,9 +138,8 @@ async function budgetTurn(ctx: DemoRunContext, plan: DemoBudget, year: number): 
   return act(ctx, 'Finance lập phiên bản', () =>
     ctx.api.call(finance, 'POST', '/budget-versions', {
       proposalId: proposal.id,
-      base: money(ctx, plan.base),
-      reserve: money(ctx, plan.reserve),
-      highValuePercent: plan.highValuePercent,
+      // The server sets the reserve to the default 10 % of the base; a different share would carry `reserveReason`.
+      base: money(plan.base),
     }),
   );
 }
@@ -165,26 +166,137 @@ async function act(ctx: DemoRunContext, action: string, write: () => Promise<unk
 
 function propose(
   ctx: DemoRunContext,
-  plan: DemoBudget,
+  plan: Pick<DemoBudget, 'lines'>,
   to: { headEmail: string; costCenterId: string; year: number },
 ): Promise<unknown> {
-  const lastDay = `${to.year}-12-31`;
-  const firstDay = to.year === Number(ctx.today.slice(0, 4)) ? ctx.today : `${to.year}-01-01`;
-
   return ctx.api.call(to.headEmail, 'POST', '/budget-proposals', {
-    costCenterId: to.costCenterId,
     year: to.year,
     lines: plan.lines.map((line) => ({
       description: line.description,
       planId: ctx.ids.plans.get(line.plan),
       seats: line.seats,
-      amount: money(ctx, line.amount),
-      windowFrom: firstDay,
-      windowTo: lastDay,
-      servicePeriodMonths: 12,
-      repeatCycle: 'MONTHLY',
+      amount: money(line.amount),
     })),
   });
+}
+
+/**
+ * The proposal of a department for a later year, sent by its head and left for Finance to answer. A proposal of that year in any
+ * state is the dataset's: the step never sends a second one, and never takes the answer out of Finance's hands.
+ */
+async function nextYearProposals(ctx: DemoRunContext): Promise<StepOutcome> {
+  const results: Result[] = [];
+  for (const proposal of ctx.fixture.proposals) {
+    const year = yearOf(ctx).year + proposal.yearOffset;
+    const label = `${proposal.department} ${year}`;
+    const head = ctx.fixture.departments.find((department) => department.code === proposal.department)?.head ?? '';
+    const headEmail = await as(ctx, head);
+    const costCenterId = ctx.ids.costCenters.get(proposal.department) ?? '';
+    const sent = (await listAll<Row>(ctx, headEmail, `/budget-proposals?year=${year}`)).filter(
+      (row) => row.costCenter.id === costCenterId,
+    );
+    if (sent.length > 0) {
+      results.push({ status: 'present', label: `${label}: đề xuất đã gửi (${sent[0].state})` });
+    } else if (ctx.mode === 'plan') {
+      results.push({ status: 'planned', label: `${label}: gửi đề xuất` });
+    } else {
+      await propose(ctx, proposal, { headEmail, costCenterId, year });
+      results.push({ status: 'done', label: `${label}: đề xuất chờ Finance` });
+    }
+  }
+
+  return summarize(results);
+}
+
+interface CommitmentRow {
+  id: string;
+  amount: { amount: string };
+  state: string;
+}
+
+interface InvoiceRow {
+  number: string;
+}
+
+/** The refusals of recording an invoice that mean the dataset's invoice is already there or cannot be put there. */
+const INVOICE_DUPLICATE = 'INVOICE.DUPLICATE';
+
+/**
+ * The invoices of the fixture, each recorded by Finance against the commitment of its request. An invoice is found by its number
+ * (the tag of the dataset and the key), so a rerun records none twice; the same number from the vendor refused by the API counts as
+ * present too. A request with no commitment, or one the API refuses, is a conflict and nothing is forced.
+ */
+async function invoices(ctx: DemoRunContext): Promise<StepOutcome> {
+  const finance = await as(ctx, personWith(ctx, 'FINANCE'));
+  const results: Result[] = [];
+  for (const spec of ctx.fixture.invoices) {
+    results.push(await invoiceOf(ctx, finance, spec));
+  }
+
+  return summarize(results);
+}
+
+async function invoiceOf(ctx: DemoRunContext, finance: string, spec: DemoInvoice): Promise<Result> {
+  const label = `${spec.key} → ${spec.request}`;
+  const requestId = ctx.ids.requests.get(spec.request);
+  const commitment = requestId
+    ? (await listAll<CommitmentRow>(ctx, finance, `/budget-commitments?requestId=${requestId}`))[0]
+    : undefined;
+  if (!commitment) {
+    return ctx.mode === 'plan'
+      ? { status: 'planned', label }
+      : { status: 'conflict', label: `${label}: Request chưa có cam kết` };
+  }
+  const number = `${ctx.fixture.marker}-${spec.key}`;
+  const recorded = await listAll<InvoiceRow>(ctx, finance, `/budget-commitments/${commitment.id}/invoices`);
+  if (recorded.some((row) => row.number === number)) return { status: 'present', label };
+  if (ctx.mode === 'plan') return { status: 'planned', label };
+  try {
+    await ctx.api.call(
+      finance,
+      'POST',
+      `/budget-commitments/${commitment.id}/invoices`,
+      invoiceBody(ctx, spec, commitment, number),
+    );
+  } catch (error) {
+    if (error instanceof DemoApiError && error.status === 409) {
+      return error.code === INVOICE_DUPLICATE
+        ? { status: 'present', label }
+        : { status: 'conflict', label: `${label}: ${error.code}` };
+    }
+    throw error;
+  }
+
+  return { status: 'done', label };
+}
+
+function invoiceBody(ctx: DemoRunContext, spec: DemoInvoice, commitment: CommitmentRow, number: string) {
+  const net = percentOf(commitment.amount.amount, spec.netPercent);
+
+  return {
+    number,
+    issuedOn: addDays(ctx.today, -spec.issuedDaysAgo),
+    netAmount: money(net),
+    ...(spec.deductibleTaxPercent > 0 ? { deductibleTax: money(percentOf(net, spec.deductibleTaxPercent)) } : {}),
+    ...(spec.nonDeductibleTaxPercent > 0
+      ? { nonDeductibleTax: money(percentOf(net, spec.nonDeductibleTaxPercent)) }
+      : {}),
+    note: spec.note,
+  };
+}
+
+/** The step that records the invoices, after every request whose commitment it records them against. */
+export function invoiceSteps(fixture: DemoFixture): DemoStep[] {
+  const requests = [...new Set(fixture.invoices.map((spec) => `requests.${spec.request}`))];
+
+  return [
+    {
+      key: 'finance.invoices',
+      title: 'Hóa đơn của các cam kết đã duyệt chi (Finance ghi)',
+      needs: ['finance.tax-profile', ...requests],
+      run: invoices,
+    },
+  ];
 }
 
 export const FINANCE_STEPS: readonly DemoStep[] = [
@@ -200,5 +312,11 @@ export const FINANCE_STEPS: readonly DemoStep[] = [
     title: 'Ngân sách năm của Kỹ thuật, Marketing, Kinh doanh (trưởng phòng → Finance → Người duyệt chi)',
     needs: ['finance.cost-centers', 'catalog.plans', 'org.heads', 'org.approval-roles'],
     run: budgets,
+  },
+  {
+    key: 'budget.next-year',
+    title: 'Đề xuất ngân sách năm sau của Công nghệ thông tin chờ Finance (trưởng phòng gửi)',
+    needs: ['finance.cost-centers', 'catalog.plans', 'org.heads'],
+    run: nextYearProposals,
   },
 ];

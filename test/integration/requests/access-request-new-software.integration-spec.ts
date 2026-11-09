@@ -57,14 +57,7 @@ describe('requests over HTTP: software that is not in the catalog (integration, 
   /** A proposal of the designer whose need the head has approved: it waits for the IT Admin. */
   const awaiting = async (extra: Record<string, unknown> = {}): Promise<AccessRequestWire> => {
     const proposed = await h.proposed(designer, extra);
-    const long = Number(extra.termMonths ?? 6) > 12;
-    await h
-      .decide(
-        proposed.id,
-        { decision: 'APPROVE', ...(long ? { termConfirmation: { reason: 'The contract runs that long' } } : {}) },
-        head.account,
-      )
-      .expect(200);
+    await h.decide(proposed.id, { decision: 'APPROVE' }, head.account).expect(200);
 
     return proposed;
   };
@@ -127,10 +120,13 @@ describe('requests over HTTP: software that is not in the catalog (integration, 
       expect(proposed.needStep.assignee?.employeeId).toBe(boss.employeeId);
     });
 
-    it('is fixed to the budget year of the day the money is expected to go out', async () => {
-      const proposed = await h.proposed(designer, { expectedSpendOn: `${year + 1}-01-05` });
+    it('takes no day the money is expected to go out: the person does not know it, and the budget year is worked out from today', async () => {
+      const refused = await h.propose(h.proposeBody({ expectedSpendOn: `${year + 1}-01-05` }), designer.account);
+      const proposed = await h.proposed(designer);
 
-      expect(proposed).toMatchObject({ expectedSpendOn: `${year + 1}-01-05`, budgetYear: year + 1 });
+      expect(refused.status).toBe(422);
+      expect(h.codeOf(refused)).toBe('VALIDATION_ERROR');
+      expect(proposed.budgetYear).toBe(year);
     });
   });
 
@@ -436,7 +432,7 @@ describe('requests over HTTP: software that is not in the catalog (integration, 
       };
 
       it('is not guessed to be one payment of the first year', async () => {
-        const proposed = await awaiting({ termMonths: 24 });
+        const proposed = await awaiting({ termMonths: 12 });
         await save(proposed.id, h.assessmentBody({ quote: monthly })).expect(200);
 
         const refused = await complete(proposed.id).expect(422);
@@ -447,8 +443,8 @@ describe('requests over HTTP: software that is not in the catalog (integration, 
         expect(await stateOf(proposed.id)).toBe('AWAITING_IT_ASSESSMENT');
       });
 
-      it('with a contract of twelve months paid by the year binds the first payment and forecasts the second', async () => {
-        const proposed = await awaiting({ termMonths: 24 });
+      it('with a contract of twelve months paid by the year binds the one payment of the term', async () => {
+        const proposed = await awaiting({ termMonths: 12 });
         await save(
           proposed.id,
           h.assessmentBody({
@@ -461,16 +457,30 @@ describe('requests over HTTP: software that is not in the catalog (integration, 
         expect(done.pricing).toMatchObject({
           status: 'PRICED',
           amount: { amount: '96.00', currency: 'USD' },
-          periodCount: 2,
+          periodCount: 1,
           bindingPeriodCount: 1,
           firstDueOn: `${year}-11-01`,
-          lastDueOn: `${year + 1}-11-01`,
+          lastDueOn: `${year}-11-01`,
         });
-        expect(done).toMatchObject({ expectedSpendOn: `${year}-11-01`, budgetYear: year });
+        expect(done).toMatchObject({ budgetYear: year });
+      });
+
+      it('with a contract of six months paid by the quarter binds the first two payments and forecasts the rest of the year', async () => {
+        const proposed = await awaiting({ termMonths: 12 });
+        await save(
+          proposed.id,
+          h.assessmentBody({
+            quote: { ...monthly, commitmentMonths: 6, paymentFrequency: 'QUARTERLY', firstPaymentOn: `${year}-11-01` },
+          }),
+        ).expect(200);
+
+        const done = h.dataOf<{ request: AccessRequestWire }>(await complete(proposed.id).expect(200)).request;
+
+        expect(done.pricing).toMatchObject({ status: 'PRICED', periodCount: 4, bindingPeriodCount: 2 });
       });
 
       it('paid up front once is the whole term in one payment that binds', async () => {
-        const proposed = await awaiting({ termMonths: 24 });
+        const proposed = await awaiting({ termMonths: 12 });
         await save(proposed.id, h.assessmentBody({ quote: { ...monthly, paymentFrequency: 'UPFRONT_ONCE' } })).expect(
           200,
         );
@@ -478,18 +488,18 @@ describe('requests over HTTP: software that is not in the catalog (integration, 
         const done = h.dataOf<{ request: AccessRequestWire }>(await complete(proposed.id).expect(200)).request;
 
         expect(done.pricing).toMatchObject({
-          amount: { amount: '192.00', currency: 'USD' },
+          amount: { amount: '96.00', currency: 'USD' },
           periodCount: 1,
           bindingPeriodCount: 1,
         });
       });
 
       it('is refused when the payment is shorter than the billing cycle of the price', async () => {
-        const proposed = await awaiting({ termMonths: 24 });
+        const proposed = await awaiting({ termMonths: 12 });
         await save(
           proposed.id,
           h.assessmentBody({
-            quote: { ...monthly, billingCycle: 'ANNUAL', commitmentMonths: 12, paymentFrequency: 'MONTHLY' },
+            quote: { ...monthly, billingCycle: 'QUARTERLY', commitmentMonths: 12, paymentFrequency: 'MONTHLY' },
           }),
         ).expect(200);
 

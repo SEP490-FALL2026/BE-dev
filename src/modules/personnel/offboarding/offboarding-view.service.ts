@@ -73,11 +73,13 @@ export class OffboardingViewService {
     );
 
     const roles = await this.roleDuties.flagMapsOf(items.filter((item) => item.state !== 'CANCELLED'));
+    const blocks = await this.identity.findDepartureBlocks(items.map((item) => item.employeeId));
 
     return paged(
       items.map((item) =>
         toSummary(item, employees, {
           today,
+          block: blocks.get(item.employeeId) ?? null,
           heldRights: held.get(item.employeeId) ?? 0,
           roleFlags: roles.get(item.employeeId),
         }),

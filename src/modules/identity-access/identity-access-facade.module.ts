@@ -1,6 +1,8 @@
 import { Module } from '@nestjs/common';
 import { DatabaseModule } from '../../infrastructure/database/database.module';
 import { OrganizationModule } from '../organization/organization.module';
+import { AccessBlockRepo } from './access-block/access-block.repo';
+import { AccessBlockService } from './access-block/access-block.service';
 import { AccountRecordService } from './accounts/account-record.service';
 import { ActionLinkService } from './accounts/action-link.service';
 import { ActionTokenRepo } from './accounts/action-token.repo';
@@ -28,6 +30,7 @@ import { ApprovalRoleChangeListeners, SpendingApproverGrantChecks } from './publ
   imports: [DatabaseModule, OrganizationModule],
   providers: [
     AppUserRepo,
+    AccessBlockRepo,
     CredentialRepo,
     RoleGrantRepo,
     SuperAdminHolderRepo,
@@ -36,6 +39,7 @@ import { ApprovalRoleChangeListeners, SpendingApproverGrantChecks } from './publ
     SpendingApproverGrantChecks,
     PasswordHasher,
     AccountRecordService,
+    AccessBlockService,
     RoleGrantService,
     ActionLinkService,
     CredentialService,
@@ -48,6 +52,7 @@ import { ApprovalRoleChangeListeners, SpendingApproverGrantChecks } from './publ
     IdentityAccessApi,
     RequestPartyEligibilityApi,
     AccountRecordService,
+    AccessBlockService,
     RoleGrantService,
     ActionLinkService,
     CredentialService,

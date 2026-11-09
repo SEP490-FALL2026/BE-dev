@@ -1,5 +1,4 @@
 import { Injectable } from '@nestjs/common';
-import type { BusinessDate } from '../../../core/business-date';
 import { TransactionRunner, type DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../../audit/public/audit.api';
@@ -9,6 +8,7 @@ import {
   AccessRequestNotDraftError,
   AccessRequestNotFoundError,
   AccessRequestSuperAdminCannotRequestError,
+  AccessRequestTermBeyondLimitError,
 } from '../access-request/access-request.errors';
 import { mayRequest } from '../access-request/access-request.policy';
 import { AccessRequestRepo } from '../access-request/access-request.repo';
@@ -32,15 +32,13 @@ import {
  * exists without them and a refused request leaves nothing behind. What the request is judged by is read by
  * `RequestFactsService`, the same read the preview before sending shows.
  */
-/** What a sending that is not the plain one says: the seat that is not held against the sender, and the day the access ends. */
+/** What a sending that is not the plain one says: the seat that is not held against the sender, and the draft it comes from. */
 export interface SubmitOptions {
   /**
    * The seat a request for the renewal of a right that has ended leaves out of the check of the seat the person holds: it is the
    * seat the new request is for, still held because its revocation has not been done (`US-05-14` AC-5).
    */
   toleratedSeatId?: string;
-  /** The day the access ends: the end the person asked for when a renewal was sent after the end of the right. */
-  expectedEndDate?: BusinessDate;
   /** The draft this request is sent from: it is locked first, judged again under the lock, and becomes the request. */
   draftId?: string;
 }
@@ -90,7 +88,6 @@ export class AccessRequestService {
       employeeId: actor.employeeId,
       planId: body.planId,
       termMonths: body.termMonths,
-      expectedSpendOn: body.expectedSpendOn,
       now,
       settings,
       lockDepartment: true,
@@ -98,13 +95,15 @@ export class AccessRequestService {
     if (assessed.heldAccess && assessed.heldAccess.assignmentId !== options.toleratedSeatId) {
       throw new AccessRequestAlreadyHoldsAccessError(assessed.heldAccess);
     }
+    if (assessed.termBeyondLimit) {
+      throw new AccessRequestTermBeyondLimitError(assessed.termLimit.maxMonths, assessed.termLimit.endsBy);
+    }
     const sent: SubmittedRequest = {
       actor,
       organizationId: employee.organizationId,
       body,
       assessed,
       now,
-      expectedEndDate: options.expectedEndDate,
       draftId: options.draftId,
     };
     const created = await this.repo.insert(tx, newRequestOf(sent));

@@ -121,6 +121,20 @@ export class BudgetFactsService {
     if (missing.length > 0) throw new BudgetPlanNotFoundError(missing);
   }
 
+  /** The name a line takes when only its plan is given: the plan and its application (`QĐ-101n`). */
+  async planNames(planIds: readonly (string | null | undefined)[]): Promise<Map<string, string>> {
+    const wanted = [...new Set(planIds.filter((id): id is string => typeof id === 'string'))];
+    if (wanted.length === 0) return new Map();
+    const found = await this.catalog.getPlanSummaries(wanted);
+
+    return new Map(found.map((plan) => [plan.planId, `${plan.applicationName} - ${plan.planName}`.slice(0, 200)]));
+  }
+
+  /** The share of the base a new version sets aside as its reserve when Finance gives none (`QĐ-98`); read before a transaction opens. */
+  async reserveDefaultPercent(): Promise<number> {
+    return Number(await this.parameters.getValue('BUDGET_RESERVE_DEFAULT_PERCENT'));
+  }
+
   /** The month the fiscal year begins in; read before a transaction opens. */
   async fiscalYearStartMonth(): Promise<number> {
     return Number(await this.parameters.getValue('FISCAL_YEAR_START_MONTH'));
@@ -271,8 +285,9 @@ export class BudgetFactsService {
   }
 
   /** Reads an amount in whole minor units. Throws the money errors, and BudgetCurrencyError for any currency but the reporting one. */
-  async money(input: { amount: string; currency: string }, reporting: string, tx?: DbTx): Promise<bigint> {
-    const parsed = await this.finance.parseMoney(input, tx);
+  async money(input: { amount: string; currency?: string }, reporting: string, tx?: DbTx): Promise<bigint> {
+    // An amount of a budget is always in the reporting currency: whoever gives it does not name one (`QĐ-98`).
+    const parsed = await this.finance.parseMoney({ amount: input.amount, currency: input.currency ?? reporting }, tx);
     if (parsed.currency !== reporting) throw new BudgetCurrencyError(parsed.currency, reporting);
     // A budget never holds a negative amount.
     if (parsed.amountMinor < 0n) throw new MoneyOutOfRangeError();
@@ -280,8 +295,13 @@ export class BudgetFactsService {
     return parsed.amountMinor;
   }
 
+  /** Reads an amount in the minor units of a given currency, as an invoice states it in the currency of its commitment. Throws the money errors. */
+  async moneyIn(input: { amount: string }, currency: string, tx?: DbTx): Promise<bigint> {
+    return (await this.finance.parseMoney({ amount: input.amount, currency }, tx)).amountMinor;
+  }
+
   /** `money` for a threshold: it must be more than nothing, since a threshold of nothing would flag every line. */
-  async positiveMoney(input: { amount: string; currency: string }, reporting: string, tx?: DbTx): Promise<bigint> {
+  async positiveMoney(input: { amount: string; currency?: string }, reporting: string, tx?: DbTx): Promise<bigint> {
     const minor = await this.money(input, reporting, tx);
     if (minor <= 0n) throw new MoneyOutOfRangeError();
 

@@ -2,7 +2,6 @@ import type { HeadDecision } from './transfer-review.types';
 import {
   HEAD_DECISIONS,
   isChangeOfMind,
-  isNoteAllowed,
   isReviewOverdue,
   mayDecide,
   mayRecordDecision,
@@ -58,7 +57,7 @@ describe('who decides (US-03-07 AC-7, AC-9)', () => {
 });
 
 describe('the one decision that may be taken back (T-6, F43)', () => {
-  const ALL: HeadDecision[] = ['STILL_NEEDED', 'NOT_NEEDED', 'NEEDS_NEW_TOOL'];
+  const ALL: HeadDecision[] = ['STILL_NEEDED', 'NOT_NEEDED'];
 
   it('lets a line that waits take any decision', () => {
     for (const next of ALL) expect(mayRecordDecision('PENDING', next)).toBe(true);
@@ -67,10 +66,8 @@ describe('the one decision that may be taken back (T-6, F43)', () => {
   it('lets "still needed" become "no longer needed" and nothing else', () => {
     expect(isChangeOfMind('STILL_NEEDED', 'NOT_NEEDED')).toBe(true);
     expect(mayRecordDecision('STILL_NEEDED', 'NOT_NEEDED')).toBe(true);
-    for (const next of ['STILL_NEEDED', 'NEEDS_NEW_TOOL'] as const) {
-      expect(isChangeOfMind('STILL_NEEDED', next)).toBe(false);
-      expect(mayRecordDecision('STILL_NEEDED', next)).toBe(false);
-    }
+    expect(isChangeOfMind('STILL_NEEDED', 'STILL_NEEDED')).toBe(false);
+    expect(mayRecordDecision('STILL_NEEDED', 'STILL_NEEDED')).toBe(false);
   });
 
   it.each(['NOT_NEEDED', 'NEEDS_NEW_TOOL'] as const)(
@@ -88,21 +85,9 @@ describe('the one decision that may be taken back (T-6, F43)', () => {
   });
 });
 
-describe('the decision and its note (US-03-07 AC-3, AC-4, AC-5)', () => {
-  it('allows three decisions', () => {
-    expect(HEAD_DECISIONS).toEqual(['STILL_NEEDED', 'NOT_NEEDED', 'NEEDS_NEW_TOOL']);
-  });
-
-  it.each([
-    ['no note with any decision', 'STILL_NEEDED', undefined, true],
-    ['a note with a new tool', 'NEEDS_NEW_TOOL', 'Cần bản Figma Pro cho dự án mới', true],
-    ['a note of 500 characters', 'NEEDS_NEW_TOOL', 'x'.repeat(500), true],
-    ['a note of 501 characters', 'NEEDS_NEW_TOOL', 'x'.repeat(501), false],
-    ['a blank note', 'NEEDS_NEW_TOOL', '   ', false],
-    ['a note with the tool still needed', 'STILL_NEEDED', 'why', false],
-    ['a note with the tool not needed', 'NOT_NEEDED', 'why', false],
-  ] as const)('%s', (_name, decision, note, allowed) => {
-    expect(isNoteAllowed(decision, note)).toBe(allowed);
+describe('the decision and its reason (US-03-07 AC-3, AC-4, AC-5)', () => {
+  it('allows two decisions: NEEDS_NEW_TOOL is retired and only read from the lines written before', () => {
+    expect(HEAD_DECISIONS).toEqual(['STILL_NEEDED', 'NOT_NEEDED']);
   });
 
   it('completes the review when no line waits (AC-13)', () => {

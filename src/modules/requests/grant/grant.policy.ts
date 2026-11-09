@@ -1,5 +1,6 @@
 import type { GrantRequestAnswer } from '../../licensing/public/licensing.types';
 import type { LineState } from '../access-request/group-request.types';
+import type { AccessRequestBranchCode } from '../access-request/access-request.policy';
 import type {
   AccessRequestKind,
   AccessRequestState,
@@ -19,10 +20,12 @@ import type {
 export function grantAnswerFor(
   request: {
     type?: AccessRequestKind;
+    branch: AccessRequestBranchCode;
     state: AccessRequestState;
     beneficiaryEmployeeIds: readonly string[];
     planId: string | null;
     expectedEndDate: string | null;
+    termMonths: number;
     departmentId: string;
     costCenterId: string | null;
     serviceAccount: ServiceAccountRecord | null;
@@ -46,6 +49,9 @@ export function grantAnswerFor(
           planId,
           departmentId: request.departmentId,
           expectedEndDate,
+          termMonths: request.termMonths,
+          // Free internal software has no end by term; anything that costs money ends with its term.
+          termBound: request.branch !== 'INTERNAL_FREE',
         };
       }
       if (serviceAccount.boundaryState !== 'ACCEPTED') return { status: 'BOUNDARY_NOT_CHECKED' };
@@ -58,6 +64,8 @@ export function grantAnswerFor(
         employeeId: serviceAccount.responsibleEmployeeId,
         planId,
         expectedEndDate,
+        termMonths: request.termMonths,
+        termBound: false,
         serviceAccount: {
           purpose: serviceAccount.purpose,
           expectedIdentifier: serviceAccount.expectedIdentifier,
@@ -93,6 +101,7 @@ function groupAnswerFor(
     state: AccessRequestState;
     planId: string | null;
     departmentId: string;
+    termMonths: number;
     lines?: readonly { employeeId: string; state: LineState; expectedEndDate: string | null }[];
   },
   employeeId: string | undefined,
@@ -115,6 +124,9 @@ function groupAnswerFor(
         planId: request.planId,
         departmentId: request.departmentId,
         expectedEndDate: line.expectedEndDate,
+        termMonths: request.termMonths,
+        // A request for a group is only for paid software.
+        termBound: true,
       };
     default:
       return { status: 'ENDED' };

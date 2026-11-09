@@ -1,29 +1,21 @@
 import { Injectable } from '@nestjs/common';
 import { CsvError, parseCsv } from '../../../core/csv';
-import { isBusinessDate } from '../../../core/business-date';
 import { TransactionRunner, type DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../../audit/public/audit.api';
 import { FinanceApi } from '../../finance/public/finance.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { BudgetImportFileInvalidError } from '../budget/budget.errors';
-import { LINE_DESCRIPTION_MAX, REASON_MAX, type RepeatCycle } from '../budget/budget.policy';
+import { LINE_DESCRIPTION_MAX, REASON_MAX } from '../budget/budget.policy';
 import { budgetAuditEvent, BudgetFactsService } from '../budget/budget-facts.service';
 import { VersionAccessService } from './version-access.service';
 import { VersionHistoryService } from './version-history.service';
 import { VersionLineRepo, type VersionLineRecord } from '../budget/version-line.repo';
 import type { ImportWire } from '../budget/budget.dto';
 
-const REQUIRED = [
-  'cost_center_code',
-  'description',
-  'amount',
-  'window_from',
-  'window_to',
-  'service_period_months',
-  'repeat_cycle',
-] as const;
-const CYCLES: readonly string[] = ['MONTHLY', 'QUARTERLY', 'ANNUAL', 'ONE_TIME'];
+const REQUIRED = ['cost_center_code', 'description', 'amount'] as const;
+/** Columns of the file before `QĐ-101n`: a file that still has one is refused as a whole. */
+const RETIRED = ['window_from', 'window_to', 'service_period_months', 'repeat_cycle', 'quote_valid_until'] as const;
 /** The largest number of lines one file may add to a version. */
 const MAX_ROWS = 1000;
 /** The rows reported back one by one; the count says the rest. */
@@ -108,6 +100,8 @@ export class LineImportService {
     const [header, ...rows] = cells;
     if (!header) throw new BudgetImportFileInvalidError('EMPTY');
     const names = header.map((cell) => cell.trim().toLowerCase());
+    const retired = RETIRED.filter((column) => names.includes(column));
+    if (retired.length > 0) throw new BudgetImportFileInvalidError('RETIRED_COLUMNS', retired.join(','));
     const missing = REQUIRED.filter((column) => !names.includes(column));
     if (missing.length > 0) throw new BudgetImportFileInvalidError('MISSING_COLUMNS', missing.join(','));
     if (rows.length === 0) throw new BudgetImportFileInvalidError('EMPTY');
@@ -138,12 +132,6 @@ export class LineImportService {
       return 'AMOUNT_INVALID';
     }
     if (amountMinor < 0n) return 'AMOUNT_INVALID';
-    const { window_from: from = '', window_to: to = '', quote_valid_until: quote = '' } = row;
-    if (!isBusinessDate(from) || !isBusinessDate(to) || (quote !== '' && !isBusinessDate(quote))) return 'DATE_INVALID';
-    if (to < from) return 'WINDOW_BACKWARDS';
-    const service = Number(row.service_period_months);
-    if (!Number.isInteger(service) || service < 1 || service > 120) return 'SERVICE_PERIOD_INVALID';
-    if (!CYCLES.includes(row.repeat_cycle ?? '')) return 'REPEAT_CYCLE_INVALID';
     const seats = row.seats ? Number(row.seats) : null;
     if (seats !== null && (!Number.isInteger(seats) || seats < 1)) return 'SEATS_INVALID';
 
@@ -154,11 +142,6 @@ export class LineImportService {
       planId: null,
       seats,
       amountMinor,
-      windowFrom: from,
-      windowTo: to,
-      servicePeriodMonths: service,
-      repeatCycle: row.repeat_cycle as RepeatCycle,
-      quoteValidUntil: quote === '' ? null : quote,
       financeComment: row.note ? row.note : null,
       adjustmentReason: null,
     };

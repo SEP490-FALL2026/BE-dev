@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpStatus, Param, Post, Put, Query } from '@nestjs/common';
+import { Body, Controller, Get, HttpStatus, Param, Post, Query } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   ApiErrorResponses,
@@ -11,20 +11,18 @@ import { ApiSuccessResponse } from '../../../infrastructure/http/decorators/api-
 import { AuthenticatedOnly, RequireRoles } from '../../../infrastructure/security/decorators/access.decorators';
 import { CurrentPrincipal } from '../../../infrastructure/security/models/current-principal';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import { PlanLineRouteService } from './plan-line-route.service';
 import { SpendBatchService } from './spend-batch.service';
+import { SpendBatchListService } from './spend-batch-list.service';
 import { SpendBatchViewService } from './spend-batch-view.service';
+import { SpendBatchListQueryDto, SpendBatchListResponseDto } from './spend-batch-list.dto';
 import { SpendQueueService } from './spend-queue.service';
 import {
   BatchItemListResponseDto,
   BatchResponseDto,
   IdParamDto,
   PageQueryDto,
-  PlanLineBodyDto,
-  PlanLineResponseDto,
   QueueResponseDto,
   SubmitBatchBodyDto,
-  SuggestionListResponseDto,
   SupplementBodyDto,
   SupplementListResponseDto,
   SupplementResponseDto,
@@ -69,7 +67,7 @@ export class SpendSubmissionController {
     private readonly queue: SpendQueueService,
     private readonly batches: SpendBatchService,
     private readonly batchViews: SpendBatchViewService,
-    private readonly planLines: PlanLineRouteService,
+    private readonly batchList: SpendBatchListService,
     private readonly supplements: SupplementService,
     private readonly supplementQueries: SupplementQueryService,
   ) {}
@@ -122,13 +120,34 @@ export class SpendSubmissionController {
     }
   }
 
+  @Get('spend-batches')
+  @RequireRoles('FINANCE')
+  @ApiOperation({ operationId: 'spendBatchList', summary: 'List the batches the heads sent on as spend' })
+  @ApiSuccessResponse(SpendBatchListResponseDto, {
+    message: 'SPEND_BATCH.LISTED',
+    description:
+      'Every batch, the newest first, each with its department, who sent it and when, how many requests it holds, how many of them were approved for spend and what those were committed for (by currency), and how many still wait for a decision. Narrowed by department and by the time the batch was sent. Only Finance reads the list, and only reads it.',
+  })
+  @ApiErrorResponses(
+    ...AUTH_ERRORS,
+    {
+      status: HttpStatus.FORBIDDEN,
+      description: 'Only Finance reads the batches of all the departments.',
+      examples: [FORBIDDEN_EXAMPLE],
+    },
+    INVALID,
+  )
+  async listBatches(@Query() query: SpendBatchListQueryDto) {
+    return this.batchList.page(query);
+  }
+
   @Get('spend-batches/:id')
   @AuthenticatedOnly()
   @ApiOperation({ operationId: 'spendBatchGet', summary: 'Get a batch of requests sent on as spend' })
   @ApiSuccessResponse(BatchResponseDto, {
     message: 'SPEND_BATCH.FETCHED',
     description:
-      'Who sent the batch, when, and how many requests it holds. It has no decision and no commitment: each request keeps its own steps, state and reason. Read by the head who sent it and by a person who holds the spend step of a request in it.',
+      'Who sent the batch, when, and how many requests it holds. It has no decision and no commitment: each request keeps its own steps, state and reason. Read by the head who sent it, by Finance (every batch) and by a person who holds the spend step of a request in it.',
   })
   @ApiErrorResponses(...AUTH_ERRORS, BATCH_NOT_FOUND, INVALID)
   async get(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Param() params: IdParamDto) {
@@ -145,7 +164,7 @@ export class SpendSubmissionController {
   @ApiSuccessResponse(BatchItemListResponseDto, {
     message: 'SPEND_BATCH.ITEMS_LISTED',
     description:
-      'The requests of the batch in the order they were sent, each with how it fared (sent to the approver, sent to Finance, or stopped with its reason), whether it left the batch and why, and the state the request is in now. The head sees all of them; the person who holds a spend step sees the requests they hold.',
+      'The requests of the batch in the order they were sent, each with how it fared (sent to the approver, sent to Finance, or stopped with its reason), whether it left the batch and why, and the state the request is in now. The head who sent the batch and Finance see all of them; the person who holds a spend step sees the requests they hold.',
   })
   @ApiErrorResponses(...AUTH_ERRORS, BATCH_NOT_FOUND, INVALID)
   async items(
@@ -155,70 +174,6 @@ export class SpendSubmissionController {
   ) {
     try {
       return await this.batchViews.items(actor, params.id, query);
-    } catch (error) {
-      throw toSpendApiException(error);
-    }
-  }
-
-  @Put('access-requests/:id/plan-line')
-  @RequireRoles('MANAGER')
-  @ApiOperation({ operationId: 'accessRequestPlanLineSet', summary: 'Attach a request to a line of the plan' })
-  @ApiSuccessResponse(PlanLineResponseDto, {
-    message: 'ACCESS_REQUEST.PLAN_LINE_SET',
-    description:
-      'The head attaches a request that waits in their queue to a line of the plan of the budget of its Cost Center and of the year the money goes out in, or says it is outside the plan. A line whose window has gone by is kept only when the head confirms it is still needed. Outside the plan is information for Finance and the approver, never an exception.',
-  })
-  @ApiErrorResponses(
-    ...AUTH_ERRORS,
-    NOT_HEAD,
-    NOT_FOUND,
-    {
-      status: HttpStatus.CONFLICT,
-      description: 'The request is not waiting in the queue of the head (SPEND.NOT_IN_QUEUE).',
-      examples: [SPEND_ERROR_EXAMPLES.NOT_IN_QUEUE],
-    },
-    {
-      status: HttpStatus.UNPROCESSABLE_ENTITY,
-      description:
-        'The body is invalid (VALIDATION_ERROR), the line is not there (ACCESS_REQUEST.LINE_NOT_FOUND), or its window has gone by and it is not confirmed as still needed (ACCESS_REQUEST.STILL_NEEDED_REQUIRED).',
-      examples: [
-        VALIDATION_EXAMPLE,
-        SPEND_ERROR_EXAMPLES.PLAN_LINE_NOT_FOUND,
-        SPEND_ERROR_EXAMPLES.STILL_NEEDED_REQUIRED,
-      ],
-    },
-  )
-  async setPlanLine(
-    @CurrentPrincipal() actor: AuthenticatedPrincipal,
-    @Param() params: IdParamDto,
-    @Body() body: PlanLineBodyDto,
-  ) {
-    try {
-      return { planLine: await this.planLines.attach(actor, params.id, body) };
-    } catch (error) {
-      throw toSpendApiException(error);
-    }
-  }
-
-  @Get('access-requests/:id/plan-line-suggestions')
-  @RequireRoles('MANAGER')
-  @ApiOperation({
-    operationId: 'accessRequestPlanLineSuggestionList',
-    summary: 'List the lines a request may be attached to',
-  })
-  @ApiSuccessResponse(SuggestionListResponseDto, {
-    message: 'ACCESS_REQUEST.PLAN_LINE_SUGGESTIONS_LISTED',
-    description:
-      'The lines of the current plan of the Cost Center of the request for the year the money goes out in: the software or plan, the amount, the window and whether it has gone by, the ones for the plan asked for marked as suggested. Nothing of what is left, the checks of the requests, other departments or the company.',
-  })
-  @ApiErrorResponses(...AUTH_ERRORS, NOT_HEAD, NOT_FOUND, INVALID)
-  async suggestions(
-    @CurrentPrincipal() actor: AuthenticatedPrincipal,
-    @Param() params: IdParamDto,
-    @Query() query: PageQueryDto,
-  ) {
-    try {
-      return await this.planLines.suggestions(actor, params.id, query);
     } catch (error) {
       throw toSpendApiException(error);
     }

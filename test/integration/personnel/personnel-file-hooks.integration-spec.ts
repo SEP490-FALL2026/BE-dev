@@ -101,12 +101,21 @@ describe('a hook of a personnel file and the transaction of the write (integrati
   it('runs the three hooks of the flows that follow a file, in the order their modules add them, then a hook added later', async () => {
     const person = await leaver();
     const hooks = h.ctx.app.get(PersonnelFileHookContributions);
-    // The hooks are the objects the modules added; a spy on each calls through, so they do what they always do.
-    const spies = hooks.all().map((hook) => jest.spyOn(hook as Required<PersonnelFileHook>, 'onRecorded'));
+    // The hooks are the objects the modules added; a spy on each calls through, so they do what they always do. A hook that has no
+    // step for a recording (the device registrations end only when a person is `LEFT`) is left out of the order under test.
+    const spies = hooks
+      .all()
+      .filter((hook) => typeof hook.onRecorded === 'function')
+      .map((hook) => jest.spyOn(hook as Required<PersonnelFileHook>, 'onRecorded'));
 
     const wire = await h.recordedCase(person);
 
-    expect(realHooks).toEqual(['personnel.open-requests', 'personnel.service-account-duty', 'personnel.role-duties']);
+    expect(realHooks.filter((name) => name !== 'personnel.device-registration')).toEqual([
+      'personnel.open-requests',
+      'personnel.service-account-duty',
+      'personnel.role-duties',
+    ]);
+    expect(realHooks).toContain('personnel.device-registration');
     expect(hooks.names()).toEqual([...realHooks, 'test.switch']);
     expect(spies.map((spy) => spy.mock.calls.length)).toEqual([1, 1, 1, 1]);
     const order = spies.map((spy) => spy.mock.invocationCallOrder[0]);

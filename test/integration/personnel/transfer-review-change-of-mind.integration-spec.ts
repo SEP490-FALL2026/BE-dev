@@ -108,7 +108,7 @@ describe('the head changes their mind about a tool that is still needed (integra
 
       const changed = await h.auditEventsOf('TRANSFER_REVIEW.DECISION_CHANGED', reviewId);
       expect(changed).toHaveLength(1);
-      expect(changed[0].before).toEqual({ decision: 'STILL_NEEDED' });
+      expect(changed[0].before).toEqual({ decision: 'STILL_NEEDED', reason: 'Cần để tiếp tục công việc' });
       expect(changed[0].after).toMatchObject({
         assignmentId: seats[0],
         decision: 'NOT_NEEDED',
@@ -165,15 +165,12 @@ describe('the head changes their mind about a tool that is still needed (integra
     it('refuses a second change, and every other change of a decided tool, as a decision that is final', async () => {
       const { seats, reviewId } = await stillNeeded(3);
       await say(reviewId, seats[0], 'NOT_NEEDED').expect(201);
-      await say(reviewId, seats[1], 'NEEDS_NEW_TOOL', { newToolNote: 'A bigger plan' }).expect(201);
+      await h.legacyNewTool(reviewId, seats[1], h2.employeeId, 'A bigger plan');
       const refused = async (assignmentId: string, decision: string, extra: object = {}) =>
         h.codeOf(await say(reviewId, assignmentId, decision, extra).expect(409));
 
       expect(await refused(seats[0], 'NOT_NEEDED')).toBe('TRANSFER_REVIEW.DECISION_ALREADY_RECORDED');
       expect(await refused(seats[0], 'STILL_NEEDED')).toBe('TRANSFER_REVIEW.DECISION_ALREADY_RECORDED');
-      expect(await refused(seats[0], 'NEEDS_NEW_TOOL', { newToolNote: 'x' })).toBe(
-        'TRANSFER_REVIEW.DECISION_ALREADY_RECORDED',
-      );
       expect(await refused(seats[1], 'NOT_NEEDED')).toBe('TRANSFER_REVIEW.DECISION_ALREADY_RECORDED');
       expect(await refused(seats[1], 'STILL_NEEDED')).toBe('TRANSFER_REVIEW.DECISION_ALREADY_RECORDED');
 
@@ -183,13 +180,10 @@ describe('the head changes their mind about a tool that is still needed (integra
       expect(await h.liveTaskOf(seats[1])).toBeNull();
     });
 
-    it('refuses "still needed" again and a change to a new tool, leaving the tool as it was', async () => {
+    it('refuses "still needed" again, leaving the tool as it was', async () => {
       const { seats, reviewId } = await stillNeeded(2);
 
       expect(h.codeOf(await say(reviewId, seats[0], 'STILL_NEEDED').expect(409))).toBe(
-        'TRANSFER_REVIEW.DECISION_ALREADY_RECORDED',
-      );
-      expect(h.codeOf(await say(reviewId, seats[0], 'NEEDS_NEW_TOOL', { newToolNote: 'x' }).expect(409))).toBe(
         'TRANSFER_REVIEW.DECISION_ALREADY_RECORDED',
       );
 

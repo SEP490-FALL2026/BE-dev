@@ -140,24 +140,14 @@ describe('RequestsDashboardApi facts agree with source lists (integration, real 
         .set(h.as(person.account))
         .send({ kind: 'INDIVIDUAL', planId: paid, businessReason: 'Design the new brand', termMonths: 6 })
         .expect(201);
-      // Somebody else's request is not theirs, and nor is one the head sent for them: it is the head's.
+      // Somebody else's request is not theirs, and nor is one the head sent for them and a colleague: it is the head's.
       await h.sent(colleague, await freshInternal());
-      await h
-        .sendDelegated(
-          {
-            beneficiaryEmployeeIds: [person.employeeId],
-            items: [{ planId: await freshInternal() }],
-            businessReason: 'The new designer needs the tool',
-            termMonths: 6,
-          },
-          u.head.account,
-        )
-        .expect(201);
+      await h.sentForPeople(paid, [person, colleague], u.head.account, { termMonths: 6 });
 
       // Two are open. Every state of a sent request together would be five, so the filter is what makes it two.
       expect(await openCounts(person)).toEqual({ facade: 2, list: 2 });
       expect(await myRequestsTotal(person.account)).toBe(5);
-      // The head is the requester of the one they sent on behalf, and of nothing else.
+      // The head is the requester of the one they sent for the two, and of nothing else.
       expect(await openCounts(u.head)).toEqual({ facade: 1, list: 1 });
       expect(await openCounts(colleague)).toEqual({ facade: 1, list: 1 });
     });

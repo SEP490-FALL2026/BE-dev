@@ -1,4 +1,4 @@
-import { INSTALLATION } from '../../../src/cli/seed/fixture/shared-demo-v2/installation';
+import { INSTALLATION } from '../../../src/cli/seed/fixture/shared-demo-v3/installation';
 import { InstallationApi } from '../../../src/modules/installation/public/installation.api';
 import type { INestApplicationContext } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
@@ -24,7 +24,7 @@ describe('ops:seed at the edges of the year (integration, real API and PostgreSQ
     runSeed({
       args: {
         mode,
-        fixture: 'shared-demo-v2',
+        fixture: 'shared-demo-v3',
         apiUrl: baseUrl,
         operator: 'TEST-CALENDAR',
         environment: 'LOCAL_TEST',
@@ -52,9 +52,9 @@ describe('ops:seed at the edges of the year (integration, real API and PostgreSQ
 
   async function requestStates(): Promise<Record<string, string>> {
     const { rows } = await ctx.sql.query<{ marker: string; state: string }>(
-      `SELECT substring(coalesce(p.purpose, r.business_reason) from '^\\[DS1-(R[0-9]+)\\]') AS marker, r.state::text AS state
+      `SELECT substring(coalesce(p.purpose, r.business_reason) from '^\\[SV-(R[0-9]+)\\]') AS marker, r.state::text AS state
          FROM access_requests r LEFT JOIN access_request_proposals p ON p.request_id = r.id
-        WHERE coalesce(p.purpose, r.business_reason) LIKE '[DS1-R%'`,
+        WHERE coalesce(p.purpose, r.business_reason) LIKE '[SV-R%'`,
     );
     return Object.fromEntries(rows.map((row) => [row.marker, row.state]));
   }
@@ -132,6 +132,8 @@ describe('ops:seed at the edges of the year (integration, real API and PostgreSQ
       R7: 'AWAITING_SPEND_SUBMISSION',
       R8: 'AWAITING_IT_ASSESSMENT',
       R9: 'AWAITING_FINANCE_REVIEW',
+      R10: 'COMPLETED',
+      R11: 'COMPLETED',
     });
   }, 600000);
 

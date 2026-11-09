@@ -12,7 +12,7 @@ async function draft(ctx: DemoRunContext): Promise<StepOutcome> {
   await ctx.api.call(email, 'POST', '/access-requests/drafts', {
     kind: 'INDIVIDUAL',
     planId,
-    businessReason: `${tag(ctx, 'DRAFT')} Bản nháp chưa gửi (dữ liệu demo).`,
+    businessReason: `${tag(ctx, 'DRAFT')} Bản nháp chưa gửi.`,
     termMonths: spec.termMonths,
   });
 

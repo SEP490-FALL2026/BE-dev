@@ -1,4 +1,5 @@
 import { parseArgs } from 'node:util';
+import { GROUNDS_TYPES } from '../../modules/personnel/public/personnel.types';
 import { isBusinessDate } from '../../core/business-date';
 import { InvalidEmailError, normalizeEmail } from '../../core/email';
 import type { EmploymentType } from '../../modules/organization/public/organization.types';
@@ -240,12 +241,21 @@ function contextOf(values: Values): SuperAdminEventContext {
     environment,
     subjectCode: text(values, 'subject-code'),
     basis: {
-      type: text(values, 'basis-type'),
+      type: basisType(values),
       reference: text(values, 'basis-reference'),
       issuer: text(values, 'basis-issuer'),
       issuedOn: day(values, 'basis-issued-on'),
     },
   };
+}
+
+/** The kind of the basis is one of the closed list every personnel operation takes (`BM-04`). */
+function basisType(values: Values): string {
+  const type = text(values, 'basis-type');
+  if (!(GROUNDS_TYPES as readonly string[]).includes(type))
+    throw new SuperAdminEventArgumentError(`--basis-type must be one of ${GROUNDS_TYPES.join(', ')}.`);
+
+  return type;
 }
 
 /** Who follows the head of the department the person leaves; at most one of the two options. */

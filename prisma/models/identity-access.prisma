@@ -214,3 +214,22 @@ model RecoveryTicket {
   @@index([targetAppUserId])
   @@map("recovery_tickets")
 }
+
+// The day the access of an employee stops, from their departure case (QĐ-100q): from `blockedFrom` the account is refused at login,
+// refresh and on every request, whatever the state of the case. One row for each employee. `releasable` is set when the departure
+// is cancelled after the block took effect: only an unlock with a reason by the Super Admin removes it.
+model EmployeeAccessBlock {
+  employeeId     String                   @id @map("employee_id") @db.Uuid
+  organizationId String                   @map("organization_id") @db.Uuid
+  blockedFrom    DateTime                 @map("blocked_from") @db.Date
+  cause          String                   // DEPARTURE_LAST_DAY | DEPARTURE_BLOCK_NOW (CHECK in the database)
+  sourceCaseId   String?                  @map("source_case_id") @db.Uuid
+  releasable     Boolean                  @default(false)
+  createdAt      DateTime                 @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt      DateTime                 @default(now()) @map("updated_at") @db.Timestamptz(3)
+
+  employee Employee @relation(fields: [employeeId], references: [id])
+
+  @@index([organizationId])
+  @@map("employee_access_blocks")
+}

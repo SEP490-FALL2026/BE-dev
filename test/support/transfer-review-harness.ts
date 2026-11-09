@@ -36,6 +36,7 @@ export interface ReviewItemWire {
   decidedBy: { id: string } | null;
   decidedAt: string | null;
   newToolNote: string | null;
+  reason: string | null;
   revocationTaskId: string | null;
   needsNewRequest: boolean;
 }
@@ -62,6 +63,7 @@ export interface ReviewItemRow {
   decision: string;
   decided_by_employee_id: string | null;
   decided_at: Date | null;
+  reason?: string | null;
   new_tool_note: string | null;
   revocation_task_id: string | null;
 }
@@ -77,8 +79,24 @@ export class TransferReviewHarness extends HandoverHarness {
     request(this.server()).get(`/api/v1/transfer-reviews/${id}`).set(this.as(account));
   reviewItems = (id: string, query = '', account: ApiAccount = this.it1) =>
     request(this.server()).get(`/api/v1/transfer-reviews/${id}/items${query}`).set(this.as(account));
+  /** The head always says why (F17); a test that wants it missing passes `reason: undefined`. */
   decide = (id: string, body: object, account: ApiAccount) =>
-    request(this.server()).post(`/api/v1/transfer-reviews/${id}/decisions`).set(this.as(account)).send(body);
+    request(this.server())
+      .post(`/api/v1/transfer-reviews/${id}/decisions`)
+      .set(this.as(account))
+      .send({ reason: 'Cần để tiếp tục công việc', ...body });
+
+  /**
+   * A line decided "a new tool is needed", as the lines written before that decision was retired are: it can only be read now, so it is
+   * written straight to the table, the way the old release wrote it.
+   */
+  async legacyNewTool(reviewId: string, assignmentId: string, deciderEmployeeId: string, note: string): Promise<void> {
+    await this.ctx.sql.query(
+      `UPDATE transfer_review_items SET decision = 'NEEDS_NEW_TOOL', decided_by_employee_id = $3, decided_at = now(), new_tool_note = $4
+        WHERE review_id = $1 AND assignment_id = $2`,
+      [reviewId, assignmentId, deciderEmployeeId, note],
+    );
+  }
 
   /** The reminder of the hour for the reviews past their deadline, run by hand. */
   noticeLateReviews = (now: Date = new Date()) => this.ctx.app.get(TransferReviewOverdueService).noticeOverdue(now);
@@ -128,7 +146,7 @@ export class TransferReviewHarness extends HandoverHarness {
   async itemRows(reviewId: string): Promise<ReviewItemRow[]> {
     const { rows } = await this.ctx.sql.query<ReviewItemRow>(
       `SELECT review_id, assignment_id, plan_id, position, grant_reason, decision::text AS decision, decided_by_employee_id,
-              decided_at, new_tool_note, revocation_task_id
+              decided_at, new_tool_note, reason, revocation_task_id
          FROM transfer_review_items WHERE review_id = $1 ORDER BY position`,
       [reviewId],
     );

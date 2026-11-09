@@ -90,6 +90,7 @@ describe('what licensing reads of catalog and organization (integration, real Po
 
       expect(await catalog.findSeatTarget({ subscriptionId: id })).toEqual({
         kind: 'SUBSCRIPTION',
+        allowsMidTermReduction: false,
         subscriptionId: id,
         planId: p.id,
         planName: p.name,
@@ -147,6 +148,7 @@ describe('what licensing reads of catalog and organization (integration, real Po
 
       expect(await catalog.findSeatTarget({ planId: p.id })).toEqual({
         kind: 'PLAN',
+        allowsMidTermReduction: false,
         subscriptionId: null,
         planId: p.id,
         planName: p.name,

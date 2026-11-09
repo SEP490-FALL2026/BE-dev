@@ -148,7 +148,7 @@ export class TransferReviewsController {
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
-        'The request is invalid (VALIDATION_ERROR): an unknown decision, or a note that does not go with the decision or is longer than 500 characters.',
+        'The request is invalid (VALIDATION_ERROR): an unknown decision (NEEDS_NEW_TOOL is retired), a missing, blank or over-long reason, or a field the route does not know such as newToolNote.',
       examples: [VALIDATION_EXAMPLE],
     },
   )
@@ -161,7 +161,7 @@ export class TransferReviewsController {
       const outcome = await this.decisions.decide(actor, params.id, {
         assignmentId: body.assignmentId,
         decision: body.decision,
-        ...(body.newToolNote === undefined ? {} : { newToolNote: body.newToolNote }),
+        reason: body.reason,
       });
 
       return await this.views.decisionOf(actor, outcome);

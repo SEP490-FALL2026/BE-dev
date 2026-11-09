@@ -77,6 +77,17 @@ export const RUNNERS = [
     needs: ['PostgreSQL on localhost'],
     proves: 'a few business journeys end to end: HTTP, PostgreSQL and the worker loops together',
   },
+  {
+    name: 'flows',
+    roots: ['test/flows'],
+    suffix: '.flow-spec.ts',
+    config: 'test/config/jest.flows.cjs',
+    command: 'pnpm test:flows',
+    jest: true,
+    needs: ['PostgreSQL on localhost (one seeded template per run, a clone per file; runs in band)'],
+    proves:
+      'the five main flows through the real API: a real sign-in per role, the demo dataset and a clock the test controls',
+  },
 ];
 
 // Directories under test/ that hold helpers or configuration and must contain no spec files.

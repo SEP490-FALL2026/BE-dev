@@ -9,27 +9,12 @@ import { BudgetYearLockRepo } from '../budget/budget-year-lock.repo';
 import { ProposalRepo, type ProposalLineRecord, type ProposalRecord } from '../budget/proposal.repo';
 import { VersionRepo } from '../budget/version.repo';
 import { BudgetNotifierService } from '../budget/budget-notifier.service';
-import {
-  backwardLines,
-  incompleteLines,
-  proposalIsSucceedable,
-  totalOf,
-  yearIsOpen,
-  type LineDraft,
-} from '../budget/budget.policy';
-import {
-  BudgetNotYourCostCenterError,
-  BudgetProposalIncompleteError,
-  BudgetProposalNotFoundError,
-  BudgetProposalOpenError,
-  BudgetWindowBackwardsError,
-  BudgetYearEndedError,
-} from '../budget/budget.errors';
+import { proposalIsSucceedable, totalOf, yearIsOpen } from '../budget/budget.policy';
+import { BudgetProposalNotFoundError, BudgetProposalOpenError, BudgetYearEndedError } from '../budget/budget.errors';
 
 type LineBody = BudgetProposalBodyDto['lines'][number];
 
 export interface ProposalSendInput {
-  costCenterId: string;
   year: number;
   lines: LineBody[];
   previous: string | null;
@@ -54,11 +39,9 @@ export class ProposalSender {
     const today = await this.facts.today(now, tx);
 
     const own = await this.facts.requireHeadedCostCenter(actor.employeeId, today, tx);
-    const costCenter = await this.facts.costCenter(input.costCenterId, tx);
-    if (costCenter.id !== own) throw new BudgetNotYourCostCenterError();
+    const costCenter = await this.facts.costCenter(own, tx);
     if (!yearIsOpen(input.year, today, input.fiscalStart)) throw new BudgetYearEndedError(input.year);
 
-    this.validateLineDrafts(input.lines);
     await this.facts.requirePlans(input.lines.map((line) => line.planId));
 
     const reporting = await this.facts.reportingCurrency(tx);
@@ -108,38 +91,19 @@ export class ProposalSender {
     return id;
   }
 
-  private validateLineDrafts(lines: LineBody[]): void {
-    const drafts: LineDraft[] = lines.map((line) => ({
-      description: line.description,
-      amountMinor: 0n,
-      windowFrom: line.windowFrom,
-      windowTo: line.windowTo,
-      servicePeriodMonths: line.servicePeriodMonths,
-      repeatCycle: line.repeatCycle,
-    }));
-    const incomplete = incompleteLines(drafts);
-    if (incomplete.length > 0) throw new BudgetProposalIncompleteError(incomplete);
-    const backwards = backwardLines(drafts);
-    if (backwards.length > 0) throw new BudgetWindowBackwardsError(backwards);
-  }
-
   private async buildProposalLines(
     tx: DbTx,
     lines: LineBody[],
     reporting: string,
   ): Promise<Omit<ProposalLineRecord, 'position'>[]> {
     const records: Omit<ProposalLineRecord, 'position'>[] = [];
+    const names = await this.facts.planNames(lines.map((line) => line.planId));
     for (const line of lines) {
       records.push({
-        description: line.description,
+        description: line.description ?? names.get(line.planId as string) ?? '',
         planId: line.planId ?? null,
         seats: line.seats ?? null,
         amountMinor: await this.facts.money(line.amount, reporting, tx),
-        windowFrom: line.windowFrom as ProposalLineRecord['windowFrom'],
-        windowTo: line.windowTo as ProposalLineRecord['windowTo'],
-        servicePeriodMonths: line.servicePeriodMonths as number,
-        repeatCycle: line.repeatCycle as ProposalLineRecord['repeatCycle'],
-        quoteValidUntil: line.quoteValidUntil ?? null,
         note: line.note ?? null,
       });
     }

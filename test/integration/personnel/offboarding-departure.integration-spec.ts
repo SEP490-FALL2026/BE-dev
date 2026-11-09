@@ -63,7 +63,7 @@ describe('the departure of a person, the revocations and the closing (integratio
       await me(person).expect(200);
       const tasks = await h.taskCount();
 
-      const left = h.dataOf<CaseWire>(await h.markLeft(wire.id).expect(200));
+      const left = h.dataOf<CaseWire>(await h.leaveOnLastDay(wire.id).expect(200));
 
       expect(left).toMatchObject({
         state: 'LEFT',
@@ -81,7 +81,7 @@ describe('the departure of a person, the revocations and the closing (integratio
       expect(event.after).toMatchObject({ state: 'LEFT', alert: 'VERY_HIGH' });
       expect((await h.auditEventsOf('OFFBOARDING_CASE.ACCOUNT_LOCK_REMINDER', wire.id)).length).toBe(1);
       expect(await h.changeKinds(wire.id)).toEqual(['RECORDED', 'MARKED_LEFT']);
-      const again = await h.markLeft(wire.id);
+      const again = await h.leaveOnLastDay(wire.id);
       expect([again.status, h.codeOf(again)]).toEqual([409, 'OFFBOARDING_CASE.CASE_LEFT']);
       // The Super Admin lists the accounts of the people who have left and are not locked.
       const accounts = (query: string) =>
@@ -94,16 +94,20 @@ describe('the departure of a person, the revocations and the closing (integratio
       expect(await accounts('employeeLeft=false')).not.toContain(person.account.appUserId);
     });
 
-    it('does not take the rights away or stop the person when the last working day is past and nobody has said they left', async () => {
+    it('does not take the rights away when the last working day is past and nobody has said they left, but the person is refused (QĐ-100q)', async () => {
       const { person } = await leaver();
       const wire = await h.recordedCase(person);
       await h.ctx.sql.query(
         `UPDATE offboarding_cases SET last_working_day = $2::date, departure_effective_on = $3::date WHERE id = $1`,
         [wire.id, h.day(-3), h.day(-2)],
       );
+      await h.ctx.sql.query(`UPDATE employee_access_blocks SET blocked_from = $2::date WHERE employee_id = $1`, [
+        person.employeeId,
+        h.day(-2),
+      ]);
       const tasks = await h.taskCount();
 
-      await me(person).expect(200);
+      await me(person).expect(401);
       const listed = h.dataOf<{ items: CaseWire[] }>(
         await h.listCases('?state=HANDING_OVER&pastLastDay=true&pageSize=100').expect(200),
       ).items;
@@ -111,9 +115,12 @@ describe('the departure of a person, the revocations and the closing (integratio
       expect(listed.map((row) => [row.id, row.pastLastDay, row.heldRights])).toContainEqual([wire.id, true, 3]);
       expect(await h.taskCount()).toBe(tasks);
       expect((await h.caseRow(wire.id)).state).toBe('HANDING_OVER');
-      const left = await h.markLeft(wire.id, { departedOn: h.day(1) });
-      expect([left.status, h.codeOf(left)]).toEqual([422, 'OFFBOARDING_CASE.DEPARTED_ON_INVALID']);
-      await h.markLeft(wire.id).expect(200);
+      const body = await h.leaveOnLastDay(wire.id, { departedOn: h.day(-3) });
+      expect([body.status, h.codeOf(body)]).toEqual([422, 'VALIDATION_ERROR']);
+      const left = h.dataOf<CaseWire>(await h.leaveOnLastDay(wire.id).expect(200));
+      // The person left on their last working day, whenever the Super Admin marks it (Q-04 B).
+      expect(left.left?.leftOn).toBe(h.day(-3));
+      expect(await h.employeeLeftOn(person.employeeId)).toBe(h.day(-3));
     });
 
     it('ends the review of the tools that waited for the new head: a person who has left is not asked about a tool any more', async () => {
@@ -127,7 +134,7 @@ describe('the departure of a person, the revocations and the closing (integratio
         [person.employeeId, h.day(-5), h.day(-1), placement.id],
       );
 
-      await h.markLeft(wire.id).expect(200);
+      await h.leaveOnLastDay(wire.id).expect(200);
 
       const reviews = await h.ctx.sql.query(
         `SELECT status::text AS status FROM transfer_reviews WHERE employee_id = $1`,
@@ -138,33 +145,34 @@ describe('the departure of a person, the revocations and the closing (integratio
   });
 
   describe('the revocations (AC-4, AC-5, AC-20)', () => {
-    it('are made only when the IT Admin asks, with the count, one reason and the lock of the account first or together', async () => {
+    it('are made only when the IT Admin asks, the server counts them, the reason is the standard one and the lock of the account comes first or together', async () => {
       const { person, seats } = await leaver();
       const wire = await h.recordedCase(person);
-      await h.markLeft(wire.id).expect(200);
+      await h.leaveOnLastDay(wire.id).expect(200);
       const tasks = await h.taskCount();
-      const reason = 'Người dùng đã nghỉ việc, thu hồi mọi quyền';
+      const reason = 'DEPARTURE_REVOCATION: Người dùng đã nghỉ việc, thu hồi mọi quyền';
 
-      const notLeft = await h.revokeRights((await h.recordedCase((await leaver()).person)).id, {
-        count: 3,
-        reason,
+      const notBlocked = await h.revokeRights((await h.recordedCase((await leaver()).person)).id, {
         accountLock: LOCK,
       });
-      const wrongCount = await h.revokeRights(wire.id, { count: 2, reason, accountLock: LOCK });
-      const noReason = await h.revokeRights(wire.id, { count: 3, accountLock: LOCK });
-      const noLock = await h.revokeRights(wire.id, { count: 3, reason });
-      expect([notLeft, wrongCount, noReason, noLock].map((response) => [response.status, h.codeOf(response)])).toEqual([
-        [409, 'OFFBOARDING_CASE.CASE_NOT_LEFT'],
-        [422, 'OFFBOARDING_CASE.COUNT_MISMATCH'],
-        [422, 'OFFBOARDING_CASE.REASON_REQUIRED'],
+      const withCount = await h.revokeRights(wire.id, { count: 3, accountLock: LOCK });
+      const withReason = await h.revokeRights(wire.id, { reason: 'x', accountLock: LOCK });
+      const noLock = await h.revokeRights(wire.id, {});
+      expect(
+        [notBlocked, withCount, withReason, noLock].map((response) => [response.status, h.codeOf(response)]),
+      ).toEqual([
+        [409, 'OFFBOARDING_CASE.CASE_NOT_BLOCKED'],
+        [422, 'VALIDATION_ERROR'],
+        [422, 'VALIDATION_ERROR'],
         [409, 'OFFBOARDING_CASE.ACCOUNT_LOCK_NOT_RECORDED'],
       ]);
-      expect(h.detailsOf(wrongCount)).toEqual({ expected: 3 });
       expect(await h.taskCount()).toBe(tasks);
       expect((await h.caseRow(wire.id)).account_lock_at).toBeNull();
 
       const opened = h.dataOf<CaseWire>(
-        await h.revokeRights(wire.id, { count: 3, reason, accountLock: LOCK }).expect(200),
+        await h
+          .revokeRights(wire.id, { note: 'Người dùng đã nghỉ việc, thu hồi mọi quyền', accountLock: LOCK })
+          .expect(200),
       );
 
       expect(opened.revocations).toEqual({ created: 3, reasonAdded: 0 });
@@ -197,13 +205,15 @@ describe('the departure of a person, the revocations and the closing (integratio
       ]);
       const [event] = await h.auditEventsOf('OFFBOARDING_CASE.REVOCATIONS_OPENED', wire.id);
       expect(event.after).toMatchObject({ count: 3, reason, source: 'DEPARTURE' });
+      expect(await h.changeKinds(wire.id)).toContain('REVOCATIONS_OPENED');
       expect((await rightsOf(wire.id)).every((right) => right.revocation?.source === 'DEPARTURE')).toBe(true);
 
       // Asking again finds every right already under way, and the lock of the account is recorded once.
-      const second = await h.revokeRights(wire.id, { count: 3, reason });
-      expect([second.status, h.codeOf(second)]).toEqual([422, 'OFFBOARDING_CASE.COUNT_MISMATCH']);
-      const lockAgain = await h.revokeRights(wire.id, { count: 0, reason, accountLock: LOCK });
-      expect([lockAgain.status, h.codeOf(lockAgain)]).toEqual([409, 'OFFBOARDING_CASE.ALREADY_RECORDED']);
+      const second = await h.revokeRights(wire.id, {});
+      expect([second.status, h.codeOf(second)]).toEqual([409, 'OFFBOARDING_CASE.NOTHING_TO_REVOKE']);
+      const lockAgain = await h.revokeRights(wire.id, { accountLock: LOCK });
+      // Nothing is left to take away, which the selection says before it looks at the lock.
+      expect([lockAgain.status, h.codeOf(lockAgain)]).toEqual([409, 'OFFBOARDING_CASE.NOTHING_TO_REVOKE']);
       const lockRoute = await h.lockAccount(wire.id, LOCK);
       expect([lockRoute.status, h.codeOf(lockRoute)]).toEqual([409, 'OFFBOARDING_CASE.ALREADY_RECORDED']);
     });
@@ -211,7 +221,7 @@ describe('the departure of a person, the revocations and the closing (integratio
     it('go through the handover, are completed by the IT Admin, and then the case closes with its steps done (AC-20, QĐ-62i)', async () => {
       const { person } = await leaver();
       const wire = await h.recordedCase(person);
-      await h.markLeft(wire.id).expect(200);
+      await h.leaveOnLastDay(wire.id).expect(200);
       const lockedFirst = h.dataOf<CaseWire>(await h.lockAccount(wire.id, LOCK).expect(200));
       expect(lockedFirst.accountLock).toMatchObject({ note: LOCK.note });
       const blockers = h.ctx.app.get(OffboardingBlockerContributions);
@@ -220,7 +230,7 @@ describe('the departure of a person, the revocations and the closing (integratio
         code: 'SERVICE_ACCOUNTS_WITHOUT_ANSWERER',
         countFor: () => Promise.resolve(waiting),
       });
-      await h.revokeRights(wire.id, { count: 3, reason: 'Thu hồi quyền' }).expect(200);
+      await h.revokeRights(wire.id, {}).expect(200);
       const held = await rightsOf(wire.id);
       expect(held).toHaveLength(3);
 
@@ -263,7 +273,7 @@ describe('the departure of a person, the revocations and the closing (integratio
     it('never close a case whose account is not recorded as locked, even with no right left', async () => {
       const person = await h.worker(des, code());
       const wire = await h.recordedCase(person);
-      await h.markLeft(wire.id).expect(200);
+      await h.leaveOnLastDay(wire.id).expect(200);
 
       const response = await h.closeCase(wire.id);
 
@@ -287,12 +297,12 @@ describe('the departure of a person, the revocations and the closing (integratio
       );
       seats.push(k4Seat);
       const wire = await h.recordedCase(person);
-      await h.markLeft(wire.id).expect(200);
+      await h.leaveOnLastDay(wire.id).expect(200);
       await h.lockAccount(wire.id, LOCK).expect(200);
       const tasks = await h.taskCount();
       const [k2Seat, k1Seat] = seats;
 
-      const named = await h.revokeRights(wire.id, { assignmentIds: [k2Seat, k4Seat], count: 2, reason: 'Thu hồi' });
+      const named = await h.revokeRights(wire.id, { assignmentIds: [k2Seat, k4Seat] });
       expect([named.status, h.codeOf(named)]).toEqual([409, 'OFFBOARDING_CASE.REVOCATION_NOT_SUPPORTED']);
       expect(h.detailsOf(named)).toMatchObject({ assignmentId: k4Seat, provisioningType: 'K4' });
       expect(await h.taskCount()).toBe(tasks);
@@ -302,7 +312,7 @@ describe('the departure of a person, the revocations and the closing (integratio
         revocable: false,
         provisioningType: 'K4',
       });
-      await h.revokeRights(wire.id, { count: 2, reason: 'Thu hồi' }).expect(200);
+      await h.revokeRights(wire.id, {}).expect(200);
       expect(await h.taskCount()).toBe(tasks + 2);
       await confirmAll(person);
       const after = await rightsOf(wire.id);
@@ -340,11 +350,9 @@ describe('the departure of a person, the revocations and the closing (integratio
   describe('a departure nobody planned (AC-18)', () => {
     it('lets the tool that loses no data go at once and holds the one that does until the head confirms it', async () => {
       const { person, seats } = await leaver([canva, chatgpt]);
-      const wire = await h.recordedCase(person, { abrupt: true, lastWorkingDay: h.today() });
+      const wire = await h.recordedCase(person, { accessBlockMode: 'BLOCK_NOW', lastWorkingDay: h.today() });
 
-      const opened = h.dataOf<CaseWire>(
-        await h.revokeRights(wire.id, { count: 2, reason: 'Nghỉ đột ngột', accountLock: LOCK }).expect(200),
-      );
+      const opened = h.dataOf<CaseWire>(await h.revokeRights(wire.id, { accountLock: LOCK }).expect(200));
 
       expect(opened.revocations).toEqual({ created: 2, reasonAdded: 0 });
       const rights = await rightsOf(wire.id);

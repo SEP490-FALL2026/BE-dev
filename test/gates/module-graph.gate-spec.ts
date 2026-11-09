@@ -63,6 +63,7 @@ const PUBLIC_CONTRACT_EXPORTS: ReadonlySet<string> = new Set([
   // The extension points the requests context binds (public/budgets.extension-points.ts): the change listeners and the release guard.
   'BudgetsModule: BudgetChangeListeners',
   'BudgetsModule: CommitmentReleaseGuardHook',
+  'BudgetsModule: CommitmentRequestFactsHook',
   // G4 (ADR-0013): the catalog facade licensing reads the seat targets (subscription or internal plan) through.
   'CatalogModule: CatalogApi',
   // The extension point licensing binds its reader of occupied seats to (public/catalog.extension-points.ts).
@@ -70,6 +71,11 @@ const PUBLIC_CONTRACT_EXPORTS: ReadonlySet<string> = new Set([
   'CatalogModule: SubscriptionPeriodApi',
   // H8.3 (A4-10): the data-import facade; onboarding reads the latest people import through it.
   'DataImportModule: DataImportApi',
+  // G7: the register of company machines; personnel ends the registrations of a person who left through it.
+  'DevicesModule: DevicesApi',
+  // The extension point the usage module binds the collector allowlist to (devices/public/devices.extension-points.ts).
+  'DevicesModule: CollectorAllowlistHook',
+  'DevicesModule: Symbol(DEVICE_CREDENTIAL_VERIFIER)', // port of src/infrastructure/security
   // G3 (ADR-0013): the finance facade, money in and conversion snapshot out; the repos stay private.
   'FinanceModule: FinanceApi',
   // The audited exchange-rate use case the finance HTTP module serves; the raw ledger is not exported.

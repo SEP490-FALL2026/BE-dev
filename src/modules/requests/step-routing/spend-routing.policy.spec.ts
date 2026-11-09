@@ -54,17 +54,12 @@ describe('how a review may end (US-06-13 AC-4, AC-11)', () => {
     })),
   });
 
-  it('may give an opinion on an exception, but not while the plan line is overdue', () => {
+  it('may give an opinion on an exception', () => {
     expect(checkReviewOutcome('ASSESSED', { check: check(['BUDGET_OK']), departmentHasHead: true })).toBeNull();
-    expect(checkReviewOutcome('ASSESSED', { check: check(['BUDGET_OK'], true), departmentHasHead: true })).toBe(
-      'PLAN_LINE_NOT_UPDATED',
-    );
   });
 
   it('may always give the request back to the head', () => {
-    expect(
-      checkReviewOutcome('RETURN_TO_HEAD', { check: check(['BUDGET_OK'], true), departmentHasHead: false }),
-    ).toBeNull();
+    expect(checkReviewOutcome('RETURN_TO_HEAD', { check: check(['BUDGET_OK']), departmentHasHead: false })).toBeNull();
   });
 
   it('asks for a budget only for a year that has none, and only when a head can propose it', () => {

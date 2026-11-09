@@ -1,4 +1,5 @@
 import { Body, Controller, Get, HttpStatus, Param, Post, Query } from '@nestjs/common';
+import { PersonnelGroundsDateService } from '../personnel-grounds-date.service';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   ApiErrorResponses,
@@ -53,7 +54,10 @@ const NOT_FOUND = {
 } as const;
 
 /** The refusals of the basis of a change, the same on every write that needs one. */
-const GROUNDS_EXAMPLES = [EXAMPLES.GROUNDS_REQUIRED, EXAMPLES.GROUNDS_INCOMPLETE, EXAMPLES.GROUNDS_IS_NOTICE] as const;
+const GROUNDS_EXAMPLES = [
+  EXAMPLES.GROUNDS_IS_NOTICE,
+  PERSONNEL_ACCESS_ERROR_EXAMPLES.GROUNDS_ISSUED_ON_FUTURE,
+] as const;
 /** The refusals of a change of a transfer that waits: it took effect or was cancelled, or the head or the placements were changed meanwhile. */
 const SETTLED_EXAMPLES = [EXAMPLES.ALREADY_EFFECTIVE, EXAMPLES.ALREADY_CANCELLED, EXAMPLES.CONCURRENT_CHANGE] as const;
 /** The refusals of the day of a change. */
@@ -64,7 +68,7 @@ const DAY_EXAMPLES = [
 ] as const;
 
 const GROUNDS_REFUSALS =
-  'the basis is empty or lacks a part (DEPARTMENT_TRANSFER.GROUNDS_REQUIRED, GROUNDS_INCOMPLETE) or is the code of a notice and not a document (GROUNDS_IS_NOTICE)';
+  'the basis is the code of a notice and not a document (DEPARTMENT_TRANSFER.GROUNDS_IS_NOTICE), it is issued after today (PERSONNEL.GROUNDS_ISSUED_ON_FUTURE); a basis that is missing or lacks a part is a VALIDATION_ERROR';
 
 /**
  * Transfers of a person to another department with the day they take effect and the basis they rest on. The Super Admin records,
@@ -80,6 +84,7 @@ export class TransfersController {
     private readonly changes: TransferChangeService,
     private readonly query: TransferQueryService,
     private readonly closures: TransferClosureService,
+    private readonly groundsDate: PersonnelGroundsDateService,
   ) {}
 
   @Post()
@@ -124,6 +129,7 @@ export class TransfersController {
     },
   )
   async record(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Body() body: RecordTransferBodyDto) {
+    await this.groundsDate.assertNotInFuture(body.grounds);
     try {
       const outcome = await this.transfers.record(userActor(actor), body);
 
@@ -219,14 +225,8 @@ export class TransfersController {
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
-      description: `The body is invalid (VALIDATION_ERROR), no reason is given (DEPARTMENT_TRANSFER.REASON_REQUIRED), ${GROUNDS_REFUSALS}, the day is the same, in the past or not after the current placement (NO_CHANGE, EFFECTIVE_DATE_IN_PAST, EFFECTIVE_DATE_NOT_AFTER_CURRENT_PERIOD), or the head of the department cannot be handed over on the new day (HEAD_SUCCESSOR_REQUIRED, SUCCESSOR_NOT_A_MEMBER_ON_DATE): nothing is saved.`,
-      examples: [
-        VALIDATION_EXAMPLE,
-        EXAMPLES.REASON_REQUIRED,
-        ...GROUNDS_EXAMPLES,
-        ...DAY_EXAMPLES,
-        EXAMPLES.SUCCESSOR_NOT_A_MEMBER_ON_DATE,
-      ],
+      description: `The body is invalid, such as one without a reason or a basis (VALIDATION_ERROR), ${GROUNDS_REFUSALS}, the day is the same, in the past or not after the current placement (NO_CHANGE, EFFECTIVE_DATE_IN_PAST, EFFECTIVE_DATE_NOT_AFTER_CURRENT_PERIOD), or the head of the department cannot be handed over on the new day (HEAD_SUCCESSOR_REQUIRED, SUCCESSOR_NOT_A_MEMBER_ON_DATE): nothing is saved.`,
+      examples: [VALIDATION_EXAMPLE, ...GROUNDS_EXAMPLES, ...DAY_EXAMPLES, EXAMPLES.SUCCESSOR_NOT_A_MEMBER_ON_DATE],
     },
   )
   async reschedule(
@@ -234,8 +234,9 @@ export class TransfersController {
     @Param() params: TransferIdParamDto,
     @Body() body: RescheduleTransferBodyDto,
   ) {
+    await this.groundsDate.assertNotInFuture(body.grounds);
     try {
-      const record = await this.changes.reschedule(userActor(actor), params.id, { ...body, reason: body.reason ?? '' });
+      const record = await this.changes.reschedule(userActor(actor), params.id, body);
 
       return await this.query.detailOf(record);
     } catch (error) {
@@ -262,8 +263,8 @@ export class TransfersController {
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
-      description: `The body is invalid (VALIDATION_ERROR), no reason is given (DEPARTMENT_TRANSFER.REASON_REQUIRED), or ${GROUNDS_REFUSALS}.`,
-      examples: [VALIDATION_EXAMPLE, EXAMPLES.REASON_REQUIRED, ...GROUNDS_EXAMPLES],
+      description: `The body is invalid, such as one without a reason or a basis (VALIDATION_ERROR), or ${GROUNDS_REFUSALS}.`,
+      examples: [VALIDATION_EXAMPLE, ...GROUNDS_EXAMPLES],
     },
   )
   async cancel(
@@ -271,8 +272,9 @@ export class TransfersController {
     @Param() params: TransferIdParamDto,
     @Body() body: CancelTransferBodyDto,
   ) {
+    await this.groundsDate.assertNotInFuture(body.grounds);
     try {
-      const record = await this.changes.cancel(userActor(actor), params.id, { ...body, reason: body.reason ?? '' });
+      const record = await this.changes.cancel(userActor(actor), params.id, body);
 
       return await this.query.detailOf(record);
     } catch (error) {

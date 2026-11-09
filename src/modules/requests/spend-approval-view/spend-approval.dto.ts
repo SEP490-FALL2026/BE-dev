@@ -9,48 +9,30 @@ import { BATCH_MAX } from '../spend/spend-submission.dto';
 const text = (max: number) => z.string().trim().min(1).max(max);
 const money = z.strictObject({ amount: z.string(), currency: z.string() });
 const employeeRef = z.strictObject({ employeeId: z.uuid(), employeeCode: z.string(), fullName: z.string() });
-const year = z.number().int().min(2000).max(2200);
 
 /**
- * How the spending approver decides (`US-06-01`): approve, or refuse with a reason (`AC-4`). Approving a request that has less
- * money than it costs, or none, is an override with its reason and the years it accepts (`AC-5`, `AC-16`, `AC-21`); there
- * is no field for a figure, a snapshot or a signature.
+ * How the spending approver decides (`US-06-01`): approve, or refuse with a reason (`AC-4`). A request that has less money than it
+ * costs, or none, cannot be approved (`QĐ-97c`); there is no field for a figure, a snapshot or a signature.
  */
 export const spendDecisionBodySchema = z
   .strictObject({
     decision: z.enum(['APPROVE', 'REJECT']),
     reason: text(1000).optional(),
-    override: z
-      .strictObject({
-        reason: text(1000),
-        years: z
-          .array(year)
-          .min(1)
-          .max(20)
-          .refine((years) => new Set(years).size === years.length, { message: 'A year is named once.' })
-          .meta({ uniqueItems: true }),
-      })
-      .optional(),
   })
   .superRefine((body, ctx) => {
     if (body.decision === 'REJECT' && body.reason === undefined) {
       ctx.addIssue({ code: 'custom', path: ['reason'], message: 'A refusal gives its reason.' });
     }
-    if (body.decision === 'REJECT' && body.override !== undefined) {
-      ctx.addIssue({ code: 'custom', path: ['override'], message: 'Only an approval accepts an exception.' });
-    }
     if (body.decision === 'APPROVE' && body.reason !== undefined) {
       ctx.addIssue({
         code: 'custom',
         path: ['reason'],
-        message: 'An approval gives no reason; an override has its own.',
+        message: 'An approval gives no reason.',
       });
     }
   })
   .meta({
-    description:
-      'A refusal (REJECT) gives its reason and no exception. An approval (APPROVE) gives no reason, and may accept an exception ' +
-      '(override) with its own reason and the years it names.',
+    description: 'A refusal (REJECT) gives its reason. An approval (APPROVE) gives no reason.',
   });
 
 /** Approving or refusing the requests of a batch the person holds, one by one, in the order chosen (`AC-19`, `AC-20`). */
@@ -97,7 +79,6 @@ const codeSchema = z.enum([
   'NO_ACTIVE_BUDGET',
   'CLOSED_OR_EXPIRED_BUDGET_PERIOD',
   'STALE_COST_EVIDENCE',
-  'PLAN_LINE_OVERDUE',
 ]);
 
 /** A request waiting for the approver: what it is, what it costs, and the first code of its check. */
@@ -124,7 +105,6 @@ const approvalSummarySchema = z.strictObject({
   samePersonAsSpend: z.boolean(),
   /** Finance is the one it is for, so nobody independent reviewed it. */
   noIndependentReview: z.boolean(),
-  offPlan: z.boolean(),
   /** The batch it was last sent in, when it was sent in one. */
   batchId: z.uuid().nullable(),
 });
@@ -132,12 +112,8 @@ const approvalSummarySchema = z.strictObject({
 const decisionSchema = z.strictObject({
   decision: z.enum(['APPROVED', 'REJECTED']),
   reason: z.string().nullable(),
-  /** The reason of the exception the approval accepted, when it accepted one; the years are marked on the years of the check. */
-  overrideReason: z.string().nullable(),
   decidedBy: employeeRef,
   decidedAt: z.iso.datetime(),
-  /** Historical: true only for a decision of before `QĐ-93`, taken by the substitute for a conflict of interest; never true now. */
-  bySubstitute: z.boolean(),
 });
 
 const assessmentSchema = z.strictObject({
@@ -173,10 +149,7 @@ const approvalDetailSchema = z.strictObject({
     costCenter: z.strictObject({ id: z.uuid(), code: z.string() }),
     businessReason: z.string(),
     termMonths: z.number().int().positive(),
-    expectedSpendOn: z.string().nullable(),
     budgetYear: z.number().int().nullable(),
-    offPlan: z.boolean(),
-    planLineAttached: z.boolean(),
   }),
   /** The need the head confirmed. */
   need: z

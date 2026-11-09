@@ -16,7 +16,6 @@ import {
   DecisionBodyDto,
   IdParamDto,
   PageQueryDto,
-  RevisionBodyDto,
   VersionBodyDto,
   VersionListQueryDto,
   VersionPageResponseDto,
@@ -33,7 +32,6 @@ import { VersionHistoryViewService } from './version-history-view.service';
 import { LineImportService } from './line-import.service';
 import { VersionLineService } from './version-line.service';
 import { VersionCreationService } from './version-creation.service';
-import { VersionRevisionService } from './version-revision.service';
 import { VersionService } from './version.service';
 import { VersionViewService } from '../budget/version-view.service';
 
@@ -83,9 +81,9 @@ const MONEY_EXAMPLES = [
 ] as const;
 
 /**
- * The versions of a budget as Finance builds them (`US-06-09`): a first version from the proposal that waits, a revision of
- * the current budget, lines adjusted with a comment and a reason, a forecast by quarter that never limits a payment, a file
- * of lines, and the sending to the spending approver. Only Finance does this: the head, the IT Admin, the Super Admin and
+ * The versions of a budget as Finance builds them (`US-06-09`): a first version from the proposal that waits, lines adjusted
+ * with a comment and a reason, a forecast by quarter that never limits a payment, a file of lines, and the sending to the
+ * spending approver. Only Finance does this: the head, the IT Admin, the Super Admin and
  * the spending approver cannot, and nobody here makes a version current.
  */
 @ApiTags('budget-versions')
@@ -94,7 +92,6 @@ export class BudgetVersionsController {
   constructor(
     private readonly versions: VersionService,
     private readonly creations: VersionCreationService,
-    private readonly revisions: VersionRevisionService,
     private readonly lineOps: VersionLineService,
     private readonly decisions: VersionDecisionService,
     private readonly views: VersionViewService,
@@ -109,7 +106,7 @@ export class BudgetVersionsController {
     status: HttpStatus.CREATED,
     message: 'BUDGET_VERSION.CREATED',
     description:
-      'A draft with the base, the reserve and the threshold of a high value, and the lines of the proposal copied to be reviewed; the proposal itself is not changed. A proposal whose latest version was refused is made again the same way: the new draft points at the refused one (rejectedPredecessorId).',
+      'A draft with the base and the reserve (the default share of the base unless Finance gives another with its reason), and the lines of the proposal copied to be reviewed; the proposal itself is not changed. A proposal whose latest version was refused is made again the same way: the new draft points at the refused one (rejectedPredecessorId).',
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,
@@ -141,49 +138,6 @@ export class BudgetVersionsController {
     }
   }
 
-  @Post('revisions')
-  @RequireRoles('FINANCE')
-  @ApiOperation({ operationId: 'budgetVersionRevise', summary: 'Build a revision of the current budget' })
-  @ApiSuccessResponse(VersionResponseDto, {
-    status: HttpStatus.CREATED,
-    message: 'BUDGET_VERSION.REVISION_CREATED',
-    description:
-      'A draft that changes the current budget; the current budget stays what it is until the spending approver approves the revision.',
-  })
-  @ApiErrorResponses(
-    ...AUTH_ERRORS,
-    FINANCE_ONLY,
-    {
-      status: HttpStatus.NOT_FOUND,
-      description: 'The Cost Center does not exist (BUDGET.COST_CENTER_NOT_FOUND).',
-      examples: [EXAMPLES.COST_CENTER_NOT_FOUND],
-    },
-    {
-      status: HttpStatus.CONFLICT,
-      description:
-        'The Cost Center is no longer in use (FINANCE.SETUP_INCOMPLETE), there is no current budget to revise (BUDGET.NO_CURRENT_BUDGET), nobody heads the department today (BUDGET.DEPARTMENT_HAS_NO_HEAD) or a version is in progress (BUDGET.VERSION_IN_FLIGHT).',
-      examples: [
-        EXAMPLES.FINANCE_SETUP_INCOMPLETE,
-        EXAMPLES.NO_CURRENT_BUDGET,
-        EXAMPLES.DEPARTMENT_HAS_NO_HEAD,
-        EXAMPLES.VERSION_IN_FLIGHT,
-      ],
-    },
-    {
-      status: HttpStatus.UNPROCESSABLE_ENTITY,
-      description:
-        'The body is invalid (VALIDATION_ERROR), the year has ended (BUDGET.YEAR_ENDED) or the quarters do not add up (BUDGET.QUARTERS_MISMATCH).',
-      examples: [VALIDATION_EXAMPLE, EXAMPLES.YEAR_ENDED, EXAMPLES.QUARTERS_MISMATCH, ...MONEY_EXAMPLES],
-    },
-  )
-  async revise(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Body() body: RevisionBodyDto) {
-    try {
-      return { version: await this.revisions.createRevision(actor, body) };
-    } catch (error) {
-      throw toBudgetApiException(error);
-    }
-  }
-
   @Get()
   @AuthenticatedOnly()
   @ApiOperation({ operationId: 'budgetVersionList', summary: 'List the versions of the budgets' })
@@ -206,7 +160,7 @@ export class BudgetVersionsController {
   @ApiSuccessResponse(BudgetVersionHistoryPageResponseDto, {
     message: 'BUDGET_VERSION.HISTORY_LISTED',
     description:
-      'The edits of the figures, of a line, of the lines added or imported and of the window of a line, newest first, each with the fields it changed before and after, and who and when. Finance reads it, and so does the person who decides the version.',
+      'The edits of the figures, of a line and of the lines added or imported, newest first, each with the fields it changed before and after, and who and when. Finance reads it, and so does the person who decides the version.',
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,
@@ -252,19 +206,13 @@ export class BudgetVersionsController {
   @ApiSuccessResponse(VersionResponseDto, {
     message: 'BUDGET_VERSION.UPDATED',
     description:
-      'The base, the reserve, the threshold, the forecast by quarter and the reason; the total is the base and the reserve. The quarters add up to the total or nothing is saved.',
+      'The base, the reserve with its reason, and the forecast by quarter; the total is the base and the reserve. A reserve that is still the default share of the base follows the base. The quarters add up to the total or nothing is saved.',
   })
   @ApiErrorResponses(...AUTH_ERRORS, FINANCE_ONLY, NOT_FOUND, NOT_EDITABLE, {
     status: HttpStatus.UNPROCESSABLE_ENTITY,
     description:
-      'The body is invalid (VALIDATION_ERROR), the reason of a revision is taken away (BUDGET.REVISION_REASON_REQUIRED), the year has ended (BUDGET.YEAR_ENDED) or the quarters do not add up (BUDGET.QUARTERS_MISMATCH).',
-    examples: [
-      VALIDATION_EXAMPLE,
-      EXAMPLES.REVISION_REASON_REQUIRED,
-      EXAMPLES.YEAR_ENDED,
-      EXAMPLES.QUARTERS_MISMATCH,
-      ...MONEY_EXAMPLES,
-    ],
+      'The body is invalid (VALIDATION_ERROR), the year has ended (BUDGET.YEAR_ENDED) or the quarters do not add up (BUDGET.QUARTERS_MISMATCH).',
+    examples: [VALIDATION_EXAMPLE, EXAMPLES.YEAR_ENDED, EXAMPLES.QUARTERS_MISMATCH, ...MONEY_EXAMPLES],
   })
   async update(
     @CurrentPrincipal() actor: AuthenticatedPrincipal,
@@ -284,7 +232,7 @@ export class BudgetVersionsController {
   @ApiSuccessResponse(VersionResponseDto, {
     message: 'BUDGET_VERSION.SENT',
     description:
-      'The version waits for the spending approver. A revision is sent with its reason; the current budget stays what it is until it is approved.',
+      'The version waits for the spending approver. A reserve that is not the default share of the base is sent with its reason.',
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,
@@ -299,8 +247,8 @@ export class BudgetVersionsController {
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
-        'A revision has no reason (BUDGET.REVISION_REASON_REQUIRED) or the year has ended (BUDGET.YEAR_ENDED).',
-      examples: [VALIDATION_EXAMPLE, EXAMPLES.REVISION_REASON_REQUIRED, EXAMPLES.YEAR_ENDED],
+        'A reserve that is not the default share of the base has no reason (BUDGET.RESERVE_REASON_REQUIRED) or the year has ended (BUDGET.YEAR_ENDED).',
+      examples: [VALIDATION_EXAMPLE, EXAMPLES.RESERVE_REASON_REQUIRED, EXAMPLES.YEAR_ENDED],
     },
   )
   async send(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Param() params: IdParamDto) {

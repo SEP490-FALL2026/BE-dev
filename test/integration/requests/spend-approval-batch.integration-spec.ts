@@ -31,7 +31,7 @@ describe('the decision of the requests of a batch over PostgreSQL (US-06-01 AC-1
     counter += 1;
     const design = await h.departmentWithHead(`P-B${counter}`);
 
-    return { design, versionId: (await h.budgetFor(design, { total: 1000 * M, percent: 50 })).id };
+    return { design, versionId: (await h.budgetFor(design, { total: 1000 * M })).id };
   };
   const sendAll = async (design: Unit, amounts: number[]) => {
     const ids: string[] = [];
@@ -54,7 +54,7 @@ describe('the decision of the requests of a batch over PostgreSQL (US-06-01 AC-1
   describe('approving together (AC-19)', () => {
     it('decides each request on its own, in order, and skips the one with no step, the one withdrawn and the one that waits for Finance', async () => {
       const { design } = await fresh();
-      const { ids, batchId } = await sendAll(design, [10 * M, 10 * M, 10 * M, 900 * M]);
+      const { ids, batchId } = await sendAll(design, [10 * M, 10 * M, 10 * M, 2000 * M]);
       const [first, second, withdrawn, big] = ids;
       // The effect of a withdrawal on the step of its request (the item that withdraws makes it): the step is closed.
       await h.ctx.sql.query(
@@ -95,26 +95,37 @@ describe('the decision of the requests of a batch over PostgreSQL (US-06-01 AC-1
       expect(after.body).toEqual(before.body);
     });
 
-    it('does not give an override in bulk: a request that needs one is skipped and left as it was', async () => {
+    it('checks again as it decides: a request that became an exception is skipped and sent to Finance, left undecided', async () => {
       const { design, versionId } = await fresh();
-      const { ids, batchId } = await sendAll(design, [10 * M, 600 * M]);
-      const [ok, over] = ids;
-      // 600 million is 60 % of what is left: a high value, which Finance reviews, and then it waits for the approver.
-      await h
-        .completeReview(over, { outcome: 'ASSESSED', opinion: 'Reviewed', direction: 'RECOMMEND_APPROVE' })
-        .expect(200);
-      // Money was committed since: the reviewed request costs more than is left, and the other is now an exception no one reviewed.
+      const { ids, batchId } = await sendAll(design, [10 * M, 20 * M]);
+      const [first, second] = ids;
+      // Money was committed since: neither request fits in what is left, and nobody approves an exception (QĐ-97c).
       await h.commit(design, versionId, h.year, 995 * M, 'HELD');
 
-      const results = await decideAll(batchId, { decision: 'APPROVE', requestIds: [over, ok] });
+      const results = await decideAll(batchId, { decision: 'APPROVE', requestIds: [first, second] });
 
       expect(results).toEqual([
-        { requestId: over, outcome: 'SKIPPED', reason: 'OVERRIDE_REQUIRED' },
-        { requestId: ok, outcome: 'SKIPPED', reason: 'RECHECKED_NEEDS_FINANCE_REVIEW' },
+        { requestId: first, outcome: 'SKIPPED', reason: 'RECHECKED_NEEDS_FINANCE_REVIEW' },
+        { requestId: second, outcome: 'SKIPPED', reason: 'RECHECKED_NEEDS_FINANCE_REVIEW' },
       ]);
       expect(await records(ids)).toEqual([]);
-      expect(await h.state(over)).toBe('AWAITING_SPEND_DECISION');
-      expect(await h.state(ok)).toBe('AWAITING_FINANCE_REVIEW');
+      expect(await h.state(first)).toBe('AWAITING_FINANCE_REVIEW');
+      expect(await h.state(second)).toBe('AWAITING_FINANCE_REVIEW');
+    });
+
+    it('skips a request that Finance reviewed and that still costs more than what is left: nobody approves past the budget (OVERRIDE_REQUIRED, QĐ-97c)', async () => {
+      const { design } = await fresh();
+      const { ids, batchId } = await sendAll(design, [1500 * M]);
+      const [short] = ids;
+      await h
+        .completeReview(short, { outcome: 'ASSESSED', opinion: 'Over by half', direction: 'RECOMMEND_OVERRIDE' })
+        .expect(200);
+
+      const results = await decideAll(batchId, { decision: 'APPROVE', requestIds: [short] });
+
+      expect(results).toEqual([{ requestId: short, outcome: 'SKIPPED', reason: 'OVERRIDE_REQUIRED' }]);
+      expect(await records(ids)).toEqual([]);
+      expect(await h.state(short)).toBe('AWAITING_SPEND_DECISION');
     });
 
     it('skips a request that is not in the batch, and answers 404 for a batch the caller holds nothing of', async () => {

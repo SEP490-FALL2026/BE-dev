@@ -115,12 +115,12 @@ const SHAPES: Readonly<Record<NoticeKind, EventShape>> = {
   // Retired (`QĐ-87e`): one that was sent before can still be read and rejected; recording it has no department to go to.
   JOB_TITLE_CHANGE: { required: ['effectiveOn'], allowed: ['effectiveOn'] },
   DEPARTURE: {
-    required: ['lastWorkingDay'],
-    allowed: ['lastWorkingDay', 'successor', 'pendingTransferCancellation'],
+    required: ['lastWorkingDay', 'accessBlockMode'],
+    allowed: ['lastWorkingDay', 'accessBlockMode', 'successor', 'cancelPendingTransfer'],
   },
   ABRUPT_DEPARTURE: {
-    required: ['lastWorkingDay'],
-    allowed: ['lastWorkingDay', 'successor', 'pendingTransferCancellation'],
+    required: ['lastWorkingDay', 'accessBlockMode'],
+    allowed: ['lastWorkingDay', 'accessBlockMode', 'successor', 'cancelPendingTransfer'],
   },
   LONG_LEAVE: { required: ['startedOn', 'approvedReturnOn'], allowed: ['startedOn', 'approvedReturnOn'] },
 };

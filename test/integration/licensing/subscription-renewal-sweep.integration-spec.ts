@@ -138,8 +138,12 @@ describe('the pass over the milestones of the renewals (integration, real Postgr
       });
       for (const subscriptionId of [done, decidedOnly]) {
         const id = await h.proposedRenewal({ subscriptionId, choice: 'RENEW' });
-        await h.decideRenewal(id, { choice: 'RENEW' }, h.boss.account).expect(200);
-        if (subscriptionId === done) await h.outcome(id, { outcome: 'VENDOR_REFUSED' }).expect(200);
+        await h.confirmRenewal(id, unit.head.account).expect(200);
+        if (subscriptionId === done) {
+          await h
+            .outcome(id, { outcome: 'VENDOR_REFUSED', note: 'The vendor refused, e-mail of the account manager' })
+            .expect(200);
+        }
       }
 
       await h.sweepOn(h.inDays(3));
@@ -160,7 +164,7 @@ describe('the pass over the milestones of the renewals (integration, real Postgr
         autoRenew: true,
       });
       const id = await h.proposedRenewal({ subscriptionId, choice: 'RENEW' });
-      await h.decideRenewal(id, { choice: 'RENEW' }, h.boss.account).expect(200);
+      await h.confirmRenewal(id, unit.head.account).expect(200);
 
       await h.sweepOn(h.inDays(4));
       expect((await h.caseRow(id)).late_flagged_at).toBeNull();
@@ -169,7 +173,9 @@ describe('the pass over the milestones of the renewals (integration, real Postgr
 
       expect((await h.caseRow(id)).late_flagged_at).not.toBeNull();
       const told = await h.notices('SUBSCRIPTION_RENEWAL_LATE', id);
-      expect(told.map((row) => row.recipient_employee_id).sort()).toEqual([h.it1.employeeId, h.boss.employeeId].sort());
+      expect(told.map((row) => row.recipient_employee_id).sort()).toEqual(
+        [h.it1.employeeId, unit.head.employeeId].sort(),
+      );
       expect(await deadlineEventOf(subscriptionId)).toEqual([]);
       const list = h.dataOf<{ items: { id: string; lateFlagged: boolean }[] }>(
         await h.renewals('?late=true').expect(200),
@@ -204,7 +210,7 @@ describe('the pass over the milestones of the renewals (integration, real Postgr
         autoRenew: true,
       });
       const decidedId = await h.proposedRenewal({ subscriptionId: decidedInTime, choice: 'CANCEL' });
-      await h.decideRenewal(decidedId, { choice: 'CANCEL' }, h.boss.account).expect(200);
+      await h.confirmRenewal(decidedId, unit.head.account).expect(200);
 
       await h.sweepOn(h.today());
       await h.sweepOn(h.today());
@@ -248,7 +254,7 @@ describe('the pass over the milestones of the renewals (integration, real Postgr
 
       // A decision taken after the incident is never voided and leaves the incident as it was.
       const lateId = await h.proposedRenewal({ subscriptionId: renewing, choice: 'RENEW' });
-      const lateDecision = await h.decideRenewal(lateId, { choice: 'RENEW' }, h.boss.account).expect(200);
+      const lateDecision = await h.confirmRenewal(lateId, unit.head.account).expect(200);
       expect(
         h.dataOf<{ renewal: { decision: { executionPoint: string } } }>(lateDecision).renewal.decision.executionPoint,
       ).toBe('NEXT_RENEWAL');

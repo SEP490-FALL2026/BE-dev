@@ -20,7 +20,7 @@ export interface DepartureDetailReads {
 }
 
 export function departureDetailFacts(
-  record: Pick<OffboardingRecord, 'abrupt' | 'state' | 'accountLockAt' | 'closedAt'>,
+  record: Pick<OffboardingRecord, 'accessBlockMode' | 'state' | 'accountLockAt' | 'closedAt'>,
   reads: DepartureDetailReads,
 ): { heldRights: number; accessRunsOn: number; checklist: Checklist | null; blockers: Record<string, number> } {
   const { seats } = reads;
@@ -33,7 +33,7 @@ export function departureDetailFacts(
     accessRunsOn,
     checklist: reads.live
       ? checklistOf({
-          abrupt: record.abrupt,
+          blockNow: record.accessBlockMode === 'BLOCK_NOW',
           lockRecorded,
           pendingDuties: reads.duties.filter((duty) => duty.status === 'OPEN' && !duty.flaggedUnconfirmed).length,
           heldRights: seats.length,

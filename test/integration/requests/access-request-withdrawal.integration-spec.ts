@@ -243,25 +243,14 @@ describe('the requester withdraws a request that is still waiting over PostgreSQ
       expect(await h.state(sent.id)).toBe('PENDING');
     });
 
-    it('lets the head withdraw a request sent for a colleague, and not the colleague it was sent for (AC-8)', async () => {
+    it('lets the head withdraw a request sent for colleagues, and not a colleague it was sent for (AC-8)', async () => {
       const u = await example();
       counter += 1;
       const colleague = await h.staff(u.department, `W-C${counter}`);
-      await h.ctx.sql.query(`UPDATE employees SET hire_date = current_date WHERE id = $1`, [colleague.employeeId]);
-      const batch = h.dataOf<{ requests: { id: string }[] }>(
-        await h
-          .sendDelegated(
-            {
-              beneficiaryEmployeeIds: [colleague.employeeId],
-              items: [{ planId: plan }],
-              businessReason: 'The new designer needs the tool',
-              termMonths: 1,
-            },
-            u.head.account,
-          )
-          .expect(201),
-      );
-      const id = batch.requests[0].id;
+      const other = await h.staff(u.department, `W-D${counter}`);
+      const id = await h.sentForPeople(plan, [colleague, other], u.head.account, {
+        businessReason: 'The new designers need the tool',
+      });
 
       const refused = await h.withdrawRequest(id, {}, colleague.account).expect(403);
       expect(h.codeOf(refused)).toBe('ACCESS_REQUEST.NOT_REQUESTER');

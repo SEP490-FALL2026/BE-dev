@@ -1,5 +1,4 @@
 import type { ReleaseRefusal } from './commitment-release.policy';
-import type { IncompleteLine } from './budget.policy';
 
 /** The proposal does not exist, or the caller has no part in it: the two answer alike so one cannot be probed. */
 export class BudgetProposalNotFoundError extends Error {
@@ -44,22 +43,6 @@ export class BudgetYearEndedError extends Error {
   constructor(readonly year: number) {
     super(`The year ${year} has ended.`);
     this.name = 'BudgetYearEndedError';
-  }
-}
-
-/** Lines lack what every line must say (`US-06-10` AC-2): the line and the fields. */
-export class BudgetProposalIncompleteError extends Error {
-  constructor(readonly lines: readonly IncompleteLine[]) {
-    super('Some lines are incomplete.');
-    this.name = 'BudgetProposalIncompleteError';
-  }
-}
-
-/** The purchase window of a line ends before it begins. */
-export class BudgetWindowBackwardsError extends Error {
-  constructor(readonly lines: readonly number[]) {
-    super('The purchase window of a line ends before it begins.');
-    this.name = 'BudgetWindowBackwardsError';
   }
 }
 
@@ -139,19 +122,11 @@ export class BudgetVersionInFlightError extends Error {
   }
 }
 
-/** A first version is built from a proposal only while there is no current budget; after that, by revision (`INV-21`). */
+/** A first version is built from a proposal only while there is no current budget (`INV-21`). */
 export class BudgetCurrentExistsError extends Error {
   constructor() {
-    super('The Cost Center already has a current budget for this year: change it by a revision.');
+    super('The Cost Center already has a current budget for this year.');
     this.name = 'BudgetCurrentExistsError';
-  }
-}
-
-/** A revision changes a current budget; there is none (`US-06-09` AC-7). */
-export class BudgetNoCurrentError extends Error {
-  constructor() {
-    super('The Cost Center has no current budget for this year to revise.');
-    this.name = 'BudgetNoCurrentError';
   }
 }
 
@@ -163,27 +138,11 @@ export class BudgetQuartersMismatchError extends Error {
   }
 }
 
-/** A reason is needed: to send a revision, or to change a line that adjusts the proposal (`US-06-09` AC-8, AC-14). */
+/** A reason is needed: to send a reserve that is not the default share of the base, or to change a line that adjusts the proposal (`US-06-09` AC-14, AC-30). */
 export class BudgetReasonRequiredError extends Error {
-  constructor(readonly what: 'REVISION' | 'ADJUSTMENT' | 'WINDOW') {
+  constructor(readonly what: 'ADJUSTMENT' | 'RESERVE') {
     super(`A reason is required for the ${what.toLowerCase()}.`);
     this.name = 'BudgetReasonRequiredError';
-  }
-}
-
-/** The amount of a line of the current budget is not changed in place: a revision goes the whole way again (`US-06-09` AC-17). */
-export class BudgetRevisionRequiredError extends Error {
-  constructor() {
-    super('An amount of the current budget is changed by a revision, not in place.');
-    this.name = 'BudgetRevisionRequiredError';
-  }
-}
-
-/** Only a line of the current budget has its window moved. */
-export class BudgetVersionNotCurrentError extends Error {
-  constructor() {
-    super('Only a line of the current budget has its window moved.');
-    this.name = 'BudgetVersionNotCurrentError';
   }
 }
 
@@ -235,21 +194,37 @@ export class BudgetVersionNumberTakenError extends Error {
   }
 }
 
-/** A revision is begun while nobody heads the department of the Cost Center (F64, `QĐ-92d(1)`): nothing was written. */
-export class BudgetDepartmentHasNoHeadError extends Error {
-  constructor(readonly departmentId: string) {
-    super('The department of the Cost Center has no head today, so a revision is not begun.');
-    this.name = 'BudgetDepartmentHasNoHeadError';
-  }
-}
-
 /** The file of lines cannot be read at all (`US-06-09` AC-3). */
 export class BudgetImportFileInvalidError extends Error {
   constructor(
-    readonly reason: 'NOT_CSV' | 'MISSING_COLUMNS' | 'EMPTY' | 'TOO_MANY_ROWS',
+    readonly reason: 'NOT_CSV' | 'MISSING_COLUMNS' | 'RETIRED_COLUMNS' | 'EMPTY' | 'TOO_MANY_ROWS',
     readonly detail?: string,
   ) {
     super(`The file cannot be read: ${reason}.`);
     this.name = 'BudgetImportFileInvalidError';
+  }
+}
+
+/** The invoice of this vendor with this number was already recorded (`US-12-02` AC-11). */
+export class InvoiceDuplicateError extends Error {
+  constructor() {
+    super('An invoice with this number from this vendor was already recorded.');
+    this.name = 'InvoiceDuplicateError';
+  }
+}
+
+/** The vendor of the commitment cannot be told from its request, and an invoice is not recorded without one. */
+export class InvoiceVendorUnknownError extends Error {
+  constructor() {
+    super('The vendor of the software behind the commitment cannot be told, so an invoice cannot be recorded for it.');
+    this.name = 'InvoiceVendorUnknownError';
+  }
+}
+
+/** The commitment was released: no spend that was approved is left to be invoiced against it. */
+export class InvoiceCommitmentReleasedError extends Error {
+  constructor() {
+    super('The commitment was released, so no invoice is recorded against it.');
+    this.name = 'InvoiceCommitmentReleasedError';
   }
 }

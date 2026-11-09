@@ -1,4 +1,3 @@
-import { calendarFor } from '../seed-calendar';
 import { as, listAll, tag } from '../demo-step-kit';
 import type { DemoRunContext, DemoStep, StepOutcome } from '../demo-run.types';
 import type { DemoRequestScenario } from '../fixture/demo-fixture.types';
@@ -16,14 +15,6 @@ export interface RequestWire {
 }
 
 const MAX_TURNS = 8;
-
-function isPaid(ctx: DemoRunContext, planKey: string): boolean {
-  const plan = ctx.fixture.applications
-    .flatMap((application) => application.plans)
-    .find((candidate) => candidate.key === planKey);
-
-  return plan !== undefined && plan.provisioningType !== 'K5';
-}
 
 function departmentOf(ctx: DemoRunContext, code: string) {
   const department = ctx.fixture.departments.find((candidate) => candidate.code === code);
@@ -74,15 +65,10 @@ async function submit(ctx: DemoRunContext, scenario: DemoRequestScenario): Promi
         planId: ctx.ids.plans.get(scenario.plan ?? ''),
         businessReason: text,
         termMonths: scenario.termMonths,
-        ...(isPaid(ctx, scenario.plan ?? '') ? { expectedSpendOn: spendDay(ctx) } : {}),
       });
   ctx.ids.requests.set(scenario.key, created.request.id);
 
   return created.request;
-}
-
-function spendDay(ctx: DemoRunContext): string {
-  return calendarFor(ctx).spendDay;
 }
 
 async function scenarioStep(ctx: DemoRunContext, scenario: DemoRequestScenario): Promise<StepOutcome> {
@@ -155,16 +141,15 @@ async function decideNeed(ctx: DemoRunContext, scenario: DemoRequestScenario, re
       `The need step of ${scenario.key} is held by somebody outside the dataset (${assignee ?? 'nobody'})`,
     );
   }
-  const spend = scenario.planLine ? { planLine: { position: scenario.planLine } } : { offPlan: true };
   const body = approve
-    ? { decision: 'APPROVE', ...(request.policy.hasSpendStep ? { spend } : {}) }
-    : { decision: 'REJECT', reason: `${tag(ctx, scenario.key)} Chưa cần trong quý này (dữ liệu demo).` };
+    ? { decision: 'APPROVE' }
+    : { decision: 'REJECT', reason: `${tag(ctx, scenario.key)} Chưa cần trong quý này.` };
   await post(ctx, assignee, `/access-requests/${request.id}/need-decision`, body);
 }
 
 async function withdraw(ctx: DemoRunContext, scenario: DemoRequestScenario, request: RequestWire): Promise<void> {
   await post(ctx, scenario.requester, `/access-requests/${request.id}/withdraw`, {
-    reason: `${tag(ctx, scenario.key)} Không còn cần (dữ liệu demo).`,
+    reason: `${tag(ctx, scenario.key)} Không còn cần.`,
   });
 }
 
@@ -190,7 +175,7 @@ async function completeGrant(
   if (!task) throw new Error(`The grant task of ${scenario.key} is neither queued nor in progress`);
   if (task.status === 'QUEUED') await ctx.api.call(email, 'POST', `/provisioning-tasks/${task.id}/claim`);
   await ctx.api.call(email, 'POST', `/provisioning-tasks/${task.id}/complete`, {
-    evidence: `${tag(ctx, scenario.key)} Đã thêm email công ty vào workspace (dữ liệu demo).`,
+    evidence: `${tag(ctx, scenario.key)} Đã thêm email công ty vào workspace.`,
   });
 }
 
@@ -202,7 +187,7 @@ export function requestSteps(scenarios: readonly DemoRequestScenario[]): DemoSte
     title: `Request ${scenario.key} → ${scenario.target}: ${scenario.summary}`,
     // A request that is checked against the budget of the year waits for that budget; the others do not.
     needs:
-      scenario.planLine || scenario.target === 'COMPLETED' || scenario.target === 'AWAITING_SPEND_DECISION'
+      scenario.target === 'COMPLETED' || scenario.target === 'AWAITING_SPEND_DECISION'
         ? [...BASE_NEEDS, 'budget.year']
         : BASE_NEEDS,
     run: (ctx) => scenarioStep(ctx, scenario),

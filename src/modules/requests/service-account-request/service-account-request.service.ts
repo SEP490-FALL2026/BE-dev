@@ -8,6 +8,7 @@ import {
   AccessRequestNotDraftError,
   AccessRequestNotFoundError,
   AccessRequestSuperAdminCannotRequestError,
+  AccessRequestTermBeyondLimitError,
 } from '../access-request/access-request.errors';
 import { hasSpendStep, mayRequest } from '../access-request/access-request.policy';
 import { AccessRequestRepo } from '../access-request/access-request.repo';
@@ -73,13 +74,15 @@ export class ServiceAccountRequestService {
         employeeId: actor.employeeId,
         planId: body.planId,
         termMonths: body.termMonths,
-        expectedSpendOn: body.expectedSpendOn,
         now,
         settings,
         lockDepartment: true,
         // The seat it ends in is charged to the Unit of the department, free or not (`QĐ-86a`).
         chargedToUnit: true,
       });
+      if (assessed.termBeyondLimit) {
+        throw new AccessRequestTermBeyondLimitError(assessed.termLimit.maxMonths, assessed.termLimit.endsBy);
+      }
       const refusal = submitRefusal({
         baselineClosed: baseline.closed,
         provisioningType: assessed.target.provisioningType,

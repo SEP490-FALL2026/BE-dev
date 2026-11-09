@@ -298,7 +298,8 @@ describe('the roles of a person who leaves and the duties of a workspace (integr
       const second = await h.recordedCase(a2);
       expect(flagsOf(second as FlaggedCase)).toEqual(['WORKSPACE_OWNER']);
 
-      await h.markLeft(wire.id, { accountLock: { note: 'Đã khóa tài khoản công ty' } }).expect(200);
+      await h.leaveOnLastDay(wire.id).expect(200);
+      await h.lockAccount(wire.id, { note: 'Đã khóa tài khoản công ty' }).expect(200);
       const events = await flaggedEvents(wire.id);
       expect(events.map((event) => [event.after.stage, event.after.priority, event.after.workspacesLoseOwner])).toEqual(
         [
@@ -383,7 +384,8 @@ describe('the roles of a person who leaves and the duties of a workspace (integr
       const bystander = await h.recordedCase(h.bystander);
       expect(flagsOf(bystander as FlaggedCase)).toEqual([]);
       for (const wire of [financeCase, bossCase]) {
-        await h.markLeft(wire.id, { accountLock: { note: 'Đã khóa tài khoản công ty' } }).expect(200);
+        await h.leaveOnLastDay(wire.id).expect(200);
+        await h.lockAccount(wire.id, { note: 'Đã khóa tài khoản công ty' }).expect(200);
         const closed = h.dataOf<FlaggedCase>(await h.closeCase(wire.id).expect(200));
         expect(closed.closed).toBe(true);
         expect((await flaggedEvents(wire.id)).map((event) => event.after.stage)).toEqual(['RECORDED']);
@@ -460,7 +462,7 @@ describe('the roles of a person who leaves and the duties of a workspace (integr
 
       // The Super Admin does not mark themself as left in the application either; the procedure ends the handover and records the
       // departure that is already over, as the last write about the person.
-      const refusedLeft = await h.markLeft(wire.id, {}, person.account).expect(403);
+      const refusedLeft = await h.leaveOnLastDay(wire.id, {}, person.account).expect(403);
       expect(h.codeOf(refusedLeft)).toBe('PERSONNEL.SELF_CHANGE_FORBIDDEN');
       await recordAsSuperAdmin(h.ctx.app, subjectCode, 'R-RD-002', {
         mode: 'departure-cancel',

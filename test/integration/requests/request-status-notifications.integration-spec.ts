@@ -452,36 +452,27 @@ describe('the status of a request told to the people it concerns, over PostgreSQ
       expect(await h.codesFor(u.head.employeeId, id)).not.toContain('REQUEST_WITHDRAWN');
     });
 
-    it('tells the person a head sent a request for how it ended, and nothing of how it went (AC-8 of the withdrawal)', async () => {
+    it('tells the people a head sent a request for how it ended, and nothing of how it went (AC-8 of the withdrawal)', async () => {
       const u = await example();
       counter += 1;
       const colleague = await h.staff(u.department, `N-D${counter}`);
-      await h.ctx.sql.query(`UPDATE employees SET hire_date = current_date WHERE id = $1`, [colleague.employeeId]);
-      const delegated = h.dataOf<{ requests: { id: string }[] }>(
-        await h
-          .sendDelegated(
-            {
-              beneficiaryEmployeeIds: [colleague.employeeId],
-              items: [{ planId: plan }],
-              businessReason: 'The new designer needs the tool',
-              termMonths: 1,
-            },
-            u.head.account,
-          )
-          .expect(201),
-      );
-      const id = delegated.requests[0].id;
+      const other = await h.staff(u.department, `N-E${counter}`);
+      const id = await h.sentForPeople(plan, [colleague, other], u.head.account, {
+        businessReason: 'The new designers need the tool',
+      });
       await h.project();
       expect(await h.codesFor(u.head.employeeId, id)).toEqual(['REQUEST_SUBMITTED']);
       expect((await h.noticesOf(u.head.employeeId, 'REQUEST_SUBMITTED'))[0].params).toMatchObject({
         stage: 'CONFIRMED',
       });
       expect(await h.codesFor(colleague.employeeId, id)).toEqual([]);
+      expect(await h.codesFor(other.employeeId, id)).toEqual([]);
 
       await h.withdrawRequest(id, {}, u.head.account).expect(200);
       await h.project();
 
       expect(await h.codesFor(colleague.employeeId, id)).toEqual(['REQUEST_WITHDRAWN']);
+      expect(await h.codesFor(other.employeeId, id)).toEqual(['REQUEST_WITHDRAWN']);
       expect(await h.codesFor(u.head.employeeId, id)).toEqual(['REQUEST_SUBMITTED']);
     });
   });

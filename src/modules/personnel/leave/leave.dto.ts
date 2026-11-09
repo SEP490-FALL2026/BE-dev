@@ -2,36 +2,27 @@ import { createZodDto } from '../../../infrastructure/http/dto/zod-dto';
 import { z } from 'zod';
 import { successEnvelopeSchema } from '../../../infrastructure/http/dto/success-envelope.dto';
 import { businessDay } from '../../../infrastructure/http/dto/business-date.dto';
+import { groundsBodySchema, optionalGroundsBodySchema } from '../personnel-grounds.dto';
 
 const flag = z.enum(['true', 'false']).transform((value) => value === 'true');
-
-/**
- * The basis a day rests on. Every part is optional here and judged after: a basis that is empty or lacks a part has its own answer,
- * and so has a reference that is the code of a notice, which is not the document that approves the leave.
- */
-const groundsBodySchema = z.strictObject({
-  type: z.string().max(100).nullish(),
-  reference: z.string().max(200).nullish(),
-  issuer: z.string().max(200).nullish(),
-  issuedOn: z.string().max(10).nullish(),
-});
 
 /** Strict: a field the route does not know, such as the reason for the leave, is refused and never kept. */
 const startBodySchema = z.strictObject({
   employeeId: z.uuid(),
   startedOn: businessDay,
   approvedReturnOn: businessDay,
-  grounds: groundsBodySchema.optional(),
+  grounds: groundsBodySchema,
 });
 
 const changeReturnDateBodySchema = z.strictObject({
   newApprovedReturnOn: businessDay,
-  grounds: groundsBodySchema.optional(),
+  grounds: groundsBodySchema,
 });
 
 const confirmReturnBodySchema = z.strictObject({
   returnedOn: businessDay,
-  grounds: groundsBodySchema.optional(),
+  // Needed only when the person returns on another day than the approved one (`leave.policy.ts`), so it is optional but typed.
+  grounds: optionalGroundsBodySchema,
 });
 
 const listQuerySchema = z.strictObject({

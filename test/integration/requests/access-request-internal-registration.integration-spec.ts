@@ -66,7 +66,6 @@ describe('requests over HTTP: registering internal software (integration, real P
         branch: 'INTERNAL_FREE',
         state: 'AWAITING_EXECUTION',
         pricing: { status: 'NOT_APPLICABLE', amount: null },
-        expectedSpendOn: null,
         policy: { hasSpendStep: false },
         plan: { applicationName: proposed.proposal?.softwareName },
       });

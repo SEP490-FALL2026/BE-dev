@@ -65,17 +65,35 @@ export class SpendDecisionService {
     });
   }
 
-  /** The request locked, with the spend step the person holds; the person who reviewed it for Finance does not decide it (`SoD-8`). */
+  /**
+   * The request locked, with the spend step the person holds; the person who reviewed it for Finance does not decide it (`SoD-8`).
+   * Who may decide, and in which state, is judged on a plain read first, so a person who may not decide never takes the row lock of
+   * the request (`R-D2`); the judgement is made again under the lock, since the step may have moved meanwhile.
+   */
   private async lockDecidable(
     tx: DbTx,
     actor: AuthenticatedPrincipal,
     requestId: string,
   ): Promise<{ request: AccessRequestRecord; step: SpendStepRecord }> {
+    await this.judge(tx, actor, await this.requests.findById(requestId, tx));
     const request = await this.requests.lockById(tx, requestId);
+    const step = await this.judge(tx, actor, request);
+    if (!request) throw new AccessRequestNotFoundError();
+    await this.effects.refuseReviewer(tx, request, actor.employeeId);
+
+    return { request, step };
+  }
+
+  /** Throws AccessRequestNotFoundError, AccessRequestGroupUsesLinesError and SpendDecisionRefusedError; returns the open spend step. */
+  private async judge(
+    tx: DbTx,
+    actor: AuthenticatedPrincipal,
+    request: AccessRequestRecord | null,
+  ): Promise<SpendStepRecord> {
     if (!request) throw new AccessRequestNotFoundError();
     // The people of a request for a group are decided one by one, in the route of its lines (`US-05-17`).
     if (request.type === 'GROUP_GRANT') throw new AccessRequestGroupUsesLinesError();
-    const step = await this.steps.findOpen(requestId, 'SPEND_APPROVAL', tx);
+    const step = await this.steps.findOpen(request.id, 'SPEND_APPROVAL', tx);
     if (!step) throw new SpendDecisionRefusedError('NO_SPEND_STEP');
     const refusal = checkSpendDecider({
       actorEmployeeId: actor.employeeId,
@@ -85,9 +103,8 @@ export class SpendDecisionService {
       stepState: step.state,
     });
     if (refusal) throw new SpendDecisionRefusedError(refusal);
-    await this.effects.refuseReviewer(tx, request, actor.employeeId);
 
-    return { request, step };
+    return step;
   }
 
   /** An approval is made on what the check says: it is recorded, goes back to the head or to Finance, or is refused for its override. */

@@ -28,15 +28,15 @@
 Module chỉ import module **tầng thấp hơn**, hoặc module cùng tầng có ghi trong bảng. Nguồn duy nhất:
 [scripts/arch/tiers.cjs](../../scripts/arch/tiers.cjs); hình: [module graph](../generated/module-graph.md).
 
-| Tầng | Module                                                 | Cùng tầng được phép              |
-| ---- | ------------------------------------------------------ | -------------------------------- |
-| T1   | `audit`, `notifications`                               | —                                |
-| T2   | `organization`, `identity-access`                      | `identity-access → organization` |
-| T3   | `finance`, `operating-parameters`                      | `operating-parameters → finance` |
-| T4   | `catalog`, `licensing`                                 | `licensing → catalog`            |
-| T5   | `budgets`, `requests`, `data-import`                   | `requests → budgets`             |
-| T6   | `personnel`, `onboarding`, `installation`, `ai-assist` | —                                |
-| T7   | `dashboards`                                           | —                                |
+| Tầng | Module                                                          | Cùng tầng được phép              |
+| ---- | --------------------------------------------------------------- | -------------------------------- |
+| T1   | `audit`, `notifications`                                        | —                                |
+| T2   | `organization`, `identity-access`                               | `identity-access → organization` |
+| T3   | `finance`, `operating-parameters`                               | `operating-parameters → finance` |
+| T4   | `catalog`, `licensing`                                          | `licensing → catalog`            |
+| T5   | `budgets`, `requests`, `data-import`, `devices`                 | `requests → budgets`             |
+| T6   | `personnel`, `onboarding`, `installation`, `ai-assist`, `usage` | —                                |
+| T7   | `dashboards`                                                    | —                                |
 
 Cần gọi ngược chiều (module dưới cần biết điều module trên giữ): module dưới **mở một extension point**, module trên
 đăng ký (mục dưới). Không thêm cạnh ngược, không thêm cạnh cùng tầng khi chưa sửa bảng và ADR.

@@ -140,9 +140,8 @@ describe('reading the reviews after a transfer (integration, real PostgreSQL)', 
     // The lines keep the order the seats came in, which is the one the database gave them.
     const order = (await h.itemRows(reviewId)).map((row) => row.assignment_id);
     expect([...order].sort()).toEqual([...seats].sort());
-    await h
-      .decide(reviewId, { assignmentId: order[1], decision: 'NEEDS_NEW_TOOL', newToolNote: 'Bản Pro' }, h2.account)
-      .expect(201);
+    // A line decided before the decision was retired is still read as it was written.
+    await h.legacyNewTool(reviewId, order[1], h2.employeeId, 'Bản Pro');
 
     const items = h.dataOf<{ items: ReviewItemWire[]; pagination: { totalItems: number; totalPages: number } }>(
       await h.reviewItems(reviewId, '?pageSize=2', h2.account).expect(200),
@@ -156,6 +155,7 @@ describe('reading the reviews after a transfer (integration, real PostgreSQL)', 
       newToolNote: 'Bản Pro',
       decidedBy: { id: h2.employeeId },
       provisioningType: 'K2',
+      reason: null,
       revocationTaskId: null,
     });
     expect(items.items[0]).toMatchObject({ decision: 'PENDING', decidedBy: null, decidedAt: null });

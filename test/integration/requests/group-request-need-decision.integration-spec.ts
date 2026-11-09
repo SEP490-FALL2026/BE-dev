@@ -31,7 +31,6 @@ describe('the need of the people of a request for a group, decided one by one ov
 
     return h.departmentWithHead(`P-N${counter}`);
   };
-  const outPlan = { spend: { offPlan: true } };
   const approve = (employeeId: string) => ({ employeeId, decision: 'APPROVE' });
   const refuse = (employeeId: string, reason = 'No longer needed') => ({ employeeId, decision: 'REJECT', reason });
   const lineList = async (id: string, account: Parameters<GroupHarness['linesOf']>[1]) =>
@@ -55,7 +54,7 @@ describe('the need of the people of a request for a group, decided one by one ov
       const decided = await h
         .decideLines(
           request.id,
-          { lines: [approve(e1.employeeId), approve(e2.employeeId), refuse(e3.employeeId)], ...outPlan },
+          { lines: [approve(e1.employeeId), approve(e2.employeeId), refuse(e3.employeeId)] },
           u.head.account,
         )
         .expect(200);
@@ -97,7 +96,6 @@ describe('the need of the people of a request for a group, decided one by one ov
           request.id,
           {
             lines: [approve(e1.employeeId), approve(e2.employeeId), { employeeId: e3.employeeId, decision: 'REJECT' }],
-            ...outPlan,
           },
           u.head.account,
         )
@@ -129,13 +127,11 @@ describe('the need of the people of a request for a group, decided one by one ov
       const { u, e1, e2, request } = await sentByEmployee();
       const stranger = await h.colleague(await unit());
 
-      const missing = await h
-        .decideLines(request.id, { lines: [approve(e1.employeeId)], ...outPlan }, u.head.account)
-        .expect(422);
+      const missing = await h.decideLines(request.id, { lines: [approve(e1.employeeId)] }, u.head.account).expect(422);
       const extra = await h
         .decideLines(
           request.id,
-          { lines: [approve(e1.employeeId), approve(e2.employeeId), approve(stranger.employeeId)], ...outPlan },
+          { lines: [approve(e1.employeeId), approve(e2.employeeId), approve(stranger.employeeId)] },
           u.head.account,
         )
         .expect(422);
@@ -154,43 +150,36 @@ describe('the need of the people of a request for a group, decided one by one ov
       const all = [approve(e1.employeeId), approve(e2.employeeId), approve(e3.employeeId)];
       const stranger = await h.colleague(await unit());
 
-      expect(h.codeOf(await h.decideLines(request.id, { lines: all, ...outPlan }, e1.account).expect(403))).toBe(
+      expect(h.codeOf(await h.decideLines(request.id, { lines: all }, e1.account).expect(403))).toBe(
         'ACCESS_REQUEST.OWN_REQUEST',
       );
-      expect(h.codeOf(await h.decideLines(request.id, { lines: all, ...outPlan }, e2.account).expect(403))).toBe(
+      expect(h.codeOf(await h.decideLines(request.id, { lines: all }, e2.account).expect(403))).toBe(
         'ACCESS_REQUEST.OWN_REQUEST',
       );
-      await h.decideLines(request.id, { lines: all, ...outPlan }, stranger.account).expect(404);
-      await h.decideLines(request.id, { lines: all, ...outPlan }, h.boss.account).expect(404);
-      await h.decideLines(request.id, { lines: all, ...outPlan }, u.head.account).expect(200);
-      expect(h.codeOf(await h.decideLines(request.id, { lines: all, ...outPlan }, u.head.account).expect(409))).toBe(
+      await h.decideLines(request.id, { lines: all }, stranger.account).expect(404);
+      await h.decideLines(request.id, { lines: all }, h.boss.account).expect(404);
+      await h.decideLines(request.id, { lines: all }, u.head.account).expect(200);
+      expect(h.codeOf(await h.decideLines(request.id, { lines: all }, u.head.account).expect(409))).toBe(
         'ACCESS_REQUEST.STEP_NOT_PENDING',
       );
     });
 
-    it('asks the head who approves a term over twelve months to confirm it, for the people approved', async () => {
+    it('takes no term over twelve months, and no confirmation in words that would approve one (QĐ-98)', async () => {
       const u = await unit();
       const [e1, e2] = await h.colleagues(u, 2);
+      const long = await h.submitGroup(h.groupBody(paid, [e1, e2], { termMonths: 13 }), e1.account).expect(422);
       const request = h.dataOf<{ request: RequestWire }>(
-        await h.submitGroup(h.groupBody(paid, [e1, e2], { termMonths: 18 }), e1.account).expect(201),
+        await h.submitGroup(h.groupBody(paid, [e1, e2], { termMonths: 12 }), e1.account).expect(201),
       ).request;
       const both = [approve(e1.employeeId), approve(e2.employeeId)];
 
-      const unconfirmed = await h.decideLines(request.id, { lines: both, ...outPlan }, u.head.account).expect(422);
-      expect(h.codeOf(unconfirmed)).toBe('ACCESS_REQUEST.TERM_CONFIRMATION_REQUIRED');
-      await h
-        .decideLines(
-          request.id,
-          { lines: both, termConfirmation: { reason: 'A long project' }, ...outPlan },
-          u.head.account,
-        )
-        .expect(200);
+      const confirmed = await h
+        .decideLines(request.id, { lines: both, termConfirmation: { reason: 'A long project' } }, u.head.account)
+        .expect(422);
 
-      const record = await h.ctx.sql.query<{ term_confirmation_reason: string | null }>(
-        `SELECT term_confirmation_reason FROM approval_records WHERE request_id = $1`,
-        [request.id],
-      );
-      expect(record.rows[0].term_confirmation_reason).toBe('A long project');
+      expect(h.codeOf(long)).toBe('VALIDATION_ERROR');
+      expect(h.codeOf(confirmed)).toBe('VALIDATION_ERROR');
+      expect(await h.lineStates(request.id)).toEqual(['AWAITING_NEED', 'AWAITING_NEED']);
     });
 
     it('does not approve a person who holds a seat of the plan since the request was sent, and the others are not touched (AC-15)', async () => {
@@ -206,11 +195,7 @@ describe('the need of the people of a request for a group, decided one by one ov
       ]);
 
       const attempt = await h
-        .decideLines(
-          request.id,
-          { lines: [approve(e1.employeeId), approve(e2.employeeId)], ...outPlan },
-          u.head.account,
-        )
+        .decideLines(request.id, { lines: [approve(e1.employeeId), approve(e2.employeeId)] }, u.head.account)
         .expect(409);
 
       expect(attempt.body as Refused).toMatchObject({
@@ -220,7 +205,7 @@ describe('the need of the people of a request for a group, decided one by one ov
       await h
         .decideLines(
           request.id,
-          { lines: [approve(e1.employeeId), refuse(e2.employeeId, 'Already has it')], ...outPlan },
+          { lines: [approve(e1.employeeId), refuse(e2.employeeId, 'Already has it')] },
           u.head.account,
         )
         .expect(200);
@@ -230,7 +215,7 @@ describe('the need of the people of a request for a group, decided one by one ov
     it('refuses the routes of one person on a request for a group', async () => {
       const { u, request } = await sentByEmployee();
 
-      const need = await h.decideNeed(request.id, { decision: 'APPROVE', ...outPlan }, u.head.account).expect(409);
+      const need = await h.decideNeed(request.id, { decision: 'APPROVE' }, u.head.account).expect(409);
       const spend = await h.decideSpend(request.id, { decision: 'APPROVE' }, h.boss.account).expect(409);
 
       expect(h.codeOf(need)).toBe('ACCESS_REQUEST.GROUP_USES_LINES');
@@ -248,11 +233,7 @@ describe('the need of the people of a request for a group, decided one by one ov
 
       expect(await h.state(request.id)).toBe('PENDING');
       expect(
-        h.codeOf(
-          await h
-            .decideLines(request.id, { lines: [approve(u.head.employeeId)], ...outPlan }, u.head.account)
-            .expect(403),
-        ),
+        h.codeOf(await h.decideLines(request.id, { lines: [approve(u.head.employeeId)] }, u.head.account).expect(403)),
       ).toBe('ACCESS_REQUEST.OWN_REQUEST');
 
       await h
@@ -281,11 +262,7 @@ describe('the need of the people of a request for a group, decided one by one ov
       ).request;
 
       await h
-        .decideLines(
-          request.id,
-          { lines: [approve(e1.employeeId), approve(e2.employeeId)], ...outPlan },
-          u.head.account,
-        )
+        .decideLines(request.id, { lines: [approve(e1.employeeId), approve(e2.employeeId)] }, u.head.account)
         .expect(200);
       expect(await h.state(request.id)).toBe('PENDING');
       await h.decideLines(request.id, { lines: [approve(u.head.employeeId)] }, h.boss.account).expect(200);
@@ -311,7 +288,7 @@ describe('the need of the people of a request for a group, decided one by one ov
       const [step] = await h.needSteps(request.id);
       expect(step).toMatchObject({ state: 'PENDING', assignee_employee_id: h.boss.employeeId });
       const own = await h
-        .decideLines(request.id, { lines: [approve(e1.employeeId), approve(e2.employeeId)], ...outPlan }, e2.account)
+        .decideLines(request.id, { lines: [approve(e1.employeeId), approve(e2.employeeId)] }, e2.account)
         .expect(403);
       expect(h.codeOf(own)).toBe('ACCESS_REQUEST.OWN_REQUEST');
     });

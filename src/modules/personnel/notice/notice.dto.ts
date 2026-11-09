@@ -3,21 +3,11 @@ import { z } from 'zod';
 import { successEnvelopeSchema } from '../../../infrastructure/http/dto/success-envelope.dto';
 import { NOTICE_KINDS, SENDABLE_NOTICE_KINDS, VERIFICATION_METHODS } from '../personnel-notice.types';
 import { businessDay } from '../../../infrastructure/http/dto/business-date.dto';
+import { groundsBodySchema } from '../personnel-grounds.dto';
 
 const flag = z.enum(['true', 'false']).transform((value) => value === 'true');
 const kindSchema = z.enum(NOTICE_KINDS);
 const statusSchema = z.enum(['PENDING_VERIFICATION', 'RECORDED', 'REJECTED', 'WITHDRAWN']);
-
-/**
- * The basis of the event. Every part is optional here and judged after: a basis that is empty or lacks a part has its own answer,
- * and so has a reference that is only the code of a notice, which is not an authoritative document.
- */
-const groundsBodySchema = z.strictObject({
-  type: z.string().max(100).nullish(),
-  reference: z.string().max(200).nullish(),
-  issuer: z.string().max(200).nullish(),
-  issuedOn: z.string().max(10).nullish(),
-});
 
 const verificationBodySchema = z.strictObject({
   method: z.enum(VERIFICATION_METHODS),
@@ -44,8 +34,9 @@ const eventBodySchema = z.strictObject({
   toDepartmentId: z.uuid().optional(),
   effectiveOn: businessDay.optional(),
   lastWorkingDay: businessDay.optional(),
+  accessBlockMode: z.enum(['WITH_LAST_DAY', 'BLOCK_NOW']).optional(),
   successor: successorSchema.optional(),
-  pendingTransferCancellation: z.strictObject({ reason: z.string().min(1).max(500) }).optional(),
+  cancelPendingTransfer: z.literal(true).optional(),
   startedOn: businessDay.optional(),
   approvedReturnOn: businessDay.optional(),
 });
@@ -53,7 +44,7 @@ const eventBodySchema = z.strictObject({
 const rejectBodySchema = z.strictObject({ reason: z.string().min(1).max(1000) });
 const recordBodySchema = z.strictObject({
   verification: verificationBodySchema,
-  grounds: groundsBodySchema.optional(),
+  grounds: groundsBodySchema,
   event: eventBodySchema,
 });
 const linkBodySchema = z.strictObject({ eventId: z.uuid(), verification: verificationBodySchema });

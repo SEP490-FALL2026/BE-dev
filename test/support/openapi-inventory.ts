@@ -7,6 +7,7 @@ import {
   IS_AUTHENTICATED_ONLY_METADATA,
   REQUIRED_ROLES_METADATA,
 } from '../../src/infrastructure/security/decorators/access.decorators';
+import { IS_DEVICE_AUTHENTICATED_METADATA } from '../../src/infrastructure/security/decorators/device-authenticated.decorator';
 import { IS_PUBLIC_METADATA } from '../../src/infrastructure/security/decorators/public.decorator';
 
 /**
@@ -27,6 +28,9 @@ export const HTTP_METHODS = ['get', 'post', 'put', 'patch', 'delete'] as const;
 
 /** The one bearer scheme the document registers (`DocumentBuilder.addBearerAuth()`). */
 export const BEARER_REQUIREMENT = [{ bearer: [] }];
+
+/** The scheme of the routes a collector calls with the credential it enrolled for. */
+export const DEVICE_REQUIREMENT = [{ deviceCredential: [] }];
 
 /** Internal requirement and decision codes belong in specs, not in the public API description. */
 export const INTERNAL_CODE = /\b(?:US|AC|FR|OQ|R|N|T)-\d|QĐ-|⟹/;
@@ -110,6 +114,7 @@ export function routeHandlersOf(app: INestApplication): RouteHandler[] {
           [IS_PUBLIC_METADATA, 'public'],
           [IS_AUTHENTICATED_ONLY_METADATA, 'authenticated'],
           [REQUIRED_ROLES_METADATA, 'roles'],
+          [IS_DEVICE_AUTHENTICATED_METADATA, 'device'],
         ];
         const own = kinds.filter(([key]) => reflector.get(key, handler) !== undefined).map(([, kind]) => kind);
         const onClass = kinds.filter(([key]) => reflector.get(key, controller) !== undefined).map(([, kind]) => kind);

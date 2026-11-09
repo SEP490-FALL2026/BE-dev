@@ -34,10 +34,6 @@ export interface BudgetSpec {
   year?: number;
   /** The lines of the plan; one line of the last month of the year when not given. */
   lines?: object[];
-  /** Whole percent of what is left above which a request is high value. */
-  percent?: number;
-  /** An amount above which a request is high value, whatever is left. */
-  amountThreshold?: number;
   /** What the attached commitments hold, and what has become an expense. */
   held?: number;
   spent?: number;
@@ -157,17 +153,15 @@ export class SpendHarness extends BudgetHarness {
    */
   async budgetFor(unit: Unit, spec: BudgetSpec): Promise<VersionWire> {
     const year = spec.year ?? this.year;
-    const window = { windowFrom: `${year}-12-01`, windowTo: `${year}-12-31`, quoteValidUntil: undefined };
     const version = await approvedBudget<VersionWire>(this.ctx, {
       headToken: unit.head.account.accessToken,
       financeToken: this.finance.accessToken,
       deciderToken: this.deciderOf().accessToken,
-      proposal: this.proposalBody(unit.department.unitId, spec.lines ?? [this.line(window)], year),
+      proposal: this.proposalBody(unit.department.unitId, spec.lines ?? [this.line()], year),
       version: {
         base: this.money(spec.total),
         reserve: this.money(0),
-        highValuePercent: spec.percent ?? 50,
-        ...(spec.amountThreshold ? { highValueAmount: this.money(spec.amountThreshold) } : {}),
+        reserveReason: 'The budget of the test keeps no reserve',
       },
     });
     if (spec.held) await this.commit(unit, version.id, year, spec.held, 'HELD');
@@ -176,12 +170,16 @@ export class SpendHarness extends BudgetHarness {
     return { ...version, state: 'APPROVED' };
   }
 
-  /** A commitment of a request that is not in the table of requests, attached to the version. */
+  /**
+   * A commitment of a request that is not in the table of requests, attached to the version. An `EXPENSED` one is what an invoice
+   * made of it: all of it applied, and the invoice that cost it, so that what is spent is read from the invoice as in the
+   * application.
+   */
   async commit(unit: Unit, versionId: string, year: number, amount: number, state: 'HELD' | 'EXPENSED'): Promise<void> {
-    await this.ctx.sql.query(
+    const { rows } = await this.ctx.sql.query<{ id: string }>(
       `INSERT INTO budget_commitments
-         (id, organization_id, request_id, cost_center_id, year, amount_minor, currency, state, attached_version_id, attached_at)
-       VALUES (gen_random_uuid(), $1, $8, $2, $3, $4, $5, $6::"CommitmentState", $7, now())`,
+         (id, organization_id, request_id, cost_center_id, year, amount_minor, currency, state, attached_version_id, attached_at, applied_minor)
+       VALUES (gen_random_uuid(), $1, $8, $2, $3, $4, $5, $6::"CommitmentState", $7, now(), $9) RETURNING id`,
       [
         this.seed.organizationId,
         unit.department.unitId,
@@ -191,7 +189,32 @@ export class SpendHarness extends BudgetHarness {
         state,
         versionId,
         await this.fixtureRequestId(),
+        state === 'EXPENSED' ? amount : 0,
       ],
+    );
+    if (state === 'EXPENSED') await this.invoiceOf(rows[0].id, amount);
+  }
+
+  /** An invoice for the whole of a commitment, as the application would have written it. */
+  async invoiceOf(commitmentId: string, amount: number, number = `HARNESS-${commitmentId}`): Promise<void> {
+    const vendors = await this.ctx.sql.query<{ id: string }>(
+      `SELECT id FROM vendors WHERE organization_id = $1 ORDER BY id LIMIT 1`,
+      [this.seed.organizationId],
+    );
+    const vendorId =
+      vendors.rows[0]?.id ??
+      (
+        await this.ctx.sql.query<{ id: string }>(
+          `INSERT INTO vendors (id, organization_id, name, normalized_name)
+           VALUES (gen_random_uuid(), $1, 'Harness vendor', 'harness vendor') RETURNING id`,
+          [this.seed.organizationId],
+        )
+      ).rows[0].id;
+    await this.ctx.sql.query(
+      `INSERT INTO invoices (id, organization_id, commitment_id, vendor_id, number, issued_on, currency, net_minor,
+          deductible_tax_minor, non_deductible_tax_minor, actual_cost_minor, applied_minor, match_result, recorded_by_employee_id, recorded_at)
+       VALUES (gen_random_uuid(), $1, $2, $3, $4, current_date, $5, $6, 0, 0, $6, $6, 'MATCHED', $7, now())`,
+      [this.seed.organizationId, commitmentId, vendorId, number, this.reporting, amount, this.finance.employeeId],
     );
   }
 
@@ -243,17 +266,12 @@ export class SpendHarness extends BudgetHarness {
     request(this.server()).get('/api/v1/spend-queue').query(query).set(this.as(account));
   sendOn = (requestIds: string[], account: ApiAccount) =>
     request(this.server()).post('/api/v1/spend-batches').set(this.as(account)).send({ requestIds });
+  batchList = (account: ApiAccount, query: Record<string, string | number> = {}) =>
+    request(this.server()).get('/api/v1/spend-batches').query(query).set(this.as(account));
   batchOf = (id: string, account: ApiAccount) =>
     request(this.server()).get(`/api/v1/spend-batches/${id}`).set(this.as(account));
   batchItems = (id: string, account: ApiAccount, query: Record<string, string | number> = {}) =>
     request(this.server()).get(`/api/v1/spend-batches/${id}/items`).query(query).set(this.as(account));
-  setPlanLine = (id: string, body: object, account: ApiAccount) =>
-    request(this.server()).put(`/api/v1/access-requests/${id}/plan-line`).set(this.as(account)).send(body);
-  suggestions = (id: string, account: ApiAccount, query: Record<string, string | number> = {}) =>
-    request(this.server())
-      .get(`/api/v1/access-requests/${id}/plan-line-suggestions`)
-      .query(query)
-      .set(this.as(account));
   addSupplement = (id: string, body: object, account: ApiAccount) =>
     request(this.server()).post(`/api/v1/access-requests/${id}/supplements`).set(this.as(account)).send(body);
   supplements = (id: string, account: ApiAccount, query: Record<string, string | number> = {}) =>
@@ -267,8 +285,44 @@ export class SpendHarness extends BudgetHarness {
     request(this.server()).post(`/api/v1/access-requests/${id}/spend-approval`).set(this.as(account)).send(body);
   withdrawRequest = (id: string, body: object, account: ApiAccount) =>
     request(this.server()).post(`/api/v1/access-requests/${id}/withdraw`).set(this.as(account)).send(body);
-  sendDelegated = (body: object, account: ApiAccount) =>
-    request(this.server()).post('/api/v1/delegated-requests').set(this.as(account)).send(body);
+  /**
+   * The request for a group of people, two at least, as the account sends it: the one way left to send a request for others, since
+   * the route that sent one request for each person is gone (`QĐ-96`). The people start today, as the group of a request needs.
+   */
+  async submitForPeople(
+    planId: string,
+    people: readonly Person[],
+    account: ApiAccount,
+    extra: Record<string, unknown> = {},
+  ): Promise<request.Response> {
+    await this.ctx.sql.query(`UPDATE employees SET hire_date = current_date WHERE id = ANY($1::uuid[])`, [
+      people.map((person) => person.employeeId),
+    ]);
+
+    return request(this.server())
+      .post('/api/v1/group-requests')
+      .set(this.as(account))
+      .send({
+        planId,
+        lines: people.map((person) => ({ employeeId: person.employeeId })),
+        businessReason: 'The new designers need the tool',
+        termMonths: 1,
+        ...extra,
+      });
+  }
+
+  /** The id of the request for a group that `submitForPeople` made, failing on anything but 201. */
+  async sentForPeople(
+    planId: string,
+    people: readonly Person[],
+    account: ApiAccount,
+    extra: Record<string, unknown> = {},
+  ): Promise<string> {
+    const response = await this.submitForPeople(planId, people, account, extra);
+    if (response.status !== 201) throw new Error(`group submit: ${response.status} ${JSON.stringify(response.body)}`);
+
+    return this.dataOf<{ request: { id: string } }>(response).request.id;
+  }
   grantQueue = (account: ApiAccount, query: Record<string, string | number> = {}) =>
     request(this.server()).get('/api/v1/grant-queue').query(query).set(this.as(account));
   departmentEmployees = (departmentId: string, account: ApiAccount) =>

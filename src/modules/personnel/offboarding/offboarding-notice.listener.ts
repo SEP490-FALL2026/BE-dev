@@ -45,10 +45,10 @@ export class OffboardingNoticeRecorder implements OnModuleInit, NoticeEventRecor
         this.offboarding.recordInTx(tx, request.actor, {
           employeeId: notice.employeeId,
           lastWorkingDay: event.lastWorkingDay,
-          abrupt: notice.kind === 'ABRUPT_DEPARTURE',
+          accessBlockMode: this.modeOf(event),
           grounds: request.grounds,
           successor: event.successor,
-          pendingTransferCancellation: event.pendingTransferCancellation,
+          cancelPendingTransfer: event.cancelPendingTransfer,
           noticeId: notice.id,
         }),
       );
@@ -59,6 +59,14 @@ export class OffboardingNoticeRecorder implements OnModuleInit, NoticeEventRecor
         throw new NoticeRefusedError('DUPLICATE_EVENT');
       throw toOffboardingApiException(error);
     }
+  }
+
+  /** The shape of the event of a departure requires the mode, so a missing one is a defect and never a default. */
+  private modeOf(event: NoticeEventRequest['event']): NonNullable<NoticeEventRequest['event']['accessBlockMode']> {
+    if (event.accessBlockMode === undefined)
+      throw new Error('The event of a departure notice carries no accessBlockMode.');
+
+    return event.accessBlockMode;
   }
 
   /** The departure of the person that is in force (handing over or left, not cancelled): the one a notice is tied to. */

@@ -13,6 +13,7 @@ import { createOpenApiDocument } from '../../../src/app/configure-application';
 import { OPENAPI_DOCUMENT_BUDGET_MS } from '../../support/openapi-document-budget';
 import {
   BEARER_REQUIREMENT,
+  DEVICE_REQUIREMENT,
   BUSINESS_PATTERNS,
   GENERATED_DATE_TIME_PATTERN,
   GENERATED_DATE_TIME_WITH_OFFSET_PATTERN,
@@ -51,9 +52,15 @@ describe('API inventory (e2e): openapi presentation and wire messages', () => {
       return access;
     }
 
-    it('registers exactly one bearer scheme and no document-wide requirement', () => {
+    it('registers the bearer scheme of people and the one of devices, and no document-wide requirement', () => {
       expect(document.components?.securitySchemes).toEqual({
         bearer: { scheme: 'bearer', bearerFormat: 'JWT', type: 'http' },
+        deviceCredential: {
+          scheme: 'bearer',
+          bearerFormat: 'opaque',
+          type: 'http',
+          description: 'The credential a collector received when it enrolled.',
+        },
       });
       expect((document as { security?: unknown }).security).toBeUndefined();
     });
@@ -63,7 +70,8 @@ describe('API inventory (e2e): openapi presentation and wire messages', () => {
       const mismatches = operations.flatMap((operation) => {
         const declared = access.get(operation.operationId ?? '');
         if (declared === undefined) return [`${operation.key}: no handler`];
-        const expected = declared === 'public' ? undefined : BEARER_REQUIREMENT;
+        const expected =
+          declared === 'public' ? undefined : declared === 'device' ? DEVICE_REQUIREMENT : BEARER_REQUIREMENT;
         return JSON.stringify(operation.security) === JSON.stringify(expected)
           ? []
           : [`${operation.key} (${declared}): security ${JSON.stringify(operation.security)}`];
@@ -152,8 +160,13 @@ describe('API inventory (e2e): openapi presentation and wire messages', () => {
       const protectedOperations = operations.filter(
         (operation) => access.get(operation.operationId ?? '') !== 'public',
       );
+      // A device route is answered by the device guard, whose 401 says so in words of its own.
       const descriptionsOf = (status: string) =>
-        new Set(protectedOperations.map((operation) => operation.responses[status]?.description));
+        new Set(
+          protectedOperations
+            .filter((operation) => status !== '401' || access.get(operation.operationId ?? '') !== 'device')
+            .map((operation) => operation.responses[status]?.description),
+        );
       const leaks: string[] = [];
       visit(document, '#', (node, at) => {
         if (typeof node.description === 'string' && INTERNAL_CODE.test(node.description)) leaks.push(at);
@@ -173,6 +186,7 @@ describe('API inventory (e2e): openapi presentation and wire messages', () => {
     const WITHOUT_VALIDATION = [
       'aiAccessRequestSummarySource',
       'currencyList',
+      'deviceSessionGet',
       'employeeDashboardGet',
       'healthGetLiveness',
       'healthGetReadiness',
@@ -180,6 +194,7 @@ describe('API inventory (e2e): openapi presentation and wire messages', () => {
       'managerDashboardGet',
       'meDepartureNoticeGet',
       'meGet',
+      'monitoringNoticeCurrentGet',
       'notificationMarkAllRead',
       'notificationUnreadCount',
       'onboardingChecklistGet',
@@ -251,7 +266,7 @@ describe('API inventory (e2e): openapi presentation and wire messages', () => {
         })
         .map((operation) => operation.key);
 
-      expect(operations).toHaveLength(316);
+      expect(operations).toHaveLength(341);
       expect(missing).toEqual([]);
     });
 

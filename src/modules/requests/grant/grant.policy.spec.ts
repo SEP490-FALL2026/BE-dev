@@ -13,9 +13,11 @@ const detail = (boundaryState: ServiceAccountRecord['boundaryState']): ServiceAc
 });
 const request = (state: AccessRequestState, serviceAccount: ServiceAccountRecord | null = null) => ({
   state,
+  branch: 'PAID_IN_CATALOG' as const,
   beneficiaryEmployeeIds: ['e5'],
   planId: 'plan-1' as string | null,
   expectedEndDate: null,
+  termMonths: 6,
   departmentId: 'd-eng',
   costCenterId: 'cc-eng',
   serviceAccount,
@@ -30,6 +32,16 @@ describe('grantAnswerFor a request of a person (US-07-01 AC-3, AC-16)', () => {
       planId: 'plan-1',
       departmentId: 'd-eng',
       expectedEndDate: null,
+      termMonths: 6,
+      termBound: true,
+    });
+  });
+
+  it('ends no seat by term for free internal software, which costs nothing and has no term to bind (R-H1, Q-03 a1)', () => {
+    expect(grantAnswerFor({ ...request('AWAITING_EXECUTION'), branch: 'INTERNAL_FREE' })).toMatchObject({
+      status: 'GRANTABLE',
+      seat: 'PERSONAL',
+      termBound: false,
     });
   });
 
@@ -64,6 +76,8 @@ describe('grantAnswerFor a request of a service account (US-05-21 AC-3)', () => 
       employeeId: 'e5',
       planId: 'plan-1',
       expectedEndDate: null,
+      termMonths: 6,
+      termBound: false,
       serviceAccount: {
         purpose: 'Build bot of the pipeline',
         expectedIdentifier: 'ci-bot-2',
@@ -81,6 +95,8 @@ describe('grantAnswerFor a request of a service account (US-05-21 AC-3)', () => 
       planId: 'plan-1',
       departmentId: 'd-eng',
       expectedEndDate: null,
+      termMonths: 6,
+      termBound: true,
     });
   });
 
@@ -135,6 +151,8 @@ describe('grantAnswerFor a request for a group (US-05-17 AC-6)', () => {
       planId: 'plan-1',
       departmentId: 'd-eng',
       expectedEndDate: null,
+      termMonths: 6,
+      termBound: true,
     });
     expect(grantAnswerFor(group('EXECUTING'), 'e2')).toMatchObject({ employeeId: 'e2', expectedEndDate: '2026-12-31' });
   });

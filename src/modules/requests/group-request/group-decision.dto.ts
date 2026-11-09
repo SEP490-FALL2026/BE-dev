@@ -1,14 +1,7 @@
 import { createZodDto } from '../../../infrastructure/http/dto/zod-dto';
 import { z } from 'zod';
-import {
-  PLAN_LINE_CHOICE_DESCRIPTION,
-  REASON_MAX_LENGTH,
-  oneChoice,
-  planLineChoiceFields,
-  withdrawBodySchema,
-} from '../access-request/access-request.dto';
+import { REASON_MAX_LENGTH, withdrawBodySchema } from '../access-request/access-request.dto';
 import { GROUP_HEAD_MAX } from './group-request.policy';
-import { businessDate } from '../../../infrastructure/http/dto/business-date.dto';
 
 const reason = z.string().trim().min(1).max(REASON_MAX_LENGTH);
 
@@ -31,71 +24,38 @@ const verdictSchema = z
 
 /**
  * The decision of the need on the people of a step (`US-05-17` AC-4): every person of the step, each approved or refused with the
- * reason, in one go, with what a head gives when they approve a request that costs money. A term over twelve months is confirmed in
- * so many words, once, for the people approved.
+ * reason, in one go, with what a head gives when they approve a request that costs money.
  */
 export const lineNeedDecisionBodySchema = z
   .strictObject({
     lines: z.array(verdictSchema).min(1).max(GROUP_HEAD_MAX),
-    termConfirmation: z.strictObject({ reason }).optional(),
-    spend: z
-      .strictObject({
-        ...planLineChoiceFields,
-        expectedSpendOn: businessDate.optional(),
-      })
-      .superRefine(oneChoice)
-      .meta({ description: PLAN_LINE_CHOICE_DESCRIPTION })
-      .optional(),
   })
   .superRefine((body, ctx) => {
-    const approves = body.lines.some((line) => line.decision === 'APPROVE');
-    if (!approves && body.termConfirmation !== undefined) {
-      ctx.addIssue({ code: 'custom', path: ['termConfirmation'], message: 'Only an approval confirms a term.' });
-    }
-    if (!approves && body.spend !== undefined) {
-      ctx.addIssue({ code: 'custom', path: ['spend'], message: 'Only an approval chooses a line of the plan.' });
-    }
     if (new Set(body.lines.map((line) => line.employeeId)).size !== body.lines.length) {
       ctx.addIssue({ code: 'custom', path: ['lines'], message: 'A person is decided once.' });
     }
   })
   .meta({
     description:
-      'Each person of the step is decided once. A term confirmation and a choice of line of the plan (spend) are accepted only ' +
+      'Each person of the step is decided once. A choice of line of the plan (spend) is accepted only ' +
       'when at least one person is approved.',
   });
 
 /**
  * The decision of the spending approver on the people of the step (`US-05-17` AC-9, `US-06-01` AC-15): every person whose need is
- * confirmed, each approved or refused with the reason, in one go, and the exception an approval accepts, with its reason and the years
- * it names, exactly as for a request of one person.
+ * confirmed, each approved or refused with the reason, in one go.
  */
 export const lineSpendDecisionBodySchema = z
   .strictObject({
     lines: z.array(verdictSchema).min(1).max(GROUP_HEAD_MAX),
-    override: z
-      .strictObject({
-        reason,
-        years: z
-          .array(z.number().int().min(2000).max(2200))
-          .min(1)
-          .max(20)
-          .refine((years) => new Set(years).size === years.length, { message: 'A year is named once.' })
-          .meta({ uniqueItems: true }),
-      })
-      .optional(),
   })
   .superRefine((body, ctx) => {
-    if (body.override !== undefined && !body.lines.some((line) => line.decision === 'APPROVE')) {
-      ctx.addIssue({ code: 'custom', path: ['override'], message: 'Only an approval accepts an exception.' });
-    }
     if (new Set(body.lines.map((line) => line.employeeId)).size !== body.lines.length) {
       ctx.addIssue({ code: 'custom', path: ['lines'], message: 'A person is decided once.' });
     }
   })
   .meta({
-    description:
-      'Each person is decided once. An exception (override) is accepted only when at least one person is approved.',
+    description: 'Each person is decided once.',
   });
 
 /**

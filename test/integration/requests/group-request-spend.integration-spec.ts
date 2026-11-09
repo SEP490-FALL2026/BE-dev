@@ -37,13 +37,12 @@ describe('the spend of the people of a request for a group, decided one by one o
   const waiting = async (count = 5, extra: { total?: number; members?: (u: Unit) => Promise<Colleague[]> } = {}) => {
     const u = await unit();
     const total = extra.total ?? 100_000 * M;
-    await h.budgetFor(u, { total, percent: 100 });
-    await h.budgetFor(u, { total, percent: 100, year: h.next });
+    await h.budgetFor(u, { total });
+    await h.budgetFor(u, { total, year: h.next });
     const people = extra.members ? await extra.members(u) : await h.colleagues(u, count);
     const sent = h.dataOf<{ request: { id: string } }>(
       await h.submitGroup(h.groupBody(paid, people), u.head.account).expect(201),
     ).request;
-    await h.setPlanLine(sent.id, { offPlan: true }, u.head.account).expect(200);
     await h.sendOn([sent.id], u.head.account).expect(201);
 
     return { u, people, id: sent.id };
@@ -140,10 +139,10 @@ describe('the spend of the people of a request for a group, decided one by one o
       expect(await h.lineStates(id)).toEqual(['NEED_CONFIRMED', 'NEED_CONFIRMED', 'NEED_CONFIRMED']);
     });
 
-    it('wants an override on the years that lack the money, and takes it only for those years', async () => {
+    it('refuses the years that lack the money, and takes no override to get past them (QĐ-97c)', async () => {
       const { people, id } = await waiting(2, { total: 1 * M });
       const all = people.map((p) => approve(p.employeeId));
-      // Less money than it costs sends it to Finance first, and the approver then decides it with the exception in view.
+      // Less money than it costs sends it to Finance first; the approver still cannot approve past the years that lack it.
       await h
         .completeReview(id, { outcome: 'ASSESSED', opinion: 'No room: accepted', direction: 'RECOMMEND_OVERRIDE' })
         .expect(200);
@@ -154,11 +153,13 @@ describe('the spend of the people of a request for a group, decided one by one o
       expect(years.length).toBeGreaterThanOrEqual(1);
       expect(await h.commitments(id)).toEqual([]);
 
-      await h
+      // The exception is gone: a body that carries one is not a body.
+      const withOverride = await h
         .decideSpendLines(id, { lines: all, override: { reason: 'The project cannot wait', years } }, h.boss.account)
-        .expect(200);
-      expect(await h.state(id)).toBe('AWAITING_EXECUTION');
-      expect((await h.commitments(id)).length).toBeGreaterThanOrEqual(1);
+        .expect(422);
+      expect(h.codeOf(withOverride)).toBe('VALIDATION_ERROR');
+      expect(await h.state(id)).toBe('AWAITING_SPEND_DECISION');
+      expect(await h.commitments(id)).toEqual([]);
     });
 
     it('is not for anybody but the person the step is given to, nor for one of the people', async () => {
@@ -210,7 +211,6 @@ describe('the spend of the people of a request for a group, decided one by one o
           await h.spendQueue(u.head.account).expect(200),
         )
         .items.find((item) => item.requestId === id);
-      await h.setPlanLine(id, { offPlan: true }, u.head.account).expect(200);
       await h.sendOn([id], u.head.account).expect(201);
       const waitingRow = h
         .dataOf<{ items: Array<{ requestId: string; beneficiary: unknown; lineCount: number }> }>(
@@ -234,29 +234,30 @@ describe('the spend of the people of a request for a group, decided one by one o
   describe('the spending approver among the people (US-06-08 AC-10, US-05-17 AC-18, D-S21)', () => {
     it('is never a line, so no step is given to a substitute: the group of the others goes to the spending approver, who decides it', async () => {
       const u = await unit();
-      await h.budgetFor(u, { total: 100_000 * M, percent: 100 });
-      await h.budgetFor(u, { total: 100_000 * M, percent: 100, year: h.next });
-      const [e1] = await h.colleagues(u, 1);
+      await h.budgetFor(u, { total: 100_000 * M });
+      await h.budgetFor(u, { total: 100_000 * M, year: h.next });
+      const [e1, e2] = await h.colleagues(u, 2);
       const approver = await h.colleague(u);
       await h.setRole('SPENDING_APPROVER', approver);
       try {
-        const refused = await h.submitGroup(h.groupBody(paid, [e1, approver]), u.head.account).expect(422);
+        const refused = await h.submitGroup(h.groupBody(paid, [e1, e2, approver]), u.head.account).expect(422);
         expect(h.codeOf(refused)).toBe('GROUP_REQUEST.LINES_REFUSED');
         expect(h.detailsOf(refused)).toEqual({
           lines: [{ employeeId: approver.employeeId, reason: 'SPENDING_APPROVER' }],
         });
 
         const sent = h.dataOf<{ request: { id: string } }>(
-          await h.submitGroup(h.groupBody(paid, [e1]), u.head.account).expect(201),
+          await h.submitGroup(h.groupBody(paid, [e1, e2]), u.head.account).expect(201),
         ).request;
-        await h.setPlanLine(sent.id, { offPlan: true }, u.head.account).expect(200);
         await h.sendOn([sent.id], u.head.account).expect(201);
 
         const steps = await h.steps(sent.id, 'SPEND_APPROVAL');
         expect(steps).toHaveLength(1);
         expect(steps[0].assignee_employee_id).toBe(approver.employeeId);
-        await h.decideSpendLines(sent.id, { lines: [approve(e1.employeeId)] }, approver.account).expect(200);
-        expect(await h.lineStates(sent.id)).toEqual(['APPROVED']);
+        await h
+          .decideSpendLines(sent.id, { lines: [approve(e1.employeeId), approve(e2.employeeId)] }, approver.account)
+          .expect(200);
+        expect(await h.lineStates(sent.id)).toEqual(['APPROVED', 'APPROVED']);
       } finally {
         await h.setRole('SPENDING_APPROVER', h.boss);
       }
@@ -266,14 +267,13 @@ describe('the spend of the people of a request for a group, decided one by one o
   describe('the same person on two steps of one request (US-06-14 AC-6)', () => {
     it('flags the need step of the line of the head as held by the person who also holds the spend step, and not the head’s own step', async () => {
       const u = await unit();
-      await h.budgetFor(u, { total: 100_000 * M, percent: 100 });
-      await h.budgetFor(u, { total: 100_000 * M, percent: 100, year: h.next });
+      await h.budgetFor(u, { total: 100_000 * M });
+      await h.budgetFor(u, { total: 100_000 * M, year: h.next });
       const [e1, e2] = await h.colleagues(u, 2);
       const sent = h.dataOf<{ request: { id: string } }>(
         await h.submitGroup(h.groupBody(paid, [e1, e2, u.head]), u.head.account).expect(201),
       ).request;
       await h.decideLines(sent.id, { lines: [approve(u.head.employeeId)] }, h.boss.account).expect(200);
-      await h.setPlanLine(sent.id, { offPlan: true }, u.head.account).expect(200);
       await h.sendOn([sent.id], u.head.account).expect(201);
 
       const steps = await h.needSteps(sent.id);

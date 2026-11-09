@@ -10,14 +10,14 @@ import { IdentityAccessFacadeModule } from '../identity-access/identity-access-f
 import { OperatingParametersModule } from '../operating-parameters/operating-parameters.module';
 import { OrganizationModule } from '../organization/organization.module';
 import { AccessRequestGrantGate } from './grant/access-request-grant.listener';
-import { DelegatedRequestService } from './delegated-request/delegated-request.service';
-import { DelegatedRequestsController } from './delegated-request/delegated-requests.controller';
-import { GrantQueueRepo } from './delegated-request/grant-queue.repo';
-import { GrantQueueService } from './delegated-request/grant-queue.service';
+import { GrantQueueController } from './grant-queue/grant-queue.controller';
+import { GrantQueueRepo } from './grant-queue/grant-queue.repo';
+import { GrantQueueService } from './grant-queue/grant-queue.service';
 import { AssessmentQueueController } from './assessment-queue/assessment-queue.controller';
 import { AssessmentQueueRepo } from './assessment-queue/assessment-queue.repo';
 import { AssessmentQueueService } from './assessment-queue/assessment-queue.service';
 import { RequestCommitmentReleaseGuard } from './spend/commitment-release.listener';
+import { RequestCommitmentFacts } from './spend/commitment-request-facts.listener';
 import { RequestDraftService } from './draft/request-draft.service';
 import { RequestDraftSubmitService } from './draft/request-draft-submit.service';
 import { RequestDraftsController } from './draft/request-drafts.controller';
@@ -52,7 +52,6 @@ import { SimilarSeatsController } from './need-decision/similar-seats.controller
 import { WithdrawalController } from './withdraw/withdrawal.controller';
 import { NeedDecisionEffects } from './need-decision/need-decision-effects.service';
 import { NeedDecisionService } from './need-decision/need-decision.service';
-import { NeedSpendService } from './assessment/need-spend.service';
 import { WithdrawalPreconditions } from './withdraw/withdrawal-preconditions.service';
 import { WithdrawalWriter } from './withdraw/withdrawal-writer.service';
 import { WithdrawalService } from './withdraw/withdrawal.service';
@@ -108,8 +107,6 @@ import { FinanceReviewRepo } from './spend/finance-review.repo';
 import { FinanceReviewWriter } from './finance-review/finance-review-writer.service';
 import { FinanceReviewService } from './finance-review/finance-review.service';
 import { FinanceReviewsController } from './finance-review/finance-reviews.controller';
-import { PlanLineRouteService } from './spend-submission/plan-line-route.service';
-import { PlanLineService } from './plan-line/plan-line.service';
 import { BudgetInformationController } from './budget-questions/budget-information.controller';
 import { BudgetInformationRepo } from './budget-information/budget-information.repo';
 import { BudgetInformationService } from './budget-information/budget-information.service';
@@ -125,6 +122,7 @@ import { SpendDecisionRepo } from './spend/spend-decision.repo';
 import { SpendDecisionRecorder } from './spend-approval/spend-decision-recorder.service';
 import { SpendDecisionService } from './spend-approval/spend-decision.service';
 import { SpendBatchService } from './spend-submission/spend-batch.service';
+import { SpendBatchListService } from './spend-submission/spend-batch-list.service';
 import { SpendBatchViewService } from './spend-submission/spend-batch-view.service';
 import { SpendEffectsService } from './budget-information/spend-effects.service';
 import { SpendEntryService } from './spend/spend-entry.service';
@@ -209,7 +207,7 @@ import { MyRequestsService } from './my-requests/my-requests.service';
     SpendApprovalsController,
     NeedDecisionQueueController,
     BudgetInformationController,
-    DelegatedRequestsController,
+    GrantQueueController,
     AssessmentQueueController,
     ServiceAccountRequestsController,
     ReturnRequestsController,
@@ -252,7 +250,6 @@ import { MyRequestsService } from './my-requests/my-requests.service';
     AccessRequestQueryService,
     NeedDecisionEffects,
     NeedDecisionService,
-    NeedSpendService,
     RequestEndService,
     WithdrawalPreconditions,
     WithdrawalWriter,
@@ -268,6 +265,7 @@ import { MyRequestsService } from './my-requests/my-requests.service';
     SimilarSeatsService,
     AccessRequestGrantGate,
     RequestCommitmentReleaseGuard,
+    RequestCommitmentFacts,
     SpendStepRepo,
     BudgetCheckRepo,
     FinanceReviewRepo,
@@ -283,12 +281,11 @@ import { MyRequestsService } from './my-requests/my-requests.service';
     RepricingService,
     SpendWireViewService,
     SpendHeadService,
-    PlanLineService,
-    PlanLineRouteService,
     SpendEntryService,
     SpendBatchRepo,
     SpendBatchService,
     SpendBatchViewService,
+    SpendBatchListService,
     SpendQueueService,
     SupplementRepo,
     SupplementPricing,
@@ -308,7 +305,6 @@ import { MyRequestsService } from './my-requests/my-requests.service';
     BudgetInformationRepo,
     BudgetInformationService,
     BudgetInformationViewService,
-    DelegatedRequestService,
     GrantQueueRepo,
     GrantQueueService,
     AssessmentQueueRepo,

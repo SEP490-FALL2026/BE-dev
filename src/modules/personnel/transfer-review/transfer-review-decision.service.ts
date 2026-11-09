@@ -80,12 +80,17 @@ export class TransferReviewDecisionService {
       const revocationTaskId = opened?.taskId ?? null;
       const written =
         changing && revocationTaskId !== null
-          ? await this.changeMind(tx, review.id, item.assignmentId, actor.employeeId, now, revocationTaskId)
+          ? await this.changeMind(tx, review.id, item.assignmentId, {
+              byEmployeeId: actor.employeeId,
+              at: now,
+              revocationTaskId,
+              reason: input.reason,
+            })
           : await this.reviews.decideItem(tx, review.id, item.assignmentId, {
               decision: input.decision,
               byEmployeeId: actor.employeeId,
               at: now,
-              note: input.newToolNote?.trim() ?? null,
+              reason: input.reason,
               revocationTaskId,
             });
       if (!written) throw new TransferReviewError('DECISION_ALREADY_RECORDED');
@@ -97,12 +102,13 @@ export class TransferReviewDecisionService {
           changing ? 'TRANSFER_REVIEW.DECISION_CHANGED' : 'TRANSFER_REVIEW.DECIDED',
           'TransferReview',
           review.id,
-          { decision: item.decision },
+          { decision: item.decision, reason: item.reason },
           {
             assignmentId: item.assignmentId,
             planId: item.planId,
             employeeId: review.employeeId,
             decision: input.decision,
+            reason: input.reason,
             decidedByEmployeeId: actor.employeeId,
             revocationTaskId,
             late: today > review.dueOn,
@@ -146,16 +152,10 @@ export class TransferReviewDecisionService {
     tx: DbTx,
     reviewId: string,
     assignmentId: string,
-    byEmployeeId: string,
-    at: Date,
-    revocationTaskId: string,
+    change: { byEmployeeId: string; at: Date; revocationTaskId: string; reason: string },
   ): Promise<boolean> {
     try {
-      return await this.reviews.changeStillNeededToNotNeeded(tx, reviewId, assignmentId, {
-        byEmployeeId,
-        at,
-        revocationTaskId,
-      });
+      return await this.reviews.changeStillNeededToNotNeeded(tx, reviewId, assignmentId, change);
     } catch (error) {
       if (readSqlState(error) === '55000') throw new TransferReviewError('DECISION_ALREADY_RECORDED');
       throw error;

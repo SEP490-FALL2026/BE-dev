@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { Prisma } from '../../../../generated/prisma/client';
 import { PrismaService } from '../../../../infrastructure/database/prisma.service';
 import type { DbTx } from '../../../../infrastructure/database/transaction-runner';
 import type { AccessRequestKind, AccessRequestState } from '../access-request.types';
@@ -25,14 +26,16 @@ export interface OpenRequestRow {
 export class OpenRequestRepo {
   constructor(private readonly prisma: PrismaService) {}
 
+  /** `filter.departmentId` keeps only the requests sent from that department (a department head reads the open work of a member). */
   async pageOf(
     employeeId: string,
     page: { skip: number; take: number },
     tx?: DbTx,
+    filter: { departmentId?: string } = {},
   ): Promise<{ items: OpenRequestRow[]; total: number }> {
-    const db = tx ?? this.prisma;
     const where = {
       beneficiaries: { some: { employeeId } },
+      ...(filter.departmentId === undefined ? {} : { departmentId: filter.departmentId }),
       // A request being drafted is written by the release after this one and is not read here.
       state: { not: 'DRAFT' as const },
       OR: [
@@ -40,23 +43,31 @@ export class OpenRequestRepo {
         { type: 'GROUP_GRANT' as const, lines: { some: { employeeId, state: { in: [...OPEN_LINE_STATES] } } } },
       ],
     };
-    const rows = await db.accessRequest.findMany({
-      where,
-      select: { id: true, type: true, state: true, planId: true, requesterEmployeeId: true, submittedAt: true },
-      orderBy: [{ submittedAt: 'asc' }, { id: 'asc' }],
-      skip: page.skip,
-      take: page.take,
-    });
-    const total = await db.accessRequest.count({ where });
+    const read = async (client: DbTx) => {
+      const rows = await client.accessRequest.findMany({
+        where,
+        select: { id: true, type: true, state: true, planId: true, requesterEmployeeId: true, submittedAt: true },
+        orderBy: [{ submittedAt: 'asc' }, { id: 'asc' }],
+        skip: page.skip,
+        take: page.take,
+      });
+      const total = await client.accessRequest.count({ where });
 
-    return {
-      items: rows.map((row) => {
-        // The filter above leaves drafts out, and only a draft has no moment it was sent.
-        if (row.submittedAt === null) throw new Error(`The request ${row.id} is listed as open but has not been sent.`);
+      return {
+        items: rows.map((row) => {
+          // The filter above leaves drafts out, and only a draft has no moment it was sent.
+          if (row.submittedAt === null)
+            throw new Error(`The request ${row.id} is listed as open but has not been sent.`);
 
-        return { ...row, submittedAt: row.submittedAt };
-      }),
-      total,
+          return { ...row, submittedAt: row.submittedAt };
+        }),
+        total,
+      };
     };
+
+    // The page and its total share one snapshot when the caller has no transaction of its own (`API-LIST-DETAIL.1`).
+    return tx
+      ? read(tx)
+      : this.prisma.$transaction(read, { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead });
   }
 }

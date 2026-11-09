@@ -7,7 +7,7 @@ const h = new FiscalYearStartLockHarness();
 const FIRST_VERSION = () => ({
   base: h.money(60_000_000),
   reserve: h.money(20_000_000),
-  highValuePercent: 50,
+  reserveReason: 'Test reserve',
 });
 
 /**

@@ -93,7 +93,6 @@ export function approvalSummaryOf(row: OpenSpendRow, lookups: QueueLookups): App
     primaryCode: check ? (codesOf(check)[0] ?? null) : null,
     samePersonAsSpend: row.samePersonAsSpend,
     noIndependentReview: row.noIndependentReview,
-    offPlan: request.offPlan,
     batchId: lookups.batches.get(row.requestId) ?? null,
   };
 }
@@ -172,10 +171,7 @@ function requestView(facts: DetailFacts): ApprovalDetailWire['request'] {
     costCenter: { id: center.id, code: center.code },
     businessReason: request.businessReason,
     termMonths: request.termMonths,
-    expectedSpendOn: request.pricing.expectedSpendOn,
     budgetYear: request.pricing.budgetYear,
-    offPlan: request.offPlan,
-    planLineAttached: request.planLine !== null,
   };
 }
 
@@ -214,10 +210,8 @@ export function approvalDetailOf(facts: DetailFacts): ApprovalDetailWire {
       ? {
           decision: decision.decision,
           reason: decision.reason,
-          overrideReason: decision.overrideReason,
           decidedBy: person(decision.decidedByEmployeeId),
           decidedAt: decision.decidedAt.toISOString(),
-          bySubstitute: decision.bySubstitute,
         }
       : null,
     latestBudgetInformation: facts.latestBudgetInformation,

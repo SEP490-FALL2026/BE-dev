@@ -55,6 +55,7 @@ function toItemRecord(row: ItemRow): ReviewItemRecord {
     decidedByEmployeeId: row.decidedByEmployeeId,
     decidedAt: row.decidedAt,
     newToolNote: row.newToolNote,
+    reason: row.reason,
     revocationTaskId: row.revocationTaskId,
   };
 }
@@ -188,10 +189,10 @@ export class TransferReviewRepo {
     reviewId: string,
     assignmentId: string,
     decision: {
-      decision: 'STILL_NEEDED' | 'NOT_NEEDED' | 'NEEDS_NEW_TOOL';
+      decision: 'STILL_NEEDED' | 'NOT_NEEDED';
       byEmployeeId: string;
       at: Date;
-      note: string | null;
+      reason: string;
       revocationTaskId: string | null;
     },
   ): Promise<boolean> {
@@ -201,7 +202,7 @@ export class TransferReviewRepo {
         decision: decision.decision,
         decidedByEmployeeId: decision.byEmployeeId,
         decidedAt: decision.at,
-        newToolNote: decision.note,
+        reason: decision.reason,
         revocationTaskId: decision.revocationTaskId,
       },
     });
@@ -219,7 +220,7 @@ export class TransferReviewRepo {
     tx: DbTx,
     reviewId: string,
     assignmentId: string,
-    by: { byEmployeeId: string; at: Date; revocationTaskId: string },
+    by: { byEmployeeId: string; at: Date; revocationTaskId: string; reason: string },
   ): Promise<boolean> {
     const result = await tx.transferReviewItem.updateMany({
       where: { reviewId, assignmentId, decision: 'STILL_NEEDED', revocationTaskId: null },
@@ -227,6 +228,7 @@ export class TransferReviewRepo {
         decision: 'NOT_NEEDED',
         decidedByEmployeeId: by.byEmployeeId,
         decidedAt: by.at,
+        reason: by.reason,
         revocationTaskId: by.revocationTaskId,
       },
     });

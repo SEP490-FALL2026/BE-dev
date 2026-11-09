@@ -96,7 +96,6 @@ describe('budgets over HTTP: the decision of the spending approver (integration,
       expect(h.dataOf<{ version: VersionWire }>(response).version).toMatchObject({
         state: 'APPROVED',
         decision: { decision: 'APPROVED', reason: null, by: { employeeId: boss.employeeId } },
-        previousTotal: null,
       });
       const mine = h.dataOf<{ budget: { status: string; total: { amount: string }; version: { number: number } } }>(
         await h.mine(head.account, h.next).expect(200),
@@ -205,34 +204,6 @@ describe('budgets over HTTP: the decision of the spending approver (integration,
       expect(queue.items.map((item) => item.id)).toContain(version.id);
     });
 
-    it('sees of a revision the Cost Center, the year, the total before and after and the reason', async () => {
-      const { version, department } = await sent();
-      await approve(version.id).expect(200);
-      const revision = h.dataOf<{ version: VersionWire }>(
-        await h
-          .createRevision({
-            costCenterId: department.unitId,
-            year: h.next,
-            base: h.money(80_000_000),
-            reserve: h.money(20_000_000),
-            reason: 'Growth of the team',
-          })
-          .expect(201),
-      ).version;
-      await h.sendVersion(revision.id).expect(200);
-
-      const seen = await wireOf(revision.id, boss.account);
-
-      expect(seen).toMatchObject({
-        kind: 'REVISION',
-        year: h.next,
-        costCenter: { id: department.unitId },
-        total: { amount: '100000000' },
-        previousTotal: { amount: '80000000' },
-        reason: 'Growth of the team',
-      });
-    });
-
     it('is read by Finance and the approver only: not by a head, the IT Admin or an employee', async () => {
       const { version, head } = await sent();
 
@@ -339,9 +310,8 @@ describe('budgets over HTTP: the decision of the spending approver (integration,
     it('has the three decisions and nothing else: no figure, no line, no send, and a figure in the decision is refused', async () => {
       const { version } = await sent();
 
-      await h.updateVersion(version.id, { highValuePercent: 1 }, boss.account).expect(403);
+      await h.updateVersion(version.id, { base: h.money(1) }, boss.account).expect(403);
       await h.updateLine(version.id, 1, { financeComment: 'x' }, boss.account).expect(403);
-      await h.createRevision({ costCenterId: version.costCenter.id, year: h.next }, boss.account).expect(403);
       const extra = await h
         .decideVersion(version.id, { decision: 'APPROVE', base: h.money(1) }, boss.account)
         .expect(422);
@@ -349,45 +319,6 @@ describe('budgets over HTTP: the decision of the spending approver (integration,
       expect(h.codeOf(extra)).toBe('VALIDATION_ERROR');
       expect(await stateOf(version.id)).toBe('SENT');
       expect((await wireOf(version.id)).base.amount).toBe('60000000');
-    });
-  });
-
-  describe('one current version (AC-6; INV-21)', () => {
-    it('replaces the current one when a revision is approved, and the replaced one is never changed again', async () => {
-      const { version, department } = await sent();
-      await approve(version.id).expect(200);
-      const revision = h.dataOf<{ version: VersionWire }>(
-        await h
-          .createRevision({
-            costCenterId: department.unitId,
-            year: h.next,
-            base: h.money(80_000_000),
-            reserve: h.money(20_000_000),
-            reason: 'Growth of the team',
-          })
-          .expect(201),
-      ).version;
-      await h.sendVersion(revision.id).expect(200);
-
-      await approve(revision.id).expect(200);
-
-      expect(await stateOf(version.id)).toBe('SUPERSEDED');
-      expect(await stateOf(revision.id)).toBe('APPROVED');
-      const current = await h.ctx.sql.query(
-        `SELECT 1 FROM budget_versions WHERE cost_center_id = $1 AND year = $2 AND state = 'APPROVED'`,
-        [department.unitId, h.next],
-      );
-      expect(current.rowCount).toBe(1);
-      expect(h.codeOf(await h.updateLine(version.id, 1, { financeComment: 'late' }).expect(409))).toBe(
-        'BUDGET.VERSION_NOT_EDITABLE',
-      );
-      expect(h.codeOf(await h.sendVersion(version.id).expect(409))).toBe('BUDGET.VERSION_NOT_EDITABLE');
-      const record = await h.ctx.sql.query<{ total_minor: string; previous_total_minor: string }>(
-        `SELECT total_minor, previous_total_minor FROM budget_version_decisions WHERE version_id = $1`,
-        [revision.id],
-      );
-      expect(record.rows).toEqual([{ total_minor: '100000000', previous_total_minor: '80000000' }]);
-      expect((await rowOf(department.unitId, h.next))?.total.amount).toBe('100000000');
     });
   });
 
@@ -482,34 +413,6 @@ describe('budgets over HTTP: the decision of the spending approver (integration,
       }
       for (const unit of [waiting, sentBack, refused])
         expect(await rowOf(unit.department.unitId, h.next)).toBeUndefined();
-    });
-
-    it('stay attached when a revision replaces the version, and are held against the new total', async () => {
-      const { version, department } = await sent(h.next, { base: h.money(20_000_000), reserve: h.money(0) });
-      const waiting = await commit(department.unitId, h.next, 5_000_000);
-      await approve(version.id).expect(200);
-      const revision = h.dataOf<{ version: VersionWire }>(
-        await h
-          .createRevision({
-            costCenterId: department.unitId,
-            year: h.next,
-            base: h.money(30_000_000),
-            reserve: h.money(0),
-            reason: 'More',
-          })
-          .expect(201),
-      ).version;
-      await h.sendVersion(revision.id).expect(200);
-
-      await approve(revision.id).expect(200);
-
-      expect(await attachedTo(waiting)).toMatchObject({ attached_version_id: version.id });
-      expect(await rowOf(department.unitId, h.next)).toMatchObject({
-        total: { amount: '30000000' },
-        committed: { amount: '5000000' },
-        remaining: { amount: '25000000' },
-        overCommitted: false,
-      });
     });
 
     it('make no budget of their own: nothing of limit zero is created for them', async () => {

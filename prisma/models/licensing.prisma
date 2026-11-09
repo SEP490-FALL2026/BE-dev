@@ -509,6 +509,8 @@ enum RenewalState {
   PROPOSED
   DECIDED
   OUTCOME_RECORDED
+  // A proposal closed because it was out of date when the head confirmed it; the IT Admin proposes again (A-H2).
+  STALE
 }
 
 enum RenewalExecutionPoint {
@@ -538,7 +540,8 @@ enum RenewalDeadlineOutcome {
 model SubscriptionRenewal {
   id                          String                 @id @default(uuid()) @db.Uuid
   organizationId              String                 @map("organization_id") @db.Uuid
-  subscriptionId              String                 @unique @map("subscription_id") @db.Uuid
+  // At most one live (not STALE) case per period: a partial unique index in the migration 20261108300100.
+  subscriptionId              String                 @map("subscription_id") @db.Uuid
   state                       RenewalState           @default(PROPOSED)
   // The milestone the period was proposed against, as the catalog derived it then.
   noticeBasis                 RenewalNoticeBasis     @map("notice_basis")
@@ -586,6 +589,7 @@ model SubscriptionRenewal {
   releasedSeats    SubscriptionRenewalReleasedSeat[]
 
   @@index([state, noticeBaseDate])
+  @@index([subscriptionId])
   @@map("subscription_renewals")
 }
 

@@ -37,26 +37,19 @@ describe('the projection of the audit events into the inbox over PostgreSQL (US-
 
     return u;
   };
-  /** A request the head sent for a colleague: the head is the requester and the colleague is who it is for. */
-  const delegated = async (u: Unit) => {
+  /**
+   * A request the head sent for colleagues, which is a request for a group of two at least (`QĐ-96`): the head is the requester and
+   * the people are who it is for. `colleague` is the first of them.
+   */
+  const forColleagues = async (u: Unit, size = 2) => {
     counter += 1;
-    const colleague = await h.staff(u.department, `J-C${counter}`);
-    await h.ctx.sql.query(`UPDATE employees SET hire_date = current_date WHERE id = $1`, [colleague.employeeId]);
-    const sent = h.dataOf<{ requests: { id: string }[] }>(
-      await h
-        .sendDelegated(
-          {
-            beneficiaryEmployeeIds: [colleague.employeeId],
-            items: [{ planId: plan }],
-            businessReason: 'The new designer needs the tool',
-            termMonths: 1,
-          },
-          u.head.account,
-        )
-        .expect(201),
-    );
+    const people = [];
+    for (let index = 1; index <= size; index += 1) people.push(await h.staff(u.department, `J-C${counter}-${index}`));
+    const id = await h.sentForPeople(plan, people, u.head.account, {
+      businessReason: 'The new designers need the tool',
+    });
 
-    return { id: sent.requests[0].id, colleague };
+    return { id, colleague: people[0], people };
   };
   const cursor = async () =>
     (
@@ -170,7 +163,7 @@ describe('the projection of the audit events into the inbox over PostgreSQL (US-
 
     it('does nothing when another pass holds the cursor, and then makes the notices when it lets go (two workers never project at once)', async () => {
       const u = await example();
-      const { id } = await delegated(u);
+      const { id } = await forColleagues(u);
       await h.writeAudit('ACCESS_REQUEST.GRANT_COMPLETED', 'ACCESS_REQUEST', id, { requestId: id });
       const holder = await h.openClient();
       try {
@@ -190,12 +183,12 @@ describe('the projection of the audit events into the inbox over PostgreSQL (US-
       const done = await h.project();
 
       expect(done.busy).toBe(false);
-      expect((await h.noticesAbout(id)).filter((row) => row.code === 'REQUEST_GRANTED')).toHaveLength(2);
+      expect((await h.noticesAbout(id)).filter((row) => row.code === 'REQUEST_GRANTED')).toHaveLength(3);
     });
 
     it('makes one notice for each recipient and event however many workers look at it at once', async () => {
       const u = await example();
-      const { id, colleague } = await delegated(u);
+      const { id, people } = await forColleagues(u);
       await h.project();
       await h.writeAudit('ACCESS_REQUEST.GRANT_COMPLETED', 'ACCESS_REQUEST', id, { requestId: id });
 
@@ -203,14 +196,14 @@ describe('the projection of the audit events into the inbox over PostgreSQL (US-
 
       const granted = (await h.noticesAbout(id)).filter((row) => row.code === 'REQUEST_GRANTED');
       expect(granted.map((row) => row.recipient_employee_id).sort()).toEqual(
-        [colleague.employeeId, u.head.employeeId].sort(),
+        [...people.map((person) => person.employeeId), u.head.employeeId].sort(),
       );
-      expect(results.reduce((sum, result) => sum + result.notified, 0)).toBe(2);
+      expect(results.reduce((sum, result) => sum + result.notified, 0)).toBe(3);
     });
 
     it('does not lose an event whose transaction commits after a pass that went by it, and the cursor only moves forward', async () => {
       const u = await example();
-      const { id } = await delegated(u);
+      const { id } = await forColleagues(u);
       await h.project();
       const first = await cursor();
       const late = await h.openClient();
@@ -228,7 +221,7 @@ describe('the projection of the audit events into the inbox over PostgreSQL (US-
         );
         begun = (await late.query<{ now: Date }>(`SELECT now() AS now`)).rows[0].now;
         // An event of another request commits meanwhile, newer than the one that is still open.
-        const other = await delegated(u);
+        const other = await forColleagues(u);
         await h.writeAudit('ACCESS_REQUEST.GRANT_FAILED', 'ACCESS_REQUEST', other.id, { requestId: other.id });
 
         // A pass at the moment the open transaction began is as far as it may go: the newer event is left for later.
@@ -253,7 +246,7 @@ describe('the projection of the audit events into the inbox over PostgreSQL (US-
 
     it('skips an event that names no request or one that is gone, says so, and goes on with the others', async () => {
       const u = await example();
-      const { id } = await delegated(u);
+      const { id } = await forColleagues(u);
       await h.project();
       await h.writeAudit('ACCESS_REQUEST.GRANT_COMPLETED', 'ACCESS_REQUEST', id, {});
       await h.writeAudit('ACCESS_REQUEST.GRANT_COMPLETED', 'ACCESS_REQUEST', randomUUID(), { requestId: randomUUID() });
@@ -262,13 +255,13 @@ describe('the projection of the audit events into the inbox over PostgreSQL (US-
       const result = await h.project();
 
       expect(result).toMatchObject({ eventsRead: 3, skipped: 2 });
-      expect((await h.noticesAbout(id)).filter((row) => row.code === 'REQUEST_FAILED')).toHaveLength(2);
+      expect((await h.noticesAbout(id)).filter((row) => row.code === 'REQUEST_FAILED')).toHaveLength(3);
       expect((await h.noticesAbout(id)).some((row) => row.code === 'REQUEST_GRANTED')).toBe(false);
     });
 
     it('undoes the whole pass when the database fails in the middle, and makes the notices in the next pass', async () => {
       const u = await example();
-      const { id } = await delegated(u);
+      const { id } = await forColleagues(u);
       await h.project();
       await h.writeAudit('ACCESS_REQUEST.GRANT_COMPLETED', 'ACCESS_REQUEST', id, { requestId: id });
       const before = await h.noticeCount();
@@ -295,7 +288,7 @@ describe('the projection of the audit events into the inbox over PostgreSQL (US-
       expect(await cursor()).toEqual(position);
 
       await h.project();
-      expect((await h.noticesAbout(id)).filter((row) => row.code === 'REQUEST_GRANTED')).toHaveLength(2);
+      expect((await h.noticesAbout(id)).filter((row) => row.code === 'REQUEST_GRANTED')).toHaveLength(3);
     });
 
     it('works off a backlog of more than one batch in one pass, and reads nothing the second time', async () => {
@@ -323,13 +316,8 @@ describe('the projection of the audit events into the inbox over PostgreSQL (US-
   describe('a request for a group (US-05-15 AC-9)', () => {
     it('tells the head and each person the outcome of their own part, with a key for each person, never the part of another', async () => {
       const u = await example();
-      const { id, colleague } = await delegated(u);
-      const second = await h.staff(u.department, `J-G2${counter}`);
-      const third = await h.staff(u.department, `J-G3${counter}`);
-      await h.ctx.sql.query(
-        `INSERT INTO access_request_beneficiaries (request_id, employee_id, position) VALUES ($1, $2, 2), ($1, $3, 3)`,
-        [id, second.employeeId, third.employeeId],
-      );
+      const { id, people } = await forColleagues(u, 3);
+      const [colleague, second, third] = people;
       await h.project();
       await h.writeAudit('ACCESS_REQUEST.GRANT_COMPLETED', 'ACCESS_REQUEST', id, {
         requestId: id,
@@ -361,7 +349,7 @@ describe('the projection of the audit events into the inbox over PostgreSQL (US-
   describe('a request closed because the person it was for left (US-05-15 AC-12, the receiving side)', () => {
     it('tells the head and the person it was for that it was cancelled, never as a withdrawal or a failure, and changes nothing of the request', async () => {
       const u = await example();
-      const { id, colleague } = await delegated(u);
+      const { id, colleague } = await forColleagues(u);
       await h.project();
       const state = await h.state(id);
       expect(await h.codesFor(colleague.employeeId, id)).toEqual([]);
@@ -389,7 +377,7 @@ describe('the projection of the audit events into the inbox over PostgreSQL (US-
   describe('who is told and who is not', () => {
     it('does not tell a person who has left, and tells the others', async () => {
       const u = await example();
-      const { id, colleague } = await delegated(u);
+      const { id, colleague } = await forColleagues(u);
       await h.project();
       await h.leave(colleague.employeeId, { announce: false });
       await h.writeAudit('ACCESS_REQUEST.GRANT_COMPLETED', 'ACCESS_REQUEST', id, { requestId: id });
@@ -402,7 +390,7 @@ describe('the projection of the audit events into the inbox over PostgreSQL (US-
 
     it('does not tell the person who caused the event about it, found from the account that acted', async () => {
       const u = await example();
-      const { id } = await delegated(u);
+      const { id } = await forColleagues(u);
       await h.project();
       await h.writeAudit(
         'ACCESS_REQUEST.GRANT_COMPLETED',
@@ -419,7 +407,7 @@ describe('the projection of the audit events into the inbox over PostgreSQL (US-
 
     it('tells the owner of a seat that a revocation is coming, unless they sent the return themselves, and tells a renewal and the verdict on a service account', async () => {
       const u = await example();
-      const { id } = await delegated(u);
+      const { id } = await forColleagues(u);
       const returnId = randomUUID();
       await h.project();
       const returnAfter = (holder: string) => ({

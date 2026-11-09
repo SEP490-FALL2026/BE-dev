@@ -143,17 +143,6 @@ describe('self-service belongs to every account, with one role per account', () 
       const response = await h.submit(h.form(internal), person.account).expect(422);
       expect(h.codeOf(response)).toBe('REQUEST_PARTY.INELIGIBLE');
     }
-    const delegated = await request(h.server())
-      .post('/api/v1/delegated-requests')
-      .set(h.as(unit.head.account))
-      .send({
-        beneficiaryEmployeeIds: [h.boss.employeeId],
-        items: [{ planId: internal }],
-        businessReason: 'A new workspace',
-        termMonths: 1,
-      })
-      .expect(422);
-    expect(h.codeOf(delegated)).toBe('REQUEST_PARTY.INELIGIBLE');
     expect(await h.requestRows()).toBe(before);
   });
 

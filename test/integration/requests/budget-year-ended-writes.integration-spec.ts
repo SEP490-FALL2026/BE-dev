@@ -66,25 +66,13 @@ describe('writes on a year that has ended, before the closure has run (integrati
     const version = await h.built(w.proposal.id);
     await h.moveYear(w.department.unitId, h.next, ended);
     const before = await fingerprint();
-    const csv = [
-      'cost_center_code,description,amount,window_from,window_to,service_period_months,repeat_cycle',
-      `${w.department.unitId},x,1,${h.next}-03-01,${h.next}-03-31,12,ANNUAL`,
-    ].join('\n');
+    const csv = ['cost_center_code,description,amount', `${w.department.unitId},x,1`].join('\n');
 
-    await refusedAsEnded(await h.updateVersion(version.id, { highValuePercent: 10 }), before);
+    await refusedAsEnded(await h.updateVersion(version.id, { base: h.money(1) }), before);
     await refusedAsEnded(await h.updateLine(version.id, 1, { financeComment: 'late' }), before);
     await refusedAsEnded(await h.addLines(version.id, [h.line()]), before);
     await refusedAsEnded(await h.importLines(version.id, csv), before);
     await refusedAsEnded(await h.sendVersion(version.id), before);
-  });
-
-  it('does not move the window of a line of the budget that was current', async () => {
-    const w = await waiting();
-    const current = await h.current(w.proposal.id);
-    await h.moveYear(w.department.unitId, h.next, ended);
-    const before = await fingerprint();
-
-    await refusedAsEnded(await h.moveWindow(current.id, 1, { windowTo: `${h.next}-04-30`, reason: 'Slipped' }), before);
   });
 
   it('does not take back, give back or send again a proposal, nor make a version from it', async () => {
@@ -103,7 +91,7 @@ describe('writes on a year that has ended, before the closure has run (integrati
         proposalId: toBuild.proposal.id,
         base: h.money(1),
         reserve: h.money(0),
-        highValuePercent: 10,
+        reserveReason: 'Test reserve',
       }),
       before,
     );
@@ -116,7 +104,7 @@ describe('writes on a year that has ended, before the closure has run (integrati
     await h.closeYears();
     const before = await fingerprint();
 
-    await refusedAsEnded(await h.updateVersion(version.id, { highValuePercent: 10 }), before);
+    await refusedAsEnded(await h.updateVersion(version.id, { base: h.money(1) }), before);
     await refusedAsEnded(await h.sendVersion(version.id), before);
     await refusedAsEnded(await h.withdraw(w.proposal.id, w.head.account), before);
   });

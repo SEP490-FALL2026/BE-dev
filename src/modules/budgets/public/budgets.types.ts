@@ -1,5 +1,3 @@
-import type { BusinessDate } from '../../../core/business-date';
-
 /** The current budget of a Cost Center and a year, as the check of a request reads it (`US-06-12`). */
 export interface YearBudgetFacts {
   versionId: string;
@@ -9,30 +7,6 @@ export interface YearBudgetFacts {
   heldMinor: bigint;
   /** What has become an expense in the year. */
   spentMinor: bigint;
-  /** A line is high value when it is over this share of what is left, in whole percent. */
-  highValuePercent: number;
-  /** Or when it is over this amount, whatever is left; null when the version sets none. */
-  highValueAmountMinor: bigint | null;
-}
-
-/** A line of the plan a request is attached to, as the check reads it. */
-export interface PlanLineFacts {
-  costCenterId: string;
-  year: number;
-  /** The version the line is read from: the current one of its Cost Center and year, whichever version the request named. */
-  versionId: string;
-  windowFrom: BusinessDate;
-  windowTo: BusinessDate;
-}
-
-/** A line of the current plan of a Cost Center and a year, as the head reads it to attach a request to it (`US-05-04` AC-12). */
-export interface PlanLineSummary {
-  position: number;
-  description: string;
-  planId: string | null;
-  amountMinor: bigint;
-  windowFrom: BusinessDate;
-  windowTo: BusinessDate;
 }
 
 /** What a request holds against the budget of a Cost Center: one amount for each year its binding payments fall in. */
@@ -79,4 +53,11 @@ export interface ReleasedCommitment {
   releasedMinor: bigint;
   heldMinor: bigint;
   released: boolean;
+}
+
+/** What one commitment was made for, as another context counts it. */
+export interface CommittedAmount {
+  requestId: string;
+  amountMinor: bigint;
+  currency: string;
 }

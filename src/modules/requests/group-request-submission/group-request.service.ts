@@ -13,18 +13,18 @@ import { mayRequest } from '../access-request/access-request.policy';
 import { AccessRequestRepo } from '../access-request/access-request.repo';
 import { RequestDraftRepo } from '../request-draft/request-draft.repo';
 import type { AccessRequestRecord, PricingRecord } from '../access-request/access-request.types';
-import { LONG_TERM_MONTHS } from '../access-request/need-decision.policy';
 import { RequestFactsService, type RequestSettings } from '../access-request/request-facts.service';
 import {
   GroupRequestDuplicateLineError,
   GroupRequestLinesRefusedError,
   GroupRequestPlanNotEligibleError,
-  GroupRequestTermConfirmationRequiredError,
+  GroupRequestTermBeyondLimitError,
+  GroupRequestTooFewLinesError,
   GroupRequestTooManyLinesError,
 } from '../group-request/group-request.errors';
 import { planNeedSteps } from './group-need-routing.policy';
 import { GroupRequestWriter } from './group-request-writer.service';
-import { needsTermConfirmation, type LineReason, type PlanRefusal } from '../group-request/group-request.policy';
+import { type LineReason, type PlanRefusal } from '../group-request/group-request.policy';
 import {
   GroupSubmissionFactsService,
   type GroupJudgement,
@@ -37,13 +37,15 @@ export interface GroupBody {
   businessReason: string;
   termMonths: number;
   expectedSpendOn?: string;
-  termConfirmation?: { reason: string };
 }
 
 /** What `POST /group-requests/check` says: every reason at once, and nothing written. */
 export interface GroupCheck {
   plan: { eligible: boolean; reason: PlanRefusal | null };
   tooManyLines: { max: number } | null;
+  tooFewLines: { min: number } | null;
+  termLimit: { maxMonths: number; endsBy: string | null };
+  termBeyondLimit: boolean;
   lines: { employeeId: string; ok: boolean; reason: LineReason | 'DUPLICATE_LINE' | null }[];
   pricing: PricingRecord;
   lineCount: number;
@@ -82,6 +84,9 @@ export class GroupRequestService {
       return {
         plan: { eligible: judged.planRefusal === null, reason: judged.planRefusal },
         tooManyLines: judged.count.tooMany,
+        tooFewLines: judged.count.tooFew,
+        termLimit: judged.assessed.termLimit,
+        termBeyondLimit: judged.assessed.termBeyondLimit,
         lines: judged.lines.map((line) => {
           const duplicate = judged.count.duplicates.includes(line.employeeId);
           const reason = duplicate ? ('DUPLICATE_LINE' as const) : (refused.get(line.employeeId) ?? null);
@@ -96,8 +101,8 @@ export class GroupRequestService {
 
   /**
    * Throws AccessRequestSuperAdminCannotRequestError, RequestPartyIneligibleError (the sender; a line is a reason of its line),
-   * GroupRequestPlanNotEligibleError, GroupRequestTooManyLinesError,
-   * GroupRequestDuplicateLineError, GroupRequestLinesRefusedError, GroupRequestTermConfirmationRequiredError,
+   * GroupRequestPlanNotEligibleError, GroupRequestTooManyLinesError, GroupRequestTooFewLinesError,
+   * GroupRequestDuplicateLineError, GroupRequestLinesRefusedError,
    * AccessRequestNoDepartmentError and the errors of assessing a plan. A draft (draftId) is the request being sent: it is locked first,
    * judged again under the lock, and its row becomes the request; AccessRequestNotFoundError and AccessRequestNotDraftError.
    */
@@ -118,7 +123,7 @@ export class GroupRequestService {
       const organizationId = await this.requireSender(tx, actor);
       await this.facts.requireEligibleSender(tx, actor.employeeId, { lock: true });
       const judged = await this.facts.judge(tx, this.input(actor, body, settings, true));
-      this.refuse(judged, body);
+      this.refuse(judged);
 
       const planned = planNeedSteps({
         senderEmployeeId: actor.employeeId,
@@ -167,20 +172,14 @@ export class GroupRequestService {
   }
 
   /** The first thing that makes the sending impossible, in the order a caller should learn it. */
-  private refuse(judged: GroupJudgement, body: GroupBody): void {
+  private refuse(judged: GroupJudgement): void {
     if (judged.planRefusal !== null) throw new GroupRequestPlanNotEligibleError(judged.planRefusal);
     if (judged.count.tooMany !== null) throw new GroupRequestTooManyLinesError(judged.count.tooMany.max);
+    if (judged.assessed.termBeyondLimit) {
+      throw new GroupRequestTermBeyondLimitError(judged.assessed.termLimit.maxMonths, judged.assessed.termLimit.endsBy);
+    }
+    if (judged.count.tooFew !== null) throw new GroupRequestTooFewLinesError(judged.count.tooFew.min);
     if (judged.count.duplicates.length > 0) throw new GroupRequestDuplicateLineError(judged.count.duplicates);
     if (judged.refused.length > 0) throw new GroupRequestLinesRefusedError(judged.refused);
-    if (
-      needsTermConfirmation({
-        senderIsHead: judged.senderIsHead,
-        termMonths: body.termMonths,
-        confirmed: (body.termConfirmation?.reason ?? '').trim() !== '',
-        longTermMonths: LONG_TERM_MONTHS,
-      })
-    ) {
-      throw new GroupRequestTermConfirmationRequiredError();
-    }
   }
 }

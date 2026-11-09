@@ -14,8 +14,21 @@ export const commitmentListQuerySchema = z.strictObject({
   year: z.coerce.number().int().min(2000).max(2200).optional(),
   costCenterId: z.uuid().optional(),
   requestId: z.uuid().optional(),
+  /** `HELD` lists what is still held, `EXPENSED` what became an expense, `RELEASED` what went back to the budget. */
+  state: z.enum(['HELD', 'RELEASED', 'EXPENSED']).optional(),
   page: z.coerce.number().int().positive().default(1),
   pageSize: z.coerce.number().int().positive().max(100).default(20),
+});
+
+/** The request a commitment is held for, as far as Finance needs it to know what the money is for. */
+const commitmentRequestSchema = z.strictObject({
+  id: z.uuid(),
+  software: z.strictObject({ name: z.string() }),
+  plan: z.strictObject({ name: z.string() }).nullable(),
+  requester: z.strictObject({ employeeCode: z.string(), fullName: z.string() }),
+  beneficiaryCount: z.number().int().nonnegative(),
+  /** When the spending approver approved the spend, which is when the commitment was made. */
+  spendApprovedAt: z.iso.datetime().nullable(),
 });
 
 /** One commitment: what it holds, for which request, and whether it is attached to a budget or waits for one. */
@@ -29,6 +42,13 @@ const commitmentSchema = z.strictObject({
   released: moneyView,
   held: moneyView,
   state: z.enum(['HELD', 'RELEASED', 'EXPENSED']),
+  /** The request it is held for; null when that request cannot be read. */
+  request: commitmentRequestSchema.nullable(),
+  /** What the invoices recorded against it came to as an expense, and how many there are. */
+  invoiced: moneyView,
+  invoiceCount: z.number().int().nonnegative(),
+  /** An invoice is for more than what the commitment allowed. */
+  hasDiscrepancy: z.boolean(),
   attached: z.boolean(),
   attachedAt: z.iso.datetime().nullable(),
   /** Why it waits: there is no budget for its Cost Center and year yet. Finance has nothing to confirm (`QĐ-82m` B). */
@@ -63,6 +83,9 @@ const pagination = z.strictObject({
   totalItems: z.number().int().nonnegative(),
   totalPages: z.number().int().nonnegative(),
 });
+
+/** The schema of one commitment, for the answers of other routes that give a commitment back. */
+export const commitmentResponseSchema = commitmentSchema;
 
 export class CommitmentListQueryDto extends createZodDto(commitmentListQuerySchema) {}
 export class ReleaseBodyDto extends createZodDto(releaseBodySchema) {}

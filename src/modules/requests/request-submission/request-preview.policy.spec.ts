@@ -1,5 +1,5 @@
 import { policyFor } from '../access-request/access-request.policy';
-import { buildChain, spendSubmissionOf, termNeedsConfirmation } from './request-preview.policy';
+import { buildChain, spendSubmissionOf } from './request-preview.policy';
 import { routeNeedStep, type RoutingFacts } from '../access-request/routing.policy';
 
 const REQUESTER = 'e1';
@@ -117,16 +117,5 @@ describe('whether the request can go on to be decided as spend (US-05-01 AC-14)'
     ['internal software', internal, 'NOT_APPLICABLE', 'NOT_NEEDED'],
   ] as const)('%s', (_name, policy, status, expected) => {
     expect(spendSubmissionOf(policy, status)).toBe(expected);
-  });
-});
-
-describe('a term that needs the head to confirm it (US-05-01 AC-4)', () => {
-  it.each([
-    [12, false],
-    [13, true],
-    [18, true],
-    [6, false],
-  ])('%i months', (months, expected) => {
-    expect(termNeedsConfirmation(months)).toBe(expected);
   });
 });

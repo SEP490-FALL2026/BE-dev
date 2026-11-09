@@ -50,7 +50,12 @@ describe('events about one person that meet at once (integration, real PostgreSQ
         employeeId: who.employeeId,
         startedOn: h.day(-1),
         approvedReturnOn: h.day(60),
-        grounds: { type: 'LEAVE_APPROVAL', reference: 'DN-07/2026', issuer: 'HR Department', issuedOn: '2026-05-25' },
+        grounds: {
+          type: 'APPROVED_APPLICATION',
+          reference: 'DN-07/2026',
+          issuer: 'HR Department',
+          issuedOn: '2026-05-25',
+        },
       });
 
   /** Holds the row of the person, lets `first` and then `second` reach the lock, releases it, and gives both answers in that order. */
@@ -125,7 +130,8 @@ describe('events about one person that meet at once (integration, real PostgreSQ
     it('the same notice recorded twice at once: the notice is locked first, so one departure is written and the other call finds the notice no longer waiting', async () => {
       const who = await person();
       const notice = await departureNoticeOf(who);
-      const record = () => h.recordNotice(notice.id, h.recording({ lastWorkingDay: h.day(12) }));
+      const record = () =>
+        h.recordNotice(notice.id, h.recording({ lastWorkingDay: h.day(12), accessBlockMode: 'WITH_LAST_DAY' }));
 
       const responses = await meet(who, record, record);
 
@@ -153,7 +159,8 @@ describe('events about one person that meet at once (integration, real PostgreSQ
       const responses = await meet(
         who,
         () => h.recordNotice(move.id, h.recording({ effectiveOn: h.day(20) })),
-        () => h.recordNotice(departure.id, h.recording({ lastWorkingDay: h.day(15) })),
+        () =>
+          h.recordNotice(departure.id, h.recording({ lastWorkingDay: h.day(15), accessBlockMode: 'WITH_LAST_DAY' })),
       );
 
       expect(answers(responses)).toEqual([

@@ -1,4 +1,4 @@
-import { BudgetHarness, Pageable, VersionWire } from '../../support/budget-harness';
+import { BudgetHarness, Pageable } from '../../support/budget-harness';
 import { waitForLockWaiters } from '../../support/lock-wait';
 import type { Person } from '../../support/request-harness';
 
@@ -68,11 +68,6 @@ describe('the closure of the fiscal year of the budgets (integration, real Postg
     it('keeps the current version as the reference budget, closes what never became current and what was never used, and leaves the rest', async () => {
       const a = await sentVersion();
       await approve(a.version.id).expect(200);
-      const revision = h.dataOf<{ version: VersionWire }>(
-        await h
-          .createRevision({ costCenterId: a.department.unitId, year: h.next, reason: 'Cut to the plan' })
-          .expect(201),
-      ).version;
       const b = await sentVersion();
       const waiting = await unit();
       const submitted = await h.budgetProposed(waiting.head, waiting.department.unitId);
@@ -84,10 +79,9 @@ describe('the closure of the fiscal year of the budgets (integration, real Postg
 
       const done = await h.closeYears(h.inTwoYears());
 
-      expect(done).toEqual({ years: 4, expired: 1, closedUnapproved: 2, proposalsClosed: 2 });
+      expect(done).toEqual({ years: 4, expired: 1, closedUnapproved: 1, proposalsClosed: 2 });
       expect(await versionRow(a.version.id)).toMatchObject({ state: 'EXPIRED', never_current: false });
       expect((await versionRow(a.version.id)).expired_at).not.toBeNull();
-      expect(await versionRow(revision.id)).toMatchObject({ state: 'EXPIRED', never_current: true });
       expect(await versionRow(b.version.id)).toMatchObject({ state: 'EXPIRED', never_current: true });
       // What was sent keeps its sending; the decision that was open on it ends with no record of a decision.
       expect((await versionRow(b.version.id)).sent_at).not.toBeNull();

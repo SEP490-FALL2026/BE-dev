@@ -3,7 +3,7 @@ import type { BusinessDate } from '../../../core/business-date';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { CatalogApi } from '../../catalog/public/catalog.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
-import type { PersonalSeat, RevocationSource, TerminatingAccess } from '../public/licensing.types';
+import type { HeldSoftware, PersonalSeat, RevocationSource, TerminatingAccess } from '../public/licensing.types';
 import { RevocationReadRepo } from './revocation-read.repo';
 
 /**
@@ -52,6 +52,42 @@ export class RevocationViewService {
           ]
         : [];
     });
+  }
+
+  /**
+   * The software a person holds on `onDate`, one page and how many there are in all: the plan and its application by name, and the
+   * days the seat begins and ends. Three statements however many seats (the page, the count, the names of the page).
+   */
+  async heldSoftwareOf(
+    employeeId: string,
+    onDate: BusinessDate,
+    page: { skip: number; take: number },
+    tx?: DbTx,
+  ): Promise<{ items: HeldSoftware[]; total: number }> {
+    const { items, total } = await this.reads.heldPage(employeeId, onDate, page, tx);
+    const planIds = [...new Set(items.map((row) => row.planId))];
+    const plans = new Map(
+      (planIds.length > 0 ? await this.catalog.getPlanSummaries(planIds) : []).map((plan) => [plan.planId, plan]),
+    );
+
+    return {
+      items: items.flatMap((row) => {
+        const plan = plans.get(row.planId);
+
+        return plan
+          ? [
+              {
+                assignmentId: row.assignmentId,
+                applicationName: plan.applicationName,
+                planName: plan.planName,
+                grantedOn: row.effectiveFrom,
+                endsOn: row.validUntil,
+              },
+            ]
+          : [];
+      }),
+      total,
+    };
   }
 
   /** How many personal seats each person holds on `onDate` or will, one statement for any number of people (none: absent). */

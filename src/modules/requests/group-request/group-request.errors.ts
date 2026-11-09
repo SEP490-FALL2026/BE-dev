@@ -17,6 +17,25 @@ export class GroupRequestTooManyLinesError extends Error {
   }
 }
 
+/** The term asked for is longer than the plan takes (`US-05-01` AC-4, `QĐ-98`). */
+export class GroupRequestTermBeyondLimitError extends Error {
+  constructor(
+    readonly maxMonths: number,
+    readonly endsBy: string | null,
+  ) {
+    super('The term is longer than a request for a group may ask for.');
+    this.name = 'GroupRequestTermBeyondLimitError';
+  }
+}
+
+/** Fewer different people were named than a request for a group needs, whoever sends it (`QĐ-100aa`, `S-01`). */
+export class GroupRequestTooFewLinesError extends Error {
+  constructor(readonly min: number) {
+    super(`A request for a group names at least ${min} different people.`);
+    this.name = 'GroupRequestTooFewLinesError';
+  }
+}
+
 /** A person was named more than once. */
 export class GroupRequestDuplicateLineError extends Error {
   constructor(readonly employeeIds: readonly string[]) {
@@ -30,14 +49,6 @@ export class GroupRequestLinesRefusedError extends Error {
   constructor(readonly lines: readonly RefusedLine[]) {
     super('Some of the people named cannot be in the request.');
     this.name = 'GroupRequestLinesRefusedError';
-  }
-}
-
-/** The head sends a term over twelve months without confirming it in so many words (`OI-07a`). */
-export class GroupRequestTermConfirmationRequiredError extends Error {
-  constructor() {
-    super('A term over twelve months is confirmed in so many words by the head who sends it.');
-    this.name = 'GroupRequestTermConfirmationRequiredError';
   }
 }
 

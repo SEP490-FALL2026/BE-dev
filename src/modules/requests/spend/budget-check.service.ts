@@ -71,7 +71,7 @@ export class BudgetCheckService {
       staleCostEvidence: result.staleCostEvidence,
       planLineOverdue: result.planLineOverdue,
       periodClosed: result.periodClosed,
-      offPlan: request.offPlan,
+      offPlan: false,
       currency: computed.currency,
       bindingTotalMinor: computed.bindingTotalMinor,
       years: result.years,
@@ -150,8 +150,6 @@ export class BudgetCheckService {
             totalMinor: found.totalMinor,
             heldMinor: found.heldMinor,
             spentMinor: found.spentMinor,
-            highValuePercent: found.highValuePercent,
-            highValueAmountMinor: found.highValueAmountMinor,
           }
         : null;
 
@@ -165,13 +163,11 @@ export class BudgetCheckService {
     });
 
     const quoteValidUntil = assessment?.quote?.validUntil ?? null;
-    const line = request.planLine
-      ? await this.budgets.planLine(request.planLine.versionId, request.planLine.position, tx)
-      : null;
     const result = checkBudget({
       slices,
       staleCostEvidence: quoteValidUntil !== null && quoteValidUntil < today,
-      planLineOverdue: line !== null && line.windowTo < today,
+      // A request is not attached to a line of the plan any more (`QĐ-101n`): none is overdue.
+      planLineOverdue: false,
     });
 
     return {

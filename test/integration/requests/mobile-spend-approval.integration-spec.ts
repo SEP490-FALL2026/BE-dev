@@ -134,7 +134,7 @@ describe('the spending approver decides on the phone (US-16-03, integration)', (
 
       expect(h.dataOf<{ spendApproval: Record<string, unknown> }>(approved).spendApproval).toMatchObject({
         request: { state: 'AWAITING_EXECUTION' },
-        decision: { decision: 'APPROVED', decidedBy: { employeeId: h.boss.employeeId }, bySubstitute: false },
+        decision: { decision: 'APPROVED', decidedBy: { employeeId: h.boss.employeeId } },
       });
       expect(await records(r1)).toEqual([
         expect.objectContaining({ kind: 'NEED', decider_role: 'MANAGER' }),
@@ -182,7 +182,7 @@ describe('the spending approver decides on the phone (US-16-03, integration)', (
   });
 
   describe('a request that waits for Finance, an override, no budget (AC-2)', () => {
-    it('has no spend step on the phone while Finance reviews it; afterwards it is approved only by an override with its reason', async () => {
+    it('has no spend step on the phone while Finance reviews it; afterwards it still cannot be approved past the budget, and takes no override (QĐ-97c)', async () => {
       const u = await example();
       const big = await h.paidRequest(u, plan, { amount: 45 * M });
       await h.sendOn([big], u.head.account).expect(201);
@@ -197,14 +197,14 @@ describe('the spending approver decides on the phone (US-16-03, integration)', (
         .completeReview(big, { outcome: 'ASSESSED', opinion: 'Over by 5 million', direction: 'RECOMMEND_OVERRIDE' })
         .expect(200);
       const bare = await spend(big, { decision: 'APPROVE' }).expect(422);
-      const blank = await spend(big, { decision: 'APPROVE', override: { reason: ' ', years: [h.year] } }).expect(422);
-      await spend(big, { decision: 'APPROVE', override: { reason: 'Revision next month', years: [h.year] } }).expect(
-        200,
-      );
+      const withOverride = await spend(big, {
+        decision: 'APPROVE',
+        override: { reason: 'Revision next month', years: [h.year] },
+      }).expect(422);
 
-      expect([h.codeOf(bare), h.codeOf(blank)]).toEqual(['SPEND.OVERRIDE_REQUIRED', 'VALIDATION_ERROR']);
+      expect([h.codeOf(bare), h.codeOf(withOverride)]).toEqual(['SPEND.OVERRIDE_REQUIRED', 'VALIDATION_ERROR']);
       expect(h.detailsOf(bare)).toMatchObject({ years: [h.year] });
-      expect(await commitments(big)).toEqual([{ state: 'HELD' }]);
+      expect(await commitments(big)).toEqual([]);
     });
 
     it('says a Cost Center has no budget, not that it has nothing left (AC-2)', async () => {

@@ -126,13 +126,9 @@ describe('the time a request took over PostgreSQL (US-05-15 AC-1, AC-6, AC-11)',
           direction: 'RECOMMEND_OVERRIDE',
         })
         .expect(200);
-      await h
-        .decideSpend(
-          id,
-          { decision: 'APPROVE', override: { reason: 'Revision next month', years: [h.year] } },
-          h.boss.account,
-        )
-        .expect(200);
+      // Nothing is approved past the budget any more: the cost is brought within what is left (the way a revised request would be).
+      await h.setPayments(id, { amount: 10 * M });
+      await h.decideSpend(id, { decision: 'APPROVE' }, h.boss.account).expect(200);
       const task = await granted(id);
       await h.claim(task.id).expect(200);
       await h.complete(task.id, { evidence: 'Added to the workspace' }).expect(200);

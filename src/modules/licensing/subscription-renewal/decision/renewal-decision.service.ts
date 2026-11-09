@@ -4,14 +4,12 @@ import type { DbTx } from '../../../../infrastructure/database/transaction-runne
 import type { AuthenticatedPrincipal } from '../../../../infrastructure/security/tokens/access-token-verifier.port';
 import { SubscriptionPeriodApi } from '../../../catalog/public/subscription-period.api';
 import type { RenewalPeriodFacts } from '../../../catalog/public/subscription-period.types';
-import { FinanceSetupIncompleteError } from '../../../organization/public/organization.errors';
 import { OrganizationReadApi } from '../../../organization/public/organization-read.api';
 import { RevocationService } from '../../provisioning/revocation.service';
 import { RenewalFinancialContributions } from '../../public/licensing.extension-points';
 import { RenewalPartiesService } from '../subscription-renewal-parties.service';
 import { RenewalDecisionTrail } from './renewal-decision-trail.service';
 import { RenewalRankingService } from '../subscription-renewal-ranking.service';
-import type { RankedSeat } from '../subscription-renewal-ranking.policy';
 import { RenewalError } from '../subscription-renewal.errors';
 import { SubscriptionRenewalRepo } from '../subscription-renewal.repo';
 import type {
@@ -22,34 +20,23 @@ import type {
   RenewalChoice,
   RenewalRecord,
 } from '../subscription-renewal.types';
-import {
-  checkChoice,
-  checkDecider,
-  checkRelease,
-  executionPointOf,
-  needsChargeableOwner,
-  seatsToRelease,
-} from './renewal-decision.policy';
+import { checkDecider, executionPointOf, proposalIsStale, seatsToRelease } from './renewal-decision.policy';
 
-export interface DecideRenewalInput {
-  choice: RenewalChoice;
-  quantity?: number;
+export interface ConfirmRenewalInput {
   reason?: string;
-  /** A reduction carried out within the paid period, without renewing (only where the subscription allows it). */
-  withinCurrentTerm?: boolean;
-  /** The decider saw how many people use the subscription and still cancels it (`US-11-02` AC-2). */
+  /** The head saw how many people use the subscription and still cancels it (`US-11-02` AC-2). */
   acknowledgeActiveUsers?: boolean;
-  /** The seats in use chosen for revocation when reducing below them (`QĐ-66x`). */
-  releasedAssignmentIds?: string[];
 }
 
 /**
- * The decision of a renewal by the person who decides spending (`US-11-02`): renew as it is, reduce, or cancel. Only the decider of
- * the case decides, never the IT Admin who proposed it (`SoD-3`); a cancellation while seats are in use is confirmed after the
- * warning; a reduction below the seats in use names the seats to take back, chosen by the decider from the ranked list. The
- * decision is written with the snapshot the decider saw, its execution point, the seats chosen and its audit event, and the
- * revocations it asks for are opened through the one gate of revocations. It writes no budget commitment (`QĐ-62s`), creates no
- * new period and records no savings: that is the outcome's business.
+ * The confirmation of a renewal by the head of the department that owns the subscription (`QĐ-94d`(2), `US-11-05`): the proposal of
+ * the IT Admin — renew as it is, reduce, or cancel — becomes the decision as it is, and nothing of it is chosen again here. Only the
+ * head of the owner department on the day of the decision confirms, never the IT Admin who proposed it (`SoD-3`); a cancellation
+ * while seats are in use is confirmed after the warning; the seats the IT Admin proposed to take back must still be exactly the
+ * excess of that day, else the proposal is out of date. The decision is written with the snapshot, its execution point and its audit
+ * event, and the revocations it asks for are opened through the one gate of revocations. It writes no budget commitment (`QĐ-62s`),
+ * creates no new period and records no savings: that is the outcome's business. It does not wait for a Cost Center: the proposal
+ * never raises the quantity (`QĐ-94m`(2)).
  */
 @Injectable()
 export class RenewalDecisionService {
@@ -64,11 +51,11 @@ export class RenewalDecisionService {
     private readonly trail: RenewalDecisionTrail,
   ) {}
 
-  /** Throws RenewalError, FinanceSetupIncompleteError and the refusals of the revocation gate; nothing is written then. */
-  async decide(
+  /** Throws RenewalError and the refusals of the revocation gate; nothing is written then. */
+  async confirm(
     actor: AuthenticatedPrincipal,
     id: string,
-    input: DecideRenewalInput,
+    input: ConfirmRenewalInput,
     now = new Date(),
   ): Promise<RenewalRecord> {
     const today = await this.organizationReads.businessToday(now);
@@ -76,32 +63,42 @@ export class RenewalDecisionService {
     if (!current) throw new RenewalError('NOT_FOUND');
     const [period] = await this.periods.getPeriods([current.subscriptionId]);
     if (!period) throw new RenewalError('NOT_FOUND');
+    // Who may decide is settled before the money is read and before any row is locked: a head of another department finds no such case,
+    // and a caller who is not the head of this one is refused (`NOT_DECIDER`) without the snapshot being taken.
+    const scope = await this.parties.readScopeOf(actor, today);
+    if (scope?.kind === 'DEPARTMENT' && scope.departmentId !== period.ownerDepartmentId) {
+      throw new RenewalError('NOT_FOUND');
+    }
+    this.refuse(await this.deciderProblem(actor, current, period.ownerDepartmentId, today));
     const snapshot = await this.snapshotOf(period, now);
 
-    return this.trail.run(async (tx) => {
+    const result = await this.trail.run(async (tx) => {
       const record = await this.repo.lock(tx, id);
       if (!record) throw new RenewalError('NOT_FOUND');
-      const decider = await this.parties.deciderOf(record.proposedByEmployeeId, tx);
-      this.refuse(
-        checkDecider({
-          actorEmployeeId: actor.employeeId,
-          deciderEmployeeId: decider.employeeId,
-          proposerEmployeeId: record.proposedByEmployeeId,
-          waitingForDecision: record.state === 'PROPOSED',
-        }),
-      );
-      await this.checkInput(tx, period, input);
+      const decider = await this.parties.deciderOf(period.ownerDepartmentId, record.proposedByEmployeeId, today, tx);
+      this.refuse(await this.deciderProblem(actor, record, period.ownerDepartmentId, today, tx));
       const seats = await this.ranking.seatsOf(period.subscriptionId, today, tx);
-      const released = this.released(input, seats.held.length, seats.ranked);
+      const choice = record.proposedChoice;
+      const released = await this.repo.releasedOf(id, tx);
+      let toRevoke: string[];
+      try {
+        toRevoke = this.toRevoke(choice, record, seats.held, released, input);
+      } catch (error) {
+        if (!(error instanceof RenewalError) || error.problem !== 'PROPOSAL_STALE') throw error;
+        // The proposal is a dead end if it only answers 409: it is closed here, in the same transaction, and the IT Admin proposes again.
+        await this.repo.closeStale(tx, id);
+        await this.trail.closedStale(tx, actor, record, error.details);
+
+        return error;
+      }
       const point = executionPointOf({
         decidedOn: today,
         baseDate: record.noticeBaseDate,
         allowsMidTermReduction: period.allowsMidTermReduction,
-        withinCurrentTerm: input.withinCurrentTerm === true,
       });
       const decided = await this.repo.recordDecision(tx, id, {
-        choice: input.choice,
-        quantity: input.quantity ?? null,
+        choice,
+        quantity: record.proposedQuantity,
         reason: input.reason?.trim() || null,
         decidedByEmployeeId: actor.employeeId,
         decidedByAppUserId: actor.appUserId,
@@ -113,18 +110,31 @@ export class RenewalDecisionService {
         activeSeatsAtDecision: seats.held.length,
         snapshot,
       });
-      await this.repo.insertReleased(tx, id, released);
-      await this.openRevocations(
-        tx,
-        actor,
-        decided,
-        decider.role,
-        this.toRevoke(input.choice, seats.held, released),
-        now,
-      );
+      await this.openRevocations(tx, actor, decided, decider.role, toRevoke, now);
       await this.trail.told(tx, actor, decided, period, released);
 
       return decided;
+    });
+    if (result instanceof RenewalError) throw result;
+
+    return result;
+  }
+
+  /** Why this caller may not confirm this case now, or null: the head of the owner department today, never its proposer, and only while it waits. */
+  private async deciderProblem(
+    actor: AuthenticatedPrincipal,
+    record: RenewalRecord,
+    ownerDepartmentId: string,
+    today: BusinessDate,
+    tx?: DbTx,
+  ) {
+    const decider = await this.parties.deciderOf(ownerDepartmentId, record.proposedByEmployeeId, today, tx);
+
+    return checkDecider({
+      actorEmployeeId: actor.employeeId,
+      deciderEmployeeId: decider.employeeId,
+      proposerEmployeeId: record.proposedByEmployeeId,
+      waitingForDecision: record.state === 'PROPOSED',
     });
   }
 
@@ -132,46 +142,32 @@ export class RenewalDecisionService {
     if (problem) throw new RenewalError(problem);
   }
 
-  /** The choice fits the subscription, and a decision that owes more into a new period has a Cost Center to charge (`QĐ-88a`). */
-  private async checkInput(tx: DbTx, period: RenewalPeriodFacts, input: DecideRenewalInput): Promise<void> {
-    const withinCurrentTerm = input.withinCurrentTerm === true;
-    this.refuse(
-      checkChoice({
-        choice: input.choice,
-        quantity: input.quantity ?? null,
-        purchasedQuantity: period.purchasedQuantity,
-        withinCurrentTerm,
-        allowsMidTermReduction: period.allowsMidTermReduction,
-      }),
-    );
-    if (!needsChargeableOwner({ choice: input.choice, quantity: input.quantity ?? null, withinCurrentTerm })) return;
-    const owner = await this.organizationReads.getDepartmentBrief(period.ownerDepartmentId, tx);
-    if (!owner?.costCenterActive) throw new FinanceSetupIncompleteError(period.ownerDepartmentId);
-  }
+  /**
+   * What the confirmation asks to take back: every personal seat of a cancelled subscription (after the warning of the people who
+   * still use it), or the seats the IT Admin proposed that are still held, which must be exactly the excess of today.
+   */
+  private toRevoke(
+    choice: RenewalChoice,
+    record: RenewalRecord,
+    held: readonly HeldSeat[],
+    released: readonly ReleasedSeat[],
+    input: ConfirmRenewalInput,
+  ): string[] {
+    if (choice === 'CANCEL') {
+      if (held.length > 0 && input.acknowledgeActiveUsers !== true) {
+        throw new RenewalError('ACTIVE_USERS_NOT_ACKNOWLEDGED', { seatsInUse: held.length });
+      }
 
-  /** The seats chosen for revocation, checked against the ranking; a cancellation in use waits for the decider's confirmation. */
-  private released(input: DecideRenewalInput, seatsInUse: number, ranked: readonly RankedSeat[]): ReleasedSeat[] {
-    if (input.choice === 'CANCEL' && seatsInUse > 0 && input.acknowledgeActiveUsers !== true) {
-      throw new RenewalError('ACTIVE_USERS_NOT_ACKNOWLEDGED', { seatsInUse });
+      return held.filter((seat) => seat.kind === 'PERSONAL').map((seat) => seat.assignmentId);
     }
-    const required = seatsToRelease(input.choice, input.quantity ?? null, seatsInUse);
-    const selected = input.releasedAssignmentIds ?? [];
-    const problem = checkRelease({ required, selected, offered: new Set(ranked.map((seat) => seat.assignmentId)) });
-    if (problem) throw new RenewalError(problem, { required, selected: selected.length });
-    const rankOf = new Map(ranked.map((seat) => [seat.assignmentId, seat]));
+    const required = seatsToRelease(choice, record.proposedQuantity, held.length);
+    const heldIds = new Set(held.filter((seat) => seat.kind === 'PERSONAL').map((seat) => seat.assignmentId));
+    const stillHeld = released.filter((seat) => heldIds.has(seat.assignmentId)).map((seat) => seat.assignmentId);
+    if (proposalIsStale({ required, stillHeld: stillHeld.length })) {
+      throw new RenewalError('PROPOSAL_STALE', { required, stillHeld: stillHeld.length });
+    }
 
-    return selected.map((assignmentId) => {
-      const seat = rankOf.get(assignmentId) as RankedSeat;
-
-      return { assignmentId, rankGroup: seat.group, position: seat.position };
-    });
-  }
-
-  /** What the decision asks to take back: every personal seat of a cancelled subscription, or the seats chosen in a reduction. */
-  private toRevoke(choice: RenewalChoice, held: readonly HeldSeat[], released: readonly ReleasedSeat[]): string[] {
-    if (choice === 'CANCEL') return held.filter((seat) => seat.kind === 'PERSONAL').map((seat) => seat.assignmentId);
-
-    return released.map((seat) => seat.assignmentId);
+    return stillHeld;
   }
 
   private async openRevocations(
@@ -198,7 +194,7 @@ export class RenewalDecisionService {
     }
   }
 
-  /** What the decider saw of money, frozen now: the reader of the module that owns budgets, or that none is connected. */
+  /** What the head saw of money, frozen now: the reader of the module that owns budgets, or that none is connected. */
   private async snapshotOf(period: RenewalPeriodFacts, now: Date): Promise<DecisionSnapshot> {
     const [reader] = this.financial.all();
     if (!reader) return { source: 'NOT_CONNECTED', takenAt: now.toISOString() };

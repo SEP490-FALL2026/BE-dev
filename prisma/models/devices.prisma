@@ -1,0 +1,222 @@
+// The register of company machines that one person uses, the notice about what is collected, the signed `BM-06` record, the
+// acknowledgement of the holder and the request to stop collecting (`US-09-01`, `US-09-03`, `US-09-04`, `US-09-08`).
+// Exclusion, partial unique indexes, CHECKs and the append-only triggers are SQL in the migration (ADR-0005).
+
+enum DeviceRegistrationEndCause {
+  HOLDER_CHANGED
+  DEVICE_RETIRED
+  DEPARTURE
+  EMPLOYEE_LEFT
+}
+
+enum DeviceCollectorKind {
+  AI_COLLECTOR
+  BROWSER_EXTENSION
+}
+
+enum DeviceCredentialRevocationCause {
+  IT_ADMIN
+  REGISTRATION_ENDED
+  REPLACED
+}
+
+enum DeviceStopRequestState {
+  OPEN
+  COMPLETED
+  INVALID
+}
+
+enum DeviceStopInvalidReason {
+  DUPLICATE
+  ALREADY_STOPPED
+  REGISTRATION_ENDED
+  IT_ADMIN
+}
+
+model ManagedDevice {
+  id                  String    @id @default(uuid(7)) @db.Uuid
+  organizationId      String    @map("organization_id") @db.Uuid
+  assetCode           String    @map("asset_code")
+  normalizedAssetCode String    @map("normalized_asset_code")
+  hostname            String
+  os                  String
+  retiredAt           DateTime? @map("retired_at") @db.Timestamptz(3)
+  retirementReason    String?   @map("retirement_reason")
+  createdByAppUserId  String    @map("created_by_app_user_id") @db.Uuid
+  createdAt           DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt           DateTime  @updatedAt @map("updated_at") @db.Timestamptz(3)
+
+  registrations DeviceRegistration[]
+  credentials   DeviceCredential[]
+
+  @@unique([organizationId, normalizedAssetCode])
+  @@map("managed_devices")
+}
+
+model DeviceRegistration {
+  id                  String                      @id @default(uuid(7)) @db.Uuid
+  organizationId      String                      @map("organization_id") @db.Uuid
+  deviceId            String                      @map("device_id") @db.Uuid
+  holderEmployeeId    String                      @map("holder_employee_id") @db.Uuid
+  validFrom           DateTime                    @map("valid_from") @db.Date
+  validUntil          DateTime?                   @map("valid_until") @db.Date
+  endedAt             DateTime?                   @map("ended_at") @db.Timestamptz(3)
+  endCause            DeviceRegistrationEndCause? @map("end_cause")
+  // The head of the chain of acknowledgements still in force; null until the holder acknowledges (a projection, never edited by hand).
+  acknowledgedFrom    DateTime?                   @map("acknowledged_from") @db.Timestamptz(3)
+  // Set when a stop request was completed and the holder has not turned collection back on.
+  collectionStoppedAt DateTime?                   @map("collection_stopped_at") @db.Timestamptz(3)
+  createdByAppUserId  String                      @map("created_by_app_user_id") @db.Uuid
+  createdAt           DateTime                    @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  device           ManagedDevice           @relation(fields: [deviceId], references: [id], onDelete: Restrict)
+  holder           Employee                @relation(fields: [holderEmployeeId], references: [id], onDelete: Restrict)
+  signatureRecords DeviceSignatureRecord[]
+  acknowledgements DeviceAcknowledgement[]
+  stopRequests     DeviceStopRequest[]
+  enrollmentCodes  DeviceEnrollmentCode[]
+  credentials      DeviceCredential[]
+
+  @@index([holderEmployeeId])
+  @@index([deviceId])
+  @@map("device_registrations")
+}
+
+model MonitoringNoticeVersion {
+  id                        String   @id @default(uuid(7)) @db.Uuid
+  organizationId            String   @map("organization_id") @db.Uuid
+  versionNumber             Int      @map("version_number")
+  collected                 String
+  notCollected              String   @map("not_collected")
+  purpose                   String
+  retention                 String
+  stopRight                 String   @map("stop_right")
+  includesToolStatus        Boolean  @map("includes_tool_status")
+  requiresReacknowledgement Boolean  @map("requires_reacknowledgement")
+  publishedByAppUserId      String   @map("published_by_app_user_id") @db.Uuid
+  publishedAt               DateTime @default(now()) @map("published_at") @db.Timestamptz(3)
+
+  signatureRecords DeviceSignatureRecord[]
+  acknowledgements DeviceAcknowledgement[]
+
+  @@unique([organizationId, versionNumber])
+  @@map("monitoring_notice_versions")
+}
+
+model DeviceSignatureRecord {
+  id                  String   @id @default(uuid(7)) @db.Uuid
+  organizationId      String   @map("organization_id") @db.Uuid
+  registrationId      String   @map("registration_id") @db.Uuid
+  // A value, not a foreign key: the file is owned by the catalog and the record only names it.
+  documentId          String   @unique @map("document_id") @db.Uuid
+  noticeVersionId     String   @map("notice_version_id") @db.Uuid
+  signerEmployeeId    String   @map("signer_employee_id") @db.Uuid
+  recordedByAppUserId String   @map("recorded_by_app_user_id") @db.Uuid
+  recordedAt          DateTime @default(now()) @map("recorded_at") @db.Timestamptz(3)
+
+  registration  DeviceRegistration      @relation(fields: [registrationId], references: [id], onDelete: Restrict)
+  noticeVersion MonitoringNoticeVersion @relation(fields: [noticeVersionId], references: [id], onDelete: Restrict)
+
+  @@index([registrationId, recordedAt])
+  @@map("device_signature_records")
+}
+
+model DeviceAcknowledgement {
+  id              String   @id @default(uuid(7)) @db.Uuid
+  organizationId  String   @map("organization_id") @db.Uuid
+  registrationId  String   @map("registration_id") @db.Uuid
+  noticeVersionId String   @map("notice_version_id") @db.Uuid
+  employeeId      String   @map("employee_id") @db.Uuid
+  appUserId       String   @map("app_user_id") @db.Uuid
+  acknowledgedAt  DateTime @default(now()) @map("acknowledged_at") @db.Timestamptz(3)
+
+  registration  DeviceRegistration      @relation(fields: [registrationId], references: [id], onDelete: Restrict)
+  noticeVersion MonitoringNoticeVersion @relation(fields: [noticeVersionId], references: [id], onDelete: Restrict)
+
+  @@index([registrationId, acknowledgedAt])
+  @@map("device_acknowledgements")
+}
+
+model DeviceStopRequest {
+  id                  String                   @id @default(uuid(7)) @db.Uuid
+  organizationId      String                   @map("organization_id") @db.Uuid
+  registrationId      String                   @map("registration_id") @db.Uuid
+  requesterEmployeeId String                   @map("requester_employee_id") @db.Uuid
+  requestedAt         DateTime                 @default(now()) @map("requested_at") @db.Timestamptz(3)
+  dueAt               DateTime?                @map("due_at") @db.Timestamptz(3)
+  state               DeviceStopRequestState
+  invalidReason       DeviceStopInvalidReason? @map("invalid_reason")
+  invalidNote         String?                  @map("invalid_note")
+  handledByAppUserId  String?                  @map("handled_by_app_user_id") @db.Uuid
+  handledAt           DateTime?                @map("handled_at") @db.Timestamptz(3)
+  selfHandled         Boolean                  @default(false) @map("self_handled")
+  overdueNoticedAt    DateTime?                @map("overdue_noticed_at") @db.Timestamptz(3)
+
+  registration DeviceRegistration @relation(fields: [registrationId], references: [id], onDelete: Restrict)
+
+  @@index([state, dueAt])
+  @@map("device_stop_requests")
+}
+
+// One code lets one collector exchange it for a credential (the browser extension may be installed in a few profiles).
+model DeviceEnrollmentCode {
+  id                 String              @id @default(uuid(7)) @db.Uuid
+  organizationId     String              @map("organization_id") @db.Uuid
+  registrationId     String              @map("registration_id") @db.Uuid
+  collectorKind      DeviceCollectorKind @map("collector_kind")
+  // Only the hash of the code is kept; the code itself is shown once.
+  codeHash           String              @unique @map("code_hash")
+  maxUses            Int                 @map("max_uses")
+  uses               Int                 @default(0)
+  expiresAt          DateTime            @map("expires_at") @db.Timestamptz(3)
+  createdByAppUserId String              @map("created_by_app_user_id") @db.Uuid
+  createdAt          DateTime            @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  registration DeviceRegistration    @relation(fields: [registrationId], references: [id], onDelete: Restrict)
+  enrollments  DeviceEnrollmentUse[]
+
+  @@index([registrationId])
+  @@map("device_enrollment_codes")
+}
+
+// Which credential an `Idempotency-Key` of an enrollment produced: a retry after a lost answer gets it again.
+model DeviceEnrollmentUse {
+  id                 String   @id @default(uuid(7)) @db.Uuid
+  codeId             String   @map("code_id") @db.Uuid
+  idempotencyKeyHash String   @map("idempotency_key_hash")
+  credentialId       String   @unique @map("credential_id") @db.Uuid
+  usedAt             DateTime @default(now()) @map("used_at") @db.Timestamptz(3)
+
+  code       DeviceEnrollmentCode @relation(fields: [codeId], references: [id], onDelete: Restrict)
+  credential DeviceCredential     @relation(fields: [credentialId], references: [id], onDelete: Restrict)
+
+  @@unique([codeId, idempotencyKeyHash])
+  @@map("device_enrollment_uses")
+}
+
+model DeviceCredential {
+  id                 String                           @id @default(uuid(7)) @db.Uuid
+  organizationId     String                           @map("organization_id") @db.Uuid
+  registrationId     String                           @map("registration_id") @db.Uuid
+  deviceId           String                           @map("device_id") @db.Uuid
+  collectorKind      DeviceCollectorKind              @map("collector_kind")
+  // Only the hash of the secret is kept. The previous one stays valid for a day after a rotation, until the new one is used.
+  secretHash         String                           @map("secret_hash")
+  secretUsedAt       DateTime?                        @map("secret_used_at") @db.Timestamptz(3)
+  previousSecretHash String?                          @map("previous_secret_hash")
+  previousValidUntil DateTime?                        @map("previous_valid_until") @db.Timestamptz(3)
+  issuedAt           DateTime                         @default(now()) @map("issued_at") @db.Timestamptz(3)
+  expiresAt          DateTime                         @map("expires_at") @db.Timestamptz(3)
+  lastAcceptedAt     DateTime?                        @map("last_accepted_at") @db.Timestamptz(3)
+  revokedAt          DateTime?                        @map("revoked_at") @db.Timestamptz(3)
+  revocationCause    DeviceCredentialRevocationCause? @map("revocation_cause")
+  revocationReason   String?                          @map("revocation_reason")
+  revokedByAppUserId String?                          @map("revoked_by_app_user_id") @db.Uuid
+
+  registration DeviceRegistration   @relation(fields: [registrationId], references: [id], onDelete: Restrict)
+  device       ManagedDevice        @relation(fields: [deviceId], references: [id], onDelete: Restrict)
+  enrollment   DeviceEnrollmentUse?
+
+  @@index([registrationId])
+  @@map("device_credentials")
+}

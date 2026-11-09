@@ -1,4 +1,5 @@
 import { Body, Controller, Get, HttpStatus, Param, Post, Query } from '@nestjs/common';
+import { PersonnelGroundsDateService } from '../personnel-grounds-date.service';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   ApiErrorResponses,
@@ -71,11 +72,11 @@ const PERSON_REFUSALS = [E.EMPLOYEE_LEFT, E.ALREADY_HANDING_OVER, E.PENDING_EVEN
 const DAY_REFUSALS = [E.LAST_WORKING_DAY_INVALID, E.SUCCESSOR_NOT_A_MEMBER_ON_DATE] as const;
 
 const GROUNDS_REFUSALS =
-  'the basis is empty or lacks a part (OFFBOARDING_CASE.GROUNDS_REQUIRED, GROUNDS_INCOMPLETE) or is the code of a notice and not a document (GROUNDS_IS_NOTICE)';
-const GROUNDS_EXAMPLES = [E.GROUNDS_REQUIRED, E.GROUNDS_INCOMPLETE, E.GROUNDS_IS_NOTICE] as const;
+  'the basis is the code of a notice and not a document (OFFBOARDING_CASE.GROUNDS_IS_NOTICE), it is issued after today (PERSONNEL.GROUNDS_ISSUED_ON_FUTURE); a basis that is missing or lacks a part is a VALIDATION_ERROR';
+const GROUNDS_EXAMPLES = [E.GROUNDS_IS_NOTICE, PERSONNEL_ACCESS_ERROR_EXAMPLES.GROUNDS_ISSUED_ON_FUTURE] as const;
 
 /**
- * The departure of a person: a handover with the last working day and the basis it rests on, or an abrupt departure (the Super Admin
+ * The departure of a person: a handover with the last working day and the basis it rests on, blocked from the last working day or from the day it is recorded (the Super Admin
  * records, moves, cancels and marks it, `QĐ-87a`), the list of the rights the person holds, the lock of the company account, the
  * revocations the IT Admin asks for and the closing of the case (the IT Admin's technical steps). Finance, a department head and an
  * employee are refused. The role is judged again by the service, so this guard is only the outer layer. Nothing is revoked by itself.
@@ -89,6 +90,7 @@ export class OffboardingController {
     private readonly left: OffboardingLeftService,
     private readonly view: OffboardingViewService,
     private readonly detail: OffboardingDetailService,
+    private readonly groundsDate: PersonnelGroundsDateService,
   ) {}
 
   @Post()
@@ -98,7 +100,7 @@ export class OffboardingController {
     status: HttpStatus.CREATED,
     message: 'OFFBOARDING_CASE.RECORDED',
     description:
-      'The handover was recorded with the last working day and the basis, or the departure was recorded as having happened (an abrupt one is left at once). The placement of the person ends the day after the last working day, the head of the department they leave is handed over or left empty as chosen (a warning says from when), a long leave ends, a transfer that would take effect later is cancelled with the reason given, and the head of the department is asked to confirm the handover of every tool. No seat is taken away and no task is made. A person with no placement in force (department null) is recorded the same way with no placement to end and no head handover; a first placement not yet in force that starts after the last working day is cancelled with the record, and put back if the case is cancelled.',
+      'The handover was recorded with the last working day and the basis, or, blocked now, the departure was recorded with the access of the person refused from the next request (a last working day that is today or past leaves the person at once). The placement of the person ends the day after the last working day, the head of the department they leave is handed over or left empty as chosen (a warning says from when), a long leave ends, a transfer that would take effect later is cancelled with the reason given, and the head of the department is asked to confirm the handover of every tool. No seat is taken away and no task is made. A person with no placement in force (department null) is recorded the same way with no placement to end and no head handover; a first placement not yet in force that starts after the last working day is cancelled with the record, and put back if the case is cancelled.',
   })
   @ApiErrorResponses(
     ...WRITE_COMMON,
@@ -114,17 +116,18 @@ export class OffboardingController {
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
-      description: `The body is invalid (VALIDATION_ERROR), there is no last working day or it is not allowed (OFFBOARDING_CASE.LAST_WORKING_DAY_REQUIRED, LAST_WORKING_DAY_INVALID), ${GROUNDS_REFUSALS}, the reason to cancel the transfer that waits is missing (TRANSFER_CANCELLATION_REASON_REQUIRED), or the person chosen to follow the head cannot take the department that day (SUCCESSOR_NOT_A_MEMBER_ON_DATE): nothing is saved.`,
+      description: `The body is invalid (VALIDATION_ERROR), there is no last working day or it is not allowed (OFFBOARDING_CASE.LAST_WORKING_DAY_REQUIRED, LAST_WORKING_DAY_INVALID), ${GROUNDS_REFUSALS}, a transfer that waits would be cancelled by the departure and the confirmation is missing (TRANSFER_CANCELLATION_REQUIRED), or the person chosen to follow the head cannot take the department that day (SUCCESSOR_NOT_A_MEMBER_ON_DATE): nothing is saved.`,
       examples: [
         VALIDATION_EXAMPLE,
         E.LAST_WORKING_DAY_REQUIRED,
         ...DAY_REFUSALS,
         ...GROUNDS_EXAMPLES,
-        E.TRANSFER_CANCELLATION_REASON_REQUIRED,
+        E.TRANSFER_CANCELLATION_REQUIRED,
       ],
     },
   )
   async record(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Body() body: RecordOffboardingBodyDto) {
+    await this.groundsDate.assertNotInFuture(body.grounds);
     try {
       return await this.detail.detailOf(await this.offboarding.record(userActor(actor), body));
     } catch (error) {
@@ -218,7 +221,7 @@ export class OffboardingController {
   @ApiSuccessResponse(OffboardingDetailResponseDto, {
     message: 'OFFBOARDING_CASE.LAST_DAY_CHANGED',
     description:
-      'The last working day moved: the placement of the person and the handover of the head move with it, the day the confirmation is due is counted again, and a reason is kept. Only a handover under way before its last working day can move.',
+      'The last working day moved: the placement of the person and the handover of the head move with it, the day the confirmation is due is counted again, and the reason and the basis are kept. Only a handover under way before its last working day can move.',
   })
   @ApiErrorResponses(
     ...WRITE_COMMON,
@@ -230,9 +233,8 @@ export class OffboardingController {
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
-      description:
-        'The body is invalid (VALIDATION_ERROR), no reason is given (OFFBOARDING_CASE.REASON_REQUIRED), the day is the same or not allowed (NO_CHANGE, LAST_WORKING_DAY_INVALID), or the head of the department cannot be handed over on the new day (SUCCESSOR_NOT_A_MEMBER_ON_DATE): nothing is saved, and the old day and the old choice stay.',
-      examples: [VALIDATION_EXAMPLE, E.REASON_REQUIRED, E.NO_CHANGE, ...DAY_REFUSALS],
+      description: `The body is invalid, such as one without a reason or a basis (VALIDATION_ERROR), ${GROUNDS_REFUSALS}, the day is the same or not allowed (NO_CHANGE, LAST_WORKING_DAY_INVALID), or the head of the department cannot be handed over on the new day (SUCCESSOR_NOT_A_MEMBER_ON_DATE): nothing is saved, and the old day and the old choice stay.`,
+      examples: [VALIDATION_EXAMPLE, ...GROUNDS_EXAMPLES, E.NO_CHANGE, ...DAY_REFUSALS],
     },
   )
   async changeLastDay(
@@ -240,11 +242,9 @@ export class OffboardingController {
     @Param() params: OffboardingIdParamDto,
     @Body() body: ChangeLastDayBodyDto,
   ) {
+    await this.groundsDate.assertNotInFuture(body.grounds);
     try {
-      const record = await this.changes.changeLastDay(userActor(actor), params.id, {
-        ...body,
-        reason: body.reason ?? '',
-      });
+      const record = await this.changes.changeLastDay(userActor(actor), params.id, body);
 
       return await this.detail.detailOf(record);
     } catch (error) {
@@ -270,8 +270,8 @@ export class OffboardingController {
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
-      description: 'The body is invalid (VALIDATION_ERROR) or no reason is given (OFFBOARDING_CASE.REASON_REQUIRED).',
-      examples: [VALIDATION_EXAMPLE, E.REASON_REQUIRED],
+      description: `The body is invalid, such as one without a reason or a basis (VALIDATION_ERROR), or ${GROUNDS_REFUSALS}.`,
+      examples: [VALIDATION_EXAMPLE, ...GROUNDS_EXAMPLES],
     },
   )
   async cancel(
@@ -279,8 +279,9 @@ export class OffboardingController {
     @Param() params: OffboardingIdParamDto,
     @Body() body: CancelOffboardingBodyDto,
   ) {
+    await this.groundsDate.assertNotInFuture(body.grounds);
     try {
-      const record = await this.changes.cancel(userActor(actor), params.id, { reason: body.reason ?? '' });
+      const record = await this.changes.cancel(userActor(actor), params.id, body);
       const detail = await this.detail.detailOf(record);
       return record.firstPlacementRestored !== undefined
         ? { ...detail, firstPlacementRestored: record.firstPlacementRestored }
@@ -303,23 +304,23 @@ export class OffboardingController {
     NOT_FOUND,
     {
       status: HttpStatus.CONFLICT,
-      description: `The person has left already (OFFBOARDING_CASE.CASE_LEFT), the handover is not under way (NOT_HANDING_OVER), or ${CONCURRENT}.`,
-      examples: NOT_UNDER_WAY,
+      description: `The person has left already (OFFBOARDING_CASE.CASE_LEFT), the handover is not under way (NOT_HANDING_OVER), the last working day has not come yet (LAST_WORKING_DAY_AHEAD, details.lastWorkingDay), or ${CONCURRENT}.`,
+      examples: [...NOT_UNDER_WAY, E.LAST_WORKING_DAY_AHEAD],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
-      description:
-        'The body is invalid (VALIDATION_ERROR) or the day the person left is ahead or before the handover was recorded (OFFBOARDING_CASE.DEPARTED_ON_INVALID).',
-      examples: [VALIDATION_EXAMPLE, E.DEPARTED_ON_INVALID],
+      description: 'The body is invalid (VALIDATION_ERROR): it takes no field.',
+      examples: [VALIDATION_EXAMPLE],
     },
   )
   async markLeft(
+    // Validated only: the body is a strict empty object, so a client that still sends `departedOn` or `accountLock` is refused.
+    @Body() _body: MarkLeftBodyDto,
     @CurrentPrincipal() actor: AuthenticatedPrincipal,
     @Param() params: OffboardingIdParamDto,
-    @Body() body: MarkLeftBodyDto,
   ) {
     try {
-      return await this.detail.detailOf(await this.left.markLeft(userActor(actor), params.id, body));
+      return await this.detail.detailOf(await this.left.markLeft(userActor(actor), params.id));
     } catch (error) {
       throw toOffboardingApiException(error);
     }

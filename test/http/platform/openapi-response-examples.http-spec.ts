@@ -72,7 +72,8 @@ describe('API inventory (e2e): response examples', () => {
       const hasInput = (operation.parameters?.length ?? 0) > 0 || takesJson;
       const guarded = access !== 'public';
       const codes: string[] = [];
-      if (status === '401' && guarded) codes.push('AUTHENTICATION_REQUIRED', 'INVALID_ACCESS_TOKEN');
+      if (status === '401' && guarded && access !== 'device')
+        codes.push('AUTHENTICATION_REQUIRED', 'INVALID_ACCESS_TOKEN');
       if (status === '503' && guarded) codes.push('TOKEN_VERIFICATION_UNAVAILABLE', 'SERVICE_UNAVAILABLE');
       if (status === '403' && access === 'roles') codes.push('AUTHORIZATION.FORBIDDEN');
       if (status === '422' && hasInput) codes.push('VALIDATION_ERROR');
@@ -82,6 +83,23 @@ describe('API inventory (e2e): response examples', () => {
       if (status === '415' && takesJson) codes.push('HTTP_UNSUPPORTED_MEDIA_TYPE');
       return codes;
     }
+
+    it('G-L7: every route a collector calls shows the three device 401 codes, and no user 401 code', () => {
+      const problems: string[] = [];
+      const access = accessByOperation();
+      for (const { operation, key, response } of responses((code) => code === 401)) {
+        if (access.get(operation.operationId) !== 'device') continue;
+        const shown = JSON.stringify(json(response) ?? {});
+        for (const code of ['DEVICE.CREDENTIAL_INVALID', 'DEVICE.CREDENTIAL_REVOKED', 'DEVICE.CREDENTIAL_EXPIRED']) {
+          if (!shown.includes(code)) problems.push(`${key}: ${code} missing`);
+        }
+        for (const code of ['AUTHENTICATION_REQUIRED', 'INVALID_ACCESS_TOKEN']) {
+          if (shown.includes(code)) problems.push(`${key}: ${code} is not a device answer`);
+        }
+      }
+
+      expect(problems).toEqual([]);
+    });
 
     it('every JSON success response shows exactly the message its decorator declares, on the unchanged DTO', () => {
       const reflector = app.get(Reflector);

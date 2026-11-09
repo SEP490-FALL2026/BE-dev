@@ -1,3 +1,4 @@
+import type { Person } from '../../support/request-harness';
 import { SpendHarness, Unit } from '../../support/spend-harness';
 
 const h = new SpendHarness();
@@ -7,14 +8,18 @@ interface SupplementWire {
   number: number;
   reason: string;
   changedBy: { employeeId: string };
-  expectedSpendOn: { before: string; after: string };
-  budgetYear: { before: number; after: number };
   amount: { before: { amount: string }; after: { amount: string } };
+  droppedCount: number;
 }
 
-describe('the supplementary file of the head over PostgreSQL (US-06-14 AC-13, AC-15; US-05-04 AC-16)', () => {
+/**
+ * The supplementary file of the head (US-06-14 AC-13, AC-16): after QĐ-98 the only change the head makes to a request that waits in
+ * their queue is to leave people of a request for a group out. The day the money goes out is no longer asked, so no file changes it.
+ */
+describe('the supplementary file of the head over PostgreSQL (US-06-14 AC-13, AC-16)', () => {
   let plan: string;
   let design: Unit;
+  let counter = 0;
 
   beforeAll(async () => {
     await h.start();
@@ -25,93 +30,68 @@ describe('the supplementary file of the head over PostgreSQL (US-06-14 AC-13, AC
       .expect(200);
     design = await h.departmentWithHead('P-DES');
     await h.budgetFor(design, { total: 1000 * M });
+    await h.budgetFor(design, { total: 1000 * M, year: h.next });
   }, 240000);
 
   afterAll(async () => {
     await h.stop();
   });
 
-  /** A request whose money was to go out in a year that has ended: it stopped when it was sent on. */
-  const closed = async () => {
-    const id = await h.paidRequest(design, plan, { year: h.year - 1, dueOn: `${h.year - 1}-12-20`, amount: 20 * M });
-    await h.sendOn([id], design.head.account).expect(201);
+  /** A request for a group of `count` people that waits in the queue of the head. */
+  const queued = async (count = 3): Promise<{ id: string; people: Person[] }> => {
+    const people: Person[] = [];
+    for (let index = 0; index < count; index += 1) {
+      counter += 1;
+      people.push(await h.staff(design.department, `SUP-P${counter}`));
+    }
 
-    return id;
+    return { id: await h.sentForPeople(plan, people, design.head.account, { businessReason: 'The new team' }), people };
   };
-  const supplement = (id: string, body: object = {}, account = design.head.account) =>
-    h.addSupplement(
-      id,
-      { expectedSpendOn: `${h.year}-11-15`, reason: 'The purchase moved to this year', ...body },
-      account,
-    );
+  const supplement = (id: string, body: object, account = design.head.account) =>
+    h.addSupplement(id, { reason: 'Left the team', ...body }, account);
   const history = async (id: string, account = design.head.account) =>
     h.dataOf<{ items: SupplementWire[] }>(await h.supplements(id, account).expect(200)).items;
-  const checks = async (id: string) =>
-    (
-      await h.ctx.sql.query<{ number: number; route: string }>(
-        `SELECT number, route FROM request_budget_checks WHERE request_id = $1 ORDER BY number`,
-        [id],
-      )
-    ).rows;
 
-  describe('a year that has ended (AC-15)', () => {
-    it('changes the day, prices the request again for it and keeps what it was before and after', async () => {
-      const id = await closed();
+  describe('leaving people out', () => {
+    it('prices the request again for those who remain and keeps what it was before and after', async () => {
+      const { id, people } = await queued(3);
 
-      const response = await supplement(id).expect(201);
+      const response = await supplement(id, { dropEmployeeIds: [people[2].employeeId] }).expect(201);
 
-      expect(h.dataOf<{ supplement: SupplementWire }>(response).supplement).toMatchObject({
+      const file = h.dataOf<{ supplement: SupplementWire }>(response).supplement;
+      expect(file).toMatchObject({
         number: 1,
-        reason: 'The purchase moved to this year',
+        reason: 'Left the team',
         changedBy: { employeeId: design.head.employeeId },
-        expectedSpendOn: { before: `${h.year - 1}-12-20`, after: `${h.year}-11-15` },
-        budgetYear: { before: h.year - 1, after: h.year },
-        // What the plan costs for the term, which is what the request is priced at once the day changes.
-        amount: { before: { amount: String(20 * M) }, after: { amount: String(1 * M) } },
+        droppedCount: 1,
       });
+      expect(Number(file.amount.after.amount)).toBeLessThan(Number(file.amount.before.amount));
+      // The day the money goes out is not asked any more, so no file carries one.
+      expect(file).not.toHaveProperty('expectedSpendOn');
       expect(await history(id)).toHaveLength(1);
-      const request = h.dataOf<{ request: { expectedSpendOn: string; budgetYear: number } }>(
-        await h.fetch(id, design.head.account).expect(200),
-      ).request;
-      expect(request).toMatchObject({ expectedSpendOn: `${h.year}-11-15`, budgetYear: h.year });
-    });
-
-    it('is checked again as a whole when the head sends it on, on the budget of the new year, and the first check stays', async () => {
-      const id = await closed();
-      await supplement(id).expect(201);
-
-      // The line chosen for the year that ended no longer fits: the head chooses again before it can go.
-      const first = await h.sendOn([id], design.head.account).expect(201);
-      const stopped = h.dataOf<{ items: Array<{ outcome: string; stopReason: string | null }> }>(
-        await h.batchItems(h.dataOf<{ batch: { id: string } }>(first).batch.id, design.head.account).expect(200),
-      ).items;
-      expect(stopped).toEqual([expect.objectContaining({ outcome: 'STOPPED', stopReason: 'PLAN_LINE_REQUIRED' })]);
-
-      await h.setPlanLine(id, { planLine: { position: 1 } }, design.head.account).expect(200);
-      const second = h.dataOf<{ batch: { id: string } }>(await h.sendOn([id], design.head.account).expect(201)).batch;
-      const items = h.dataOf<{ items: Array<{ outcome: string }> }>(
-        await h.batchItems(second.id, design.head.account).expect(200),
-      ).items;
-
-      expect(items).toEqual([expect.objectContaining({ outcome: 'SENT_TO_APPROVER' })]);
-      expect(await checks(id)).toEqual([
-        expect.objectContaining({ number: 1, route: 'BLOCKED' }),
-        expect.objectContaining({ number: 2, route: 'SPEND_APPROVAL' }),
-      ]);
-      expect(await h.state(id)).toBe('AWAITING_SPEND_DECISION');
     });
 
     it('keeps every supplementary file, the oldest first, and numbers them', async () => {
-      const id = await closed();
-      await supplement(id, { expectedSpendOn: `${h.year}-11-15` }).expect(201);
-      await supplement(id, { expectedSpendOn: `${h.year}-12-02`, reason: 'A month later' }).expect(201);
+      const { id, people } = await queued(4);
+      await supplement(id, { dropEmployeeIds: [people[3].employeeId] }).expect(201);
+      await supplement(id, { dropEmployeeIds: [people[2].employeeId], reason: 'One more left' }).expect(201);
 
       const items = await history(id);
 
-      expect(items.map((item) => [item.number, item.expectedSpendOn.before, item.expectedSpendOn.after])).toEqual([
-        [1, `${h.year - 1}-12-20`, `${h.year}-11-15`],
-        [2, `${h.year}-11-15`, `${h.year}-12-02`],
+      expect(items.map((item) => [item.number, item.reason])).toEqual([
+        [1, 'Left the team'],
+        [2, 'One more left'],
       ]);
+    });
+
+    it('is not made for a request of one person, which has nobody to leave out', async () => {
+      const sent = await h.sent(design.member, plan, { termMonths: 1 });
+      await h.decide(sent.id, { decision: 'APPROVE' }, design.head.account).expect(200);
+
+      const response = await supplement(sent.id, { dropEmployeeIds: [design.member.employeeId] }).expect(422);
+
+      expect(h.codeOf(response)).toBe('SUPPLEMENT.DROP_NOT_FOR_GROUP');
+      expect(await history(sent.id)).toEqual([]);
     });
   });
 
@@ -119,26 +99,26 @@ describe('the supplementary file of the head over PostgreSQL (US-06-14 AC-13, AC
     it.each([
       ['no reason', { reason: undefined }],
       ['a blank reason', { reason: '   ' }],
-      ['no day', { expectedSpendOn: undefined }],
-      ['a day that is not a day', { expectedSpendOn: '2026-02-30' }],
+      ['no person to leave out', { dropEmployeeIds: undefined }],
+      ['a day of spending, which is not asked any more', { expectedSpendOn: '2026-11-15' }],
       ['a field that is not there', { amount: 5 }],
     ])('is not made with %s', async (_name, over) => {
-      const id = await closed();
+      const { id, people } = await queued(3);
 
-      const response = await supplement(id, over).expect(422);
+      const response = await supplement(id, { dropEmployeeIds: [people[2].employeeId], ...over }).expect(422);
 
       expect(h.codeOf(response)).toBe('VALIDATION_ERROR');
       expect(await history(id)).toEqual([]);
     });
 
     it('has no way to add a person, the spending approver or anybody: a field that names one is refused and the request stays as it was (US-06-14 AC-16, D-S23)', async () => {
-      const id = await closed();
+      const { id, people } = await queued(3);
       const before = await h.requestRows();
 
       for (const over of [
         { addEmployeeIds: [h.boss.employeeId] },
         { beneficiaryEmployeeIds: [h.boss.employeeId] },
-        { dropEmployeeIds: [h.boss.employeeId], addEmployeeIds: [h.boss.employeeId] },
+        { dropEmployeeIds: [people[2].employeeId], addEmployeeIds: [h.boss.employeeId] },
       ]) {
         const response = await supplement(id, over).expect(422);
 
@@ -157,56 +137,34 @@ describe('the supplementary file of the head over PostgreSQL (US-06-14 AC-13, AC
       ).toBe(0);
     });
 
-    it('is not made to the day it already is, and nothing is written', async () => {
-      const id = await closed();
-
-      const response = await supplement(id, { expectedSpendOn: `${h.year - 1}-12-20` }).expect(409);
-
-      expect(h.codeOf(response)).toBe('SPEND.SUPPLEMENT_NO_CHANGE');
-      expect(await history(id)).toEqual([]);
-    });
-
-    it('is the only way to change the day once the request is sent on: it is not made while the request is decided (US-05-04 AC-16)', async () => {
-      const id = await h.paidRequest(design, plan, { amount: 10 * M });
+    it('is not made once the request is sent on: it is the head who changes a request in their queue only (US-05-04)', async () => {
+      const { id, people } = await queued(3);
       await h.sendOn([id], design.head.account).expect(201);
 
-      const response = await supplement(id).expect(409);
+      const response = await supplement(id, { dropEmployeeIds: [people[2].employeeId] }).expect(409);
 
       expect(h.codeOf(response)).toBe('SPEND.SUPPLEMENT_NOT_IN_QUEUE');
-      expect(await h.state(id)).toBe('AWAITING_SPEND_DECISION');
     });
 
     it('is only for the head of the department of the request', async () => {
-      const id = await closed();
+      const { id, people } = await queued(3);
       const other = await h.departmentWithHead('P-OTH');
+      const body = { dropEmployeeIds: [people[2].employeeId] };
 
-      await supplement(id, {}, other.head.account).expect(404);
-      await supplement(id, {}, design.member.account).expect(403);
-      await supplement(id, {}, h.finance).expect(403);
-      await supplement(id, {}, h.boss.account).expect(403); // the approver heads no department (QĐ-93b)
+      await supplement(id, body, other.head.account).expect(404);
+      await supplement(id, body, design.member.account).expect(403);
+      await supplement(id, body, h.finance).expect(403);
+      await supplement(id, body, h.boss.account).expect(403); // the approver heads no department (QĐ-93b)
       expect(await history(id)).toEqual([]);
     });
 
     it('is read by the people who may read the request, and by nobody else', async () => {
-      const id = await closed();
-      await supplement(id).expect(201);
+      const { id, people } = await queued(3);
+      await supplement(id, { dropEmployeeIds: [people[2].employeeId] }).expect(201);
 
-      await h.supplements(id, design.member.account).expect(200);
       await h.supplements(id, design.head.account).expect(200);
       await h.supplements(id, h.finance).expect(404);
       await h.supplements(id, h.boss.account).expect(404);
-    });
-
-    it('is not made for a request that has no price', async () => {
-      const id = await closed();
-      await h.ctx.sql.query(
-        `UPDATE access_requests SET pricing_status = 'MISSING', price_missing_reason = 'AWAITING_QUOTE', amount_minor = NULL, amount_currency = NULL, unit_price_minor = NULL, billing_cycle = NULL, payment_schedule = NULL WHERE id = $1`,
-        [id],
-      );
-
-      const response = await supplement(id).expect(409);
-
-      expect(h.codeOf(response)).toBe('SPEND.SUPPLEMENT_NOT_PRICED');
     });
   });
 });

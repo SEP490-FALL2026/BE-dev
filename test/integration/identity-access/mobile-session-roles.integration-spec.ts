@@ -153,10 +153,12 @@ describe('the mobile channel signs in, keeps its session and reads its roles exa
         'in_app_notifications',
         'email_outbox',
       ];
+      // `device_id` is not searched everywhere: the register of company machines (G7) names its own machines by it, and those tables are
+      // not accounts, sessions or the inbox. In the tables listed above any column about a device or a channel is refused.
       const { rows } = await h.ctx.sql.query<{ table_name: string; column_name: string }>(
         `SELECT table_name, column_name FROM information_schema.columns
           WHERE table_schema = 'public'
-            AND (column_name ~* '(push|fcm|apns|device_token|device_id|biometric)'
+            AND (column_name ~* '(push|fcm|apns|device_token|biometric)'
                  OR table_name ~* '(push|fcm|apns|device_token)'
                  OR (table_name = ANY($1) AND column_name ~* '(device|channel|user_agent|client)'))`,
         [identityAndInbox],

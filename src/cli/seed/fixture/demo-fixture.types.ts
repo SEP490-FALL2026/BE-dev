@@ -71,9 +71,39 @@ export interface DemoBudgetLine {
 export interface DemoBudget {
   department: string;
   lines: DemoBudgetLine[];
+  /** The base of the year; the reserve is the default share of it (10 %) the server works out (`QĐ-101`, step 11). */
   base: string;
-  reserve: string;
-  highValuePercent: number;
+}
+
+/**
+ * A budget proposal a head sends for a year after the current one, for a department that has no budget of that year: it stays
+ * where the head's send leaves it, waiting for Finance to build a version from it.
+ */
+export interface DemoBudgetProposal {
+  department: string;
+  /** How many years after the year of today; 1 is next year. */
+  yearOffset: number;
+  lines: DemoBudgetLine[];
+}
+
+/**
+ * An invoice Finance records against the commitment of a scenario request. Every amount is a share of what the commitment was made
+ * for, so the fixture does not depend on prices: the price before tax at more than 100 is an invoice for more than the commitment
+ * allowed.
+ */
+export interface DemoInvoice {
+  key: string;
+  /** The scenario request whose commitment the invoice is recorded against; it must reach COMPLETED. */
+  request: string;
+  /** The price before tax, in percent of the commitment. */
+  netPercent: number;
+  /** The tax that can be deducted, in percent of the price before tax; 0 leaves it out. */
+  deductibleTaxPercent: number;
+  /** The tax that cannot be deducted, in percent of the price before tax; 0 leaves it out. */
+  nonDeductibleTaxPercent: number;
+  /** How many days before today the invoice is dated. */
+  issuedDaysAgo: number;
+  note: string;
 }
 
 /** The states a scenario request is brought to, each by the actions of the people the routing names. */
@@ -96,8 +126,6 @@ export interface DemoRequestScenario {
   proposal?: { softwareName: string; homepageUrl: string; dataDescription: string; expectedUsers: number };
   termMonths: number;
   target: DemoRequestTarget;
-  /** How the head approves a request that costs money: the line of the plan of the budget, or outside the plan. */
-  planLine?: number;
   /** For COMPLETED: the subscription the IT Admin grants the seat from. */
   grantFrom?: string;
   summary: string;
@@ -124,7 +152,11 @@ export interface DemoFixture {
   };
   /** The budgets of the year, one per department that has one; a department left out has none (R9 counts on it). */
   budgets: DemoBudget[];
+  /** Proposals for a later year that wait for Finance; a department with one has no budget of that year. */
+  proposals: DemoBudgetProposal[];
   requests: DemoRequestScenario[];
+  /** Invoices Finance records against the commitments of scenario requests; each ends in the match its shares say. */
+  invoices: DemoInvoice[];
   /** A draft that is saved and never sent. */
   draft: { requester: string; plan: string; termMonths: number };
   /** A report of an error in the seat the request of this key granted. */

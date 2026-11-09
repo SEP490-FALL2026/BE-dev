@@ -23,10 +23,8 @@ const figures: FigureFacts = {
   baseMinor: 60_000_000n,
   reserveMinor: 20_000_000n,
   totalMinor: 80_000_000n,
-  highValuePercent: 50,
-  highValueAmountMinor: null,
   quarters: null,
-  reason: null,
+  reserveReason: null,
 };
 
 const line: LineFacts = {
@@ -34,11 +32,6 @@ const line: LineFacts = {
   planId: null,
   seats: 10,
   amountMinor: 50_000_000n,
-  windowFrom: '2027-03-01',
-  windowTo: '2027-03-31',
-  servicePeriodMonths: 12,
-  repeatCycle: 'ANNUAL',
-  quoteValidUntil: '2027-01-31',
   financeComment: null,
   adjustmentReason: null,
 };
@@ -53,33 +46,21 @@ describe('the figures an edit of a version changed (F66, spec J.4)', () => {
     });
   });
 
-  it('writes a number as its digits, a threshold amount that is set or taken away, and the forecast by quarter field by field', () => {
+  it('writes the reason of the reserve and the forecast by quarter field by field', () => {
     const after: FigureFacts = {
       ...figures,
-      highValuePercent: 40,
-      highValueAmountMinor: 5_000_000n,
       quarters: [20_000_000n, 20_000_000n, 20_000_000n, 20_000_000n],
-      reason: 'Cut to the plan',
+      reserveReason: 'The plan buys more in the autumn',
     };
 
     expect(figureChange(figures, after, money)).toEqual({
-      before: {
-        highValuePercent: '50',
-        highValueAmount: null,
-        q1: null,
-        q2: null,
-        q3: null,
-        q4: null,
-        reason: null,
-      },
+      before: { q1: null, q2: null, q3: null, q4: null, reserveReason: null },
       after: {
-        highValuePercent: '40',
-        highValueAmount: '5000000',
         q1: '20000000',
         q2: '20000000',
         q3: '20000000',
         q4: '20000000',
-        reason: 'Cut to the plan',
+        reserveReason: 'The plan buys more in the autumn',
       },
     });
   });
@@ -90,17 +71,16 @@ describe('the figures an edit of a version changed (F66, spec J.4)', () => {
 });
 
 describe('the fields an edit of a line changed', () => {
-  it('names the fields of the line, an amount in the currency of the version and a date as YYYY-MM-DD', () => {
+  it('names the fields of the line and an amount in the currency of the version', () => {
     const after = {
       ...line,
       amountMinor: 18_000_000n,
-      windowTo: '2027-04-15',
       adjustmentReason: 'The price went down',
     };
 
     expect(lineChange(line, after, money)).toEqual({
-      before: { amount: '50000000', windowTo: '2027-03-31', adjustmentReason: null },
-      after: { amount: '18000000', windowTo: '2027-04-15', adjustmentReason: 'The price went down' },
+      before: { amount: '50000000', adjustmentReason: null },
+      after: { amount: '18000000', adjustmentReason: 'The price went down' },
     });
   });
 
@@ -114,18 +94,13 @@ describe('the fields an edit of a line changed', () => {
       planId: 'p',
       seats: 1,
       amountMinor: 1n,
-      windowFrom: '2027-01-01',
-      windowTo: '2027-01-02',
-      servicePeriodMonths: 1,
-      repeatCycle: 'MONTHLY',
-      quoteValidUntil: '2027-01-01',
       financeComment: 'c',
       adjustmentReason: 'r',
     };
     const change = lineChange(line, everything, money);
 
     expect(Object.keys(change?.after ?? {}).length).toBeLessThanOrEqual(HISTORY_CHANGES_MAX);
-    expect(Object.keys(change?.after ?? {})).toHaveLength(11);
+    expect(Object.keys(change?.after ?? {})).toHaveLength(6);
   });
 });
 
@@ -136,9 +111,6 @@ describe('the lines of an entry that adds or imports', () => {
       description: 'Figma Organization 10 seats',
       seats: '10',
       amount: '50000000',
-      windowFrom: '2027-03-01',
-      servicePeriodMonths: '12',
-      repeatCycle: 'ANNUAL',
       financeComment: null,
     });
   });

@@ -235,7 +235,9 @@ describe('the vocabulary and the unnamed actors of the next release, read by the
         await h.sendNotice({ employeeId: e1.employeeId, kind: 'DEPARTURE', proposedOn: h.day(5) }, head.account),
       );
       const recorded = h.dataOf<NoticeWire>(
-        await h.recordNotice(sent.id, h.recording({ lastWorkingDay: h.day(6) })).expect(201),
+        await h
+          .recordNotice(sent.id, h.recording({ lastWorkingDay: h.day(6), accessBlockMode: 'WITH_LAST_DAY' }))
+          .expect(201),
       );
       const caseId = (recorded.recordedEvent as unknown as { id: string }).id;
       const ticket = await ticketFor(e1.employeeId, 'DEPARTURE_RECORD');
@@ -270,7 +272,7 @@ describe('the vocabulary and the unnamed actors of the next release, read by the
     it('reads a long leave and its changes that no account started', async () => {
       const e1 = await h.worker(des, code());
       const approval = {
-        type: 'LEAVE_APPROVAL',
+        type: 'APPROVED_APPLICATION',
         reference: 'DN-05/2026',
         issuer: 'HR Department',
         issuedOn: '2026-05-25',

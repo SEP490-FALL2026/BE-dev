@@ -449,7 +449,7 @@ describe('removing a person who left from a request for a group (integration, re
       const { u, people, id } = await approved(3);
       const [e1, e2] = people;
       const other = await unit();
-      const waiting = await h.groupWaiting(other, paid, await h.colleagues(other, 1));
+      const waiting = await h.groupWaiting(other, paid, await h.colleagues(other, 2));
       const task = await granted(id, e2.employeeId);
       await h.claim(task.id).expect(200);
       await h.fail(task.id, { reason: 'The vendor refused the invitation' }).expect(200);

@@ -15,7 +15,7 @@ import { OffboardingLeftService } from './offboarding-left.service';
 import type { ScheduledDeparture } from './offboarding-periods.service';
 import type { DepartureHeld, DepartureSeen } from './offboarding-preconditions.service';
 import { OffboardingRefusedError } from './offboarding.errors';
-import { departmentWithoutHeadFrom } from './offboarding.policy';
+import { departmentWithoutHeadFrom, leavesAtOnce } from './offboarding.policy';
 import { OffboardingRepo } from './offboarding.repo';
 import type { OffboardingRecord, PriorWorkState, RecordOffboardingInput } from './offboarding.types';
 
@@ -30,7 +30,7 @@ export interface DepartureWritten {
 
 /**
  * Writes the case of a departure and what follows it, in one transaction after the endings (`US-03-04` AC-2, AC-8, AC-23, AC-29): the
- * row (an abrupt one is `LEFT` at once), its first change, the audit entries, the hook of the file, the confirmation of the handover
+ * row (one blocked now with a last working day that is not ahead is `LEFT` at once), its first change, the audit entries, the hook of the file, the confirmation of the handover
  * for every tool, and the notices. Returns the case as it is read back, with what the database filled in.
  */
 @Injectable()
@@ -79,9 +79,13 @@ export class OffboardingCaseWriter {
     input: RecordOffboardingInput,
     written: DepartureWritten,
   ): Promise<OffboardingRecord> {
-    const plannedDue = input.abrupt ? null : await this.handovers.plannedDueOn(input.lastWorkingDay as BusinessDate);
+    const blockNow = input.accessBlockMode === 'BLOCK_NOW';
+    const plannedDue = blockNow ? null : await this.handovers.plannedDueOn(input.lastWorkingDay as BusinessDate);
     const row = this.buildCaseRow(actor, input, written, plannedDue);
-    const left = input.abrupt ? { on: written.today, by: (await this.guard.standIn(tx, actor)).appUserId } : undefined;
+    // The day the person left is their last working day, also when it is recorded afterwards (`Q-04` B).
+    const left = this.leavesAtOnce(input, written)
+      ? { on: input.lastWorkingDay as BusinessDate, by: (await this.guard.standIn(tx, actor)).appUserId }
+      : undefined;
     try {
       return await this.repo.insert(tx, row, left ? 'LEFT' : 'HANDING_OVER', left);
     } catch (error) {
@@ -105,7 +109,7 @@ export class OffboardingCaseWriter {
       organizationId: written.organizationId,
       employeeId: input.employeeId,
       departmentId: seen.before ? seen.before.departmentId : null,
-      abrupt: input.abrupt,
+      accessBlockMode: input.accessBlockMode,
       priorWorkState: held.employee.workState as PriorWorkState,
       lastWorkingDay: input.lastWorkingDay as BusinessDate,
       departureEffectiveOn: seen.endsOn,
@@ -138,13 +142,18 @@ export class OffboardingCaseWriter {
       caseId: record.id,
       kind: 'RECORDED',
       newLastWorkingDay: record.lastWorkingDay,
-      detail: { abrupt: record.abrupt, departureEffectiveOn: seen.endsOn, headSuccessor, transferCancelled },
+      detail: {
+        accessBlockMode: record.accessBlockMode,
+        departureEffectiveOn: seen.endsOn,
+        headSuccessor,
+        transferCancelled,
+      },
       changedByAppUserId: by.appUserId,
       changedByTicketId: by.ticketId,
     });
     await this.audit.changed(tx, actor, record, 'OFFBOARDING_CASE.RECORDED', null, {
       employeeCode: held.employee.employeeCode,
-      abrupt: record.abrupt,
+      accessBlockMode: record.accessBlockMode,
       lastWorkingDay: record.lastWorkingDay,
       departureEffectiveOn: seen.endsOn,
       handoverDueOn: record.handoverDueOn,
@@ -156,7 +165,15 @@ export class OffboardingCaseWriter {
     await this.audit.employeeInformed(tx, actor, record);
   }
 
-  /** The hook of the file, the confirmation of the handover, the leaving of an abrupt departure, and the notices. */
+  private leavesAtOnce(input: RecordOffboardingInput, written: { today: BusinessDate }): boolean {
+    return leavesAtOnce({
+      accessBlockMode: input.accessBlockMode,
+      lastWorkingDay: input.lastWorkingDay as BusinessDate,
+      today: written.today,
+    });
+  }
+
+  /** The hook of the file, the confirmation of the handover, the leaving of a departure blocked now, and the notices. */
   private async announce(
     tx: DbTx,
     actor: PersonnelActor,
@@ -172,8 +189,16 @@ export class OffboardingCaseWriter {
       dueOn: record.departureEffectiveOn,
     });
     if (seen.before) await this.handovers.open(tx, actor, record, { leaverIsHead: seen.leavesAsHead, today });
-    if (input.abrupt) {
-      await this.left.leaveInTx(tx, actor, record, today, 'RECORDING');
+    const leftAtOnce = this.leavesAtOnce(input, done);
+    if (input.accessBlockMode === 'WITH_LAST_DAY') {
+      // From the day after the last working day the person is refused, whatever the state of the case (QĐ-100q).
+      await this.handovers.blockAccessAfterLastDay(tx, record);
+    } else if (!leftAtOnce) {
+      // Blocked now with a last working day still ahead: refused from the next request, while the case is a handover under way.
+      await this.handovers.blockAccessNow(tx, record, today);
+    }
+    if (leftAtOnce) await this.left.leaveInTx(tx, actor, record, record.lastWorkingDay, 'RECORDING');
+    if (input.accessBlockMode === 'BLOCK_NOW') {
       await this.notifier.abruptDeparture(tx, {
         organizationId,
         employeeId: record.employeeId,

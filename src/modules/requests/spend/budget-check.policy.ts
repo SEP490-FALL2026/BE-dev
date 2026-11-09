@@ -8,11 +8,14 @@
  * of nothing (`QĐ-82l`). Two codes are about the data and not the budget, and nothing is routed past them (`QĐ-82d`).
  */
 
-/** What one year says: the most serious of what applies is the one that is kept. */
+/**
+ * What one year says: the most serious of what applies is the one that is kept. `HIGH_VALUE` is no longer given (`QĐ-97c`: no route
+ * by the size of a request); it stays in the type so that a check made before that rule still reads.
+ */
 export type YearCode = 'BUDGET_OK' | 'HIGH_VALUE' | 'INSUFFICIENT_BUDGET' | 'NO_ACTIVE_BUDGET';
 
 /** Every code a check can give: a year's own, the two of the data, and the plan line. */
-export type CheckCode = YearCode | 'CLOSED_OR_EXPIRED_BUDGET_PERIOD' | 'STALE_COST_EVIDENCE' | 'PLAN_LINE_OVERDUE';
+export type CheckCode = YearCode | 'CLOSED_OR_EXPIRED_BUDGET_PERIOD' | 'STALE_COST_EVIDENCE';
 
 /** The current budget of a Cost Center and year, with what is held and spent against it, in the reporting currency. */
 export interface YearBudget {
@@ -20,10 +23,6 @@ export interface YearBudget {
   totalMinor: bigint;
   heldMinor: bigint;
   spentMinor: bigint;
-  /** A request is high value when it is over this share of what is left, in whole percent. */
-  highValuePercent: number;
-  /** Or over this amount, whatever is left. */
-  highValueAmountMinor: bigint | null;
 }
 
 /** What the request costs in one year, as the estimate that falls on the company, in the reporting currency. */
@@ -112,14 +111,7 @@ function judgeYear(slice: YearSlice): YearResult {
 
   const remaining = budget.totalMinor - budget.heldMinor - budget.spentMinor;
   const share = remaining > 0n ? Number((slice.costMinor * 10_000n) / remaining) : null;
-  let code: YearCode = 'BUDGET_OK';
-  if (slice.costMinor > remaining) code = 'INSUFFICIENT_BUDGET';
-  else if (
-    slice.costMinor * 100n > BigInt(budget.highValuePercent) * remaining ||
-    (budget.highValueAmountMinor !== null && slice.costMinor > budget.highValueAmountMinor)
-  ) {
-    code = 'HIGH_VALUE';
-  }
+  const code: YearCode = slice.costMinor > remaining ? 'INSUFFICIENT_BUDGET' : 'BUDGET_OK';
 
   return {
     ...base,
@@ -160,7 +152,6 @@ export function codesOf(result: CheckResult): CheckCode[] {
   const codes: CheckCode[] = [];
   if (result.staleCostEvidence) codes.push('STALE_COST_EVIDENCE');
   if (result.periodClosed) codes.push('CLOSED_OR_EXPIRED_BUDGET_PERIOD');
-  if (result.planLineOverdue) codes.push('PLAN_LINE_OVERDUE');
   const own = result.years
     .map((year) => year.code)
     .filter((code): code is YearCode => code !== null)

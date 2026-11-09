@@ -34,9 +34,14 @@ export class ProvisioningHolderService {
     private readonly requestParties: RequestPartyEligibilityApi,
   ) {}
 
-  /** Throws EmployeeNotFoundError, ProvisioningBeneficiaryDepartedError, ProvisioningBeneficiaryNotStartedError and ProvisioningPersonalAccountError. */
+  /**
+   * Throws EmployeeNotFoundError, ProvisioningBeneficiaryDepartedError, ProvisioningBeneficiaryNotStartedError,
+   * ProvisioningPersonalAccountError and ProvisioningAnotherItAdminNeededError (an IT Admin does not queue the grant of their own
+   * request while another usable IT Admin can, `QĐ-77m`).
+   */
   async personal(
     tx: DbTx,
+    actor: AuthenticatedPrincipal,
     input: { requestId: string; employeeId: string; accountIdentifier: string | undefined; today: BusinessDate },
   ): Promise<GrantHolder> {
     await this.organizationReads.lockEmployeeForShare(tx, input.employeeId);
@@ -45,6 +50,8 @@ export class ProvisioningHolderService {
     if (employee.hireDate > input.today) {
       throw new ProvisioningBeneficiaryNotStartedError(input.requestId, employee.hireDate);
     }
+
+    const mode = await this.frame.selfExecutionMode(actor, input.employeeId, tx);
 
     return {
       employeeId: input.employeeId,
@@ -57,7 +64,8 @@ export class ProvisioningHolderService {
       reason: null,
       costCenterId: null,
       owningDepartmentId: null,
-      selfExecuted: null,
+      // Only an IT Admin who grants their own request is marked; for anybody else the rule does not apply.
+      selfExecuted: actor.employeeId === input.employeeId ? mode === 'ALLOW_SELF_EXECUTED' : null,
     };
   }
 
