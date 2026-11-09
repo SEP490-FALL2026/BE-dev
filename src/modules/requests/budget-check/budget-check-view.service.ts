@@ -3,7 +3,7 @@ import { formatAmount } from '../../../core/money/money';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { FinanceApi } from '../../finance/public/finance.api';
 import { AccessRequestRepo } from '../access-request/access-request.repo';
-import { codesOf } from '../spend/budget-check.policy';
+import { codesOf, wireRouteOf } from '../spend/budget-check.policy';
 import { BudgetCheckRepo, type CheckRecord } from '../spend/budget-check.repo';
 import { SpendReviewNotFoundError } from '../spend/spend.errors';
 import { SpendStepRepo } from '../spend/spend-step.repo';
@@ -60,7 +60,7 @@ export class BudgetCheckViewService {
       id: check.id,
       number: check.number,
       trigger: check.trigger,
-      route: check.route,
+      route: wireRouteOf(check.route, outcome),
       outcome,
       blockedReasons: check.blockReasons,
       overBaseBy: optional(check.overBaseByMinor),

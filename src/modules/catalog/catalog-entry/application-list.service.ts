@@ -34,7 +34,9 @@ export class ApplicationListService {
       take: query.pageSize,
     });
     const employees = await this.organizationReads.getEmployees([
-      ...new Set(items.map((item) => item.businessOwnerEmployeeId)),
+      ...new Set(
+        items.flatMap((item) => (item.businessOwnerEmployeeId === null ? [] : [item.businessOwnerEmployeeId])),
+      ),
     ]);
     const owners = new Map<string, BusinessOwnerView>(
       employees.map((employee) => [
@@ -50,6 +52,9 @@ export class ApplicationListService {
 
     return pageOf(
       items.map((item) => {
+        // An application declared since QĐ-104 names no Business Owner: there is none to show and none to replace.
+        if (item.businessOwnerEmployeeId === null)
+          return { ...item, businessOwner: null, businessOwnerReplacementRequired: false };
         const businessOwner = owners.get(item.businessOwnerEmployeeId);
         if (!businessOwner) throw new Error('The Business Owner of an application is not an employee');
 

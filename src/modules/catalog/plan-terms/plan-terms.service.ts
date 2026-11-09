@@ -8,7 +8,11 @@ import { OrganizationReadApi } from '../../organization/public/organization-read
 import { catalogAuditEvent } from '../catalog-audit-event.mapper';
 import { PlanFactsService } from '../plan/plan-facts.service';
 import { SubscriptionNoticeService } from '../subscription/subscription-notice.service';
-import { PlanTermsPlanNotFoundError, PlanTermsTextInvalidError } from './plan-terms.errors';
+import {
+  PlanTermsNotApplicableError,
+  PlanTermsPlanNotFoundError,
+  PlanTermsTextInvalidError,
+} from './plan-terms.errors';
 import {
   assertInstallLimit,
   assertReviewDate,
@@ -196,6 +200,12 @@ export class PlanTermsService {
       const plan = await this.plans.lockShared(tx, planId);
       if (!plan) throw new PlanTermsPlanNotFoundError();
       assertTermsApplicable(plan.provisioningType);
+      // An application declared since QĐ-104 names no Business Owner: there is nobody whose opinion this would be.
+      if (plan.businessOwnerEmployeeId === null) {
+        throw new PlanTermsNotApplicableError(
+          'The application names no Business Owner (QĐ-104): no opinion of one is recorded.',
+        );
+      }
 
       const opinion = await this.terms.insertOpinion(tx, {
         planId,

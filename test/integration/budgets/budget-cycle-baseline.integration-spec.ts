@@ -1,6 +1,7 @@
 import request from 'supertest';
 import { PgRelay } from '../../support/pg-relay';
 import { QueryCounter, dataStatements } from '../../support/query-count';
+import { BaselineService } from '../../../src/modules/budgets/cycle/baseline.service';
 import { SpendHarness } from '../../support/spend-harness';
 
 const h = new SpendHarness();
@@ -9,11 +10,11 @@ interface Software {
   subscriptionId: string;
   seatsPurchased: number | null;
   seatsAssigned: number;
-  seatsIdle: number | null;
   monthlyUnitPrice: { amount: string } | null;
   monthsRunning: number;
   estimatedAnnualCost: { amount: string } | null;
   suggestRenewal: boolean;
+  kpi3: number | null;
 }
 interface BaselineDepartment {
   departmentId: string;
@@ -21,17 +22,23 @@ interface BaselineDepartment {
   spentThisYear: { amount: string };
   estimatedAnnualCost: { amount: string };
   hasUnknownCost: boolean;
-  seatsPurchased: number;
   seatsAssigned: number;
   softwareTotal: number;
   software: Software[];
 }
+interface PoolSoftware {
+  subscriptionId: string;
+  seatsPurchased: number;
+  seatsAssigned: number;
+  seatsIdle: number;
+  estimatedAnnualCost: { amount: string } | null;
+}
 interface BaselineWire {
   basis: string;
   year: number;
-  kpi3: number | null;
   departmentsTotal: number;
   departments: BaselineDepartment[];
+  sharedPoolUnallocated: { line: string; seatsIdle: number; software: PoolSoftware[] } | null;
 }
 interface PackageWire {
   annualCeiling: { amount: string };
@@ -122,6 +129,8 @@ describe('the baseline and the package of a budget cycle (integration, real Post
     wire.departments
       .find((row) => row.departmentId === departmentId)
       ?.software.find((row) => row.subscriptionId === subscription);
+  const poolEntryOf = (wire: BaselineWire, subscription: string) =>
+    wire.sharedPoolUnallocated?.software.find((row) => row.subscriptionId === subscription);
 
   beforeAll(async () => {
     await h.start({
@@ -149,16 +158,16 @@ describe('the baseline and the package of a budget cycle (integration, real Post
 
     const wire = h.dataOf<BaselineWire>(await baseline().expect(200));
 
-    expect(wire.basis).toBe('OWNER_DEPARTMENT');
+    expect(wire.basis).toBe('HOLDER_DEPARTMENT');
     const entry = entryOf(wire, unit.department.id, unit.subscription);
     // 10 seats bought, 6 held (five people, one of them starting later, and a service account), 1,000,000 a month, running since
     // January and not ordered to end: it is renewed, 6 × 1,000,000 × 12 (F-096, Q-162).
     expect(entry).toMatchObject({
       seatsPurchased: 10,
       seatsAssigned: 6,
-      seatsIdle: 4,
       monthsRunning: 12,
       suggestRenewal: true,
+      kpi3: null,
     });
     expect(entry?.monthlyUnitPrice?.amount).toBe('1000000');
     expect(entry?.estimatedAnnualCost?.amount).toBe('72000000');
@@ -166,12 +175,109 @@ describe('the baseline and the package of a budget cycle (integration, real Post
     expect(row?.estimatedAnnualCost.amount).toBe('72000000');
     expect(row).toMatchObject({
       costCenterId: unit.department.unitId,
-      seatsPurchased: 10,
       seatsAssigned: 6,
       softwareTotal: 1,
       hasUnknownCost: false,
     });
-    expect(wire.kpi3).toBeNull();
+    // The 4 idle seats are the line of the shared pool, not the department's: 4 × 1,000,000 × 12.
+    const idle = poolEntryOf(wire, unit.subscription);
+    expect(wire.sharedPoolUnallocated?.line).toBe('SHARED_POOL_UNALLOCATED');
+    expect(idle).toMatchObject({ seatsPurchased: 10, seatsAssigned: 6, seatsIdle: 4 });
+    expect(idle?.estimatedAnnualCost?.amount).toBe('48000000');
+  });
+
+  describe('BR-MF4-01 QĐ-103k: a seat is charged to the department of its holder (AF-05)', () => {
+    /** Seats of the subscription of `unit` held by people of another department. */
+    const holdFor = async (
+      unit: Awaited<ReturnType<typeof department>>,
+      holders: Awaited<ReturnType<typeof department>>['department'],
+      held: number,
+    ) => {
+      const planId = (
+        await h.ctx.sql.query<{ plan_id: string }>(`SELECT plan_id FROM subscriptions WHERE id = $1`, [
+          unit.subscription,
+        ])
+      ).rows[0].plan_id;
+      for (let i = 0; i < held; i += 1) {
+        const person = await h.staff(holders, `BLH${serial}-${i}`);
+        await h.ctx.sql.query(
+          `INSERT INTO license_assignments (id, organization_id, kind, source, plan_id, subscription_id, employee_id,
+             account_identifier, normalized_account_identifier, valid_from, valid_from_basis, created_by_app_user_id)
+           SELECT gen_random_uuid(), e.organization_id, 'PERSONAL', 'REQUEST', $2, $3, e.id, e.employee_code || '@acme.vn',
+                  lower(e.employee_code) || '@acme.vn', '2026-01-05', 'ACTUAL', gen_random_uuid()
+             FROM employees e WHERE e.id = $1`,
+          [person.employeeId, planId, unit.subscription],
+        );
+      }
+    };
+
+    it('charges the seats of a pool subscription IT owns to Marketing, whose people hold them, and the idle ones to the pool', async () => {
+      const itDepartment = await department();
+      const marketing = await department();
+      await holdFor(itDepartment, marketing.department, 8);
+
+      const wire = h.dataOf<BaselineWire>(await baseline().expect(200));
+
+      // 8 seats × 1,000,000 × 12 to Marketing; IT, which only owns the subscription, is charged nothing for it.
+      expect(entryOf(wire, marketing.department.id, itDepartment.subscription)).toMatchObject({ seatsAssigned: 8 });
+      expect(entryOf(wire, marketing.department.id, itDepartment.subscription)?.estimatedAnnualCost?.amount).toBe(
+        '96000000',
+      );
+      expect(entryOf(wire, itDepartment.department.id, itDepartment.subscription)).toBeUndefined();
+      const idle = poolEntryOf(wire, itDepartment.subscription);
+      expect(idle).toMatchObject({ seatsIdle: 2 });
+      expect(idle?.estimatedAnnualCost?.amount).toBe('24000000');
+    });
+
+    it('counts a pool subscription that names no department (QĐ-103d)', async () => {
+      const owner = await department();
+      const holders = await department();
+      await holdFor(owner, holders.department, 3);
+      await h.ctx.sql.query(`UPDATE subscriptions SET owner_department_id = NULL WHERE id = $1`, [owner.subscription]);
+
+      const wire = h.dataOf<BaselineWire>(await baseline().expect(200));
+
+      expect(entryOf(wire, holders.department.id, owner.subscription)?.estimatedAnnualCost?.amount).toBe('36000000');
+      expect(poolEntryOf(wire, owner.subscription)?.seatsIdle).toBe(7);
+    });
+
+    it('builds the lines of a version of source BASELINE the same way: Renew lines of what its people hold', async () => {
+      const owner = await department();
+      const holders = await department();
+      await holdFor(owner, holders.department, 3);
+      const service = h.ctx.app.get(BaselineService, { strict: false });
+
+      const lines = await service.renewalLinesOf(holders.department.id, year(), h.today());
+      const ownerLines = await service.renewalLinesOf(owner.department.id, year(), h.today());
+
+      expect(lines).toEqual([expect.objectContaining({ lineType: 'RENEW', seats: 3, amountMinor: 36_000_000n })]);
+      expect(ownerLines).toEqual([]);
+    });
+
+    it('gives a head their own department only, without the line of the pool', async () => {
+      const unit = await department();
+
+      const own = h.dataOf<BaselineWire>(
+        await baseline(unit.head.account, `?departmentId=${unit.department.id}`).expect(200),
+      );
+
+      expect(own.sharedPoolUnallocated).toBeNull();
+    });
+  });
+
+  it('AF-08 QĐ-109d: tells the KPI-3 the last pass of the usage rules left for the plan, over the seats bought', async () => {
+    const unit = await department();
+    await holdSeats(unit, 2);
+    // The pass judged 8 seats of the plan and found 4 active in 30 days; the subscription bought 10: KPI-3 = 40 %.
+    await h.ctx.sql.query(
+      `INSERT INTO plan_usage_rates (plan_id, organization_id, active_seats, assessed_seats, assessed_on)
+       SELECT plan_id, organization_id, 4, 8, current_date FROM subscriptions WHERE id = $1`,
+      [unit.subscription],
+    );
+
+    const entry = entryOf(h.dataOf<BaselineWire>(await baseline().expect(200)), unit.department.id, unit.subscription);
+
+    expect(entry?.kpi3).toBe(40);
   });
 
   it('divides an annual price by twelve and renews what runs: twelve months, whatever its end date says (R-I03, Q-162)', async () => {

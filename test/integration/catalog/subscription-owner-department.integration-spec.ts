@@ -180,4 +180,41 @@ describe('the owner department of a subscription: the finance gate of a change a
       expect(await priceOf(planId)).toBeNull();
     });
   });
+
+  describe('AF-05 QĐ-103d: a purchase of the shared pool names no department', () => {
+    const declareWithout = (planId: string) =>
+      request(h.server())
+        .post('/api/v1/subscriptions')
+        .set(h.as(h.it1))
+        .send({
+          planId,
+          kind: 'TERM',
+          purchasedQuantity: 10,
+          unitPrice: { amount: '1000000', currency: 'VND' },
+          billingCycle: 'MONTHLY',
+          commitmentTermMonths: 1,
+          responsibleItAdminEmployeeId: h.it1.employeeId,
+          startDate: '2026-01-05',
+        });
+
+    it('declares a K2 subscription without ownerDepartmentId: it owns none', async () => {
+      const planId = await h.plan('K2');
+
+      const created = h.dataOf<{ id: string }>(await declareWithout(planId).expect(201));
+
+      const { rows } = await h.ctx.sql.query<{ owner_department_id: string | null }>(
+        `SELECT owner_department_id FROM subscriptions WHERE id = $1`,
+        [created.id],
+      );
+      expect(rows[0].owner_department_id).toBeNull();
+    });
+
+    it('still asks a K1 subscription for the department that owns it (QĐ-89a)', async () => {
+      const planId = await h.plan('K1');
+
+      const refused = await declareWithout(planId).expect(422);
+
+      expect(h.codeOf(refused)).toBe('SUBSCRIPTION.OWNER_DEPARTMENT_INACTIVE');
+    });
+  });
 });

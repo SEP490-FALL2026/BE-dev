@@ -18,7 +18,8 @@ export interface ApplicationRecord {
   dictionaryServiceLineId: string | null;
   domains: string[];
   dataSensitivity: DataSensitivity;
-  businessOwnerEmployeeId: string;
+  /** QĐ-104 removed the Business Owner: null for an application declared without one; older rows keep the person they named. */
+  businessOwnerEmployeeId: string | null;
   communication: ApplicationCommunication;
   functionalGroup: { id: string; name: string } | null;
   status: CatalogStatus;
@@ -33,7 +34,7 @@ export interface ApplicationSummaryRecord {
   kind: ApplicationKind;
   vendor: { id: string; name: string } | null;
   dataSensitivity: DataSensitivity;
-  businessOwnerEmployeeId: string;
+  businessOwnerEmployeeId: string | null;
   isCommunicationService: boolean;
   functionalGroup: { id: string; name: string } | null;
   status: CatalogStatus;
@@ -49,13 +50,14 @@ export interface BusinessOwnerView {
 
 /** An application as it is answered: the record and the Business Owner read from the organization. */
 export interface ApplicationView extends ApplicationRecord {
-  businessOwner: BusinessOwnerView;
+  /** Null when the application names none (`QĐ-104`). */
+  businessOwner: BusinessOwnerView | null;
   /** The Business Owner has left and has not been replaced (`INV-06`: the previous one is kept until then). */
   businessOwnerReplacementRequired: boolean;
 }
 
 export interface ApplicationSummaryView extends ApplicationSummaryRecord {
-  businessOwner: BusinessOwnerView;
+  businessOwner: BusinessOwnerView | null;
   businessOwnerReplacementRequired: boolean;
 }
 
@@ -75,7 +77,7 @@ export interface NewApplication {
   vendorId: string | null;
   dictionaryServiceLineId: string | null;
   functionalGroupId: string | null;
-  businessOwnerEmployeeId: string;
+  businessOwnerEmployeeId: string | null;
   dataSensitivity: DataSensitivity;
   communication: ApplicationCommunication;
   domains: string[];

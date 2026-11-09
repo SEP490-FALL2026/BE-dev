@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { Page, pageOf } from '../../../core/application/pagination';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { BudgetNotYourCostCenterError } from '../budget/budget.errors';
-import { BudgetFactsService } from '../budget/budget-facts.service';
+import { BudgetFactsService, type MoneyView } from '../budget/budget-facts.service';
 import { BudgetViewNumbersService } from './budget-view-numbers.service';
 import { BudgetTableViewService } from './budget-table-view.service';
 import { budgetNumbers } from './budget-view.mapper';
@@ -70,14 +70,17 @@ export class BudgetViewService {
     const totals = (await this.numbers.totals([{ costCenterId: ownId, year }])).get(`${ownId}:${year}`)!;
     const cycle = await this.numbers.cycle(year);
     const departmentId = (await this.facts.departmentsOf([ownId])).get(ownId);
-    const ceiling = cycle?.publishedAt ? cycle.ceilings.find((entry) => entry.departmentId === departmentId) : null;
+    // The head reads the ceiling they were told when the cycle was published (S4-01), never the figure Finance may be editing.
+    const ceiling = cycle?.publishedAt
+      ? cycle.ceilings.find((entry) => entry.departmentId === departmentId && entry.publishedTotalMinor !== null)
+      : null;
     const ceilingMoney = cycle ? await this.facts.formatter(cycle.currency) : null;
     return {
       ...budgetNumbers(current ?? { baseMinor: null, reserveMinor: null, totalMinor: null }, totals, format),
       departmentCeiling:
         ceiling && ceilingMoney
           ? {
-              total: ceilingMoney(ceiling.totalMinor),
+              total: ceilingMoney(ceiling.publishedTotalMinor!),
               signedCommitments: ceilingMoney(ceiling.signedCommitmentsMinor),
               plannedSeats: ceilingMoney(ceiling.plannedSeatsMinor),
               priority: ceilingMoney(ceiling.priorityMinor),
@@ -136,13 +139,25 @@ export class BudgetViewService {
       take: query.pageSize,
     });
 
-    const wires: MineVersionSummaryWire[] = items.map((item) => ({
-      id: item.id,
-      year: item.year,
-      number: item.number,
-      state: item.state,
-      sentAt: item.sentAt.toISOString(),
-    }));
+    // Each version is told in its own currency (QĐ-100p: the head sees the amounts of what was sent).
+    const formats = new Map<string, (minor: bigint) => MoneyView>();
+    for (const currency of new Set(items.map((item) => item.currency))) {
+      formats.set(currency, await this.facts.formatter(currency));
+    }
+    const wires: MineVersionSummaryWire[] = items.map((item) => {
+      const money = formats.get(item.currency)!;
+
+      return {
+        id: item.id,
+        year: item.year,
+        number: item.number,
+        state: item.state,
+        sentAt: item.sentAt.toISOString(),
+        base: money(item.baseMinor),
+        reserve: money(item.reserveMinor),
+        total: money(item.totalMinor),
+      };
+    });
 
     return pageOf(wires, total, query.page, query.pageSize);
   }

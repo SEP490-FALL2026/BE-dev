@@ -103,23 +103,25 @@ const softwareView = z.strictObject({
   subscriptionId: z.uuid(),
   application: z.string(),
   plan: z.string(),
-  seatsPurchased: z.number().int().nullable(),
-  seatsAssigned: z.number().int().meta({
-    description: 'The seats held (what the warehouse counts: a future start and a service account included).',
+  seatsPurchased: z.number().int().nullable().meta({
+    description: 'The seats the subscription bought in all (the whole shared pool for K2/K4); null when it has none.',
   }),
-  seatsIdle: z
-    .number()
-    .int()
-    .nullable()
-    .meta({ description: 'Purchased and not assigned; null when the purchase has no seats.' }),
+  seatsAssigned: z.number().int().meta({
+    description:
+      'The seats the people of the department hold (QĐ-103k), counted the way the warehouse counts them: a future start and a service account they answer for included.',
+  }),
   monthlyUnitPrice: moneyView.nullable(),
   monthsRunning: z.number().int().min(0).max(12),
   estimatedAnnualCost: moneyView.nullable().meta({
     description:
-      'Seats assigned × monthly price × months running; the seats idle belong to the shared pool. Null when the price is not known.',
+      'Seats assigned to the department × monthly price × months running; the idle seats are in sharedPoolUnallocated. Null when the price is not known.',
   }),
   suggestRenewal: z.boolean().meta({
     description: 'The term ends within the year, or ends before it and still runs today: a Renew line is suggested.',
+  }),
+  kpi3: z.number().min(0).nullable().meta({
+    description:
+      'KPI-3 of the plan, in percent: the seats with activity in the last 30 days over the seats bought, for a plan priced per seat. Null when no usage of the plan was assessed (MF-5).',
   }),
 });
 const baselineDepartmentView = z.strictObject({
@@ -133,26 +135,49 @@ const baselineDepartmentView = z.strictObject({
   }),
   estimatedAnnualCost: moneyView,
   hasUnknownCost: z.boolean().meta({
-    description:
-      'A subscription of the department has no price the baseline can use: its cost is left out of the total.',
+    description: 'A subscription its people hold has no price the baseline can use: its cost is left out of the total.',
   }),
-  seatsPurchased: z.number().int(),
   seatsAssigned: z.number().int(),
   softwareTotal: z.number().int(),
   software: z.array(softwareView).max(50).meta({
     description:
-      'The active subscriptions the department owns, by id: at most 50 are listed (the bound of the baseline); softwareTotal says how many there are.',
+      'The active subscriptions the people of the department hold seats of, by id: at most 50 are listed (the bound of the baseline); softwareTotal says how many there are.',
+  }),
+});
+const poolSoftwareView = z.strictObject({
+  subscriptionId: z.uuid(),
+  application: z.string(),
+  plan: z.string(),
+  seatsPurchased: z.number().int(),
+  seatsAssigned: z.number().int().meta({ description: 'The seats held by anyone, every department together.' }),
+  seatsIdle: z.number().int().meta({ description: 'Bought and not held: the seats of the line.' }),
+  monthlyUnitPrice: moneyView.nullable(),
+  monthsRunning: z.number().int().min(0).max(12),
+  estimatedAnnualCost: moneyView.nullable().meta({
+    description: 'Seats idle × monthly price × months running; null when the price is not known.',
+  }),
+});
+/** The idle seats of the shared pool (`QĐ-103k`): a line of the company, in no department, that Finance reads to set the pool reserve. */
+const sharedPoolLineView = z.strictObject({
+  line: z.literal('SHARED_POOL_UNALLOCATED'),
+  estimatedAnnualCost: moneyView,
+  hasUnknownCost: z.boolean(),
+  seatsIdle: z.number().int(),
+  softwareTotal: z.number().int(),
+  software: z.array(poolSoftwareView).max(50).meta({
+    description:
+      'The K2/K4 subscriptions with idle seats, by id: at most 50 are listed; softwareTotal says how many there are.',
   }),
 });
 /** What runs today, department by department, and what it is estimated to cost over the year (`FR-5.15`, `R-I03`). */
 export const baselineSchema = z.strictObject({
-  basis: z
-    .literal('OWNER_DEPARTMENT')
-    .meta({ description: 'Costs follow subscription ownership until seat-month allocation is available.' }),
+  basis: z.literal('HOLDER_DEPARTMENT').meta({
+    description:
+      'A seat held is charged to the department of the person who holds it (QĐ-103k); the idle seats of the shared pool are in sharedPoolUnallocated.',
+  }),
   year: z.number().int(),
   currency: z.string(),
   computedAt: z.iso.datetime(),
-  kpi3: z.number().nullable().meta({ description: 'KPI-3 needs usage, which is not collected yet: always null.' }),
   departmentsTotal: z
     .number()
     .int()
@@ -160,6 +185,10 @@ export const baselineSchema = z.strictObject({
   departments: z.array(baselineDepartmentView).max(500).meta({
     description:
       'The departments of the year, by id: at most 500 are listed (the most a division of the ceiling names); departmentsTotal says how many there are.',
+  }),
+  sharedPoolUnallocated: sharedPoolLineView.nullable().meta({
+    description:
+      'Unallocated — shared pool: the idle seats of the K2/K4 subscriptions, a line of the company in no department. Null when one department is asked for.',
   }),
 });
 

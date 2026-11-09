@@ -16,7 +16,7 @@ import {
   SubscriptionStillDraftError,
 } from './subscription.errors';
 import { assertSubscriptionShape, declaredStateOf, missingData, subscriptionStatusOf } from './subscription.policy';
-import { assertDeclarableCycle } from './pool/subscription-pool.policy';
+import { assertDeclarableCycle, isPooledPlan } from './pool/subscription-pool.policy';
 import { SubscriptionRepo } from './subscription.repo';
 import { snapshotOf, stateOf } from './subscription.mapper';
 import { SubscriptionPoolService } from './pool/subscription-pool.service';
@@ -35,8 +35,11 @@ import type {
 
 export interface DeclareSubscriptionInput {
   planId: string;
-  /** The department that owns the purchase; required, active, and never changed afterwards. */
-  ownerDepartmentId: string;
+  /**
+   * The department that owns the purchase, never changed afterwards. A `K2`/`K4` purchase is the company's shared pool (`QĐ-103d`) and may
+   * name none; any other must name an active one (`QĐ-89a`).
+   */
+  ownerDepartmentId?: string;
   kind: SubscriptionKind;
   purchasedQuantity?: number;
   unitPrice?: { amount: string; currency: string };
@@ -156,9 +159,7 @@ export class SubscriptionService {
     if (!plan) throw new SubscriptionPlanNotFoundError();
     if (plan.applicationStatus === 'RETIRED') throw new SubscriptionApplicationRetiredError();
     await this.poolRules.assertNoLiveDuplicate(tx, plan, null, organizationId);
-    // Held FOR SHARE until commit, so the department cannot be stopped between this check and the row (QĐ-89a).
-    const owner = await this.organizationReads.lockDepartmentShared(tx, input.ownerDepartmentId);
-    if (!owner?.active) throw new SubscriptionOwnerDepartmentInactiveError();
+    const ownerDepartmentId = await this.ownerOf(tx, plan.provisioningType, input.ownerDepartmentId);
     const state = declaredStateOf(input);
     this.assertShape(plan, input.kind, state);
 
@@ -168,7 +169,7 @@ export class SubscriptionService {
     const created = await this.subscriptions.insert(tx, {
       organizationId,
       planId: plan.id,
-      ownerDepartmentId: owner.id,
+      ownerDepartmentId,
       kind: input.kind,
       ...state,
       ...priced,
@@ -188,6 +189,27 @@ export class SubscriptionService {
     );
 
     return created;
+  }
+
+  /**
+   * The department that owns a purchase being declared: none for a `K2`/`K4` purchase that names none (the shared pool of the company,
+   * `QĐ-103d`; its cost follows the people who hold its seats, `QĐ-103k`), otherwise the one named, which must be active (`QĐ-89a`). It is
+   * held FOR SHARE until commit, so the department cannot be stopped between this check and the row. A purchase of any other kind that
+   * names none is refused like one that names a department that does not exist. Throws SubscriptionOwnerDepartmentInactiveError.
+   */
+  private async ownerOf(
+    tx: DbTx,
+    provisioningType: LockedPlan['provisioningType'],
+    departmentId: string | undefined,
+  ): Promise<string | null> {
+    if (departmentId === undefined) {
+      if (isPooledPlan(provisioningType)) return null;
+      throw new SubscriptionOwnerDepartmentInactiveError();
+    }
+    const owner = await this.organizationReads.lockDepartmentShared(tx, departmentId);
+    if (!owner?.active) throw new SubscriptionOwnerDepartmentInactiveError();
+
+    return owner.id;
   }
 
   /**

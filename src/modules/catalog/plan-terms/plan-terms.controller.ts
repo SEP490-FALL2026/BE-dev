@@ -180,7 +180,7 @@ export class PlanTermsController {
   @ApiErrorResponses(...AUTH_ERRORS, IT_ONLY, NOT_FOUND, {
     status: HttpStatus.UNPROCESSABLE_ENTITY,
     description:
-      'The request is invalid (VALIDATION_ERROR), the opinion is empty or too long (PLAN_TERMS.TEXT_INVALID) or the plan has no terms (PLAN_TERMS.NOT_APPLICABLE).',
+      'The request is invalid (VALIDATION_ERROR), the opinion is empty or too long (PLAN_TERMS.TEXT_INVALID) or the plan has no terms or its application names no Business Owner (PLAN_TERMS.NOT_APPLICABLE).',
     examples: [VALIDATION_EXAMPLE, EXAMPLES.TEXT_INVALID, EXAMPLES.NOT_APPLICABLE],
   })
   async recordOpinion(

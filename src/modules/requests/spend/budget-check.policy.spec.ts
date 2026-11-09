@@ -1,4 +1,4 @@
-import { checkBudget, codesOf, type YearBudget, type YearSlice } from './budget-check.policy';
+import { checkBudget, codesOf, wireRouteOf, type YearBudget, type YearSlice } from './budget-check.policy';
 
 /** Base 100, reserve 10, spent 40, held 20 and 15 waiting to be decided: 25 left of the base and 35 with the reserve. */
 const budget = (over: Partial<YearBudget> = {}): YearBudget => ({
@@ -118,5 +118,18 @@ describe('the check of the budget of a request (BR-MF1-06e..g)', () => {
       expect(codesOf(check(36n, {}, true))).toEqual(['STALE_COST_EVIDENCE', 'INSUFFICIENT_BUDGET']);
       expect(codesOf(check(1n))).toEqual(['BUDGET_OK']);
     });
+  });
+});
+
+describe('the route of a check on the wire: the review by Finance is gone (AUDIT §3)', () => {
+  it('tells a check made before that went to Finance as the spend approval it led to, or as blocked', () => {
+    expect(wireRouteOf('FINANCE_REVIEW', 'WITHIN_BASE')).toBe('SPEND_APPROVAL');
+    expect(wireRouteOf('FINANCE_REVIEW', 'USES_RESERVE')).toBe('SPEND_APPROVAL');
+    expect(wireRouteOf('FINANCE_REVIEW', 'BLOCKED')).toBe('BLOCKED');
+  });
+
+  it('keeps the two routes of today as they are', () => {
+    expect(wireRouteOf('BLOCKED', 'BLOCKED')).toBe('BLOCKED');
+    expect(wireRouteOf('SPEND_APPROVAL', 'USES_RESERVE')).toBe('SPEND_APPROVAL');
   });
 });

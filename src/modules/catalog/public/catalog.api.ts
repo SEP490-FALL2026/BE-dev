@@ -7,6 +7,7 @@ import type {
   CatalogOnboardingFacts,
   PlanRevocationInfo,
   PlanSummary,
+  PlanUsageRate,
   PoolSubscription,
   RuleSubscription,
   SubscriptionPrice,
@@ -138,9 +139,34 @@ export class CatalogApi {
     return this.subscriptions.priceOfSubscription(subscriptionId, tx);
   }
 
-  /** The active subscriptions these departments own with their price and term: what the baseline of the budget starts from (`FR-5.15`). */
-  getBaselineSubscriptions(departmentIds: readonly string[], tx?: DbTx): Promise<BaselineSubscription[]> {
-    return this.subscriptions.baselineOf(departmentIds, tx);
+  /**
+   * Every active subscription of the company with its price and term: what the baseline of the budget starts from (`FR-5.15`). Its cost is
+   * charged to the departments of the people who hold its seats, the idle seats to the shared pool (`QĐ-103k`), so none is left out for
+   * owning no department.
+   */
+  getBaselineSubscriptions(tx?: DbTx): Promise<BaselineSubscription[]> {
+    return this.subscriptions.baselineOf(tx);
+  }
+
+  /**
+   * Replaces what the organization knows of the usage of its plans priced per seat with what one weekly pass of the usage rules found
+   * (`KPI-3`, `QĐ-109d`), in the transaction of the caller: the module of the rules pushes it here, so the budget reads it below that module.
+   */
+  replacePlanUsageRates(
+    tx: DbTx,
+    organizationId: string,
+    assessedOn: BusinessDate,
+    rates: readonly PlanUsageRate[],
+  ): Promise<void> {
+    return this.plans.replaceUsageRates(tx, organizationId, assessedOn, rates);
+  }
+
+  /**
+   * `KPI-3` in percent of each of these plans (`QĐ-109d`): the seats with activity in the 30 days before the last pass over the seats bought,
+   * for a plan priced per seat that the pass judged. A plan with no usage known is absent (no figure, never zero).
+   */
+  getPlanKpi3(planIds: readonly string[], tx?: DbTx): Promise<Map<string, number>> {
+    return this.plans.kpi3Of(planIds, tx);
   }
 
   /** The subscriptions that grant seats on `day` (active, not taken over by a later period that runs, not ended), with their plan facts, in one read. */

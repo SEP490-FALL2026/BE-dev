@@ -98,9 +98,9 @@ flowchart BT
   operating_parameters -->|2| finance
   operating_parameters -->|7| organization
   optimization -->|6| audit
-  optimization -->|6| catalog
+  optimization -->|8| catalog
   optimization -->|4| identity_access
-  optimization -->|23| licensing
+  optimization -->|24| licensing
   optimization -->|7| notifications
   optimization -->|6| operating_parameters
   optimization -->|18| organization

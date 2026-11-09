@@ -41,8 +41,8 @@ const checkSchema = z.strictObject({
     'BUDGET_VERSION_APPROVED',
     'FINANCE_OUTCOME_WHILE_WAITING',
   ]),
-  /** \`BLOCKED\` or \`SPEND_APPROVAL\`; \`FINANCE_REVIEW\` is read from checks made before the three outcomes. */
-  route: z.enum(['BLOCKED', 'FINANCE_REVIEW', 'SPEND_APPROVAL']),
+  /** \`BLOCKED\` or \`SPEND_APPROVAL\`; a check made before the three outcomes that went to Finance is told as the spend approval it led to. */
+  route: z.enum(['BLOCKED', 'SPEND_APPROVAL']),
   /**
    * The outcome: within the base, uses the reserve, or blocked. A check made before the three outcomes is read from its code
    * (\`BUDGET_OK\` is within the base, any other is blocked).

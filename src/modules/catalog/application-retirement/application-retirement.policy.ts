@@ -28,7 +28,8 @@ export function cleanConfirmationNote(raw: string): string {
  * role before, or someone else, does not confirm for them. Throws ApplicationRetirementNotBusinessOwnerError.
  */
 export function assertConfirmable(input: {
-  currentOwnerEmployeeId: string;
+  /** Null for an application that names no Business Owner (`QĐ-104`): nobody confirms for it. */
+  currentOwnerEmployeeId: string | null;
   businessOwnerEmployeeId: string;
   ownerStatus: string | null;
 }): void {

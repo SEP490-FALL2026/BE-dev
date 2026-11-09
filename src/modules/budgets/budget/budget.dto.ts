@@ -416,6 +416,11 @@ export const mineVersionSummarySchema = z.strictObject({
   number: z.number().int().positive(),
   state: z.enum(['SENT', 'APPROVED', 'REJECTED', 'CHANGES_REQUESTED', 'EXPIRED']),
   sentAt: z.iso.datetime(),
+  base: moneyView.meta({
+    description: 'The base Finance set in the version, in the currency of the version (QĐ-100p).',
+  }),
+  reserve: moneyView.meta({ description: 'The reserve on top of the base (QĐ-100h).' }),
+  total: moneyView.meta({ description: 'Base plus reserve.' }),
 });
 const importSchema = z.strictObject({
   added: z.number().int().nonnegative(),

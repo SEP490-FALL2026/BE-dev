@@ -74,7 +74,7 @@ export class BudgetsController {
   @ApiSuccessResponse(MineLinePageResponseDto, {
     message: 'BUDGET.LINES_LISTED',
     description:
-      'The lines of the current version: what is planned to be bought, its amount, its window, and whether the window has gone by. Without the comments Finance made.',
+      'The lines of the current version: what is planned to be bought (Renew, Change, New or Cancel), its seats and its amount, by priority rank. Without the comments Finance made.',
   })
   @ApiErrorResponses(...AUTH_ERRORS, HEADS_ONLY, MINE_INVALID)
   async mineLines(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Query() query: MineLinesQueryDto) {
@@ -90,7 +90,8 @@ export class BudgetsController {
   @ApiOperation({ operationId: 'budgetMineVersionList', summary: 'List sent versions for the cost center' })
   @ApiSuccessResponse(MineVersionPageResponseDto, {
     message: 'BUDGET.VERSIONS_LISTED',
-    description: 'The sent versions of the Cost Center the caller heads today, newest first, without amounts.',
+    description:
+      'The sent versions of the Cost Center the caller heads today, newest first, with the base, reserve and total Finance set (QĐ-100p).',
   })
   @ApiErrorResponses(...AUTH_ERRORS, HEADS_ONLY, MINE_INVALID)
   async mineVersions(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Query() query: MineVersionsQueryDto) {

@@ -57,6 +57,24 @@ export class GhostSeatSeatStateRepo {
     return done.count;
   }
 
+  /** The state of every seat chain of the organization after the last pass, with the last day it showed activity: what `KPI-3` counts. */
+  async statesOf(
+    organizationId: string,
+    tx?: DbTx,
+  ): Promise<{ seatChainId: string; status: SeatStatus; lastActiveDate: BusinessDate | null }[]> {
+    const rows = await (tx ?? this.prisma).ghostSeatSeatState.findMany({
+      where: { organizationId },
+      select: { seatChainId: true, status: true, lastActiveDate: true },
+      orderBy: { seatChainId: 'asc' },
+    });
+
+    return rows.map((row) => ({
+      seatChainId: row.seatChainId,
+      status: row.status,
+      lastActiveDate: row.lastActiveDate ? fromDateColumn(row.lastActiveDate) : null,
+    }));
+  }
+
   async seatStatePage(
     organizationId: string,
     filter: { applicationId?: string; status?: SeatStatus },

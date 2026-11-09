@@ -35,8 +35,8 @@ export function duplicateRankPositions(lines: readonly Pick<RuledLine, 'position
 /** What the zero-based-budget rule reads besides the line itself (`QĐ-94l`, `QĐ-109d`, `BUDGET_ZBB_*`). */
 export interface ZbbContext {
   /**
-   * The usage of what runs now by plan, in percent (`KPI-3` belongs to a plan, C4-15); a plan without a figure is absent: the baseline
-   * has none until usage feeds it (W6).
+   * The usage of what runs now by plan, in percent (`KPI-3` belongs to a plan, C4-15): the seats with activity in the 30 days before the
+   * last weekly pass of the usage rules over the seats bought. A plan without a figure (no usage assessed) is absent.
    */
   kpi3ByPlan: ReadonlyMap<string, number>;
   kpi3BelowPercent: number;

@@ -22,7 +22,9 @@ export class ApplicationViewService {
   /** The records with their Business Owners, read in one call. Throws when an owner is not an employee. */
   async withOwners(records: ApplicationRecord[]): Promise<ApplicationView[]> {
     const employees = await this.organizationReads.getEmployees([
-      ...new Set(records.map((record) => record.businessOwnerEmployeeId)),
+      ...new Set(
+        records.flatMap((record) => (record.businessOwnerEmployeeId === null ? [] : [record.businessOwnerEmployeeId])),
+      ),
     ]);
     const byId = new Map<string, BusinessOwnerView>(
       employees.map((employee) => [
@@ -37,6 +39,9 @@ export class ApplicationViewService {
     );
 
     return records.map((record) => {
+      // An application declared since QĐ-104 names no Business Owner: there is none to show and none to replace.
+      if (record.businessOwnerEmployeeId === null)
+        return { ...record, businessOwner: null, businessOwnerReplacementRequired: false };
       const businessOwner = byId.get(record.businessOwnerEmployeeId);
       if (!businessOwner) throw new Error('The Business Owner of an application is not an employee');
 

@@ -6,8 +6,8 @@ export class PlanTermsPlanNotFoundError extends Error {
 }
 
 export class PlanTermsNotApplicableError extends Error {
-  constructor() {
-    super('A K5 plan of an internal application has no terms.');
+  constructor(message = 'A K5 plan of an internal application has no terms.') {
+    super(message);
     this.name = 'PlanTermsNotApplicableError';
   }
 }

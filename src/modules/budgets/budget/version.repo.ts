@@ -338,6 +338,10 @@ export class VersionRepo {
       number: number;
       state: 'SENT' | 'APPROVED' | 'REJECTED' | 'CHANGES_REQUESTED' | 'EXPIRED';
       sentAt: Date;
+      baseMinor: bigint;
+      reserveMinor: bigint;
+      totalMinor: bigint;
+      currency: string;
     }[];
     total: number;
   }> {
@@ -357,6 +361,10 @@ export class VersionRepo {
             number: true,
             state: true,
             sentAt: true,
+            baseMinor: true,
+            reserveMinor: true,
+            totalMinor: true,
+            currency: true,
           },
           orderBy: [{ year: 'desc' }, { number: 'desc' }, { id: 'asc' }],
           skip: options.skip,
@@ -372,6 +380,10 @@ export class VersionRepo {
             // A sent version: never a draft, and never SUPERSEDED (`budget_versions_no_superseded`).
             state: r.state as 'SENT' | 'APPROVED' | 'REJECTED' | 'CHANGES_REQUESTED' | 'EXPIRED',
             sentAt: r.sentAt!,
+            baseMinor: r.baseMinor,
+            reserveMinor: r.reserveMinor,
+            totalMinor: r.totalMinor,
+            currency: r.currency,
           })),
           total,
         };

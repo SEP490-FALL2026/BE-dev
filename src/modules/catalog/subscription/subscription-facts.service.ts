@@ -25,9 +25,9 @@ export class SubscriptionFactsService {
     return this.pool.addSeat(tx, actor, subscriptionId);
   }
 
-  /** The active subscriptions these departments own, for the baseline of the budget: one statement for any number of departments. */
-  baselineOf(departmentIds: readonly string[], tx?: DbTx): Promise<BaselineSubscription[]> {
-    return this.subscriptions.baselineRowsOf(departmentIds, tx);
+  /** Every active subscription of the company, for the baseline of the budget: one statement. */
+  baselineOf(tx?: DbTx): Promise<BaselineSubscription[]> {
+    return this.subscriptions.baselineRows(tx);
   }
 
   /**

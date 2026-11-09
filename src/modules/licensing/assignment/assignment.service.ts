@@ -45,6 +45,15 @@ export class AssignmentService {
     return this.repo.countHoldingOfSubscriptions(ids, day, tx);
   }
 
+  /** The seats of these subscriptions held as of `day`, by holder (the person, or who answers for a service account), in one statement. */
+  countHoldingByHolder(
+    ids: readonly string[],
+    day: BusinessDate,
+    tx?: DbTx,
+  ): Promise<{ subscriptionId: string; employeeId: string; seats: number }[]> {
+    return this.repo.countHoldingByHolder(ids, day, tx);
+  }
+
   constructor(
     private readonly repo: AssignmentRepo,
     private readonly byDepartment: AssignmentDepartmentRepo,

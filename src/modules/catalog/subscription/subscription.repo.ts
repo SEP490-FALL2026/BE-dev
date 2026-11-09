@@ -441,14 +441,15 @@ export class SubscriptionRepo {
     return rows.map((row) => row.id);
   }
 
-  /** The active subscriptions owned by any of these owners, with their plan and application, by owner and id: one statement. */
-  async baselineRowsOf(departmentIds: readonly string[], tx?: DbTx): Promise<BaselineSubscription[]> {
-    if (departmentIds.length === 0) return [];
+  /**
+   * Every active subscription of the company, with its plan and application, by id: one statement. Its cost follows the people who hold its
+   * seats, not the department that may own it (`QĐ-103k`), so the baseline reads them all.
+   */
+  async baselineRows(tx?: DbTx): Promise<BaselineSubscription[]> {
     const rows = await (tx ?? this.prisma).subscription.findMany({
-      where: { ownerDepartmentId: { in: [...departmentIds] }, status: 'ACTIVE' },
+      where: { status: 'ACTIVE' },
       select: {
         id: true,
-        ownerDepartmentId: true,
         planId: true,
         purchasedQuantity: true,
         priceReportingMinor: true,
@@ -457,17 +458,17 @@ export class SubscriptionRepo {
         endDate: true,
         renewalDate: true,
         renewedBy: { select: { id: true } },
-        plan: { select: { name: true, application: { select: { name: true } } } },
+        plan: { select: { name: true, provisioningType: true, application: { select: { name: true } } } },
       },
-      orderBy: [{ ownerDepartmentId: 'asc' }, { id: 'asc' }],
+      orderBy: { id: 'asc' },
     });
 
     return rows.map((row) => ({
       subscriptionId: row.id,
-      departmentId: row.ownerDepartmentId,
       planId: row.planId,
       planName: row.plan.name,
       applicationName: row.plan.application.name,
+      provisioningType: row.plan.provisioningType,
       purchasedQuantity: row.purchasedQuantity,
       unitPriceReportingMinor: row.priceReportingMinor,
       billingCycle: row.billingCycle,

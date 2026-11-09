@@ -57,12 +57,17 @@ export class ApplicationRetirementRepo {
     return { items, total };
   }
 
-  /** The newest confirmation recorded by this employee as Business Owner, or null: the only one the decision reads. */
+  /**
+   * The newest confirmation recorded by this employee as Business Owner, or null: the only one the decision reads. An application that
+   * names no Business Owner (`QĐ-104`) has none.
+   */
   async latestBy(
     applicationId: string,
-    businessOwnerEmployeeId: string,
+    businessOwnerEmployeeId: string | null,
     tx?: DbTx,
   ): Promise<RetirementConfirmationRecord | null> {
+    if (businessOwnerEmployeeId === null) return null;
+
     return (tx ?? this.prisma).applicationRetirementConfirmation.findFirst({
       where: { applicationId, businessOwnerEmployeeId },
       orderBy: [{ recordedAt: 'desc' }, { id: 'desc' }],

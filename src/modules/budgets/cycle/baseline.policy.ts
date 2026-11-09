@@ -103,6 +103,52 @@ export function subscriptionCost(
   return { monthlyMinor, months, costMinor: estimatedCost(seatsHeld, monthlyMinor, months) };
 }
 
+/** The seats of each subscription held as of a day, for each department and in all: a seat is charged to the department of its holder (`QĐ-103k`). */
+export interface SeatAllocation {
+  /** By department, the seats its people hold (or answer for, a service account), by subscription. */
+  byDepartment: Map<string, Map<string, number>>;
+  /** The seats held in all, by subscription, a holder placed in no department included. */
+  held: Map<string, number>;
+}
+
+/**
+ * Charges each seat held to the department its holder is in (`QĐ-103k`, `QĐ-89a(2)`): the seats of a shared-pool subscription go to as many
+ * departments as its holders are in, whatever department may own the subscription. A holder placed in no department is counted in `held`
+ * only (the seat is taken, so it is not idle), never in a department.
+ */
+export function allocateSeats(
+  holdings: readonly { subscriptionId: string; employeeId: string; seats: number }[],
+  departmentOf: ReadonlyMap<string, string>,
+): SeatAllocation {
+  const byDepartment = new Map<string, Map<string, number>>();
+  const held = new Map<string, number>();
+  for (const holding of holdings) {
+    held.set(holding.subscriptionId, (held.get(holding.subscriptionId) ?? 0) + holding.seats);
+    const departmentId = departmentOf.get(holding.employeeId);
+    if (departmentId === undefined) continue;
+    const seats = byDepartment.get(departmentId) ?? new Map<string, number>();
+    seats.set(holding.subscriptionId, (seats.get(holding.subscriptionId) ?? 0) + holding.seats);
+    byDepartment.set(departmentId, seats);
+  }
+
+  return { byDepartment, held };
+}
+
+/** A `K2` or `K4` purchase is the shared pool of the company (`QĐ-103d`): its idle seats belong to no department. */
+const isSharedPool = (provisioningType: string): boolean => provisioningType === 'K2' || provisioningType === 'K4';
+
+/** The seats bought and not held; none when the purchase has no number of seats, never below zero. */
+const idleSeats = (purchased: number | null, held: number): number | null =>
+  purchased === null ? null : Math.max(0, purchased - held);
+
+/** The idle seats a purchase gives the line of the shared pool: some of a `K2`/`K4` purchase, none of any other or when all are held. */
+export function poolIdleSeats(provisioningType: string, purchased: number | null, held: number): number | null {
+  if (!isSharedPool(provisioningType)) return null;
+  const idle = idleSeats(purchased, held);
+
+  return idle === null || idle === 0 ? null : idle;
+}
+
 /**
  * Whether Finance may build the first version of a department from the baseline (`QĐ-100h`, `R-I05`): the cycle of the year was
  * published once and the department is in it (a ceiling there, in effect by the end of the year); the day is after the submission deadline; nobody heads the department today and nobody is to head it later (a
