@@ -253,7 +253,9 @@ const DROPPED: Call[] = [
     path: '/api/v1/budget-proposals',
     role: 'MANAGER',
     body: { year: 2027 },
-    dropped: { lines: [{ description: 'Tool', amount: { amount: '100', currency: 'VND' } }] },
+    dropped: {
+      lines: [{ lineType: 'RENEW', priorityRank: 1, description: 'Tool', amount: { amount: '100', currency: 'VND' } }],
+    },
     at: 'lines.0.amount',
     field: 'currency',
   },
@@ -263,7 +265,9 @@ const DROPPED: Call[] = [
     path: `/api/v1/budget-proposals/${ID}/resubmission`,
     role: 'MANAGER',
     body: {},
-    dropped: { lines: [{ description: 'Tool', amount: { amount: '100', currency: 'VND' } }] },
+    dropped: {
+      lines: [{ lineType: 'RENEW', priorityRank: 1, description: 'Tool', amount: { amount: '100', currency: 'VND' } }],
+    },
     at: 'lines.0.amount',
     field: 'currency',
   },
@@ -303,7 +307,9 @@ const DROPPED: Call[] = [
     path: `/api/v1/budget-versions/${ID}/lines`,
     role: 'FINANCE',
     body: {},
-    dropped: { lines: [{ description: 'Tool', amount: { amount: '100', currency: 'VND' } }] },
+    dropped: {
+      lines: [{ lineType: 'RENEW', priorityRank: 1, description: 'Tool', amount: { amount: '100', currency: 'VND' } }],
+    },
     at: 'lines.0.amount',
     field: 'currency',
   },
@@ -363,6 +369,8 @@ const DROPPED: Call[] = [
       dropped: {
         lines: [
           {
+            lineType: 'RENEW',
+            priorityRank: 1,
             description: 'Tool',
             amount: { amount: '100' },
             [field]: field === 'servicePeriodMonths' ? 12 : field === 'repeatCycle' ? 'ANNUAL' : '2027-01-01',
@@ -387,7 +395,17 @@ const DROPPED: Call[] = [
     path: `/api/v1/budget-versions/${ID}/lines`,
     role: 'FINANCE',
     body: {},
-    dropped: { lines: [{ description: 'Tool', amount: { amount: '100' }, windowFrom: '2027-01-01' }] },
+    dropped: {
+      lines: [
+        {
+          lineType: 'RENEW',
+          priorityRank: 1,
+          description: 'Tool',
+          amount: { amount: '100' },
+          windowFrom: '2027-01-01',
+        },
+      ],
+    },
     at: 'lines.0',
     field: 'windowFrom',
   },
@@ -397,8 +415,8 @@ const DROPPED: Call[] = [
     path: '/api/v1/budget-proposals',
     role: 'MANAGER',
     body: { year: 2027 },
-    dropped: { lines: [{ amount: { amount: '100' } }] },
-    control: { lines: [{ description: 'Tool', amount: { amount: '100' } }] },
+    dropped: { lines: [{ lineType: 'RENEW', priorityRank: 1, amount: { amount: '100' } }] },
+    control: { lines: [{ lineType: 'RENEW', priorityRank: 1, description: 'Tool', amount: { amount: '100' } }] },
     at: 'lines.0.description',
   },
   {

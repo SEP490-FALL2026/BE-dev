@@ -300,7 +300,7 @@ describe('budgets over HTTP: the versions Finance builds (integration, real Post
   });
 
   describe('lines loaded from a file (AC-3)', () => {
-    const header = 'cost_center_code,description,amount,seats,note';
+    const header = 'cost_center_code,description,amount,seats,note,line_type';
     const retiredHeader =
       'cost_center_code,description,amount,window_from,window_to,service_period_months,repeat_cycle,seats,note';
 
@@ -312,10 +312,10 @@ describe('budgets over HTTP: the versions Finance builds (integration, real Post
       ).rows[0].code;
       const csv = [
         header,
-        `${code},Zoom,12000000,20,`,
-        `CC-Z,Slack,5000000,,`,
-        `${code},Linear,not-a-number,,`,
-        `${code},Notion,9000000,,Team plan`,
+        `${code},Zoom,12000000,20,,RENEW`,
+        `CC-Z,Slack,5000000,,,RENEW`,
+        `${code},Linear,not-a-number,,,RENEW`,
+        `${code},Notion,9000000,,Team plan,new`,
       ].join('\n');
 
       const response = await h.importLines(version.id, csv).expect(201);
@@ -347,7 +347,7 @@ describe('budgets over HTTP: the versions Finance builds (integration, real Post
         .rows[0].code;
 
       const response = await h
-        .importLines(version.id, `${header}\n${code},Zoom,1000,${h.next}-02-01,${h.next}-02-28,12,ANNUAL,,`)
+        .importLines(version.id, `${header}\n${code},Zoom,1000,${h.next}-02-01,${h.next}-02-28,12,ANNUAL,,,RENEW`)
         .expect(201);
 
       expect(h.dataOf<{ result: { errors: unknown[] } }>(response).result.errors).toEqual([

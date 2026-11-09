@@ -50,4 +50,16 @@ export const W2_REGISTRY_EVENTS: readonly RegistryEvent[] = [
     reason:
       'The departments of the year listed by the package: at most DEPARTMENTS_LISTED_MAX, with the total beside it.',
   },
+  {
+    registry: 'nested',
+    key: 'budgetCyclePackage#departments.proposal.lines',
+    change: 'added',
+    to: 'bounded',
+    bound: 'LINES_MAX',
+    finding: 'LD-14',
+    item: 'qd103-budget-proposal-lines-cleanup',
+    date: '2026-11-09',
+    reason:
+      'The lines of the open proposal of a department listed by the package: at most LINES_MAX (a proposal takes no more).',
+  },
 ];

@@ -143,6 +143,8 @@ describe('budgets (integration, PostgreSQL constraints)', () => {
       const row = {
         proposal_id: source.id,
         position: 1,
+        // BM-10 lines are ranked: the rank is required (QT 4.4) and given once in a proposal.
+        priority_rank: 1,
         description: 'Figma',
         amount_minor: 50,
         window_from: '2027-03-01',
@@ -196,7 +198,7 @@ describe('budgets (integration, PostgreSQL constraints)', () => {
       expect(sameNumber.state).toBeNull();
     });
 
-    it('has one current version for a Cost Center and a year, and any number of replaced ones', async () => {
+    it('has one current version for a Cost Center and a year, and none that is replaced (QĐ-97b: SUPERSEDED is retired)', async () => {
       const sent = { sent_at: new Date(), sent_by_employee_id: employeeId };
       const current = await version({ state: 'APPROVED', ...sent });
       const another = await version({
@@ -216,7 +218,8 @@ describe('budgets (integration, PostgreSQL constraints)', () => {
 
       expect(current.state).toBeNull();
       expect(another.state).toBe(UNIQUE);
-      expect(replaced.state).toBeNull();
+      // `budget_versions_no_superseded` (migration BM-10): a version is never replaced, so the state cannot be written any more.
+      expect(replaced.state).toBe(CHECK);
     });
 
     it.each([

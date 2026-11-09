@@ -54,9 +54,9 @@ describe('the history of the edits of a version (integration, real PostgreSQL)',
     it('writes one Audit Trail record with the real values before and after, and one entry of the history, for each edit', async () => {
       const s = await sentBack();
       const csv = [
-        'cost_center_code,description,amount',
-        `${s.version.costCenter.code},Imported one,1000`,
-        `${s.version.costCenter.code},Imported two,2000`,
+        'cost_center_code,description,amount,line_type',
+        `${s.version.costCenter.code},Imported one,1000,RENEW`,
+        `${s.version.costCenter.code},Imported two,2000,RENEW`,
       ].join('\n');
 
       await h.updateVersion(s.version.id, { reserve: h.money(10_000_000) }).expect(200);
@@ -181,9 +181,9 @@ describe('the history of the edits of a version (integration, real PostgreSQL)',
    * bytes, so the entries are cut by bytes as well as by count; a legal import is kept whole in the history, never a 500.
    */
   describe('the size of an entry (R4 D-6)', () => {
-    const HEADER = 'cost_center_code,description,amount,seats,note';
+    const HEADER = 'cost_center_code,description,amount,seats,note,line_type';
     const row = (code: string, index: number, description: string, note: string) =>
-      `${code},${description},${1000 + index},,${note}`;
+      `${code},${description},${1000 + index},,${note},RENEW`;
 
     it('keeps 200 imported lines with the longest description and note as several entries that follow one another, and answers 201', async () => {
       const s = await sentBack();
