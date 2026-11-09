@@ -46,9 +46,9 @@ flowchart BT
   budgets -->|3| finance
   budgets -->|5| identity_access
   budgets -->|2| licensing
-  budgets -->|3| notifications
+  budgets -->|5| notifications
   budgets -->|3| operating_parameters
-  budgets -->|15| organization
+  budgets -->|17| organization
   catalog -->|19| audit
   catalog -->|11| finance
   catalog -->|3| identity_access
@@ -78,7 +78,7 @@ flowchart BT
   installation -->|11| identity_access
   installation -->|8| organization
   licensing -->|29| audit
-  licensing -->|49| catalog
+  licensing -->|50| catalog
   licensing -->|2| finance
   licensing -->|8| identity_access
   licensing -->|6| notifications
