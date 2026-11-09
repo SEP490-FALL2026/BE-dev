@@ -36,7 +36,7 @@ export class SubscriptionFactsService {
 
     return (
       priced && {
-        kind: priced.kind,
+        kind: priced.subscriptionKind === 'PERPETUAL' ? 'ONE_TIME' : 'RECURRING',
         unitPrice: { amountMinor: priced.unitPriceMinor, currency: priced.currency },
         billingCycle: priced.billingCycle,
         allowsMidTermReduction: priced.allowsMidTermReduction,

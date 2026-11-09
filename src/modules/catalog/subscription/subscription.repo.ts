@@ -243,7 +243,7 @@ export class SubscriptionRepo {
     ownerDepartmentId: string,
     tx?: DbTx,
   ): Promise<{
-    kind: 'RECURRING' | 'ONE_TIME';
+    subscriptionKind: 'TERM' | 'PERPETUAL';
     unitPriceMinor: bigint;
     currency: string;
     billingCycle: 'MONTHLY' | 'QUARTERLY' | 'ANNUAL' | 'OTHER';
@@ -257,7 +257,7 @@ export class SubscriptionRepo {
     if (!row || row.unitPriceMinor === null || row.unitPriceCurrency === null || row.billingCycle === null) return null;
 
     return {
-      kind: row.kind,
+      subscriptionKind: row.kind,
       unitPriceMinor: row.unitPriceMinor,
       currency: row.unitPriceCurrency,
       billingCycle: row.billingCycle,

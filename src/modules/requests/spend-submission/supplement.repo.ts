@@ -71,8 +71,8 @@ export class SupplementRepo {
     createdAt: Date;
     beforeExpectedSpendOn: Date | null;
     afterExpectedSpendOn: Date | null;
-    beforeBudgetYear: number;
-    afterBudgetYear: number;
+    beforeBudgetYear: number | null;
+    afterBudgetYear: number | null;
     beforeAmountMinor: bigint;
     afterAmountMinor: bigint;
     currency: string | null;
@@ -84,8 +84,8 @@ export class SupplementRepo {
       createdAt: row.createdAt,
       beforeExpectedSpendOn: row.beforeExpectedSpendOn ? fromDateColumn(row.beforeExpectedSpendOn) : null,
       afterExpectedSpendOn: row.afterExpectedSpendOn ? fromDateColumn(row.afterExpectedSpendOn) : null,
-      beforeBudgetYear: row.beforeBudgetYear,
-      afterBudgetYear: row.afterBudgetYear,
+      beforeBudgetYear: row.beforeBudgetYear ?? 0,
+      afterBudgetYear: row.afterBudgetYear ?? 0,
       beforeAmountMinor: row.beforeAmountMinor,
       afterAmountMinor: row.afterAmountMinor,
       currency: row.currency ?? 'VND',

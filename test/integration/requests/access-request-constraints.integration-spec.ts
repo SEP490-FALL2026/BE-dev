@@ -635,12 +635,12 @@ describe('requests (integration, PostgreSQL constraints)', () => {
             h.seed.organizationId,
             'PAID_IN_CATALOG',
             'PENDING',
-            person.id,
+            person.employeeId,
             department.id,
             'Test BR amount_months field',
             6,
             'RECURRING',
-            person.id,
+            person.employeeId,
           ]
         )
       ).toBeNull();
@@ -657,12 +657,12 @@ describe('requests (integration, PostgreSQL constraints)', () => {
             h.seed.organizationId,
             'PAID_IN_CATALOG',
             'PENDING',
-            person.id,
+            person.employeeId,
             department.id,
             'Test',
             13,
             'RECURRING',
-            person.id,
+            person.employeeId,
           ]
         )
       ).toBe(CHECK);
