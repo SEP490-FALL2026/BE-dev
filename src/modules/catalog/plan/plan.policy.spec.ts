@@ -18,6 +18,7 @@ import {
   cleanPlanName,
   cleanRevocationNote,
   cleanWorkspaceText,
+  kpi3Percent,
   seatTrackingOf,
 } from './plan.policy';
 
@@ -248,5 +249,16 @@ describe('cleanWorkspaceText', () => {
     expect(cleanWorkspaceText('   ')).toBeNull();
     expect(cleanWorkspaceText('  hand over   in the console ')).toBe('hand over in the console');
     expect(() => cleanWorkspaceText('n'.repeat(2001))).toThrow(PlanWorkspaceTextInvalidError);
+  });
+});
+
+describe('kpi3Percent (AF-08, QĐ-109d): the seats used over the seats bought', () => {
+  it('gives the percent to one decimal', () => {
+    expect(kpi3Percent(4, 10)).toBe(40);
+    expect(kpi3Percent(2, 3)).toBe(66.7);
+  });
+
+  it('gives none when nothing was bought', () => {
+    expect(kpi3Percent(3, 0)).toBeNull();
   });
 });

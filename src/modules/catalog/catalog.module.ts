@@ -38,6 +38,7 @@ import { PlanTermsRepo } from './plan-terms/plan-terms.repo';
 import { PlanTermsService } from './plan-terms/plan-terms.service';
 import { PlanTermsController } from './plan-terms/plan-terms.controller';
 import { PlanFactsService } from './plan/plan-facts.service';
+import { PlanUsageRepo } from './plan/plan-usage.repo';
 import { PlanWorkspaceService } from './plan/plan-workspace.service';
 import { PlanRepo } from './plan/plan.repo';
 import { PlanService } from './plan/plan.service';
@@ -131,6 +132,7 @@ import { VendorRepo } from './vendor/vendor.repo';
     PlanService,
     PlanWorkspaceService,
     PlanRepo,
+    PlanUsageRepo,
     InternalSoftwareRegistrationService,
     VendorFactsService,
     VendorQueryService,

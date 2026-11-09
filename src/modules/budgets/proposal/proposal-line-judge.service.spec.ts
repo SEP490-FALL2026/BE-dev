@@ -31,11 +31,15 @@ const judgeOf = (
     currency?: string;
     reporting?: { amountMinor: bigint; currency: string } | null;
   } | null = null,
+  kpi3: ReadonlyMap<string, number> = new Map(),
 ) => {
   const parameters = {
     getValueAt: jest.fn((key: string) => Promise.resolve(key === 'BUDGET_ZBB_KPI3_BELOW_PERCENT' ? 70 : 10)),
   } as unknown as OperatingParametersApi;
   const catalog = {
+    getPlanKpi3: jest.fn((planIds: readonly string[]) =>
+      Promise.resolve(new Map([...kpi3].filter(([planId]) => planIds.includes(planId)))),
+    ),
     getPlanPrice: jest.fn(() =>
       Promise.resolve(
         price && {
@@ -142,5 +146,34 @@ describe('the rules of the lines of BM-10 that read more than the line', () => {
     const judged = await judgeOf().judge(tx, input(lines, 90n));
 
     expect(judged.map((entry) => entry.overCeilingMinor)).toEqual([null, null, null]);
+  });
+
+  describe('BR-MF4-02 QĐ-109d: KPI-3 under 70 % asks the explanation of a Renew or Change line only (AF-08)', () => {
+    const low = new Map([['slack', 40]]);
+
+    it.each(['RENEW', 'CHANGE'] as const)(
+      'a %s line of a plan used at 40 % without its explanation is refused',
+      async (lineType) => {
+        const error = await refusal(judgeOf(null, low).judge(tx, input([draft({ planId: 'slack', lineType })])));
+
+        expect([error.rule, error.positions]).toEqual(['ZBB_REQUIRED', [1]]);
+        await expect(
+          judgeOf(null, low).judge(tx, input([draft({ planId: 'slack', lineType, zbb })])),
+        ).resolves.toHaveLength(1);
+      },
+    );
+
+    it('a CANCEL line of the same plan asks nothing for its usage', async () => {
+      await expect(
+        judgeOf(null, low).judge(tx, input([draft({ planId: 'slack', lineType: 'CANCEL' })])),
+      ).resolves.toHaveLength(1);
+    });
+
+    it('a plan used at 70 % or more, or with no usage assessed, asks nothing', async () => {
+      await expect(
+        judgeOf(null, new Map([['slack', 70]])).judge(tx, input([draft({ planId: 'slack' })])),
+      ).resolves.toHaveLength(1);
+      await expect(judgeOf(null, new Map()).judge(tx, input([draft({ planId: 'slack' })]))).resolves.toHaveLength(1);
+    });
   });
 });

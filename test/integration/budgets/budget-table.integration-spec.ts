@@ -143,7 +143,7 @@ describe('BR-MF4-05 budgetTable commitment-only years over PostgreSQL', () => {
       .get(`/api/v1/budget-cycles/${h.next}/baseline`)
       .set(h.as(h.finance))
       .expect(200);
-    expect(h.dataOf<{ basis: string }>(baseline).basis).toBe('OWNER_DEPARTMENT');
+    expect(h.dataOf<{ basis: string }>(baseline).basis).toBe('HOLDER_DEPARTMENT');
     const response = await request(h.server())
       .get(`/api/v1/budget-cycles/${h.next}/package`)
       .set(h.as(h.finance))

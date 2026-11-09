@@ -21,8 +21,9 @@ const money = z.strictObject({ amount: z.string().max(40), currency: z.string().
 
 export const declareSubscriptionBodySchema = z.strictObject({
   planId: z.uuid(),
-  // The department that owns the purchase (QĐ-89a). Required, and never part of a change: it is not a field of PATCH.
-  ownerDepartmentId: z.uuid(),
+  // The department that owns the purchase (QĐ-89a), never part of a change: it is not a field of PATCH. A K2/K4 purchase is the company's
+  // shared pool (QĐ-103d) and may name none; a K1 purchase must name one (SUBSCRIPTION.OWNER_DEPARTMENT_INACTIVE when it does not).
+  ownerDepartmentId: z.uuid().optional(),
   kind,
   purchasedQuantity: quantity.optional(),
   unitPrice: money.optional(),

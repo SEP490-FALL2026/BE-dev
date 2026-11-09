@@ -109,6 +109,6 @@ export interface PlanLookup {
   applicationKind: ApplicationKind;
   /** Whether the application is still in the catalog or has been retired. */
   applicationStatus: 'APPROVED' | 'RETIRED';
-  /** The Business Owner of the application now. */
-  businessOwnerEmployeeId: string;
+  /** The Business Owner of the application now; null when it names none (`QĐ-104`). */
+  businessOwnerEmployeeId: string | null;
 }

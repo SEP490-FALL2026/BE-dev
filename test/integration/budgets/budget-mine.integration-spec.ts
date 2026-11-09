@@ -1,4 +1,5 @@
-import type { MineWire } from '../../../src/modules/budgets/budget/budget.dto';
+import request from 'supertest';
+import type { MineVersionSummaryWire, MineWire } from '../../../src/modules/budgets/budget/budget.dto';
 import { BudgetCheckRepo } from '../../../src/modules/requests/spend/budget-check.repo';
 import { PendingSpendContributions } from '../../../src/modules/budgets/public/budgets.extension-points';
 import { BudgetViewsHarness } from '../../support/budget-views-harness';
@@ -106,5 +107,37 @@ describe('BR-MF4-05 budgetMine over PostgreSQL', () => {
     const u = await unit();
     await h.budgetFor(u, { total: 10 * M, spent: 11 * M });
     expect(await mine(u)).toMatchObject({ remainingWithReserve: { amount: String(-M) }, overBudget: true });
+  });
+
+  it('AF-16 S4-01: tells the head the ceiling that was published, not the one Finance is editing', async () => {
+    const u = await unit();
+    await h.ctx.sql.query(
+      `INSERT INTO budget_department_ceilings
+      (cycle_id, department_id, signed_commitments_minor, planned_seats_minor, priority_minor, total_minor, published_total_minor)
+      SELECT id, $1, 70, 0, 0, 70, 50 FROM budget_cycles WHERE year = $2`,
+      [u.department.id, h.year],
+    );
+
+    expect((await mine(u)).departmentCeiling?.total).toMatchObject({ amount: '50' });
+  });
+
+  it('AF-12 BR-MF4-07 QĐ-100p: lists the sent versions of the department with their base, reserve and total', async () => {
+    const u = await unit();
+    await h.budgetFor(u, { total: 100 * M, reserve: 10 * M });
+
+    const page = h.dataOf<{ items: MineVersionSummaryWire[] }>(
+      await request(h.server())
+        .get(`/api/v1/budgets/mine/versions?year=${h.year}`)
+        .set(h.as(u.head.account))
+        .expect(200),
+    );
+
+    expect(page.items).toHaveLength(1);
+    expect(page.items[0]).toMatchObject({
+      state: 'APPROVED',
+      base: { amount: String(100 * M) },
+      reserve: { amount: String(10 * M) },
+      total: { amount: String(110 * M) },
+    });
   });
 });

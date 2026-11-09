@@ -75,8 +75,12 @@ export class ProposalLineJudge {
     const priceIncrease = await this.parameters.getValueAt('BUDGET_ZBB_PRICE_INCREASE_PERCENT', now, tx);
 
     return {
-      // TẠM CHỌN: usage is not collected yet (W6), so no plan has a KPI-3 figure and the rule waits for one.
-      kpi3ByPlan: new Map<string, number>(),
+      // KPI-3 of the plans the lines name, as the last weekly pass of the usage rules (MF-5) left it; a plan with no usage assessed has
+      // none, and the rule asks nothing of its line (QĐ-109d: Renew/Change only, judged in the policy).
+      kpi3ByPlan: await this.catalog.getPlanKpi3(
+        [...new Set(lines.flatMap((line) => (line.planId === null ? [] : [line.planId])))],
+        tx,
+      ),
       kpi3BelowPercent: Number(kpi3Below),
       priceIncreasePercent: Number(priceIncrease),
       monthlyPriceByPlan: await this.monthlyPrices(tx, lines, currency),

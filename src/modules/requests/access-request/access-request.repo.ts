@@ -286,23 +286,6 @@ export class AccessRequestRepo {
     });
   }
 
-  /** Writes the line of the plan of the budget the head attached the request to, or that it is outside the plan (`US-05-04` AC-12). */
-  async setSpendPlan(
-    tx: DbTx,
-    id: string,
-    plan: { line: { versionId: string; position: number; confirmed: boolean } | null; offPlan: boolean },
-  ): Promise<void> {
-    await tx.accessRequest.update({
-      where: { id },
-      data: {
-        planLineVersionId: plan.line?.versionId ?? null,
-        planLinePosition: plan.line?.position ?? null,
-        planLineConfirmed: plan.line?.confirmed ?? false,
-        offPlan: plan.offPlan,
-      },
-    });
-  }
-
   /** Writes a new price over the old one: the day the money goes out changed (`QĐ-82n`, `US-05-04` AC-16). */
   async setPricing(tx: DbTx, id: string, pricing: PricingRecord): Promise<void> {
     await tx.accessRequest.update({ where: { id }, data: pricingColumns(pricing) });

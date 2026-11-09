@@ -235,6 +235,30 @@ export class AssignmentRepo {
     return new Map(rows.flatMap((row) => (row.subscriptionId === null ? [] : [[row.subscriptionId, row._count._all]])));
   }
 
+  /**
+   * The seats of these purchases held as of `day` (`HOLDING`), by the person who holds each or answers for it (a service account), in one
+   * statement: what charges a seat to the department of its holder (`QĐ-103k`).
+   */
+  async countHoldingByHolder(
+    ids: readonly string[],
+    day: BusinessDate,
+    tx?: DbTx,
+  ): Promise<{ subscriptionId: string; employeeId: string; seats: number }[]> {
+    if (ids.length === 0) return [];
+    const rows = await (tx ?? this.prisma).licenseAssignment.groupBy({
+      by: ['subscriptionId', 'employeeId'],
+      where: { subscriptionId: { in: [...ids] }, ...HOLDING(day) },
+      _count: { _all: true },
+      orderBy: [{ subscriptionId: 'asc' }, { employeeId: 'asc' }],
+    });
+
+    return rows.flatMap((row) =>
+      row.subscriptionId === null
+        ? []
+        : [{ subscriptionId: row.subscriptionId, employeeId: row.employeeId, seats: row._count._all }],
+    );
+  }
+
   /** Which of these ids have an assignment that has not ended and has not failed as of `day`, in one statement. */
   async subscriptionIdsHolding(ids: readonly string[], day: BusinessDate, tx?: DbTx): Promise<Set<string>> {
     if (ids.length === 0) return new Set();

@@ -172,18 +172,18 @@ export class SpendSubmissionController {
   }
 
   @Get('spend-batches')
-  @RequireRoles('FINANCE')
+  @RequireRoles('FINANCE', 'SPENDING_APPROVER')
   @ApiOperation({ operationId: 'spendBatchList', summary: 'List the batches the heads sent on as spend' })
   @ApiSuccessResponse(SpendBatchListResponseDto, {
     message: 'SPEND_BATCH.LISTED',
     description:
-      'Every batch, the newest first, each with its department, who sent it and when, how many requests it holds, how many of them were approved for spend and what those were committed for (by currency), and how many still wait for a decision. Narrowed by department and by the time the batch was sent. Only Finance reads the list, and only reads it.',
+      'Every batch, the newest first, each with its department, who sent it and when, how many requests it holds, how many of them were approved for spend and what those were committed for (by currency), and how many still wait for a decision. Narrowed by department and by the time the batch was sent. Finance and the spending approver read the list (the approver decides the requests in it), and only read it.',
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,
     {
       status: HttpStatus.FORBIDDEN,
-      description: 'Only Finance reads the batches of all the departments.',
+      description: 'Only Finance and the spending approver read the batches of all the departments.',
       examples: [FORBIDDEN_EXAMPLE],
     },
     INVALID,

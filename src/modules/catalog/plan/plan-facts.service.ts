@@ -1,8 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { ApplicationPlans } from '../catalog-entry/application-plans.types';
-import type { PlanRevocationInfo, PlanSummary, WorkspaceDuty } from '../public/catalog.types';
+import type { BusinessDate } from '../../../core/business-date';
+import type { PlanRevocationInfo, PlanSummary, PlanUsageRate, WorkspaceDuty } from '../public/catalog.types';
+import { kpi3Percent } from './plan.policy';
 import { PlanRepo } from './plan.repo';
+import { PlanUsageRepo } from './plan-usage.repo';
 import type { PlanLookup } from './plan.types';
 
 export type LockedPlan = PlanLookup;
@@ -10,7 +13,31 @@ export type LockedPlan = PlanLookup;
 /** What the subscriptions and the terms of a plan need to know about it, and what the application needs to know of its plans. */
 @Injectable()
 export class PlanFactsService implements ApplicationPlans {
-  constructor(private readonly plans: PlanRepo) {}
+  constructor(
+    private readonly plans: PlanRepo,
+    private readonly usage: PlanUsageRepo,
+  ) {}
+
+  /** Replaces what is known of the usage of the plans of the organization with what one pass of the usage rules found (`KPI-3`). */
+  replaceUsageRates(
+    tx: DbTx,
+    organizationId: string,
+    assessedOn: BusinessDate,
+    rates: readonly PlanUsageRate[],
+  ): Promise<void> {
+    return this.usage.replaceAll(tx, organizationId, assessedOn, rates);
+  }
+
+  /** `KPI-3` in percent of each of these plans that has one (priced per seat, judged by the last pass, seats bought); the others are absent. */
+  async kpi3Of(planIds: readonly string[], tx?: DbTx): Promise<Map<string, number>> {
+    const figures = new Map<string, number>();
+    for (const row of await this.usage.activeAndPurchased(planIds, tx)) {
+      const kpi3 = kpi3Percent(row.activeSeats, row.purchasedSeats);
+      if (kpi3 !== null) figures.set(row.planId, kpi3);
+    }
+
+    return figures;
+  }
 
   /** The plan, locked `FOR SHARE` until the transaction ends so its kind cannot change meanwhile; null if absent. */
   lockShared(tx: DbTx, id: string): Promise<LockedPlan | null> {

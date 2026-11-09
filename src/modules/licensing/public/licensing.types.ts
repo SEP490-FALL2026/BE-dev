@@ -98,6 +98,13 @@ export interface SeatHolder {
   seats: number;
 }
 
+/** How many seats of one subscription one person holds (or answers for, a service account): what the baseline charges to their department (`QĐ-103k`). */
+export interface SeatHolding {
+  subscriptionId: string;
+  employeeId: string;
+  seats: number;
+}
+
 export interface SeatUsage {
   subscriptionId: string;
   purchased: number | null;

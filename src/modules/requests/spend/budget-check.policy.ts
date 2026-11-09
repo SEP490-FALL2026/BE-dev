@@ -26,6 +26,19 @@ export type BlockReason = 'PRICE_EXPIRED' | 'NO_APPROVED_BUDGET' | 'OVER_RESERVE
 /** Where the request goes next: nowhere (blocked), or to the spending approver. `FINANCE_REVIEW` is read from checks made before. */
 export type CheckRoute = 'BLOCKED' | 'FINANCE_REVIEW' | 'SPEND_APPROVAL';
 
+/**
+ * The route a check is told with on the wire: `BLOCKED` or `SPEND_APPROVAL` only. The review by Finance is gone (`QĐ-100`), so a check made
+ * before that went to Finance is told as blocked when its outcome blocked it, and otherwise as the spend approval it led to.
+ */
+export function wireRouteOf(
+  route: CheckRoute,
+  outcome: 'WITHIN_BASE' | 'USES_RESERVE' | 'BLOCKED',
+): 'BLOCKED' | 'SPEND_APPROVAL' {
+  if (route !== 'FINANCE_REVIEW') return route;
+
+  return outcome === 'BLOCKED' ? 'BLOCKED' : 'SPEND_APPROVAL';
+}
+
 /** The approved version of a Cost Center and year, with what is held and spent against it, in the reporting currency. */
 export interface YearBudget {
   versionId: string;

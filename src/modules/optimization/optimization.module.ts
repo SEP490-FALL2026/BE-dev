@@ -44,6 +44,7 @@ import { UsageImportListener } from './usage-rules/usage-import.listener';
 import { UsageNegationService } from './usage-rules/usage-negation.service';
 import { UsageRulesSweeper } from './usage-rules/usage-rules.job';
 import { UsageRulesRepo } from './usage-rules/usage-rules.repo';
+import { UsageRulesClosingService } from './usage-rules/usage-rules-closing.service';
 import { UsageRulesContextService } from './usage-rules/usage-rules-context.service';
 import { UsageRulesSeatService } from './usage-rules/usage-rules-seat.service';
 import { UsageStaleNoticeService } from './usage-rules/usage-stale-notice.service';
@@ -102,6 +103,7 @@ import { UsageRulesService } from './usage-rules/usage-rules.service';
     UsageStaleNoticeService,
     UsageRulesSeatService,
     UsageRulesService,
+    UsageRulesClosingService,
     UsageRulesSweeper,
     UsageImportListener,
     UsageRulesThresholdService,

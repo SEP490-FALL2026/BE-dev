@@ -24927,7 +24927,7 @@
             }
           },
           "422": {
-            "description": "The request is invalid (VALIDATION_ERROR), the opinion is empty or too long (PLAN_TERMS.TEXT_INVALID) or the plan has no terms (PLAN_TERMS.NOT_APPLICABLE).",
+            "description": "The request is invalid (VALIDATION_ERROR), the opinion is empty or too long (PLAN_TERMS.TEXT_INVALID) or the plan has no terms or its application names no Business Owner (PLAN_TERMS.NOT_APPLICABLE).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -45044,7 +45044,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Every batch, the newest first, each with its department, who sent it and when, how many requests it holds, how many of them were approved for spend and what those were committed for (by currency), and how many still wait for a decision. Narrowed by department and by the time the batch was sent. Only Finance reads the list, and only reads it.",
+            "description": "Every batch, the newest first, each with its department, who sent it and when, how many requests it holds, how many of them were approved for spend and what those were committed for (by currency), and how many still wait for a decision. Narrowed by department and by the time the batch was sent. Finance and the spending approver read the list (the approver decides the requests in it), and only read it.",
             "content": {
               "application/json": {
                 "schema": {
@@ -45089,7 +45089,7 @@
             }
           },
           "403": {
-            "description": "Only Finance reads the batches of all the departments.",
+            "description": "Only Finance and the spending approver read the batches of all the departments.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -58076,7 +58076,7 @@
         ],
         "responses": {
           "200": {
-            "description": "The lines of the current version: what is planned to be bought, its amount, its window, and whether the window has gone by. Without the comments Finance made.",
+            "description": "The lines of the current version: what is planned to be bought (Renew, Change, New or Cancel), its seats and its amount, by priority rank. Without the comments Finance made.",
             "content": {
               "application/json": {
                 "schema": {
@@ -58282,7 +58282,7 @@
         ],
         "responses": {
           "200": {
-            "description": "The sent versions of the Cost Center the caller heads today, newest first, without amounts.",
+            "description": "The sent versions of the Cost Center the caller heads today, newest first, with the base, reserve and total Finance set (QĐ-100p).",
             "content": {
               "application/json": {
                 "schema": {
@@ -91100,7 +91100,9 @@
                         "status": { "type": "string", "enum": ["ACTIVE", "TERMINATED"] }
                       },
                       "required": ["employeeId", "employeeCode", "fullName", "status"],
-                      "additionalProperties": false
+                      "additionalProperties": false,
+                      "description": "Null for an application declared without one: QĐ-104 removed the Business Owner.",
+                      "nullable": true
                     },
                     "businessOwnerReplacementRequired": { "type": "boolean" },
                     "usageCollectionDefault": { "type": "string", "nullable": true, "enum": ["NOT_COLLECTED", null] },
@@ -91197,7 +91199,7 @@
           },
           "functionalGroupId": { "type": "string", "format": "uuid" }
         },
-        "required": ["name", "kind", "dataSensitivity", "businessOwnerEmployeeId", "communication"],
+        "required": ["name", "kind", "dataSensitivity", "communication"],
         "additionalProperties": false
       },
       "CreatedApplicationResponseDto": {
@@ -91229,7 +91231,9 @@
                   "status": { "type": "string", "enum": ["ACTIVE", "TERMINATED"] }
                 },
                 "required": ["employeeId", "employeeCode", "fullName", "status"],
-                "additionalProperties": false
+                "additionalProperties": false,
+                "description": "Null for an application declared without one: QĐ-104 removed the Business Owner.",
+                "nullable": true
               },
               "businessOwnerReplacementRequired": { "type": "boolean" },
               "usageCollectionDefault": { "type": "string", "nullable": true, "enum": ["NOT_COLLECTED", null] },
@@ -91314,7 +91318,9 @@
                   "status": { "type": "string", "enum": ["ACTIVE", "TERMINATED"] }
                 },
                 "required": ["employeeId", "employeeCode", "fullName", "status"],
-                "additionalProperties": false
+                "additionalProperties": false,
+                "description": "Null for an application declared without one: QĐ-104 removed the Business Owner.",
+                "nullable": true
               },
               "businessOwnerReplacementRequired": { "type": "boolean" },
               "usageCollectionDefault": { "type": "string", "nullable": true, "enum": ["NOT_COLLECTED", null] },
@@ -91451,7 +91457,9 @@
                   "status": { "type": "string", "enum": ["ACTIVE", "TERMINATED"] }
                 },
                 "required": ["employeeId", "employeeCode", "fullName", "status"],
-                "additionalProperties": false
+                "additionalProperties": false,
+                "description": "Null for an application declared without one: QĐ-104 removed the Business Owner.",
+                "nullable": true
               },
               "businessOwnerReplacementRequired": { "type": "boolean" },
               "usageCollectionDefault": { "type": "string", "nullable": true, "enum": ["NOT_COLLECTED", null] },
@@ -92599,7 +92607,7 @@
           "responsibleItAdminEmployeeId": { "type": "string", "format": "uuid" },
           "vendorMinimumSeats": { "type": "integer", "minimum": 1, "maximum": 1000000000 }
         },
-        "required": ["planId", "ownerDepartmentId", "kind"],
+        "required": ["planId", "kind"],
         "additionalProperties": false
       },
       "SubscriptionResponseDto": {
@@ -99880,7 +99888,7 @@
                       "FINANCE_OUTCOME_WHILE_WAITING"
                     ]
                   },
-                  "route": { "type": "string", "enum": ["BLOCKED", "FINANCE_REVIEW", "SPEND_APPROVAL"] },
+                  "route": { "type": "string", "enum": ["BLOCKED", "SPEND_APPROVAL"] },
                   "outcome": { "type": "string", "enum": ["WITHIN_BASE", "USES_RESERVE", "BLOCKED"] },
                   "blockedReasons": {
                     "maxItems": 3,
@@ -105804,9 +105812,30 @@
                       "type": "string",
                       "enum": ["SENT", "APPROVED", "REJECTED", "CHANGES_REQUESTED", "EXPIRED"]
                     },
-                    "sentAt": { "type": "string", "format": "date-time" }
+                    "sentAt": { "type": "string", "format": "date-time" },
+                    "base": {
+                      "type": "object",
+                      "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                      "required": ["amount", "currency"],
+                      "additionalProperties": false,
+                      "description": "The base Finance set in the version, in the currency of the version (QĐ-100p)."
+                    },
+                    "reserve": {
+                      "type": "object",
+                      "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                      "required": ["amount", "currency"],
+                      "additionalProperties": false,
+                      "description": "The reserve on top of the base (QĐ-100h)."
+                    },
+                    "total": {
+                      "type": "object",
+                      "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                      "required": ["amount", "currency"],
+                      "additionalProperties": false,
+                      "description": "Base plus reserve."
+                    }
                   },
-                  "required": ["id", "year", "number", "state", "sentAt"],
+                  "required": ["id", "year", "number", "state", "sentAt", "base", "reserve", "total"],
                   "additionalProperties": false
                 }
               },
@@ -107058,17 +107087,12 @@
             "properties": {
               "basis": {
                 "type": "string",
-                "description": "Costs follow subscription ownership until seat-month allocation is available.",
-                "enum": ["OWNER_DEPARTMENT"]
+                "description": "A seat held is charged to the department of the person who holds it (QĐ-103k); the idle seats of the shared pool are in sharedPoolUnallocated.",
+                "enum": ["HOLDER_DEPARTMENT"]
               },
               "year": { "type": "integer", "minimum": -9007199254740991, "maximum": 9007199254740991 },
               "currency": { "type": "string" },
               "computedAt": { "type": "string", "format": "date-time" },
-              "kpi3": {
-                "description": "KPI-3 needs usage, which is not collected yet: always null.",
-                "type": "number",
-                "nullable": true
-              },
               "departmentsTotal": {
                 "type": "integer",
                 "minimum": -9007199254740991,
@@ -107100,9 +107124,8 @@
                     },
                     "hasUnknownCost": {
                       "type": "boolean",
-                      "description": "A subscription of the department has no price the baseline can use: its cost is left out of the total."
+                      "description": "A subscription its people hold has no price the baseline can use: its cost is left out of the total."
                     },
-                    "seatsPurchased": { "type": "integer", "minimum": -9007199254740991, "maximum": 9007199254740991 },
                     "seatsAssigned": { "type": "integer", "minimum": -9007199254740991, "maximum": 9007199254740991 },
                     "softwareTotal": { "type": "integer", "minimum": -9007199254740991, "maximum": 9007199254740991 },
                     "software": {
@@ -107118,20 +107141,14 @@
                             "type": "integer",
                             "minimum": -9007199254740991,
                             "maximum": 9007199254740991,
+                            "description": "The seats the subscription bought in all (the whole shared pool for K2/K4); null when it has none.",
                             "nullable": true
                           },
                           "seatsAssigned": {
                             "type": "integer",
                             "minimum": -9007199254740991,
                             "maximum": 9007199254740991,
-                            "description": "The seats held (what the warehouse counts: a future start and a service account included)."
-                          },
-                          "seatsIdle": {
-                            "type": "integer",
-                            "minimum": -9007199254740991,
-                            "maximum": 9007199254740991,
-                            "description": "Purchased and not assigned; null when the purchase has no seats.",
-                            "nullable": true
+                            "description": "The seats the people of the department hold (QĐ-103k), counted the way the warehouse counts them: a future start and a service account they answer for included."
                           },
                           "monthlyUnitPrice": {
                             "type": "object",
@@ -107146,12 +107163,18 @@
                             "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
                             "required": ["amount", "currency"],
                             "additionalProperties": false,
-                            "description": "Seats assigned × monthly price × months running; the seats idle belong to the shared pool. Null when the price is not known.",
+                            "description": "Seats assigned to the department × monthly price × months running; the idle seats are in sharedPoolUnallocated. Null when the price is not known.",
                             "nullable": true
                           },
                           "suggestRenewal": {
                             "type": "boolean",
                             "description": "The term ends within the year, or ends before it and still runs today: a Renew line is suggested."
+                          },
+                          "kpi3": {
+                            "type": "number",
+                            "minimum": 0,
+                            "description": "KPI-3 of the plan, in percent: the seats with activity in the last 30 days over the seats bought, for a plan priced per seat. Null when no usage of the plan was assessed (MF-5).",
+                            "nullable": true
                           }
                         },
                         "required": [
@@ -107160,15 +107183,15 @@
                           "plan",
                           "seatsPurchased",
                           "seatsAssigned",
-                          "seatsIdle",
                           "monthlyUnitPrice",
                           "monthsRunning",
                           "estimatedAnnualCost",
-                          "suggestRenewal"
+                          "suggestRenewal",
+                          "kpi3"
                         ],
                         "additionalProperties": false
                       },
-                      "description": "The active subscriptions the department owns, by id: at most 50 are listed (the bound of the baseline); softwareTotal says how many there are."
+                      "description": "The active subscriptions the people of the department hold seats of, by id: at most 50 are listed (the bound of the baseline); softwareTotal says how many there are."
                     }
                   },
                   "required": [
@@ -107179,7 +107202,6 @@
                     "spentThisYear",
                     "estimatedAnnualCost",
                     "hasUnknownCost",
-                    "seatsPurchased",
                     "seatsAssigned",
                     "softwareTotal",
                     "software"
@@ -107187,9 +107209,94 @@
                   "additionalProperties": false
                 },
                 "description": "The departments of the year, by id: at most 500 are listed (the most a division of the ceiling names); departmentsTotal says how many there are."
+              },
+              "sharedPoolUnallocated": {
+                "type": "object",
+                "properties": {
+                  "line": { "type": "string", "enum": ["SHARED_POOL_UNALLOCATED"] },
+                  "estimatedAnnualCost": {
+                    "type": "object",
+                    "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                    "required": ["amount", "currency"],
+                    "additionalProperties": false
+                  },
+                  "hasUnknownCost": { "type": "boolean" },
+                  "seatsIdle": { "type": "integer", "minimum": -9007199254740991, "maximum": 9007199254740991 },
+                  "softwareTotal": { "type": "integer", "minimum": -9007199254740991, "maximum": 9007199254740991 },
+                  "software": {
+                    "maxItems": 50,
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "subscriptionId": { "type": "string", "format": "uuid" },
+                        "application": { "type": "string" },
+                        "plan": { "type": "string" },
+                        "seatsPurchased": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991
+                        },
+                        "seatsAssigned": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991,
+                          "description": "The seats held by anyone, every department together."
+                        },
+                        "seatsIdle": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991,
+                          "description": "Bought and not held: the seats of the line."
+                        },
+                        "monthlyUnitPrice": {
+                          "type": "object",
+                          "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                          "required": ["amount", "currency"],
+                          "additionalProperties": false,
+                          "nullable": true
+                        },
+                        "monthsRunning": { "type": "integer", "minimum": 0, "maximum": 12 },
+                        "estimatedAnnualCost": {
+                          "type": "object",
+                          "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                          "required": ["amount", "currency"],
+                          "additionalProperties": false,
+                          "description": "Seats idle × monthly price × months running; null when the price is not known.",
+                          "nullable": true
+                        }
+                      },
+                      "required": [
+                        "subscriptionId",
+                        "application",
+                        "plan",
+                        "seatsPurchased",
+                        "seatsAssigned",
+                        "seatsIdle",
+                        "monthlyUnitPrice",
+                        "monthsRunning",
+                        "estimatedAnnualCost"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "description": "The K2/K4 subscriptions with idle seats, by id: at most 50 are listed; softwareTotal says how many there are."
+                  }
+                },
+                "required": ["line", "estimatedAnnualCost", "hasUnknownCost", "seatsIdle", "softwareTotal", "software"],
+                "additionalProperties": false,
+                "description": "Unallocated — shared pool: the idle seats of the K2/K4 subscriptions, a line of the company in no department. Null when one department is asked for.",
+                "nullable": true
               }
             },
-            "required": ["basis", "year", "currency", "computedAt", "kpi3", "departmentsTotal", "departments"],
+            "required": [
+              "basis",
+              "year",
+              "currency",
+              "computedAt",
+              "departmentsTotal",
+              "departments",
+              "sharedPoolUnallocated"
+            ],
             "additionalProperties": false,
             "nullable": true
           }

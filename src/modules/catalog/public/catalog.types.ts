@@ -119,15 +119,27 @@ export interface WorkspaceDuty {
   emergencyAccountDeclared: boolean;
 }
 
-/** An active subscription a department owns, as the baseline of the budget reads it (`FR-5.15`): what runs, at what price, for how long.
- * **Gói 9:** `departmentId` nullable — kho dùng chung được cấp cho bất kỳ phòng nào (không gắn với phòng sở hữu).
+/**
+ * What the last weekly pass of the usage rules (MF-5) found of one plan priced per seat (`KPI-3`, `QĐ-109d`): of the seats it could judge
+ * (`assessedSeats`), how many showed activity in the 30 days before the pass (`activeSeats`).
+ */
+export interface PlanUsageRate {
+  planId: string;
+  activeSeats: number;
+  assessedSeats: number;
+}
+
+/**
+ * An active subscription of the company, as the baseline of the budget reads it (`FR-5.15`): what runs, at what price, for how long. Its
+ * cost follows the people who hold its seats (`QĐ-103k`), so the department that may own it is not part of it.
  */
 export interface BaselineSubscription {
   subscriptionId: string;
-  departmentId: string | null; // Gói 9: nullable khi kho dùng chung
   planId: string;
   planName: string;
   applicationName: string;
+  /** `K2`/`K4` is the shared pool of the company (`QĐ-103d`): its idle seats are the pool's line of the baseline. */
+  provisioningType: 'K1' | 'K2' | 'K3' | 'K4' | 'K5';
   /** The seats bought; null for a purchase that has none (perpetual, or priced another way). */
   purchasedQuantity: number | null;
   /** The unit price in the reporting currency as recorded when the price was; null when it has none. */

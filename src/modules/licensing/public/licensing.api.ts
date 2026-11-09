@@ -21,6 +21,7 @@ import type {
   OpenRevocationInput,
   PersonalSeat,
   ProvisioningFailureKind,
+  SeatHolding,
   RevocationSource,
   SelfExecutionMode,
   TerminatingAccess,
@@ -106,6 +107,19 @@ export class LicensingApi {
     tx?: DbTx,
   ): Promise<Map<string, number>> {
     return this.assignments.countHoldingOfSubscriptions(subscriptionIds, onDate, tx);
+  }
+
+  /**
+   * The seats of these subscriptions held as of `onDate`, counted the way the warehouse counts them (a service account and a future start
+   * included), by the person who holds each or answers for it, in one statement: the baseline charges a seat to that person's department
+   * (`QĐ-103k`).
+   */
+  countSeatsByHolderOfSubscriptions(
+    subscriptionIds: readonly string[],
+    onDate: BusinessDate,
+    tx?: DbTx,
+  ): Promise<SeatHolding[]> {
+    return this.assignments.countHoldingByHolder(subscriptionIds, onDate, tx);
   }
 
   /** How many personal seats each of these people holds on `onDate` or will, in one statement (the people with none are absent). */
