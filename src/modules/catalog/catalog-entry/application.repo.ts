@@ -121,7 +121,7 @@ export class ApplicationRepo {
   async markRetired(
     tx: DbTx,
     applicationId: string,
-    input: { appUserId: string; confirmationId: string; now: Date },
+    input: { appUserId: string; confirmationId: string | null; now: Date },
   ): Promise<void> {
     await tx.application.update({
       where: { id: applicationId },

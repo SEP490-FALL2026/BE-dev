@@ -11,6 +11,7 @@ import {
   assertConfirmable,
   cleanConfirmationNote,
   decideRetirement,
+  ownerConfirmationNeeded,
 } from './application-retirement.policy';
 
 const TODAY = '2026-10-20';
@@ -65,6 +66,13 @@ describe('the subscriptions that stop a software from being retired (US-04-01 AC
     ];
 
     expect(activeTermSubscriptions(rows, TODAY)).toEqual([]);
+  });
+});
+
+describe('the confirmation a retirement waits for (US-04-01 AC-8, QĐ-104)', () => {
+  it('is asked for only when the application names a Business Owner; one that names none is retired on the act of the IT Admin', () => {
+    expect(ownerConfirmationNeeded('owner-1')).toBe(true);
+    expect(ownerConfirmationNeeded(null)).toBe(false);
   });
 });
 

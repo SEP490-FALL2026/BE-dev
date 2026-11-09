@@ -103,7 +103,7 @@ export class ApplicationRetirementController {
   @ApiSuccessResponse(RetirementResponseDto, {
     message: 'APPLICATION.RETIREMENT_FETCHED',
     description:
-      'The newest 50 confirmations recorded and how many there are, whether the Business Owner of today has confirmed, the first 50 assignments and running term subscriptions that would stop the retirement with their totals and the number of assignments per plan, and whether it would go through now.',
+      'The newest 50 confirmations recorded and how many there are, whether the Business Owner of today has confirmed (true when the application names no Business Owner, QĐ-104: nothing to confirm), the first 50 assignments and running term subscriptions that would stop the retirement with their totals and the number of assignments per plan, and whether it would go through now.',
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,
@@ -160,7 +160,7 @@ export class ApplicationRetirementController {
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
-        'The id is invalid (VALIDATION_ERROR), or the Business Owner of today has not confirmed (APPLICATION.RETIREMENT_NEEDS_CONFIRMATION).',
+        'The id is invalid (VALIDATION_ERROR), or the Business Owner of today has not confirmed (APPLICATION.RETIREMENT_NEEDS_CONFIRMATION); an application that names no Business Owner needs no confirmation.',
       examples: [VALIDATION_EXAMPLE, EXAMPLES.RETIREMENT_NEEDS_CONFIRMATION],
     },
   )

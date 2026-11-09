@@ -53,8 +53,17 @@ export function activeTermSubscriptions<T extends { kind: 'TERM' | 'PERPETUAL'; 
 }
 
 /**
+ * Whether the retirement waits for the confirmation of a Business Owner (`US-04-01` AC-8): only when the application names one. An
+ * application that names none (`QĐ-104`, Business Owner no longer required) is retired on the act of the IT Admin alone, who already
+ * decides it; nobody else is made to confirm in place of an owner that does not exist.
+ */
+export const ownerConfirmationNeeded = (businessOwnerEmployeeId: string | null): boolean =>
+  businessOwnerEmployeeId !== null;
+
+/**
  * Whether the application may be retired, judged in a fixed order (`US-04-01` AC-8, AC-9): it is not retired already; the
- * Business Owner of today has confirmed, which is asked for even when nothing holds the application; nothing holds it.
+ * Business Owner of today has confirmed (or it names none, `ownerConfirmationNeeded`), which is asked for even when nothing holds the
+ * application; nothing holds it.
  * A refusal lists what holds it and creates nothing. Throws ApplicationAlreadyRetiredError,
  * ApplicationRetirementNeedsConfirmationError and ApplicationRetirementBlockedError.
  */
