@@ -89,6 +89,7 @@ model Organization {
   budgetCycles                       BudgetCycle[]
   budgetVersions                     BudgetVersion[]
   budgetCommitments                  BudgetCommitment[]
+  yearStartCommitmentRuns            YearStartCommitmentRun[]
   invoices                           Invoice[]
   applicationRetirementConfirmations ApplicationRetirementConfirmation[]
   contracts                          Contract[]

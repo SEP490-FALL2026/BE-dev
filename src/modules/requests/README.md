@@ -36,6 +36,7 @@ controller) và `requests-work-facade.module.ts` (phần worker chạy, API dùn
   `budget_information_requests`.
 - Trạng thái/SLA: `controlled_wait_alerts`, `step_sla_reminders`, `step_sla_reminder_recipients`,
   `congestion_incidents`, `request_status_cursor` (`prisma/models/requests.prisma`).
+- Khoản cam kết 01/01: `year_start_commitment_runs` (dấu chạy của tổ chức và năm; migration đánh dấu năm triển khai đã xong, không hồi tố).
 
 ## Extension point
 
@@ -168,16 +169,17 @@ cùng cần; phần ghi nằm ở `assessment/assessment.repo.ts`.
 
 **Tìm X ở đâu**
 
-| Cần tìm                                           | Ở đâu                                                                                    |
-| ------------------------------------------------- | ---------------------------------------------------------------------------------------- |
-| Request được đọc ra thế nào (`AccessRequestView`) | `request-view/access-request-query.service.ts`                                           |
-| Request được gửi thế nào                          | `request-intake/access-request.service.ts` (cá nhân), `group-request-submission/` (nhóm) |
-| Bước nhu cầu: quyết định, ghế tương tự, rút       | `need-decision/`, `withdraw/` (controller cạnh service)                                  |
-| Kiểm tra ngân sách của một request                | `spend/budget-check.service.ts`                                                          |
-| Ai giữ một bước, chuyển bước                      | `access-request/routing.policy.ts`, `step-routing/`, `reassignment/`                     |
-| Kết thúc request và phát `requests.outcome`       | `outcome/request-outcome.service.ts`, `request-end/request-end.service.ts`               |
-| Lý do từ chối của spend, hủy, ủy quyền            | `spend/spend.errors.ts`, `access-request/access-request.types.ts` (kiểu lý do)           |
-| Route của một use case                            | `docs/generated/routes.md` (sinh từ code)                                                |
+| Cần tìm                                             | Ở đâu                                                                                                    |
+| --------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| Request được đọc ra thế nào (`AccessRequestView`)   | `request-view/access-request-query.service.ts`                                                           |
+| Request được gửi thế nào                            | `request-intake/access-request.service.ts` (cá nhân), `group-request-submission/` (nhóm)                 |
+| Bước nhu cầu: quyết định, ghế tương tự, rút         | `need-decision/`, `withdraw/` (controller cạnh service)                                                  |
+| Kiểm tra ngân sách của một request                  | `spend/budget-check.service.ts`                                                                          |
+| Khoản cam kết tự tạo ngày 01/01 (job, luật số tiền) | `year-start-commitments/` (`*.service.ts` điều phối, `*-batch.service.ts` một lô, `*.policy.ts` số tiền) |
+| Ai giữ một bước, chuyển bước                        | `access-request/routing.policy.ts`, `step-routing/`, `reassignment/`                                     |
+| Kết thúc request và phát `requests.outcome`         | `outcome/request-outcome.service.ts`, `request-end/request-end.service.ts`                               |
+| Lý do từ chối của spend, hủy, ủy quyền              | `spend/spend.errors.ts`, `access-request/access-request.types.ts` (kiểu lý do)                           |
+| Route của một use case                              | `docs/generated/routes.md` (sinh từ code)                                                                |
 
 ## Bất biến quan trọng
 
@@ -195,6 +197,11 @@ cùng cần; phần ghi nằm ở `assessment/assessment.repo.ts`.
   chưa từng có grant giữ). Bước chờ đổi lý do (`REWAIT`) chỉ ghi `waiting_reason`, giữ `waiting_since`.
 - Thứ tự khóa: task grant (`LicensingApi.lockGrantOfRequest`) rồi request (`request-end/request-end.service.ts`); hàng request
   rồi khóa năm ngân sách (`budgets/budget/budget-year-lock.repo.ts`).
+- Khoản 01/01 (`year-start-commitments/`, `BudgetsApi.holdYearStart`): `YearStartCommitmentsSweeper` mỗi giờ trong tiến trình API (ADR-0018); lượt đầu
+  của năm sau 00:00 giờ tổ chức giữ cho mỗi Request trả phí `K1`/`K2` đang chạy hoặc đã duyệt chi chưa cấp một khoản của năm mới (giá tháng của
+  gói × số tháng của năm, mỗi seat), rồi ghi dấu `year_start_commitment_runs`; lượt sau trong năm không đọc gì. Mỗi lô ≤ 100 Request một
+  transaction: khóa hàng Request `FOR UPDATE` theo id, đọc grant (không khóa), rồi khóa năm của Cost Center theo id — cùng thứ tự với mọi ghi ngân sách.
+  Chạy tay: `YearStartCommitmentsService.run(now)`. Chỉ Request có khoản; quyền không có Request thì không (QĐ-109a).
 - Mọi kết thúc request phát `requests.outcome` trong cùng transaction; listener ném lỗi thì kết thúc bị hoàn tác.
 - Sweep chuyển bước: mỗi request một transaction, khóa theo id, chỉ ghi khi bảng định tuyến chỉ ra người khác người
   đang giữ; sweep SLA chỉ ghi nhắc, thông báo và audit, không đổi bước hay request (`public/*-sweep.api.ts`).

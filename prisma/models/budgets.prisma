@@ -266,6 +266,13 @@ enum CommitmentState {
   EXPENSED
 }
 
+// Where a commitment came from: the approval of the spending approver (US-06-04), or the pass made on 01/01 for a request whose right goes on
+// into the new year or that was approved and not yet granted (FR-5.8(6), QĐ-109a).
+enum CommitmentOrigin {
+  APPROVAL
+  YEAR_START
+}
+
 // Why money held for a request went back to the budget (US-06-06, US-05-08 AC-5, US-05-17 AC-10).
 enum CommitmentReleaseReason {
   REQUEST_CANCELLED
@@ -323,6 +330,10 @@ model BudgetCommitment {
   appliedMinor      BigInt          @default(0) @map("applied_minor")
   // The check the decision of the spending approver kept, which is the snapshot this commitment was made on (US-06-04 AC-1).
   snapshotCheckId   String?         @map("snapshot_check_id") @db.Uuid
+  // `APPROVAL` for the commitment of a decision; `YEAR_START` for the one made on 01/01, which no check backs (`snapshotCheckId` is null).
+  origin            CommitmentOrigin @default(APPROVAL)
+  // What one seat costs a month, rounded up, when the commitment was made: what the release by day takes from. Null before it was kept.
+  seatMonthlyMinor  BigInt?         @map("seat_monthly_minor")
   createdAt         DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt         DateTime        @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
 

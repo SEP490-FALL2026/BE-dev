@@ -129,6 +129,18 @@
   pass only logs. It only tells and flags late: it never renews, cancels, decides or records an outcome, never changes a subscription or
   a seat, and a decision taken after the deadline is never voided. Run one by hand with `SubscriptionRenewalSweepService.sweep(now)`.
   The API also runs `BudgetAttachmentExpirySweeper` once an hour (the first pass five minutes after start, unreferenced timer): for each unattached document upload whose deadline has passed (`AWAITING_UPLOAD` older than 24 hours, `UPLOADED` older than 7 days) it marks the attachment `EXPIRED`, writes the audit event `BUDGET_ATTACHMENT.EXPIRED` with actor `SYSTEM`, and deletes the abandoned storage object(s) after commit; each file is picked and locked `FOR UPDATE SKIP LOCKED` inside its own transaction (a file a proposal send holds is skipped, never waited for; at most 100 per pass), attached, removed and discarded records are left untouched, and a failed pass only logs. Run one by hand with `BudgetAttachmentExpiryService.expire(now)`.
+  The API also runs `YearStartCommitmentsSweeper` once an hour (the first pass five minutes after start, unreferenced timer): the first pass after
+  midnight of 01/01 in the time zone of the organization makes one commitment of the new year (`budget_commitments.origin = 'YEAR_START'`) for each
+  paid request (`K1`/`K2`) whose right goes on or that was approved as spend and not yet granted, and completes the mark
+  `year_start_commitment_runs` of the year, so the hours after find nothing to do. It is idempotent and safe for several instances without a leader:
+  a request holds one commitment a year (unique key and a check under the row lock), the rows of the requests are locked `FOR UPDATE` in order of id
+  before the lock of the Cost Center and year (the order of the budgets), the batches (at most 100 requests) are separate transactions, and the pass
+  that completes the mark writes the audit event `BUDGET_COMMITMENT.YEAR_START_RUN` once (`BUDGET_COMMITMENT.CREATED` for each commitment and
+  `BUDGET_COMMITMENT.YEAR_START_SKIPPED` with `NO_PRICE` or `NO_COST_CENTER` for a request left out, all by the `SYSTEM`). A year with no approved budget
+  makes the commitment waiting for one (`NO_BUDGET`), attached when a version is approved; the migration marks the year of the deployment done and an
+  organization with no earlier mark only marks its first year, so nothing is made backwards; a failed pass only logs and is tried again at the next
+  hour. Run one by hand with `YearStartCommitmentsService.run(now)`; after 01/01 check `year_start_commitment_runs` has the year with `completed_at` and
+  `budget_commitments` has rows with `origin = 'YEAR_START'`.
   The record of a departure has no job of its own: `EMPLOYEE_LEFT` is told once in the transaction that sets the employee `TERMINATED` (the
   unique `(kind, subject_id)` of the announcements makes a second telling a no-op), and a person who has left is refused by the sign-in and
   the access guard from their next action because they read the status of the employee, not a flag of the account. The reminder to the

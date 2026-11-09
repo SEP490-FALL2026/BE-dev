@@ -14,6 +14,8 @@ import type {
   CommitmentReleaseReason,
   HeldCommitment,
   ReleasedCommitment,
+  YearStartHoldInput,
+  YearStartHoldResult,
 } from '../public/budgets.types';
 import {
   BudgetCommitmentExistsError,
@@ -212,6 +214,74 @@ export class CommitmentService {
     }
 
     return held;
+  }
+
+  /**
+   * The commitments of 01/01 (`FR-5.8`(6), `QĐ-109a`): one for each request that does not hold one for the year, in the transaction of the pass, which
+   * holds the rows of the requests. Cost Centers are taken in order of id, so two passes never wait for each other's years in a circle. The audit
+   * of each is written by the system; a request that already holds one for the year is left as it was and told back.
+   */
+  async holdYearStart(tx: DbTx, input: YearStartHoldInput): Promise<YearStartHoldResult> {
+    for (const item of input.items) {
+      if (item.amountMinor <= 0n) throw new BudgetCommitmentNotHoldableError('NOT_POSITIVE', input.year);
+    }
+    const already = await this.commitments.requestsHoldingYear(
+      tx,
+      input.items.map((item) => item.requestId),
+      input.year,
+    );
+    const result: YearStartHoldResult = { created: [], alreadyHeld: [] };
+    const ordered = [...input.items].sort(
+      (a, b) => a.costCenterId.localeCompare(b.costCenterId) || a.requestId.localeCompare(b.requestId),
+    );
+    for (const item of ordered) {
+      if (already.has(item.requestId)) {
+        result.alreadyHeld.push(item.requestId);
+        continue;
+      }
+      const held = await this.commitments.holdYearStart(tx, {
+        organizationId: input.organizationId,
+        requestId: item.requestId,
+        costCenterId: item.costCenterId,
+        year: input.year,
+        amountMinor: item.amountMinor,
+        currency: item.currency,
+        seatMonthlyMinor: item.seatMonthlyMinor,
+        now: input.now,
+      });
+      result.created.push({
+        requestId: item.requestId,
+        commitmentId: held.id,
+        costCenterId: item.costCenterId,
+        attachedVersionId: held.attachedVersionId,
+      });
+      await this.audit.record(tx, {
+        organizationId: input.organizationId,
+        actorKind: 'SYSTEM',
+        action: 'BUDGET_COMMITMENT.CREATED',
+        resourceType: 'BUDGET_COMMITMENT',
+        resourceId: held.id,
+        before: null,
+        after: {
+          requestId: item.requestId,
+          costCenterId: item.costCenterId,
+          year: input.year,
+          amountMinor: item.amountMinor.toString(),
+          seatMonthlyMinor: item.seatMonthlyMinor.toString(),
+          origin: 'YEAR_START',
+          attachedVersionId: held.attachedVersionId,
+          unattachedReason: held.attachedVersionId === null ? 'NO_BUDGET' : null,
+        },
+        correlationId: item.requestId,
+      });
+    }
+
+    return result;
+  }
+
+  /** The requests, among these, that hold a commitment for the year already, in one read. */
+  requestsHoldingYear(tx: DbTx, requestIds: readonly string[], year: number): Promise<Set<string>> {
+    return this.commitments.requestsHoldingYear(tx, requestIds, year);
   }
 
   /** What each of the requests was committed for (one entry for each commitment), in one read. */

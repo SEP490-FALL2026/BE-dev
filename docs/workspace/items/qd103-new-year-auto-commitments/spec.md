@@ -149,6 +149,9 @@ tháng của các seat`; `seat_monthly_minor` ghi giá một seat. Không tính 
 
 ## Changes and acceptance
 
+- 09/11/2026: **gói 4 rút gọn theo `QĐ-109a`** (xem _Delta gói 4_ ở [plan](plan.md)): chỉ Request có khoản; bỏ Q-01 B, `request_id` nullable, `assignment_id`, đổi `budgetCommitmentList`,
+  listener thu hồi theo Assignment; số tiền dùng `requestAmountOf`; đã implement + test (`test/integration/requests/year-start-commitments*.integration-spec.ts`). Chưa nghiệm thu.
+
 - 08/11/2026: tạo ở W4 (subagent soạn). Chưa qua cổng audit thiết kế. Chưa nghiệm thu.
 - 08/11/2026: sửa theo audit thiết kế W4: DA4-17, DA4-35, DA4-36, DA4-37, DA4-38, DA4-39 sửa. Q-47 → B (giá hiệu lực 01/01). Không finding nào bị
   bác. Chi tiết ở plan _Design review_ và [REVISION-NOTES](../../../reviews/qd103-108-alignment-2026-11-08/QUESTIONS.md). Chưa nghiệm thu.

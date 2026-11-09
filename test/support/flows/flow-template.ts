@@ -8,6 +8,7 @@ import { SHARED_DEMO_V3 } from '../../../src/cli/seed/fixture/shared-demo-v3';
 import { BudgetAttachmentExpirySweeper } from '../../../src/modules/budgets/attachment/budget-attachment-expiry.job';
 import { BudgetYearEndSweeper } from '../../../src/modules/budgets/year-end/year-end.job';
 import { DocumentExpirySweeper } from '../../../src/modules/catalog/contract/document-expiry.job';
+import { YearStartCommitmentsSweeper } from '../../../src/modules/requests/year-start-commitments/year-start-commitments.job';
 import { ExpiryReminderSweeper } from '../../../src/modules/licensing/expiry/expiry-reminder.job';
 import { HandoverDutySweeper } from '../../../src/modules/licensing/handover/handover-duty.job';
 import { SaasIssueSweeper } from '../../../src/modules/licensing/saas-issue/saas-issue.job';
@@ -50,6 +51,7 @@ export const FLOW_SUPER_ADMIN_EMAIL = INSTALLATION.loginEmail;
 export const SWEEPER_OVERRIDES: { token: unknown; useValue: unknown }[] = [
   BudgetAttachmentExpirySweeper,
   BudgetYearEndSweeper,
+  YearStartCommitmentsSweeper,
   DocumentExpirySweeper,
   ExpiryReminderSweeper,
   HandoverDutySweeper,
