@@ -22,9 +22,11 @@ export const grantBodySchema = z.strictObject({
   /** Only for a request for a group, which is granted one person at a time: the person of the request this grant is for. */
   beneficiaryEmployeeId: z.uuid().optional(),
   /** Pkg 9 (MF1-F): Purchase additional seats when pool is exhausted (AC-2/3). */
-  purchase: z.object({
-    reason: z.string().min(1).max(500).optional(),
-  }).optional(),
+  purchase: z
+    .object({
+      reason: z.string().min(1).max(500).optional(),
+    })
+    .optional(),
 });
 export const completeBodySchema = z.strictObject({ evidence: z.string().max(EVIDENCE_MAX_LENGTH).default('') });
 export const failureBodySchema = z.strictObject({ reason: z.string().max(FAILURE_REASON_MAX_LENGTH).default('') });
@@ -68,6 +70,11 @@ export const listTasksQuerySchema = z.strictObject({
   channel: z.enum(['MANUAL', 'CONNECTOR']).optional(),
   status: z.enum(TASK_STATUSES).optional(),
   scope: z.enum(['ALL', 'MINE', 'GENERAL']).default('ALL'),
+  /** `true`: only the tasks that may be taken today (a revocation in its grace is left out); `false`: only those in their grace. */
+  claimableNow: z
+    .enum(['true', 'false'])
+    .transform((value) => value === 'true')
+    .optional(),
   ...pageQuery,
 });
 export const taskIdParamSchema = z.strictObject({ id: z.uuid() });
@@ -112,6 +119,8 @@ const revocationDetailSchema = revocationSummarySchema.extend({
       decidedAt: z.iso.datetime(),
     })
     .nullable(),
+  withdrawnReasonCount: z.number().int().nonnegative(),
+  lastWithdrawnAt: z.iso.datetime().nullable(),
 });
 /** A row of the list: the task without its steps, evidence and errors; the detail is this and those. */
 const taskSummarySchema = z.strictObject({
@@ -135,6 +144,9 @@ const taskSummarySchema = z.strictObject({
   accountIdentifier: z.string(),
   defaultResponsibleEmployeeId: z.uuid().nullable(),
   inGeneralQueue: z.boolean(),
+  dueOn: responseBusinessDate.nullable(),
+  notBefore: responseBusinessDate.nullable(),
+  claimableNow: z.boolean(),
   createdAt: z.iso.datetime(),
   claimedBy: z.uuid().nullable(),
   claimedAt: z.iso.datetime().nullable(),
@@ -148,10 +160,12 @@ const taskSummarySchema = z.strictObject({
   closedAt: z.iso.datetime().nullable(),
   revocation: revocationSummarySchema.nullable(),
   /** Pkg 9 (MF1-F): Purchase from pool when exhausted. */
-  purchase: z.strictObject({
-    kind: z.enum(['POOL_TOP_UP', 'KEY_PURCHASE']).optional(),
-    reason: z.string().optional(),
-  }).optional(),
+  purchase: z
+    .strictObject({
+      kind: z.enum(['POOL_TOP_UP', 'KEY_PURCHASE']).optional(),
+      reason: z.string().optional(),
+    })
+    .optional(),
   elapsedSeconds: z.number().int().nonnegative(),
 });
 const taskSchema = taskSummarySchema.extend({

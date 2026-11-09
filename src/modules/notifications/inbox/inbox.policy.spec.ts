@@ -151,6 +151,14 @@ describe('the alerts of the rights (a03-license-inbox-alerts, FR-5.14 lines 3, 1
         code: 'LEAVER_K1_ACCESS_RUNS_ON',
         params: { taskId: ID, assignmentId: ID, employeeId: ID, planId: ID, accessUntil: '2026-11-30' },
       }),
+      notice({
+        code: 'REVOCATION_UPCOMING',
+        params: { taskId: ID, planId: ID, applicationId: ID, source: 'GHOST_SEAT', notBefore: '2026-11-08' },
+      }),
+      notice({
+        code: 'REVOCATION_CANCELLED',
+        params: { planId: ID, applicationId: ID, source: 'GHOST_SEAT' },
+      }),
     ];
     for (const input of accepted)
       expect({ code: input.code, refusal: refuseInAppNotification(input) }).toEqual({

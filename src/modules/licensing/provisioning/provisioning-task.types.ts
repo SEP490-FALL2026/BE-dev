@@ -49,6 +49,9 @@ export interface ProvisioningTaskRecord {
   accessCutOn: BusinessDate | null;
   accessEvidence: string | null;
   completionNote: string | null;
+  /** What the reasons that stand ask of a revocation: not before a day, due by a day (null: none asked; a grant has none). */
+  dueOn: BusinessDate | null;
+  notBefore: BusinessDate | null;
   createdAt: Date;
   assignment: {
     employeeId: string;
@@ -96,6 +99,8 @@ export const SUMMARY_SELECT = {
   paidThroughOn: true,
   accessState: true,
   accessCutOn: true,
+  dueOn: true,
+  notBefore: true,
   createdByAppUserId: true,
   createdAt: true,
   updatedAt: true,
@@ -141,6 +146,8 @@ export const toRecord = (row: Row): ProvisioningTaskRecord => ({
   accessCutOn: dayOf(row.accessCutOn),
   accessEvidence: row.accessEvidence,
   completionNote: row.completionNote,
+  dueOn: dayOf(row.dueOn),
+  notBefore: dayOf(row.notBefore),
   createdAt: row.createdAt,
   assignment: {
     employeeId: row.assignment.employeeId,

@@ -42,6 +42,9 @@ export class ReturnRevocationHook implements OnModuleInit {
       case 'OPENED':
         // The task is made by the return itself: nothing is done when it opens.
         return Promise.resolve();
+      case 'REASON_WITHDRAWN':
+        // A reason of another source was taken back: the return keeps the task it made and has nothing to do.
+        return Promise.resolve();
       case 'BEFORE_WORK':
         return this.beforeWork(tx, event.task, event.now);
       case 'AFTER_WORK':

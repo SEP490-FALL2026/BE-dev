@@ -1,4 +1,41 @@
+import type { BusinessDate } from '../../../core/business-date';
+import { RevocationInputError } from '../public/licensing.errors';
 import type { RevocationReasonFacts } from '../public/licensing.types';
+
+/** The timing a task carries: read from the reasons that stand, never from one alone. */
+export interface RevocationTiming {
+  dueOn: BusinessDate | null;
+  notBefore: BusinessDate | null;
+}
+
+/** A day not before that is after the due day contradicts itself: a fault of the source module, not of the person. Throws RevocationInputError. */
+export function assertTiming(timing: { dueOn?: BusinessDate; notBefore?: BusinessDate } | undefined): RevocationTiming {
+  const dueOn = timing?.dueOn ?? null;
+  const notBefore = timing?.notBefore ?? null;
+  if (dueOn !== null && notBefore !== null && notBefore > dueOn) {
+    throw new RevocationInputError('The day not before of a revocation is after its due day.');
+  }
+
+  return { dueOn, notBefore };
+}
+
+/**
+ * The timing of a task from the reasons that stand (`BR-MF5-04`, `R-J08`): the grace of one reason never holds back the work another
+ * reason asks for at once, so a single reason with no day not before leaves none; otherwise the earliest. The due day is the earliest given.
+ */
+export function effectiveTiming(reasons: readonly RevocationTiming[]): RevocationTiming {
+  const days = (pick: (reason: RevocationTiming) => BusinessDate | null): BusinessDate[] =>
+    reasons.flatMap((reason) => pick(reason) ?? []);
+  const notBefores = days((reason) => reason.notBefore);
+  const dueOns = days((reason) => reason.dueOn);
+
+  return {
+    notBefore: reasons.length === 0 || notBefores.length < reasons.length ? null : notBefores.reduce(earlier),
+    dueOn: dueOns.length === 0 ? null : dueOns.reduce(earlier),
+  };
+}
+
+const earlier = (a: BusinessDate, b: BusinessDate): BusinessDate => (a <= b ? a : b);
 
 /** What the reason of a revocation says to the listeners of the moment it opens: the source, who decided and in which role, and what it refers to. */
 export const reasonFactsOf = (reason: {

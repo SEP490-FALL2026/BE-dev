@@ -61,7 +61,12 @@ export class RevocationReadRepo {
         validFrom: true,
         validUntil: true,
         provisioningTasks: {
-          where: { kind: 'REVOKE', status: { notIn: ['CLOSED_FAILED', 'CANCELLED'] } },
+          // Under way only while a reason that was not withdrawn asks for it (a withdrawn reason is read nowhere).
+          where: {
+            kind: 'REVOKE',
+            status: { notIn: ['CLOSED_FAILED', 'CANCELLED'] },
+            reasons: { some: { withdrawnAt: null } },
+          },
           select: { id: true, status: true, revocationSource: true },
         },
       },
@@ -164,7 +169,7 @@ export class RevocationReadRepo {
         kind: 'REVOKE',
         status: { notIn: ['CLOSED_FAILED', 'CANCELLED'] },
         assignmentId: { in: [...assignmentIds] },
-        reasons: { some: { source: { in: [...sources] }, referenceId } },
+        reasons: { some: { source: { in: [...sources] }, referenceId, withdrawnAt: null } },
       },
       select: { assignmentId: true },
     });

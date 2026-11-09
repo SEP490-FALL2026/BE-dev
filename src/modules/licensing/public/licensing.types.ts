@@ -233,6 +233,8 @@ export type GrantCancellation =
 
 /** The reason kept on a task that was cancelled because its request was withdrawn. */
 export const WITHDRAWAL_CANCEL_REASON = 'REQUESTER_WITHDREW';
+/** The cause a source gives for taking its reason for a revocation back, and the close reason of the task left with none (`US-07-05` AC-22). */
+export const NO_LONGER_APPLIES = 'NO_LONGER_APPLIES';
 
 /** How the work a request led to ended: the seat is real, or the IT Admin closed the grant as failed (`FR-2.5`, `QĐ-62i`). */
 export type GrantOutcome = 'COMPLETED' | 'FAILED';
@@ -279,6 +281,14 @@ export interface OpenRevocationInput {
   decision: RevocationDecision;
   /** Handed to the listeners as it is and kept nowhere here: the department, the short deadline, the notice of the handover step. */
   context?: RevocationContext;
+  /**
+   * The timing the source asks for (BR-MF5-04): `notBefore` is the first day the IT Admin may take or complete the work, `dueOn` the day it
+   * is due. Nothing given is no timing: the work is taken at once, as it was before. Only MF-5 gives `notBefore` (the grace of a ghost
+   * seat); a reason with none wins over one that has it when both ask for the same seat.
+   */
+  timing?: { dueOn?: BusinessDate; notBefore?: BusinessDate };
+  /** `{ holder: true }`: the person who holds the seat is told once that its revocation is coming. Nothing given: nobody is told. */
+  notice?: { holder: true };
   now?: Date;
 }
 
@@ -286,6 +296,26 @@ export interface RevocationContext {
   departmentId?: string;
   dueOn?: BusinessDate;
   noticeText?: string;
+}
+
+/** The reason a source takes back (`withdrawRevocationReason`): which seat, which of its own reasons, and why it no longer holds. */
+export interface WithdrawRevocationInput {
+  assignmentId: string;
+  source: RevocationSource;
+  referenceId: string | null;
+  cause: 'NO_LONGER_APPLIES';
+  /** The account that works the task now: a task in progress with no reason left is cancelled only when this account took it. */
+  cancelInProgressClaimedBy?: string;
+}
+
+/**
+ * What the withdrawal did to the task of the seat: `CONTINUES` (other reasons stand), `CANCELLED` (none left: no longer applies),
+ * `IT_ADMIN_TO_CLOSE` (none left but another IT Admin is working it), `ALREADY_ENDED` (done, closed or cancelled), `NOT_FOUND`
+ * (no standing reason of that source and reference).
+ */
+export interface WithdrawnRevocation {
+  taskId: string | null;
+  outcome: 'CONTINUES' | 'CANCELLED' | 'IT_ADMIN_TO_CLOSE' | 'ALREADY_ENDED' | 'NOT_FOUND';
 }
 
 /** What the opening of a revocation did: a task was made, or the seat had one already and the reason was added to it. */

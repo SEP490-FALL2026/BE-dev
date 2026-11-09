@@ -21,6 +21,7 @@ import {
   ProvisioningResponsibleNotInDepartmentError,
   ProvisioningSubscriptionError,
   ProvisioningTaskAlreadyManualError,
+  ProvisioningTaskNotBeforeError,
   ProvisioningTaskNotFoundError,
   ProvisioningTaskNotManualError,
   ProvisioningTaskStateError,
@@ -113,6 +114,9 @@ export function toProvisioningApiException(error: unknown): unknown {
   if (error instanceof ProvisioningTaskAlreadyManualError) {
     return refuse(CONFLICT, 'PROVISIONING_TASK.ALREADY_MANUAL', error.message);
   }
+  if (error instanceof ProvisioningTaskNotBeforeError) {
+    return refuse(CONFLICT, 'PROVISIONING_TASK.NOT_BEFORE', error.message, { notBefore: error.notBefore });
+  }
   if (error instanceof ProvisioningTaskStateError) {
     return refuse(CONFLICT, `PROVISIONING_TASK.${error.problem}`, error.message);
   }
@@ -166,6 +170,7 @@ export const PROVISIONING_ERROR_EXAMPLES = {
   WITHDRAWAL_PENDING: example(new ProvisioningTaskStateError('WITHDRAWAL_PENDING')),
   NO_WITHDRAWAL: example(new ProvisioningTaskStateError('NO_WITHDRAWAL')),
   NOT_TERMINATING: example(new ProvisioningTaskStateError('NOT_TERMINATING')),
+  NOT_BEFORE: example(new ProvisioningTaskNotBeforeError('2026-11-08')),
   ALREADY_MANUAL: example(new ProvisioningTaskAlreadyManualError()),
   BENEFICIARY_DEPARTED: example(new ProvisioningBeneficiaryDepartedError('<request-id>')),
   COMPLETION_NOT_ALLOWED: example(new RevocationCompletionError('COMPLETION_NOT_ALLOWED')),

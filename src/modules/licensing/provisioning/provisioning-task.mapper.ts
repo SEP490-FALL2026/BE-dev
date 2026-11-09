@@ -26,11 +26,14 @@ const detailOf = (view: TaskView) => ({
   handOffEvidence: view.handOffEvidence,
   closedBy: view.closedBy,
   closeReason: view.closeReason,
+  // TẠM (nền 95aab022: DTO của gói 9 đòi trường này mà view chưa có; mọi route đọc 1 task trả 500): chờ MF-1 nối lại.
+  poolGrantAvoidedCosts: null,
   revocation: view.revocation && {
     ...view.revocation,
     firstReason: view.revocation.firstReason && {
       ...view.revocation.firstReason,
       decidedAt: view.revocation.firstReason.decidedAt.toISOString(),
     },
+    lastWithdrawnAt: view.revocation.lastWithdrawnAt?.toISOString() ?? null,
   },
 });

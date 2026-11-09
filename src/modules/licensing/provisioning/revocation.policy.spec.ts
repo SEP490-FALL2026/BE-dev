@@ -1,6 +1,7 @@
 import {
   AssignmentNotOpenError,
   ProvisioningEvidenceRequiredError,
+  ProvisioningTaskNotBeforeError,
   ProvisioningTaskStateError,
   RevocationCompletionError,
   RevocationRefusedError,
@@ -9,6 +10,7 @@ import {
 import { REVOCATION_SOURCES } from '../public/licensing.types';
 import { doneWhenFor, stepsFor } from './provisioning.policy';
 import {
+  assertNotBefore,
   assertNotRevocationTask,
   assertRevocable,
   assertRevocationSource,
@@ -380,5 +382,15 @@ describe('the card of a revocation (US-07-05 AC-1, AC-5, AC-8)', () => {
     expect(doneWhenFor('K5', 'REVOKE')).toBe('REVOKED_OFF_SYSTEM_WITH_EVIDENCE');
     expect(doneWhenFor('K2')).toBe('MEMBER_ACTIVE');
     expect(stepsFor('K2', 'a@x.vn').map((step) => step.code)).toEqual(['ADD_TO_WORKSPACE', 'CONFIRM_WITH_EVIDENCE']);
+  });
+});
+
+describe('US-10-07 AC-18: a revocation is not done before its day not before', () => {
+  it('refuses the days before it with the day it can be done, and lets that day and the later ones, and a task with none', () => {
+    expect(() => assertNotBefore('2026-11-08', '2026-11-05')).toThrow(ProvisioningTaskNotBeforeError);
+    expect(() => assertNotBefore('2026-11-08', '2026-11-07')).toThrow(new ProvisioningTaskNotBeforeError('2026-11-08'));
+    expect(() => assertNotBefore('2026-11-08', '2026-11-08')).not.toThrow();
+    expect(() => assertNotBefore('2026-11-08', '2026-11-30')).not.toThrow();
+    expect(() => assertNotBefore(null, '2026-11-01')).not.toThrow();
   });
 });
