@@ -87,10 +87,10 @@ describe('requests over HTTP: the preview before sending (integration, real Post
       expect(kinds(full)).toContain('SPEND_APPROVAL');
     });
 
-    it('says that a Finance review may be added later, and shows no budget figure at all', async () => {
+    it('QĐ-97c: says no step may be added later (Finance has no review), and shows no budget figure at all', async () => {
       const preview = await h.previewed(designer, paidPlan);
 
-      expect(preview.possibleExtraSteps).toEqual([{ kind: 'FINANCE_REVIEW', beforeStep: 'SPEND_APPROVAL' }]);
+      expect(preview).not.toHaveProperty('possibleExtraSteps');
       expect(Object.keys(preview).sort()).toEqual(
         [
           'plan',
@@ -109,7 +109,6 @@ describe('requests over HTTP: the preview before sending (integration, real Post
           'costEstimate',
           'spendSubmission',
           'chain',
-          'possibleExtraSteps',
           'totalExpectedWorkingDays',
         ].sort(),
       );
@@ -126,7 +125,6 @@ describe('requests over HTTP: the preview before sending (integration, real Post
         costEstimate: null,
         budgetYear: null,
         spendSubmission: 'NOT_NEEDED',
-        possibleExtraSteps: [],
       });
       expect(preview.chain.map((step) => [step.kind, step.assignee?.employeeId ?? null])).toEqual([
         ['NEED', head.employeeId],

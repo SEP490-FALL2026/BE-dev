@@ -424,41 +424,8 @@ describe('who holds a step when the organization or a role changes, over Postgre
       ).toEqual(['HEAD_CHANGED']);
     });
 
-    it('makes the review of Finance wait when its holder leaves and nobody else holds the role, and gives it back when somebody does', async () => {
-      const unit = await scene();
-      await h.budgetFor(unit, { total: 100 * M, held: 20 * M, spent: 40 * M });
-      counter += 1;
-      const departed = await h.staff(await h.departmentWithUnit(`P-FIN${counter}`), `FIN-D${counter}`);
-      const next = await h.staff(await h.departmentWithUnit(`P-FIN${counter + 100}`), `FIN-N${counter}`);
-      await h.changeRoleOf(h.finance.appUserId, 'EMPLOYEE').expect(200);
-      await h.changeRoleOf(departed.account.appUserId, 'FINANCE').expect(200);
-      const id = await h.paidRequest(unit, paid, { amount: 45 * M });
-      await h.route(id, unit.head.account);
-      expect(await h.stepOf(id, 'FINANCE_REVIEW')).toMatchObject({ assignee_employee_id: departed.employeeId });
-
-      try {
-        await h.changeRoleOf(departed.account.appUserId, 'EMPLOYEE').expect(200);
-        await h.leave(departed.employeeId);
-        expect(await h.stepOf(id, 'FINANCE_REVIEW')).toMatchObject({
-          state: 'WAITING',
-          assignee_employee_id: null,
-          waiting_reason: 'NO_FINANCE_REVIEWER',
-        });
-        expect(await h.state(id)).toBe('WAITING_CONTROLLED');
-
-        await h.changeRoleOf(next.account.appUserId, 'FINANCE').expect(200);
-        expect(await h.stepOf(id, 'FINANCE_REVIEW')).toMatchObject({
-          state: 'PENDING',
-          assignee_employee_id: next.employeeId,
-          waiting_reason: null,
-          waiting_since: null,
-        });
-        expect(await h.state(id)).toBe('AWAITING_FINANCE_REVIEW');
-      } finally {
-        await h.changeRoleOf(next.account.appUserId, 'EMPLOYEE');
-        await h.changeRoleOf(h.finance.appUserId, 'FINANCE');
-      }
-    });
+    // Removed: "makes the review of Finance wait when its holder leaves" (US-06-13 AC-6). Finance has no review any more (QĐ-97c), so no step
+    // waits for the role of Finance; the same movement of a held step is proved by the spend step above and the need step here.
 
     it('makes the assessment of the IT Admin wait when the IT Admin in charge leaves, and gives it to the one named after', async () => {
       const unit = await scene();

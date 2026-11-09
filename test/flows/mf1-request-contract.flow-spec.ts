@@ -221,6 +221,56 @@ describe('MF-1 request contract: field cũ, sai vai, gọi lại @MF1 @D1', () =
     });
   });
 
+  describe('F1-05 dùng dự phòng: trình lô, xác nhận, duyệt chi @MF1 @B2', () => {
+    it('BR-MF1-06h: lô không lý do ⟹ chờ xác nhận; xác nhận bằng endpoint ⟹ bước chi mở; duyệt ⟹ một khoản cam kết #B2 @B2', async () => {
+      const year = Number(call().today().slice(0, 4));
+      const sql = world.ctx.sql;
+      const version = await world.facts.one<{ id: string; base_minor: string; reserve_minor: string }>(
+        `SELECT v.id, v.base_minor::text, v.reserve_minor::text
+           FROM budget_versions v JOIN cost_centers c ON c.id = v.cost_center_id
+          WHERE c.code = 'CC-ENG' AND v.year = $1 AND v.state = 'APPROVED'`,
+        [year],
+      );
+      const total = BigInt(version.base_minor) + BigInt(version.reserve_minor);
+      // The base is gone; what is left is left only with the reserve.
+      await sql.query(`UPDATE budget_versions SET base_minor = 1, reserve_minor = $2 WHERE id = $1`, [
+        version.id,
+        String(total - 1n),
+      ]);
+      try {
+        const id = await call().submitRequest('NV-DEV2', figma);
+        expect((await call().approveNeed('NV-ENGH', id)).status).toBe(200);
+
+        const sent = await call().submitBatch('NV-ENGH', [id]);
+        expect(sent.status).toBe(201);
+        const result = call().data<{ results: { outcome: string; reserveConfirmation: string }[] }>(sent).results[0];
+        expect(result).toMatchObject({ outcome: 'AWAITING_RESERVE_CONFIRMATION', reserveConfirmation: 'NOT_GIVEN' });
+        expect(
+          await world.facts.count('access_request_steps', "request_id = $1 AND kind = 'SPEND_APPROVAL'", [id]),
+        ).toBe(0);
+
+        const confirmed = await call().post('NV-ENGH', `/access-requests/${id}/reserve-confirmation`, {
+          reason: 'Cần cho đợt phát hành tháng này',
+        });
+        expect(confirmed.status).toBe(200);
+        expect(call().data<{ reserveConfirmation: { result: string } }>(confirmed).reserveConfirmation).toMatchObject({
+          result: 'SPEND_STEP_OPENED',
+          confirmationKept: true,
+        });
+
+        const approved = await call().post('NV-CEO', `/access-requests/${id}/spend-approval`, { decision: 'APPROVE' });
+        expect(approved.status).toBe(200);
+        expect(await world.facts.count('budget_commitments', 'request_id = $1', [id])).toBe(1);
+      } finally {
+        await sql.query(`UPDATE budget_versions SET base_minor = $2, reserve_minor = $3 WHERE id = $1`, [
+          version.id,
+          version.base_minor,
+          version.reserve_minor,
+        ]);
+      }
+    });
+  });
+
   describe('F1-04 gọi lại không tạo bản ghi trùng @MF1 @D1', () => {
     it('trình lô, duyệt chi và hoàn tất cấp: lần hai là 409 và không thêm dòng #B0 @B0', async () => {
       const id = await call().submitRequest('NV-DEV1', figma);

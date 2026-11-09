@@ -119,16 +119,12 @@ describe('the commitment held when a request is approved over PostgreSQL (US-06-
       expect(events.rowCount).toBe(1);
     });
 
-    it('leaves Finance nothing to record or confirm, and the IT Admin can grant it at once (AC-2)', async () => {
+    it('QĐ-97c: leaves Finance nothing to record or confirm (no review of Finance exists), and the IT Admin can grant it at once (AC-2)', async () => {
       const { u } = await example();
       const id = await approved(u, 15 * M);
 
-      const queue = h.dataOf<{ items: Array<{ requestId: string }> }>(
-        await h.reviewQueue(h.finance, { pageSize: 100 }).expect(200),
-      );
-
-      expect(queue.items.map((item) => item.requestId)).not.toContain(id);
-      expect(await h.steps(id, 'FINANCE_REVIEW')).toEqual([]);
+      const reviews = await h.ctx.sql.query(`SELECT 1 FROM request_finance_reviews WHERE request_id = $1`, [id]);
+      expect(reviews.rowCount).toBe(0);
       await h.grant({ requestId: id, subscriptionId }).expect(201);
     });
 
@@ -196,16 +192,8 @@ describe('the commitment held when a request is approved over PostgreSQL (US-06-
   });
 
   describe('which year, and how many (AC-10 to AC-13)', () => {
-    it('is the year of the day the money goes out, whole, and leaves the year it is approved in as it was (AC-10)', async () => {
-      const { u } = await example();
-      await h.budgetFor(u, { total: 100 * M, year: h.next });
-      const before = await row(u);
-      const id = await approved(u, 10 * M, plan, { year: h.next, dueOn: `${h.next}-01-05` });
-
-      expect(await held(id)).toEqual([expect.objectContaining({ year: h.next, amount_minor: String(10 * M) })]);
-      expect(await row(u)).toEqual(before);
-      expect(await row(u, h.next)).toMatchObject({ remaining: { amount: String(90 * M) } });
-    });
+    // FR-5.8a: the old test of a commitment for a later year (AC-10) is removed: a commitment is held for the current year only; the refusal
+    // of another year is judged in commitment-current-year.integration-spec.ts.
 
     it('QĐ-109: is one, for the year the amount is counted in, attached to the budget of that year and touching no other (AC-11, US-06-07 AC-7)', async () => {
       // Rewritten from "one for each year the binding payments fall in": a request has one amount for one year now, not a schedule.

@@ -180,6 +180,22 @@ describe('the renewal of a right that ends on a day over PostgreSQL (US-05-14)',
       });
     });
 
+    it('A5-2, BR-MF1-07d: a renewal that begins in the next fiscal year is approved at no cost this year, holds no commitment and says so in the audit', async () => {
+      const year = Number(h.today().slice(0, 4));
+      const days = Math.round((Date.UTC(year, 11, 31) - Date.parse(`${h.today()}T00:00:00Z`)) / 86_400_000);
+      const { unit, assignmentId } = await holder(paid, days);
+      const { request } = await h.renewed(unit.member.account, body(assignmentId, 3));
+      await approve(request.id, unit).expect(200);
+      await h.sendOn([request.id], unit.head.account).expect(201);
+
+      // Nothing costs this year: it is within the base whatever is left and goes to the approver.
+      expect(await h.state(request.id)).toBe('AWAITING_SPEND_DECISION');
+      await h.decideSpend(request.id, { decision: 'APPROVE' }, h.boss.account).expect(200);
+
+      expect(await commitmentOf(request.id)).toEqual([]);
+      expect((await h.eventsOf('ACCESS_REQUEST.NO_CURRENT_YEAR_COMMITMENT', request.id)).length).toBe(1);
+    });
+
     it('ends the old record today when the decision comes after the day the right was to end, and never leaves a period empty', async () => {
       const licensing = h.ctx.app.get(LicensingRenewalApi);
       const { TransactionRunner } = await import('../../../src/infrastructure/database/transaction-runner');

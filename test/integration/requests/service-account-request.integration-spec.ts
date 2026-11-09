@@ -260,7 +260,8 @@ describe('a request for a service account after the installation over PostgreSQL
       await h.sendOn([sent.id], bare.head.account).expect(201);
 
       expect(await h.state(withBudget)).toBe('AWAITING_EXECUTION');
-      expect(await h.state(sent.id)).toBe('AWAITING_FINANCE_REVIEW');
+      // BR-MF1-06g(3)(ii): blocked, it stays in the queue of its head and nothing is made for Finance.
+      expect(await h.state(sent.id)).toBe('AWAITING_SPEND_SUBMISSION');
       const years = h.dataOf<{ items: { code: string }[] }>(await h.checkYears(sent.id).expect(200)).items;
       expect(years.map((year) => year.code)).toEqual(['NO_ACTIVE_BUDGET']);
     });

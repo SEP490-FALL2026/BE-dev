@@ -31,7 +31,6 @@ const FRIDAY_16 = at(0, '16:00');
 describe('the reminders of a step that is late, over PostgreSQL (US-05-09, US-05-06 AC-10, US-05-10 AC-5)', () => {
   let internal: string;
   let paid: string;
-  let financeUnit: Unit;
   let superAdmin: string;
   let counter = 0;
 
@@ -43,9 +42,6 @@ describe('the reminders of a step that is late, over PostgreSQL (US-05-09, US-05
     await h
       .declareTaxProfile((await h.vendorOf(paid)).id, [{ taxType: 'GTGT', ratePercent: '10', deductible: true }])
       .expect(200);
-    // Finance sits in a department with its own head, so that the head of that department is the superior of Finance.
-    financeUnit = await h.departmentWithHead('P-FIN');
-    await h.moveTo(h.finance.employeeId, financeUnit.department.id, { announce: false });
     superAdmin = (
       await h.ctx.sql.query<{ employee_id: string }>(
         `SELECT u.employee_id FROM app_users u JOIN role_grants g ON g.app_user_id = u.id
@@ -75,7 +71,7 @@ describe('the reminders of a step that is late, over PostgreSQL (US-05-09, US-05
     rows.map((row) => `${row.employee_id}:${row.role}`).sort();
 
   describe('the first reminder (AC-1, AC-2, AC-5)', () => {
-    it('reminds the holder and the spending approver when a step is three working days old with two to wait, and changes nothing (AC-1, AC-2, AC-5)', async () => {
+    it('QĐ-100j: reminds the holder of a need step and the person who asked, and nobody above them, when it is three working days old with two to wait, and changes nothing (AC-1, AC-2, AC-5)', async () => {
       const { u, id, stepId } = await needStepBegunAt(FRIDAY_16);
       const before = await h.decisionState();
 
@@ -95,10 +91,13 @@ describe('the reminders of a step that is late, over PostgreSQL (US-05-09, US-05
         overdue_working_days: 1,
       });
       expect(reminder.due_at).toEqual(at(4, '16:00'));
+      // Rewritten (QĐ-100j, QĐ-52c): the need step is told to the holder and the requester, not to the spending approver above the head.
       expect(roles(reminder.recipients)).toEqual(
-        [`${u.head.employeeId}:HOLDER`, `${h.boss.employeeId}:SUPERIOR`].sort(),
+        [`${u.head.employeeId}:HOLDER`, `${u.member.employeeId}:REQUESTER`].sort(),
       );
       expect(await h.codesFor(u.head.employeeId, id)).toEqual(['STEP_SLA_REMINDER']);
+      expect(await h.codesFor(u.member.employeeId, id)).toEqual(['STEP_SLA_REMINDER']);
+      expect(await h.codesFor(h.boss.employeeId, id)).toEqual([]);
       const [holderNotice] = await h.noticesOf(u.head.employeeId, 'STEP_SLA_REMINDER');
       expect(holderNotice).toMatchObject({
         subject_type: 'ACCESS_REQUEST',
@@ -109,9 +108,8 @@ describe('the reminders of a step that is late, over PostgreSQL (US-05-09, US-05
       const escalations = (await h.noticesOf(h.boss.employeeId, 'STEP_SLA_ESCALATION')).filter(
         (notice) => notice.subject_id === id,
       );
-      expect(escalations).toHaveLength(1);
-      expect(escalations[0].params).toMatchObject({ holderEmployeeId: u.head.employeeId, reminderNumber: 1 });
-      expect(JSON.stringify(escalations[0].params)).not.toMatch(/amount|budget|reason/i);
+      expect(escalations).toHaveLength(0);
+      expect(JSON.stringify(holderNotice.params)).not.toMatch(/amount|budget|reason/i);
       const [event] = await h.audit('ACCESS_REQUEST.STEP_REMINDED', stepId);
       expect(event).toMatchObject({
         actor_kind: 'SYSTEM',
@@ -238,28 +236,21 @@ describe('the reminders of a step that is late, over PostgreSQL (US-05-09, US-05
   });
 
   describe('the superior, whoever holds the step (AC-8, AC-9, AC-10)', () => {
-    it('reminds Finance and the head of the department of Finance for a review that is late, with no spend step made (AC-8, AC-10)', async () => {
+    it('QĐ-100j: tells the holder of a late spend step and the Super Admin as before, never the person who asked, and makes no other step', async () => {
+      // Replaces "reminds Finance and the head of the department of Finance for a review that is late": the review of Finance is gone (QĐ-97c).
       const u = await scene();
-      await h.budgetFor(u, { total: 100 * M, held: 20 * M, spent: 40 * M });
-      const id = await h.paidRequest(u, paid, { amount: 45 * M });
-      await h.route(id, u.head.account);
-      const step = await h.stepOf(id, 'FINANCE_REVIEW');
-      expect(step).toMatchObject({ state: 'PENDING', assignee_employee_id: h.finance.employeeId });
-      await h.beganAt(id, 'FINANCE_REVIEW', FRIDAY_16);
+      await h.budgetFor(u, { total: 100 * M });
+      const id = await h.waitingForApprover(u, paid, { amount: 5 * M });
+      await h.beganAt(id, 'SPEND_APPROVAL', FRIDAY_16);
+      const step = await h.stepOf(id, 'SPEND_APPROVAL');
       const stepsBefore = await h.stepCount(id);
 
       await h.sweepAt(at(5, '10:00'));
 
       const [reminder] = await h.remindersOf(step.id);
-      expect(reminder).toMatchObject({ step_kind: 'FINANCE_REVIEW' });
-      expect(roles(reminder.recipients)).toEqual(
-        [`${h.finance.employeeId}:HOLDER`, `${financeUnit.head.employeeId}:SUPERIOR`].sort(),
-      );
-      expect(await h.stepOf(id, 'FINANCE_REVIEW')).toMatchObject({
-        state: 'PENDING',
-        assignee_employee_id: h.finance.employeeId,
-      });
-      expect(await h.steps(id, 'SPEND_APPROVAL')).toEqual([]);
+      expect(reminder).toMatchObject({ step_kind: 'SPEND_APPROVAL' });
+      expect(roles(reminder.recipients)).toEqual([`${h.boss.employeeId}:HOLDER`, `${superAdmin}:SUPER_ADMIN`].sort());
+      expect(await h.codesFor(u.member.employeeId, id)).toEqual([]);
       expect(await h.stepCount(id)).toBe(stepsBefore);
     });
 
@@ -376,9 +367,13 @@ describe('the reminders of a step that is late, over PostgreSQL (US-05-09, US-05
       expect(
         (await h.noticesOf(u.head.employeeId, 'STEP_SLA_REMINDER')).filter((n) => n.subject_id === id),
       ).toHaveLength(1);
+      // Rewritten (QĐ-100j): the second person of a late need step is the requester, not the spending approver above the head.
+      expect(
+        (await h.noticesOf(u.member.employeeId, 'STEP_SLA_REMINDER')).filter((n) => n.subject_id === id),
+      ).toHaveLength(1);
       expect(
         (await h.noticesOf(h.boss.employeeId, 'STEP_SLA_ESCALATION')).filter((n) => n.subject_id === id),
-      ).toHaveLength(1);
+      ).toHaveLength(0);
     });
 
     it('rolls the whole reminder back when a notice fails, and makes it complete on the next pass', async () => {

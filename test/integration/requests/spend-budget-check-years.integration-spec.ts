@@ -53,7 +53,7 @@ describe('the check of the budget by year over PostgreSQL (US-06-12 AC-11 to AC-
   const years = async (requestId: string) =>
     h.dataOf<{ items: YearRowWire[] }>(await h.checkYears(requestId).expect(200)).items;
   const checkWire = async (requestId: string) =>
-    h.dataOf<{ budgetCheck: { route: string; bindingTotal: { amount: string }; yearCount: number } }>(
+    h.dataOf<{ budgetCheck: { outcome: string; bindingTotal: { amount: string }; yearCount: number } }>(
       await h.checkOf(requestId).expect(200),
     ).budgetCheck;
   const rows = (table: string) => h.budgetRows(table);
@@ -131,7 +131,7 @@ describe('the check of the budget by year over PostgreSQL (US-06-12 AC-11 to AC-
 
       const outcome = await checked(id, u);
 
-      expect(outcome.route).toBe('SPEND_APPROVAL');
+      expect(outcome.outcome).toBe('WITHIN_BASE');
       expect(await years(id)).toEqual([
         expect.objectContaining({ year: h.year, code: 'BUDGET_OK', shareBasisPoints: 4800 }),
       ]);
@@ -145,7 +145,7 @@ describe('the check of the budget by year over PostgreSQL (US-06-12 AC-11 to AC-
 
       const outcome = await checked(id, u);
 
-      expect(outcome.route).toBe('SPEND_APPROVAL');
+      expect(outcome.outcome).toBe('WITHIN_BASE');
       expect(await years(id)).toEqual([expect.objectContaining({ year: h.year, code: 'BUDGET_OK' })]);
       expect(await checkWire(id)).toMatchObject({ bindingTotal: { amount: '2400000' }, yearCount: 1 });
     });
@@ -192,7 +192,7 @@ describe('the check of the budget by year over PostgreSQL (US-06-12 AC-11 to AC-
 
       await h.setPayments(sent.id, { amount: 10 * M });
 
-      expect(await h.route(sent.id, u.head.account)).toMatchObject({ status: 'ROUTED', route: 'SPEND_APPROVAL' });
+      expect(await h.route(sent.id, u.head.account)).toMatchObject({ status: 'ROUTED', outcome: 'WITHIN_BASE' });
     });
 
     it('is not checked in a currency with no rate for the day, and is converted when there is one', async () => {

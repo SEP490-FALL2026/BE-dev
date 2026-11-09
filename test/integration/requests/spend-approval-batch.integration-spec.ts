@@ -27,11 +27,11 @@ describe('the decision of the requests of a batch over PostgreSQL (US-06-01 AC-1
   });
 
   /** A department with a budget of its own, so that what one test commits does not meet the next. */
-  const fresh = async (): Promise<{ design: Unit; versionId: string }> => {
+  const fresh = async (reserve = 0): Promise<{ design: Unit; versionId: string }> => {
     counter += 1;
     const design = await h.departmentWithHead(`P-B${counter}`);
 
-    return { design, versionId: (await h.budgetFor(design, { total: 1000 * M })).id };
+    return { design, versionId: (await h.budgetFor(design, { total: 1000 * M, reserve })).id };
   };
   const sendAll = async (design: Unit, amounts: number[]) => {
     const ids: string[] = [];
@@ -52,7 +52,7 @@ describe('the decision of the requests of a batch over PostgreSQL (US-06-01 AC-1
     ).rows;
 
   describe('approving together (AC-19)', () => {
-    it('decides each request on its own, in order, and skips the one with no step, the one withdrawn and the one that waits for Finance', async () => {
+    it('decides each request on its own, in order, and skips the one with no step, the one withdrawn and the one that was blocked when it was sent', async () => {
       const { design } = await fresh();
       const { ids, batchId } = await sendAll(design, [10 * M, 10 * M, 10 * M, 2000 * M]);
       const [first, second, withdrawn, big] = ids;
@@ -75,8 +75,8 @@ describe('the decision of the requests of a batch over PostgreSQL (US-06-01 AC-1
         [second, 'APPROVED'],
       ]);
       expect(await h.state(first)).toBe('AWAITING_EXECUTION');
-      // The one that waits for Finance stays in its batch and with Finance.
-      expect(await h.state(big)).toBe('AWAITING_FINANCE_REVIEW');
+      // BR-MF1-06g: the one that costs more than the base and the reserve was blocked when it was sent: it stays in the queue of its head.
+      expect(await h.state(big)).toBe('AWAITING_SPEND_SUBMISSION');
       const left = await h.ctx.sql.query(
         `SELECT 1 FROM spend_batch_items WHERE request_id = $1 AND left_reason IS NOT NULL`,
         [big],
@@ -95,37 +95,36 @@ describe('the decision of the requests of a batch over PostgreSQL (US-06-01 AC-1
       expect(after.body).toEqual(before.body);
     });
 
-    it('checks again as it decides: a request that became an exception is skipped and sent to Finance, left undecided', async () => {
+    it('BR-MF1-07c: checks again as it decides, one by one: a request that became blocked is skipped and goes back to its head, left undecided', async () => {
       const { design, versionId } = await fresh();
       const { ids, batchId } = await sendAll(design, [10 * M, 20 * M]);
       const [first, second] = ids;
-      // Money was committed since: neither request fits in what is left, and nobody approves an exception (QĐ-97c).
+      // Money was committed since: neither request fits in what is left and there is no reserve, and nobody approves past the budget (QĐ-97c).
       await h.commit(design, versionId, h.year, 995 * M, 'HELD');
 
       const results = await decideAll(batchId, { decision: 'APPROVE', requestIds: [first, second] });
 
       expect(results).toEqual([
-        { requestId: first, outcome: 'SKIPPED', reason: 'RECHECKED_NEEDS_FINANCE_REVIEW' },
-        { requestId: second, outcome: 'SKIPPED', reason: 'RECHECKED_NEEDS_FINANCE_REVIEW' },
+        { requestId: first, outcome: 'SKIPPED', reason: 'RECHECKED_RETURNED_TO_HEAD' },
+        { requestId: second, outcome: 'SKIPPED', reason: 'RECHECKED_RETURNED_TO_HEAD' },
       ]);
       expect(await records(ids)).toEqual([]);
-      expect(await h.state(first)).toBe('AWAITING_FINANCE_REVIEW');
-      expect(await h.state(second)).toBe('AWAITING_FINANCE_REVIEW');
+      expect(await h.state(first)).toBe('AWAITING_SPEND_SUBMISSION');
+      expect(await h.state(second)).toBe('AWAITING_SPEND_SUBMISSION');
     });
 
-    it('skips a request that Finance reviewed and that still costs more than what is left: nobody approves past the budget (OVERRIDE_REQUIRED, QĐ-97c)', async () => {
-      const { design } = await fresh();
-      const { ids, batchId } = await sendAll(design, [1500 * M]);
+    it('BR-MF1-07c: skips a request that now uses a reserve nobody confirmed, and goes back to its head', async () => {
+      const { design, versionId } = await fresh(50 * M);
+      const { ids, batchId } = await sendAll(design, [10 * M]);
       const [short] = ids;
-      await h
-        .completeReview(short, { outcome: 'ASSESSED', opinion: 'Over by half', direction: 'RECOMMEND_OVERRIDE' })
-        .expect(200);
+      // 5 left of the base and 55 with the reserve: the request (10) used to be within the base and now uses the reserve, unconfirmed.
+      await h.commit(design, versionId, h.year, 995 * M, 'HELD');
 
       const results = await decideAll(batchId, { decision: 'APPROVE', requestIds: [short] });
 
-      expect(results).toEqual([{ requestId: short, outcome: 'SKIPPED', reason: 'OVERRIDE_REQUIRED' }]);
+      expect(results).toEqual([{ requestId: short, outcome: 'SKIPPED', reason: 'RECHECKED_RETURNED_TO_HEAD' }]);
       expect(await records(ids)).toEqual([]);
-      expect(await h.state(short)).toBe('AWAITING_SPEND_DECISION');
+      expect(await h.state(short)).toBe('AWAITING_SPEND_SUBMISSION');
     });
 
     it('skips a request that is not in the batch, and answers 404 for a batch the caller holds nothing of', async () => {

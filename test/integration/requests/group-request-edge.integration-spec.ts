@@ -203,7 +203,7 @@ describe('the edges of a request for a group over PostgreSQL (US-05-17 AC-5, AC-
     expect(await h.lineStates(id)).toEqual(['AWAITING_NEED', 'AWAITING_NEED', 'AWAITING_NEED']);
   });
 
-  it('checks the people approved again when the approver decides: an exception that Finance has not looked at goes back, and nobody is decided (AC-9)', async () => {
+  it('BR-MF1-07c: checks the people approved again when the approver decides: a request that is blocked now goes back to its head, and nobody is decided (AC-9)', async () => {
     counter += 1;
     const u = await h.departmentWithHead(`P-Y${counter}`);
     const plan = await h.planOf(await h.subscription(100));
@@ -221,11 +221,12 @@ describe('the edges of a request for a group over PostgreSQL (US-05-17 AC-5, AC-
       .decideSpendLines(id, { lines: people.map((person) => approve(person.employeeId)) }, h.boss.account)
       .expect(409);
 
-    expect(h.codeOf(bounced)).toBe('SPEND.RECHECKED_NEEDS_FINANCE_REVIEW');
+    expect(h.codeOf(bounced)).toBe('SPEND.RECHECKED_RETURNED_TO_HEAD');
+    expect(bounced.body.error.details.reasons).toEqual(['OVER_RESERVE']);
     expect(await h.lineStates(id)).toEqual(['NEED_CONFIRMED', 'NEED_CONFIRMED']);
     expect(await h.commitments(id)).toEqual([]);
     expect((await h.steps(id, 'SPEND_APPROVAL')).map((step) => step.state)).toEqual(['CLOSED']);
-    expect((await h.steps(id, 'FINANCE_REVIEW')).map((step) => step.state)).toEqual(['PENDING']);
+    expect(await h.state(id)).toBe('AWAITING_SPEND_SUBMISSION');
   });
 
   it('has no line of the spending approver any more: the group is refused for that line, and nothing is written (US-05-17 AC-18, D-S21)', async () => {

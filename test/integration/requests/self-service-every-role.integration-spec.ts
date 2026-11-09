@@ -148,7 +148,7 @@ describe('self-service belongs to every account, with one role per account', () 
 
   it('keeps role-specific operations closed to other roles', async () => {
     await request(h.server()).get('/api/v1/spend-queue').set(h.as(manager.account)).expect(403);
-    await request(h.server()).get('/api/v1/finance-reviews').set(h.as(h.it1)).expect(403);
+    await request(h.server()).get('/api/v1/spend-batches').set(h.as(h.it1)).expect(403);
     await request(h.server()).get('/api/v1/provisioning-tasks').set(h.as(employee.account)).expect(403);
   });
 });

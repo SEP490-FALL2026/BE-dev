@@ -30,9 +30,7 @@ audit, notifications. Được dùng bởi: requests; gốc `src/app/app.module.
 
 ## Extension point
 
-- Mở `BudgetChangeListeners` (`budgets.change-listeners`, Listeners; `LOCK_WAITING`, `VERSION_APPROVED`,
-  `VERSION_REFUSED`, `VERSION_EXPIRED`, `PLAN_LINE_MOVED`) — requests `finance-review/spend-budget.listener.ts`.
-  Phát từ `version-decision.service.ts`, `version-line.service.ts`, `year-end.service.ts`.
+- Mở `PendingSpendContributions` (`budgets.pending-spend`, Contributions): số tiền các Request đang chờ duyệt chi của một (Cost Center, năm) — requests `spend/pending-spend.listener.ts` cấp (định nghĩa ở `requests/spend`, không ở `BudgetsApi`). `BudgetChangeListeners` đã gỡ (không còn Request chờ phiên bản ngân sách).
 - Mở `CommitmentReleaseGuardHook` (`budgets.commitment-release-guard`, Hook) — requests
   `spend/commitment-release.listener.ts`. Chưa bind thì nhả phần dư thất bại thay vì cho qua.
 - Mở `CommitmentRequestFactsHook` (`budgets.commitment-request-facts`, Hook) — requests `spend/commitment-request-facts.listener.ts`:
@@ -94,11 +92,11 @@ vendor, number)`; bảng `invoices` chỉ ghi thêm (trigger + quyền runtime `
 - Chỉ Finance dựng version; chỉ spending approver quyết định, không ai thay (QĐ-93c, US-06-11 AC-12): chưa ai giữ vai thì
   phiên bản chờ với `waitingReason` `NO_SPENDING_APPROVER`; phiên bản của đề xuất do chính approver gửi (dữ liệu cũ) không ai
   quyết, 403 `BUDGET.CONFLICT_OF_INTEREST` (`budget.policy.ts`). Gửi phiên bản đọc grant `FOR SHARE` (M6).
-- `BudgetChangeListeners` chạy trong transaction của thay đổi, listener nào lỗi thì thay đổi bị rollback;
-  `LOCK_WAITING` phát trước khi lấy khóa năm.
 
 ## Test
 
 - Unit: `src/modules/budgets/**/*.spec.ts`; HTTP: `test/http/budgets/`; integration: `test/integration/budgets/` (hóa đơn:
   `budget-invoices`, `budget-summary`, `budget-commitment-list`), `test/integration/_serial/database-runtime-role-invoice-write` (vai runtime),
   migration: `test/integration/platform/finance-invoices-upgrade`.
+
+- Cam kết (BR-MF1-07d, FR-5.8a, INV-16): duyệt chi giữ **đúng một** khoản cho năm hiện hành, trên phiên bản `APPROVED`; `commitment-hold.policy.ts` từ chối `MORE_THAN_ONE_YEAR`, `NOT_CURRENT_YEAR`, `NOT_POSITIVE`, `NO_APPROVED_BUDGET` (409 `BUDGET.COMMITMENT_NOT_HOLDABLE`). Số tiền 0 không giữ khoản. Khoản năm sau / `NO_BUDGET` ghi trước giữ nguyên (Q-27). Điều kiện cho job 01/01: bỏ qua (Request, năm) đã có khoản (UNIQUE INV-16); `CommitmentRepo.hold(..., { allowUnattached: true })` chỉ dành cho khoản 01/01.

@@ -93,7 +93,7 @@ describe('the confirmation of the reserve (http contract, no database)', () => {
     const response = await post(PATH, ['MANAGER'], { reason: `  ${'x'.repeat(500)}  ` }).expect(200);
 
     expect(confirm).toHaveBeenCalledWith(expect.anything(), ID, 'x'.repeat(500));
-    expect(bodyOf(response).data.reserveConfirmation).toMatchObject({
+    expect((bodyOf(response).data as Record<string, unknown>).reserveConfirmation).toMatchObject({
       result: 'SPEND_STEP_OPENED',
       confirmationKept: true,
     });
@@ -129,7 +129,7 @@ describe('the confirmation of the reserve (http contract, no database)', () => {
         [ID],
         [{ requestId: ID, reason: 'Cần cho đợt phát hành' }],
       );
-      expect(bodyOf(response).data.results).toEqual([
+      expect((bodyOf(response).data as Record<string, unknown>).results).toEqual([
         { requestId: ID, outcome: 'SENT_TO_APPROVER', stopReason: null, reserveConfirmation: 'APPLIED' },
       ]);
     });

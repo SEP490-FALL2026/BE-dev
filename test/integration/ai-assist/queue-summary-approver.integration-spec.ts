@@ -58,14 +58,13 @@ describe('the AI summary of the queue of the spending approver (integration, rea
     engineering = await h.unit('P-ENG');
     const it = { employeeId: h.it1.employeeId, account: h.it1 };
     await h.setItAdminInCharge(design.department, it);
-    // Whole percent of what is left above which a request is high value: 100, so no review of Finance stands in the way.
     await h.budgetFor(design, { total: 100 * M, held: 20 * M, spent: 40 * M });
     await h.budgetFor(engineering, { total: 100 * M });
 
     r1 = await h.sent(design.member, internal, { businessReason: 'Nhân viên cần công cụ ghi chú' });
     r9 = await h.sent(design.head, plan, { businessReason: 'Trưởng phòng cần công cụ thiết kế' });
-    // The amount of the request is the months left of the year, which depends on the day the suite runs: it is written, so that it is more than what is left once R10 waits (40 - 21 million) and the review of Finance this suite reads stands.
-    await h.setPayments(r9.id, { amount: 25 * M });
+    // The amount of the request is the months left of the year, which depends on the day the suite runs: it is written, so that it is within the base once R10 waits (40 - 21 = 19 million left): its spend step goes straight to C1 (BR-MF1-06g).
+    await h.setPayments(r9.id, { amount: 15 * M });
     r10 = await h.waitingForApprover(design, plan, { amount: 21 * M });
     r11 = await h.staleRequest(engineering, 10 * M);
     await h.ctx.sql.query(
@@ -254,17 +253,11 @@ describe('the AI summary of the queue of the spending approver (integration, rea
     expect(reread.sourceStale).toBe(true);
   });
 
-  it('AC-14: once C1 approves the need of R9 and Finance has reviewed it, its spend step goes to C1 and a new summary shows R9 as a spend step', async () => {
+  it('AC-14: once C1 approves the need of R9 its spend step goes straight to C1 (within the base, no review of Finance), and a new summary shows R9 as a spend step', async () => {
     h.ai.reset();
     await h.decide(r9.id, { decision: 'APPROVE' }, h.boss.account).expect(200);
-    // The approval of the need sends R9 to Finance first; Finance holds a review step, which is no step a summary reads.
-    expect(await h.steps(r9.id, 'FINANCE_REVIEW')).toEqual([
-      expect.objectContaining({ state: 'PENDING', assignee_employee_id: h.finance.employeeId }),
-    ]);
+    // Finance has no step of any request (QĐ-97c): it has nothing a summary reads.
     expect(h.codeOf(await h.ask(h.finance, await h.revisionOf(h.finance)).expect(403))).toBe('AI.NO_ASSIGNED_STEPS');
-    await h
-      .completeReview(r9.id, { outcome: 'ASSESSED', opinion: 'Vượt phần còn lại', direction: 'RECOMMEND_OVERRIDE' })
-      .expect(200);
     expect(await h.steps(r9.id, 'SPEND_APPROVAL')).toEqual([
       expect.objectContaining({ state: 'PENDING', assignee_employee_id: h.boss.employeeId }),
     ]);

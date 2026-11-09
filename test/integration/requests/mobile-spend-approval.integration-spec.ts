@@ -27,7 +27,7 @@ interface YearWire {
 
 /**
  * The spending approver decides on the phone (US-16-03): the spend step on a snapshot that is only read, and the need step of a
- * request a head sent for themselves, as two decisions; a step that waits for Finance, overrides, conflicts and screens that went
+ * request a head sent for themselves, as two decisions; a request that is blocked, conflicts and screens that went
  * stale. Routes of the web with a mobile label; real HTTP and PostgreSQL. One queue of both kinds of step does not exist yet
  * (B-02/B-10): `GET /spend-approvals` lists spend steps only, which a test below records.
  */
@@ -44,9 +44,8 @@ describe('the spending approver decides on the phone (US-16-03, integration)', (
     post(`/access-requests/${id}/spend-approval`, account, body, label);
   const queue = async (account: ApiAccount = h.boss.account) =>
     h.dataOf<{ items: QueueItem[] }>(await get('/spend-approvals', account, { pageSize: 100 }).expect(200)).items;
-  const years = async (id: string) =>
-    h.dataOf<{ items: YearWire[] }>(await get(`/access-requests/${id}/budget-check/years`, h.boss.account).expect(200))
-      .items;
+  const years = async (id: string, account: ApiAccount = h.boss.account) =>
+    h.dataOf<{ items: YearWire[] }>(await get(`/access-requests/${id}/budget-check/years`, account).expect(200)).items;
   const unit = async (): Promise<Unit> => {
     counter += 1;
 
@@ -117,7 +116,8 @@ describe('the spending approver decides on the phone (US-16-03, integration)', (
         budget: { amount: String(100 * M) },
         spent: { amount: String(40 * M) },
         held: { amount: String(20 * M) },
-        remaining: { amount: String(40 * M) },
+        // What is left counts what the others that wait cost (BR-MF1-06e): 100 - 40 - 20 - 15.
+        remaining: { amount: String(25 * M) },
         pending: { amount: String(15 * M) },
       });
       // There is no field of the decision for a figure: a snapshot cannot be changed from the phone.
@@ -169,53 +169,37 @@ describe('the spending approver decides on the phone (US-16-03, integration)', (
         expect.objectContaining({ by: 'SPEND', reason: 'Not this quarter' }),
       ]);
     });
-
-    it('decides a step while the question to Finance has no answer yet (AC-2)', async () => {
-      const u = await example();
-      const r1 = await h.waitingForApprover(u, plan, { amount: 10 * M });
-      await h.askFinance(r1, { question: 'Is the renewal of next year planned?' }, h.boss.account).expect(201);
-
-      await spend(r1, { decision: 'APPROVE' }).expect(200);
-
-      expect(await commitments(r1)).toEqual([{ state: 'HELD' }]);
-    });
   });
 
-  describe('a request that waits for Finance, an override, no budget (AC-2)', () => {
-    it('has no spend step on the phone while Finance reviews it; afterwards it still cannot be approved past the budget, and takes no override (QĐ-97c)', async () => {
+  describe('a request that is blocked, no override, no budget (AC-2, BR-MF1-06g)', () => {
+    it('BR-MF1-06g: has no spend step on the phone while it is blocked in the queue of its head, and takes no override (QĐ-97c)', async () => {
       const u = await example();
       const big = await h.paidRequest(u, plan, { amount: 45 * M });
       await h.sendOn([big], u.head.account).expect(201);
-      expect(await h.state(big)).toBe('AWAITING_FINANCE_REVIEW');
+      expect(await h.state(big)).toBe('AWAITING_SPEND_SUBMISSION');
 
       expect((await queue()).map((row) => row.requestId)).not.toContain(big);
       await get(`/access-requests/${big}/spend-approval`, h.boss.account).expect(404);
       const early = await spend(big, { decision: 'APPROVE' }).expect(409);
-      expect(h.codeOf(early)).toBe('SPEND.NO_SPEND_STEP');
-
-      await h
-        .completeReview(big, { outcome: 'ASSESSED', opinion: 'Over by 5 million', direction: 'RECOMMEND_OVERRIDE' })
-        .expect(200);
-      const bare = await spend(big, { decision: 'APPROVE' }).expect(422);
       const withOverride = await spend(big, {
         decision: 'APPROVE',
         override: { reason: 'Revision next month', years: [h.year] },
       }).expect(422);
 
-      expect([h.codeOf(bare), h.codeOf(withOverride)]).toEqual(['SPEND.OVERRIDE_REQUIRED', 'VALIDATION_ERROR']);
-      expect(h.detailsOf(bare)).toMatchObject({ years: [h.year] });
+      expect([h.codeOf(early), h.codeOf(withOverride)]).toEqual(['SPEND.NO_SPEND_STEP', 'VALIDATION_ERROR']);
       expect(await commitments(big)).toEqual([]);
     });
 
-    it('says a Cost Center has no budget, not that it has nothing left (AC-2)', async () => {
+    it('BR-MF1-06g(3)(ii): says a Cost Center has no approved budget, not that it has nothing left (AC-2)', async () => {
       const u = await unit();
       const id = await h.paidRequest(u, plan, { amount: 30 * M });
       await h.sendOn([id], u.head.account).expect(201);
-      await h
-        .completeReview(id, { outcome: 'ASSESSED', opinion: 'No budget yet', direction: 'RECOMMEND_OVERRIDE' })
-        .expect(200);
 
-      expect((await years(id))[0]).toMatchObject({ code: 'NO_ACTIVE_BUDGET', budget: null, remaining: null });
+      expect((await years(id, h.finance))[0]).toMatchObject({
+        code: 'NO_ACTIVE_BUDGET',
+        budget: null,
+        remaining: null,
+      });
     });
   });
 

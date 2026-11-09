@@ -171,8 +171,8 @@ describe('the mobile channel signs in, keeps its session and reads its roles exa
       // An operation the mobile app does not offer is still answered by role alone, whatever the client says it is.
       for (const [, label] of CHANNELS) {
         await get('/api/v1/provisioning-tasks', h.it1.accessToken, label).expect(200);
-        await get('/api/v1/finance-reviews', h.it1.accessToken, label).expect(403);
-        await get('/api/v1/finance-reviews', h.finance.accessToken, label).expect(200);
+        await get('/api/v1/spend-batches', h.it1.accessToken, label).expect(403);
+        await get('/api/v1/spend-batches', h.finance.accessToken, label).expect(200);
       }
     });
   });
@@ -364,7 +364,7 @@ describe('the mobile channel signs in, keeps its session and reads its roles exa
     // Role-gated operations, one per role, read from the guard of each route: what each kind of account may open.
     const GATED: [string, string, string][] = [
       ['IT_ADMIN', 'GET', '/api/v1/provisioning-tasks'],
-      ['FINANCE', 'GET', '/api/v1/finance-reviews'],
+      ['FINANCE', 'GET', '/api/v1/spend-batches'],
       ['MANAGER', 'GET', '/api/v1/spend-queue'],
       ['SUPER_ADMIN', 'GET', '/api/v1/app-users'],
     ];

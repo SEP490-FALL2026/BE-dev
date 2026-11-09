@@ -124,6 +124,16 @@ describe('what the database refuses about reminders, incidents and the clock of 
       expect(await sqlState(insertRecipient, [reminderId, unit.head.employeeId, 'HOLDER'])).toBeNull();
       expect(await sqlState(insertRecipient, [reminderId, unit.head.employeeId, 'SUPERIOR'])).toBe(UNIQUE);
     });
+
+    it('QĐ-100j: takes the requester as a recipient of a reminder, beside the holder', async () => {
+      const { id } = await held();
+      const reminderId = randomUUID();
+      await h.ctx.sql.query(insertReminder, reminderValues(id, { id: reminderId }));
+      const insertRecipient = `INSERT INTO step_sla_reminder_recipients (reminder_id, employee_id, role) VALUES ($1, $2, $3::"SlaReminderRole")`;
+
+      expect(await sqlState(insertRecipient, [reminderId, unit.head.employeeId, 'HOLDER'])).toBeNull();
+      expect(await sqlState(insertRecipient, [reminderId, unit.member.employeeId, 'REQUESTER'])).toBeNull();
+    });
   });
 
   describe('the incidents', () => {
@@ -188,7 +198,8 @@ describe('what the database refuses about reminders, incidents and the clock of 
       expect(await queuedAt(id)).toEqual(first);
 
       // Leaving does not clear it: the wait of a request that went on can still be measured.
-      await setState(id, 'AWAITING_FINANCE_REVIEW');
+      // (Left for the step of the approver: the state of waiting for Finance is retired, QĐ-97c.)
+      await setState(id, 'AWAITING_SPEND_DECISION');
       expect(await queuedAt(id)).toEqual(first);
 
       // Entering again starts a new wait.

@@ -165,18 +165,12 @@ describe('the requester withdraws a request that is still waiting over PostgreSQ
       expect(await h.state(sent.id)).toBe('WITHDRAWN');
     });
 
-    it('closes the question to Finance that waits for an answer, and the spend step with it (AC-2)', async () => {
+    it('closes the spend step with the withdrawal (AC-2; the question to Finance is retired, QĐ-97c)', async () => {
       const u = await example();
       const id = await h.waitingForApprover(u, plan, { amount: 15 * M });
-      await h.askFinance(id, { question: 'Is there room in the budget?' }, h.boss.account).expect(201);
 
       await h.withdrawRequest(id, {}, u.member.account).expect(200);
 
-      const question = await h.ctx.sql.query<{ state: string; close_reason: string }>(
-        `SELECT state::text, close_reason::text FROM budget_information_requests WHERE request_id = $1`,
-        [id],
-      );
-      expect(question.rows).toEqual([{ state: 'CLOSED', close_reason: 'REQUEST_WITHDRAWN' }]);
       expect((await stepStates(id)).filter((step) => step.state === 'PENDING' || step.state === 'WAITING')).toEqual([]);
       expect((await stepStates(id)).find((step) => step.kind === 'SPEND_APPROVAL')?.state).toBe('CLOSED');
     });

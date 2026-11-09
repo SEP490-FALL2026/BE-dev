@@ -332,71 +332,8 @@ describe('steps that wait under control, over PostgreSQL (US-05-11)', () => {
     });
   });
 
-  describe('nobody holds the role of Finance (AC-9)', () => {
-    it('makes the review wait for Finance without opening a spend step, leaves a request that needs no review alone, and gives the review to Finance once the role is granted and the account can act', async () => {
-      const exceptional = await unitWithBudget({ held: 20 * M, spent: 40 * M });
-      const ordinary = await unitWithBudget();
-      const r4 = await h.paidRequest(exceptional, paid, { amount: 45 * M });
-      const r6 = await h.paidRequest(ordinary, paid, { amount: 5 * M });
-      n += 1;
-      const first = await h.staff(await h.departmentWithUnit(`P-F${n}`), `FIN-A${n}`);
-      const second = await h.staff(await h.departmentWithUnit(`P-F${n + 1000}`), `FIN-B${n}`);
-      await h.changeRoleOf(h.finance.appUserId, 'EMPLOYEE').expect(200);
-      try {
-        await h.route(r4, exceptional.head.account);
-        await h.route(r6, ordinary.head.account);
-
-        const review = await h.stepOf(r4, 'FINANCE_REVIEW');
-        expect(review).toMatchObject({ state: 'WAITING', waiting_reason: 'NO_FINANCE_REVIEWER' });
-        expect(await h.state(r4)).toBe('WAITING_CONTROLLED');
-        expect(
-          (
-            await h.ctx.sql.query(
-              `SELECT 1 FROM access_request_steps WHERE request_id = $1 AND kind = 'SPEND_APPROVAL'`,
-              [r4],
-            )
-          ).rowCount,
-        ).toBe(0);
-        expect(await h.stepOf(r6, 'SPEND_APPROVAL')).toMatchObject({
-          state: 'PENDING',
-          assignee_employee_id: h.boss.employeeId,
-        });
-        await h.sweep();
-        expect((await h.audit('ACCESS_REQUEST.STEP_WAIT_ALERTED', review.id))[0].after).toMatchObject({
-          configurationHint: 'GRANT_FINANCE_ROLE',
-          notify: 'SUPER_ADMIN',
-        });
-
-        // The role is granted to an account that has not been activated yet: the review keeps waiting.
-        await h.ctx.sql.query(`UPDATE app_users SET activation_state = 'INVITED' WHERE id = $1`, [
-          first.account.appUserId,
-        ]);
-        await h.changeRoleOf(first.account.appUserId, 'FINANCE').expect(200);
-        expect(await h.stepOf(r4, 'FINANCE_REVIEW')).toMatchObject({ state: 'WAITING', assignee_employee_id: null });
-
-        // The account is activated: the sweep gives it, since no change of the role announces an activation.
-        await h.ctx.sql.query(`UPDATE app_users SET activation_state = 'ACTIVATED' WHERE id = $1`, [
-          first.account.appUserId,
-        ]);
-        await h.sweep();
-        expect(await h.stepOf(r4, 'FINANCE_REVIEW')).toMatchObject({
-          state: 'PENDING',
-          assignee_employee_id: first.employeeId,
-          waiting_reason: null,
-          waiting_since: null,
-        });
-        expect(await h.state(r4)).toBe('AWAITING_FINANCE_REVIEW');
-
-        // The review that is held is not taken from Finance when the role changes person.
-        await h.changeRoleOf(first.account.appUserId, 'EMPLOYEE').expect(200);
-        await h.changeRoleOf(second.account.appUserId, 'FINANCE').expect(200);
-        expect(await h.stepOf(r4, 'FINANCE_REVIEW')).toMatchObject({ assignee_employee_id: first.employeeId });
-      } finally {
-        await h.changeRoleOf(second.account.appUserId, 'EMPLOYEE');
-        await h.changeRoleOf(h.finance.appUserId, 'FINANCE');
-      }
-    });
-  });
+  // Removed: "nobody holds the role of Finance (AC-9)". Finance has no review step any more (QĐ-97c); what waits under control is the
+  // need step (no head), the spend step (no spending approver) and the assessment (no IT Admin in charge), each proved above.
 
   describe('the queue (API)', () => {
     it('lists the steps that wait, the longest first, with a stable order, in pages that add up, and shows no amount', async () => {

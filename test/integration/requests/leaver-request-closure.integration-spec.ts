@@ -389,7 +389,7 @@ describe('the requests and grants of a person who left (integration, real Postgr
       });
     });
 
-    it('takes the request out of the batch it was sent in and closes its question to Finance, and no other request changes', async () => {
+    it('takes the request out of the batch it was sent in, and no other request changes', async () => {
       const u = await example();
       const mate = await h.worker(u.department, `LR-M${(n += 1)}`);
       const second = await h.sent(u.leaver, plan, { termMonths: 1 });
@@ -399,7 +399,6 @@ describe('the requests and grants of a person who left (integration, real Postgr
       await h.decide(third.id, { decision: 'APPROVE' }, u.head.account).expect(200);
       await h.setPayments(third.id, { amount: 5 * M });
       await h.sendOn([second.id, third.id], u.head.account).expect(201);
-      await h.askFinance(second.id, { question: 'Is there room in the budget?' }, h.boss.account).expect(201);
       await left(u.leaver);
 
       await h.cancelForDeparture(second.id).expect(200);
@@ -412,11 +411,6 @@ describe('the requests and grants of a person who left (integration, real Postgr
         { request_id: second.id, left_reason: 'REQUEST_CANCELLED' },
         { request_id: third.id, left_reason: null },
       ]);
-      const question = await h.ctx.sql.query<{ state: string; close_reason: string }>(
-        `SELECT state::text, close_reason::text FROM budget_information_requests WHERE request_id = $1`,
-        [second.id],
-      );
-      expect(question.rows).toEqual([{ state: 'CLOSED', close_reason: 'REQUEST_CANCELLED' }]);
       expect(await h.state(third.id)).toBe('AWAITING_SPEND_DECISION');
       expect((await stepStates(third.id)).find((step) => step.kind === 'SPEND_APPROVAL')?.state).toBe('PENDING');
     });
