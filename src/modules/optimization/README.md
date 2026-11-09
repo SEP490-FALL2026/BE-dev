@@ -8,7 +8,8 @@ operating-parameters, notifications, audit. Được dùng bởi: `dashboards` (
 
 ## Public API
 
-- `OptimizationApi` (`public/optimization.api.ts`): `getSummary()` — số khuyến nghị chưa đóng của bốn nhóm và `counted` (`G2` chưa đóng + `G1` mở) cho section
+- `OptimizationApi` (`public/optimization.api.ts`): `departmentCounts(organizationId, departmentId)` — số khuyến nghị đang chờ trưởng phòng quyết (`AWAITING_DECISION` +
+  `RETURNED_TO_HEAD`) cho section `ghostSeats` của dashboard trưởng phòng (`counted`, `ghostSeatQueueList`); `getSummary()` — số khuyến nghị chưa đóng của bốn nhóm và `counted` (`G2` chưa đóng + `G1` mở) cho section
   `ghostSeats` của dashboard IT Admin (`dashboards` → `optimization`).
 
 ## Bảng sở hữu
@@ -31,10 +32,25 @@ operating-parameters, notifications, audit. Được dùng bởi: `dashboards` (
   `ABRUPT_DEPARTURE`, không `timing`/`notice`), `ghostSeatRuleRunList` + `ghostSeatRuleSkipList` (lượt chạy và lý do bỏ qua, phân trang), `ghostSeatKpi5Get`
   (SUPER_ADMIN). Quyền: IT_ADMIN cho bảng/chi tiết/tóm tắt/thu hồi; IT_ADMIN và SUPER_ADMIN cho lượt chạy; SUPER_ADMIN cho `KPI-5`.
 
+- `decision/` (L3, không import `board`; dùng `ghost-seat` L0) — hàng đợi trưởng phòng cho `G3`/`G4` (`qd103-ghost-seat-manager-decision`):
+  `decision-routing.service.ts` (định tuyến `OPEN` REVIEW/ACTION tới trưởng phòng có hiệu lực của phòng người giữ, chờ trưởng phòng, mất/có trưởng phòng),
+  `decision-transfer.service.ts` (tạm dừng/tiếp tục khi điều chuyển), `decision-reminder.service.ts` (quá hạn, miễn trừ sắp hết),
+  `decision-follow-up.service.ts` + `decision-follow-up.job.ts` (`DecisionFollowUpSweeper`, mỗi giờ), `decision.service.ts` (Giữ / Thu hồi / Miễn trừ,
+  hàng loạt tất cả-hoặc-không), `decision-reclaim.service.ts` (`LicensingApi.openRevocation` với `timing.notBefore` + `notice.holder`),
+  `decision-return.service.ts` (IT trả lại một lần), `decision-queue.service.ts` (hàng đợi, báo cáo quyết định, miễn trừ), `decision.policy.ts`,
+  `decision-routing.policy.ts`. HTTP: `ghostSeatQueueList` (MANAGER), `ghostSeatDecisionCreate` (MANAGER), `ghostSeatRecommendationReturn` (IT_ADMIN),
+  `ghostSeatDecisionList` (SUPER_ADMIN), `ghostSeatExemptionList` (MANAGER phòng mình, IT_ADMIN đọc); `ghostSeatRecommendationGet` mở cho MANAGER là người quyết;
+  `ghostSeatRecommendationReclaim` mở lại `G3`/`G4` `RECLAIM_DECIDED` sau đóng thất bại (Q-95). SQL quyết định/trả lại/miễn trừ ở
+  `ghost-seat/ghost-seat-decision.repo.ts` (L0, dùng chung `board` và `decision`).
+
 ## Trạng thái và quyền
 
-`OPEN → RECLAIM_DECIDED → CLOSED` (`PAUSED` dành cho `G3`/`G4`); đóng kèm lý do `ACCEPTED`, `SUPERSEDED`, `SEAT_ENDED`, `FREE_SEATS_GONE`,
-`OUT_OF_SCOPE` (`KEPT`, `NEGATED`, `TRANSFER_SEAT_REVOKED` của hạng mục sau). `G1` không có mức; `G2` luôn `ACTION`. Không có gì tự thu hồi
+`OPEN → RECLAIM_DECIDED → CLOSED` cho `G1`/`G2`. `G3`/`G4`: `OPEN` → (REVIEW/ACTION) `AWAITING_DECISION` (hoặc `WAITING_FOR_HEAD` khi phòng không có
+trưởng phòng; `decision_due_on` vẫn tính, không đặt lại) → trưởng phòng chọn: **Giữ** `KEPT`, **Miễn trừ** `EXEMPTED` (≤ 12 tháng, ghi `ghost_seat_exemptions`),
+**Thu hồi** `RECLAIM_DECIDED` (`SBF-18`, ân hạn `GHOST_SEAT_REVOCATION_GRACE_DAYS` ngày lịch → `provisioning_tasks.not_before`; quyền hết hạn ≤ 1 tháng ⟹ đóng
+`LEFT_TO_EXPIRE`, không tác vụ). IT trả lại tối đa một lần: `RECLAIM_DECIDED → RETURNED_TO_HEAD` (hạn mới từ hôm nay). Người giữ có điều chuyển đã hiệu lực chưa đóng
+⟹ `PAUSED` (`paused_at`, `pause_transfer_id`; `RECLAIM_DECIDED` không tạm dừng); điều chuyển đóng ⟹ `TRANSFER_SEAT_REVOKED` / hàng trưởng phòng hiện tại / `MONITOR`
+về `OPEN`. Đóng kèm lý do `ACCEPTED`, `SUPERSEDED`, `SEAT_ENDED`, `FREE_SEATS_GONE`, `OUT_OF_SCOPE`, `KEPT`, `EXEMPTED`, `LEFT_TO_EXPIRE`, `TRANSFER_SEAT_REVOKED` (`NEGATED` của g3-g4). `G1` không có mức; `G2` luôn `ACTION`. Không có gì tự thu hồi
 (`SoD-6`): chỉ IT Admin mở thu hồi `G2`, luôn qua `LicensingApi.openRevocation`.
 
 ## Job
@@ -42,9 +58,13 @@ operating-parameters, notifications, audit. Được dùng bởi: `dashboards` (
 `InternalRulesSweeper` chạy trong tiến trình API: lần đầu sau 5 phút, rồi mỗi 60 phút; khóa kỳ theo `RULE_SCHEDULE_G1_G2` nên chạy một lần cho
 mỗi kỳ dù có nhiều instance. Chạy tay: `InternalRulesService.run(now)`.
 
+`DecisionFollowUpSweeper` (mỗi giờ, lần đầu sau 6 phút): tạm dừng/tiếp tục theo điều chuyển → định tuyến → theo dõi trưởng phòng → thông báo quá hạn (ngày làm việc,
+một lần cho trưởng phòng + IT Admin phụ trách) → nhắc miễn trừ ≤ 7 ngày (một lần) và đánh dấu `ended_at` miễn trừ đã qua. Chạy tay: `DecisionFollowUpService.run(now)`.
+`GHOST_SEAT_NEW`/`GHOST_SEAT_ACTION_TIER` gộp theo tuần ISO cho mỗi người nhận (`eventKey` có `YYYY-Www`).
+
 ## Thứ tự khóa
 
-Service của module khóa khuyến nghị (`FOR UPDATE`) **trước** rồi mới gọi licensing. Listener kết cục chạy trong transaction của licensing (đã
+Service của module khóa khuyến nghị (`FOR UPDATE`; hàng loạt thì `lockMany` theo `id` tăng dần, khử trùng) **trước** rồi mới gọi licensing; job dùng `FOR UPDATE SKIP LOCKED`. Listener kết cục chạy trong transaction của licensing (đã
 khóa tác vụ) nên chọn khuyến nghị `FOR UPDATE SKIP LOCKED`; khuyến nghị bị khóa thì bỏ qua và lượt ngày đối soát từ trạng thái tác vụ.
 
 ## Extension point
@@ -58,7 +78,13 @@ Kho `K4` chưa hỗ trợ (không sinh `G1`); không điểm điều chỉnh và
 việc), `holder_left_on` là ngày lượt chạy phát hiện; thông báo `GHOST_SEAT_G2_DETECTED` mang `recommendationId`, `employeeId`, `applicationId` (quy tắc của hộp thư:
 chỉ gọi người bằng id); enum khai sớm `G3`/`G4`, `PAUSED`, `KEPT`/`NEGATED`/`TRANSFER_SEAT_REVOKED` để luật thay thế `G2` và `KPI-5` chạy được trên DB thật.
 
+## TẠM CHỌN của `qd103-ghost-seat-manager-decision`
+
+Xem mục Verification trong [plan](../../../docs/workspace/items/qd103-ghost-seat-manager-decision/plan.md). Tóm tắt: `paused_at`/`pause_transfer_id` và `ghost_seat_exemptions`
+tạo ở đây (thuộc g3-g4); `PersonnelApi.getTransfersInOverlap`/`getTransfersByIds` thêm tối thiểu; hàng đợi là danh sách phẳng sắp theo người giữ (`holderCount`);
+chưa đăng ký `RevocationDecisionContributions` (W5 chưa có).
+
 ## Chưa làm
 
-`G3`/`G4` và cổng 2–7 (`qd103-ghost-seat-g3-g4`), hàng đợi trưởng phòng (`qd103-ghost-seat-manager-decision`), kho `K4` (chờ key pool), điểm điều
+`G3`/`G4` và cổng 2–7 (`qd103-ghost-seat-g3-g4`), kho `K4` (chờ key pool), điểm điều
 chỉnh (`nextAdjustmentPoint`), `notBefore` của tác vụ (chờ `qd103-revocation-grace-notice`).

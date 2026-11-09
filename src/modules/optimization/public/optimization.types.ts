@@ -6,3 +6,8 @@ export interface OptimizationSummary {
   /** What is not covered yet: internal software has no usage source, so `G2` to `G4` are not recognised for it. */
   limitation: string;
 }
+
+/** The recommendations about the seats of one department that wait for its head to decide. */
+export interface DepartmentGhostSeatCounts {
+  queued: number;
+}
