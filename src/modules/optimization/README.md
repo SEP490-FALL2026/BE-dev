@@ -8,7 +8,8 @@ operating-parameters, notifications, audit. Được dùng bởi: `dashboards` (
 
 ## Public API
 
-- `OptimizationApi` (`public/optimization.api.ts`): tóm tắt số khuyến nghị chưa đóng cho dashboard IT Admin.
+- `OptimizationApi` (`public/optimization.api.ts`): `getSummary()` — số khuyến nghị chưa đóng của bốn nhóm và `counted` (`G2` chưa đóng + `G1` mở) cho section
+  `ghostSeats` của dashboard IT Admin (`dashboards` → `optimization`).
 
 ## Bảng sở hữu
 
@@ -25,7 +26,10 @@ operating-parameters, notifications, audit. Được dùng bởi: `dashboards` (
   (`RULE_SCHEDULE_G1_G2`), lý do bỏ qua (`rule-run-skip-detail.json.ts`).
 - `internal-rules/` — `G1` (`internal-rules-g1.service.ts`), `G2` + dọn (`internal-rules-g2.service.ts`), luật thuần (`internal-rules.policy.ts`),
   điểm vào của lượt (`internal-rules.service.ts`), job (`internal-rules.job.ts`, `InternalRulesSweeper`).
-- `board/` — bảng tối ưu IT, chi tiết, tóm tắt, thu hồi `G2`, danh sách lượt chạy, `KPI-5`.
+- `board/` — HTTP: `ghostSeatRecommendationList`/`Get` (bảng, lọc `group`/`tier`/`state`/`applicationId`/`departmentScope MINE|ALL`), `ghostSeatOptimizationSummaryGet`
+  (bốn nhóm tách riêng + `limitation` phần mềm nội bộ), `ghostSeatRecommendationReclaim` (mở thu hồi `G2` qua `LicensingApi.openRevocation`, nguồn
+  `ABRUPT_DEPARTURE`, không `timing`/`notice`), `ghostSeatRuleRunList` + `ghostSeatRuleSkipList` (lượt chạy và lý do bỏ qua, phân trang), `ghostSeatKpi5Get`
+  (SUPER_ADMIN). Quyền: IT_ADMIN cho bảng/chi tiết/tóm tắt/thu hồi; IT_ADMIN và SUPER_ADMIN cho lượt chạy; SUPER_ADMIN cho `KPI-5`.
 
 ## Trạng thái và quyền
 
@@ -47,6 +51,12 @@ khóa tác vụ) nên chọn khuyến nghị `FOR UPDATE SKIP LOCKED`; khuyến 
 
 - Đăng ký vào `licensing.revocation` (`RevocationListeners`) — `ghost-seat/ghost-seat-revocation.listener.ts`: chỉ xử lý `AFTER_WORK` có tác vụ
   `COMPLETED` và `CLOSED_FAILED`.
+
+## TẠM CHỌN của module (chờ Owner / hạng mục sau)
+
+Kho `K4` chưa hỗ trợ (không sinh `G1`); không điểm điều chỉnh và không `nextAdjustmentPoint`; `leftOn` trong bằng chứng `G2` là `null` (chưa có facade ngày nghỉ
+việc), `holder_left_on` là ngày lượt chạy phát hiện; thông báo `GHOST_SEAT_G2_DETECTED` mang `recommendationId`, `employeeId`, `applicationId` (quy tắc của hộp thư:
+chỉ gọi người bằng id); enum khai sớm `G3`/`G4`, `PAUSED`, `KEPT`/`NEGATED`/`TRANSFER_SEAT_REVOKED` để luật thay thế `G2` và `KPI-5` chạy được trên DB thật.
 
 ## Chưa làm
 

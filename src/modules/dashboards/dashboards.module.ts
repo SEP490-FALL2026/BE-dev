@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { IdentityAccessFacadeModule } from '../identity-access/identity-access-facade.module';
 import { LicensingModule } from '../licensing/licensing.module';
 import { OrganizationModule } from '../organization/organization.module';
+import { OptimizationModule } from '../optimization/optimization.module';
 import { PersonnelModule } from '../personnel/personnel.module';
 import { RequestsModule } from '../requests/requests.module';
 import { EmployeeDashboardController } from './employee/employee-dashboard.controller';
@@ -19,7 +20,14 @@ import { SuperAdminDashboardService } from './super-admin/super-admin-dashboard.
  * its data has no source yet. Only the API mounts it.
  */
 @Module({
-  imports: [OrganizationModule, IdentityAccessFacadeModule, LicensingModule, PersonnelModule, RequestsModule],
+  imports: [
+    OrganizationModule,
+    IdentityAccessFacadeModule,
+    LicensingModule,
+    OptimizationModule,
+    PersonnelModule,
+    RequestsModule,
+  ],
   controllers: [
     EmployeeDashboardController,
     ManagerDashboardController,

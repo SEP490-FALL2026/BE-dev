@@ -119,6 +119,7 @@ export const PARAM_KEYS_BY_CODE: Readonly<Record<InAppNotificationCode, readonly
     'dueOn',
   ],
   LEAVER_K1_ACCESS_RUNS_ON: ['taskId', 'assignmentId', 'employeeId', 'planId', 'accessUntil'],
+  GHOST_SEAT_G2_DETECTED: ['recommendationId', 'employeeId', 'applicationId'],
   // The renewal of a subscription: ids, the milestone and where it comes from, the choice and when it is carried out. The
   // usage of the seats is only said to be available or not; no figure of money, no person but the recipient.
   SUBSCRIPTION_RENEWAL_ALERT: [

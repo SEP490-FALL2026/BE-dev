@@ -160,56 +160,32 @@ export class RuleRunRepo {
     return { items: rows.map(toRun), total };
   }
 
-  /**
-   * The first `take` reasons kept for each of these runs and how many each has, in two statements however many runs there are: the
-   * window numbers the reasons of each run in the order they were kept (`created_at`, `id`).
-   */
-  async skipsOfRuns(
-    runIds: readonly string[],
-    take: number,
+  /** One page of the reasons kept for a run, in the order they were kept, with how many there are. */
+  async skipsPage(
+    runId: string,
+    page: { skip: number; take: number },
     tx?: DbTx,
-  ): Promise<Map<string, { items: RuleSkipRecord[]; total: number }>> {
-    const result = new Map<string, { items: RuleSkipRecord[]; total: number }>(
-      runIds.map((id) => [id, { items: [], total: 0 }]),
-    );
-    if (runIds.length === 0) return result;
+  ): Promise<{ items: RuleSkipRecord[]; total: number }> {
     const db = tx ?? this.prisma;
-    const rows = await db.$queryRaw<
-      {
-        id: string;
-        run_id: string;
-        subject_type: SkipSubject;
-        subject_id: string;
-        gate: SkipGate;
-        detail: unknown;
-        created_at: Date;
-      }[]
-    >`
-      SELECT id, run_id, subject_type, subject_id, gate, detail, created_at FROM (
-        SELECT s.*, row_number() OVER (PARTITION BY s."run_id" ORDER BY s."created_at", s."id") AS position
-          FROM "ghost_seat_rule_skips" s WHERE s."run_id" = ANY(${[...runIds]}::uuid[])
-      ) ranked WHERE position <= ${take} ORDER BY created_at, id`;
-    for (const row of rows) {
-      result.get(row.run_id)?.items.push({
+    const rows = await db.ghostSeatRuleSkip.findMany({
+      where: { runId },
+      orderBy: [{ createdAt: 'asc' }, { id: 'asc' }],
+      skip: page.skip,
+      take: page.take,
+    });
+    const total = await db.ghostSeatRuleSkip.count({ where: { runId } });
+
+    return {
+      items: rows.map((row) => ({
         id: row.id,
-        subjectType: row.subject_type,
-        subjectId: row.subject_id,
+        subjectType: row.subjectType,
+        subjectId: row.subjectId,
         gate: row.gate,
         detail: ruleSkipDetailJson.decode(row.detail),
-        createdAt: row.created_at,
-      });
-    }
-    const counts = await db.ghostSeatRuleSkip.groupBy({
-      by: ['runId'],
-      where: { runId: { in: [...runIds] } },
-      _count: { _all: true },
-    });
-    for (const count of counts) {
-      const entry = result.get(count.runId);
-      if (entry) entry.total = count._count._all;
-    }
-
-    return result;
+        createdAt: row.createdAt,
+      })),
+      total,
+    };
   }
 
   async find(runId: string, organizationId: string, tx?: DbTx): Promise<RuleRunRecord | null> {

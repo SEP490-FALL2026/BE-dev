@@ -120,6 +120,8 @@ export const IN_APP_NOTIFICATION_CODES = [
   'SERVICE_ACCOUNT_RESPONSIBLE_DUE',
   'SERVICE_ACCOUNT_RESPONSIBLE_OVERDUE',
   'LEAVER_K1_ACCESS_RUNS_ON',
+  // A seat still held by a person who left (`G2`, `US-10-01` AC-2): told once to the IT Admin in charge.
+  'GHOST_SEAT_G2_DETECTED',
   // The renewal of a subscription (EP-11): the milestones, the quality of the contract data, the case and its deadline.
   'SUBSCRIPTION_RENEWAL_ALERT',
   'SUBSCRIPTION_RENEWAL_DATA_QUALITY',

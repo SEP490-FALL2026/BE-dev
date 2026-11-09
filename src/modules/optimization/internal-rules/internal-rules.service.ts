@@ -5,6 +5,7 @@ import { RuleRunService } from '../rule-run/rule-run.service';
 import type { RuleRunRecord } from '../rule-run/rule-run.repo';
 import { periodKeyOf, scheduleOf } from '../rule-run/rule-run.policy';
 import { InternalRulesG1Service } from './internal-rules-g1.service';
+import { InternalRulesG2Service } from './internal-rules-g2.service';
 
 /** The parameter that says how often `G1` and `G2` run (`FR-4.12b`). */
 export const RULE_SCHEDULE_PARAMETER = 'RULE_SCHEDULE_G1_G2';
@@ -21,6 +22,7 @@ export class InternalRulesService {
     private readonly parameters: OperatingParametersApi,
     private readonly runs: RuleRunService,
     private readonly g1: InternalRulesG1Service,
+    private readonly g2: InternalRulesG2Service,
   ) {}
 
   /** The run of the period `now` falls in, or null when there is nothing to run (no organization yet, or the period is taken). */
@@ -33,6 +35,7 @@ export class InternalRulesService {
     return this.runs.execute(organization.id, 'G1_G2', periodKeyOf(schedule, today), now, async (tally) => {
       const pass = { organizationId: organization.id, today, now, tally };
       await this.g1.pass(pass);
+      await this.g2.pass(pass);
     });
   }
 }

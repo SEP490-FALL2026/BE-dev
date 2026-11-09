@@ -3,6 +3,7 @@ import type { BusinessDate } from '../../../core/business-date';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
 import { LicensingDashboardApi } from '../../licensing/public/licensing-dashboard.api';
+import { OptimizationApi } from '../../optimization/public/optimization.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { PersonnelDashboardApi } from '../../personnel/public/personnel-dashboard.api';
 import {
@@ -26,6 +27,7 @@ export interface ItAdminDashboard {
     offboardingHandovers: DashboardSection;
     unconfirmedDevices: DashboardSection;
     saasIssues: DashboardSection;
+    ghostSeats: DashboardSection;
   };
 }
 
@@ -37,7 +39,7 @@ export interface ItAdminDashboard {
  * subscription and cannot filter by notice deadline: the client keeps the ones whose `noticeDeadline` is near (an open decision, see
  * `a10-it-admin-dashboard`); `subscriptionRenewalList` lists only the cases already proposed, so it is not the source either. The discrepancies
  * between sources (usage data) and the company machines without a confirmation (device registry) have no source yet: each says so and
- * never shows zero.
+ * never shows zero. The recommendations of wasted seats are counted as the `G2` not closed plus the `G1` open of the whole organization (`ghostSeats`).
  */
 @Injectable()
 export class ItAdminDashboardService {
@@ -46,6 +48,7 @@ export class ItAdminDashboardService {
     private readonly identity: IdentityAccessApi,
     private readonly licensing: LicensingDashboardApi,
     private readonly personnel: PersonnelDashboardApi,
+    private readonly optimization: OptimizationApi,
   ) {}
 
   /** Throws DashboardRefusedError for a caller without the IT Admin role. */
@@ -57,6 +60,7 @@ export class ItAdminDashboardService {
     );
     const work = await this.licensing.itAdminFacts(actor.employeeId);
     const handovers = await this.personnel.handingOverCases(departmentIds);
+    const wastedSeats = await this.optimization.getSummary();
 
     return {
       asOf: today,
@@ -72,6 +76,7 @@ export class ItAdminDashboardService {
         offboardingHandovers: counted(handovers, 'offboardingCaseList'),
         unconfirmedDevices: notAvailable('DEVICE_REGISTRY_NOT_DELIVERED'),
         saasIssues: counted(work.openSaasIssues, 'saasIssueList'),
+        ghostSeats: counted(wastedSeats.counted, 'ghostSeatRecommendationList'),
       },
     };
   }

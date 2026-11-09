@@ -20,12 +20,26 @@ describe('ghost seat evidence codec', () => {
   });
 
   it('reads a G2 evidence with and without the end of a K1 access', () => {
-    const base = { group: 'G2', employeeId: EMPLOYEE, leftOn: null, planId: PLAN, provisioningType: 'K1' } as const;
+    const base = {
+      group: 'G2',
+      employeeId: EMPLOYEE,
+      leftOn: null,
+      planId: PLAN,
+      provisioningType: 'K1',
+      terminatingAccess: null,
+    } as const;
 
     expect(ghostSeatEvidenceJson.decode(base)).toEqual(base);
     expect(ghostSeatEvidenceJson.decode({ ...base, terminatingAccess: { until: '2026-11-30' } })).toEqual({
       ...base,
       terminatingAccess: { until: '2026-11-30' },
+    });
+  });
+
+  it('reads the evidence of a G3 or a G4 as an object that names its group (theirs to define)', () => {
+    expect(ghostSeatEvidenceJson.decode({ group: 'G4', lastUsedOn: '2026-08-01' })).toEqual({
+      group: 'G4',
+      lastUsedOn: '2026-08-01',
     });
   });
 

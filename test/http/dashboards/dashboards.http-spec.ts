@@ -80,6 +80,7 @@ const ROUTES: Route[] = [
         offboardingHandovers: COUNTED,
         unconfirmedDevices: MISSING,
         saasIssues: COUNTED,
+        ghostSeats: COUNTED,
       },
     },
   },

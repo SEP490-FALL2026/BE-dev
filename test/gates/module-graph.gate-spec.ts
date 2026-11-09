@@ -90,6 +90,7 @@ const PUBLIC_CONTRACT_EXPORTS: ReadonlySet<string> = new Set([
   'LicensingModule: LicensingHandoverApi',
   'LicensingModule: LicensingGhostSeatApi',
   'LicensingModule: LicensingOpenGrantsApi',
+  'OptimizationModule: OptimizationApi',
   'LicensingModule: LicensingServiceAccountApi',
   'LicensingModule: LicensingSeatBaselineApi',
   // G8 (US-12-15): the counts of licensing the role overviews read.

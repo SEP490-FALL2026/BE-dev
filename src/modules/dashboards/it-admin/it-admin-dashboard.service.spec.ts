@@ -2,6 +2,7 @@ import type { AuthenticatedPrincipal } from '../../../infrastructure/security/to
 import { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
 import { LicensingDashboardApi } from '../../licensing/public/licensing-dashboard.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
+import type { OptimizationApi } from '../../optimization/public/optimization.api';
 import { PersonnelDashboardApi } from '../../personnel/public/personnel-dashboard.api';
 import { DashboardRefusedError } from '../section/dashboard-section.errors';
 import { ItAdminDashboardService } from './it-admin-dashboard.service';
@@ -26,14 +27,16 @@ function serviceWith(scope: string[]) {
     .fn()
     .mockResolvedValue({ openGrantTasks: 3, openRevocationTasks: 1, openSaasIssues: 2, keysInStore: 40 });
   const handingOverCases = jest.fn().mockResolvedValue(5);
+  const getSummary = jest.fn().mockResolvedValue({ counted: 3, groups: [], limitation: '' });
   const service = new ItAdminDashboardService(
     { businessToday: () => Promise.resolve('2026-10-23'), getItAdminScope } as unknown as OrganizationReadApi,
     { findUsableItAdminEmployeeIds } as unknown as IdentityAccessApi,
     { itAdminFacts } as unknown as LicensingDashboardApi,
     { handingOverCases } as unknown as PersonnelDashboardApi,
+    { getSummary } as unknown as OptimizationApi,
   );
 
-  return { service, getItAdminScope, findUsableItAdminEmployeeIds, itAdminFacts, handingOverCases };
+  return { service, getItAdminScope, findUsableItAdminEmployeeIds, itAdminFacts, handingOverCases, getSummary };
 }
 
 describe('ItAdminDashboardService', () => {
@@ -55,6 +58,8 @@ describe('ItAdminDashboardService', () => {
       grantTasks: { state: 'COUNTED', count: 3, sourceOperationId: 'provisioningTaskList' },
       revocationTasks: { state: 'COUNTED', count: 1, sourceOperationId: 'provisioningTaskList' },
       saasIssues: { state: 'COUNTED', count: 2, sourceOperationId: 'saasIssueList' },
+      // `G2` not closed plus `G1` open, from the facade of the recommendations.
+      ghostSeats: { state: 'COUNTED', count: 3, sourceOperationId: 'ghostSeatRecommendationList' },
       licenseKeys: { state: 'COUNTED', count: 40, sourceOperationId: 'licenseKeyList' },
       offboardingHandovers: { state: 'COUNTED', count: 5, sourceOperationId: 'offboardingCaseList' },
       cancellationDeadlines: { state: 'AT_SOURCE', count: null, sourceOperationId: 'subscriptionList' },

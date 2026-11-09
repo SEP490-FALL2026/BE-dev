@@ -151,6 +151,11 @@ describe('the alerts of the rights (a03-license-inbox-alerts, FR-5.14 lines 3, 1
         code: 'LEAVER_K1_ACCESS_RUNS_ON',
         params: { taskId: ID, assignmentId: ID, employeeId: ID, planId: ID, accessUntil: '2026-11-30' },
       }),
+      // A seat still held by a person who left (`G2`): ids only, the interface turns them into names.
+      notice({
+        code: 'GHOST_SEAT_G2_DETECTED',
+        params: { recommendationId: ID, employeeId: ID, applicationId: ID },
+      }),
     ];
     for (const input of accepted)
       expect({ code: input.code, refusal: refuseInAppNotification(input) }).toEqual({

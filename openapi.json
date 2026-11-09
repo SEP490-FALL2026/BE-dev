@@ -80116,6 +80116,1262 @@
         "tags": ["app-users"]
       }
     },
+    "/api/v1/ghost-seat-recommendations": {
+      "get": {
+        "operationId": "ghostSeatRecommendationList",
+        "parameters": [
+          {
+            "name": "group",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string", "enum": ["G1", "G2", "G3", "G4"] }
+          },
+          {
+            "name": "tier",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string", "enum": ["MONITOR", "REVIEW", "ACTION"] }
+          },
+          {
+            "name": "state",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string", "enum": ["OPEN", "PAUSED", "RECLAIM_DECIDED", "CLOSED"] }
+          },
+          {
+            "name": "applicationId",
+            "required": false,
+            "in": "query",
+            "schema": { "format": "uuid", "type": "string" }
+          },
+          {
+            "name": "departmentScope",
+            "required": false,
+            "in": "query",
+            "schema": { "default": "ALL", "type": "string", "enum": ["MINE", "ALL"] }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maximum": 9007199254740991,
+              "exclusiveMinimum": true,
+              "default": 1,
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": { "maximum": 100, "exclusiveMinimum": true, "default": 20, "type": "integer", "minimum": 0 }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "One page of recommendations (G1, G2), newest first, filtered by group, tier, state, application and department scope.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/RecommendationPageResponseDto" },
+                    { "properties": { "message": { "example": "GHOST_SEAT_RECOMMENDATIONS.LISTED" } } }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHENTICATION_REQUIRED": {
+                    "summary": "A Bearer access token is required.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHENTICATION_REQUIRED",
+                        "message": "A Bearer access token is required.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "INVALID_ACCESS_TOKEN": {
+                    "summary": "The access token is invalid.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "INVALID_ACCESS_TOKEN",
+                        "message": "The access token is invalid.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only an IT Admin may do this.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHORIZATION.FORBIDDEN": {
+                    "summary": "You do not have permission to perform this action.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHORIZATION.FORBIDDEN",
+                        "message": "You do not have permission to perform this action.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The query or the id is invalid (VALIDATION_ERROR).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "VALIDATION_ERROR": {
+                    "summary": "Request validation failed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "VALIDATION_ERROR",
+                        "message": "Request validation failed.",
+                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_TOO_MANY_REQUESTS": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_TOO_MANY_REQUESTS",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "TOKEN_VERIFICATION_UNAVAILABLE": {
+                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
+                        "message": "Authentication is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SERVICE_UNAVAILABLE": {
+                    "summary": "The service is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SERVICE_UNAVAILABLE",
+                        "message": "The service is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "bearer": [] }],
+        "summary": "List the recommendations of wasted seats",
+        "tags": ["ghost-seats"]
+      }
+    },
+    "/api/v1/ghost-seat-optimization-summary": {
+      "get": {
+        "operationId": "ghostSeatOptimizationSummaryGet",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "How many recommendations of each group are not closed, how many have a reclaim under way, and the limitation for internal software.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/OptimizationSummaryResponseDto" },
+                    { "properties": { "message": { "example": "GHOST_SEAT_OPTIMIZATION_SUMMARY.READ" } } }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHENTICATION_REQUIRED": {
+                    "summary": "A Bearer access token is required.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHENTICATION_REQUIRED",
+                        "message": "A Bearer access token is required.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "INVALID_ACCESS_TOKEN": {
+                    "summary": "The access token is invalid.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "INVALID_ACCESS_TOKEN",
+                        "message": "The access token is invalid.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only an IT Admin may do this.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHORIZATION.FORBIDDEN": {
+                    "summary": "You do not have permission to perform this action.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHORIZATION.FORBIDDEN",
+                        "message": "You do not have permission to perform this action.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_TOO_MANY_REQUESTS": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_TOO_MANY_REQUESTS",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "TOKEN_VERIFICATION_UNAVAILABLE": {
+                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
+                        "message": "Authentication is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SERVICE_UNAVAILABLE": {
+                    "summary": "The service is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SERVICE_UNAVAILABLE",
+                        "message": "The service is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "bearer": [] }],
+        "summary": "Read the four groups of wasted seats side by side",
+        "tags": ["ghost-seats"]
+      }
+    },
+    "/api/v1/ghost-seat-recommendations/{id}": {
+      "get": {
+        "operationId": "ghostSeatRecommendationGet",
+        "parameters": [
+          { "name": "id", "required": true, "in": "path", "schema": { "format": "uuid", "type": "string" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "The recommendation with the evidence it was made from.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/RecommendationResponseDto" },
+                    { "properties": { "message": { "example": "GHOST_SEAT_RECOMMENDATION.READ" } } }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHENTICATION_REQUIRED": {
+                    "summary": "A Bearer access token is required.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHENTICATION_REQUIRED",
+                        "message": "A Bearer access token is required.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "INVALID_ACCESS_TOKEN": {
+                    "summary": "The access token is invalid.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "INVALID_ACCESS_TOKEN",
+                        "message": "The access token is invalid.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only an IT Admin may do this.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHORIZATION.FORBIDDEN": {
+                    "summary": "You do not have permission to perform this action.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHORIZATION.FORBIDDEN",
+                        "message": "You do not have permission to perform this action.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The recommendation or the run does not exist (GHOST_SEAT.NOT_FOUND).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "GHOST_SEAT.NOT_FOUND": {
+                    "summary": "The recommendation or the run does not exist.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "GHOST_SEAT.NOT_FOUND",
+                        "message": "The recommendation or the run does not exist.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The query or the id is invalid (VALIDATION_ERROR).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "VALIDATION_ERROR": {
+                    "summary": "Request validation failed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "VALIDATION_ERROR",
+                        "message": "Request validation failed.",
+                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_TOO_MANY_REQUESTS": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_TOO_MANY_REQUESTS",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "TOKEN_VERIFICATION_UNAVAILABLE": {
+                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
+                        "message": "Authentication is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SERVICE_UNAVAILABLE": {
+                    "summary": "The service is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SERVICE_UNAVAILABLE",
+                        "message": "The service is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "bearer": [] }],
+        "summary": "Read one recommendation of wasted seats",
+        "tags": ["ghost-seats"]
+      }
+    },
+    "/api/v1/ghost-seat-recommendations/{id}/reclaim": {
+      "post": {
+        "operationId": "ghostSeatRecommendationReclaim",
+        "parameters": [
+          { "name": "id", "required": true, "in": "path", "schema": { "format": "uuid", "type": "string" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "The revocation task was opened through the gate of licensing and the recommendation holds it; the seat is given back only when the task is completed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/ReclaimResponseDto" },
+                    { "properties": { "message": { "example": "GHOST_SEAT_RECOMMENDATION.RECLAIM_OPENED" } } }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHENTICATION_REQUIRED": {
+                    "summary": "A Bearer access token is required.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHENTICATION_REQUIRED",
+                        "message": "A Bearer access token is required.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "INVALID_ACCESS_TOKEN": {
+                    "summary": "The access token is invalid.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "INVALID_ACCESS_TOKEN",
+                        "message": "The access token is invalid.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only an IT Admin may do this.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHORIZATION.FORBIDDEN": {
+                    "summary": "You do not have permission to perform this action.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHORIZATION.FORBIDDEN",
+                        "message": "You do not have permission to perform this action.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The recommendation or the run does not exist (GHOST_SEAT.NOT_FOUND).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "GHOST_SEAT.NOT_FOUND": {
+                    "summary": "The recommendation or the run does not exist.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "GHOST_SEAT.NOT_FOUND",
+                        "message": "The recommendation or the run does not exist.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The recommendation is not an open G2 (GHOST_SEAT.NOT_RECLAIMABLE) or the gate of the revocation refused the seat (GHOST_SEAT.SEAT_NOT_REVOCABLE).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "GHOST_SEAT.NOT_RECLAIMABLE": {
+                    "summary": "Only an open recommendation about the seat of a person who left can be reclaimed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "GHOST_SEAT.NOT_RECLAIMABLE",
+                        "message": "Only an open recommendation about the seat of a person who left can be reclaimed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "GHOST_SEAT.SEAT_NOT_REVOCABLE": {
+                    "summary": "The seat cannot be revoked: ASSIGNMENT_IS_SERVICE_ACCOUNT.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "GHOST_SEAT.SEAT_NOT_REVOCABLE",
+                        "message": "The seat cannot be revoked: ASSIGNMENT_IS_SERVICE_ACCOUNT.",
+                        "details": { "problem": "ASSIGNMENT_IS_SERVICE_ACCOUNT" },
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The query or the id is invalid (VALIDATION_ERROR).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "VALIDATION_ERROR": {
+                    "summary": "Request validation failed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "VALIDATION_ERROR",
+                        "message": "Request validation failed.",
+                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_TOO_MANY_REQUESTS": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_TOO_MANY_REQUESTS",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "TOKEN_VERIFICATION_UNAVAILABLE": {
+                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
+                        "message": "Authentication is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SERVICE_UNAVAILABLE": {
+                    "summary": "The service is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SERVICE_UNAVAILABLE",
+                        "message": "The service is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "bearer": [] }],
+        "summary": "Open the reclaim of the seat of a person who left",
+        "tags": ["ghost-seats"]
+      }
+    },
+    "/api/v1/ghost-seat-rule-runs": {
+      "get": {
+        "operationId": "ghostSeatRuleRunList",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maximum": 9007199254740991,
+              "exclusiveMinimum": true,
+              "default": 1,
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": { "maximum": 100, "exclusiveMinimum": true, "default": 20, "type": "integer", "minimum": 0 }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "One page of runs, newest first, each with how it ended and how many subjects it left out.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/RuleRunPageResponseDto" },
+                    { "properties": { "message": { "example": "GHOST_SEAT_RULE_RUNS.LISTED" } } }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHENTICATION_REQUIRED": {
+                    "summary": "A Bearer access token is required.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHENTICATION_REQUIRED",
+                        "message": "A Bearer access token is required.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "INVALID_ACCESS_TOKEN": {
+                    "summary": "The access token is invalid.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "INVALID_ACCESS_TOKEN",
+                        "message": "The access token is invalid.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only an IT Admin or the Super Admin may do this.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHORIZATION.FORBIDDEN": {
+                    "summary": "You do not have permission to perform this action.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHORIZATION.FORBIDDEN",
+                        "message": "You do not have permission to perform this action.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The query or the id is invalid (VALIDATION_ERROR).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "VALIDATION_ERROR": {
+                    "summary": "Request validation failed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "VALIDATION_ERROR",
+                        "message": "Request validation failed.",
+                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_TOO_MANY_REQUESTS": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_TOO_MANY_REQUESTS",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "TOKEN_VERIFICATION_UNAVAILABLE": {
+                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
+                        "message": "Authentication is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SERVICE_UNAVAILABLE": {
+                    "summary": "The service is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SERVICE_UNAVAILABLE",
+                        "message": "The service is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "bearer": [] }],
+        "summary": "List the runs of the rules of wasted seats",
+        "tags": ["ghost-seats"]
+      }
+    },
+    "/api/v1/ghost-seat-rule-runs/{id}/skips": {
+      "get": {
+        "operationId": "ghostSeatRuleSkipList",
+        "parameters": [
+          { "name": "id", "required": true, "in": "path", "schema": { "format": "uuid", "type": "string" } },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maximum": 9007199254740991,
+              "exclusiveMinimum": true,
+              "default": 1,
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": { "maximum": 100, "exclusiveMinimum": true, "default": 20, "type": "integer", "minimum": 0 }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "One page of the subjects the run left out (a plan that is not per seat, internal software, a seat that already has a recommendation) and the gate that decided it.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/RuleSkipPageResponseDto" },
+                    { "properties": { "message": { "example": "GHOST_SEAT_RULE_SKIPS.LISTED" } } }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHENTICATION_REQUIRED": {
+                    "summary": "A Bearer access token is required.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHENTICATION_REQUIRED",
+                        "message": "A Bearer access token is required.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "INVALID_ACCESS_TOKEN": {
+                    "summary": "The access token is invalid.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "INVALID_ACCESS_TOKEN",
+                        "message": "The access token is invalid.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only an IT Admin or the Super Admin may do this.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHORIZATION.FORBIDDEN": {
+                    "summary": "You do not have permission to perform this action.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHORIZATION.FORBIDDEN",
+                        "message": "You do not have permission to perform this action.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The recommendation or the run does not exist (GHOST_SEAT.NOT_FOUND).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "GHOST_SEAT.NOT_FOUND": {
+                    "summary": "The recommendation or the run does not exist.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "GHOST_SEAT.NOT_FOUND",
+                        "message": "The recommendation or the run does not exist.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The query or the id is invalid (VALIDATION_ERROR).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "VALIDATION_ERROR": {
+                    "summary": "Request validation failed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "VALIDATION_ERROR",
+                        "message": "Request validation failed.",
+                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_TOO_MANY_REQUESTS": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_TOO_MANY_REQUESTS",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "TOKEN_VERIFICATION_UNAVAILABLE": {
+                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
+                        "message": "Authentication is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SERVICE_UNAVAILABLE": {
+                    "summary": "The service is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SERVICE_UNAVAILABLE",
+                        "message": "The service is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "bearer": [] }],
+        "summary": "List why a run of the rules left subjects out",
+        "tags": ["ghost-seats"]
+      }
+    },
+    "/api/v1/ghost-seat-kpi5": {
+      "get": {
+        "operationId": "ghostSeatKpi5Get",
+        "parameters": [
+          {
+            "name": "from",
+            "required": true,
+            "in": "query",
+            "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused).",
+            "schema": { "format": "date", "type": "string" }
+          },
+          {
+            "name": "to",
+            "required": true,
+            "in": "query",
+            "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused).",
+            "schema": { "format": "date", "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The share of recommendations made in the period (G1, G2, and the review and action tiers of the others) that were right, for all and by group.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/Kpi5ResponseDto" },
+                    { "properties": { "message": { "example": "GHOST_SEAT_KPI5.READ" } } }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHENTICATION_REQUIRED": {
+                    "summary": "A Bearer access token is required.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHENTICATION_REQUIRED",
+                        "message": "A Bearer access token is required.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "INVALID_ACCESS_TOKEN": {
+                    "summary": "The access token is invalid.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "INVALID_ACCESS_TOKEN",
+                        "message": "The access token is invalid.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only the Super Admin may do this.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHORIZATION.FORBIDDEN": {
+                    "summary": "You do not have permission to perform this action.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHORIZATION.FORBIDDEN",
+                        "message": "You do not have permission to perform this action.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The query is invalid (VALIDATION_ERROR) or the period goes backwards or spans more than a year (GHOST_SEAT.PERIOD_INVALID).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "VALIDATION_ERROR": {
+                    "summary": "Request validation failed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "VALIDATION_ERROR",
+                        "message": "Request validation failed.",
+                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "GHOST_SEAT.PERIOD_INVALID": {
+                    "summary": "The period of KPI-5 must start on or before the day it ends.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "GHOST_SEAT.PERIOD_INVALID",
+                        "message": "The period of KPI-5 must start on or before the day it ends.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_TOO_MANY_REQUESTS": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_TOO_MANY_REQUESTS",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "TOKEN_VERIFICATION_UNAVAILABLE": {
+                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
+                        "message": "Authentication is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SERVICE_UNAVAILABLE": {
+                    "summary": "The service is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SERVICE_UNAVAILABLE",
+                        "message": "The service is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "bearer": [] }],
+        "summary": "Read KPI-5 over a period",
+        "tags": ["ghost-seats"]
+      }
+    },
     "/api/v1/dashboards/employee": {
       "get": {
         "operationId": "employeeDashboardGet",
@@ -88513,7 +89769,11 @@
           "subscriptionId": { "type": "string", "format": "uuid" },
           "accountIdentifier": { "type": "string", "maxLength": 254 },
           "responsibleEmployeeId": { "type": "string", "format": "uuid" },
-          "beneficiaryEmployeeId": { "type": "string", "format": "uuid" }
+          "beneficiaryEmployeeId": { "type": "string", "format": "uuid" },
+          "purchase": {
+            "type": "object",
+            "properties": { "reason": { "type": "string", "minLength": 1, "maxLength": 500 } }
+          }
         },
         "required": ["requestId"],
         "additionalProperties": false
@@ -88684,6 +89944,14 @@
                     "additionalProperties": false,
                     "nullable": true
                   },
+                  "purchase": {
+                    "type": "object",
+                    "properties": {
+                      "kind": { "type": "string", "enum": ["POOL_TOP_UP", "KEY_PURCHASE"] },
+                      "reason": { "type": "string" }
+                    },
+                    "additionalProperties": false
+                  },
                   "elapsedSeconds": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
                   "steps": {
                     "type": "array",
@@ -88735,7 +90003,8 @@
                   "handedOffAt": { "type": "string", "format": "date-time", "nullable": true },
                   "handOffEvidence": { "type": "string", "nullable": true },
                   "closedBy": { "type": "string", "format": "uuid", "nullable": true },
-                  "closeReason": { "type": "string", "nullable": true }
+                  "closeReason": { "type": "string", "nullable": true },
+                  "poolGrantAvoidedCosts": { "type": "string", "nullable": true }
                 },
                 "required": [
                   "id",
@@ -88922,6 +90191,14 @@
                       ],
                       "additionalProperties": false,
                       "nullable": true
+                    },
+                    "purchase": {
+                      "type": "object",
+                      "properties": {
+                        "kind": { "type": "string", "enum": ["POOL_TOP_UP", "KEY_PURCHASE"] },
+                        "reason": { "type": "string" }
+                      },
+                      "additionalProperties": false
                     },
                     "elapsedSeconds": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
                   },
@@ -89146,6 +90423,14 @@
                     "additionalProperties": false,
                     "nullable": true
                   },
+                  "purchase": {
+                    "type": "object",
+                    "properties": {
+                      "kind": { "type": "string", "enum": ["POOL_TOP_UP", "KEY_PURCHASE"] },
+                      "reason": { "type": "string" }
+                    },
+                    "additionalProperties": false
+                  },
                   "elapsedSeconds": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
                   "steps": {
                     "type": "array",
@@ -89197,7 +90482,8 @@
                   "handedOffAt": { "type": "string", "format": "date-time", "nullable": true },
                   "handOffEvidence": { "type": "string", "nullable": true },
                   "closedBy": { "type": "string", "format": "uuid", "nullable": true },
-                  "closeReason": { "type": "string", "nullable": true }
+                  "closeReason": { "type": "string", "nullable": true },
+                  "poolGrantAvoidedCosts": { "type": "string", "nullable": true }
                 },
                 "required": [
                   "id",
@@ -104569,6 +105855,714 @@
         "required": ["role"],
         "additionalProperties": false
       },
+      "RecommendationPageResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "enum": [true] },
+          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "items": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": { "type": "string", "format": "uuid" },
+                    "group": { "type": "string", "enum": ["G1", "G2", "G3", "G4"] },
+                    "state": { "type": "string", "enum": ["OPEN", "PAUSED", "RECLAIM_DECIDED", "CLOSED"] },
+                    "closeReason": {
+                      "type": "string",
+                      "enum": [
+                        "ACCEPTED",
+                        "SUPERSEDED",
+                        "SEAT_ENDED",
+                        "FREE_SEATS_GONE",
+                        "OUT_OF_SCOPE",
+                        "KEPT",
+                        "NEGATED",
+                        "TRANSFER_SEAT_REVOKED",
+                        null
+                      ],
+                      "nullable": true
+                    },
+                    "tier": { "type": "string", "enum": ["MONITOR", "REVIEW", "ACTION", null], "nullable": true },
+                    "confidenceLabel": {
+                      "type": "string",
+                      "enum": ["INTERNAL_DATA"],
+                      "description": "Data of the system itself: no level and no percentage."
+                    },
+                    "application": {
+                      "type": "object",
+                      "properties": {
+                        "applicationId": { "type": "string", "format": "uuid" },
+                        "applicationName": { "type": "string" }
+                      },
+                      "required": ["applicationId", "applicationName"],
+                      "additionalProperties": false
+                    },
+                    "plan": {
+                      "type": "object",
+                      "properties": {
+                        "planId": { "type": "string", "format": "uuid" },
+                        "planName": { "type": "string" }
+                      },
+                      "required": ["planId", "planName"],
+                      "additionalProperties": false
+                    },
+                    "subscriptionId": { "type": "string", "format": "uuid", "nullable": true },
+                    "assignmentId": { "type": "string", "format": "uuid", "nullable": true },
+                    "holder": {
+                      "type": "object",
+                      "properties": {
+                        "employeeId": { "type": "string", "format": "uuid" },
+                        "employeeCode": { "type": "string" },
+                        "fullName": { "type": "string" }
+                      },
+                      "required": ["employeeId", "employeeCode", "fullName"],
+                      "additionalProperties": false,
+                      "nullable": true
+                    },
+                    "freeSeats": { "type": "integer", "minimum": 0, "maximum": 9007199254740991, "nullable": true },
+                    "countsTowardVacantCost": { "type": "boolean", "nullable": true },
+                    "revocationTaskId": { "type": "string", "format": "uuid", "nullable": true },
+                    "labels": {
+                      "type": "object",
+                      "properties": {
+                        "revocationUnderWay": {
+                          "type": "boolean",
+                          "description": "The reclaim of the seat is under way (a task holds it)."
+                        },
+                        "terminatingUntil": {
+                          "type": "boolean",
+                          "description": "A K1 access that runs on to a day: see `terminatingUntil` of the detail."
+                        },
+                        "holderLeft": {
+                          "type": "boolean",
+                          "description": "The holder of a seat a head decided on has left."
+                        }
+                      },
+                      "required": ["revocationUnderWay", "terminatingUntil", "holderLeft"],
+                      "additionalProperties": false
+                    },
+                    "canReclaim": { "type": "boolean" },
+                    "createdAt": { "type": "string", "format": "date-time" }
+                  },
+                  "required": [
+                    "id",
+                    "group",
+                    "state",
+                    "closeReason",
+                    "tier",
+                    "confidenceLabel",
+                    "application",
+                    "plan",
+                    "subscriptionId",
+                    "assignmentId",
+                    "holder",
+                    "freeSeats",
+                    "countsTowardVacantCost",
+                    "revocationTaskId",
+                    "labels",
+                    "canReclaim",
+                    "createdAt"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "pagination": {
+                "type": "object",
+                "properties": {
+                  "page": { "type": "integer", "exclusiveMinimum": true, "maximum": 9007199254740991, "minimum": 0 },
+                  "pageSize": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "maximum": 9007199254740991,
+                    "minimum": 0
+                  },
+                  "totalItems": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                  "totalPages": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+                },
+                "required": ["page", "pageSize", "totalItems", "totalPages"],
+                "additionalProperties": false
+              }
+            },
+            "required": ["items", "pagination"],
+            "additionalProperties": false,
+            "nullable": true
+          }
+        },
+        "required": ["success", "message", "data"],
+        "additionalProperties": false
+      },
+      "OptimizationSummaryResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "enum": [true] },
+          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "groups": {
+                "type": "object",
+                "properties": {
+                  "G1": {
+                    "type": "object",
+                    "properties": {
+                      "confidenceLabel": { "type": "string", "enum": ["INTERNAL_DATA"] },
+                      "unclosedCount": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                      "reclaimUnderWayCount": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+                    },
+                    "required": ["confidenceLabel", "unclosedCount", "reclaimUnderWayCount"],
+                    "additionalProperties": false
+                  },
+                  "G2": {
+                    "type": "object",
+                    "properties": {
+                      "confidenceLabel": { "type": "string", "enum": ["INTERNAL_DATA"] },
+                      "unclosedCount": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                      "reclaimUnderWayCount": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+                    },
+                    "required": ["confidenceLabel", "unclosedCount", "reclaimUnderWayCount"],
+                    "additionalProperties": false
+                  },
+                  "G3": {
+                    "type": "object",
+                    "properties": {
+                      "confidenceLabel": { "type": "string", "enum": ["INTERNAL_DATA"] },
+                      "unclosedCount": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                      "reclaimUnderWayCount": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+                    },
+                    "required": ["confidenceLabel", "unclosedCount", "reclaimUnderWayCount"],
+                    "additionalProperties": false
+                  },
+                  "G4": {
+                    "type": "object",
+                    "properties": {
+                      "confidenceLabel": { "type": "string", "enum": ["INTERNAL_DATA"] },
+                      "unclosedCount": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                      "reclaimUnderWayCount": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+                    },
+                    "required": ["confidenceLabel", "unclosedCount", "reclaimUnderWayCount"],
+                    "additionalProperties": false
+                  }
+                },
+                "required": ["G1", "G2", "G3", "G4"],
+                "additionalProperties": false,
+                "description": "The four groups, each on its own."
+              },
+              "counted": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991,
+                "description": "The G2 not closed plus the G1 open: what the dashboard of the IT Admin counts."
+              },
+              "limitation": { "type": "string" }
+            },
+            "required": ["groups", "counted", "limitation"],
+            "additionalProperties": false,
+            "nullable": true
+          }
+        },
+        "required": ["success", "message", "data"],
+        "additionalProperties": false
+      },
+      "RecommendationResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "enum": [true] },
+          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "recommendation": {
+                "type": "object",
+                "properties": {
+                  "id": { "type": "string", "format": "uuid" },
+                  "group": { "type": "string", "enum": ["G1", "G2", "G3", "G4"] },
+                  "state": { "type": "string", "enum": ["OPEN", "PAUSED", "RECLAIM_DECIDED", "CLOSED"] },
+                  "closeReason": {
+                    "type": "string",
+                    "enum": [
+                      "ACCEPTED",
+                      "SUPERSEDED",
+                      "SEAT_ENDED",
+                      "FREE_SEATS_GONE",
+                      "OUT_OF_SCOPE",
+                      "KEPT",
+                      "NEGATED",
+                      "TRANSFER_SEAT_REVOKED",
+                      null
+                    ],
+                    "nullable": true
+                  },
+                  "tier": { "type": "string", "enum": ["MONITOR", "REVIEW", "ACTION", null], "nullable": true },
+                  "confidenceLabel": {
+                    "type": "string",
+                    "enum": ["INTERNAL_DATA"],
+                    "description": "Data of the system itself: no level and no percentage."
+                  },
+                  "application": {
+                    "type": "object",
+                    "properties": {
+                      "applicationId": { "type": "string", "format": "uuid" },
+                      "applicationName": { "type": "string" }
+                    },
+                    "required": ["applicationId", "applicationName"],
+                    "additionalProperties": false
+                  },
+                  "plan": {
+                    "type": "object",
+                    "properties": {
+                      "planId": { "type": "string", "format": "uuid" },
+                      "planName": { "type": "string" }
+                    },
+                    "required": ["planId", "planName"],
+                    "additionalProperties": false
+                  },
+                  "subscriptionId": { "type": "string", "format": "uuid", "nullable": true },
+                  "assignmentId": { "type": "string", "format": "uuid", "nullable": true },
+                  "holder": {
+                    "type": "object",
+                    "properties": {
+                      "employeeId": { "type": "string", "format": "uuid" },
+                      "employeeCode": { "type": "string" },
+                      "fullName": { "type": "string" }
+                    },
+                    "required": ["employeeId", "employeeCode", "fullName"],
+                    "additionalProperties": false,
+                    "nullable": true
+                  },
+                  "freeSeats": { "type": "integer", "minimum": 0, "maximum": 9007199254740991, "nullable": true },
+                  "countsTowardVacantCost": { "type": "boolean", "nullable": true },
+                  "revocationTaskId": { "type": "string", "format": "uuid", "nullable": true },
+                  "labels": {
+                    "type": "object",
+                    "properties": {
+                      "revocationUnderWay": {
+                        "type": "boolean",
+                        "description": "The reclaim of the seat is under way (a task holds it)."
+                      },
+                      "terminatingUntil": {
+                        "type": "boolean",
+                        "description": "A K1 access that runs on to a day: see `terminatingUntil` of the detail."
+                      },
+                      "holderLeft": {
+                        "type": "boolean",
+                        "description": "The holder of a seat a head decided on has left."
+                      }
+                    },
+                    "required": ["revocationUnderWay", "terminatingUntil", "holderLeft"],
+                    "additionalProperties": false
+                  },
+                  "canReclaim": { "type": "boolean" },
+                  "createdAt": { "type": "string", "format": "date-time" },
+                  "evidence": {
+                    "type": "object",
+                    "additionalProperties": {},
+                    "description": "What the recommendation was made from, by its group; written once."
+                  },
+                  "holderLeftOn": {
+                    "type": "string",
+                    "format": "date",
+                    "description": "A calendar date as YYYY-MM-DD.",
+                    "nullable": true
+                  },
+                  "terminatingUntil": {
+                    "type": "string",
+                    "format": "date",
+                    "description": "A calendar date as YYYY-MM-DD.",
+                    "nullable": true
+                  },
+                  "closedAt": { "type": "string", "format": "date-time", "nullable": true },
+                  "supersededById": { "type": "string", "format": "uuid", "nullable": true },
+                  "createdRunId": { "type": "string", "format": "uuid" }
+                },
+                "required": [
+                  "id",
+                  "group",
+                  "state",
+                  "closeReason",
+                  "tier",
+                  "confidenceLabel",
+                  "application",
+                  "plan",
+                  "subscriptionId",
+                  "assignmentId",
+                  "holder",
+                  "freeSeats",
+                  "countsTowardVacantCost",
+                  "revocationTaskId",
+                  "labels",
+                  "canReclaim",
+                  "createdAt",
+                  "evidence",
+                  "holderLeftOn",
+                  "terminatingUntil",
+                  "closedAt",
+                  "supersededById",
+                  "createdRunId"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": ["recommendation"],
+            "additionalProperties": false,
+            "nullable": true
+          }
+        },
+        "required": ["success", "message", "data"],
+        "additionalProperties": false
+      },
+      "ReclaimResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "enum": [true] },
+          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "recommendation": {
+                "type": "object",
+                "properties": {
+                  "id": { "type": "string", "format": "uuid" },
+                  "group": { "type": "string", "enum": ["G1", "G2", "G3", "G4"] },
+                  "state": { "type": "string", "enum": ["OPEN", "PAUSED", "RECLAIM_DECIDED", "CLOSED"] },
+                  "closeReason": {
+                    "type": "string",
+                    "enum": [
+                      "ACCEPTED",
+                      "SUPERSEDED",
+                      "SEAT_ENDED",
+                      "FREE_SEATS_GONE",
+                      "OUT_OF_SCOPE",
+                      "KEPT",
+                      "NEGATED",
+                      "TRANSFER_SEAT_REVOKED",
+                      null
+                    ],
+                    "nullable": true
+                  },
+                  "tier": { "type": "string", "enum": ["MONITOR", "REVIEW", "ACTION", null], "nullable": true },
+                  "confidenceLabel": {
+                    "type": "string",
+                    "enum": ["INTERNAL_DATA"],
+                    "description": "Data of the system itself: no level and no percentage."
+                  },
+                  "application": {
+                    "type": "object",
+                    "properties": {
+                      "applicationId": { "type": "string", "format": "uuid" },
+                      "applicationName": { "type": "string" }
+                    },
+                    "required": ["applicationId", "applicationName"],
+                    "additionalProperties": false
+                  },
+                  "plan": {
+                    "type": "object",
+                    "properties": {
+                      "planId": { "type": "string", "format": "uuid" },
+                      "planName": { "type": "string" }
+                    },
+                    "required": ["planId", "planName"],
+                    "additionalProperties": false
+                  },
+                  "subscriptionId": { "type": "string", "format": "uuid", "nullable": true },
+                  "assignmentId": { "type": "string", "format": "uuid", "nullable": true },
+                  "holder": {
+                    "type": "object",
+                    "properties": {
+                      "employeeId": { "type": "string", "format": "uuid" },
+                      "employeeCode": { "type": "string" },
+                      "fullName": { "type": "string" }
+                    },
+                    "required": ["employeeId", "employeeCode", "fullName"],
+                    "additionalProperties": false,
+                    "nullable": true
+                  },
+                  "freeSeats": { "type": "integer", "minimum": 0, "maximum": 9007199254740991, "nullable": true },
+                  "countsTowardVacantCost": { "type": "boolean", "nullable": true },
+                  "revocationTaskId": { "type": "string", "format": "uuid", "nullable": true },
+                  "labels": {
+                    "type": "object",
+                    "properties": {
+                      "revocationUnderWay": {
+                        "type": "boolean",
+                        "description": "The reclaim of the seat is under way (a task holds it)."
+                      },
+                      "terminatingUntil": {
+                        "type": "boolean",
+                        "description": "A K1 access that runs on to a day: see `terminatingUntil` of the detail."
+                      },
+                      "holderLeft": {
+                        "type": "boolean",
+                        "description": "The holder of a seat a head decided on has left."
+                      }
+                    },
+                    "required": ["revocationUnderWay", "terminatingUntil", "holderLeft"],
+                    "additionalProperties": false
+                  },
+                  "canReclaim": { "type": "boolean" },
+                  "createdAt": { "type": "string", "format": "date-time" },
+                  "evidence": {
+                    "type": "object",
+                    "additionalProperties": {},
+                    "description": "What the recommendation was made from, by its group; written once."
+                  },
+                  "holderLeftOn": {
+                    "type": "string",
+                    "format": "date",
+                    "description": "A calendar date as YYYY-MM-DD.",
+                    "nullable": true
+                  },
+                  "terminatingUntil": {
+                    "type": "string",
+                    "format": "date",
+                    "description": "A calendar date as YYYY-MM-DD.",
+                    "nullable": true
+                  },
+                  "closedAt": { "type": "string", "format": "date-time", "nullable": true },
+                  "supersededById": { "type": "string", "format": "uuid", "nullable": true },
+                  "createdRunId": { "type": "string", "format": "uuid" }
+                },
+                "required": [
+                  "id",
+                  "group",
+                  "state",
+                  "closeReason",
+                  "tier",
+                  "confidenceLabel",
+                  "application",
+                  "plan",
+                  "subscriptionId",
+                  "assignmentId",
+                  "holder",
+                  "freeSeats",
+                  "countsTowardVacantCost",
+                  "revocationTaskId",
+                  "labels",
+                  "canReclaim",
+                  "createdAt",
+                  "evidence",
+                  "holderLeftOn",
+                  "terminatingUntil",
+                  "closedAt",
+                  "supersededById",
+                  "createdRunId"
+                ],
+                "additionalProperties": false
+              },
+              "taskId": { "type": "string", "format": "uuid" }
+            },
+            "required": ["recommendation", "taskId"],
+            "additionalProperties": false,
+            "nullable": true
+          }
+        },
+        "required": ["success", "message", "data"],
+        "additionalProperties": false
+      },
+      "RuleRunPageResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "enum": [true] },
+          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "items": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": { "type": "string", "format": "uuid" },
+                    "ruleSet": { "type": "string", "enum": ["G1_G2", "G3_G4"] },
+                    "periodKey": { "type": "string" },
+                    "status": { "type": "string", "enum": ["RUNNING", "COMPLETED", "FAILED"] },
+                    "attempt": {
+                      "type": "integer",
+                      "exclusiveMinimum": true,
+                      "maximum": 9007199254740991,
+                      "minimum": 0
+                    },
+                    "startedAt": { "type": "string", "format": "date-time" },
+                    "finishedAt": { "type": "string", "format": "date-time", "nullable": true },
+                    "createdCount": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                    "updatedCount": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                    "closedCount": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                    "skippedCount": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                    "failedCount": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+                  },
+                  "required": [
+                    "id",
+                    "ruleSet",
+                    "periodKey",
+                    "status",
+                    "attempt",
+                    "startedAt",
+                    "finishedAt",
+                    "createdCount",
+                    "updatedCount",
+                    "closedCount",
+                    "skippedCount",
+                    "failedCount"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "pagination": {
+                "type": "object",
+                "properties": {
+                  "page": { "type": "integer", "exclusiveMinimum": true, "maximum": 9007199254740991, "minimum": 0 },
+                  "pageSize": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "maximum": 9007199254740991,
+                    "minimum": 0
+                  },
+                  "totalItems": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                  "totalPages": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+                },
+                "required": ["page", "pageSize", "totalItems", "totalPages"],
+                "additionalProperties": false
+              }
+            },
+            "required": ["items", "pagination"],
+            "additionalProperties": false,
+            "nullable": true
+          }
+        },
+        "required": ["success", "message", "data"],
+        "additionalProperties": false
+      },
+      "RuleSkipPageResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "enum": [true] },
+          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "items": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "subjectType": { "type": "string", "enum": ["SUBSCRIPTION", "ASSIGNMENT"] },
+                    "subjectId": { "type": "string", "format": "uuid" },
+                    "gate": { "type": "string", "enum": ["PER_SEAT", "INTERNAL_SOFTWARE", "OPEN_RECOMMENDATION"] },
+                    "detail": {
+                      "type": "object",
+                      "properties": {
+                        "pricingModel": { "type": "string", "nullable": true },
+                        "provisioningType": { "type": "string" },
+                        "recommendationId": { "type": "string", "format": "uuid" }
+                      },
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": ["subjectType", "subjectId", "gate", "detail"],
+                  "additionalProperties": false
+                }
+              },
+              "pagination": {
+                "type": "object",
+                "properties": {
+                  "page": { "type": "integer", "exclusiveMinimum": true, "maximum": 9007199254740991, "minimum": 0 },
+                  "pageSize": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "maximum": 9007199254740991,
+                    "minimum": 0
+                  },
+                  "totalItems": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                  "totalPages": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+                },
+                "required": ["page", "pageSize", "totalItems", "totalPages"],
+                "additionalProperties": false
+              }
+            },
+            "required": ["items", "pagination"],
+            "additionalProperties": false,
+            "nullable": true
+          }
+        },
+        "required": ["success", "message", "data"],
+        "additionalProperties": false
+      },
+      "Kpi5ResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "enum": [true] },
+          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "denominator": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+              "numerator": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+              "ratePercent": { "type": "number", "nullable": true },
+              "from": { "type": "string", "format": "date", "description": "A calendar date as YYYY-MM-DD." },
+              "to": { "type": "string", "format": "date", "description": "A calendar date as YYYY-MM-DD." },
+              "byGroup": {
+                "type": "object",
+                "properties": {
+                  "G1": {
+                    "type": "object",
+                    "properties": {
+                      "denominator": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                      "numerator": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                      "ratePercent": { "type": "number", "nullable": true },
+                      "confidenceLabel": { "type": "string", "enum": ["INTERNAL_DATA"] }
+                    },
+                    "required": ["denominator", "numerator", "ratePercent", "confidenceLabel"],
+                    "additionalProperties": false
+                  },
+                  "G2": {
+                    "type": "object",
+                    "properties": {
+                      "denominator": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                      "numerator": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                      "ratePercent": { "type": "number", "nullable": true },
+                      "confidenceLabel": { "type": "string", "enum": ["INTERNAL_DATA"] }
+                    },
+                    "required": ["denominator", "numerator", "ratePercent", "confidenceLabel"],
+                    "additionalProperties": false
+                  },
+                  "G3": {
+                    "type": "object",
+                    "properties": {
+                      "denominator": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                      "numerator": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                      "ratePercent": { "type": "number", "nullable": true },
+                      "confidenceLabel": { "type": "string", "enum": ["INTERNAL_DATA"] }
+                    },
+                    "required": ["denominator", "numerator", "ratePercent", "confidenceLabel"],
+                    "additionalProperties": false
+                  },
+                  "G4": {
+                    "type": "object",
+                    "properties": {
+                      "denominator": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                      "numerator": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                      "ratePercent": { "type": "number", "nullable": true },
+                      "confidenceLabel": { "type": "string", "enum": ["INTERNAL_DATA"] }
+                    },
+                    "required": ["denominator", "numerator", "ratePercent", "confidenceLabel"],
+                    "additionalProperties": false
+                  }
+                },
+                "required": ["G1", "G2", "G3", "G4"],
+                "additionalProperties": false
+              }
+            },
+            "required": ["denominator", "numerator", "ratePercent", "from", "to", "byGroup"],
+            "additionalProperties": false,
+            "nullable": true
+          }
+        },
+        "required": ["success", "message", "data"],
+        "additionalProperties": false
+      },
       "EmployeeDashboardResponseDto": {
         "type": "object",
         "properties": {
@@ -105439,6 +107433,43 @@
                     "required": ["state", "count", "sourceOperationId", "reason"],
                     "additionalProperties": false,
                     "description": "The SaaS error reports given to the caller that are not resolved, closed or marked duplicate."
+                  },
+                  "ghostSeats": {
+                    "type": "object",
+                    "properties": {
+                      "state": {
+                        "type": "string",
+                        "enum": ["COUNTED", "AT_SOURCE", "NOT_AVAILABLE"],
+                        "description": "COUNTED: count is how many, in the scope of the caller. AT_SOURCE: the rows are listed by sourceOperationId in the same scope and are not counted here. NOT_AVAILABLE: the data has no source yet; reason says why. A section that is not counted is never shown as zero."
+                      },
+                      "count": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991,
+                        "description": "Set only when state is COUNTED.",
+                        "nullable": true
+                      },
+                      "sourceOperationId": {
+                        "description": "The operation that lists the rows of the section; null when there is none yet.",
+                        "type": "string",
+                        "nullable": true
+                      },
+                      "reason": {
+                        "type": "string",
+                        "enum": [
+                          "FINANCE_FIGURES_NOT_DELIVERED",
+                          "USAGE_DATA_NOT_DELIVERED",
+                          "DEVICE_REGISTRY_NOT_DELIVERED",
+                          "NO_DATA_SOURCE",
+                          null
+                        ],
+                        "description": "Set only when state is NOT_AVAILABLE: the source of the data that is not delivered yet.",
+                        "nullable": true
+                      }
+                    },
+                    "required": ["state", "count", "sourceOperationId", "reason"],
+                    "additionalProperties": false,
+                    "description": "The recommendations of wasted seats not closed: the seats of people who left (G2) and the free seats of subscriptions (G1 open)."
                   }
                 },
                 "required": [
@@ -105450,7 +107481,8 @@
                   "termsToReview",
                   "offboardingHandovers",
                   "unconfirmedDevices",
-                  "saasIssues"
+                  "saasIssues",
+                  "ghostSeats"
                 ],
                 "additionalProperties": false
               }

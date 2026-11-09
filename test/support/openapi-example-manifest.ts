@@ -21,6 +21,7 @@ import { ROUTE_ERROR_CODES_BUDGETS } from './openapi-example-route-codes-budgets
 import { ROUTE_ERROR_CODES_CATALOG } from './openapi-example-route-codes-catalog';
 import { ROUTE_ERROR_CODES_DATA_IMPORT } from './openapi-example-route-codes-data-import';
 import { SUCCESS_MESSAGES_DEVICES } from './openapi-example-messages-devices';
+import { SUCCESS_MESSAGES_OPTIMIZATION } from './openapi-example-messages-optimization';
 import { ROUTE_ERROR_CODES_DEVICES } from './openapi-example-route-codes-devices';
 import { ROUTE_ERROR_CODES_FINANCE } from './openapi-example-route-codes-finance';
 import { ROUTE_ERROR_CODES_HEALTH } from './openapi-example-route-codes-health';
@@ -28,6 +29,7 @@ import { ROUTE_ERROR_CODES_IDENTITY_ACCESS } from './openapi-example-route-codes
 import { ROUTE_ERROR_CODES_LICENSING } from './openapi-example-route-codes-licensing';
 import { ROUTE_ERROR_CODES_OPERATING_PARAMETERS } from './openapi-example-route-codes-operating-parameters';
 import { ROUTE_ERROR_CODES_ORGANIZATION } from './openapi-example-route-codes-organization';
+import { ROUTE_ERROR_CODES_OPTIMIZATION } from './openapi-example-route-codes-optimization';
 import { ROUTE_ERROR_CODES_PERSONNEL } from './openapi-example-route-codes-personnel';
 import { ROUTE_ERROR_CODES_REQUESTS } from './openapi-example-route-codes-requests';
 import { ROUTE_ERROR_CODES_REQUESTS_SPEND } from './openapi-example-route-codes-requests-spend';
@@ -36,6 +38,7 @@ export type RouteErrorStatus = '400' | '401' | '403' | '404' | '409' | '413' | '
 
 export const SUCCESS_MESSAGES: Readonly<Record<string, string>> = {
   ...SUCCESS_MESSAGES_DEVICES,
+  ...SUCCESS_MESSAGES_OPTIMIZATION,
   accessRequestAssessmentComplete: 'ACCESS_REQUEST.ASSESSMENT_COMPLETED',
   accessRequestAssessmentGet: 'ACCESS_REQUEST.ASSESSMENT_FETCHED',
   accessRequestAssessmentReject: 'ACCESS_REQUEST.ASSESSMENT_REJECTED',
@@ -383,6 +386,7 @@ const PARTS = [
   ROUTE_ERROR_CODES_LICENSING,
   ROUTE_ERROR_CODES_OPERATING_PARAMETERS,
   ROUTE_ERROR_CODES_ORGANIZATION,
+  ROUTE_ERROR_CODES_OPTIMIZATION,
   ROUTE_ERROR_CODES_PERSONNEL,
   ROUTE_ERROR_CODES_REQUESTS,
   ROUTE_ERROR_CODES_REQUESTS_SPEND,

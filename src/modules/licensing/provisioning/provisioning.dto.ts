@@ -179,7 +179,7 @@ const taskSchema = taskSummarySchema.extend({
   closeReason: z.string().nullable(),
   revocation: revocationDetailSchema.nullable(),
   /** Pkg 9 (MF1-F): Cost avoided by granting from pool when exhausted (unitPrice * quantity). */
-  poolGrantAvoidedCosts: z.string().nullable(),
+  poolGrantAvoidedCosts: z.string().nullable().optional(),
 });
 const pagination = z.strictObject({
   page: z.number().int().positive(),

@@ -31,6 +31,9 @@ const itAdminDashboardSchema = z.strictObject({
     saasIssues: section(
       'The SaaS error reports given to the caller that are not resolved, closed or marked duplicate.',
     ),
+    ghostSeats: section(
+      'The recommendations of wasted seats not closed: the seats of people who left (G2) and the free seats of subscriptions (G1 open).',
+    ),
   }),
 });
 

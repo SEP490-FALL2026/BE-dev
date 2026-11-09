@@ -20,11 +20,17 @@ const g2 = z.strictObject({
   leftOn: day.nullable(),
   planId: z.uuid(),
   provisioningType: z.enum(['K1', 'K2', 'K3', 'K4', 'K5']),
-  terminatingAccess: z.strictObject({ until: day }).optional(),
+  terminatingAccess: z.strictObject({ until: day }).nullable(),
 });
 
+/**
+ * `G3`/`G4` (the item `qd103-ghost-seat-g3-g4`): their evidence is theirs to define. This item only reads such a row as an object that
+ * names its group, so a seat chain that has one can be judged by gate 8 (replacement, `holder_left_on`); that item replaces this shape.
+ */
+const otherGroups = z.object({ group: z.enum(['G3', 'G4']) }).catchall(z.json());
+
 /** What a recommendation was made from, by its group: written once and never changed (a trigger). */
-const schema = z.discriminatedUnion('group', [g1, g2]);
+const schema = z.discriminatedUnion('group', [g1, g2, otherGroups]);
 
 export type GhostSeatEvidence = z.output<typeof schema>;
 export type GhostSeatG1Evidence = z.output<typeof g1>;

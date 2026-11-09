@@ -155,6 +155,106 @@ export class GhostSeatWorld extends RevocationHarness {
     ).rows;
   }
 
+  /**
+   * A recommendation another rule set (or an earlier run) already made for a seat, written as a row: what the replacement and the
+   * `holder_left_on` cases of `G2` start from. The chain is the seat itself (a baseline seat has no predecessor).
+   */
+  async seedRecommendation(input: {
+    group: 'G1' | 'G2' | 'G3' | 'G4';
+    state: 'OPEN' | 'PAUSED' | 'RECLAIM_DECIDED' | 'CLOSED';
+    tier?: 'MONITOR' | 'REVIEW' | 'ACTION' | null;
+    assignmentId: string;
+    closeReason?: string;
+    createdAt?: Date;
+    revocationTaskId?: string;
+    supersededById?: string;
+  }): Promise<string> {
+    const { rows: seat } = await this.ctx.sql.query<{
+      employee_id: string;
+      plan_id: string;
+      application_id: string;
+      subscription_id: string | null;
+    }>(
+      `SELECT a.employee_id, a.plan_id, p.application_id, a.subscription_id
+         FROM license_assignments a JOIN plans p ON p.id = a.plan_id WHERE a.id = $1`,
+      [input.assignmentId],
+    );
+    const runId = await this.anyRun();
+    const id = randomUUID();
+    await this.ctx.sql.query(
+      `INSERT INTO ghost_seat_recommendations (id, organization_id, "group", state, close_reason, tier, application_id, plan_id,
+         subscription_id, assignment_id, seat_chain_id, employee_id, evidence, created_run_id, created_at, closed_at, revocation_task_id, superseded_by_id)
+       VALUES ($1, $2, $3::"GhostSeatGroup", $4::"GhostSeatState", $5::"GhostSeatCloseReason", $6::"GhostSeatTier", $7, $8, $9, $10, $10,
+         $11, $16::jsonb, $12, COALESCE($13::timestamptz, now()), $14, $15, $17)`,
+      [
+        id,
+        this.seed.organizationId,
+        input.group,
+        input.state,
+        input.closeReason ?? null,
+        input.group === 'G1' ? null : (input.tier ?? 'MONITOR'),
+        seat[0].application_id,
+        seat[0].plan_id,
+        seat[0].subscription_id,
+        input.assignmentId,
+        seat[0].employee_id,
+        runId,
+        input.createdAt ?? null,
+        input.state === 'CLOSED' ? new Date() : null,
+        input.revocationTaskId ?? null,
+        JSON.stringify(
+          input.group === 'G2'
+            ? {
+                group: 'G2',
+                employeeId: seat[0].employee_id,
+                leftOn: null,
+                planId: seat[0].plan_id,
+                provisioningType: 'K2',
+                terminatingAccess: null,
+              }
+            : { group: input.group },
+        ),
+        input.supersededById ?? null,
+      ],
+    );
+
+    return id;
+  }
+
+  /** A run row to hang seeded recommendations on (made once, with a period no rule asks for). */
+  async anyRun(): Promise<string> {
+    const { rows } = await this.ctx.sql.query<{ id: string }>(
+      `INSERT INTO ghost_seat_rule_runs (organization_id, rule_set, period_key, status, finished_at)
+       VALUES ($1, 'G3_G4', 'seeded', 'COMPLETED', now())
+       ON CONFLICT (organization_id, rule_set, period_key) DO UPDATE SET status = 'COMPLETED' RETURNING id`,
+      [this.seed.organizationId],
+    );
+
+    return rows[0].id;
+  }
+
+  /** A seat of a person on a plan with no subscription (internal software), made through the baseline of the plan. */
+  async internalSeat(code: string): Promise<{ employeeId: string; assignmentId: string }> {
+    const planId = await this.plan('K5');
+    const assignmentId = await this.seat({ planId }, code);
+    const { rows } = await this.ctx.sql.query<{ employee_id: string }>(
+      `SELECT employee_id FROM license_assignments WHERE id = $1`,
+      [assignmentId],
+    );
+
+    return { employeeId: rows[0].employee_id, assignmentId };
+  }
+
+  /** The revocation tasks a seat has, whatever their state. */
+  async revocationTasksOf(assignmentId: string): Promise<{ id: string; status: string }[]> {
+    return (
+      await this.ctx.sql.query<{ id: string; status: string }>(
+        `SELECT id, status FROM provisioning_tasks WHERE assignment_id = $1 AND kind = 'REVOKE' ORDER BY created_at, id`,
+        [assignmentId],
+      )
+    ).rows;
+  }
+
   /** The Super Admin sets the schedule of the rule (`RULE_SCHEDULE_G1_G2`) through the operating parameters. */
   setSchedule = (value: 'DAILY' | 'WEEKLY') =>
     request(this.server())
