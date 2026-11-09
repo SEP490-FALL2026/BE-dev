@@ -218,17 +218,18 @@ export class ProvisioningTaskRepo {
   /**
    * The grant task of a request, locked `FOR UPDATE` until the transaction ends, or null when the request has none. A request
    * for one person has at most one: its grant makes one assignment and one task. A request for a group has one for each person,
-   * so the task is the one of the seat of that person (`employeeId`).
+   * so the task is the one of the seat of that person (`employeeId`). The task that extends the right of a renewal (`EXTEND`,
+   * `BR-MF1-08d`) answers for its request the same way, so it is the one found for a renewal.
    */
   async lockGrantOfRequest(tx: DbTx, requestId: string, employeeId?: string): Promise<ProvisioningTaskRecord | null> {
     const locked =
       employeeId === undefined
         ? await tx.$queryRaw<
             { id: string }[]
-          >`SELECT id FROM provisioning_tasks WHERE request_id = ${requestId}::uuid AND kind = 'GRANT' ORDER BY created_at DESC LIMIT 1 FOR UPDATE`
+          >`SELECT id FROM provisioning_tasks WHERE request_id = ${requestId}::uuid AND kind IN ('GRANT', 'EXTEND') ORDER BY created_at DESC LIMIT 1 FOR UPDATE`
         : await tx.$queryRaw<{ id: string }[]>`SELECT t.id FROM provisioning_tasks t
             JOIN license_assignments a ON a.id = t.assignment_id
-           WHERE t.request_id = ${requestId}::uuid AND t.kind = 'GRANT' AND a.employee_id = ${employeeId}::uuid
+           WHERE t.request_id = ${requestId}::uuid AND t.kind IN ('GRANT', 'EXTEND') AND a.employee_id = ${employeeId}::uuid
            ORDER BY t.created_at DESC LIMIT 1 FOR UPDATE OF t`;
     if (locked.length === 0) return null;
 

@@ -204,6 +204,26 @@ describe('the window and the IT extension of a renewal (integration, real Postgr
       ]);
     });
 
+    it('a renewal withdrawn while its extension task is open cancels the task (out of the IT queue) and leaves the right its old end', async () => {
+      const { unit, assignmentId, end } = await holder(10);
+      const { request } = await h.renewed(unit.member.account, body(assignmentId, h.inDays(100)));
+      await h.decide(request.id, { decision: 'APPROVE' }, unit.head.account).expect(200);
+      expect((await extensionTaskOf(request.id))[0]).toMatchObject({ kind: 'EXTEND', status: 'QUEUED' });
+
+      await h.withdrawRequest(request.id, { reason: 'No longer needed' }, unit.member.account).expect(200);
+
+      const withdrawn = h.dataOf<{ request: RenewalWire }>(await h.fetch(request.id, unit.member.account).expect(200));
+      expect(withdrawn.request.state).toBe('WITHDRAWN');
+      // The task is cancelled the way the grant of a withdrawn request is (US-05-08): no IT Admin works it any more.
+      expect(await extensionTaskOf(request.id)).toEqual([
+        expect.objectContaining({ kind: 'EXTEND', status: 'CANCELLED', assignment_id: assignmentId }),
+      ]);
+      // The right is the assignment itself: it is neither cancelled nor extended, and keeps its old end.
+      expect(await h.successorsOf(assignmentId)).toEqual([]);
+      expect(await h.seatRow(assignmentId)).toMatchObject({ valid_until: null, expected_end_date: end });
+      expect(await h.ctx.app.get(LicensingRenewalApi).hasPendingRenewal(assignmentId)).toBe(false);
+    });
+
     it('RV-03: a renewal approved and not extended yet counts on 01/01 as approved and not granted, to its new end', async () => {
       const { unit, assignmentId } = await holder(10);
       const newEnd = h.inDays(100);
