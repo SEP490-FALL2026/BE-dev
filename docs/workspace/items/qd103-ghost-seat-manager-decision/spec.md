@@ -92,7 +92,7 @@ RECLAIM, EXEMPT}`, `reason text NOT NULL` CHECK 3–1000, `exempt_until date NUL
 
 1. **Định tuyến** (`decision-follow-up.job.ts`, mỗi giờ; mỗi khuyến nghị một transaction `FOR UPDATE SKIP LOCKED`): `G3`/`G4` `OPEN`, `tier ∈ {REVIEW,
 ACTION}`, `routed_at IS NULL` ⟹ phòng người giữ hôm nay, trưởng phòng có hiệu lực. Có ⟹ `AWAITING_DECISION`, `decider_department_id`, `decision_due_on
-= addWorkingDays(hôm nay, N)` (tính từ lúc **vào hàng đợi** — `US-10-06` AC-16). `GHOST_SEAT_NEW` và `GHOST_SEAT_ACTION_TIER` **gộp theo tuần**: một
+= decisionDueOn(hôm nay, N)` (ngày vào hàng tính là ngày thứ nhất nếu là ngày làm việc — M5-08) (tính từ lúc **vào hàng đợi** — `US-10-06` AC-16). `GHOST_SEAT_NEW` và `GHOST_SEAT_ACTION_TIER` **gộp theo tuần**: một
    thông báo mỗi người nhận mỗi tuần ISO, `eventKey = GHOST_SEAT_NEW:<employeeId>:<YYYY-Www>` (`SBF-04` _gộp theo tuần_ — Q-96). Seat của chính trưởng
    phòng ⟹ cùng hàng đợi, nhãn `selfSeat`. Không trưởng phòng ⟹ `WAITING_FOR_HEAD`, `decision_due_on` vẫn tính, `GHOST_SEAT_NEW` qua `holdForDepartment`,
    Super Admin nhận `GHOST_SEAT_WAITING_FOR_HEAD` (một lần mỗi phòng mỗi ngày). Không ai khác được giao (`QĐ-104h`).
@@ -102,7 +102,7 @@ ACTION}`, `routed_at IS NULL` ⟹ phòng người giữ hôm nay, trưởng phò
 3. **Tạm dừng / tiếp tục** (R-J03, `QĐ-90c`, `QĐ-103y`(2)): chưa quyết (`OPEN`, `AWAITING_DECISION`, `WAITING_FOR_HEAD`, `RETURNED_TO_HEAD`) mà người giữ
    có điều chuyển **đã hiệu lực** chưa đóng (`getTransfersInOverlap`) ⟹ `PAUSED`, `paused_at`, `pause_transfer_id`, audit (`US-10-06` AC-15). `PAUSED`
    mà điều chuyển đã đóng: chuỗi không còn Assignment mở ⟹ `TRANSFER_SEAT_REVOKED`; còn mở ⟹ tầng `REVIEW|ACTION` vào hàng trưởng phòng **hiện tại** của
-   người giữ (phòng mới; điều chuyển `CANCELLED` ⟹ phòng cũ) với `decision_due_on = addWorkingDays(ngày vào hàng, N)` (`US-10-06` AC-16, AC-19 — Q-87;
+   người giữ (phòng mới; điều chuyển `CANCELLED` ⟹ phòng cũ) với `decision_due_on = decisionDueOn(ngày vào hàng, N)` (`US-10-06` AC-16, AC-19 — Q-87;
    không dùng `effective_on` — DA6-22), audit `H1 → H2` + sự kiện nguồn; tầng `MONITOR` ⟹ về `OPEN`, `routed_at NULL` (DA6-20). `RECLAIM_DECIDED` **không**
    tạm dừng (`QĐ-90c` _đang chờ_ — Q-89). Miễn trừ đang có giữ tới hết hạn (cổng 7).
 4. **Quyết định** (`ghostSeatDecisionCreate { items: [{ recommendationId }] (1–50), choice, reason, exemptUntil? }`): khóa khuyến nghị theo `id` tăng
@@ -125,7 +125,7 @@ notice { holder: true } })` ⟹ `RECLAIM_DECIDED`, `revocation_task_id`. Ngườ
 5. **IT trả lại** (`ghostSeatRecommendationReturn { reason }`, IT_ADMIN bất kỳ, audit `byInCharge`): chỉ `G3`/`G4` `RECLAIM_DECIDED` (`G2` ⟹ 409
    `NOT_RETURNABLE`); `return_count = 1` ⟹ 409 `ALREADY_RETURNED` (`OI-02`); lý do thiếu ⟹ 422. `withdrawRevocationReason({ source: 'GHOST_SEAT',
 referenceId, cause: 'NO_LONGER_APPLIES', cancelInProgressClaimedBy: người gọi })`: `CANCELLED`/`CONTINUES` ⟹ ghi `ghost_seat_returns`,
-   `RETURNED_TO_HEAD`, `return_count = 1`, `decision_due_on = addWorkingDays(hôm nay, N)`, `GHOST_SEAT_RETURNED` tới trưởng phòng; `IT_ADMIN_TO_CLOSE` ⟹ 409
+   `RETURNED_TO_HEAD`, `return_count = 1`, `decision_due_on = decisionDueOn(hôm nay, N)` (ngày vào hàng tính là ngày thứ nhất nếu là ngày làm việc — M5-08), `GHOST_SEAT_RETURNED` tới trưởng phòng; `IT_ADMIN_TO_CLOSE` ⟹ 409
    `TASK_IN_PROGRESS`, rollback; `ALREADY_ENDED` ⟹ 409 `NOT_RETURNABLE`. Gỡ ngay khi trả lại (kỹ thuật — lệch chữ L4-08(5) _hủy khi trưởng phòng đổi_).
 6. **Kết cục thu hồi** (listener g1-g2, nhánh `G3`/`G4`, chỉ `COMPLETED` — DA6-02): lý do tham chiếu ⟹ `ACCEPTED` (tiềm năng **không** thành thực —
    `US-10-04` AC-8); `CLOSED_FAILED` ⟹ giữ `RECLAIM_DECIDED`, bảng hiện _chưa xử lý xong_ (AC-12, AC-13). Mở lại (Q-95, `QĐ-62i`, DA6-25):

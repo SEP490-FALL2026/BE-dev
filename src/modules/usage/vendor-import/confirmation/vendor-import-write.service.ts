@@ -93,7 +93,13 @@ export class VendorImportWriteService {
     const now = new Date();
     const people = await this.people.record(
       tx,
-      { source, importId: current.id, actorAppUserId: actor.appUserId, now },
+      {
+        source,
+        importId: current.id,
+        actorAppUserId: actor.appUserId,
+        now,
+        window: { from: current.coverageFrom, to: current.coverageTo },
+      },
       fresh,
     );
     const count = (outcome: string) => fresh.filter((row) => row.outcome === outcome).length;

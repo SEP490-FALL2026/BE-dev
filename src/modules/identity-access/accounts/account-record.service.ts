@@ -128,6 +128,10 @@ export class AccountRecordService {
   }
 
   /** The usable IT Admin with the smallest employee code, or null: who a report is given to when nobody is in charge. */
+  findAllUsableItAdminEmployeeIds(tx?: DbTx): Promise<string[]> {
+    return this.accounts.findAllUsableItAdminEmployeeIds(tx);
+  }
+
   findFirstUsableItAdminEmployeeId(tx?: DbTx): Promise<string | null> {
     return this.accounts.findFirstUsableItAdminEmployeeId(tx);
   }

@@ -6,7 +6,7 @@ import { IdentityRepo } from '../../identity/identity.repo';
 import { NoAssignmentFindingRepo } from '../../identity/no-assignment-finding.repo';
 import type { SourceRecord } from '../../vendor-source/vendor-source.types';
 import type { StoredRow } from '../vendor-import.types';
-import { mappingToWrite, uncoveredActivity } from './vendor-import-confirmation.policy';
+import { mappingToWrite, rangeCovered, uncoveredActivity } from './vendor-import-confirmation.policy';
 
 type JudgedRow = StoredRow & { candidates: string[] };
 
@@ -33,7 +33,14 @@ export class VendorImportPeopleService {
 
   async record(
     tx: DbTx,
-    input: { source: SourceRecord; importId: string; actorAppUserId: string; now: Date },
+    input: {
+      source: SourceRecord;
+      importId: string;
+      actorAppUserId: string;
+      now: Date;
+      /** The window the report covers: activity with no seat is looked for in it only. */
+      window: { from: BusinessDate; to: BusinessDate };
+    },
     rows: readonly JudgedRow[],
   ): Promise<PeopleOutcome> {
     const mappingsCreated = await this.writeMappings(tx, input, rows);
@@ -69,7 +76,7 @@ export class VendorImportPeopleService {
         confidence: confidenceOf(method),
       });
     }
-    const created = await this.identities.insertMappingsIfAbsent(tx, [...wanted.values()]);
+    const created = await this.identities.insertMappingsIfAbsent(tx, [...wanted.values()], input.actorAppUserId);
     await this.identities.resolveByMappings(
       tx,
       {
@@ -121,23 +128,43 @@ export class VendorImportPeopleService {
     );
   }
 
-  /** Opens a finding for each matched person with activity no seat covers, and closes the one of a person whose days are all covered now. */
+  /**
+   * Opens a finding for each matched person with activity in the window that no seat covers (`FR-4.8`), then closes each open finding of the
+   * people of the report whose own days, first to last, a seat covers now: a finding is never closed for days it does not name.
+   */
   private async judgeSeats(
     tx: DbTx,
-    input: { source: SourceRecord; importId: string; now: Date },
+    input: { source: SourceRecord; importId: string; now: Date; window: { from: BusinessDate; to: BusinessDate } },
     rows: readonly StoredRow[],
   ): Promise<{ opened: number; closed: number }> {
     const datesOf = new Map<string, Set<BusinessDate>>();
+    const people = new Set<string>();
     for (const row of rows) {
-      if (row.outcome !== 'MATCHED' || row.employeeId === null) continue;
+      // A person found only by the rule of aliases is not sure enough to be told they used the tool without a seat (`FR-4.8`, `TC-2`).
+      if (row.outcome !== 'MATCHED' || row.employeeId === null || row.matchMethod === 'ALIAS_RULE') continue;
+      people.add(row.employeeId);
       for (const day of row.cells.days) {
         if (day.eventClass !== 'VALUE' && day.eventClass !== 'PASSIVE') continue;
+        // A last activity long before the report (before any seat was recorded) is a fact of the past, not activity without a seat now.
+        if (day.date < input.window.from || day.date > input.window.to) continue;
         datesOf.set(row.employeeId, (datesOf.get(row.employeeId) ?? new Set()).add(day.date));
       }
     }
-    if (datesOf.size === 0) return { opened: 0, closed: 0 };
+    if (people.size === 0) return { opened: 0, closed: 0 };
 
+    const opened = await this.openFindings(tx, input, datesOf);
+    const closed = await this.closeFindings(tx, input, [...people]);
+
+    return { opened, closed };
+  }
+
+  private async openFindings(
+    tx: DbTx,
+    input: { source: SourceRecord; importId: string },
+    datesOf: ReadonlyMap<string, ReadonlySet<BusinessDate>>,
+  ): Promise<number> {
     const all = [...datesOf.values()].flatMap((dates) => [...dates]).sort();
+    if (all.length === 0) return 0;
     const seats = await this.licensingUsage.listAssignmentIntervals(
       {
         applicationId: input.source.applicationId,
@@ -148,16 +175,12 @@ export class VendorImportPeopleService {
       tx,
     );
     let opened = 0;
-    const covered: string[] = [];
     for (const [employeeId, dates] of datesOf) {
       const gap = uncoveredActivity(
         [...dates],
         seats.filter((seat) => seat.employeeId === employeeId),
       );
-      if (gap === null) {
-        covered.push(employeeId);
-        continue;
-      }
+      if (gap === null) continue;
       const inserted = await this.findings.openOrWiden(tx, {
         organizationId: input.source.organizationId,
         applicationId: input.source.applicationId,
@@ -168,13 +191,41 @@ export class VendorImportPeopleService {
       });
       if (inserted) opened += 1;
     }
-    const closed = await this.findings.closeCovered(tx, {
+
+    return opened;
+  }
+
+  private async closeFindings(
+    tx: DbTx,
+    input: { source: SourceRecord; now: Date },
+    people: readonly string[],
+  ): Promise<number> {
+    const ranges = await this.findings.openRangesOf(input.source.applicationId, people, tx);
+    if (ranges.size === 0) return 0;
+    const days = [...ranges.values()].flatMap((range) => [range.first, range.last]).sort();
+    const seats = await this.licensingUsage.listAssignmentIntervals(
+      {
+        applicationId: input.source.applicationId,
+        employeeIds: [...ranges.keys()],
+        from: days[0],
+        to: days[days.length - 1],
+      },
+      tx,
+    );
+    const covered = [...ranges].flatMap(([employeeId, range]) =>
+      rangeCovered(
+        range,
+        seats.filter((seat) => seat.employeeId === employeeId),
+      )
+        ? [employeeId]
+        : [],
+    );
+
+    return this.findings.closeCovered(tx, {
       applicationId: input.source.applicationId,
       employeeIds: covered,
       at: input.now,
       reason: 'ASSIGNMENT_COVERS',
     });
-
-    return { opened, closed };
   }
 }

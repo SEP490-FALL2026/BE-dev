@@ -70,8 +70,7 @@ const sourceSchema = z.strictObject({
 });
 
 /** A source in a list: without its template, which only the source itself shows. */
-const { template: _template, ...sourceItemShape } = sourceSchema.shape;
-const sourceItemSchema = z.strictObject(sourceItemShape);
+const sourceItemSchema = sourceSchema.omit({ template: true });
 
 export class UsageSourceCreateBodyDto extends createZodDto(usageSourceCreateBodySchema) {}
 export class UsageSourceUpdateBodyDto extends createZodDto(usageSourceUpdateBodySchema) {}

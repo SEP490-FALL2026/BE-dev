@@ -37,6 +37,17 @@ export function effectiveTiming(reasons: readonly RevocationTiming[]): Revocatio
 
 const earlier = (a: BusinessDate, b: BusinessDate): BusinessDate => (a <= b ? a : b);
 
+/**
+ * The day the holder is told the revocation will not come before (`US-10-06` AC-2, `BR-MF5-04`), or null when they are not told: a task already
+ * completed has nothing to come, and a task another reason asks for at once (a departure, a security reason) has no day to promise; telling
+ * the holder in advance would warn the person a security revocation is meant to surprise.
+ */
+export function holderNoticeDay(status: string, standing: readonly RevocationTiming[]): BusinessDate | null {
+  if (status === 'COMPLETED' || status === 'CANCELLED' || status === 'CLOSED_FAILED') return null;
+
+  return effectiveTiming(standing).notBefore;
+}
+
 /** What the reason of a revocation says to the listeners of the moment it opens: the source, who decided and in which role, and what it refers to. */
 export const reasonFactsOf = (reason: {
   source: string;

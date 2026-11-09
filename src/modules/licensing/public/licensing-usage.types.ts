@@ -14,9 +14,10 @@ export interface AssignmentInterval {
   until: BusinessDate | null;
   /**
    * The first day the seat could be used (`QĐ-77n`): the later of the `valid_from` of the first assignment of its chain and the day its grant
-   * task was completed; the `valid_from` when no grant task was done (a seat of the baseline).
+   * task was completed; the `valid_from` when no grant task was made (a seat of the baseline); null while its grant task is still open (the
+   * invitation or the grant waits): such a seat is never judged.
    */
-  usableOn: BusinessDate;
+  usableOn: BusinessDate | null;
 }
 
 export interface AssignmentIntervalFilter {

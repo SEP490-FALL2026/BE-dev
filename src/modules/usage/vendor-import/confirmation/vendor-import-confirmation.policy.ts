@@ -99,3 +99,21 @@ export function uncoveredActivity(
 
   return uncovered.length === 0 ? null : { first: uncovered[0], last: uncovered[uncovered.length - 1] };
 }
+
+/** Whether every day from `first` to `last` falls in one of the seats: what lets a finding of activity with no seat close (`FR-4.8`). */
+export function rangeCovered(
+  range: { first: BusinessDate; last: BusinessDate },
+  seats: readonly SeatInterval[],
+): boolean {
+  let day = range.first;
+  while (day <= range.last) {
+    const seat = seats.find(
+      (candidate) => candidate.from <= day && (candidate.until === null || day < candidate.until),
+    );
+    if (!seat) return false;
+    if (seat.until === null || seat.until > range.last) return true;
+    day = seat.until;
+  }
+
+  return true;
+}

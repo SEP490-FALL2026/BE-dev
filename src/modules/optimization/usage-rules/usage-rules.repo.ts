@@ -17,6 +17,24 @@ export interface ApplicationThresholdRecord {
 export class UsageRulesRepo {
   constructor(private readonly prisma: PrismaService) {}
 
+  /**
+   * Runs `work` behind a savepoint of `tx`: when it throws, what it wrote is undone and the transaction of the caller goes on (a failed
+   * statement would otherwise abort it). Returns whether the work was kept.
+   */
+  async fenced(tx: DbTx, work: () => Promise<void>): Promise<{ kept: true } | { kept: false; error: unknown }> {
+    await tx.$executeRaw`SAVEPOINT usage_rules_fence`;
+    try {
+      await work();
+      await tx.$executeRaw`RELEASE SAVEPOINT usage_rules_fence`;
+
+      return { kept: true };
+    } catch (error) {
+      await tx.$executeRaw`ROLLBACK TO SAVEPOINT usage_rules_fence`;
+
+      return { kept: false, error };
+    }
+  }
+
   async thresholdsOf(applicationIds: readonly string[], tx?: DbTx): Promise<Map<string, ApplicationThresholdRecord>> {
     if (applicationIds.length === 0) return new Map();
     const rows = await (tx ?? this.prisma).ghostSeatApplicationThreshold.findMany({

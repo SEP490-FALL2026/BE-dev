@@ -1,4 +1,4 @@
-import { addWorkingDays } from '../../../src/core/working-days';
+import { decisionDueOn } from '../../../src/modules/optimization/decision/decision-routing.policy';
 import { OrganizationReadApi } from '../../../src/modules/organization/public/organization-read.api';
 import { GhostSeatWorld } from '../../support/ghost-seat-world';
 
@@ -45,7 +45,7 @@ describe('the routing of G3/G4 to the head of the department (integration, real 
     expect(routed).toMatchObject({
       state: 'AWAITING_DECISION',
       decider_department_id: dept.departmentId,
-      decision_due_on: addWorkingDays(today, 5, new Set()),
+      decision_due_on: decisionDueOn(today, 5, new Set()),
     });
     expect(routed.routed_at).not.toBeNull();
     expect((await w.ghostRows('id = $1', [monitor]))[0]).toMatchObject({ state: 'OPEN', routed_at: null });
@@ -107,7 +107,7 @@ describe('the routing of G3/G4 to the head of the department (integration, real 
 
     const [waiting] = await w.ghostRows('id = $1', [rec]);
     expect(waiting).toMatchObject({ state: 'WAITING_FOR_HEAD', decider_department_id: department.id });
-    expect(waiting.decision_due_on).toBe(addWorkingDays(await todayOf(day), 5, new Set()));
+    expect(waiting.decision_due_on).toBe(decisionDueOn(await todayOf(day), 5, new Set()));
     const held = await w.ctx.sql.query(`SELECT 1 FROM held_department_notifications WHERE department_id = $1`, [
       department.id,
     ]);
@@ -138,7 +138,7 @@ describe('the routing of G3/G4 to the head of the department (integration, real 
     const e1 = await holder('E-RT4-A', dept.departmentId);
     const e2 = await holder('E-RT4-B', dept.departmentId);
     const day = w.nextDay();
-    const due = addWorkingDays(await todayOf(day), 5, new Set());
+    const due = decisionDueOn(await todayOf(day), 5, new Set());
     const awaiting = await w.seedRecommendation({
       group: 'G4',
       state: 'AWAITING_DECISION',

@@ -58,6 +58,19 @@ export function resolveWindow(input: {
 }
 
 /**
+ * Whether the window the IT Admin typed reaches past the one the file declares of itself (`FR-4.3`, `TC-2`): the days outside the file were never
+ * reported, and a silence there would read as not used. The preview says so before anything is confirmed.
+ */
+export function typedWiderThanFile(
+  window: CoverageWindow,
+  file: { from: string | null; to: string | null } | null,
+): boolean {
+  if (!file?.from || !file.to || !isBusinessDate(file.from) || !isBusinessDate(file.to)) return false;
+
+  return window.from < file.from || window.to > file.to;
+}
+
+/**
  * Judges a day against the window (`FR-4.10`): a day after the window is wrong, a day of activity before it is wrong, but the last activity
  * of a person before the window is a fact (an aggregate report says when a person was last seen, however long ago).
  */

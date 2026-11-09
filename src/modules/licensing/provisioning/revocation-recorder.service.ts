@@ -10,7 +10,13 @@ import { ProvisioningTaskFrame } from './provisioning-task-frame.service';
 import { toRevocationFacts, type ProvisioningTaskRecord } from './provisioning-task.types';
 import { ProvisioningTaskReasonRepo } from './provisioning-task-reason.repo';
 import { ProvisioningTaskRepo } from './provisioning-task.repo';
-import { effectiveTiming, reasonFactsOf, revocationOpenedAudit, type RevocationTiming } from './revocation-open.policy';
+import {
+  effectiveTiming,
+  holderNoticeDay,
+  reasonFactsOf,
+  revocationOpenedAudit,
+  type RevocationTiming,
+} from './revocation-open.policy';
 
 /**
  * What opening a revocation writes beside the task (`US-07-05` AC-3, AC-11, AC-12, `SoD-5`): the reason, the audit event, the notice to the
@@ -65,24 +71,15 @@ export class RevocationRecorder {
       reason,
       selfExecuted: opened.selfExecuted,
     });
-    await this.audit.record(
-      tx,
-      licensingAuditEvent(
-        actor,
-        opened.organizationId,
-        recorded.action,
-        'ProvisioningTask',
-        task.id,
-        recorded.before,
-        recorded.after,
-      ),
-    );
+    const event = [recorded.action, 'ProvisioningTask', task.id, recorded.before, recorded.after] as const;
+    await this.audit.record(tx, licensingAuditEvent(actor, opened.organizationId, ...event));
     // An IT Admin who asks for their own seat to go because no other IT Admin can is told to the Super Admin (`SoD-5`).
     if (opened.selfExecuted) await this.frame.tellSuperAdmin(tx, opened.organizationId, task.id, actor.employeeId);
     const standing = await this.reasons.listOf([task.id], tx);
     // A task that was completed is final: its timing is read from the reasons only while it can still be worked.
     if (task.status !== 'COMPLETED') await this.tasks.markTiming(tx, task.id, effectiveTiming(standing));
-    if (input.notice?.holder) await this.tellHolder(tx, opened, reason.referenceId);
+    const noticeDay = input.notice?.holder ? holderNoticeDay(task.status, standing) : null;
+    await this.tellHolder(tx, opened, noticeDay, reason.referenceId);
     await this.revocation.emit(tx, {
       moment: 'OPENED',
       task: toRevocationFacts(task),
@@ -94,8 +91,9 @@ export class RevocationRecorder {
   }
 
   /**
-   * The holder of the seat is told its revocation is coming and from which day (`US-10-06` AC-2). The same source and reference tells
-   * once: a decision taken again after a return changes nothing the holder was not told.
+   * The holder of the seat is told its revocation is coming and from which day (`US-10-06` AC-2): the day not before that the reasons standing
+   * give the task, never one a security reason overrides (no day: nobody is told). The same source and reference tells once: a decision taken
+   * again after a return changes nothing the holder was not told.
    */
   private async tellHolder(
     tx: DbTx,
@@ -103,11 +101,12 @@ export class RevocationRecorder {
       organizationId: string;
       task: ProvisioningTaskRecord;
       source: RevocationSource;
-      timing: RevocationTiming;
       plan: { planId: string; applicationId: string };
     },
+    notBefore: string | null,
     referenceId: string | null,
   ): Promise<void> {
+    if (notBefore === null) return;
     await this.notifications.notifyInApp(tx, {
       organizationId: opened.organizationId,
       recipientEmployeeId: opened.task.assignment.employeeId,
@@ -118,7 +117,7 @@ export class RevocationRecorder {
         planId: opened.plan.planId,
         applicationId: opened.plan.applicationId,
         source: opened.source,
-        notBefore: opened.timing.notBefore,
+        notBefore,
       },
       eventKey: `REVOCATION_UPCOMING:${opened.source}:${referenceId ?? opened.task.id}`,
     });

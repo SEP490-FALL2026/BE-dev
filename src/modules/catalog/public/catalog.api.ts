@@ -116,6 +116,11 @@ export class CatalogApi {
     return this.subscriptions.grantingOn(day, tx);
   }
 
+  /** The IT Admin named responsible for the subscription; null when it names none: who answers for a seat of the shared pool. */
+  getSubscriptionResponsibleItAdmin(subscriptionId: string, tx?: DbTx): Promise<string | null> {
+    return this.subscriptions.responsibleItAdminOf(subscriptionId, tx);
+  }
+
   /** The ids of every subscription and purchase a department owns, by id: for a module that finds what belongs to the department through them. */
   getSubscriptionIdsOwnedBy(departmentId: string, tx?: DbTx): Promise<string[]> {
     return this.subscriptions.idsOwnedBy(departmentId, tx);

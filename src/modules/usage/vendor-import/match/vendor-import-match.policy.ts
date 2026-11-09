@@ -4,6 +4,8 @@ import type { MatchMethod, RowOutcome } from '../vendor-import.types';
 export interface IdentifierFacts {
   /** The mapping in force (step 1): who and how it was made. */
   mapping: { employeeId: string; method: MatchMethod } | null;
+  /** Whether a mapping of the identifier was ended by the IT Admin: with none in force, only a mapping made by hand ties it again. */
+  mappingEnded?: boolean;
   /** The people whose work email is the identifier, those who left included (step 2). */
   emailHits: readonly string[];
   /** The people who hold, or held, a seat of the application under the identifier as an account (step 2). */
@@ -24,8 +26,8 @@ export interface IdentityJudgement {
 const unique = (ids: readonly string[]): string[] => [...new Set(ids)].sort();
 
 /**
- * Tells who an identifier is, in the order of the system (`FR-4.5`, `FR-4.6`): the mapping in force; else the work email or the account
- * identifier exactly (high confidence); else the rule of aliases (medium). More than one person at a step is ambiguous, never a guess;
+ * Tells who an identifier is, in the order of the system (`FR-4.5`, `FR-4.6`): the mapping in force; else nobody when a mapping of it was
+ * ended; else the work email or the account identifier exactly (high confidence); else the rule of aliases (medium). More than one person at a step is ambiguous, never a guess;
  * nobody is not found. An identifier is one person: two identifiers may be the same person, but one is never two.
  */
 export function judgeIdentity(facts: IdentifierFacts): IdentityJudgement {
@@ -38,6 +40,9 @@ export function judgeIdentity(facts: IdentifierFacts): IdentityJudgement {
       candidates: [],
     };
   }
+  // A mapping the IT Admin ended said the system was wrong: the same steps would make it again, so it waits in the queue for a person.
+  if (facts.mappingEnded)
+    return { outcome: 'UNMATCHED', employeeId: null, method: null, confidence: null, candidates: [] };
   const exact = unique([...facts.emailHits, ...facts.accountHits]);
   if (exact.length === 1) {
     return {
@@ -62,8 +67,33 @@ export function judgeIdentity(facts: IdentifierFacts): IdentityJudgement {
 }
 
 /**
- * The emails the rule of aliases tries for an email identifier: without the `+tag` of its local part, and the same local part on each
- * domain of the company (an old domain of the vendor account). The identifier itself is not among them (it was tried exactly).
+ * Domains anyone can open a mailbox on: never a domain of the company for the rule of aliases, even when someone's work email is on one,
+ * since the same local part there is not the same person.
+ */
+const PUBLIC_EMAIL_DOMAINS: ReadonlySet<string> = new Set([
+  'gmail.com',
+  'googlemail.com',
+  'yahoo.com',
+  'outlook.com',
+  'hotmail.com',
+  'live.com',
+  'msn.com',
+  'icloud.com',
+  'me.com',
+  'aol.com',
+  'proton.me',
+  'protonmail.com',
+  'gmx.com',
+  'mail.com',
+  'yandex.com',
+  'zoho.com',
+]);
+
+/**
+ * The emails the rule of aliases tries for an email identifier: without the `+tag` of its local part on its own domain and, only when that
+ * domain is itself a domain of the company, the same local part on each other domain of the company (an old domain of the vendor account). An
+ * address on a domain outside the company is never tied to a person of the company by its local part (`FR-4.5`, `TC-2`). The identifier
+ * itself is not among them (it was tried exactly).
  */
 export function aliasVariants(normalized: string, companyDomains: readonly string[]): string[] {
   const parts = normalized.split('@');
@@ -71,7 +101,8 @@ export function aliasVariants(normalized: string, companyDomains: readonly strin
   const [local, domain] = parts;
   const base = local.split('+')[0];
   if (base === '') return [];
-  const domains = unique([domain, ...companyDomains]);
+  const company = companyDomains.filter((candidate) => !PUBLIC_EMAIL_DOMAINS.has(candidate));
+  const domains = company.includes(domain) ? unique([domain, ...company]) : [domain];
 
   return domains.map((candidate) => `${base}@${candidate}`).filter((variant) => variant !== normalized);
 }

@@ -1,7 +1,7 @@
 import { UsageImportFileError } from '../vendor-import.errors';
 import { REPORT_SCHEMA } from '../vendor-import.types';
-import { resolveWindow, judgeDayInWindow, daysBetween } from './coverage-window.policy';
-import { parseReport } from './vendor-import-parse.policy';
+import { resolveWindow, judgeDayInWindow, daysBetween, typedWiderThanFile } from './coverage-window.policy';
+import { dayOf, parseReport } from './vendor-import-parse.policy';
 import type { ReadingSource } from './vendor-import-parse.types';
 
 const TODAY = '2026-09-02';
@@ -286,3 +286,100 @@ describe('the JSON report of the normalized schema', () => {
     }
   });
 });
+
+describe('dayOf — M5-24 (FR-4.2): the day of the organization a cell names, read strictly', () => {
+  const vn = {
+    dateFormat: 'YYYY-MM-DD' as const,
+    sourceTimeZone: 'America/Los_Angeles',
+    organizationTimeZone: 'Asia/Ho_Chi_Minh',
+  };
+
+  it('takes an instant with an offset to the day it is in the zone of the organization', () => {
+    expect(dayOf('2026-06-01T20:00-08:00', vn)).toBe('2026-06-02');
+    expect(dayOf('2026-06-01T20:00:00Z', vn)).toBe('2026-06-02');
+    expect(dayOf('2026-06-01T10:00:00+0700', vn)).toBe('2026-06-01');
+  });
+
+  it('reads a time with no offset in the zone of the source', () => {
+    expect(dayOf('2026-06-01 20:00', vn)).toBe('2026-06-02');
+    expect(dayOf('2026-06-01T08:00:00', vn)).toBe('2026-06-01');
+  });
+
+  it('keeps a date alone as written', () => {
+    expect(dayOf('2026-06-01', vn)).toBe('2026-06-01');
+  });
+
+  it('refuses a date with anything else after it, and a day or a time that does not exist', () => {
+    expect(dayOf('2026-06-01rác', vn)).toBeNull();
+    expect(dayOf('2026-02-30', vn)).toBeNull();
+    expect(dayOf('2026-06-01T25:00', vn)).toBeNull();
+    expect(dayOf('06/01/2026', vn)).toBeNull();
+  });
+
+  it('reads a date with slashes in the order the template names', () => {
+    expect(dayOf('06/01/2026', { ...vn, dateFormat: 'MM/DD/YYYY' })).toBe('2026-06-01');
+    expect(dayOf('01/06/2026', { ...vn, dateFormat: 'DD/MM/YYYY' })).toBe('2026-06-01');
+    expect(dayOf('31/02/2026', { ...vn, dateFormat: 'DD/MM/YYYY' })).toBeNull();
+    expect(dayOf('2026-06-01', { ...vn, dateFormat: 'DD/MM/YYYY' })).toBeNull();
+  });
+});
+
+describe('M5-28: a type of event named like a property of every object is a type the template does not know', () => {
+  it('leaves `constructor` and `__proto__` without a class instead of reading the prototype', () => {
+    const parsed = parseReport({
+      format: 'CSV',
+      text: csv('email,day,event', 'a@x.com,2026-08-05,constructor', 'b@x.com,2026-08-05,__proto__'),
+      source: events,
+      declared: { from: '2026-06-01', to: '2026-08-31' },
+      today: TODAY,
+    });
+
+    expect(parsed.rows.map((row) => row.days.map((day) => day.eventClass))).toEqual([[null], [null]]);
+    expect(parsed.unmappedEventTypes).toEqual(['__proto__', 'constructor']);
+  });
+});
+
+describe('typedWiderThanFile — M5-26 (FR-4.3, TC-2): a typed window that reaches past the file is said in the preview', () => {
+  it('is true when the typed window starts before or ends after the window the file declares', () => {
+    const file = { from: '2026-08-01', to: '2026-08-31' };
+
+    expect(typedWiderThanFile({ from: '2026-07-01', to: '2026-08-31', basis: 'DECLARED' }, file)).toBe(true);
+    expect(typedWiderThanFile({ from: '2026-08-01', to: '2026-09-01', basis: 'DECLARED' }, file)).toBe(true);
+    expect(typedWiderThanFile({ from: '2026-08-05', to: '2026-08-31', basis: 'DECLARED' }, file)).toBe(false);
+  });
+
+  it('is false when the file declares no window', () => {
+    expect(typedWiderThanFile({ from: '2026-07-01', to: '2026-08-31', basis: 'DECLARED' }, null)).toBe(false);
+    expect(
+      typedWiderThanFile({ from: '2026-07-01', to: '2026-08-31', basis: 'DECLARED' }, { from: null, to: null }),
+    ).toBe(false);
+  });
+});
+
+describe('M5-31: a CSV report is held to the limit of (identifier, date) pairs, as a JSON report is', () => {
+  it('refuses a few rows that list more dates than the limit', () => {
+    const listing: ReadingSource = {
+      ...aggregate,
+      template: { columns: { identifier: 'email', activeDates: 'days' }, eventClasses: {} },
+    };
+    // 400 rows of 150 dates: 60 000 pairs over 50 000, with every cell under its length limit.
+    const days = Array.from({ length: 150 }, (_unused, index) => addDaysOf('2026-01-01', index)).join(';');
+    const lines = Array.from({ length: 400 }, (_unused, index) => `u${index}@x.com,"${days}"`);
+
+    expect(
+      thrown(() =>
+        parseReport({
+          format: 'CSV',
+          text: csv('email,days', ...lines),
+          source: listing,
+          declared: { from: '2026-01-01', to: '2026-12-31' },
+          today: TODAY,
+        }),
+      ).problem,
+    ).toBe('FILE_TOO_MANY_ROWS');
+  });
+});
+
+function addDaysOf(day: string, count: number): string {
+  return new Date(Date.parse(`${day}T00:00:00Z`) + count * 86_400_000).toISOString().slice(0, 10);
+}

@@ -1,7 +1,6 @@
 import type { BusinessDate } from '../../../core/business-date';
 import type { EmployeeWorkState } from '../../organization/public/organization.types';
 import {
-  AssignmentConflictError,
   AssignmentEffectiveDateInvalidError,
   AssignmentExpectedEndRequiredError,
   AssignmentNotOpenError,
@@ -22,8 +21,6 @@ export const assignmentCreatedSnapshot = (record: AssignmentRecord, importId: st
   effectiveFromBasis: record.effectiveFromBasis,
   importId,
 });
-
-const byText = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0);
 
 /** `2026-10-01` as `01/10/2026`. */
 const dayMonthYear = (date: BusinessDate): string => `${date.slice(8, 10)}/${date.slice(5, 7)}/${date.slice(0, 4)}`;
@@ -88,4 +85,19 @@ export function assertResponsibleChange(
   if (TIME_LIMITED.has(holder.employmentType) && change.expectedEndDate === null) {
     throw new AssignmentExpectedEndRequiredError();
   }
+}
+
+/** The day a first assignment could be used from its `valid_from` and its grant tasks that were not dropped; null while one is still open. */
+export function usableDayOf(
+  validFrom: BusinessDate,
+  grants: readonly { status: string; completedAt: Date | null }[],
+  toBusinessDate: (instant: Date) => BusinessDate,
+): BusinessDate | null {
+  if (grants.some((grant) => grant.status !== 'COMPLETED')) return null;
+  const done = grants
+    .flatMap((grant) => (grant.completedAt ? [toBusinessDate(grant.completedAt)] : []))
+    .sort()
+    .at(-1);
+
+  return done !== undefined && done > validFrom ? done : validFrom;
 }

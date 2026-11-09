@@ -1,5 +1,7 @@
 import {
   assessUsage,
+  chainEvidenceOf,
+  consideredFrom,
   coveredRanges,
   daysAfter,
   oneMonthAfter,
@@ -165,5 +167,62 @@ describe('one calendar month after a day (R-J01)', () => {
     expect(oneMonthAfter('2026-12-01')).toBe('2027-01-01');
     expect(oneMonthAfter('2026-01-31')).toBe('2026-02-28');
     expect(oneMonthAfter('2026-12-31')).toBe('2027-01-31');
+  });
+});
+
+describe('chainEvidenceOf — M5-15 (QĐ-35c, FR-4.7, FR-4.10): a seat given again inherits nothing of the old one', () => {
+  const source = (windowTo: string, person: Partial<Record<string, unknown>>) =>
+    ({
+      kind: 'VENDOR',
+      windows: [{ from: '2026-01-01', to: windowTo }],
+      employees: [
+        {
+          employeeId: 'e1',
+          activeDates: [],
+          appeared: true,
+          lastAuthOnlyDate: null,
+          weakestMethod: 'EXACT_EMAIL',
+          mappingChangedOn: null,
+          ...person,
+        },
+      ],
+    }) as never;
+
+  it('a person seen only in a report that ended before the seat could be used has not appeared for it: a G3, never INACTIVE', () => {
+    const out = chainEvidenceOf([source('2026-05-31', { activeDates: ['2026-03-10'] })], 'e1', '2026-06-01');
+
+    expect(out).toMatchObject({ activeDates: [], appeared: false });
+  });
+
+  it('keeps the days, the sign-in without use and the change of mapping from the usable day only', () => {
+    const out = chainEvidenceOf(
+      [
+        source('2026-08-31', {
+          activeDates: ['2026-03-10', '2026-07-02'],
+          lastAuthOnlyDate: '2026-04-01',
+          mappingChangedOn: '2026-04-02',
+        }),
+      ],
+      'e1',
+      '2026-06-01',
+    );
+
+    expect(out).toMatchObject({
+      activeDates: ['2026-07-02'],
+      appeared: true,
+      lastAuthOnlyDate: null,
+      mappingChangedOn: null,
+    });
+  });
+});
+
+describe('consideredFrom — M5-17 (FR-4.14 CF-4): the days considered start where a source could first see them', () => {
+  it('starts at the first day a source covers when the seat is older than every report', () => {
+    expect(consideredFrom('2025-01-10', [{ windows: [{ from: '2026-06-01', to: '2026-08-31' }] }])).toBe('2026-06-01');
+  });
+
+  it('starts at the usable day when the seat is newer than the reports', () => {
+    expect(consideredFrom('2026-07-01', [{ windows: [{ from: '2026-06-01', to: '2026-08-31' }] }])).toBe('2026-07-01');
+    expect(consideredFrom('2026-07-01', [])).toBe('2026-07-01');
   });
 });

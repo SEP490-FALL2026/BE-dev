@@ -1,5 +1,5 @@
 import { addDays, type BusinessDate } from '../../../core/business-date';
-import { addWorkingDays, type NonWorkingDates } from '../../../core/working-days';
+import { addWorkingDays, isWorkingDay, type NonWorkingDates } from '../../../core/working-days';
 import type { GhostSeatState, GhostSeatTier } from '../ghost-seat/ghost-seat.types';
 
 /** The ISO week of a day as `YYYY-Www`: the notice of new recommendations is one for each person each week (`SBF-04` _gộp theo tuần_). */
@@ -16,12 +16,18 @@ export function isoWeekKeyOf(day: BusinessDate): string {
 /** Only the tiers a head is asked about go to the queue; `MONITOR` is the IT Admin's observation (`QĐ-09`, `DA6-20`). */
 export const isRoutedTier = (tier: GhostSeatTier | null): boolean => tier === 'REVIEW' || tier === 'ACTION';
 
-/** The day a decision is due: working days from the day the recommendation entered the queue (`US-10-06` AC-16). */
+/**
+ * The day a decision is due (`US-10-06` AC-16, `QĐ-104k`(2), `FR-3.10`): the last of `workingDays` working days counted from the day the
+ * recommendation entered the queue, that day included when it is a working day (entered on a Monday with 5 days: due on the Friday).
+ */
 export const decisionDueOn = (
   enteredOn: BusinessDate,
   workingDays: number,
   nonWorking: NonWorkingDates,
-): BusinessDate => addWorkingDays(enteredOn, workingDays, nonWorking);
+): BusinessDate =>
+  isWorkingDay(enteredOn, nonWorking) && workingDays > 0
+    ? addWorkingDays(enteredOn, workingDays - 1, nonWorking)
+    : addWorkingDays(enteredOn, workingDays, nonWorking);
 
 /** Where a recommendation goes when it enters the queue: the head of the department decides, or the department waits for one (`QĐ-104h`). */
 export const queueStateOf = (hasHead: boolean, returned: boolean): GhostSeatState =>

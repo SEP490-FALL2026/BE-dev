@@ -24,7 +24,13 @@ export interface SourceTemplate {
     eventType?: string;
   };
   eventClasses: Record<string, EventClassMapping>;
+  /** How a date with slashes is read (`FR-4.2`); absent: dates are `YYYY-MM-DD`, with or without a time. */
+  dateFormat?: DateFormat;
 }
+
+/** The orders a date of a report may be written in. */
+export const DATE_FORMATS = ['YYYY-MM-DD', 'DD/MM/YYYY', 'MM/DD/YYYY'] as const;
+export type DateFormat = (typeof DATE_FORMATS)[number];
 
 /** What the vendor can tell (`FR-4.4`): the matrix of capabilities the IT Admin declares. */
 export interface SourceCapabilities {

@@ -10,6 +10,7 @@ import { GhostSeatService } from '../ghost-seat/ghost-seat.service';
 import type { GhostSeatRecord } from '../ghost-seat/ghost-seat.types';
 import { DecisionFollowUpService } from './decision-follow-up.service';
 import { decisionDueOn, queueStateOf } from './decision-routing.policy';
+import { returnOutcomeOf } from './decision.policy';
 import {
   GhostSeatAlreadyReturnedError,
   GhostSeatDecisionNotFoundError,
@@ -22,7 +23,7 @@ import type { FollowUpDay } from './decision.types';
 /**
  * The IT Admin cannot do what the head decided to reclaim and gives it back, once (`OI-02`, `US-10-06` AC-10): the reason of the head is
  * taken back from the task through licensing (the task goes on while another reason stands, is cancelled when none does, and is left alone
- * when another IT Admin works it), and the recommendation goes back to the head with a due day counted again from today. The
+ * when another IT Admin works it; a task already closed as failed or cancelled is given back as it is), and the recommendation goes back to the head with a due day counted again from today. The
  * recommendation is locked first, then licensing is called (`DA6-23`). Any IT Admin may return it; the audit says whether it was the one
  * in charge. Throws GhostSeatDecisionNotFoundError, GhostSeatAlreadyReturnedError, GhostSeatNotReturnableError and GhostSeatTaskInProgressError.
  */
@@ -65,17 +66,17 @@ export class DecisionReturnService {
         cause: 'NO_LONGER_APPLIES',
         cancelInProgressClaimedBy: actor.appUserId,
       });
-      if (withdrawn.outcome === 'IT_ADMIN_TO_CLOSE') throw new GhostSeatTaskInProgressError();
-      if (withdrawn.outcome !== 'CANCELLED' && withdrawn.outcome !== 'CONTINUES')
-        throw new GhostSeatNotReturnableError();
+      const outcome = returnOutcomeOf(withdrawn);
+      if (outcome === 'IT_ADMIN_TO_CLOSE') throw new GhostSeatTaskInProgressError();
+      if (outcome === null) throw new GhostSeatNotReturnableError();
       await this.decisions.insertReturn(tx, {
         recommendationId: record.id,
         reason,
         returnedByAppUserId: actor.appUserId,
-        taskId: withdrawn.taskId,
+        taskId: withdrawn.taskId ?? record.revocationTaskId,
       });
 
-      return this.handBack(tx, actor, record, day, withdrawn.outcome);
+      return this.handBack(tx, actor, record, day, outcome);
     });
   }
 

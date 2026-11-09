@@ -40,6 +40,28 @@ export class IdentityRepo {
     return new Map(rows.map((row) => [row.normalizedIdentifier, toMapping(row)]));
   }
 
+  /** The identifiers of these that had a mapping the IT Admin ended: the match never ties them again by itself (`FR-4.6`, `INV-12`). */
+  async identifiersWithEndedMapping(
+    applicationId: string,
+    identifierType: UsageIdentifierType,
+    normalizedIdentifiers: readonly string[],
+    tx?: DbTx,
+  ): Promise<Set<string>> {
+    if (normalizedIdentifiers.length === 0) return new Set();
+    const rows = await (tx ?? this.prisma).usageIdentityMapping.findMany({
+      where: {
+        applicationId,
+        identifierType,
+        normalizedIdentifier: { in: [...normalizedIdentifiers] },
+        endedAt: { not: null },
+      },
+      select: { normalizedIdentifier: true },
+      distinct: ['normalizedIdentifier'],
+    });
+
+    return new Set(rows.map((row) => row.normalizedIdentifier));
+  }
+
   /** Writes the mapping unless one is in force already (the unique index of the identifier says which wins); returns its id or null. */
   async insertMappingIfAbsent(tx: DbTx, input: NewMapping): Promise<string | null> {
     const rows = await tx.$queryRaw<{ id: string }[]>`
@@ -55,8 +77,9 @@ export class IdentityRepo {
   }
 
   /**
-   * Writes many mappings in one statement, those a match of a report makes; an identifier that has a mapping in force already is left as it
-   * is. Returns the id of each one written, by normalized identifier.
+   * Writes many mappings in one statement, those a match of a report makes, each with the account that confirmed the report (`FR-4.5`: who
+   * confirmed a mapping is kept); an identifier that has a mapping in force already is left as it is. Returns the id of each one written, by
+   * normalized identifier.
    */
   async insertMappingsIfAbsent(
     tx: DbTx,
@@ -66,14 +89,15 @@ export class IdentityRepo {
         confidence: MappingConfidence;
       }
     >,
+    confirmedByAppUserId: string | null = null,
   ): Promise<Map<string, string>> {
     if (input.length === 0) return new Map();
     const first = input[0];
     const rows = await tx.$queryRaw<{ id: string; normalized_identifier: string }[]>`
       INSERT INTO usage_identity_mappings (organization_id, application_id, identifier_type, normalized_identifier, raw_identifier,
-        employee_id, method, confidence)
+        employee_id, method, confidence, confirmed_by_app_user_id)
       SELECT ${first.organizationId}::uuid, ${first.applicationId}::uuid, ${first.identifierType}::"UsageIdentifierType", t.normalized,
-             t.raw, t.employee::uuid, t.method::"UsageMatchMethod", t.confidence::"UsageMatchConfidence"
+             t.raw, t.employee::uuid, t.method::"UsageMatchMethod", t.confidence::"UsageMatchConfidence", ${confirmedByAppUserId}::uuid
         FROM unnest(${input.map((item) => item.normalizedIdentifier)}::text[], ${input.map((item) => item.rawIdentifier)}::text[],
                     ${input.map((item) => item.employeeId)}::text[], ${input.map((item) => item.method)}::text[],
                     ${input.map((item) => item.confidence)}::text[]) AS t(normalized, raw, employee, method, confidence)

@@ -1,6 +1,6 @@
 import request from 'supertest';
 import { addDays } from '../../../src/core/business-date';
-import { addWorkingDays } from '../../../src/core/working-days';
+import { decisionDueOn } from '../../../src/modules/optimization/decision/decision-routing.policy';
 import { addMonths } from '../../../src/core/fiscal-year';
 import { pretendBusinessToday } from '../../support/pretend-today';
 import type { ApiAccount } from '../../support/api-accounts';
@@ -72,7 +72,7 @@ describe('the return of the IT Admin and the end of a reclaim the head decided (
       recommendationId: rec,
       state: 'RETURNED_TO_HEAD',
       returnCount: 1,
-      decisionDueOn: addWorkingDays(today, 5, new Set()),
+      decisionDueOn: decisionDueOn(today, 5, new Set()),
     });
     expect((await w.revocationOf(taskId)).status).toBe('CANCELLED');
     expect((await w.ghostRows('id = $1', [rec]))[0]).toMatchObject({

@@ -1,3 +1,4 @@
+import { GhostSeatRepo } from '../../../src/modules/optimization/ghost-seat/ghost-seat.repo';
 import { GhostSeatWorld } from '../../support/ghost-seat-world';
 
 const w = new GhostSeatWorld();
@@ -25,6 +26,10 @@ describe('G2: the seat of a person who left (integration, real PostgreSQL)', () 
     await w.startWorld();
     k2 = await w.worldSubscription(200, 'K2');
   }, 240000);
+
+  afterEach(() => {
+    jest.restoreAllMocks();
+  });
 
   afterAll(async () => {
     await w.stop();
@@ -54,6 +59,57 @@ describe('G2: the seat of a person who left (integration, real PostgreSQL)', () 
       recommendationId: g2.id,
       employeeId,
     });
+  });
+
+  it('M5-04, BRD MF-5, US-10-01 AC-2: a seat of the shared pool (no owning department) answers to where its holder last worked, and its IT Admin is told', async () => {
+    const assignmentId = await w.seat({ subscriptionId: k2 }, 'E-G2-M504');
+    const { rows } = await w.ctx.sql.query<{ employee_id: string }>(
+      `UPDATE license_assignments SET owning_department_id = NULL WHERE id = $1 RETURNING employee_id`,
+      [assignmentId],
+    );
+    await w.leave(rows[0].employee_id);
+
+    const run = await w.runRules();
+
+    expect(run).toMatchObject({ status: 'COMPLETED', failedCount: 0 });
+    const [g2] = await w.g2Of(rows[0].employee_id);
+    expect(g2).toMatchObject({ group: 'G2', state: 'OPEN', department_id: w.worldDepartment });
+    const notices = await w.noticesOf('GHOST_SEAT_G2_DETECTED', w.worldItAdmin.employeeId);
+    expect(notices.filter((notice) => notice.event_key === `GHOST_SEAT_G2:${g2.id}`)).toHaveLength(1);
+  });
+
+  it('M5-05, QĐ-108i, DA6-04: a G4 a head decided to reclaim after the pass read it as undecided is marked, never superseded', async () => {
+    const { employeeId, assignmentId } = await leaverOn(k2, 'E-G2-M505');
+    const g4 = await w.seedRecommendation({
+      group: 'G4',
+      state: 'AWAITING_DECISION',
+      tier: 'REVIEW',
+      assignmentId,
+      deciderDepartmentId: w.worldDepartment,
+      routedAt: new Date(),
+      decisionDueOn: '2030-01-01',
+    });
+    const repo = w.ctx.app.get(GhostSeatRepo);
+    const lock = repo.lock.bind(repo);
+    // The head decides between the read of the pass and its lock of the recommendation.
+    jest.spyOn(repo, 'lock').mockImplementation(async (tx, id) => {
+      if (id === g4) {
+        await w.ctx.sql.query(
+          `UPDATE ghost_seat_recommendations SET state = 'RECLAIM_DECIDED' WHERE id = $1 AND state = 'AWAITING_DECISION'`,
+          [g4],
+        );
+      }
+
+      return lock(tx, id);
+    });
+
+    const run = await w.runRules();
+
+    expect(run?.failedCount).toBe(0);
+    expect(await w.g2Of(employeeId)).toEqual([]);
+    const [row] = await w.ghostRows('id = $1', [g4]);
+    expect(row).toMatchObject({ state: 'RECLAIM_DECIDED', superseded_by_id: null });
+    expect(row.holder_left_on).toMatch(/^\d{4}-\d{2}-\d{2}$/);
   });
 
   it('US-10-01 AC-6, US-10-02 AC-11: a seat made 5 days ago and the seat of a head who left both get a G2 (gate 4 does not apply)', async () => {

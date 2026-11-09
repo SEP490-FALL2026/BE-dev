@@ -10,9 +10,10 @@ import { confidenceFactsOf, confidenceOf, type ConfidenceResult } from './confid
 import { potentialSavingOf } from './potential-saving.policy';
 import {
   assessUsage,
+  chainEvidenceOf,
+  consideredFrom,
   coveredRanges,
   daysAfter,
-  daysOfChain,
   lowerThresholdOf,
   personEvidenceOf,
   type PersonEvidence,
@@ -21,6 +22,7 @@ import {
 import { snapshotOf } from './usage-evidence-snapshot.policy';
 import {
   coverageGateOf,
+  endsWithinMonth,
   evidenceGateOf,
   gateSkip,
   seatGateOf,
@@ -108,9 +110,12 @@ export class UsageRulesSeatService {
   }
 
   private async judge(c: SeatCase): Promise<SeatOutcome> {
-    if (c.gate && EARLY_GATES.has(c.gate.gate)) return this.record(c, c.gate, c.gate.status, null);
-    const person = personEvidenceOf(c.app.evidence.sources, c.seat.employeeId);
-    const days = c.usableOn ? daysOfChain(person.activeDates, c.usableOn) : [];
+    const early = await this.leftOutEarly(c);
+    if (early) return early;
+    const person = c.usableOn
+      ? chainEvidenceOf(c.app.evidence.sources, c.seat.employeeId, c.usableOn)
+      : personEvidenceOf(c.app.evidence.sources, c.seat.employeeId);
+    const days = c.usableOn ? person.activeDates : [];
     const existing = await this.settleExisting(c, days);
     if (c.gate) return this.record(c, c.gate, c.gate.status, null);
     if (!c.usableOn) return this.record(c, null, 'EXCLUDED', null);
@@ -122,23 +127,75 @@ export class UsageRulesSeatService {
     if (blocked) return this.record(c, blocked, blocked.status, null);
     const finding = this.assessSeat(c, person, days);
     if ('skip' in finding) return this.record(c, finding.skip, finding.skip.status, null);
-    const open = await this.record(c, null, finding.assessment.tier ? 'INACTIVE' : 'ACTIVE', finding.assessment);
-    if (!finding.assessment.tier) return open;
+
+    return this.conclude(c, existing, finding);
+  }
+
+  /**
+   * What leaves the seat out before its days are read: its `G2` (gate 8: the rule of usage never makes a second recommendation for a seat whose
+   * holder left nor denies that one), or a gate about the seat itself (`FR-4.9` gates 2-4) once what it closes is closed. Null when it goes on.
+   */
+  private async leftOutEarly(c: SeatCase): Promise<SeatOutcome | null> {
+    const listed = c.run.existing.get(c.seat.chainRootId);
+    if (listed?.group === 'G2') {
+      const skip = gateSkip('OPEN_RECOMMENDATION', {
+        reason: 'the seat already has a recommendation',
+        recommendationId: listed.id,
+      });
+
+      return this.record(c, skip, skip.status, null);
+    }
+    await this.closeLeftOut(c);
+
+    return c.gate && EARLY_GATES.has(c.gate.gate) ? this.record(c, c.gate, c.gate.status, null) : null;
+  }
+
+  /** The seat passed every gate: its state is written, and a tier a head is asked about becomes a recommendation, or is read into the one it has. */
+  private async conclude(c: SeatCase, existing: GhostSeatRecord | null, finding: Finding): Promise<SeatOutcome> {
+    const tier = finding.assessment.tier;
+    const open = await this.record(c, null, tier ? 'INACTIVE' : 'ACTIVE', finding.assessment);
+    if (tier === null || tier === 'MONITOR') return this.watchOnly(c, existing, open);
 
     return existing ? this.keepExisting(c, existing, finding, open) : this.create(c, finding, open);
   }
 
-  /** The recommendation the chain already has: denied by a day of activity, closed because the right is ending, flagged after a decided reclaim, or left as it is. */
+  /**
+   * The watch tier (30 to 59 days) is shown on the board of the IT Admin only (`FR-4.12`): the state of the seat says it, and it is never a
+   * recommendation. A watch made before that is still undecided closes (`OUT_OF_SCOPE`), so it holds no place at gate 8 and counts nowhere.
+   */
+  private async watchOnly(c: SeatCase, existing: GhostSeatRecord | null, open: SeatOutcome): Promise<SeatOutcome> {
+    if (existing?.tier === 'MONITOR' && UNDECIDED_STATES.includes(existing.state)) {
+      await this.ghostSeats.close(c.tx, existing, 'OUT_OF_SCOPE', SYSTEM, c.run.now);
+      c.run.tally.closed();
+    }
+
+    return open;
+  }
+
+  /**
+   * A recommendation nobody decided on is closed when its seat is left out whatever the other gates say (`FR-4.9` gates 3 and 7): the right ends
+   * within a month (`LEFT_TO_EXPIRE`), or the holder is on long leave or handing over (`OUT_OF_SCOPE`: a head never decides on such a seat; the
+   * pass judges it again once the person is back). A reclaim already decided is left to its task.
+   */
+  private async closeLeftOut(c: SeatCase): Promise<void> {
+    const reason = endsWithinMonth(c.seat.expectedEndDate, c.run.today)
+      ? 'LEFT_TO_EXPIRE'
+      : c.gate?.gate === 'LEAVE_OR_HANDOVER'
+        ? 'OUT_OF_SCOPE'
+        : null;
+    const listed = reason ? c.run.existing.get(c.seat.chainRootId) : undefined;
+    if (!reason || !listed) return;
+    const existing = await this.repo.lock(c.tx, listed.id);
+    if (!existing || !UNDECIDED_STATES.includes(existing.state)) return;
+    await this.ghostSeats.close(c.tx, existing, reason, SYSTEM, c.run.now);
+    c.run.tally.closed();
+  }
+
+  /** The recommendation the chain already has: denied by a day of activity, flagged after a decided reclaim, or left as it is. */
   private async settleExisting(c: SeatCase, days: readonly string[]): Promise<GhostSeatRecord | null> {
     const listed = c.run.existing.get(c.seat.chainRootId);
     const existing = listed ? await this.repo.lock(c.tx, listed.id) : null;
     if (!existing || existing.state === 'CLOSED') return null;
-    if (c.gate?.gate === 'TIME_BOUND_ENDING' && UNDECIDED_STATES.includes(existing.state)) {
-      await this.ghostSeats.close(c.tx, existing, 'LEFT_TO_EXPIRE', SYSTEM, c.run.now);
-      c.run.tally.closed();
-
-      return null;
-    }
     const reaction = await this.negation.react(c.tx, existing, days, c.run.now);
     if (reaction === 'NEGATED') {
       c.run.tally.closed();
@@ -174,7 +231,7 @@ export class UsageRulesSeatService {
     const group = assessment.status === 'NEVER_ACTIVE' ? 'G3' : 'G4';
     const considered = daysAfter(
       coveredRanges({
-        windows: [{ from: usableOn, to: c.run.today }],
+        windows: [{ from: consideredFrom(usableOn, verdict.sources), to: c.run.today }],
         usableOn,
         today: c.run.today,
         leaves: leaveSpans,
@@ -197,7 +254,7 @@ export class UsageRulesSeatService {
     return { assessment, tier, group, confidence, person };
   }
 
-  /** The seat already has a recommendation: a watch that rose a tier is read again before it reaches a head; either way the seat is left out as `OPEN_RECOMMENDATION`. */
+  /** The seat already has a recommendation: a watch made before that rose a tier is read again before it reaches a head; either way the seat is left out as `OPEN_RECOMMENDATION`. */
   private async keepExisting(
     c: SeatCase,
     existing: GhostSeatRecord,
@@ -231,6 +288,7 @@ export class UsageRulesSeatService {
 
   private async create(c: SeatCase, finding: Finding, open: SeatOutcome): Promise<SeatOutcome> {
     const { run, seat } = c;
+    if (await this.closedDuringRun(c)) return open;
     const previous = run.previous.get(seat.chainRootId) ?? null;
     const transfer = run.transfers.get(seat.employeeId);
     const input: NewGhostSeat = {
@@ -263,6 +321,18 @@ export class UsageRulesSeatService {
     run.tally.created();
 
     return open;
+  }
+
+  /**
+   * Whether the recommendation the chain had when the run began was closed since by someone else (a report confirmed while the pass ran denied
+   * it): the evidence this pass read is older than what closed it, so no recommendation is made from it; the next pass judges the seat again
+   * (`TC-2`, `US-10-04` AC-5). What this pass closed itself carries its own time.
+   */
+  private async closedDuringRun(c: SeatCase): Promise<boolean> {
+    const listed = c.run.existing.get(c.seat.chainRootId);
+    const now = listed ? await this.repo.lock(c.tx, listed.id) : null;
+
+    return now?.state === 'CLOSED' && now.closedAt !== null && now.closedAt > c.run.now;
   }
 
   private async evidenceOf(

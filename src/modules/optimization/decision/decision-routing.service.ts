@@ -90,6 +90,8 @@ export class DecisionRoutingService {
         deciderDepartmentId: entry.departmentId,
         routedAt: day.now,
         decisionDueOn: dueOn,
+        // A recommendation that enters a queue again is new to it: its head is reminded and the IT Admin warned when it is overdue again.
+        overdueNoticedAt: null,
         pausedAt: null,
         pauseTransferId: null,
       },

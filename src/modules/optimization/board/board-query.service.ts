@@ -6,7 +6,7 @@ import { GhostSeatSeatStateRepo, type SeatStatus } from '../ghost-seat/ghost-sea
 import { GhostSeatRepo } from '../ghost-seat/ghost-seat.repo';
 import type { GhostSeatRecord } from '../ghost-seat/ghost-seat.types';
 import { RuleRunQueryService } from '../rule-run/rule-run-query.service';
-import { toDetailWire, toSummaryWire, type RowNames } from './board.mapper';
+import { toDetailWire, toSummaryWire, type DetailReader, type RowNames } from './board.mapper';
 import { departmentsOfScope, type DepartmentScope } from './board.policy';
 import { GhostSeatNotDeciderError, GhostSeatNotFoundError } from './board.errors';
 
@@ -81,14 +81,14 @@ export class BoardQueryService {
       if (!headed || record.deciderDepartmentId !== headed.departmentId) throw new GhostSeatNotDeciderError();
     }
 
-    return this.detailOf(record);
+    return this.detailOf(record, actor.roles.includes('IT_ADMIN') ? 'IT_ADMIN' : 'HEAD');
   }
 
-  /** The detail of a recommendation as the wire has it. */
-  async detailOf(record: GhostSeatRecord) {
+  /** The detail of a recommendation as the wire has it; a head reads the evidence in short (`SoD-2`). */
+  async detailOf(record: GhostSeatRecord, reader: DetailReader = 'IT_ADMIN') {
     const names = await this.namesOf([record]);
 
-    return toDetailWire(record, names(record));
+    return toDetailWire(record, names(record), reader);
   }
 
   /**

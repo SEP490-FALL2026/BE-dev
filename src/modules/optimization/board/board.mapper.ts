@@ -1,5 +1,5 @@
 import type { GhostSeatRecord } from '../ghost-seat/ghost-seat.types';
-import { canReclaim, confidenceLabelOf, labelsOf } from './board.policy';
+import { canReclaim, confidenceLabelOf, headEvidenceOf, labelsOf } from './board.policy';
 
 /** The names a row of the table shows besides the ids it keeps. */
 export interface RowNames {
@@ -51,9 +51,12 @@ export const toSummaryWire = (record: GhostSeatRecord, names: RowNames) => ({
   createdAt: record.createdAt.toISOString(),
 });
 
-export const toDetailWire = (record: GhostSeatRecord, names: RowNames) => ({
+/** Who reads the detail: the IT Admin reads the whole evidence, a head only what `headEvidenceOf` keeps (`SoD-2`). */
+export type DetailReader = 'IT_ADMIN' | 'HEAD';
+
+export const toDetailWire = (record: GhostSeatRecord, names: RowNames, reader: DetailReader = 'IT_ADMIN') => ({
   ...toSummaryWire(record, names),
-  evidence: { ...record.evidence },
+  evidence: reader === 'IT_ADMIN' ? { ...record.evidence } : headEvidenceOf(record.evidence),
   holderLeftOn: record.holderLeftOn,
   terminatingUntil: record.evidence.group === 'G2' ? (record.evidence.terminatingAccess?.until ?? null) : null,
   closedAt: record.closedAt?.toISOString() ?? null,

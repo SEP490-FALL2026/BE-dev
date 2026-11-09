@@ -26,10 +26,14 @@ describe('the routing of a recommendation to the head of the department (qd103-g
     ]);
   });
 
-  it('US-10-06 AC-16: the due day is the fifth working day after the day it entered the queue, skipping the weekend and the holidays', () => {
-    expect(decisionDueOn('2026-11-09', 5, new Set())).toBe('2026-11-16');
-    expect(decisionDueOn('2026-11-12', 5, new Set())).toBe('2026-11-19');
-    expect(decisionDueOn('2026-11-09', 5, new Set(['2026-11-11']))).toBe('2026-11-17');
+  it('M5-08, US-10-06 AC-16, QĐ-104k(2): the due day is the fifth working day counting the day it entered the queue, skipping the weekend and the holidays', () => {
+    expect(decisionDueOn('2026-11-02', 5, new Set())).toBe('2026-11-06');
+    expect(decisionDueOn('2026-11-09', 5, new Set())).toBe('2026-11-13');
+    expect(decisionDueOn('2026-11-12', 5, new Set())).toBe('2026-11-18');
+    expect(decisionDueOn('2026-11-09', 5, new Set(['2026-11-11']))).toBe('2026-11-16');
+    // Entered on a day off: the count starts on the next working day.
+    expect(decisionDueOn('2026-11-14', 5, new Set())).toBe('2026-11-20');
+    expect(decisionDueOn('2026-11-11', 5, new Set(['2026-11-11']))).toBe('2026-11-18');
   });
 
   it('US-10-06 AC-9: with no head the recommendation waits; with the return of the IT Admin it goes back to the head as returned', () => {

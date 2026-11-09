@@ -146,6 +146,15 @@ export class OrganizationReadApi {
     return this.employees.placementOn(employeeId, onDate ?? (await this.businessToday(new Date(), tx)), tx);
   }
 
+  /** The department of the employee's latest placement begun by `onDate`, ended or not: where a person who left last worked; null when they had none. */
+  async getLastPlacement(
+    employeeId: string,
+    onDate: BusinessDate,
+    tx?: DbTx,
+  ): Promise<{ departmentId: string } | null> {
+    return this.employees.lastPlacementBy(employeeId, onDate, tx);
+  }
+
   /** The department of the employee on `onDate` and its IT Admin, named only while still working (`US-01-11` AC-4, AC-8). */
   async getItAdminInCharge(employeeId: string, onDate?: BusinessDate, tx?: DbTx): Promise<ItAdminInCharge | null> {
     const placement = await this.getEmployeePlacement(employeeId, onDate, tx);

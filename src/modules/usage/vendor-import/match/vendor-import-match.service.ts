@@ -59,6 +59,12 @@ export class VendorImportMatchService {
       tx,
     );
 
+    const ended = await this.identities.identifiersWithEndedMapping(
+      context.applicationId,
+      context.identifierType,
+      identifiers.filter((id) => !mappings.has(id)),
+      tx,
+    );
     const emails = identifiers.filter((id) => !mappings.has(id) && looksLikeEmail(id));
     const emailHits = await this.emailHits(emails, tx);
     const accountKeys = new Map(
@@ -92,6 +98,7 @@ export class VendorImportMatchService {
       const mapping = mappings.get(id);
       const facts: IdentifierFacts = {
         mapping: mapping ? { employeeId: mapping.employeeId, method: mapping.method } : null,
+        mappingEnded: !mapping && ended.has(id),
         emailHits: emailHits.get(id) ?? [],
         accountHits: holdersOf.get(accountKeys.get(id) ?? id) ?? [],
         aliasHits: (variantsOf.get(id) ?? []).flatMap((variant) => variantHits.get(variant) ?? []),

@@ -191,6 +191,50 @@ export function personEvidenceOf(sources: readonly EvidenceSource[], employeeId:
   return out;
 }
 
+/**
+ * What every source says of one person for one chain of seats (`QĐ-35c`, `FR-4.7`, `FR-4.10`): only what happened from the day its first link
+ * could be used counts. A seat given again after a revocation inherits neither the old days of activity, nor an old appearance (a source counts
+ * the person as seen only when one of its windows reaches that day), nor an old sign-in without use or an old change of mapping.
+ */
+export function chainEvidenceOf(
+  sources: readonly EvidenceSource[],
+  employeeId: string,
+  usableOn: BusinessDate,
+): PersonEvidence {
+  const reaching = sources.filter((source) => source.windows.some((window) => window.to >= usableOn));
+  const whole = personEvidenceOf(sources, employeeId);
+  const since = personEvidenceOf(reaching, employeeId);
+  const activeDates = daysOfChain(whole.activeDates, usableOn);
+  const lastAuthOnlyDate =
+    whole.lastAuthOnlyDate !== null && whole.lastAuthOnlyDate >= usableOn ? whole.lastAuthOnlyDate : null;
+
+  return {
+    ...whole,
+    activeDates,
+    appeared: since.appeared || activeDates.length > 0 || lastAuthOnlyDate !== null,
+    inCollector: since.inCollector,
+    lastAuthOnlyDate,
+    mappingChangedOn:
+      whole.mappingChangedOn !== null && whole.mappingChangedOn >= usableOn ? whole.mappingChangedOn : null,
+  };
+}
+
+/**
+ * The first day the confidence counts the days considered from (`FR-4.14` CF-4): the later of the day the seat could be used and the first day a
+ * source that may conclude covers. A seat held long before the reports began is not short of coverage for the days no report could ever cover.
+ */
+export function consideredFrom(
+  usableOn: BusinessDate,
+  sources: readonly Pick<EvidenceSource, 'windows'>[],
+): BusinessDate {
+  const first = sources
+    .flatMap((source) => source.windows.map((window) => window.from))
+    .sort()
+    .at(0);
+
+  return first !== undefined && first > usableOn ? first : usableOn;
+}
+
 /** The days of a chain: only the ones from the day its first link could be used count (`QĐ-35c`: a seat given again after a revocation does not inherit the old days). */
 export const daysOfChain = (activeDates: readonly BusinessDate[], usableOn: BusinessDate): BusinessDate[] =>
   activeDates.filter((day) => day >= usableOn);

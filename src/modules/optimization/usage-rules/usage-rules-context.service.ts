@@ -53,7 +53,7 @@ export class UsageRulesContextService {
     }
     const existing = new Map<string, GhostSeatRecord>(
       (await this.repo.unclosedOfSeats(pass.organizationId)).flatMap((record) =>
-        record.seatChainId && record.group !== 'G2' ? [[record.seatChainId, record] as const] : [],
+        record.seatChainId ? [[record.seatChainId, record] as const] : [],
       ),
     );
     const grace = await this.parameters.getValue(NEW_ASSIGNMENT_GRACE_PARAMETER);
@@ -82,11 +82,11 @@ export class UsageRulesContextService {
       from: run.today,
       to: run.today,
     });
-    const usableOn = new Map<string, BusinessDate>();
-    for (const interval of intervals) {
-      const known = usableOn.get(interval.chainRootId);
-      if (!known || interval.usableOn < known) usableOn.set(interval.chainRootId, interval.usableOn);
-    }
+    // Every link of a chain carries the usable day of its first link, null while its grant still waits.
+    const usableOn = new Map<string, BusinessDate | null>(
+      intervals.map((interval) => [interval.chainRootId, interval.usableOn] as const),
+    );
+    const firstUsable = [...usableOn.values()].flatMap((day) => (day ? [day] : [])).sort()[0];
     const prices = new Map<string, Promise<Price>>();
 
     return {
@@ -95,7 +95,7 @@ export class UsageRulesContextService {
       verdict: verdictOfSources(evidence.sources),
       thresholds: await this.thresholdsOfApplication(applicationId),
       usableOn,
-      leaves: await this.leavesOf(people, [...usableOn.values()].sort()[0] ?? run.today, run.today),
+      leaves: await this.leavesOf(people, firstUsable ?? run.today, run.today),
       price: (planId) => {
         const known = prices.get(planId) ?? this.priceOf(planId);
         prices.set(planId, known);

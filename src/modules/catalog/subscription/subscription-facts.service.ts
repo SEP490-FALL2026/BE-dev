@@ -61,6 +61,11 @@ export class SubscriptionFactsService {
     return this.subscriptions.grantingOn(day, tx);
   }
 
+  /** The IT Admin named responsible for the subscription; null when it names none or does not exist. */
+  async responsibleItAdminOf(subscriptionId: string, tx?: DbTx): Promise<string | null> {
+    return (await this.subscriptions.find(subscriptionId, tx))?.responsibleItAdminEmployeeId ?? null;
+  }
+
   /** The ids of every subscription and purchase a department owns, by id (what a rule about the department's work reads). */
   idsOwnedBy(departmentId: string, tx?: DbTx): Promise<string[]> {
     return this.subscriptions.idsOwnedBy(departmentId, tx);

@@ -122,6 +122,10 @@ export class EmployeeRecordService {
     return this.repo.placementIdsOn(employeeId, onDate, tx);
   }
 
+  lastPlacementBy(employeeId: string, onDate: BusinessDate, tx?: DbTx): Promise<{ departmentId: string } | null> {
+    return this.repo.lastPlacementIdsBy(employeeId, onDate, tx);
+  }
+
   findManyByCodes(employeeCodes: readonly string[], tx?: DbTx): Promise<EmployeeRecord[]> {
     return this.repo.findEmployeesByCodes(employeeCodes, tx);
   }

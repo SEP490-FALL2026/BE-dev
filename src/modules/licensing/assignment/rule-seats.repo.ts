@@ -1,14 +1,37 @@
 import { Injectable } from '@nestjs/common';
 import { fromDateColumn, toDateColumn, type BusinessDate } from '../../../core/business-date';
+import type { Prisma } from '../../../generated/prisma/client';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { RevocationTaskStanding, RuleSeat, RuleSeatRevocation } from '../public/licensing-ghost-seat.types';
 import type { RevocationSource } from '../public/licensing.types';
 
+/** What a rule reads of an open seat: its plan and, of its revocations not dropped, the reasons that still stand. */
+const OPEN_SEAT_COLUMNS = {
+  id: true,
+  kind: true,
+  planId: true,
+  subscriptionId: true,
+  employeeId: true,
+  owningDepartmentId: true,
+  expectedEndDate: true,
+  validUntil: true,
+  plan: { select: { applicationId: true, provisioningType: true, pricingModel: true } },
+  provisioningTasks: {
+    where: { kind: 'REVOKE', status: { notIn: ['CLOSED_FAILED', 'CANCELLED'] } },
+    select: {
+      id: true,
+      status: true,
+      accessState: true,
+      reasons: { where: { withdrawnAt: null }, select: { source: true } },
+    },
+  },
+} satisfies Prisma.LicenseAssignmentSelect;
+
 /**
  * What the rules of wasted seats read of the open seats and of their revocation tasks: a fixed number of statements (the seats, the
- * root of each chain), however many seats there are. The seats are the ones that hold a seat on the day: not ended, not failed,
- * not cancelled.
+ * root of each chain), however many seats there are. The seats are the ones that hold a seat on the day: begun, not ended, not failed,
+ * not cancelled; the reasons read are the ones that still stand.
  */
 @Injectable()
 export class RuleSeatsRepo {
@@ -24,25 +47,13 @@ export class RuleSeatsRepo {
       where: {
         failedAt: null,
         cancelledAt: null,
+        // A link of a chain that begins later (a renewal carried ahead) is not held yet: one chain is judged once.
+        validFrom: { lte: day },
         OR: [{ validUntil: null }, { validUntil: { gt: day } }],
         ...(filter.employeeIds ? { employeeId: { in: [...filter.employeeIds] } } : {}),
         ...(filter.applicationIds ? { plan: { applicationId: { in: [...filter.applicationIds] } } } : {}),
       },
-      select: {
-        id: true,
-        kind: true,
-        planId: true,
-        subscriptionId: true,
-        employeeId: true,
-        owningDepartmentId: true,
-        expectedEndDate: true,
-        validUntil: true,
-        plan: { select: { applicationId: true, provisioningType: true, pricingModel: true } },
-        provisioningTasks: {
-          where: { kind: 'REVOKE', status: { notIn: ['CLOSED_FAILED', 'CANCELLED'] } },
-          select: { id: true, status: true, accessState: true, reasons: { select: { source: true } } },
-        },
-      },
+      select: OPEN_SEAT_COLUMNS,
       orderBy: { id: 'asc' },
     });
     const roots = await this.rootsOf(
@@ -99,7 +110,12 @@ export class RuleSeatsRepo {
     if (taskIds.length === 0) return new Map();
     const rows = await (tx ?? this.prisma).provisioningTask.findMany({
       where: { id: { in: [...taskIds] }, kind: 'REVOKE' },
-      select: { id: true, status: true, reasons: { select: { source: true, referenceId: true } } },
+      // A reason its source took back no longer asked for the task: a recommendation it named is not what the task answered.
+      select: {
+        id: true,
+        status: true,
+        reasons: { where: { withdrawnAt: null }, select: { source: true, referenceId: true } },
+      },
     });
 
     return new Map(

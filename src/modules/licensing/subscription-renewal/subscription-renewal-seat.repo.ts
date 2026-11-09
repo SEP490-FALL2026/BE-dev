@@ -41,7 +41,7 @@ export class SubscriptionRenewalSeatRepo {
              to_char(a.expected_end_date, 'YYYY-MM-DD') AS expected_end_date,
              (SELECT array_agg(DISTINCT r.source::text ORDER BY r.source::text)
                 FROM provisioning_tasks t JOIN provisioning_task_reasons r ON r.task_id = t.id
-               WHERE t.assignment_id = a.id AND t.kind = 'REVOKE'
+               WHERE t.assignment_id = a.id AND t.kind = 'REVOKE' AND r.withdrawn_at IS NULL
                  AND t.status::text = ANY(${LIVE_REVOCATION_STATES}::text[])) AS live_sources,
              EXISTS (SELECT 1 FROM provisioning_tasks t
                       WHERE t.assignment_id = a.id AND t.status::text = ANY(${OPEN_TASK_STATES}::text[])) AS has_open_task

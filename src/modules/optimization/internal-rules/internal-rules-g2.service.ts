@@ -1,6 +1,8 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { TransactionRunner, type DbTx } from '../../../infrastructure/database/transaction-runner';
 import { describeForOperator } from '../../../infrastructure/observability/operator-error';
+import { CatalogApi } from '../../catalog/public/catalog.api';
+import { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
 import { LicensingGhostSeatApi } from '../../licensing/public/licensing-ghost-seat.api';
 import type { RuleSeat } from '../../licensing/public/licensing-ghost-seat.types';
 import { NotificationsApi } from '../../notifications/public/notifications.api';
@@ -8,7 +10,7 @@ import { OrganizationReadApi } from '../../organization/public/organization-read
 import { GhostSeatRepo } from '../ghost-seat/ghost-seat.repo';
 import { GhostSeatService } from '../ghost-seat/ghost-seat.service';
 import type { GhostSeatRecord, NewGhostSeat } from '../ghost-seat/ghost-seat.types';
-import { decideG2, type ChainRecommendation, type G2Step } from './internal-rules.policy';
+import { decideG2, type ChainRecommendation, type G2Step, type SeatFacts } from './internal-rules.policy';
 import type { RulePass } from './internal-rules.types';
 
 const SYSTEM = { kind: 'SYSTEM' } as const;
@@ -27,6 +29,15 @@ const chainOf = (record: GhostSeatRecord): ChainRecommendation => ({
   holderLeftOn: record.holderLeftOn,
 });
 
+const factsOf = (seat: RuleSeat, holderLeft: boolean): SeatFacts => ({
+  kind: seat.kind,
+  provisioningType: seat.provisioningType,
+  pricingModel: seat.pricingModel,
+  holderLeft,
+  liveRevocation: seat.liveRevocation ? { taskId: seat.liveRevocation.taskId } : null,
+  terminatingUntil: seat.terminatingUntil,
+});
+
 /**
  * `G2` (`US-10-01` AC-2, AC-4, AC-6, AC-10; `US-10-02` AC-11; `US-07-05` AC-12, AC-15): a pass over the seats that are open. The seat
  * of a person who left gets one `G2` for its chain (gate 8, `decideG2` in the policy); nothing here opens a revocation (`SoD-6`: the
@@ -43,6 +54,8 @@ export class InternalRulesG2Service {
     private readonly notifications: NotificationsApi,
     private readonly repo: GhostSeatRepo,
     private readonly ghostSeats: GhostSeatService,
+    private readonly catalog: CatalogApi,
+    private readonly identity: IdentityAccessApi,
   ) {}
 
   /** Judges every open seat, then settles the recommendations whose seat or task moved (`DA6-23`: what the listener left to this pass). */
@@ -57,17 +70,7 @@ export class InternalRulesG2Service {
     const context = await this.contextOf(pass, personal);
     for (const seat of personal) {
       try {
-        const decision = decideG2(
-          {
-            kind: seat.kind,
-            provisioningType: seat.provisioningType,
-            pricingModel: seat.pricingModel,
-            holderLeft: context.holderLeft.has(seat.employeeId),
-            liveRevocation: seat.liveRevocation ? { taskId: seat.liveRevocation.taskId } : null,
-            terminatingUntil: seat.terminatingUntil,
-          },
-          existingOf(context, seat),
-        );
+        const decision = decideG2(factsOf(seat, context.holderLeft.has(seat.employeeId)), existingOf(context, seat));
         if (decision.skip) {
           pass.tally.skip({ subjectType: 'ASSIGNMENT', subjectId: seat.assignmentId, ...decision.skip });
         }
@@ -103,8 +106,28 @@ export class InternalRulesG2Service {
       if (step.kind === 'LINK_TASK') await this.ghostSeats.markReclaimDecided(tx, record, step.taskId, SYSTEM);
       else await this.ghostSeats.markHolderLeft(tx, record, pass.today, SYSTEM);
     } else if (step.kind === 'CREATE') {
-      await this.create(tx, pass, seat, step);
+      await this.createChecked(tx, pass, seat, step);
     }
+  }
+
+  /**
+   * What the pass read before the lock may have moved (a head decided the reclaim of the `G3`/`G4` it would replace, a revocation began): the
+   * recommendation it replaces is locked, the seat read again in the same transaction and judged again (`QĐ-108i`, `DA6-04`).
+   */
+  private async createChecked(
+    tx: DbTx,
+    pass: RulePass,
+    seat: RuleSeat,
+    step: Extract<G2Step, { kind: 'CREATE' }>,
+  ): Promise<void> {
+    const locked = step.supersedes ? await this.repo.lock(tx, step.supersedes) : null;
+    const replaced = locked && locked.state !== 'CLOSED' ? locked : null;
+    const seats = await this.licensing.listSeatsForRules({ asOf: pass.today, employeeIds: [seat.employeeId] }, tx);
+    const fresh = seats.find((candidate) => candidate.assignmentId === seat.assignmentId);
+    if (!fresh) return;
+    const again = decideG2(factsOf(fresh, true), replaced ? chainOf(replaced) : null).step;
+    if (again.kind === 'CREATE') await this.create(tx, pass, fresh, again, replaced);
+    else if (again.kind !== 'NONE') await this.apply(tx, pass, fresh, again);
   }
 
   private async create(
@@ -112,7 +135,9 @@ export class InternalRulesG2Service {
     pass: RulePass,
     seat: RuleSeat,
     step: Extract<G2Step, { kind: 'CREATE' }>,
+    replaced: GhostSeatRecord | null,
   ): Promise<void> {
+    const departmentId = await this.departmentOf(tx, pass, seat);
     const input: NewGhostSeat = {
       organizationId: pass.organizationId,
       group: 'G2',
@@ -124,7 +149,7 @@ export class InternalRulesG2Service {
       assignmentId: seat.assignmentId,
       seatChainId: seat.chainRootId,
       employeeId: seat.employeeId,
-      departmentId: seat.owningDepartmentId,
+      departmentId,
       freeSeats: null,
       countsTowardVacantCost: null,
       revocationTaskId: step.revocationTaskId,
@@ -138,21 +163,53 @@ export class InternalRulesG2Service {
       },
       createdRunId: pass.tally.run.id,
     };
-    const replaced = step.supersedes ? await this.repo.lock(tx, step.supersedes) : null;
-    const made =
-      replaced && replaced.state !== 'CLOSED'
-        ? await this.ghostSeats.supersede(tx, replaced, input, SYSTEM, pass.now)
-        : await this.ghostSeats.create(tx, input, SYSTEM);
+    const made = replaced
+      ? await this.ghostSeats.supersede(tx, replaced, input, SYSTEM, pass.now)
+      : await this.ghostSeats.create(tx, input, SYSTEM);
     pass.tally.created();
     if (replaced) pass.tally.closed();
-    if (made.state === 'OPEN') await this.tell(tx, pass, seat, made);
+    if (made.state === 'OPEN') await this.tell(tx, pass, seat, made, departmentId);
   }
 
-  /** The IT Admin in charge of the department that owns the seat is told once (`eventKey`); with none in charge nobody is. */
-  private async tell(tx: DbTx, pass: RulePass, seat: RuleSeat, made: GhostSeatRecord): Promise<void> {
-    const recipient = seat.owningDepartmentId
-      ? await this.organizationReads.getItAdminInChargeOfDepartment(seat.owningDepartmentId, tx)
+  /**
+   * The department a `G2` answers to: the one the holder last worked in (a seat granted from the shared pool has no owning department), else
+   * the department that owns the seat.
+   */
+  private async departmentOf(tx: DbTx, pass: RulePass, seat: RuleSeat): Promise<string | null> {
+    const last = await this.organizationReads.getLastPlacement(seat.employeeId, pass.today, tx);
+
+    return last?.departmentId ?? seat.owningDepartmentId;
+  }
+
+  /**
+   * Who is told of a `G2` (BRD MF-5: straight to the IT Admin; `US-10-01` AC-2): the IT Admin in charge of the department the holder last
+   * worked in, else of the department that owns the seat, else the IT Admin responsible for the subscription while still usable, else the
+   * first usable IT Admin. Nobody only when the organization has no usable IT Admin at all.
+   */
+  private async recipientOf(tx: DbTx, seat: RuleSeat, departmentId: string | null): Promise<string | null> {
+    for (const department of new Set([departmentId, seat.owningDepartmentId])) {
+      const inCharge = department ? await this.organizationReads.getItAdminInChargeOfDepartment(department, tx) : null;
+      if (inCharge) return inCharge;
+    }
+    const responsible = seat.subscriptionId
+      ? await this.catalog.getSubscriptionResponsibleItAdmin(seat.subscriptionId, tx)
       : null;
+    if (responsible && (await this.identity.findUsableItAdminEmployeeIds([responsible], tx)).has(responsible)) {
+      return responsible;
+    }
+
+    return this.identity.findFirstUsableItAdminEmployeeId(tx);
+  }
+
+  /** The IT Admin who answers for the seat is told once (`eventKey`). */
+  private async tell(
+    tx: DbTx,
+    pass: RulePass,
+    seat: RuleSeat,
+    made: GhostSeatRecord,
+    departmentId: string | null,
+  ): Promise<void> {
+    const recipient = await this.recipientOf(tx, seat, departmentId);
     if (!recipient) return;
     await this.notifications.notifyInApp(tx, {
       organizationId: pass.organizationId,

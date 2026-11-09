@@ -5,6 +5,7 @@ import {
   isLeftToExpire,
   isSelfDecided,
   lockOrderOf,
+  returnOutcomeOf,
 } from './decision.policy';
 
 describe('the decision of a head on a recommendation (qd103-ghost-seat-manager-decision)', () => {
@@ -56,5 +57,22 @@ describe('the decision of a head on a recommendation (qd103-ghost-seat-manager-d
     expect(isSelfDecided('E1', 'E1')).toBe(true);
     expect(isSelfDecided('E1', 'E2')).toBe(false);
     expect(isSelfDecided(null, 'E2')).toBe(false);
+  });
+});
+
+describe('returnOutcomeOf — M5-10 (OI-02, US-10-06 AC-10, AC-12): the IT Admin gives a reclaim back', () => {
+  it('gives back a reclaim whose task was closed as failed or cancelled: the seat has no live revocation', () => {
+    expect(returnOutcomeOf({ taskId: null, outcome: 'NOT_FOUND' })).toBe('CANCELLED');
+  });
+
+  it('gives back a task that goes on or was cancelled by the withdrawal; a task another IT Admin works is theirs', () => {
+    expect(returnOutcomeOf({ taskId: 't', outcome: 'CONTINUES' })).toBe('CONTINUES');
+    expect(returnOutcomeOf({ taskId: 't', outcome: 'CANCELLED' })).toBe('CANCELLED');
+    expect(returnOutcomeOf({ taskId: 't', outcome: 'IT_ADMIN_TO_CLOSE' })).toBe('IT_ADMIN_TO_CLOSE');
+  });
+
+  it('refuses a task that ended, and a live task that carries no reason of this reclaim', () => {
+    expect(returnOutcomeOf({ taskId: 't', outcome: 'ALREADY_ENDED' })).toBeNull();
+    expect(returnOutcomeOf({ taskId: 't', outcome: 'NOT_FOUND' })).toBeNull();
   });
 });

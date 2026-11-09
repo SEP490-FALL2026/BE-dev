@@ -369,6 +369,19 @@ export class EmployeeRepo {
     return row;
   }
 
+  /** The department of the latest placement begun by `onDate`, ended or not: where a person who left last worked. */
+  async lastPlacementIdsBy(
+    employeeId: string,
+    onDate: BusinessDate,
+    tx?: DbTx,
+  ): Promise<{ departmentId: string } | null> {
+    return (tx ?? this.prisma).employeePlacement.findFirst({
+      where: { employeeId, validFrom: { lte: toDateColumn(onDate) } },
+      orderBy: [{ validFrom: 'desc' }, { id: 'desc' }],
+      select: { departmentId: true },
+    });
+  }
+
   /** The employees with these codes, as far as they exist; unlocked, for the import judgement that names people by code. */
   async findEmployeesByCodes(employeeCodes: readonly string[], tx?: DbTx): Promise<EmployeeRecord[]> {
     if (employeeCodes.length === 0) return [];

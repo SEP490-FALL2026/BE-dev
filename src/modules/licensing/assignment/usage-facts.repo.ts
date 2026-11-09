@@ -7,6 +7,7 @@ import type {
   AssignmentInterval,
   AssignmentIntervalFilter,
 } from '../public/licensing-usage.types';
+import { usableDayOf } from './assignment.policy';
 
 type Db = DbTx | PrismaService;
 
@@ -57,6 +58,7 @@ export class UsageFactsRepo {
 
     return rows.map((row) => {
       const chainRootId = rootOf.get(row.id) ?? row.id;
+      const usableOn = usable.get(chainRootId);
 
       return {
         assignmentId: row.id,
@@ -66,7 +68,7 @@ export class UsageFactsRepo {
         employeeId: row.employeeId,
         from: fromDateColumn(row.validFrom),
         until: row.validUntil ? fromDateColumn(row.validUntil) : null,
-        usableOn: usable.get(chainRootId) ?? fromDateColumn(row.validFrom),
+        usableOn: usableOn === undefined ? fromDateColumn(row.validFrom) : usableOn,
       };
     });
   }
@@ -87,34 +89,33 @@ export class UsageFactsRepo {
     return new Map(roots.map((row) => [row.seat_id, row.root_id]));
   }
 
-  /** The day each first assignment of a chain could be used: the later of its `valid_from` and the day its grant task was completed (`QĐ-77n`). */
+  /**
+   * The day each first assignment of a chain could be used (`QĐ-77n`): the later of its `valid_from` and the day its grant task was completed;
+   * null while a grant task of it is still open (the invitation or the grant waits), so the seat is never judged before it could be used;
+   * its `valid_from` when no grant task was ever made (a seat of the baseline, a recorded one).
+   */
   private async usableDays(
     db: Db,
     rootIds: readonly string[],
     toBusinessDate: (instant: Date) => BusinessDate,
-  ): Promise<Map<string, BusinessDate>> {
+  ): Promise<Map<string, BusinessDate | null>> {
     const firsts = await db.licenseAssignment.findMany({
       where: { id: { in: [...rootIds] } },
       select: {
         id: true,
         validFrom: true,
         provisioningTasks: {
-          where: { kind: 'GRANT', status: 'COMPLETED' },
-          select: { completedAt: true },
-          orderBy: { completedAt: 'desc' },
-          take: 1,
+          where: { kind: 'GRANT', status: { notIn: ['CLOSED_FAILED', 'CANCELLED'] } },
+          select: { status: true, completedAt: true },
         },
       },
     });
 
     return new Map(
-      firsts.map((root) => {
-        const from = fromDateColumn(root.validFrom);
-        const done = root.provisioningTasks[0]?.completedAt;
-        const doneOn = done ? toBusinessDate(done) : null;
-
-        return [root.id, doneOn !== null && doneOn > from ? doneOn : from] as const;
-      }),
+      firsts.map((root) => [
+        root.id,
+        usableDayOf(fromDateColumn(root.validFrom), root.provisioningTasks, toBusinessDate),
+      ]),
     );
   }
 

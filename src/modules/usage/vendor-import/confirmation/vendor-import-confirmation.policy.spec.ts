@@ -3,6 +3,7 @@ import {
   daysToWrite,
   mappingToWrite,
   planOverlaps,
+  rangeCovered,
   trackingNoticeIsMissing,
   uncoveredActivity,
   unmappedEventTypesOf,
@@ -108,5 +109,29 @@ describe('FR-4.8 (Q-84): activity of a person with no seat', () => {
     ];
 
     expect(uncoveredActivity(['2026-06-30', '2026-07-01'], chain)).toBeNull();
+  });
+});
+
+describe('rangeCovered — M5-27 (FR-4.8, TC-2): a finding closes only when a seat covers its own days', () => {
+  it('is true when one seat, or seats end to end, cover every day from first to last', () => {
+    expect(rangeCovered({ first: '2026-08-10', last: '2026-08-20' }, [{ from: '2026-08-01', until: null }])).toBe(true);
+    expect(
+      rangeCovered({ first: '2026-08-10', last: '2026-09-10' }, [
+        { from: '2026-08-01', until: '2026-09-01' },
+        { from: '2026-09-01', until: null },
+      ]),
+    ).toBe(true);
+  });
+
+  it('is false when the seat begins after the first day of the finding, or leaves a gap', () => {
+    expect(rangeCovered({ first: '2026-06-10', last: '2026-08-20' }, [{ from: '2026-08-01', until: null }])).toBe(
+      false,
+    );
+    expect(
+      rangeCovered({ first: '2026-08-10', last: '2026-09-10' }, [
+        { from: '2026-08-01', until: '2026-08-20' },
+        { from: '2026-09-01', until: null },
+      ]),
+    ).toBe(false);
   });
 });

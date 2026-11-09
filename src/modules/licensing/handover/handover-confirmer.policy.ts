@@ -88,6 +88,21 @@ export function requirementOf(
   return asked.find((requirement) => requirement.role !== 'IT_ADMIN') ?? asked[0] ?? null;
 }
 
+/**
+ * Whether a reason taken back makes the duty waiting for the seat be looked at again. A duty a departure case opened (it names the case) is the
+ * case's: only a change or a cancellation of the case moves it, never another source of the task. A duty whose own source still stands on a
+ * task that goes on is left as it is. Any other duty was owed to the reason taken back, or to a task that no longer goes on.
+ */
+export function withdrawalReconsiders(
+  duty: { caseRefId: string | null; source: RevocationSource },
+  remainingSources: readonly RevocationSource[],
+  taskCancelled: boolean,
+): boolean {
+  if (duty.caseRefId !== null) return false;
+
+  return taskCancelled || !remainingSources.includes(duty.source);
+}
+
 /** An open duty of the IT Admin takes the head of a later reason instead; an open duty of anyone else is left as it is. */
 export function takesOver(open: { role: HandoverRole }, required: Requirement): boolean {
   return open.role === 'IT_ADMIN' && required.role !== 'IT_ADMIN';

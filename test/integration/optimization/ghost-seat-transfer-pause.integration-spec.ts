@@ -1,4 +1,4 @@
-import { addWorkingDays } from '../../../src/core/working-days';
+import { decisionDueOn } from '../../../src/modules/optimization/decision/decision-routing.policy';
 import { OrganizationReadApi } from '../../../src/modules/organization/public/organization-read.api';
 import { GhostSeatWorld } from '../../support/ghost-seat-world';
 
@@ -96,13 +96,36 @@ describe('a transfer pauses and resumes the recommendation of its holder (integr
       decider_department_id: h2.departmentId,
       paused_at: null,
       pause_transfer_id: null,
-      decision_due_on: addWorkingDays(await todayOf(day), 5, new Set()),
+      decision_due_on: decisionDueOn(await todayOf(day), 5, new Set()),
     });
     const resumed = (await w.auditOf('GHOST_SEAT_RECOMMENDATION', paused)).find(
       (event) => event.action === 'GHOST_SEAT.RESUMED',
     );
     expect(resumed?.after).toMatchObject({ fromDepartmentId: h1.departmentId, toDepartmentId: h2.departmentId });
     expect(await w.noticesOf('GHOST_SEAT_NEW', h2.headEmployeeId)).toHaveLength(1);
+  });
+
+  it('M5-09, FR-3.10, US-10-06 AC-14: a recommendation already told overdue before its pause is new to the queue it enters again: the overdue mark is cleared', async () => {
+    const e1 = await w.seatIn('E-TP-M509', h2.departmentId);
+    const transfer = await w.transferOf(e1.employeeId, h1.departmentId, h2.departmentId, '2026-10-12');
+    const paused = await w.seedRecommendation({
+      group: 'G4',
+      state: 'PAUSED',
+      tier: 'REVIEW',
+      assignmentId: e1.assignmentId,
+      deciderDepartmentId: h1.departmentId,
+      decisionDueOn: '2026-01-01',
+      pausedAt: new Date(),
+      pauseTransferId: transfer,
+    });
+    await w.ctx.sql.query(`UPDATE ghost_seat_recommendations SET overdue_noticed_at = now() WHERE id = $1`, [paused]);
+    await w.closeTransfer(transfer);
+
+    await w.followUp(w.nextDay());
+
+    const [row] = await w.ghostRows('id = $1', [paused]);
+    expect(row).toMatchObject({ state: 'AWAITING_DECISION', decider_department_id: h2.departmentId });
+    expect(row.overdue_noticed_at).toBeNull();
   });
 
   it('DA6-20: a MONITOR recommendation whose transfer ended goes back to open, never to a head', async () => {
@@ -166,7 +189,7 @@ describe('a transfer pauses and resumes the recommendation of its holder (integr
     expect((await w.ghostRows('id = $1', [back]))[0]).toMatchObject({
       state: 'AWAITING_DECISION',
       decider_department_id: h1.departmentId,
-      decision_due_on: addWorkingDays(await todayOf(day), 5, new Set()),
+      decision_due_on: decisionDueOn(await todayOf(day), 5, new Set()),
     });
   });
 });

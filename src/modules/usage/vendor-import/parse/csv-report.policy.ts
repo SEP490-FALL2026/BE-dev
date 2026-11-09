@@ -81,6 +81,8 @@ export function readCsvReport(text: string, source: ReadingSource): RawReport {
       events: date === '' && eventType === '' ? [] : [{ date, eventType }],
     };
   });
+  // A row may list many dates: the limit counts the (identifier, date) pairs, as it does for a JSON report.
+  if (pairs > MAX_REPORT_ROWS) throw new UsageImportFileError('FILE_TOO_MANY_ROWS', { maxRows: MAX_REPORT_ROWS });
 
   return { rows, application: null, window: null, pairs };
 }

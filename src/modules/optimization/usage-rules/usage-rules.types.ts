@@ -30,7 +30,7 @@ export interface UsageApplicationContext {
   evidence: ApplicationUsageEvidence;
   verdict: SourceVerdict;
   thresholds: Thresholds;
-  usableOn: ReadonlyMap<string, BusinessDate>;
+  usableOn: ReadonlyMap<string, BusinessDate | null>;
   leaves: ReadonlyMap<string, readonly LeaveSpan[]>;
   price: (planId: string) => Promise<{
     amountMinor: bigint;

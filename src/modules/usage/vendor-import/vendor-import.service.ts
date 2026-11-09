@@ -87,7 +87,7 @@ export class VendorImportService {
     if (problem) throw new UsageSourceRefusedError(problem);
 
     const today = await this.organizationReads.businessToday();
-    const { parsed, format } = this.read(input, source, application.name, today);
+    const { parsed, format } = this.read(input, source, application.name, today, organization.timeZone);
 
     const trackingNoticeRequired = !(await this.repo.hasCompletedForApplication(source.applicationId));
     const { rows, summary } = await this.previews.preview({ source, parsed, today, trackingNoticeRequired });
@@ -137,6 +137,7 @@ export class VendorImportService {
     source: SourceRecord,
     applicationName: string,
     today: BusinessDate,
+    organizationTimeZone: string,
   ): { parsed: ParsedReport; format: ImportFormat } {
     const text = textOf(input.bytes);
     const format: ImportFormat = text.trimStart().startsWith('{') ? 'JSON' : 'CSV';
@@ -149,6 +150,7 @@ export class VendorImportService {
         ...(input.coverageTo ? { to: input.coverageTo } : {}),
       },
       today,
+      organizationTimeZone,
     });
     const said = parsed.application;
     if (said !== null && said !== source.applicationId && said.toLowerCase() !== applicationName.toLowerCase()) {

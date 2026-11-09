@@ -62,3 +62,22 @@ export function decidableVerdictOf(input: {
 /** The head decides on their own seat (`US-10-03` AC-13): the reason is mandatory for every choice and the act is marked. */
 export const isSelfDecided = (holderEmployeeId: string | null, deciderEmployeeId: string): boolean =>
   holderEmployeeId !== null && holderEmployeeId === deciderEmployeeId;
+
+/** What became of the task of a reclaim the IT Admin gives back, as the withdrawal of the head's reason told it. */
+export type WithdrawalOutcome = 'CONTINUES' | 'CANCELLED' | 'IT_ADMIN_TO_CLOSE' | 'ALREADY_ENDED' | 'NOT_FOUND';
+
+/**
+ * Whether the IT Admin may give the reclaim back, and what the task did (`OI-02`, `US-10-06` AC-10, AC-12): the task goes on with other
+ * reasons or was cancelled; a seat with no live revocation at all (its task was closed as failed or cancelled) is given back as cancelled,
+ * since nothing is being done for the head. A task another IT Admin works is theirs to close; a task that ended or a reason not found is not
+ * given back. Null when it is refused as not returnable.
+ */
+export function returnOutcomeOf(withdrawn: {
+  taskId: string | null;
+  outcome: WithdrawalOutcome;
+}): 'CONTINUES' | 'CANCELLED' | 'IT_ADMIN_TO_CLOSE' | null {
+  if (withdrawn.outcome === 'NOT_FOUND' && withdrawn.taskId === null) return 'CANCELLED';
+  if (withdrawn.outcome === 'ALREADY_ENDED' || withdrawn.outcome === 'NOT_FOUND') return null;
+
+  return withdrawn.outcome;
+}

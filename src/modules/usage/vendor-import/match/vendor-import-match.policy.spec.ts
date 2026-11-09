@@ -49,10 +49,40 @@ describe('FR-4.5, FR-4.6: judgeIdentity, in the order of the match', () => {
   });
 });
 
+describe('M5-07 (FR-4.6, INV-12): an identifier whose mapping the IT Admin ended', () => {
+  it('is never tied again by the exact steps or the aliases: it waits in the queue', () => {
+    expect(judgeIdentity({ ...none, mappingEnded: true, emailHits: ['E1'], aliasHits: ['E1'] })).toMatchObject({
+      outcome: 'UNMATCHED',
+      employeeId: null,
+    });
+  });
+
+  it('is tied by a mapping made by hand since', () => {
+    expect(
+      judgeIdentity({
+        ...none,
+        mappingEnded: true,
+        mapping: { employeeId: 'E2', method: 'MANUAL' },
+        emailHits: ['E1'],
+      }),
+    ).toMatchObject({ outcome: 'MATCHED', employeeId: 'E2', method: 'MANUAL' });
+  });
+});
+
 describe('aliasVariants', () => {
-  it('drops the +tag of the local part and tries the domains of the company', () => {
-    expect(aliasVariants('baovh+figma@old.com', ['acme.vn'])).toEqual(['baovh@acme.vn', 'baovh@old.com']);
-    expect(aliasVariants('baovh@old.com', ['acme.vn'])).toEqual(['baovh@acme.vn']);
+  it('drops the +tag of the local part and tries the other domains of the company from a domain of the company', () => {
+    expect(aliasVariants('baovh+figma@old.com', ['acme.vn', 'old.com'])).toEqual(['baovh@acme.vn', 'baovh@old.com']);
+    expect(aliasVariants('baovh@old.com', ['acme.vn', 'old.com'])).toEqual(['baovh@acme.vn']);
+  });
+
+  it('M5-06 (FR-4.5, TC-2): never ties an address outside the company to a person of the company by its local part', () => {
+    expect(aliasVariants('nam.nv@gmail.com', ['company.com'])).toEqual([]);
+    expect(aliasVariants('nam.nv+x@gmail.com', ['company.com'])).toEqual(['nam.nv@gmail.com']);
+  });
+
+  it('M5-06: a public mail domain is never a domain of the company, even when someone works with an address on it', () => {
+    expect(aliasVariants('nam.nv@gmail.com', ['company.com', 'gmail.com'])).toEqual([]);
+    expect(aliasVariants('nam.nv@company.com', ['company.com', 'gmail.com'])).toEqual([]);
   });
 
   it('gives nothing for what is not an email, and never the identifier itself', () => {

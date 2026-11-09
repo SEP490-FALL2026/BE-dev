@@ -110639,7 +110639,8 @@
                 "default": {},
                 "type": "object",
                 "additionalProperties": { "type": "string", "enum": ["VALUE", "PASSIVE", "AUTH_ONLY", "IGNORED"] }
-              }
+              },
+              "dateFormat": { "type": "string", "enum": ["YYYY-MM-DD", "DD/MM/YYYY", "MM/DD/YYYY"] }
             },
             "required": ["columns"],
             "additionalProperties": false
@@ -110713,7 +110714,8 @@
                     "default": {},
                     "type": "object",
                     "additionalProperties": { "type": "string", "enum": ["VALUE", "PASSIVE", "AUTH_ONLY", "IGNORED"] }
-                  }
+                  },
+                  "dateFormat": { "type": "string", "enum": ["YYYY-MM-DD", "DD/MM/YYYY", "MM/DD/YYYY"] }
                 },
                 "required": ["columns"],
                 "additionalProperties": false
@@ -110898,7 +110900,8 @@
                 "default": {},
                 "type": "object",
                 "additionalProperties": { "type": "string", "enum": ["VALUE", "PASSIVE", "AUTH_ONLY", "IGNORED"] }
-              }
+              },
+              "dateFormat": { "type": "string", "enum": ["YYYY-MM-DD", "DD/MM/YYYY", "MM/DD/YYYY"] }
             },
             "required": ["columns"],
             "additionalProperties": false

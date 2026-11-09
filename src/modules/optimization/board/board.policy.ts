@@ -58,3 +58,32 @@ export const KPI5_MAX_PERIOD_DAYS = 366;
 export function isValidKpi5Period(from: BusinessDate, to: BusinessDate): boolean {
   return from <= to && addDays(from, KPI5_MAX_PERIOD_DAYS - 1) >= to;
 }
+
+/**
+ * What a head reads of the evidence of a recommendation (`SoD-2`, `FR-4.12`, BRD 7.5): the state, the last day of activity, the days and the
+ * thresholds they were judged against, the confidence level, the end of a right and what was decided before, and of each source only its name,
+ * its kind and the days it covers. How the person was tied, how old each source was, what it reads as activity and why the confidence is what it
+ * is stay with the IT Admin. The evidence of a `G1` or a `G2` is the IT Admin's and is never a head's.
+ */
+export function headEvidenceOf(evidence: GhostSeatEvidence): Record<string, unknown> {
+  if (evidence.group !== 'G3' && evidence.group !== 'G4') return { group: evidence.group };
+
+  return {
+    group: evidence.group,
+    activityStatus: evidence.activityStatus,
+    lastActiveDate: evidence.lastActiveDate,
+    inactiveDays: evidence.inactiveDays,
+    coverageDays: evidence.coverageDays,
+    thresholds: evidence.thresholds,
+    confidence: { level: evidence.confidence.level },
+    timeBound: evidence.timeBound,
+    potentialSaving: evidence.potentialSaving,
+    previousDecision: evidence.previousDecision ?? null,
+    sources: evidence.sources.map((source) => ({
+      name: source.name,
+      kind: source.kind,
+      coverageFrom: source.coverageFrom,
+      coverageTo: source.coverageTo,
+    })),
+  };
+}

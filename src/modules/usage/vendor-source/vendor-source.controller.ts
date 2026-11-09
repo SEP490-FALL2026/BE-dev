@@ -124,11 +124,7 @@ export class VendorSourceController {
       const page = await this.queries.list(query);
 
       return {
-        items: page.items.map((view) => {
-          const { template: _template, ...item } = toWire(view);
-
-          return item;
-        }),
+        items: page.items.map((view) => withoutTemplate(toWire(view))),
         pagination: page.pagination,
       };
     } catch (error) {
@@ -180,4 +176,12 @@ export class VendorSourceController {
       throw toUsageSourceApiException(error);
     }
   }
+}
+
+/** A source as a list shows it: everything but its template, which only the source itself shows. */
+function withoutTemplate<T extends { template: unknown }>(wire: T): Omit<T, 'template'> {
+  const item: Partial<T> = { ...wire };
+  delete item.template;
+
+  return item as Omit<T, 'template'>;
 }

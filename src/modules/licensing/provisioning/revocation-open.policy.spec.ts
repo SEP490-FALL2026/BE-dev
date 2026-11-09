@@ -1,5 +1,11 @@
 import { RevocationInputError } from '../public/licensing.errors';
-import { assertTiming, effectiveTiming, reasonFactsOf, revocationOpenedAudit } from './revocation-open.policy';
+import {
+  assertTiming,
+  effectiveTiming,
+  holderNoticeDay,
+  reasonFactsOf,
+  revocationOpenedAudit,
+} from './revocation-open.policy';
 
 const reason = {
   source: 'RETURN',
@@ -80,5 +86,22 @@ describe('BR-MF5-04: the timing of a revocation from its reasons', () => {
       dueOn: '2026-11-08',
     });
     expect(assertTiming(undefined)).toEqual(none);
+  });
+});
+
+describe('holderNoticeDay — M5-20 (BR-MF5-04, US-10-06 AC-2): the holder is told only of a day that holds', () => {
+  const grace = { notBefore: '2026-11-16', dueOn: null };
+
+  it('is the day not before of the grace while the task waits', () => {
+    expect(holderNoticeDay('QUEUED', [grace])).toBe('2026-11-16');
+  });
+
+  it('is null when a security reason (or any reason that asks at once) stands: the person is not warned', () => {
+    expect(holderNoticeDay('QUEUED', [grace, { notBefore: null, dueOn: null }])).toBeNull();
+  });
+
+  it('is null when the task was already completed or dropped', () => {
+    expect(holderNoticeDay('COMPLETED', [grace])).toBeNull();
+    expect(holderNoticeDay('CANCELLED', [grace])).toBeNull();
   });
 });

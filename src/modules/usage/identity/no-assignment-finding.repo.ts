@@ -49,6 +49,26 @@ export class NoAssignmentFindingRepo {
     return result.count;
   }
 
+  /** The days, first and last, of the open finding of each of these people, by employee id. */
+  async openRangesOf(
+    applicationId: string,
+    employeeIds: readonly string[],
+    tx?: DbTx,
+  ): Promise<Map<string, { first: BusinessDate; last: BusinessDate }>> {
+    if (employeeIds.length === 0) return new Map();
+    const rows = await (tx ?? this.prisma).usageNoAssignmentFinding.findMany({
+      where: { applicationId, employeeId: { in: [...employeeIds] }, status: 'OPEN' },
+      select: { employeeId: true, firstActivityDate: true, lastActivityDate: true },
+    });
+
+    return new Map(
+      rows.map((row) => [
+        row.employeeId,
+        { first: fromDateColumn(row.firstActivityDate), last: fromDateColumn(row.lastActivityDate) },
+      ]),
+    );
+  }
+
   /** The people of these who have an open finding. */
   async employeesWithOpen(applicationId: string, employeeIds: readonly string[], tx?: DbTx): Promise<Set<string>> {
     if (employeeIds.length === 0) return new Set();

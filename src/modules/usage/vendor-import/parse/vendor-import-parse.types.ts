@@ -34,6 +34,8 @@ export interface ReadingSource {
   reportShape: UsageReportShape;
   template: SourceTemplate;
   capabilities: SourceCapabilities;
+  /** The IANA zone the vendor writes its times in: a time with no offset is read in it. */
+  timeZone?: string;
 }
 
 export interface ParseInput {
@@ -43,6 +45,8 @@ export interface ParseInput {
   /** The window the IT Admin typed with the upload; it wins over one inside the file. */
   declared: { from?: BusinessDate; to?: BusinessDate };
   today: BusinessDate;
+  /** The zone of the organization: the day of an instant the report names is the day it is there. */
+  organizationTimeZone?: string;
 }
 
 export interface ParsedReport {

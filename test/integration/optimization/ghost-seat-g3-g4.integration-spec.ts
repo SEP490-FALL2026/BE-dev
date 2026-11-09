@@ -1,11 +1,15 @@
 import { randomUUID } from 'node:crypto';
 import { addDays } from '../../../src/core/business-date';
+import { IdentityAccessApi } from '../../../src/modules/identity-access/public/identity-access.api';
 import { ghostSeatEvidenceJson } from '../../../src/modules/optimization/ghost-seat/ghost-seat-evidence.json';
 import { BoardQueryService } from '../../../src/modules/optimization/board/board-query.service';
 import { BoardSummaryService } from '../../../src/modules/optimization/board/board-summary.service';
 import { UsageRulesThresholdService } from '../../../src/modules/optimization/usage-rules/threshold/usage-rules-threshold.service';
+import { UsageNegationService } from '../../../src/modules/optimization/usage-rules/usage-negation.service';
+import { UsageRulesContextService } from '../../../src/modules/optimization/usage-rules/usage-rules-context.service';
 import { UsageRulesService } from '../../../src/modules/optimization/usage-rules/usage-rules.service';
 import { createDepartment } from '../../support/builders/organization.builder';
+import { seedUsageRecommendation } from '../../support/ghost-seat-usage-evidence';
 import { pretendBusinessToday } from '../../support/pretend-today';
 import { EVENT_SOURCE, UsageHarness } from '../../support/vendor-usage-harness';
 
@@ -130,6 +134,9 @@ describe('G3 / G4: the weekly pass, gates 2-7, the three states, days over the c
       )
     ).rows[0];
 
+  const seedOn = (employeeId: string, group: 'G2' | 'G4', tier: 'MONITOR' | 'REVIEW' = 'MONITOR') =>
+    seedUsageRecommendation(h.ctx.sql, h.seed.organizationId, { employeeId, group, tier });
+
   it('US-10-03 AC-2, TC-3: a holder the report never names is a G3 of the action tier; the other holder, active 10 days ago, has none', async () => {
     const today = nextToday();
     const w = await world(today, [{ last: null }, { last: addDays(today, -10) }], {
@@ -158,7 +165,7 @@ describe('G3 / G4: the weekly pass, gates 2-7, the three states, days over the c
     expect(JSON.stringify(g3.evidence)).not.toMatch(/tokens|sessions|responses|volume/);
   });
 
-  it('US-10-03 AC-1, AC-5: last activity 66 days ago over a window of 91 days is a G4 review of 65 days; 41 days ago is a G4 watch with no routing', async () => {
+  it('US-10-03 AC-1, AC-5, M5-18: last activity 66 days ago over a window of 91 days is a G4 review of 65 days; 41 days ago is a watch on the board, no recommendation', async () => {
     const today = nextToday();
     const w = await world(
       today,
@@ -178,12 +185,9 @@ describe('G3 / G4: the weekly pass, gates 2-7, the three states, days over the c
       state: 'OPEN',
       activity_status: 'INACTIVE',
     });
-    expect((await rowsOf(w.people[1]))[0]).toMatchObject({
-      group: 'G4',
-      tier: 'MONITOR',
-      state: 'OPEN',
-      inactive_days: 40,
-    });
+    // M5-18, FR-4.12: the watch tier is the board's only, never a recommendation.
+    expect(await rowsOf(w.people[1])).toEqual([]);
+    expect(await seatState(w.people[1])).toMatchObject({ status: 'INACTIVE', inactive_days: 40 });
     expect(await rowsOf(w.people[2])).toEqual([]);
   });
 
@@ -235,7 +239,9 @@ describe('G3 / G4: the weekly pass, gates 2-7, the three states, days over the c
 
     await service().run(new Date());
 
-    expect((await rowsOf(person))[0]).toMatchObject({ group: 'G4', tier: 'MONITOR', inactive_days: 20 + 31 });
+    // M5-18: a watch is the state of the seat only.
+    expect(await rowsOf(person)).toEqual([]);
+    expect(await seatState(person)).toMatchObject({ status: 'INACTIVE', inactive_days: 20 + 31 });
   });
 
   it('US-10-02 AC-12, AC-2: a seat usable 10 days ago is new and left out; so is one whose grant waits; neither is a recommendation', async () => {
@@ -250,6 +256,27 @@ describe('G3 / G4: the weekly pass, gates 2-7, the three states, days over the c
     expect(await rowsOf(w.people[0])).toEqual([]);
     expect(await skipOf(run!.id, w.people[0])).toMatchObject({ gate: 'NEW_ASSIGNMENT' });
     expect(await seatState(w.people[0])).toMatchObject({ status: 'EXCLUDED', gate: 'NEW_ASSIGNMENT' });
+  });
+
+  it('M5-01, FR-4.9 gate 4, QĐ-77n: a seat granted long ago whose grant task is still open is NOT_USABLE, never a G3', async () => {
+    const today = nextToday();
+    const w = await world(today, [{ last: null }, { last: addDays(today, -2) }], {
+      from: addDays(today, -91),
+      to: addDays(today, -1),
+    });
+    // The invitation is still waiting: the grant task of the first link was never completed.
+    await h.ctx.sql.query(
+      `INSERT INTO provisioning_tasks (id, organization_id, assignment_id, kind, channel, request_id, max_attempts, created_by_app_user_id)
+       SELECT gen_random_uuid(), organization_id, id, 'GRANT', 'MANUAL', gen_random_uuid(), 4, gen_random_uuid()
+         FROM license_assignments WHERE employee_id = $1`,
+      [w.people[0]],
+    );
+
+    const run = await service().run(new Date());
+
+    expect(await rowsOf(w.people[0])).toEqual([]);
+    expect(await skipOf(run!.id, w.people[0])).toMatchObject({ gate: 'NOT_USABLE' });
+    expect(await seatState(w.people[0])).toMatchObject({ status: 'EXCLUDED', gate: 'NOT_USABLE' });
   });
 
   it('US-10-03 AC-3: an application with no source has every seat NO_DATA, never inactive and never a G3', async () => {
@@ -289,14 +316,17 @@ describe('G3 / G4: the weekly pass, gates 2-7, the three states, days over the c
           [w.applicationId],
         )
       ).rows;
-    expect(await notices()).toHaveLength(1);
+    // M5-36: every usable IT Admin is told, once each.
+    const itAdmins = await h.ctx.app.get(IdentityAccessApi).findAllUsableItAdminEmployeeIds();
+    expect(itAdmins.length).toBeGreaterThan(0);
+    expect(await notices()).toHaveLength(itAdmins.length);
     expect((await notices())[0].params).toMatchObject({ coverageTo: addDays(today, -9), freshnessDays: 9 });
 
     // The next week the same report is the same source and day: nothing more is said.
     const later = nextToday();
     pretendBusinessToday(h.ctx.app, later);
     await service().run(new Date());
-    expect(await notices()).toHaveLength(1);
+    expect(await notices()).toHaveLength(itAdmins.length);
   });
 
   it('US-10-02 AC-5, US-10-03 AC-9: covered 48 days (usable 15/07, window to 31/08) is left out for COVERAGE; 78 days is judged', async () => {
@@ -387,9 +417,9 @@ describe('G3 / G4: the weekly pass, gates 2-7, the three states, days over the c
 
     await service().run(new Date());
 
-    const [row] = await rowsOf(w.people[0]);
-    expect(row).toMatchObject({ group: 'G4', tier: 'MONITOR', inactive_days: 80 });
-    expect(row.evidence).toMatchObject({ thresholds: { origin: 'APPLICATION', values: { review: 120 } } });
+    // M5-18: 80 days under a review threshold of 120 is a watch: on the board, no recommendation.
+    expect(await rowsOf(w.people[0])).toEqual([]);
+    expect(await seatState(w.people[0])).toMatchObject({ status: 'INACTIVE', inactive_days: 80 });
   });
 
   it('R-J01 / DA6-16: a right that ends within a month is left out and not recommended; an open G4 of one that now ends within a month closes LEFT_TO_EXPIRE with no notice', async () => {
@@ -426,15 +456,15 @@ describe('G3 / G4: the weekly pass, gates 2-7, the three states, days over the c
     expect(await noticesOf(w.people[0], 'GHOST_SEAT_NEW')).toEqual([]);
   });
 
-  it('gate 8: a seat that already has a recommendation is left out with OPEN_RECOMMENDATION; a watch that rises a tier is read again before it reaches a head', async () => {
+  it('M5-18, FR-4.12: a seat that was a watch on the board becomes a review recommendation once it rises a tier', async () => {
     const today = nextToday();
     const w = await world(today, [{ last: addDays(today, -41) }, { last: addDays(today, -2) }], {
       from: addDays(today, -91),
       to: addDays(today, -1),
     });
     await service().run(new Date());
-    const [watch] = await rowsOf(w.people[0]);
-    expect(watch).toMatchObject({ tier: 'MONITOR', inactive_days: 40 });
+    // M5-18: the watch is the board's only; the review it rises to is the first recommendation of the seat.
+    expect(await rowsOf(w.people[0])).toEqual([]);
 
     // Four weeks on, with a newer report that adds no activity, the same seat has 68 days: the watch rises to review in the same row.
     const later = addDays(today, 28);
@@ -452,13 +482,122 @@ describe('G3 / G4: the weekly pass, gates 2-7, the three states, days over the c
       { coverageFrom: addDays(today, 0), coverageTo: addDays(later, -1) },
     );
     week += 4;
-    const run = await service().run(new Date());
+    await service().run(new Date());
 
     const rows = await rowsOf(w.people[0]);
     expect(rows).toHaveLength(1);
-    expect(rows[0]).toMatchObject({ id: watch.id, tier: 'REVIEW', group: 'G4' });
+    expect(rows[0]).toMatchObject({ tier: 'REVIEW', group: 'G4' });
     expect(rows[0].inactive_days).toBeGreaterThanOrEqual(60);
+  });
+
+  it('M5-02, FR-4.9 gate 8: a seat whose G2 is still open is left out with OPEN_RECOMMENDATION; no G3 is tried, nothing fails', async () => {
+    const today = nextToday();
+    const w = await world(today, [{ last: null }, { last: addDays(today, -2) }], {
+      from: addDays(today, -91),
+      to: addDays(today, -1),
+    });
+    const g2 = await seedOn(w.people[0], 'G2');
+
+    const run = await service().run(new Date());
+
+    expect(await rowsOf(w.people[0])).toEqual([expect.objectContaining({ id: g2, group: 'G2', state: 'OPEN' })]);
     expect(await skipOf(run!.id, w.people[0])).toMatchObject({ gate: 'OPEN_RECOMMENDATION' });
+    expect(await seatState(w.people[0])).toMatchObject({ status: 'EXCLUDED', gate: 'OPEN_RECOMMENDATION' });
+    expect(run).toMatchObject({ status: 'COMPLETED' });
+  });
+
+  it('M5-12, FR-4.9 gates 3 and 7: an undecided G4 of a holder now on long leave closes OUT_OF_SCOPE; one whose right ends within a month closes LEFT_TO_EXPIRE even while on leave', async () => {
+    const today = nextToday();
+    const w = await world(
+      today,
+      [{ last: addDays(today, -66) }, { last: addDays(today, -66) }, { last: addDays(today, -2) }],
+      { from: addDays(today, -91), to: addDays(today, -1) },
+    );
+    const onLeave = await seedOn(w.people[0], 'G4', 'REVIEW');
+    const ending = await seedOn(w.people[1], 'G4', 'REVIEW');
+    for (const person of [w.people[0], w.people[1]]) {
+      await h.ctx.sql.query(
+        `INSERT INTO employee_leaves (id, organization_id, employee_id, started_on, approved_return_on, status, grounds_type,
+                                      grounds_reference, grounds_issuer, grounds_issued_on, started_by_app_user_id)
+         VALUES (gen_random_uuid(), $1, $2, $3::date, $4::date, 'ACTIVE', 'T', 'M5-12', 'I', $3::date, gen_random_uuid())`,
+        [h.seed.organizationId, person, addDays(today, -1), addDays(today, 60)],
+      );
+    }
+    await h.ctx.sql.query(`UPDATE license_assignments SET expected_end_date = $2 WHERE employee_id = $1`, [
+      w.people[1],
+      addDays(today, 20),
+    ]);
+
+    const run = await service().run(new Date());
+
+    expect((await rowsOf(w.people[0]))[0]).toMatchObject({
+      id: onLeave,
+      state: 'CLOSED',
+      close_reason: 'OUT_OF_SCOPE',
+    });
+    expect(await skipOf(run!.id, w.people[0])).toMatchObject({ gate: 'LEAVE_OR_HANDOVER' });
+    expect((await rowsOf(w.people[1]))[0]).toMatchObject({
+      id: ending,
+      state: 'CLOSED',
+      close_reason: 'LEFT_TO_EXPIRE',
+    });
+  });
+
+  it('M5-14: a fault of the rules while a report is confirmed is undone behind a savepoint; the import is kept COMPLETED', async () => {
+    jest.spyOn(h.ctx.app.get(UsageNegationService), 'negateForApplication').mockImplementation(async (tx) => {
+      // A statement that fails aborts the transaction unless the listener fenced it.
+      await tx.$executeRawUnsafe('SELECT 1 / 0');
+
+      return 0;
+    });
+    const today = nextToday();
+    const w = await world(today, [{ last: addDays(today, -2) }], { from: addDays(today, -91), to: addDays(today, -1) });
+
+    const { rows } = await h.ctx.sql.query<{ status: string }>(
+      `SELECT status::text FROM usage_imports WHERE source_id = $1`,
+      [w.sourceId],
+    );
+    expect(rows).toEqual([{ status: 'COMPLETED' }]);
+  });
+
+  it('M5-13, TC-2: a recommendation a report denied while the pass ran is not made again from the evidence the pass read before', async () => {
+    const today = nextToday();
+    const w = await world(today, [{ last: addDays(today, -66) }, { last: addDays(today, -2) }], {
+      from: addDays(today, -91),
+      to: addDays(today, -1),
+    });
+    const denied = await seedOn(w.people[0], 'G4', 'REVIEW');
+    const context = h.ctx.app.get(UsageRulesContextService);
+    const original = context.applicationOf.bind(context);
+    jest.spyOn(context, 'applicationOf').mockImplementation(async (run, applicationId, seats) => {
+      const app = await original(run, applicationId, seats);
+      // The listener of a confirmed report closes it after the pass began and after it read the evidence.
+      await h.ctx.sql.query(
+        `UPDATE ghost_seat_recommendations SET state = 'CLOSED', close_reason = 'NEGATED', closed_at = now() + interval '1 second'
+          WHERE id = $1 AND state <> 'CLOSED'`,
+        [denied],
+      );
+
+      return app;
+    });
+
+    await service().run(new Date());
+
+    expect(await rowsOf(w.people[0])).toEqual([expect.objectContaining({ id: denied, close_reason: 'NEGATED' })]);
+  });
+
+  it('M5-18, FR-4.12: a watch made before is closed OUT_OF_SCOPE by the next pass and holds no place at gate 8', async () => {
+    const today = nextToday();
+    const w = await world(today, [{ last: addDays(today, -41) }, { last: addDays(today, -2) }], {
+      from: addDays(today, -91),
+      to: addDays(today, -1),
+    });
+    const watch = await seedOn(w.people[0], 'G4');
+
+    await service().run(new Date());
+
+    expect((await rowsOf(w.people[0]))[0]).toMatchObject({ id: watch, state: 'CLOSED', close_reason: 'OUT_OF_SCOPE' });
+    expect(await rowsOf(w.people[0])).toHaveLength(1);
   });
 
   it('US-10-04 AC-5, Q-92: the confirmation of a report with activity after the last day closes an undecided G4 NEGATED at once, with no notice; a decided reclaim stays and is flagged', async () => {

@@ -22,7 +22,15 @@ describe('G1 (gate 1)', () => {
       skip: null,
       step: { kind: 'CREATE', freeSeats: 12, countsTowardVacantCost: true, action: 'REGRANT_OR_REDUCE' },
     });
-    expect(decideG1(vacancy({ provisioningType: 'K1' }), null).step).toMatchObject({ countsTowardVacantCost: false });
+  });
+
+  it('M5-11 (BRD 5.4.1, QĐ-103d(2)): G1 is only for the shared pool; a K1 or K3 subscription with free seats has none, and an open one closes', () => {
+    expect(decideG1(vacancy({ provisioningType: 'K1' }), null)).toEqual({ skip: null, step: { kind: 'NONE' } });
+    expect(decideG1(vacancy({ provisioningType: 'K3' }), null)).toEqual({ skip: null, step: { kind: 'NONE' } });
+    expect(decideG1(vacancy({ provisioningType: 'K1' }), { freeSeats: 3 }).step).toEqual({
+      kind: 'CLOSE',
+      reason: 'OUT_OF_SCOPE',
+    });
   });
 
   it('keeps the action of a K4 key pool apart: regrant before buying more (Q-12)', () => {

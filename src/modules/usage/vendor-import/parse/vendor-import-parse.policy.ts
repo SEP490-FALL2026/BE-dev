@@ -1,6 +1,12 @@
-import { isBusinessDate, type BusinessDate } from '../../../../core/business-date';
+import { businessDateAt, isBusinessDate, type BusinessDate } from '../../../../core/business-date';
+import { instantAtWallClock } from '../../../../core/working-days';
 import { looksLikeSecret, normalizeAccountIdentifier } from '../../../licensing/public/account-identifier.policy';
-import type { UsageIdentifierType } from '../../vendor-source/vendor-source.types';
+import type {
+  DateFormat,
+  EventClassMapping,
+  SourceTemplate,
+  UsageIdentifierType,
+} from '../../vendor-source/vendor-source.types';
 import {
   MAX_DAYS_PER_ROW,
   MAX_ROW_ERRORS,
@@ -10,7 +16,7 @@ import {
   type ReportRow,
   type RowError,
 } from '../vendor-import.types';
-import { judgeDayInWindow, resolveWindow } from './coverage-window.policy';
+import { judgeDayInWindow, resolveWindow, typedWiderThanFile } from './coverage-window.policy';
 import { readCsvReport } from './csv-report.policy';
 import { readJsonReport } from './json-report.policy';
 import type { ParsedReport, ParseInput, RawReport, RawReportRow, ReadingSource } from './vendor-import-parse.types';
@@ -23,12 +29,61 @@ export function normalizeIdentifier(raw: string, type: UsageIdentifierType): str
   return type === 'ACCOUNT_ID' ? raw.normalize('NFKC').trim() : normalizeAccountIdentifier(raw);
 }
 
-/** The day a cell names: `2026-06-01`, or a date with a time after it (the date as written); null when it is not a date. */
-function dayOf(text: string): BusinessDate | null {
-  const date = /^\d{4}-\d{2}-\d{2}/.test(text.trim()) ? text.trim().slice(0, 10) : null;
-
-  return date !== null && isBusinessDate(date) ? date : null;
+/** How the dates of a report are read: the order of a date written with slashes, the zone of the vendor and the zone of the organization. */
+export interface DateReading {
+  dateFormat: DateFormat;
+  sourceTimeZone: string;
+  organizationTimeZone: string;
 }
+
+const DATE_ONLY = /^\d{4}-\d{2}-\d{2}$/;
+const DATE_TIME = /^(\d{4}-\d{2}-\d{2})[T ](\d{2}):(\d{2})(?::(\d{2})(?:\.\d{1,9})?)?(Z|[+-]\d{2}:?\d{2})?$/i;
+const SLASHED = /^(\d{1,2})\/(\d{1,2})\/(\d{4})$/;
+
+/** `+0700` and `+07:00` are the same offset; `z` is `Z`. */
+const zoneSuffix = (zone: string): string =>
+  /^[+-]\d{4}$/.test(zone) ? `${zone.slice(0, 3)}:${zone.slice(3)}` : zone.toUpperCase();
+
+function slashedDay(value: string, dateFormat: DateFormat): BusinessDate | null {
+  const parts = SLASHED.exec(value);
+  if (!parts) return null;
+  const [day, month] = dateFormat === 'DD/MM/YYYY' ? [parts[1], parts[2]] : [parts[2], parts[1]];
+  const date = `${parts[3]}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+
+  return isBusinessDate(date) ? date : null;
+}
+
+/**
+ * The day of the organization a cell names (`FR-4.2`), read strictly: a date alone is the day as written (the vendor's own day, in its zone); a
+ * date with a time and an offset is that instant, and one with a time but no offset is that wall clock in the zone of the source, either taken
+ * to the day it is in the zone of the organization; a date written with slashes is read in the order the template names. Anything else, a
+ * date with more after it included, is null.
+ */
+export function dayOf(text: string, reading: DateReading): BusinessDate | null {
+  const value = text.trim();
+  if (reading.dateFormat !== 'YYYY-MM-DD') return slashedDay(value, reading.dateFormat);
+  if (DATE_ONLY.test(value)) return isBusinessDate(value) ? value : null;
+  const parts = DATE_TIME.exec(value);
+  if (!parts || !isBusinessDate(parts[1])) return null;
+  const [hours, minutes, seconds] = [Number(parts[2]), Number(parts[3]), Number(parts[4] ?? '0')];
+  if (hours > 23 || minutes > 59 || seconds > 59) return null;
+  const zone = parts[5];
+  const instant = zone
+    ? new Date(`${parts[1]}T${parts[2]}:${parts[3]}:${String(seconds).padStart(2, '0')}${zoneSuffix(zone)}`)
+    : instantAtWallClock(
+        { date: parts[1], msOfDay: ((hours * 60 + minutes) * 60 + seconds) * 1000 },
+        reading.sourceTimeZone,
+      );
+
+  return Number.isNaN(instant.getTime()) ? null : businessDateAt(instant, reading.organizationTimeZone);
+}
+
+/** How a source reads its dates; a source or an organization that names no zone reads in UTC. */
+const readingOf = (source: ReadingSource, organizationTimeZone: string | undefined): DateReading => ({
+  dateFormat: source.template.dateFormat ?? 'YYYY-MM-DD',
+  sourceTimeZone: source.timeZone ?? organizationTimeZone ?? 'UTC',
+  organizationTimeZone: organizationTimeZone ?? source.timeZone ?? 'UTC',
+});
 
 /** Whether the row names no date, no last activity and no event: it only says the person is there. */
 function isListedOnly(raw: RawReportRow): boolean {
@@ -57,13 +112,28 @@ function identifierOf(
   return { shown: raw.identifier.trim().slice(0, 320), normalized, errors };
 }
 
+/**
+ * The class the template gives a type of event, by its own keys only: a type named like a property of every object (`constructor`,
+ * `__proto__`) is a type the template does not know, never something inherited.
+ */
+function eventClassOf(classes: SourceTemplate['eventClasses'], type: string): EventClassMapping | undefined {
+  if (Object.hasOwn(classes, type)) return classes[type];
+  const lower = type.toLowerCase();
+
+  return Object.hasOwn(classes, lower) ? classes[lower] : undefined;
+}
+
 /** The days a row names, sorted by the template, and the faults of its dates and event types. */
-function daysOf(raw: RawReportRow, source: ReadingSource): { days: ReportDay[]; errors: RowError[] } {
+function daysOf(
+  raw: RawReportRow,
+  source: ReadingSource,
+  reading: DateReading,
+): { days: ReportDay[]; errors: RowError[] } {
   const days: ReportDay[] = [];
   const errors: RowError[] = [];
   const listed = (values: readonly string[], basis: ReportDay['basis']) => {
     for (const value of values) {
-      const date = dayOf(value);
+      const date = dayOf(value, reading);
       if (date === null) errors.push({ code: 'DATE_INVALID' });
       else days.push({ date, eventClass: 'VALUE', basis });
     }
@@ -72,12 +142,12 @@ function daysOf(raw: RawReportRow, source: ReadingSource): { days: ReportDay[]; 
   listed(raw.lastActivityDate === null ? [] : [raw.lastActivityDate], 'LAST_ACTIVITY');
 
   for (const event of raw.events) {
-    const date = dayOf(event.date);
+    const date = dayOf(event.date, reading);
     const type = event.eventType.trim();
     if (date === null) errors.push({ code: 'DATE_INVALID' });
     if (type === '') errors.push({ code: 'EVENT_TYPE_MISSING' });
     if (date === null || type === '') continue;
-    const mapped = source.template.eventClasses[type] ?? source.template.eventClasses[type.toLowerCase()];
+    const mapped = eventClassOf(source.template.eventClasses, type);
     if (mapped === 'IGNORED') continue;
     days.push(
       mapped === undefined
@@ -102,9 +172,9 @@ function distinctDays(days: readonly ReportDay[]): ReportDay[] {
   });
 }
 
-function shapeRow(raw: RawReportRow, source: ReadingSource, seen: Set<string>): ReportRow {
+function shapeRow(raw: RawReportRow, source: ReadingSource, seen: Set<string>, reading: DateReading): ReportRow {
   const identifier = identifierOf(raw, source, seen);
-  const read = raw.notAPerson ? { days: [], errors: [] } : daysOf(raw, source);
+  const read = raw.notAPerson ? { days: [], errors: [] } : daysOf(raw, source, reading);
   const days = distinctDays(read.days);
   const errors = days.length > MAX_DAYS_PER_ROW ? [...read.errors, { code: 'TOO_MANY_DAYS' }] : read.errors;
 
@@ -140,7 +210,8 @@ function judgeAgainstWindow(rows: readonly ReportRow[], listed: ReadonlySet<Repo
 export function parseReport(input: ParseInput): ParsedReport {
   const raw: RawReport = input.format === 'JSON' ? readJsonReport(input.text) : readCsvReport(input.text, input.source);
   const seen = new Set<string>();
-  const rows = raw.rows.map((row) => shapeRow(row, input.source, seen));
+  const reading = readingOf(input.source, input.organizationTimeZone);
+  const rows = raw.rows.map((row) => shapeRow(row, input.source, seen, reading));
   const listed = new Set(raw.rows.flatMap((row, index) => (isListedOnly(row) ? [rows[index]] : [])));
 
   const typed = Boolean(input.declared.from || input.declared.to);
@@ -151,6 +222,7 @@ export function parseReport(input: ParseInput): ParsedReport {
     maxHistoryDays: input.source.capabilities.maxHistoryDays,
   });
   judgeAgainstWindow(rows, listed, window);
+  if (typed && typedWiderThanFile(window, raw.window)) warnings.push('DECLARED_WINDOW_WIDER_THAN_FILE');
 
   const unmapped = rows.flatMap((row) =>
     row.days.flatMap((day) => (day.eventClass === null && day.eventType ? [day.eventType] : [])),

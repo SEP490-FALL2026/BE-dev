@@ -16,7 +16,7 @@ export const MAX_REPORT_BYTES = 10 * 1024 * 1024;
 export const MAX_WINDOW_DAYS = 366;
 /** The days of a confirmed report are written this many at a time. */
 export const CHUNK_SIZE = 5_000;
-/** The most warnings a summary carries (today one: the window is longer than the history of the vendor). */
+/** The most warnings a summary carries (the window is longer than the history of the vendor; the typed window is wider than the file's). */
 export const MAX_SUMMARY_WARNINGS = 10;
 /** The most types of event a summary names as not sorted; the rest are not listed, the count of the first is enough to sort them. */
 export const MAX_UNMAPPED_EVENT_TYPES = 200;
