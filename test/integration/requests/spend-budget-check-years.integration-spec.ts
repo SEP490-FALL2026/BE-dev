@@ -113,10 +113,11 @@ describe('the check of the budget by year over PostgreSQL (US-06-12 AC-11 to AC-
       const table = h.dataOf<{ items: Array<Record<string, unknown> & { costCenter: { id: string } }> }>(
         await h.table(h.finance, { year: h.year, pageSize: 100 }).expect(200),
       );
+      // RV-10: the table also counts what waits for the spend decision (this request, 10), which its own check leaves out.
       expect(table.items.find((row) => row.costCenter.id === u.department.unitId)).toMatchObject({
         committed: { amount: String(30 * M) },
         spent: { amount: String(20 * M) },
-        remaining: { amount: String(50 * M) },
+        remaining: { amount: String(40 * M) },
         overCommitted: false,
       });
     });

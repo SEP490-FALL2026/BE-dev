@@ -6,6 +6,7 @@ import { PROJECT_ROOT, stopCliProcesses } from '../../support/cli-process';
 import { dropDisposableDatabase, provisionDisposableDatabase } from '../../support/disposable-database';
 import {
   DEPLOY_TIMEOUT_MS,
+  committedMigrations,
   deployMigrations,
   migrationBefore,
   migrationEndingWith,
@@ -118,6 +119,10 @@ describe('the migration of the commitments of 01/01 over an organization that al
         // No check backs a commitment of 01/01 (nobody decided it): the database refuses a commitment of that origin that names one.
         expect(await hold(2028, 'origin, snapshot_check_id', ['YEAR_START', randomUUID()])).toBe('23514');
         expect(await sqlState(sql, `DELETE FROM organizations WHERE id = $1`, [organizationId])).toBe('23503');
+        // The migrations written after this one (10/11/2026: G9-02, K4, GH, history, MF-4) are applied the same way, so the schema is whole.
+        for (const later of committedMigrations().slice(committedMigrations().indexOf(TARGET) + 1)) {
+          await sql.query(sqlOf(later));
+        }
         expect(await schemaDrift(database).then((result) => result.code)).toBe(0);
       } finally {
         await sql.end();

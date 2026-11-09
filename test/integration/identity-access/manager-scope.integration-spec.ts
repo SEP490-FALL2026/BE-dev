@@ -90,7 +90,8 @@ describe('the scope of the Manager: MANAGER held, no department headed (integrat
             request(h.server())
               .post('/api/v1/budget-proposals')
               .set(h.as(holder.account))
-              .send({ year: year(), lines: [{ description: 'Seats', seats: 1, amount: { amount: '1' } }] }),
+              // The lines of a proposal take the form of BM-10 (MF4-B); a valid body reaches the scope of the caller.
+              .send(h.proposalBody('', undefined, year())),
         ],
         [
           'budgetProposalAttachmentDeclare',

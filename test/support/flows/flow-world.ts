@@ -52,6 +52,7 @@ export class FlowWorld {
         providerOverrides: [...SWEEPER_OVERRIDES, { token: OBJECT_STORAGE, useValue: storage }],
       });
       const world = new FlowWorld(ctx, database, clock, storage);
+      await world.exemptFromRequestLimits();
       world.registerPasses();
 
       return world;
@@ -60,6 +61,28 @@ export class FlowWorld {
       clock.stop();
       await dropDisposableDatabase(database);
       throw error;
+    }
+  }
+
+  /**
+   * The journeys send requests for people of the dataset who already have one open for the same plan; GH-1 and GH-2 (BR-MF1-01) are
+   * judged by their own suite (`request-limits.integration-spec.ts`). The copy of the template marks the requests of the dataset and every
+   * new one with an exemption, the one value the count of the limits skips and nothing else reads, as the request harness does.
+   */
+  private async exemptFromRequestLimits(): Promise<void> {
+    await this.ctx.sql.query(`
+      CREATE OR REPLACE FUNCTION test_harness_exempt_from_request_limits() RETURNS trigger AS $$
+      BEGIN
+        IF NEW.limit_exemption IS NULL THEN NEW.limit_exemption := 'TRANSFER_OVERLAP'; END IF;
+        RETURN NEW;
+      END;
+      $$ LANGUAGE plpgsql`);
+    for (const table of ['access_requests', 'access_request_lines']) {
+      await this.ctx.sql.query(
+        `UPDATE ${table} SET limit_exemption = 'TRANSFER_OVERLAP' WHERE limit_exemption IS NULL`,
+      );
+      await this.ctx.sql.query(`CREATE TRIGGER test_harness_exempt_from_request_limits BEFORE INSERT ON ${table}
+        FOR EACH ROW EXECUTE FUNCTION test_harness_exempt_from_request_limits()`);
     }
   }
 

@@ -183,11 +183,11 @@ describe('RequestsDashboardApi facts agree with source lists (integration, real 
       const third = await h.sent(member, await freshInternal());
       expect(await needCounts(u.head)).toEqual({ facade: 3, list: 3 });
 
-      // The request of the head is decided by the spending approver, not by the head: it is the approver's step.
+      // MF1-D (BR-MF1-02): the request of the head goes one step: it is a need step of nobody, the head and the approver alike.
       const approverBefore = await needCounts(h.boss);
       await h.sent(u.head, await freshInternal());
       expect(await needCounts(u.head)).toEqual({ facade: 3, list: 3 });
-      expect(await needCounts(h.boss)).toEqual({ facade: approverBefore.list + 1, list: approverBefore.list + 1 });
+      expect(await needCounts(h.boss)).toEqual({ facade: approverBefore.list, list: approverBefore.list });
 
       // A step the head decided is no longer waiting for them.
       await h.decide(third.id, { decision: 'APPROVE' }, u.head.account).expect(200);

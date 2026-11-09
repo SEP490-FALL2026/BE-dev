@@ -132,7 +132,8 @@ describe('the head of a department that starts next year, after the review (inte
         )
       ).rows.map((row) => ({
         departmentId: row.id,
-        signedCommitments: h.money(1),
+        // G5-05: a proposal over the ceiling needs a note on its lines; the ceiling covers the two lines the head sends (70 000 000).
+        signedCommitments: h.money(100_000_000),
         plannedSeats: h.money(0),
         priority: h.money(0),
         explanation: 'Basis of the ceiling',

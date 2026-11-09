@@ -64,7 +64,8 @@ describe('API inventory (e2e): responses the runtime answers and the contract us
         });
         expect(responses['400']?.description).toContain('HTTP_BAD_REQUEST');
         expect(responses['413']?.description).toContain('HTTP_PAYLOAD_TOO_LARGE');
-        expect(responses['413']?.description).toContain('2 MiB');
+        // A vendor usage report may be larger: its own limit is 10 MiB (MF-5); the other uploads keep 2 MiB.
+        expect(responses['413']?.description).toContain(id === 'usageImportUpload' ? '10 MiB' : '2 MiB');
       }
     });
 
