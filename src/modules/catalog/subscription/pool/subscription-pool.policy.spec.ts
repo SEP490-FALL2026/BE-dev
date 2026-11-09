@@ -139,6 +139,21 @@ describe('BR-MF1-07: the subscription that gives a plan its price (Q-04 C)', () 
     expect(pickPriceSource([source({ id: 'b' }), source({ id: 'a' })])?.id).toBe('a');
   });
 
+  it('G9-07 compares the price converted to the reporting currency, not the raw prices of two currencies', () => {
+    expect(
+      pickPriceSource([
+        source({ id: 'usd', unitPriceMinor: 2_000n, reportingPriceMinor: 500_000n }),
+        source({ id: 'vnd', unitPriceMinor: 300_000n, reportingPriceMinor: 300_000n }),
+      ])?.id,
+    ).toBe('usd');
+    expect(
+      pickPriceSource([
+        source({ id: 'not-converted', unitPriceMinor: 10n ** 9n, reportingPriceMinor: null }),
+        source({ id: 'converted', unitPriceMinor: 100n, reportingPriceMinor: 100n }),
+      ])?.id,
+    ).toBe('converted');
+  });
+
   it('puts a cycle that is not in months after the ones that are, and is null for no subscription', () => {
     expect(
       pickPriceSource([source({ id: 'other', billingCycle: 'OTHER', unitPriceMinor: 10n ** 9n }), source({ id: 'm' })])

@@ -12,7 +12,10 @@ import { avoidedCostOf, judgePurchase, type PoolStock, type PurchaseDecision } f
 
 type ProvisioningType = 'K1' | 'K2' | 'K3' | 'K4' | 'K5';
 
-/** The stock of a plan from its grantable subscriptions and what is taken of them: free seats are the seats bought less the assignments in force. */
+/**
+ * The stock of a plan from its grantable subscriptions and what is taken of them: free seats are the seats bought less the most assignments
+ * held on any day from today on (as the database counts them), so a seat already promised from a later day is not free today.
+ */
 function stockFrom(
   subscriptions: readonly PoolSubscription[],
   occupancy: ReadonlyMap<string, SubscriptionOccupancy>,
@@ -46,7 +49,10 @@ export class SharedPoolService {
     private readonly avoidedCosts: SharedPoolAvoidedCostRepo,
   ) {}
 
-  /** What the subscriptions of the plan hold today: free seats are the seats bought less the assignments in force. */
+  /**
+   * What the subscriptions of the plan hold from today on: free seats are the seats bought less the most assignments held on any day from
+   * today on. The period that runs and the next one recorded ahead of its start are one pool (`getGrantableSubscriptions`).
+   */
   async stockOf(tx: DbTx, planId: string, today: BusinessDate): Promise<PoolStock> {
     const subscriptions = await this.catalog.getGrantableSubscriptions(planId, today, tx);
     const occupancy = await this.capacityRepo.occupancyOf(

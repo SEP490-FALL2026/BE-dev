@@ -1,4 +1,4 @@
-import { claimMatchesAnswer, grantTaskAudit, grantWarnings } from './provisioning-grant.policy';
+import { claimMatchesAnswer, grantPurchaseOf, grantTaskAudit, grantWarnings } from './provisioning-grant.policy';
 
 describe('what the grant of the seat of a request is judged and recorded by (US-07-01, QĐ-89a, SoD-5)', () => {
   const answer = { employeeId: 'emp-1', planId: 'plan-1', seat: 'PERSONAL' as const };
@@ -32,5 +32,27 @@ describe('what the grant of the seat of a request is judged and recorded by (US-
     expect(grantWarnings({ itAdminEmployeeId: null })).toEqual(['DEPARTMENT_WITHOUT_IT_ADMIN']);
     expect(grantWarnings({ itAdminEmployeeId: 'it-1' })).toEqual([]);
     expect(grantWarnings(null)).toEqual([]);
+  });
+});
+
+describe('G9-04 what a grant records as bought (BR-MF1-09b, BR-MF1-09d)', () => {
+  const now = new Date('2026-11-09T03:00:00Z');
+
+  it('records K1_SUBSCRIPTION for every K1 grant: each one buys the seat of its holder', () => {
+    expect(grantPurchaseOf('K1', { purchased: false }, now)).toEqual({
+      kind: 'K1_SUBSCRIPTION',
+      reason: null,
+      purchasedAt: now,
+    });
+  });
+
+  it('records the purchase the pool allowed for K2 or K4, and none for a seat taken from the pool', () => {
+    expect(grantPurchaseOf('K2', { purchased: true, kind: 'POOL_TOP_UP', reason: 'why' }, now)).toEqual({
+      kind: 'POOL_TOP_UP',
+      reason: 'why',
+      purchasedAt: now,
+    });
+    expect(grantPurchaseOf('K2', { purchased: false }, now)).toBeNull();
+    expect(grantPurchaseOf('K5', { purchased: false }, now)).toBeNull();
   });
 });

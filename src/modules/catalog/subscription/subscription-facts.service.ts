@@ -5,7 +5,7 @@ import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { SubscriptionPoolService } from './pool/subscription-pool.service';
 import { SubscriptionRepo } from './subscription.repo';
-import type { BaselineSubscription } from '../public/catalog.types';
+import type { BaselineSubscription, SubscriptionPrice } from '../public/catalog.types';
 import type { SubscriptionKind } from './subscription.types';
 
 /** What the rules of another capability need to know of the subscriptions of some plans: their kind and their end. */
@@ -37,6 +37,8 @@ export class SubscriptionFactsService {
   ): Promise<{
     kind: 'RECURRING' | 'ONE_TIME';
     unitPrice: Money;
+    /** The unit price converted to the reporting currency when it was recorded (`M-17`); null when it was not converted. */
+    reportingUnitPrice: Money | null;
     billingCycle: 'MONTHLY' | 'QUARTERLY' | 'ANNUAL' | 'OTHER';
     /** The subscription may be cut before its term ends (`QĐ-96f`): a request on it runs to the end of the fiscal year at most. */
     allowsMidTermReduction: boolean;
@@ -47,6 +49,7 @@ export class SubscriptionFactsService {
       priced && {
         kind: priced.subscriptionKind === 'PERPETUAL' ? 'ONE_TIME' : 'RECURRING',
         unitPrice: { amountMinor: priced.unitPriceMinor, currency: priced.currency },
+        reportingUnitPrice: priced.reporting,
         billingCycle: priced.billingCycle,
         allowsMidTermReduction: priced.allowsMidTermReduction,
       }
@@ -63,22 +66,24 @@ export class SubscriptionFactsService {
     return this.subscriptions.findGrantableOfPlans(planIds, today, tx);
   }
 
-  /** What this one subscription is bought at; null when it does not exist or has no price yet. */
-  async priceOfSubscription(
-    subscriptionId: string,
-    tx?: DbTx,
-  ): Promise<{
-    kind: 'RECURRING' | 'ONE_TIME';
-    unitPrice: Money;
-    billingCycle: 'MONTHLY' | 'QUARTERLY' | 'ANNUAL' | 'OTHER';
-  } | null> {
+  /**
+   * What this one subscription is bought at, with the price converted to the reporting currency when it was recorded; null when it does
+   * not exist or has no price yet. A perpetual purchase has a price and no billing cycle (`QĐ-106d`): its cycle reads `OTHER`.
+   */
+  async priceOfSubscription(subscriptionId: string, tx?: DbTx): Promise<SubscriptionPrice | null> {
     const record = await this.subscriptions.find(subscriptionId, tx);
-    if (!record?.unitPrice || !record.billingCycle) return null;
+    if (!record?.unitPrice) return null;
+    const perpetual = record.kind === 'PERPETUAL';
+    if (!perpetual && !record.billingCycle) return null;
 
     return {
-      kind: record.kind === 'PERPETUAL' ? 'ONE_TIME' : 'RECURRING',
+      kind: perpetual ? 'ONE_TIME' : 'RECURRING',
       unitPrice: { amountMinor: record.unitPrice.amountMinor, currency: record.unitPrice.currency },
-      billingCycle: record.billingCycle,
+      reportingUnitPrice: record.priceSnapshot && {
+        amountMinor: record.priceSnapshot.reportingMinor,
+        currency: record.priceSnapshot.reportingCurrency,
+      },
+      billingCycle: record.billingCycle ?? 'OTHER',
     };
   }
 

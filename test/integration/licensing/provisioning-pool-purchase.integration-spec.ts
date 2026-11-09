@@ -191,6 +191,21 @@ describe('the purchase recorded with a grant from the shared pool (integration, 
     expect(await rows()).toEqual(before);
   });
 
+  it('G9-04 (BR-MF1-09b, BR-MF1-09d): every K1 grant buys the seat of its holder and records it as K1_SUBSCRIPTION', async () => {
+    const k1 = await h.subscription(5, 'K1');
+
+    const created = await h
+      .grant({ requestId: h.gate.grantable(person(), await h.planOf(k1)), subscriptionId: k1 })
+      .expect(201);
+
+    const task = h.dataOf<{ task: { id: string; purchase: { kind: string; reason: string | null } | null } }>(
+      created,
+    ).task;
+    expect(task.purchase).toMatchObject({ kind: 'K1_SUBSCRIPTION', reason: null });
+    expect(await purchaseOf(task.id)).toMatchObject({ purchase_kind: 'K1_SUBSCRIPTION', purchase_reason: null });
+    expect(await quantityOf(k1)).toBe(6);
+  });
+
   it('the grant takes the seat of the pool for a person of another department than the department that owns the subscription (QĐ-103d)', async () => {
     const other = await h.department(`P-PP-${(counter += 1)}`);
     const pool = await k2(2);

@@ -132,15 +132,19 @@ dịch vụ nào đọc cả ghế lẫn thu hồi thì đứng trên cả hai (
 
 - Capability không controller, không import capability licensing nào (đọc bảng bằng SQL), chỉ `CatalogApi`; `provisioning` và `public/LicensingPoolStockApi` dùng nó.
   Seat của mọi thuê bao K2/K4 cùng plan là một kho cho mọi phòng (`QĐ-103d`): cấp không kiểm phòng sở hữu, Assignment cá nhân ghi `owning_department_id` =
-  phòng người nhận lúc cấp (tài khoản dịch vụ giữ phòng của tài khoản). `stockOf`: `free` = Σ (`purchased_quantity` − Assignment mở hôm nay) trên thuê bao cấp
-  được (không gồm `DRAFT`); `inRevocation` = Assignment mở có tác vụ thu hồi chưa đóng.
-- `provisioningTaskGrant`: `subscriptionId` tùy chọn (không có ⟹ `chooseSubscription`: thuê bao chính, ưu tiên cái còn chỗ Trống; K5 không được có).
+  phòng người nhận lúc cấp (tài khoản dịch vụ giữ phòng của tài khoản). `stockOf`: `free` = Σ (`purchased_quantity` − đỉnh số Assignment trên mỗi ngày từ hôm nay
+  trở đi, đếm như trigger `license_assignments_seat_capacity`: Assignment `valid_from` tương lai, kể cả seat mang sang kỳ ghi trước ngày bắt đầu, chiếm chỗ
+  từ ngày đầu của nó) trên thuê bao cấp được (không gồm `DRAFT`; kỳ đang chạy và kỳ kế tiếp chưa bắt đầu/còn nháp là một kho); `inRevocation` =
+  Assignment chưa kết thúc có tác vụ thu hồi chưa đóng.
+- `provisioningTaskGrant`: `subscriptionId` tùy chọn (không có ⟹ `chooseSubscription`: thuê bao chính, ưu tiên cái còn chỗ Trống; K5 không được có);
+  có mà không thuộc `getGrantableSubscriptions` của gói hôm nay (kỳ đã hết, hoặc kỳ kế tiếp đã chạy) ⟹ 422 `PROVISIONING.SUBSCRIPTION_NOT_GRANTABLE`.
   `purchase?: { reason? }` chỉ K2/K4 (K khác ⟹ 422 `PURCHASE_NOT_APPLICABLE`): còn Trống ⟹ 409 `PURCHASE_NOT_ALLOWED` (audit
   `PROVISIONING_TASK.PURCHASE_REFUSED` ghi ở transaction riêng sau rollback); hết kho + còn seat đang thu hồi + thiếu lý do ⟹ 422
   `PURCHASE_REASON_REQUIRED`; ngược lại `CatalogApi.addPoolSeat` (+1 seat/lần) rồi ghi Assignment, task có `purchase_kind` (`POOL_TOP_UP`/`KEY_PURCHASE`).
   Không `purchase` mà thuê bao hết chỗ ⟹ 409 `LICENSE_ASSIGNMENT.SEAT_CAPACITY` kèm `details.freeSeatsInPool`. K1 không thuộc kho: mỗi lần cấp tự +1 số lượng
-  trong cùng transaction, không cổng phòng sở hữu (S1-04).
-- _Tránh được_ (`BR-MF1-09c`): hoàn tất tác vụ cấp K2/K4 không mua ⟹ `recordAvoided` một dòng (idempotent theo tác vụ); `reportOutcome(..., facts)` báo `fromPool`,
+  trong cùng transaction, không cổng phòng sở hữu (S1-04), và tác vụ ghi `purchase_kind = K1_SUBSCRIPTION` (dấu đã mua cho hóa đơn `SBF-19`).
+- _Tránh được_ (`BR-MF1-09c`): hoàn tất tác vụ cấp K2/K4 không mua ⟹ `recordAvoided` một dòng (idempotent theo tác vụ), theo tiền báo cáo (giá đã quy
+  đổi lúc ghi giá; K4 = giá mua của thuê bao `PERPETUAL`); `reportOutcome(..., facts)` báo `fromPool`,
   `provisioningType`, `grantedOn`, `assignmentId` cho `requests` (audit `GRANT_COMPLETED.after.fromPool`).
 - `grantQueueList` (module `requests`) đọc `stock { kind, free, inRevocation }` qua `LicensingPoolStockApi.getStockOfPlans` (số lần đọc cố định, không N+1).
 - Thu hồi hoàn tất phát `RevocationTaskFacts.completed` (`grantRequestId` qua chuỗi `predecessor_id` — `assignment-chain.repo.ts`, `provisioningType`, `endedOn`,

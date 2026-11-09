@@ -148,7 +148,7 @@ const taskSummarySchema = z.strictObject({
   availableDecisions: z.array(z.enum(['RETRY', 'HAND_OFF', 'CLOSE_FAILED'])),
   closedAt: z.iso.datetime().nullable(),
   revocation: revocationSummarySchema.nullable(),
-  /** What was bought with the grant when the pool had nothing free; null when the seat came from the pool. */
+  /** What was bought with the grant: every K1 grant (`K1_SUBSCRIPTION`), or a K2/K4 pool that had nothing free; null when the seat came from the pool. */
   purchase: z
     .strictObject({
       kind: z.enum(['POOL_TOP_UP', 'KEY_PURCHASE', 'K1_SUBSCRIPTION']),

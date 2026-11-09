@@ -79,6 +79,8 @@ export interface PriceSource {
   /** The flag that says this subscription prices the plan when there are several (`Q-04`). */
   isPrimaryForPlan: boolean;
   unitPriceMinor: bigint;
+  /** The unit price converted to the reporting currency when it was recorded: what prices in different currencies are compared by. */
+  reportingPriceMinor?: bigint | null;
   billingCycle: BillingCycle;
   startDate: string | null;
 }
@@ -93,8 +95,9 @@ const CYCLE_MONTHS: Readonly<Record<BillingCycle, number | null>> = {
 
 /**
  * The subscription that gives a plan its price (`Q-04` C, `BR-MF1-07`): the one flagged `is_primary_for_plan`; with no flag, the one with
- * the highest price a month (the price over the months of its cycle, compared without rounding; a cycle that is not in months comes last);
- * on a tie the older `start_date` (none last), then the smaller id. Null when there is none.
+ * the highest price a month in the reporting currency (the converted price over the months of its cycle, compared without rounding; a price
+ * not converted comes after the converted ones, a cycle that is not in months last); on a tie the older `start_date` (none last), then the
+ * smaller id. Null when there is none.
  */
 export function pickPriceSource<T extends PriceSource>(sources: readonly T[]): T | null {
   const primary = sources.find((source) => source.isPrimaryForPlan);
@@ -116,13 +119,21 @@ function compareSources(a: PriceSource, b: PriceSource): number {
   return comparePrice(a, b) || compareStart(a.startDate, b.startDate) || (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
 }
 
+/** One that has it first: -1 when only `a` has it, 1 when only `b` does, 0 when both or neither do. */
+const presentFirst = (a: boolean, b: boolean): number => (a === b ? 0 : a ? -1 : 1);
+
 function comparePrice(a: PriceSource, b: PriceSource): number {
   const am = CYCLE_MONTHS[a.billingCycle];
   const bm = CYCLE_MONTHS[b.billingCycle];
-  if (am === null || bm === null) return am === bm ? 0 : am === null ? 1 : -1;
+  if (am === null || bm === null) return presentFirst(am !== null, bm !== null);
+  // Prices in two currencies compare only once converted: a converted one comes before one that is not, two that are not compare as recorded.
+  const ar = a.reportingPriceMinor ?? null;
+  const br = b.reportingPriceMinor ?? null;
+  const converted = presentFirst(ar !== null, br !== null);
+  if (converted !== 0) return converted;
   // a.unit / am versus b.unit / bm, as a.unit * bm versus b.unit * am: both months are positive.
-  const left = a.unitPriceMinor * BigInt(bm);
-  const right = b.unitPriceMinor * BigInt(am);
+  const left = (ar ?? a.unitPriceMinor) * BigInt(bm);
+  const right = (br ?? b.unitPriceMinor) * BigInt(am);
 
   return left === right ? 0 : left > right ? -1 : 1;
 }

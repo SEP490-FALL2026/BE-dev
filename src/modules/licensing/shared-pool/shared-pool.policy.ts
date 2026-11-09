@@ -54,10 +54,11 @@ const MONTHS_OF_CYCLE = { MONTHLY: 1n, QUARTERLY: 3n, ANNUAL: 12n } as const;
 const ceilDiv = (amount: bigint, divisor: bigint): bigint => (amount + divisor - 1n) / divisor;
 
 /**
- * The cost avoided by the grant of a seat or key taken from the pool (`BR-MF1-09c`, `QĐ-106e`, `QĐ-108d`): a K2 seat is the monthly
- * price of the subscription it was taken from (an annual price over 12, rounded up to the minor unit) for the months left of the year
- * counted from the whole month of the grant; a K4 key is its purchase price. Null when the plan is of another kind, or the
- * subscription has no price in a cycle that can be put per month.
+ * The cost avoided by the grant of a seat or key taken from the pool (`BR-MF1-09c`, `QĐ-106e`, `QĐ-108d`), in the reporting currency
+ * (the price converted when it was recorded; the vendor's price only when it was never converted): a K2 seat is the monthly price of the
+ * subscription it was taken from (an annual price over 12, rounded up to the minor unit) for the months left of the year counted from the
+ * whole month of the grant; a K4 key is its purchase price. Null when the plan is of another kind, or the subscription has no price in a
+ * cycle that can be put per month.
  */
 export function avoidedCostOf(input: {
   provisioningType: ProvisioningType;
@@ -65,12 +66,13 @@ export function avoidedCostOf(input: {
   price: {
     kind: 'RECURRING' | 'ONE_TIME';
     unitPrice: { amountMinor: bigint; currency: string };
+    reportingUnitPrice?: { amountMinor: bigint; currency: string } | null;
     billingCycle: 'MONTHLY' | 'QUARTERLY' | 'ANNUAL' | 'OTHER';
   } | null;
 }): AvoidedCost | null {
   const { price } = input;
   if (price === null) return null;
-  const { amountMinor, currency } = price.unitPrice;
+  const { amountMinor, currency } = price.reportingUnitPrice ?? price.unitPrice;
   if (input.provisioningType === 'K4') {
     if (price.kind !== 'ONE_TIME') return null;
 

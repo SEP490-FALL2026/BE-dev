@@ -12,11 +12,13 @@ personnel, onboarding, data-import (chỉ type); gốc `src/app/app.module.ts` v
   - `findSeatTarget`, `findPlanSeatTargets`, `lockSeatTarget` — đích ghế (một subscription hoặc một plan nội bộ).
   - `getPlanSummaries`, `getPlanRevocationInfo`, `getSimilarPlanIds`, `getPlanVendorId`, `getPlanVendorIds` (nhiều plan trong một lần đọc), `getPlanBusinessOwnerId` — đọc
     plan.
-  - `getPlanPrice(planId, tx?)` — giá của plan từ thuê bao chính (`pickPriceSource`: cờ `is_primary_for_plan`, không có thì giá tháng quy đổi cao nhất,
-    hòa thì `start_date` cũ hơn rồi `id`), không theo phòng (S1-02, `BR-MF1-07`); trả `{ kind: RECURRING | ONE_TIME, unitPrice, billingCycle }`, thuê bao
-    `PERPETUAL` có giá ⟹ `ONE_TIME` (khóa `K4`).
-  - `getGrantableSubscriptions(planId, today, tx?)` / `getGrantableSubscriptionsOfPlans` (nhiều plan, một lần đọc) — thuê bao `ACTIVE` chưa có kỳ kế tiếp, còn hiệu lực hôm
-    nay (bản `DRAFT` không cấp được), thứ tự: thuê bao chính trước, rồi giá tháng cao nhất (`orderBySourcePreference`); `getSubscriptionPrice`.
+  - `getPlanPrice(planId, tx?)` — giá của plan từ thuê bao chính (`pickPriceSource`: cờ `is_primary_for_plan`, không có thì giá tháng quy đổi
+    (`price_reporting_minor`) cao nhất, hòa thì `start_date` cũ hơn rồi `id`), không theo phòng (S1-02, `BR-MF1-07`); trả `{ kind: RECURRING | ONE_TIME,
+    unitPrice, reportingUnitPrice, billingCycle }`, thuê bao `PERPETUAL` có giá ⟹ `ONE_TIME` (khóa `K4`). Kỳ đã có kỳ kế tiếp vẫn định giá khi kỳ kế
+    tiếp còn `DRAFT` (F-012).
+  - `getGrantableSubscriptions(planId, today, tx?)` / `getGrantableSubscriptionsOfPlans` (nhiều plan, một lần đọc) — thuê bao `ACTIVE` còn hiệu lực hôm
+    nay, chưa bị kỳ kế tiếp `ACTIVE` đã bắt đầu thay (kỳ đang chạy và kỳ kế tiếp ghi trước ngày bắt đầu cùng là kho; bản `DRAFT` không cấp được), thứ tự:
+    thuê bao chính trước, rồi giá tháng quy đổi cao nhất (`orderBySourcePreference`); `getSubscriptionPrice` (kèm giá quy đổi; `PERPETUAL` ⟹ `ONE_TIME`).
   - `addPoolSeat(tx, actor, subscriptionId)` — +1 `purchased_quantity` của thuê bao `ACTIVE` đang bị bên gọi khóa (`lockSeatTarget`), gói năm tăng giữa
     kỳ được, không hỏi Cost Center của phòng sở hữu; dùng khi `provisioningTaskGrant` có `purchase` mà kho hết và khi cấp `K1` (mỗi lần cấp tự +1).
   - `getSubscriptionIdsOwnedBy`, `getApplicationsOwnedBy`, `getWorkspaceDutiesOf` — thứ một phòng ban/người đang giữ.
