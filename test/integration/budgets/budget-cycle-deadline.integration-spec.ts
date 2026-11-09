@@ -102,10 +102,9 @@ describe('the deadlines of the budget cycle and the head named after a baseline 
       const department = await bare();
       const person = await h.staff(department, `DLF${counter}`, 'MANAGER');
       const noHeadOn = async (day: string) =>
-        toDepartment(
-          await noticesOf('BUDGET_NO_HEAD_AT_DEADLINE'),
-          department.id
-        ).filter((notice) => notice.params.submissionDeadline === day);
+        toDepartment(await noticesOf('BUDGET_NO_HEAD_AT_DEADLINE'), department.id).filter(
+          (notice) => notice.params.submissionDeadline === day,
+        );
       const firstDay = lateDay();
       await setDeadlines(firstDay, addDays(h.today(), 20));
       await service().run();

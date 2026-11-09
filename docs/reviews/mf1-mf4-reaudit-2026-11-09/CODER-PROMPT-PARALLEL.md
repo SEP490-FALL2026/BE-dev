@@ -12,11 +12,11 @@ cp .env ../be-mf1-core/.env && cp .env ../be-mf1-grant/.env
 (cd ../be-mf1-core && pnpm install) && (cd ../be-mf1-grant && pnpm install)
 ```
 
-| Chat | Mở Cursor tại thư mục                                     | Nhánh                  | Gói (PLAN §1)                                                             |
-| ---- | --------------------------------------------------------- | ---------------------- | ------------------------------------------------------------------------- |
-| A    | `D:\FPT\FALL2026\Code\be-mf1-core`                        | `feat/mf1-core`        | 2 → 3 → 4 → 7 → 8 (MF-1 lõi: tiền, kiểm ngân sách, cam kết, một bước, GH) |
-| B    | `D:\FPT\FALL2026\Code\BE-dev-software-license-management` | `feat/qd103-108-mf145` | 1 → 5 → 6 (MF-4)                                                          |
-| C    | `D:\FPT\FALL2026\Code\be-mf1-grant`                       | `feat/mf1-grant`       | 9 → 10 → 11 (cấp từ kho, hóa đơn `SBF-19`, Request tiếp tục)              |
+| Chat | Mở Cursor tại thư mục                                     | Nhánh                             | Gói (PLAN §1)                                                                      |
+| ---- | --------------------------------------------------------- | --------------------------------- | ---------------------------------------------------------------------------------- |
+| A    | `D:\FPT\FALL2026\Code\BE-dev-software-license-management` | `feat/qd103-108-mf145`            | 2 → 3 → 4 → 7 → 8 → 12 (đã có gói 1 trên nhánh — không cần merge cho gói 3)        |
+| B    | `D:\FPT\FALL2026\Code\be-mf1-core`                        | `feat/mf4-budget` (từ `3e45d2d5`) | FIX gói 1 → 5 → 6 → 14 (gói 6: trước đó `git merge feat/qd103-108-mf145` có gói 3) |
+| C    | `D:\FPT\FALL2026\Code\be-mf1-grant`                       | `feat/mf1-grant` (từ `3e45d2d5`)  | 9 → 10 → 11 → 13 (phần cần gói 2+3: `git merge feat/qd103-108-mf145`)              |
 
 Ghép nhánh: chat A **merge `feat/qd103-108-mf145` vào nhánh mình trước gói 3** (gói 3 cần gói 1). Chat C merge `feat/mf1-core` trước phần
 _giải phóng cam kết_ của gói 9 và trước gói 10, 11 (cần gói 2, 3). Cuối cùng chat review ghép A và C vào `feat/qd103-108-mf145`. Integration test
@@ -25,6 +25,19 @@ dùng DB tạm riêng mỗi lần chạy nên chạy song song được; Docker 
 Gói tiếp theo khi một chat xong phần của mình (chat tự làm, không chờ Owner giao): **A → 12** (API theo dõi Request; trước đó
 `git merge feat/mf1-grant` để có gói 11) · **C → 13** (`K4`) · **B → 14** (quyền theo vai; trước đó merge `feat/mf1-core` và `feat/mf1-grant`
 để có gói 8, 9). Gói 15 (tài liệu FE + seed demo) do chat review làm khi ghép nhánh.
+
+**Đổi 09/11 ~09:30 (thay bảng ở mục 1 khi khác):** chat A làm ở thư mục BE chính, B chuyển sang `be-mf1-core` nhánh `feat/mf4-budget`.
+Mỗi chat mở **cửa sổ Cursor riêng** đúng thư mục (tab trong cùng một cửa sổ dùng chung thư mục). Không nhánh nào cần merge vào `dev`; "merge"
+là `git merge <nhánh>` giữa các nhánh cục bộ. Nhật ký mỗi chat ghi ở thư mục chung ngoài repo
+`D:\FPT\FALL2026\Code\mf1-mf4-handoff\HANDOFF-<X>.md` (mọi worktree đọc được), không ghi trong repo.
+
+**Integration test** cần biến môi trường (PostgreSQL chạy native trên máy, role `app` có CREATEDB — không dùng `postgres`):
+
+```bash
+export TEST_DATABASE_ADMIN_URL="$(grep '^DATABASE_URL=' .env | cut -d= -f2- | tr -d '
+' | sed 's#/software_license_management.*#/postgres#')"
+pnpm test:integration -- <file>
+```
 
 ## 1. Prompt chung (dán vào mỗi chat, thay `<X>`, `<GÓI>`, `<VÙNG>`)
 

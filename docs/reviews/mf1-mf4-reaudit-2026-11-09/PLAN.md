@@ -28,7 +28,7 @@ kiểm sau mỗi gói. Ba mốc demo được: M1 (MF-1 cùng phòng + job 01/01
 | 3   | MF1-B | `qd103-budget-check-three-outcomes` + `qd103-commitment-current-year`                                                | 1, 2                 | L   |                               |
 | 4   | MF1-C | `qd103-new-year-auto-commitments` (rút gọn `QĐ-109a` + SPEC §4b RV-01 — **không** cần gói 9/14)                      | 3                    | M   | commit ≤ 01/12, `dev` ≤ 15/12 |
 | —   |       | **Mốc M1:** MF-1 cùng phòng chạy đúng luật (gửi → nhu cầu → lô → kiểm 3 kết quả → duyệt → cam kết → cấp) + job 01/01 |                      |     |                               |
-| 5   | MF4-B | `qd103-budget-proposal-lines-cleanup` (Task 1→5)                                                                     | 1, 3                 | L   |                               |
+| 5   | MF4-B | `qd103-budget-proposal-lines-cleanup` (Task 1→5)                                                                     | 1 (không cần 3)      | L   |                               |
 | 6   | MF4-C | `qd103-budget-views`                                                                                                 | 3 (Task 2), 5        | M   |                               |
 | —   |       | **Mốc M2:** MF-4 B1 → B7 đủ theo vai                                                                                 |                      |     |                               |
 | 7   | MF1-D | `qd103-request-single-step-routing`                                                                                  | 3                    | L   |                               |
