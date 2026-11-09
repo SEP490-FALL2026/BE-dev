@@ -222,7 +222,9 @@ describe('the edges of a request for a group over PostgreSQL (US-05-17 AC-5, AC-
       .expect(409);
 
     expect(h.codeOf(bounced)).toBe('SPEND.RECHECKED_RETURNED_TO_HEAD');
-    expect(bounced.body.error.details.reasons).toEqual(['OVER_RESERVE']);
+    expect((bounced.body as { error: { details: { reasons: string[] } } }).error.details.reasons).toEqual([
+      'OVER_RESERVE',
+    ]);
     expect(await h.lineStates(id)).toEqual(['NEED_CONFIRMED', 'NEED_CONFIRMED']);
     expect(await h.commitments(id)).toEqual([]);
     expect((await h.steps(id, 'SPEND_APPROVAL')).map((step) => step.state)).toEqual(['CLOSED']);

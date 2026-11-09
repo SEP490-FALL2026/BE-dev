@@ -21,9 +21,8 @@ export const CHAIN_STEPS = ['NEED', 'IT_ASSESSMENT', 'SPEND_APPROVAL', 'IT_EXECU
 export function currentStateOf<S extends string>(
   state: S,
 ): Exclude<S, 'AWAITING_FINANCE_REVIEW' | 'AWAITING_BUDGET'> | 'AWAITING_SPEND_SUBMISSION' {
-  return (
-    state === 'AWAITING_FINANCE_REVIEW' || state === 'AWAITING_BUDGET' ? 'AWAITING_SPEND_SUBMISSION' : state
-  ) as Exclude<S, 'AWAITING_FINANCE_REVIEW' | 'AWAITING_BUDGET'> | 'AWAITING_SPEND_SUBMISSION';
+  return (state === 'AWAITING_FINANCE_REVIEW' || state === 'AWAITING_BUDGET' ? 'AWAITING_SPEND_SUBMISSION' : state) as
+    Exclude<S, 'AWAITING_FINANCE_REVIEW' | 'AWAITING_BUDGET'> | 'AWAITING_SPEND_SUBMISSION';
 }
 
 /** A link of the chain of a request. `IT_EXECUTION` is the task of the IT Admin, not an approval step. */

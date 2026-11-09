@@ -35,11 +35,11 @@ describe('the guards of the budget lifecycle (integration, real PostgreSQL)', ()
     await h.stop();
   });
 
-  const waiting = async (lines?: object[]) => {
+  const waiting = async (lines?: object[], year?: number) => {
     counter += 1;
     const u = await h.departmentWithHead(`P-LG${counter}`);
 
-    return { ...u, proposal: await h.budgetProposed(u.head, u.department.unitId, lines) };
+    return { ...u, proposal: await h.budgetProposed(u.head, u.department.unitId, lines, year) };
   };
   const deactivate = (costCenterId: string) =>
     request(h.server()).post(`/api/v1/cost-centers/${costCenterId}/deactivate`).set(h.as(h.finance)).expect(200);
@@ -117,7 +117,8 @@ describe('the guards of the budget lifecycle (integration, real PostgreSQL)', ()
         snapshotCheckId: check.rows[0].id,
         currency: h.reporting,
         now: new Date(),
-        items: [{ year: h.next, amountMinor: 1_000_000n }],
+        // A commitment is held for the current year only (FR-5.8, BR-MF1-07d), so the race of this block is run in the current year.
+        items: [{ year: h.year, amountMinor: 1_000_000n }],
       };
     };
     const attachedTo = async (requestId: string) =>
@@ -135,14 +136,18 @@ describe('the guards of the budget lifecycle (integration, real PostgreSQL)', ()
       const input = await heldFor(costCenterId);
       const runner = h.ctx.app.get(TransactionRunner, { strict: false });
       const budgets = h.ctx.app.get(BudgetsApi, { strict: false });
-      const hold = () => runner.run((tx) => budgets.holdForRequest(tx, h.principalOf(h.finance, ['FINANCE']), input));
+      // A hold that arrives before any version of the year is approved is refused (FR-5.8a): it answers the error, it does not hang.
+      const hold = () =>
+        runner
+          .run((tx) => budgets.holdForRequest(tx, h.principalOf(h.finance, ['FINANCE']), input))
+          .catch((error: unknown) => error);
       const decide = () =>
         h.decideVersion(versionId, { decision: 'APPROVE' }, boss.account).then((response) => response);
       const holder = new Client({ connectionString: h.ctx.database.url });
       await holder.connect();
       await holder.query('BEGIN');
       await holder.query('SELECT pg_advisory_xact_lock(hashtextextended($1, 0))', [
-        budgetYearLockKey(costCenterId, h.next),
+        budgetYearLockKey(costCenterId, h.year),
       ]);
       const started: Partial<Record<'HOLD' | 'DECISION', Promise<unknown>>> = {};
       const second = first === 'HOLD' ? 'DECISION' : 'HOLD';
@@ -161,20 +166,22 @@ describe('the guards of the budget lifecycle (integration, real PostgreSQL)', ()
     };
     /** The hold and the decision of a FIRST version meet at the lock of the Cost Center and year. */
     const meet = async (first: 'HOLD' | 'DECISION') => {
-      const w = await waiting();
+      const w = await waiting(undefined, h.year);
       const version = await h.built(w.proposal.id);
       await h.sendVersion(version.id).expect(200);
 
       return { version, requestId: (await queueBoth(first, w.department.unitId, version.id)).requestId };
     };
 
-    it('holds the commitment first and the decision then attaches it: no commitment waits for a budget that was approved', async () => {
-      const { version, requestId } = await meet('HOLD');
+    // Rewritten for FR-5.8a: a commitment is never made without an approved version, so a hold that comes first is refused and writes
+    // nothing (it used to wait for a budget and be attached by the decision). The decision still goes through.
+    it('FR-5.8a: a hold that comes before the decision is refused and writes nothing: no commitment waits for a budget', async () => {
+      const { requestId } = await meet('HOLD');
 
-      expect(await attachedTo(requestId)).toEqual([{ attached_version_id: version.id, unattached_reason: null }]);
+      expect(await attachedTo(requestId)).toEqual([]);
     });
 
-    it('decides first and the commitment is attached at once', async () => {
+    it('FR-5.8: decides first and the commitment is held at once on the approved version', async () => {
       const { version, requestId } = await meet('DECISION');
 
       expect(await attachedTo(requestId)).toEqual([{ attached_version_id: version.id, unattached_reason: null }]);

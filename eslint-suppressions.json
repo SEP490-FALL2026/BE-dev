@@ -19,14 +19,6 @@
       "count": 1
     }
   },
-  "src/modules/budgets/year-end/year-end.service.ts": {
-    "complexity": {
-      "count": 1
-    },
-    "max-lines-per-function": {
-      "count": 2
-    }
-  },
   "src/modules/catalog/plan/plan.service.ts": {
     "complexity": {
       "count": 1
@@ -396,11 +388,6 @@
     }
   },
   "src/modules/requests/status/rules/request-status-rules.policy.ts": {
-    "complexity": {
-      "count": 1
-    }
-  },
-  "src/modules/requests/timing/request-timing.policy.ts": {
     "complexity": {
       "count": 1
     }
