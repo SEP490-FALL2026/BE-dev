@@ -227,10 +227,11 @@ describe('the confirmation of the reserve and the check at the decision (integra
       expect(await h.steps(id, 'SPEND_APPROVAL')).toEqual([]);
     });
 
-    it('QT 1.6: the head does not confirm what is asked for them: 403 SPEND.RESERVE_CONFIRMER_IS_BENEFICIARY', async () => {
+    it('QT 1.6: the head does not confirm what is given to them: 403 SPEND.RESERVE_CONFIRMER_IS_BENEFICIARY', async () => {
       const { u } = await unit();
       const id = await usingReserve(u);
-      await h.ctx.sql.query(`UPDATE access_requests SET requester_employee_id = $2 WHERE id = $1`, [
+      // Only a head who is one of the people the request is for is a party to it: the head who sent a request for their people confirms it.
+      await h.ctx.sql.query(`UPDATE access_request_beneficiaries SET employee_id = $2 WHERE request_id = $1`, [
         id,
         u.head.employeeId,
       ]);
