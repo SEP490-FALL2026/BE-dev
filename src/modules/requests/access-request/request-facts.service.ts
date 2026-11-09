@@ -246,6 +246,7 @@ export class RequestFactsService {
     const expectedSpendOn = input.expectedSpendOn ?? input.today;
     const price = await this.catalog.getPlanPrice(input.planId, input.departmentId, tx);
     const priced = priceRequest({
+      kind: price?.kind ?? 'RECURRING',
       unitPrice: price?.unitPrice ?? null,
       billingCycle: price?.billingCycle ?? null,
       termMonths: input.termMonths,

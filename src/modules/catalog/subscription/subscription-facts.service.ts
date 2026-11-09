@@ -18,13 +18,15 @@ export class SubscriptionFactsService {
 
   /**
    * What a plan is bought at for a department, from the newest priced active subscription that department owns; null when it
-   * has none, and never the price of another department's subscription (`FR-3.2`).
+   * has none, and never the price of another department's subscription (`FR-3.2`). The pricing model (RECURRING or ONE_TIME)
+   * determines how Request calculates amount and schedule.
    */
   async priceOfPlan(
     planId: string,
     ownerDepartmentId: string,
     tx?: DbTx,
   ): Promise<{
+    kind: 'RECURRING' | 'ONE_TIME';
     unitPrice: Money;
     billingCycle: 'MONTHLY' | 'QUARTERLY' | 'ANNUAL' | 'OTHER';
     /** The subscription may be cut before its term ends (`QĐ-96f`): a request on it runs to the end of the fiscal year at most. */
@@ -34,6 +36,7 @@ export class SubscriptionFactsService {
 
     return (
       priced && {
+        kind: priced.kind,
         unitPrice: { amountMinor: priced.unitPriceMinor, currency: priced.currency },
         billingCycle: priced.billingCycle,
         allowsMidTermReduction: priced.allowsMidTermReduction,
