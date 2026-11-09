@@ -69,6 +69,11 @@ export const listTasksQuerySchema = z.strictObject({
   channel: z.enum(['MANUAL', 'CONNECTOR']).optional(),
   status: z.enum(TASK_STATUSES).optional(),
   scope: z.enum(['ALL', 'MINE', 'GENERAL']).default('ALL'),
+  /** `true`: only the tasks that may be taken today (a revocation in its grace is left out); `false`: only those in their grace. */
+  claimableNow: z
+    .enum(['true', 'false'])
+    .transform((value) => value === 'true')
+    .optional(),
   ...pageQuery,
 });
 export const taskIdParamSchema = z.strictObject({ id: z.uuid() });
@@ -113,6 +118,8 @@ const revocationDetailSchema = revocationSummarySchema.extend({
       decidedAt: z.iso.datetime(),
     })
     .nullable(),
+  withdrawnReasonCount: z.number().int().nonnegative(),
+  lastWithdrawnAt: z.iso.datetime().nullable(),
 });
 /** A row of the list: the task without its steps, evidence and errors; the detail is this and those. */
 const taskSummarySchema = z.strictObject({
@@ -136,6 +143,9 @@ const taskSummarySchema = z.strictObject({
   accountIdentifier: z.string(),
   defaultResponsibleEmployeeId: z.uuid().nullable(),
   inGeneralQueue: z.boolean(),
+  dueOn: responseBusinessDate.nullable(),
+  notBefore: responseBusinessDate.nullable(),
+  claimableNow: z.boolean(),
   createdAt: z.iso.datetime(),
   claimedBy: z.uuid().nullable(),
   claimedAt: z.iso.datetime().nullable(),

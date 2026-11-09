@@ -3,6 +3,7 @@ import type {
   ProvisioningChannel,
   ProvisioningDecision,
   ProvisioningFailureKind,
+  ProvisioningTaskKind,
   ProvisioningTaskStatus,
 } from '../public/licensing.types';
 import { FAILURE_REASON_MAX_LENGTH } from './provisioning.policy';
@@ -70,6 +71,16 @@ export function availableDecisions(
 /** A decision is made on a failed task and on nothing else. Throws ProvisioningTaskStateError. */
 export function assertDecidable(status: ProvisioningTaskStatus): void {
   if (status !== 'FAILED') throw new ProvisioningTaskStateError('NOT_FAILED');
+}
+
+/**
+ * The cancellation of a task: a grant is cancelled only from the failure queue (its request was withdrawn); a revocation also while it
+ * is being worked, when no reason asks for it any more (`US-07-05` AC-22; whether none does is judged where it is written).
+ * Throws ProvisioningTaskStateError.
+ */
+export function assertCancellable(status: ProvisioningTaskStatus, kind: ProvisioningTaskKind): void {
+  if (kind === 'REVOKE' && (status === 'IN_PROGRESS' || status === 'FAILED')) return;
+  assertDecidable(status);
 }
 
 /** A task that is by hand already has nothing to hand off. Throws ProvisioningTaskAlreadyManualError. */

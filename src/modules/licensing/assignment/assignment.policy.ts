@@ -86,3 +86,18 @@ export function assertResponsibleChange(
     throw new AssignmentExpectedEndRequiredError();
   }
 }
+
+/** The day a first assignment could be used from its `valid_from` and its grant tasks that were not dropped; null while one is still open. */
+export function usableDayOf(
+  validFrom: BusinessDate,
+  grants: readonly { status: string; completedAt: Date | null }[],
+  toBusinessDate: (instant: Date) => BusinessDate,
+): BusinessDate | null {
+  if (grants.some((grant) => grant.status !== 'COMPLETED')) return null;
+  const done = grants
+    .flatMap((grant) => (grant.completedAt ? [toBusinessDate(grant.completedAt)] : []))
+    .sort()
+    .at(-1);
+
+  return done !== undefined && done > validFrom ? done : validFrom;
+}

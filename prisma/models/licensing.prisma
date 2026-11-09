@@ -177,6 +177,9 @@ model ProvisioningTask {
   accessCutOn                  DateTime?                @map("access_cut_on") @db.Date
   accessEvidence               String?                  @map("access_evidence")
   completionNote               String?                  @map("completion_note")
+  // A revocation asked not to be done before a day, and due by a day: read from the reasons that still stand (null: none asked).
+  dueOn                        DateTime?                @map("due_on") @db.Date
+  notBefore                    DateTime?                @map("not_before") @db.Date
   // Purchase when provisioning from shared pool: reason to buy additional seats, when bought, what kind.
   purchaseKind                 ProvisioningPurchaseKind? @map("purchase_kind")
   purchaseReason               String?                  @map("purchase_reason")
@@ -241,6 +244,12 @@ model ProvisioningTaskReason {
   referenceKind       String?          @map("reference_kind")
   referenceId         String?          @map("reference_id") @db.Uuid
   note                String?
+  // The timing the source gave (null: none), and the withdrawal of the reason (one change a reason takes, with its cause).
+  dueOn                  DateTime?     @map("due_on") @db.Date
+  notBefore              DateTime?     @map("not_before") @db.Date
+  withdrawnAt            DateTime?     @map("withdrawn_at") @db.Timestamptz(3)
+  withdrawnByAppUserId   String?       @map("withdrawn_by_app_user_id") @db.Uuid
+  withdrawCause          String?       @map("withdraw_cause")
   createdAt           DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
 
   task      ProvisioningTask @relation(fields: [taskId], references: [id], onDelete: Restrict)

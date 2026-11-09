@@ -85,6 +85,18 @@ export interface PlanRevocationInfo {
   dataLossOnRemoval: boolean;
 }
 
+/** An active subscription not taken over by a later period that runs, which grants seats on a day, as the rules of wasted seats read it (`FR-4.9` gate 1). */
+export interface RuleSubscription {
+  subscriptionId: string;
+  planId: string;
+  applicationId: string;
+  provisioningType: 'K1' | 'K2' | 'K3' | 'K4' | 'K5';
+  /** Null while the plan has no pricing model; the rules take only `PER_SEAT`. */
+  pricingModel: 'PER_SEAT' | 'FLAT_RATE' | 'CONCURRENT' | 'CONSUMPTION' | 'PER_HOST' | null;
+  /** The seats bought; null when the subscription has none. */
+  purchasedQuantity: number | null;
+}
+
 /** A plan and the application it belongs to, by name, for the views that list seats. */
 export interface PlanSummary {
   planId: string;

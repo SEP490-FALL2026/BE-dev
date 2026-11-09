@@ -80,3 +80,25 @@ export const WORKSPACE_OWNER_NOT_TRANSFERRED = 'WORKSPACE_OWNER_NOT_TRANSFERRED'
 
 /** The kinds of basis every personnel operation takes (`BM-04`); the controlled procedure checks its `--basis-type` against the same list. */
 export const GROUNDS_TYPES = ['HR_DECISION', 'APPROVED_APPLICATION', 'WRITTEN_DIRECTIVE'] as const;
+
+/**
+ * A transfer of a person as the rules of wasted seats read it (`QĐ-90c`): it is _in overlap_ from the day it takes effect until it is
+ * closed or cancelled. `closedAt` is set when the IT Admin closed it after the service accounts were settled (`US-03-08`).
+ */
+export interface TransferFact {
+  employeeId: string;
+  transferId: string;
+  fromDepartmentId: string;
+  toDepartmentId: string;
+  effectiveOn: BusinessDate;
+  status: 'PENDING' | 'EFFECTIVE' | 'CANCELLED';
+  closedAt: Date | null;
+}
+
+/** A person who is handing over before leaving (`OffboardingCase` `HANDING_OVER`): the seat of a rule that waits for the departure is not judged (`FR-4.9` gate 3). */
+export interface HandingOverCase {
+  employeeId: string;
+  caseId: string;
+  lastWorkingDay: BusinessDate;
+  handoverDueOn: BusinessDate | null;
+}

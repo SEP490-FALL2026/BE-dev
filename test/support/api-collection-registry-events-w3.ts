@@ -1,5 +1,6 @@
 import type { RegistryEvent } from './api-collection-registry';
 import { G9_REGISTRY_EVENTS } from './api-collection-registry-events-g9';
+import { W6_REGISTRY_EVENTS } from './api-collection-registry-events-w6';
 
 /** The events of the nested-array registry written by the package 3 (MF1-B) of `mf1-mf4-reaudit`. */
 const W3_OWN_EVENTS: readonly RegistryEvent[] = [
@@ -20,5 +21,12 @@ const W3_OWN_EVENTS: readonly RegistryEvent[] = [
     'The reasons a request is blocked when the budget is checked (BR-MF1-06g): at most the three values of BlockReason, each once.',
 }));
 
-/** The events of the packages 3 and 9 of `mf1-mf4-reaudit`. */
-export const W3_REGISTRY_EVENTS: readonly RegistryEvent[] = [...W3_OWN_EVENTS, ...G9_REGISTRY_EVENTS];
+/**
+ * The events of the packages 3 and 9 of `mf1-mf4-reaudit`, and those of MF-5 (W6), kept here because the main file of the events is at the
+ * line limit of the support files.
+ */
+export const W3_REGISTRY_EVENTS: readonly RegistryEvent[] = [
+  ...W3_OWN_EVENTS,
+  ...G9_REGISTRY_EVENTS,
+  ...W6_REGISTRY_EVENTS,
+];

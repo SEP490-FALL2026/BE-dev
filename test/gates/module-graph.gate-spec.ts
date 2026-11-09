@@ -90,7 +90,14 @@ const PUBLIC_CONTRACT_EXPORTS: ReadonlySet<string> = new Set([
   'LicensingModule: LicensingApi',
   'LicensingModule: LicensingRenewalApi',
   'LicensingModule: LicensingHandoverApi',
+  'LicensingModule: LicensingGhostSeatApi',
+  // qd103-vendor-usage-import: the seats and holders the usage import matches identities against, and the one door to the usage evidence the rules of wasted seats read.
+  'LicensingModule: LicensingUsageApi',
+  'UsageModule: UsageEvidenceApi',
+  // qd103-ghost-seat-g3-g4: the extension point the rules of wasted seats bind to deny a recommendation when a report is confirmed.
+  'UsageModule: UsageImportListeners',
   'LicensingModule: LicensingOpenGrantsApi',
+  'OptimizationModule: OptimizationApi',
   'LicensingModule: LicensingServiceAccountApi',
   'LicensingModule: LicensingSeatBaselineApi',
   // G8 (US-12-15): the counts of licensing the role overviews read.

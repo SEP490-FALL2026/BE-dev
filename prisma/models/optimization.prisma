@@ -1,0 +1,299 @@
+// Module optimization (T7): the recommendations of wasted seats (G1 free seats of a subscription, G2 a seat of a person who left)
+// and the runs that make them. The CHECKs, the partial unique indexes of gate 8 (one open recommendation for each subscription
+// and for each seat chain) and the triggers (evidence written once, skips append-only) live in the migration
+// 20261109200100_optimization_ghost_seats. Foreign keys to the tables of other modules are in the migration only: the model
+// holds them as values, so no module's model needs to know this one.
+
+enum GhostSeatGroup {
+  G1
+  G2
+  G3
+  G4
+}
+
+// How firm a recommendation is (FR-4.12): watch, review or act on it. G1 has none.
+enum GhostSeatTier {
+  MONITOR
+  REVIEW
+  ACTION
+}
+
+enum GhostSeatState {
+  OPEN
+  PAUSED
+  RECLAIM_DECIDED
+  CLOSED
+  AWAITING_DECISION
+  WAITING_FOR_HEAD
+  RETURNED_TO_HEAD
+}
+
+enum GhostSeatCloseReason {
+  ACCEPTED
+  SUPERSEDED
+  SEAT_ENDED
+  FREE_SEATS_GONE
+  OUT_OF_SCOPE
+  KEPT
+  NEGATED
+  TRANSFER_SEAT_REVOKED
+  EXEMPTED
+  LEFT_TO_EXPIRE
+}
+
+// What the head of a department chose for a recommendation about a seat of their department (FR-4.12).
+enum GhostSeatChoice {
+  KEEP
+  RECLAIM
+  EXEMPT
+}
+
+enum GhostSeatRuleSet {
+  G1_G2
+  G3_G4
+}
+
+enum GhostSeatRunStatus {
+  RUNNING
+  COMPLETED
+  FAILED
+}
+
+enum GhostSeatGate {
+  PER_SEAT
+  INTERNAL_SOFTWARE
+  OPEN_RECOMMENDATION
+  SERVICE_ACCOUNT
+  LEAVE_OR_HANDOVER
+  NOT_USABLE
+  NEW_ASSIGNMENT
+  COVERAGE
+  STALE_SOURCE
+  EXEMPT
+  TIME_BOUND_ENDING
+  REVOCATION_IN_PROGRESS
+  NO_DATA
+  UNMATCHED_IDENTITY
+  INSUFFICIENT_EVIDENCE
+}
+
+// How sure the rule is of a G3/G4 (FR-4.14): never a percentage.
+enum GhostSeatConfidence {
+  HIGH
+  MEDIUM
+  LOW
+}
+
+enum GhostSeatActivityStatus {
+  NEVER_ACTIVE
+  INACTIVE
+}
+
+// The one state of a seat after the weekly pass (FR-5.10): no data and unmatched identities never read as inactive.
+enum GhostSeatSeatStatus {
+  ACTIVE
+  INACTIVE
+  NO_DATA
+  UNMATCHED_IDENTITY
+  INSUFFICIENT_EVIDENCE
+  EXCLUDED
+}
+
+enum GhostSeatSkipSubject {
+  SUBSCRIPTION
+  ASSIGNMENT
+}
+
+// One run of a set of rules for one period (a day or a week): claimed by INSERT ... ON CONFLICT DO NOTHING, taken over after two hours.
+model GhostSeatRuleRun {
+  id             String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId String             @map("organization_id") @db.Uuid
+  ruleSet        GhostSeatRuleSet   @map("rule_set")
+  periodKey      String             @map("period_key")
+  status         GhostSeatRunStatus @default(RUNNING)
+  attempt        Int                @default(1) @db.SmallInt
+  startedAt      DateTime           @default(now()) @map("started_at") @db.Timestamptz(3)
+  finishedAt     DateTime?          @map("finished_at") @db.Timestamptz(3)
+  createdCount   Int                @default(0) @map("created_count")
+  updatedCount   Int                @default(0) @map("updated_count")
+  closedCount    Int                @default(0) @map("closed_count")
+  skippedCount   Int                @default(0) @map("skipped_count")
+  failedCount    Int                @default(0) @map("failed_count")
+  error          String?
+
+  skips           GhostSeatRuleSkip[]
+  recommendations GhostSeatRecommendation[]
+  seatStates      GhostSeatSeatState[]
+
+  @@unique([organizationId, ruleSet, periodKey], map: "ghost_seat_rule_runs_period")
+  @@map("ghost_seat_rule_runs")
+}
+
+// Why a subject was left out of a run (append-only: a trigger).
+model GhostSeatRuleSkip {
+  id          String               @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  runId       String               @map("run_id") @db.Uuid
+  subjectType GhostSeatSkipSubject @map("subject_type")
+  subjectId   String               @map("subject_id") @db.Uuid
+  gate        GhostSeatGate
+  detail      Json                 @default("{}")
+  createdAt   DateTime             @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  run GhostSeatRuleRun @relation(fields: [runId], references: [id], onDelete: Restrict, onUpdate: Cascade)
+
+  @@unique([runId, subjectType, subjectId], map: "ghost_seat_rule_skips_subject")
+  @@map("ghost_seat_rule_skips")
+}
+
+model GhostSeatRecommendation {
+  id                       String                   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId           String                   @map("organization_id") @db.Uuid
+  group                    GhostSeatGroup
+  state                    GhostSeatState           @default(OPEN)
+  closeReason              GhostSeatCloseReason?    @map("close_reason")
+  tier                     GhostSeatTier?
+  applicationId            String                   @map("application_id") @db.Uuid
+  planId                   String                   @map("plan_id") @db.Uuid
+  subscriptionId           String?                  @map("subscription_id") @db.Uuid
+  assignmentId             String?                  @map("assignment_id") @db.Uuid
+  // The first assignment of the chain of the seat (predecessor_id): what gate 8 is unique on.
+  seatChainId              String?                  @map("seat_chain_id") @db.Uuid
+  employeeId               String?                  @map("employee_id") @db.Uuid
+  // The department that owns the seat when it was recommended (a G2); null for a G1, which belongs to no department (R-E02).
+  departmentId             String?                  @map("department_id") @db.Uuid
+  freeSeats                Int?                     @map("free_seats")
+  countsTowardVacantCost   Boolean?                 @map("counts_toward_vacant_cost")
+  revocationTaskId         String?                  @map("revocation_task_id") @db.Uuid
+  holderLeftOn             DateTime?                @map("holder_left_on") @db.Date
+  evidence                 Json
+  createdRunId             String                   @map("created_run_id") @db.Uuid
+  createdAt                DateTime                 @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt                DateTime                 @default(now()) @map("updated_at") @db.Timestamptz(3)
+  closedAt                 DateTime?                @map("closed_at") @db.Timestamptz(3)
+  closedByAppUserId        String?                  @map("closed_by_app_user_id") @db.Uuid
+  supersededById           String?                  @map("superseded_by_id") @db.Uuid
+  // Routing to the head (manager-decision): the department whose head decides, when it was routed, the due day (working days from routing,
+  // never reset), the one overdue notice, the one return of the IT Admin and the day the grace of a decided reclaim ends.
+  deciderDepartmentId      String?                  @map("decider_department_id") @db.Uuid
+  routedAt                 DateTime?                @map("routed_at") @db.Timestamptz(3)
+  decisionDueOn            DateTime?                @map("decision_due_on") @db.Date
+  overdueNoticedAt         DateTime?                @map("overdue_noticed_at") @db.Timestamptz(3)
+  returnCount              Int                      @default(0) @map("return_count") @db.SmallInt
+  revocationNotBefore      DateTime?                @map("revocation_not_before") @db.Date
+  // Paused while the holder is in a transfer that has taken effect and is not closed (QĐ-90c); the detection of G3/G4 belongs to g3-g4.
+  pausedAt                 DateTime?                @map("paused_at") @db.Timestamptz(3)
+  pauseTransferId          String?                  @map("pause_transfer_id") @db.Uuid
+  // G3/G4 (qd103-ghost-seat-g3-g4): the confidence, whether the person was ever active, the days covered without activity (not calendar days),
+  // the last day of activity, the recommendation this one follows after a keep or an exemption, and the first activity after a reclaim was decided.
+  confidence               GhostSeatConfidence?     @map("confidence")
+  activityStatus           GhostSeatActivityStatus? @map("activity_status")
+  inactiveDays             Int?                     @map("inactive_days")
+  lastActiveDate           DateTime?                @map("last_active_date") @db.Date
+  previousRecommendationId String?                  @map("previous_recommendation_id") @db.Uuid
+  activityAfterDecisionOn  DateTime?                @map("activity_after_decision_on") @db.Date
+
+  previousRecommendation GhostSeatRecommendation?  @relation("GhostSeatPrevious", fields: [previousRecommendationId], references: [id], onDelete: Restrict)
+  followedBy             GhostSeatRecommendation[] @relation("GhostSeatPrevious")
+  createdRun             GhostSeatRuleRun          @relation(fields: [createdRunId], references: [id], onDelete: Restrict)
+  supersededBy           GhostSeatRecommendation?  @relation("GhostSeatSuperseded", fields: [supersededById], references: [id], onDelete: Restrict)
+  supersedes             GhostSeatRecommendation[] @relation("GhostSeatSuperseded")
+  decisions              GhostSeatDecision[]
+  returns                GhostSeatReturn[]
+  exemptions             GhostSeatExemption[]
+
+  @@index([organizationId, state, group], map: "ghost_seat_recommendations_board")
+  @@index([createdRunId], map: "ghost_seat_recommendations_run")
+  @@index([organizationId, createdAt], map: "ghost_seat_recommendations_created")
+  @@map("ghost_seat_recommendations")
+}
+
+// A decision of the head (append-only: a trigger); a decision made again after a return is a new row. The CHECKs of INV-09 are in the migration.
+model GhostSeatDecision {
+  id                  String          @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId      String          @map("organization_id") @db.Uuid
+  recommendationId    String          @map("recommendation_id") @db.Uuid
+  choice              GhostSeatChoice
+  reason              String
+  exemptUntil         DateTime?       @map("exempt_until") @db.Date
+  decidedOn           DateTime        @map("decided_on") @db.Date
+  decidedAt           DateTime        @default(now()) @map("decided_at") @db.Timestamptz(3)
+  decidedByEmployeeId String          @map("decided_by_employee_id") @db.Uuid
+  decidedByAppUserId  String          @map("decided_by_app_user_id") @db.Uuid
+  deciderDepartmentId String          @map("decider_department_id") @db.Uuid
+  deciderRoles        String[]        @map("decider_roles")
+  selfDecided         Boolean         @default(false) @map("self_decided")
+  batchId             String?         @map("batch_id") @db.Uuid
+
+  recommendation GhostSeatRecommendation @relation(fields: [recommendationId], references: [id], onDelete: Restrict)
+  exemption      GhostSeatExemption?
+
+  @@index([recommendationId, decidedAt], map: "ghost_seat_decisions_recommendation")
+  @@map("ghost_seat_decisions")
+}
+
+// The one return of the IT Admin of a reclaim the head decided (OI-02): a second row for a recommendation is refused (UNIQUE).
+model GhostSeatReturn {
+  id                  String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  recommendationId    String   @unique(map: "ghost_seat_returns_recommendation_key") @map("recommendation_id") @db.Uuid
+  reason              String
+  returnedByAppUserId String   @map("returned_by_app_user_id") @db.Uuid
+  returnedAt          DateTime @default(now()) @map("returned_at") @db.Timestamptz(3)
+  taskId              String?  @map("task_id") @db.Uuid
+
+  recommendation GhostSeatRecommendation @relation(fields: [recommendationId], references: [id], onDelete: Restrict)
+
+  @@map("ghost_seat_returns")
+}
+
+// An exemption of a seat chain (gate 7 of g3-g4): written by the decision of the head, read by the rules.
+model GhostSeatExemption {
+  id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId   String    @map("organization_id") @db.Uuid
+  seatChainId      String    @map("seat_chain_id") @db.Uuid
+  recommendationId String    @map("recommendation_id") @db.Uuid
+  decisionId       String    @unique(map: "ghost_seat_exemptions_decision_key") @map("decision_id") @db.Uuid
+  exemptUntil      DateTime  @map("exempt_until") @db.Date
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  remindedAt       DateTime? @map("reminded_at") @db.Timestamptz(3)
+  endedAt          DateTime? @map("ended_at") @db.Timestamptz(3)
+
+  recommendation GhostSeatRecommendation @relation(fields: [recommendationId], references: [id], onDelete: Restrict)
+  decision       GhostSeatDecision       @relation(fields: [decisionId], references: [id], onDelete: Restrict)
+
+  @@index([seatChainId, exemptUntil], map: "ghost_seat_exemptions_chain")
+  @@map("ghost_seat_exemptions")
+}
+
+// The thresholds of days without use for one application (FR-4.13): over the ones of the organization (the parameter) and the default.
+model GhostSeatApplicationThreshold {
+  organizationId     String   @map("organization_id") @db.Uuid
+  applicationId      String   @id @map("application_id") @db.Uuid
+  monitorDays        Int      @map("monitor_days")
+  reviewDays         Int      @map("review_days")
+  actionDays         Int      @map("action_days")
+  updatedByAppUserId String   @map("updated_by_app_user_id") @db.Uuid
+  updatedAt          DateTime @default(now()) @map("updated_at") @db.Timestamptz(3)
+
+  @@map("ghost_seat_application_thresholds")
+}
+
+// What the weekly pass found of each seat chain (FR-5.10), kept until the next pass.
+model GhostSeatSeatState {
+  seatChainId    String              @id @map("seat_chain_id") @db.Uuid
+  organizationId String              @map("organization_id") @db.Uuid
+  applicationId  String              @map("application_id") @db.Uuid
+  assignmentId   String              @map("assignment_id") @db.Uuid
+  employeeId     String              @map("employee_id") @db.Uuid
+  status         GhostSeatSeatStatus
+  lastActiveDate DateTime?           @map("last_active_date") @db.Date
+  inactiveDays   Int?                @map("inactive_days")
+  gate           GhostSeatGate?
+  assessedRunId  String              @map("assessed_run_id") @db.Uuid
+  assessedOn     DateTime            @map("assessed_on") @db.Date
+
+  assessedRun GhostSeatRuleRun @relation(fields: [assessedRunId], references: [id], onDelete: Restrict)
+
+  @@index([organizationId, applicationId, status], map: "ghost_seat_seat_states_board")
+  @@index([assessedRunId], map: "ghost_seat_seat_states_run")
+  @@map("ghost_seat_seat_states")
+}

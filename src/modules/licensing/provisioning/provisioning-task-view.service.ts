@@ -48,6 +48,9 @@ export interface RevocationDetailView extends RevocationSummaryView {
     note: string | null;
     decidedAt: Date;
   } | null;
+  /** The reasons taken back (`BR-MF5-04`): how many, and when the last was; a withdrawn reason is read nowhere else. */
+  withdrawnReasonCount: number;
+  lastWithdrawnAt: Date | null;
 }
 
 /** The card of a task as the IT Admin reads it: the row of the list and the rest a detail adds. */
@@ -71,6 +74,11 @@ export interface TaskSummaryView {
   accountIdentifier: string;
   defaultResponsibleEmployeeId: string | null;
   inGeneralQueue: boolean;
+  /** What the reasons that stand ask of a revocation: not before a day (`notBefore`), due by a day; null for a grant and when none asked. */
+  dueOn: BusinessDate | null;
+  notBefore: BusinessDate | null;
+  /** False only while a revocation is in its grace: it may not be taken or completed before `notBefore`. */
+  claimableNow: boolean;
   createdAt: Date;
   claimedBy: string | null;
   claimedAt: Date | null;
@@ -173,7 +181,8 @@ export class ProvisioningTaskViewService {
     summary: RevocationSummaryView,
     reasons: readonly ReasonRecord[],
   ): RevocationDetailView {
-    const first = reasons.find((reason) => reason.source === task.revocationSource) ?? reasons[0];
+    const standing = reasons.filter((reason) => reason.withdrawnAt === null);
+    const first = standing.find((reason) => reason.source === task.revocationSource) ?? standing[0];
 
     return {
       ...summary,
@@ -190,6 +199,12 @@ export class ProvisioningTaskViewService {
             decidedAt: first.createdAt,
           }
         : null,
+      withdrawnReasonCount: reasons.filter((reason) => reason.withdrawnAt !== null).length,
+      lastWithdrawnAt:
+        reasons
+          .flatMap((reason) => reason.withdrawnAt ?? [])
+          .sort((x, y) => y.getTime() - x.getTime())
+          .at(0) ?? null,
     };
   }
 
@@ -210,12 +225,14 @@ export class ProvisioningTaskViewService {
     const revocationIds = records.filter((task) => task.kind === 'REVOKE').map((task) => task.id);
     const reasons = new Map<string, ReasonRecord[]>();
     if (withReasons) {
-      for (const reason of await this.reasons.listOf(revocationIds)) {
+      for (const reason of await this.reasons.listAllOf(revocationIds)) {
         reasons.set(reason.taskId, [...(reasons.get(reason.taskId) ?? []), reason]);
       }
     }
     const reasonCounts = withReasons
-      ? new Map([...reasons].map(([taskId, list]) => [taskId, list.length]))
+      ? new Map(
+          [...reasons].map(([taskId, list]) => [taskId, list.filter((reason) => reason.withdrawnAt === null).length]),
+        )
       : await this.reasons.countOf(revocationIds);
     const today = revocationIds.length > 0 ? await this.organizationReads.businessToday() : '';
 
@@ -259,6 +276,9 @@ export class ProvisioningTaskViewService {
         defaultResponsibleEmployeeId: task.defaultResponsibleEmployeeId,
         responsibleStillWorks: responsible?.status === 'ACTIVE',
       }),
+      dueOn: task.dueOn,
+      notBefore: task.notBefore,
+      claimableNow: task.notBefore === null || task.notBefore <= today,
       createdAt: task.createdAt,
       claimedBy: task.claimedByAppUserId,
       claimedAt: task.claimedAt,

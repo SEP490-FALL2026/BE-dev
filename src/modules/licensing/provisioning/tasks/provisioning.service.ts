@@ -6,7 +6,7 @@ import { ProvisioningBeneficiaryDepartedError, ProvisioningTaskNotFoundError } f
 import { GrantRequestGateHook, RevocationListeners } from '../../public/licensing.extension-points';
 import type { ProvisioningChannel, ProvisioningTaskStatus } from '../../public/licensing.types';
 import { cleanEvidence, cleanFailureReason, nextStatus } from '../provisioning.policy';
-import { assertNotRevocationTask } from '../revocation.policy';
+import { assertNotBefore, assertNotRevocationTask } from '../revocation.policy';
 import { ProvisioningTaskFrame } from '../provisioning-task-frame.service';
 import { toRevocationFacts } from '../provisioning-task.types';
 import { ProvisioningTaskRepo } from '../provisioning-task.repo';
@@ -41,6 +41,7 @@ export class ProvisioningService {
       channel?: ProvisioningChannel;
       status?: ProvisioningTaskStatus;
       scope: TaskScope;
+      claimableNow?: boolean;
       page: number;
       pageSize: number;
     },
@@ -50,6 +51,9 @@ export class ProvisioningService {
       ...(query.status ? { status: query.status } : {}),
       ...(query.scope === 'MINE' ? { responsibleEmployeeId: actor.employeeId } : {}),
       ...(query.scope === 'GENERAL' ? { generalQueueOf: await this.responsibleWhoLeft() } : {}),
+      ...(query.claimableNow !== undefined
+        ? { claimableOn: { today: await this.organizationReads.businessToday(), claimable: query.claimableNow } }
+        : {}),
       skip: (query.page - 1) * query.pageSize,
       take: query.pageSize,
     });
@@ -77,6 +81,8 @@ export class ProvisioningService {
       write: async ({ tx, task: locked, now }) => {
         if (locked.status === 'IN_PROGRESS' && locked.claimedByAppUserId === actor.appUserId) return false;
         if (locked.kind === 'REVOKE') {
+          // A revocation with a day not before is not taken before it (`US-10-07` AC-18): nothing changes and nobody is told.
+          assertNotBefore(locked.notBefore, await this.organizationReads.businessToday(now, tx));
           await this.revocation.emit(tx, { moment: 'BEFORE_WORK', task: toRevocationFacts(locked), now });
         } else {
           const beneficiary = await this.organizationReads.getEmployee(locked.assignment.employeeId, tx);

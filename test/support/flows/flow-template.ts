@@ -14,6 +14,8 @@ import { HandoverDutySweeper } from '../../../src/modules/licensing/handover/han
 import { SaasIssueSweeper } from '../../../src/modules/licensing/saas-issue/saas-issue.job';
 import { ServiceAccountDutySweeper } from '../../../src/modules/licensing/assignment/service-account-duty/service-account-duty.job';
 import { SubscriptionRenewalSweeper } from '../../../src/modules/licensing/subscription-renewal/subscription-renewal.job';
+import { DecisionFollowUpSweeper } from '../../../src/modules/optimization/decision/decision-follow-up.job';
+import { InternalRulesSweeper } from '../../../src/modules/optimization/internal-rules/internal-rules.job';
 import { OrganizationChangeSweeper } from '../../../src/modules/organization/change-announcement/organization-change.job';
 import { LeaveReturnSweeper } from '../../../src/modules/personnel/leave/leave-return.job';
 import { NoticeOverdueSweeper } from '../../../src/modules/personnel/notice/notice-overdue.job';
@@ -62,6 +64,8 @@ export const SWEEPER_OVERRIDES: { token: unknown; useValue: unknown }[] = [
   LeaveReturnSweeper,
   NoticeOverdueSweeper,
   TransferReviewSweeper,
+  InternalRulesSweeper,
+  DecisionFollowUpSweeper,
 ].map((token) => ({ token, useValue: {} }));
 
 interface TemplateHandle {

@@ -150,6 +150,9 @@ describe('the operating parameters and the non-working dates over HTTP (integrat
         'RENEWAL_ALERT_DAYS_BEFORE_DEADLINE',
         'ACTIVITY_WINDOW_MINUTES',
         'DETECTION_THRESHOLD_DAYS',
+        'GHOST_SEAT_NEW_ASSIGNMENT_GRACE_DAYS',
+        'GHOST_SEAT_DECISION_WORKING_DAYS',
+        'GHOST_SEAT_REVOCATION_GRACE_DAYS',
         'RULE_SCHEDULE_G1_G2',
         'RULE_SCHEDULE_G3_G4',
         'AI_ENABLED',
@@ -414,7 +417,7 @@ describe('the operating parameters and the non-working dates over HTTP (integrat
       const parameters = await list();
 
       expect(parameters.has('BUDGET_PERIOD_KIND')).toBe(false);
-      expect(parameters.size).toBe(22);
+      expect(parameters.size).toBe(27);
     });
 
     it('is 404 for a parameter that does not exist, the time zone included (AC-11)', async () => {

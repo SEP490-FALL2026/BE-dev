@@ -151,6 +151,49 @@ describe('the alerts of the rights (a03-license-inbox-alerts, FR-5.14 lines 3, 1
         code: 'LEAVER_K1_ACCESS_RUNS_ON',
         params: { taskId: ID, assignmentId: ID, employeeId: ID, planId: ID, accessUntil: '2026-11-30' },
       }),
+      // A seat still held by a person who left (`G2`): ids only, the interface turns them into names.
+      notice({
+        code: 'GHOST_SEAT_G2_DETECTED',
+        params: { recommendationId: ID, employeeId: ID, applicationId: ID },
+      }),
+      notice({ code: 'GHOST_SEAT_NEW', params: { recommendationId: ID, departmentId: ID, weekKey: '2026-W45' } }),
+      notice({
+        code: 'GHOST_SEAT_ACTION_TIER',
+        params: { recommendationId: ID, departmentId: ID, weekKey: '2026-W45' },
+      }),
+      notice({
+        code: 'GHOST_SEAT_DECISION_OVERDUE',
+        params: { recommendationId: ID, employeeId: ID, applicationId: ID, decisionDueOn: '2026-11-06' },
+      }),
+      notice({ code: 'GHOST_SEAT_WAITING_FOR_HEAD', params: { recommendationId: ID, departmentId: ID } }),
+      notice({ code: 'GHOST_SEAT_RETURNED', params: { recommendationId: ID, employeeId: ID, applicationId: ID } }),
+      notice({
+        code: 'GHOST_SEAT_EXEMPTION_ENDING',
+        params: { recommendationId: ID, employeeId: ID, applicationId: ID, exemptUntil: '2026-12-31' },
+      }),
+      notice({
+        code: 'USAGE_TRACKING_NOTICE',
+        params: {
+          applicationId: ID,
+          activityDefinition: 'mở hoặc chỉnh sửa một tệp',
+          dataKinds: 'ngày hoạt động theo tài khoản',
+          purpose: 'đối chiếu quyền đang giữ với việc sử dụng',
+          retentionMonths: 6,
+          viewPath: '/applications/x/usage-tracking',
+        },
+      }),
+      notice({
+        code: 'USAGE_SOURCE_STALE',
+        params: { applicationId: ID, source: 'Figma admin export', coverageTo: '2026-09-01', freshnessDays: 8 },
+      }),
+      notice({
+        code: 'REVOCATION_UPCOMING',
+        params: { taskId: ID, planId: ID, applicationId: ID, source: 'GHOST_SEAT', notBefore: '2026-11-08' },
+      }),
+      notice({
+        code: 'REVOCATION_CANCELLED',
+        params: { planId: ID, applicationId: ID, source: 'GHOST_SEAT' },
+      }),
     ];
     for (const input of accepted)
       expect({ code: input.code, refusal: refuseInAppNotification(input) }).toEqual({

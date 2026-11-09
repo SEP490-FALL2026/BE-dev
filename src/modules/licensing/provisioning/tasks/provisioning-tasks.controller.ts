@@ -118,7 +118,7 @@ export class ProvisioningTasksController {
   @ApiSuccessResponse(TaskPageResponseDto, {
     message: 'PROVISIONING_TASK.LISTED',
     description:
-      'The tasks of both channels in one queue, the oldest first, each with the time it has taken. scope MINE is the IT Admin in charge by default, GENERAL the tasks nobody in charge works, ALL every task.',
+      'The tasks of both channels in one queue, the oldest first, each with the time it has taken. scope MINE is the IT Admin in charge by default, GENERAL the tasks nobody in charge works, ALL every task. A revocation says the day it may not be done before (notBefore), its due day (dueOn) and whether it may be taken today (claimableNow); claimableNow=true lists only what may be taken today, false only the revocations still in their grace.',
   })
   @ApiErrorResponses(...AUTH_ERRORS, IT_ONLY, {
     status: HttpStatus.UNPROCESSABLE_ENTITY,
@@ -170,8 +170,12 @@ export class ProvisioningTasksController {
     {
       status: HttpStatus.CONFLICT,
       description:
-        'PROVISIONING_TASK.NOT_MANUAL, NOT_CLAIMABLE (done or failed) or PROVISIONING.BENEFICIARY_DEPARTED (close the request as cancelled).',
-      examples: [PROVISIONING_ERROR_EXAMPLES.NOT_CLAIMABLE, PROVISIONING_ERROR_EXAMPLES.BENEFICIARY_DEPARTED],
+        'PROVISIONING_TASK.NOT_MANUAL, NOT_CLAIMABLE (done or failed), NOT_BEFORE (a revocation still in its grace: details.notBefore is the first day it can be taken) or PROVISIONING.BENEFICIARY_DEPARTED (close the request as cancelled).',
+      examples: [
+        PROVISIONING_ERROR_EXAMPLES.NOT_CLAIMABLE,
+        PROVISIONING_ERROR_EXAMPLES.NOT_BEFORE,
+        PROVISIONING_ERROR_EXAMPLES.BENEFICIARY_DEPARTED,
+      ],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
@@ -368,12 +372,12 @@ export class ProvisioningTasksController {
   @RequireRoles('IT_ADMIN')
   @ApiOperation({
     operationId: 'provisioningTaskCancel',
-    summary: 'Close the failed task of a withdrawn request as cancelled',
+    summary: 'Close the failed task of a withdrawn request, or a revocation no reason asks for, as cancelled',
   })
   @ApiSuccessResponse(TaskResponseDto, {
     message: 'PROVISIONING_TASK.CANCELLED',
     description:
-      'The only decision left on the failed task of a request its requester withdrew: the task ends as cancelled and never as failed, its assignment becomes a cancelled one so the seat is free again, the request ends as withdrawn and what was held for it goes back to the budget.',
+      'The only decision left on the failed task of a request its requester withdrew: the task ends as cancelled and never as failed, its assignment becomes a cancelled one so the seat is free again, the request ends as withdrawn and what was held for it goes back to the budget. A revocation that is in progress or failed and that no reason asks for any more (the source took its reason back) ends as cancelled (NO_LONGER_APPLIES) and its seat stays as it was.',
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,
@@ -382,7 +386,7 @@ export class ProvisioningTasksController {
     {
       status: HttpStatus.CONFLICT,
       description:
-        'The task is not failed (PROVISIONING_TASK.NOT_FAILED), or its request was not withdrawn (PROVISIONING_TASK.NO_WITHDRAWAL): nothing changes.',
+        'The task is not failed (PROVISIONING_TASK.NOT_FAILED; a revocation: not in progress or failed), or nothing was withdrawn (PROVISIONING_TASK.NO_WITHDRAWAL: its request was not withdrawn, or a reason still asks for the revocation): nothing changes.',
       examples: [PROVISIONING_ERROR_EXAMPLES.NOT_FAILED, PROVISIONING_ERROR_EXAMPLES.NO_WITHDRAWAL],
     },
     {

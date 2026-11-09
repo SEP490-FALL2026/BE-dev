@@ -35,6 +35,9 @@ flowchart BT
     usage["usage"]
   end
   subgraph T7["T7"]
+    optimization["optimization"]
+  end
+  subgraph T8["T8"]
     dashboards["dashboards"]
   end
   ai_assist -->|8| audit
@@ -56,9 +59,11 @@ flowchart BT
   catalog -->|30| organization
   dashboards -->|3| identity_access
   dashboards -->|4| licensing
+  dashboards -->|3| optimization
   dashboards -->|5| organization
   dashboards -->|4| personnel
   dashboards -->|3| requests
+  dashboards -->|2| usage
   data_import -->|6| audit
   data_import -->|1| catalog
   data_import -->|9| licensing
@@ -77,13 +82,13 @@ flowchart BT
   installation -->|2| finance
   installation -->|11| identity_access
   installation -->|8| organization
-  licensing -->|30| audit
-  licensing -->|53| catalog
+  licensing -->|31| audit
+  licensing -->|54| catalog
   licensing -->|2| finance
   licensing -->|8| identity_access
-  licensing -->|6| notifications
+  licensing -->|7| notifications
   licensing -->|6| operating_parameters
-  licensing -->|54| organization
+  licensing -->|56| organization
   onboarding -->|2| catalog
   onboarding -->|2| data_import
   onboarding -->|2| identity_access
@@ -92,6 +97,15 @@ flowchart BT
   operating_parameters -->|5| audit
   operating_parameters -->|2| finance
   operating_parameters -->|7| organization
+  optimization -->|6| audit
+  optimization -->|6| catalog
+  optimization -->|4| identity_access
+  optimization -->|23| licensing
+  optimization -->|7| notifications
+  optimization -->|6| operating_parameters
+  optimization -->|18| organization
+  optimization -->|6| personnel
+  optimization -->|9| usage
   organization -->|10| audit
   organization -->|5| notifications
   personnel -->|24| audit
@@ -112,10 +126,12 @@ flowchart BT
   requests -->|7| notifications
   requests -->|9| operating_parameters
   requests -->|79| organization
-  usage -->|3| audit
-  usage -->|3| catalog
-  usage -->|14| devices
-  usage -->|3| organization
+  usage -->|7| audit
+  usage -->|7| catalog
+  usage -->|15| devices
+  usage -->|7| licensing
+  usage -->|2| notifications
+  usage -->|10| organization
 ```
 
-79 module edges.
+92 module edges.

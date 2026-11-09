@@ -58,8 +58,8 @@ export class RevocationTasksController {
     {
       status: HttpStatus.CONFLICT,
       description:
-        'The task is not a revocation (PROVISIONING_TASK.NOT_REVOCATION), is not in progress or is completed already (NOT_IN_PROGRESS), is not for a person (NOT_MANUAL), or the assignment is no longer open (LICENSE_ASSIGNMENT.NOT_OPEN): nothing changes.',
-      examples: [EXAMPLES.NOT_REVOCATION, EXAMPLES.NOT_IN_PROGRESS],
+        'The task is not a revocation (PROVISIONING_TASK.NOT_REVOCATION), is not in progress or is completed already (NOT_IN_PROGRESS), is not for a person (NOT_MANUAL), is still in its grace (NOT_BEFORE, details.notBefore: the first day it can be completed), or the assignment is no longer open (LICENSE_ASSIGNMENT.NOT_OPEN): nothing changes.',
+      examples: [EXAMPLES.NOT_REVOCATION, EXAMPLES.NOT_IN_PROGRESS, EXAMPLES.NOT_BEFORE],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,

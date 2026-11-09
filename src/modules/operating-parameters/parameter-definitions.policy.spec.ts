@@ -23,6 +23,8 @@ describe('operating parameter definitions (US-01-04)', () => {
     expect(defaults.BACKLOG_ALERT_THRESHOLD).toBe(10);
     expect(defaults.DETECTION_THRESHOLD_DAYS).toEqual([30, 60, 90]);
     expect(defaults.RENEWAL_ALERT_DAYS_BEFORE_DEADLINE).toEqual([15, 7]);
+    expect(defaults.GHOST_SEAT_DECISION_WORKING_DAYS).toBe(5);
+    expect(defaults.GHOST_SEAT_REVOCATION_GRACE_DAYS).toBe(7);
     expect(defaults.RULE_SCHEDULE_G1_G2).toBe('DAILY');
     expect(defaults.RULE_SCHEDULE_G3_G4).toBe('WEEKLY');
   });
@@ -128,6 +130,9 @@ const EXPECTED_KEYS = [
   'RENEWAL_ALERT_DAYS_BEFORE_DEADLINE',
   'ACTIVITY_WINDOW_MINUTES',
   'DETECTION_THRESHOLD_DAYS',
+  'GHOST_SEAT_NEW_ASSIGNMENT_GRACE_DAYS',
+  'GHOST_SEAT_DECISION_WORKING_DAYS',
+  'GHOST_SEAT_REVOCATION_GRACE_DAYS',
   'RULE_SCHEDULE_G1_G2',
   'RULE_SCHEDULE_G3_G4',
   'AI_ENABLED',
@@ -135,7 +140,7 @@ const EXPECTED_KEYS = [
 ];
 
 describe('operating parameter labels and groups (QĐ93-PARAM-LABEL)', () => {
-  it('pins the twenty-three keys, ordered by group and, inside a group, as the spec table lists them', () => {
+  it('pins the twenty-six keys, ordered by group and, inside a group, as the spec table lists them', () => {
     expect(PARAMETER_DEFINITIONS.map((definition) => definition.key)).toEqual(EXPECTED_KEYS);
   });
 
@@ -248,6 +253,15 @@ describe('operating parameter labels and groups (QĐ93-PARAM-LABEL)', () => {
       ['RENEWAL_ALERT_DAYS_BEFORE_DEADLINE', 'Cảnh báo trước hạn báo hủy thuê bao', 'SUBSCRIPTION', 'days', 'ngày'],
       ['ACTIVITY_WINDOW_MINUTES', 'Số phút tính là một ngày có hoạt động', 'USAGE', 'minutes per day', 'phút mỗi ngày'],
       ['DETECTION_THRESHOLD_DAYS', 'Ngưỡng ngày không dùng của ghế', 'USAGE', 'days', 'ngày'],
+      ['GHOST_SEAT_NEW_ASSIGNMENT_GRACE_DAYS', 'Ân hạn cho ghế mới cấp', 'USAGE', 'days', 'ngày'],
+      [
+        'GHOST_SEAT_DECISION_WORKING_DAYS',
+        'Hạn trưởng phòng quyết định ghost seat',
+        'USAGE',
+        'working days',
+        'ngày làm việc',
+      ],
+      ['GHOST_SEAT_REVOCATION_GRACE_DAYS', 'Ân hạn trước khi gỡ ghost seat', 'USAGE', 'calendar days', 'ngày lịch'],
       ['RULE_SCHEDULE_G1_G2', 'Lịch chạy luật lãng phí (dữ liệu nội bộ)', 'USAGE', 'schedule', 'lịch'],
       ['RULE_SCHEDULE_G3_G4', 'Lịch chạy luật lãng phí (dữ liệu usage)', 'USAGE', 'schedule', 'lịch'],
       ['AI_ENABLED', 'Công tắc tổng của các tính năng AI', 'AI', 'switch', 'công tắc'],

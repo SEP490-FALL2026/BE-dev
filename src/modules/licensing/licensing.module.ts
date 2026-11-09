@@ -22,6 +22,10 @@ import { AssignmentDepartmentRepo } from './assignment/assignment-department.rep
 import { RevocationCompletedFactsReader } from './provisioning/revocation-completion/revocation-completed-facts.service';
 import { AssignmentChainRepo } from './assignment/assignment-chain.repo';
 import { AssignmentRepo } from './assignment/assignment.repo';
+import { UsageFactsRepo } from './assignment/usage-facts.repo';
+import { RuleSeatsFactsService } from './assignment/rule-seats-facts.service';
+import { RuleSeatsRepo } from './assignment/rule-seats.repo';
+import { SharedPoolVacancyService } from './shared-pool/shared-pool-vacancy.service';
 import { AssignmentSeatOccupancy } from './assignment/assignment-seat-occupancy.listener';
 import { AssignmentServiceAccountReader } from './assignment/assignment-service-account.listener';
 import { AssignmentListService } from './assignment/assignment-list.service';
@@ -72,6 +76,8 @@ import {
 import { LicensingApi } from './public/licensing.api';
 import { LicensingDashboardApi } from './public/licensing-dashboard.api';
 import { LicensingHandoverApi } from './public/licensing-handover.api';
+import { LicensingGhostSeatApi } from './public/licensing-ghost-seat.api';
+import { LicensingUsageApi } from './public/licensing-usage.api';
 import { LicensingOpenGrantsApi } from './public/licensing-open-grants.api';
 import { LicensingPoolStockApi } from './public/licensing-pool-stock.api';
 import { LicensingRenewalApi } from './public/licensing-renewal.api';
@@ -102,6 +108,7 @@ import { RevocationViewService } from './provisioning/revocation-view.service';
 import { RevocationRecorder } from './provisioning/revocation-recorder.service';
 import { RevocationTaskFactory } from './provisioning/revocation-task-factory.service';
 import { RevocationService } from './provisioning/revocation.service';
+import { RevocationWithdrawalService } from './provisioning/revocation-withdrawal/revocation-withdrawal.service';
 import { ProvisioningTaskReasonRepo } from './provisioning/provisioning-task-reason.repo';
 import { SaasIssueCalendar } from './saas-issue/saas-issue-calendar.service';
 import { SaasIssueFactsRepo } from './saas-issue/saas-issue-facts.repo';
@@ -215,6 +222,7 @@ import { SubscriptionRenewalsController } from './subscription-renewal/subscript
     RevocationTaskFactory,
     RevocationRecorder,
     RevocationService,
+    RevocationWithdrawalService,
     RevocationCompletionService,
     RevocationLeaverAlert,
     RevocationReadRepo,
@@ -290,6 +298,12 @@ import { SubscriptionRenewalsController } from './subscription-renewal/subscript
     LicensingApi,
     LicensingDashboardApi,
     LicensingHandoverApi,
+    LicensingGhostSeatApi,
+    LicensingUsageApi,
+    UsageFactsRepo,
+    RuleSeatsFactsService,
+    RuleSeatsRepo,
+    SharedPoolVacancyService,
     LicensingOpenGrantsApi,
     LicensingPoolStockApi,
     LicensingRenewalApi,
@@ -301,6 +315,8 @@ import { SubscriptionRenewalsController } from './subscription-renewal/subscript
     LicensingApi,
     LicensingDashboardApi,
     LicensingHandoverApi,
+    LicensingGhostSeatApi,
+    LicensingUsageApi,
     LicensingOpenGrantsApi,
     LicensingPoolStockApi,
     LicensingRenewalApi,

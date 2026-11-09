@@ -8,6 +8,7 @@ import type {
   PlanRevocationInfo,
   PlanSummary,
   PoolSubscription,
+  RuleSubscription,
   SubscriptionPrice,
   WorkspaceDuty,
   SeatTarget,
@@ -138,6 +139,16 @@ export class CatalogApi {
   /** The active subscriptions these departments own with their price and term: what the baseline of the budget starts from (`FR-5.15`). */
   getBaselineSubscriptions(departmentIds: readonly string[], tx?: DbTx): Promise<BaselineSubscription[]> {
     return this.subscriptions.baselineOf(departmentIds, tx);
+  }
+
+  /** The subscriptions that grant seats on `day` (active, not taken over by a later period that runs, not ended), with their plan facts, in one read. */
+  getSubscriptionsGrantingOn(day: BusinessDate, tx?: DbTx): Promise<RuleSubscription[]> {
+    return this.subscriptions.grantingOn(day, tx);
+  }
+
+  /** The IT Admin named responsible for the subscription; null when it names none: who answers for a seat of the shared pool. */
+  getSubscriptionResponsibleItAdmin(subscriptionId: string, tx?: DbTx): Promise<string | null> {
+    return this.subscriptions.responsibleItAdminOf(subscriptionId, tx);
   }
 
   /** The ids of every subscription and purchase a department owns, by id: for a module that finds what belongs to the department through them. */

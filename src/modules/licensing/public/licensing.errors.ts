@@ -342,6 +342,22 @@ export class RevocationRefusedError extends Error {
   }
 }
 
+/** A revocation was opened with a timing that contradicts itself (a day not before that is after the due day): a fault of the source module. */
+export class RevocationInputError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = 'RevocationInputError';
+  }
+}
+
+/** The revocation may not be taken or completed before the day the source asked for (`US-10-07` AC-18): the day it can be is told. */
+export class ProvisioningTaskNotBeforeError extends Error {
+  constructor(readonly notBefore: string) {
+    super(`The revocation cannot be done before ${notBefore}.`);
+    this.name = 'ProvisioningTaskNotBeforeError';
+  }
+}
+
 export type RevocationCompletionProblem =
   | 'COMPLETION_NOT_ALLOWED'
   | 'NOTE_REQUIRED'

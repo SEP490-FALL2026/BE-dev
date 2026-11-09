@@ -6,6 +6,7 @@ import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { BaselineSubscription } from '../public/catalog.types';
 import { orderBySourcePreference, pickPriceSource, type LivenessFacts } from './pool/subscription-pool.policy';
+import { notTakenOverOn } from './subscription-granting.repo';
 import type {
   BillingCycle,
   NewSubscription,
@@ -50,16 +51,6 @@ const livePricedOf = (): Prisma.SubscriptionWhereInput => ({
   ],
 });
 
-/**
- * A period a seat can still be taken from on `today` as far as its successor goes (`BR-MF1-09a`): no later period continues it, or the one
- * that does is still a draft or has not started. Until the next period runs, the period that runs and the next one are one pool.
- */
-const notTakenOverOn = (today: BusinessDate): Prisma.SubscriptionWhereInput => ({
-  OR: [
-    { renewedBy: null },
-    { renewedBy: { is: { OR: [{ status: { not: 'ACTIVE' } }, { startDate: { gt: toDateColumn(today) } }] } } },
-  ],
-});
 /** A K4 plan always carries its purchase price, paid once (`QĐ-106d`, review G23-04), whatever kind of subscription records it. */
 const PLAN_KIND = { plan: { select: { provisioningType: true } } } as const;
 const PRICE_FIELDS = {

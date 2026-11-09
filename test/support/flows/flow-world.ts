@@ -1,3 +1,5 @@
+import { DecisionFollowUpService } from '../../../src/modules/optimization/decision/decision-follow-up.service';
+import { InternalRulesService } from '../../../src/modules/optimization/internal-rules/internal-rules.service';
 import { RequestStatusProjection } from '../../../src/modules/requests/status/request-status-projector.service';
 import { ExpiryReminderService } from '../../../src/modules/licensing/expiry/expiry-reminder.service';
 import { businessDateAt } from '../../../src/core/business-date';
@@ -83,5 +85,12 @@ export class FlowWorld {
       get(OrganizationChangeService).announceDue(businessDateAt(now, 'Asia/Ho_Chi_Minh')),
     );
     this.clock.register('transferReview', (now) => get(TransferReviewOverdueService).noticeOverdue(now));
+    // MF-5: the daily rules of G1/G2 and the follow-up of the queue of the heads (routing, pause, overdue, exemptions).
+    this.clock.register('ghostSeatRules', async (now) => {
+      await get(InternalRulesService).run(now);
+    });
+    this.clock.register('ghostSeatQueue', async (now) => {
+      await get(DecisionFollowUpService).run(now);
+    });
   }
 }

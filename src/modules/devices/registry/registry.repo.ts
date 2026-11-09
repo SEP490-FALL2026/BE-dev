@@ -237,4 +237,23 @@ export class RegistryRepo {
 
     return rows.map((row) => row.id);
   }
+
+  /** Who holds each of these registrations and over which days: a registration has one holder for its whole life. */
+  async holdersOf(
+    registrationIds: readonly string[],
+    tx?: DbTx,
+  ): Promise<Array<{ registrationId: string; employeeId: string; validFrom: Date; validUntil: Date | null }>> {
+    if (registrationIds.length === 0) return [];
+    const rows = await (tx ?? this.prisma).deviceRegistration.findMany({
+      where: { id: { in: [...registrationIds] } },
+      select: { id: true, holderEmployeeId: true, validFrom: true, validUntil: true },
+    });
+
+    return rows.map((row) => ({
+      registrationId: row.id,
+      employeeId: row.holderEmployeeId,
+      validFrom: row.validFrom,
+      validUntil: row.validUntil,
+    }));
+  }
 }

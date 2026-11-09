@@ -140,6 +140,11 @@ export class IdentityAccessApi {
     return this.accounts.findUsableItAdminEmployeeIds(employeeIds, tx);
   }
 
+  /** Every IT Admin whose account can act, by employee code: who is told what any IT Admin may handle. */
+  findAllUsableItAdminEmployeeIds(tx?: DbTx): Promise<string[]> {
+    return this.accounts.findAllUsableItAdminEmployeeIds(tx);
+  }
+
   /** The usable IT Admin with the smallest employee code, or null: who a report is given to when nobody is in charge. */
   findFirstUsableItAdminEmployeeId(tx?: DbTx): Promise<string | null> {
     return this.accounts.findFirstUsableItAdminEmployeeId(tx);

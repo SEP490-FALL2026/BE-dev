@@ -56,6 +56,45 @@ function toRecord(row: TransferRow): TransferRecord {
   };
 }
 
+/** A transfer as another module reads it (the rules of wasted seats): where the person goes and whether it is over. */
+export interface TransferFactRow {
+  employeeId: string;
+  transferId: string;
+  fromDepartmentId: string;
+  toDepartmentId: string;
+  effectiveOn: BusinessDate;
+  status: 'PENDING' | 'EFFECTIVE' | 'CANCELLED';
+  closedAt: Date | null;
+}
+
+const toFact = (row: {
+  id: string;
+  employeeId: string;
+  fromDepartmentId: string;
+  toDepartmentId: string;
+  effectiveOn: Date;
+  status: 'PENDING' | 'EFFECTIVE' | 'CANCELLED';
+  closedAt: Date | null;
+}): TransferFactRow => ({
+  employeeId: row.employeeId,
+  transferId: row.id,
+  fromDepartmentId: row.fromDepartmentId,
+  toDepartmentId: row.toDepartmentId,
+  effectiveOn: fromDateColumn(row.effectiveOn),
+  status: row.status,
+  closedAt: row.closedAt,
+});
+
+const FACT_COLUMNS = {
+  id: true,
+  employeeId: true,
+  fromDepartmentId: true,
+  toDepartmentId: true,
+  effectiveOn: true,
+  status: true,
+  closedAt: true,
+} as const;
+
 const groundsColumns = (grounds: Grounds) => ({
   groundsType: grounds.type,
   groundsReference: grounds.reference,
@@ -349,5 +388,32 @@ export class TransferRepo {
       },
       { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead },
     );
+  }
+  /** The transfers of these people that have taken effect on `onDate` and are not closed yet (not cancelled, the service accounts not settled). */
+  async inOverlap(employeeIds: readonly string[], onDate: BusinessDate): Promise<TransferFactRow[]> {
+    if (employeeIds.length === 0) return [];
+    const rows = await this.prisma.departmentTransfer.findMany({
+      where: {
+        employeeId: { in: [...employeeIds] },
+        status: { in: ['PENDING', 'EFFECTIVE'] },
+        effectiveOn: { lte: toDateColumn(onDate) },
+        closedAt: null,
+      },
+      select: FACT_COLUMNS,
+      orderBy: [{ effectiveOn: 'asc' }, { id: 'asc' }],
+    });
+
+    return rows.map(toFact);
+  }
+
+  /** The transfers with these ids, whatever their state. */
+  async factsOf(transferIds: readonly string[]): Promise<TransferFactRow[]> {
+    if (transferIds.length === 0) return [];
+    const rows = await this.prisma.departmentTransfer.findMany({
+      where: { id: { in: [...transferIds] } },
+      select: FACT_COLUMNS,
+    });
+
+    return rows.map(toFact);
   }
 }

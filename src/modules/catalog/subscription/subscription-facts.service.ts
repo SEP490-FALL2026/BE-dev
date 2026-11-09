@@ -4,8 +4,9 @@ import type { Money } from '../../../core/money/money';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { SubscriptionPoolService } from './pool/subscription-pool.service';
+import { SubscriptionGrantingRepo } from './subscription-granting.repo';
 import { SubscriptionRepo } from './subscription.repo';
-import type { BaselineSubscription, SubscriptionPrice } from '../public/catalog.types';
+import type { BaselineSubscription, RuleSubscription, SubscriptionPrice } from '../public/catalog.types';
 import type { SubscriptionKind } from './subscription.types';
 
 /** What the rules of another capability need to know of the subscriptions of some plans: their kind and their end. */
@@ -14,6 +15,7 @@ export class SubscriptionFactsService {
   constructor(
     private readonly subscriptions: SubscriptionRepo,
     private readonly pool: SubscriptionPoolService,
+    private readonly granting: SubscriptionGrantingRepo,
   ) {}
 
   /** Buys one more seat on a subscription the caller holds locked (see `CatalogApi.addPoolSeat`). Throws PoolSeatNotAddableError. */
@@ -96,6 +98,16 @@ export class SubscriptionFactsService {
     tx?: DbTx,
   ): Promise<ReadonlyMap<string, 'MONTHLY' | 'QUARTERLY' | 'ANNUAL' | 'OTHER' | 'ONE_TIME'>> {
     return this.subscriptions.findPricedCyclesOfPlans(planIds, tx);
+  }
+
+  /** The subscriptions that grant seats on `day` (active, not taken over by a later period that runs, not ended): what the rules of wasted seats judge. One statement. */
+  grantingOn(day: BusinessDate, tx?: DbTx): Promise<RuleSubscription[]> {
+    return this.granting.grantingOn(day, tx);
+  }
+
+  /** The IT Admin named responsible for the subscription; null when it names none or does not exist. */
+  async responsibleItAdminOf(subscriptionId: string, tx?: DbTx): Promise<string | null> {
+    return (await this.subscriptions.find(subscriptionId, tx))?.responsibleItAdminEmployeeId ?? null;
   }
 
   /** The ids of every subscription and purchase a department owns, by id (what a rule about the department's work reads). */

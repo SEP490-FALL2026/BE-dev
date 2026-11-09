@@ -33,5 +33,6 @@ const detailOf = (view: TaskView) => ({
       ...view.revocation.firstReason,
       decidedAt: view.revocation.firstReason.decidedAt.toISOString(),
     },
+    lastWithdrawnAt: view.revocation.lastWithdrawnAt?.toISOString() ?? null,
   },
 });

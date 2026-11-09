@@ -11,6 +11,7 @@ import {
 } from '../provisioning/grant-cancellation/provisioning-cancellation.service';
 import { ProvisioningTaskFrame } from '../provisioning/provisioning-task-frame.service';
 import { RevocationViewService } from '../provisioning/revocation-view.service';
+import { RevocationWithdrawalService } from '../provisioning/revocation-withdrawal/revocation-withdrawal.service';
 import { RevocationService } from '../provisioning/revocation.service';
 import type {
   AssignmentRecord,
@@ -23,6 +24,8 @@ import type {
   RevocationSource,
   SelfExecutionMode,
   TerminatingAccess,
+  WithdrawnRevocation,
+  WithdrawRevocationInput,
 } from './licensing.types';
 
 /**
@@ -37,6 +40,7 @@ export class LicensingApi {
     private readonly cancellations: ProvisioningCancellationService,
     private readonly frame: ProvisioningTaskFrame,
     private readonly revocations: RevocationService,
+    private readonly withdrawals: RevocationWithdrawalService,
     private readonly revocationView: RevocationViewService,
     private readonly renewals: SubscriptionRenewalRepo,
   ) {}
@@ -51,6 +55,20 @@ export class LicensingApi {
    */
   openRevocation(tx: DbTx, actor: AuthenticatedPrincipal, input: OpenRevocationInput): Promise<OpenedRevocation> {
     return this.revocations.open(tx, actor, input);
+  }
+
+  /**
+   * Takes back the reason a source gave for the revocation of a seat (the source decided otherwise, or its cause ended), in the
+   * transaction of that source: the task goes on while another reason stands, and is cancelled as no longer applying when none does
+   * (a task in progress only when `cancelInProgressClaimedBy` is the IT Admin who took it). Asking twice changes nothing. The
+   * listeners hear `REASON_WITHDRAWN`.
+   */
+  withdrawRevocationReason(
+    tx: DbTx,
+    actor: AuthenticatedPrincipal,
+    input: WithdrawRevocationInput,
+  ): Promise<WithdrawnRevocation> {
+    return this.withdrawals.withdraw(tx, actor, input);
   }
 
   /**

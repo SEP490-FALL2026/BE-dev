@@ -55,6 +55,9 @@ export interface ProvisioningTaskRecord {
     reason: string | null;
     purchasedAt: Date;
   } | null;
+  /** What the reasons that stand ask of a revocation: not before a day, due by a day (null: none asked; a grant has none). */
+  dueOn: BusinessDate | null;
+  notBefore: BusinessDate | null;
   createdAt: Date;
   assignment: {
     employeeId: string;
@@ -105,6 +108,8 @@ export const SUMMARY_SELECT = {
   purchaseKind: true,
   purchaseReason: true,
   purchasedAt: true,
+  dueOn: true,
+  notBefore: true,
   createdByAppUserId: true,
   createdAt: true,
   updatedAt: true,
@@ -154,6 +159,8 @@ export const toRecord = (row: Row): ProvisioningTaskRecord => ({
     row.purchaseKind !== null && row.purchasedAt !== null
       ? { kind: row.purchaseKind, reason: row.purchaseReason, purchasedAt: row.purchasedAt }
       : null,
+  dueOn: dayOf(row.dueOn),
+  notBefore: dayOf(row.notBefore),
   createdAt: row.createdAt,
   assignment: {
     employeeId: row.assignment.employeeId,

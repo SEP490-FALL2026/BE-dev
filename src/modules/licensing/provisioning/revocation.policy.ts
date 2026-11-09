@@ -1,6 +1,7 @@
 import { addDays, type BusinessDate } from '../../../core/business-date';
 import {
   AssignmentNotOpenError,
+  ProvisioningTaskNotBeforeError,
   ProvisioningTaskStateError,
   RevocationCompletionError,
   RevocationRefusedError,
@@ -51,6 +52,11 @@ export function assertRevocable(input: {
 /** A revocation is completed as one, and the completion of a grant is not for it. Throws ProvisioningTaskStateError. */
 export function assertRevocationTask(kind: ProvisioningTaskKind): void {
   if (kind !== 'REVOKE') throw new ProvisioningTaskStateError('NOT_REVOCATION');
+}
+
+/** A revocation with a day not before is not taken or completed before it (`US-10-07` AC-18): the day it can be is told. Throws ProvisioningTaskNotBeforeError. */
+export function assertNotBefore(notBefore: BusinessDate | null, today: BusinessDate): void {
+  if (notBefore !== null && today < notBefore) throw new ProvisioningTaskNotBeforeError(notBefore);
 }
 
 export function assertNotRevocationTask(kind: ProvisioningTaskKind): void {

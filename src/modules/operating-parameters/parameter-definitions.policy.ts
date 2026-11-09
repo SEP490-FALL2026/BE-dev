@@ -307,6 +307,42 @@ export const PARAMETER_DEFINITIONS: readonly ParameterDefinition[] = [
     source: 'FR-4.12',
   },
   {
+    key: 'GHOST_SEAT_NEW_ASSIGNMENT_GRACE_DAYS',
+    label: 'Ân hạn cho ghế mới cấp',
+    group: 'USAGE',
+    shape: { kind: 'int', min: 1, max: 60 },
+    default: 14,
+    unit: 'days',
+    unitLabel: 'ngày',
+    description:
+      'How many days after a seat could first be used it is left out of the rules of unused seats (a person needs time to start).',
+    source: 'FR-4.9, A.4',
+  },
+  {
+    key: 'GHOST_SEAT_DECISION_WORKING_DAYS',
+    label: 'Hạn trưởng phòng quyết định ghost seat',
+    group: 'USAGE',
+    shape: { kind: 'int', min: 1, max: 20 },
+    default: 5,
+    unit: 'working days',
+    unitLabel: 'ngày làm việc',
+    description:
+      'How many working days the head of a department has to keep, reclaim or exempt a seat the system recommends, counted from the day the recommendation entered the queue; past it, only a reminder and a warning to the IT Admin.',
+    source: 'QĐ-66t, FR-4.12',
+  },
+  {
+    key: 'GHOST_SEAT_REVOCATION_GRACE_DAYS',
+    label: 'Ân hạn trước khi gỡ ghost seat',
+    group: 'USAGE',
+    shape: { kind: 'int', min: 0, max: 30 },
+    default: 7,
+    unit: 'calendar days',
+    unitLabel: 'ngày lịch',
+    description:
+      'How many calendar days after the head decides to reclaim a seat the holder is told before the IT Admin may take away the seat.',
+    source: 'QĐ-94j, BR-MF5-04',
+  },
+  {
     key: 'RULE_SCHEDULE_G1_G2',
     label: 'Lịch chạy luật lãng phí (dữ liệu nội bộ)',
     group: 'USAGE',

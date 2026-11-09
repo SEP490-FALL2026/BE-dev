@@ -52,6 +52,7 @@ import { SubscriptionNoticeService } from './subscription/subscription-notice.se
 import { SubscriptionPeriodService } from './subscription/subscription-period.service';
 import { SubscriptionPeriodApi } from './public/subscription-period.api';
 import { SubscriptionObligationService } from './subscription/subscription-obligation.service';
+import { SubscriptionGrantingRepo } from './subscription/subscription-granting.repo';
 import { SubscriptionRepo } from './subscription/subscription.repo';
 import { SubscriptionChangeGuard } from './subscription/subscription-change-guard.service';
 import { SubscriptionChangeService } from './subscription/subscription-change.service';
@@ -144,6 +145,7 @@ import { VendorRepo } from './vendor/vendor.repo';
     SubscriptionObligationService,
     SubscriptionDepartmentUseReader,
     SubscriptionRepo,
+    SubscriptionGrantingRepo,
     SubscriptionViewService,
     SubscriptionNoticeService,
     SubscriptionPeriodService,

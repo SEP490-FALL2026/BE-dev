@@ -146,6 +146,15 @@ export class OrganizationReadApi {
     return this.employees.placementOn(employeeId, onDate ?? (await this.businessToday(new Date(), tx)), tx);
   }
 
+  /** The department of the employee's latest placement begun by `onDate`, ended or not: where a person who left last worked; null when they had none. */
+  async getLastPlacement(
+    employeeId: string,
+    onDate: BusinessDate,
+    tx?: DbTx,
+  ): Promise<{ departmentId: string } | null> {
+    return this.employees.lastPlacementBy(employeeId, onDate, tx);
+  }
+
   /** The department of the employee on `onDate` and its IT Admin, named only while still working (`US-01-11` AC-4, AC-8). */
   async getItAdminInCharge(employeeId: string, onDate?: BusinessDate, tx?: DbTx): Promise<ItAdminInCharge | null> {
     const placement = await this.getEmployeePlacement(employeeId, onDate, tx);
@@ -234,6 +243,14 @@ export class OrganizationReadApi {
   /** Employees by code in one read, for the imports that name people by code. Unknown codes are simply absent. */
   getEmployeesByCodes(employeeCodes: readonly string[], tx?: DbTx): Promise<EmployeeRecord[]> {
     return this.employees.findManyByCodes(employeeCodes, tx);
+  }
+
+  /**
+   * The people whose normalized work email is one of these, those who have left included (a vendor report still names them): only the code and
+   * the email, never the name (`US-08-04` AC-4). An email nobody has is simply absent.
+   */
+  getEmployeesByWorkEmails(normalizedEmails: readonly string[], tx?: DbTx) {
+    return this.employees.findManyByNormalizedEmails(normalizedEmails, tx);
   }
 
   /** The domains of the work emails of its people: all the organization can tell of its domains (`OQ-A-22`). */

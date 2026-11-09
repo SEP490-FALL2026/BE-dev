@@ -7,7 +7,7 @@ import {
 } from '../public/licensing.errors';
 import type { AssignmentRecord } from '../public/licensing.types';
 import { AssignmentResponsibleAfterDeadlineError } from './service-account.errors';
-import { assertResponsibleChange, effectiveFromLabel, toAssignmentView } from './assignment.policy';
+import { assertResponsibleChange, effectiveFromLabel, toAssignmentView, usableDayOf } from './assignment.policy';
 
 const bot: AssignmentRecord = {
   id: 'a1',
@@ -177,3 +177,26 @@ describe('assertResponsibleChange (AC-10)', () => {
 
 // Gói 9: assertSubscriptionDepartment + holdersOfOtherDepartments functions removed — all related tests deleted.
 // (Phần cấp từ kho được phép cấp qua phòng: không guard phòng, không tìm người khác phòng)
+
+describe('usableDayOf — M5-01 (FR-4.9 gate 4, QĐ-77n)', () => {
+  const day = (instant: Date) => instant.toISOString().slice(0, 10);
+
+  it('is null while a grant task of the first link is still open: the invitation waits', () => {
+    expect(usableDayOf('2026-06-01', [{ status: 'QUEUED', completedAt: null }], day)).toBeNull();
+    expect(usableDayOf('2026-06-01', [{ status: 'IN_PROGRESS', completedAt: null }], day)).toBeNull();
+    expect(usableDayOf('2026-06-01', [{ status: 'FAILED', completedAt: null }], day)).toBeNull();
+  });
+
+  it('is the day the grant was completed when it is after valid_from', () => {
+    expect(
+      usableDayOf('2026-06-01', [{ status: 'COMPLETED', completedAt: new Date('2026-06-20T03:00:00Z') }], day),
+    ).toBe('2026-06-20');
+  });
+
+  it('is valid_from when no grant task was made (a recorded or baseline seat) or the grant was done before it', () => {
+    expect(usableDayOf('2026-06-01', [], day)).toBe('2026-06-01');
+    expect(
+      usableDayOf('2026-06-01', [{ status: 'COMPLETED', completedAt: new Date('2026-05-20T03:00:00Z') }], day),
+    ).toBe('2026-06-01');
+  });
+});
