@@ -116,6 +116,25 @@ export class MyRequestsFactsRepo {
     return new Set(rows.map((row) => row.requestId));
   }
 
+  /**
+   * GH-3 (`BR-MF1-01g`): the requests flagged when they were sent because the person used many paid applications, with how many and the
+   * reason given, by request; a request not flagged is absent.
+   */
+  async manyPaidSoftware(requestIds: readonly string[]): Promise<Map<string, { count: number; reason: string }>> {
+    if (requestIds.length === 0) return new Map();
+    const rows = await this.prisma.accessRequest.findMany({
+      where: { id: { in: unique(requestIds) }, manyPaidSoftware: true },
+      select: { id: true, manyPaidSoftwareCount: true, manyPaidSoftwareReason: true },
+    });
+    const flags = new Map<string, { count: number; reason: string }>();
+    for (const row of rows) {
+      if (row.manyPaidSoftwareCount === null || row.manyPaidSoftwareReason === null) continue;
+      flags.set(row.id, { count: row.manyPaidSoftwareCount, reason: row.manyPaidSoftwareReason });
+    }
+
+    return flags;
+  }
+
   /** What the IT Admin wrote when they refused the software at the gate, by request. */
   async assessmentRefusals(requestIds: readonly string[]): Promise<OutcomeFacts['assessmentRefusals']> {
     if (requestIds.length === 0) return new Map();

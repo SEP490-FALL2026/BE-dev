@@ -69,7 +69,7 @@ const departmentRef = z.strictObject({ id: z.uuid(), code: z.string(), name: z.s
 
 /**
  * A request as a row of the history the people who oversee requests read: what it is, who sent it and for whom, from which department,
- * where it stands and who it waits for, how it ended, and whether the head confirmed the reserve. No price, amount, figure of a budget,
+ * where it stands and who it waits for, how it ended, whether the head confirmed the reserve, and the flag GH-3 of the request. No price, amount, figure of a budget,
  * result of a check, commitment or reason Finance wrote: those are read by the routes of money, each by its own role.
  */
 export const accessRequestHistoryItemSchema = myRequestSummarySchema
@@ -79,6 +79,8 @@ export const accessRequestHistoryItemSchema = myRequestSummarySchema
     department: departmentRef,
     /** The head confirmed the use of the reserve of the budget for it: the fact, never the figure. */
     reserveUsed: z.boolean(),
+    /** GH-3 (`BR-MF1-01g`), as the request itself says it: the person uses many paid applications, how many and why; null when not flagged. */
+    flags: requestSchema.shape.flags,
   });
 
 /** A row of the history of a department, as its head reads it: the row of the history and whether it waits for the head now. */

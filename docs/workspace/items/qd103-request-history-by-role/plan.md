@@ -3,7 +3,7 @@
 - [Spec](spec.md); revision đầu vào: Docs `9c7f386`, BE `bc10bd1c`.
 - Phụ trách: chat code `SEP-Start 75: coder mainflow`. Thiết kế ban đầu bởi: AI chat review (W8, 09/11/2026).
 - Owner review: chưa review. Peer review: chat review (R2).
-- Triển khai: `implemented, test chưa chạy` (nhánh `feat/request-history`). PR: chưa có.
+- Triển khai: `in-progress` (code xong trên nhánh `feat/request-history`, gộp vào `fix/review-mf145` 10/11/2026; kiểm chứng ở báo cáo tích hợp). PR: chưa có.
 - Giao code: **hai lượt** — Phase 1 (Task 1–3, Checkpoint A: quyền đọc + lọc dòng người thụ hưởng + `me` + danh sách theo vai), Phase 2
   (Task 4–5, Checkpoint B: route cờ Super Admin + dòng thời gian + docs). Ước ~35 file. Gói **W8**, lượt 1–2 của đợt.
 

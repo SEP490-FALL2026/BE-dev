@@ -83,16 +83,17 @@ export class RequestHistoryService {
     return pageOf(await this.itemsOf(rows, lookups), total, query.page, query.pageSize);
   }
 
-  /** The rows of the page with who sent each, its department and whether the reserve was used, read once for the page. */
+  /** The rows of the page with who sent each, its department, whether the reserve was used and the flag GH-3, read once for the page. */
   private async itemsOf(
     rows: readonly MyRequestRow[],
     lookups: MyRequestLookups,
   ): Promise<AccessRequestHistoryItemWire[]> {
     const ids = rows.map((row) => row.id);
     const departmentIds = [...new Set(rows.map((row) => row.departmentId))];
-    const [departments, reserveUsed] = await Promise.all([
+    const [departments, reserveUsed, manyPaidSoftware] = await Promise.all([
       departmentIds.length === 0 ? Promise.resolve([]) : this.organizationReads.getDepartmentBriefs(departmentIds),
       this.facts.reserveUsed(ids),
+      this.facts.manyPaidSoftware(ids),
     ]);
     const departmentOf = new Map(departments.map((department) => [department.id, department]));
 
@@ -109,6 +110,7 @@ export class RequestHistoryService {
         requester,
         department: { id: department.id, code: department.code, name: department.name },
         reserveUsed: reserveUsed.has(row.id),
+        flags: { manyPaidSoftware: manyPaidSoftware.get(row.id) ?? null },
       };
     });
   }
