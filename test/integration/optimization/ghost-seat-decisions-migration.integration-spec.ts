@@ -33,8 +33,8 @@ describe('ghost seat decisions, returns and routing columns (integration, Postgr
     const code = await sqlState(
       sql,
       `INSERT INTO ghost_seat_recommendations (id, organization_id, "group", state, tier, application_id, plan_id, assignment_id,
-         seat_chain_id, employee_id, evidence, created_run_id, decision_due_on, decider_department_id, return_count)
-       VALUES ($1, $2, 'G4', $3::"GhostSeatState", 'REVIEW', $4, $5, $6, $7, $8, '{"group":"G4"}'::jsonb, $9, $10::date, $11, $12)`,
+         seat_chain_id, employee_id, evidence, created_run_id, decision_due_on, decider_department_id, return_count, confidence, activity_status)
+       VALUES ($1, $2, 'G4', $3::"GhostSeatState", 'REVIEW', $4, $5, $6, $7, $8, '{"group":"G4"}'::jsonb, $9, $10::date, $11, $12, 'HIGH', 'INACTIVE')`,
       [
         id,
         organizationId,

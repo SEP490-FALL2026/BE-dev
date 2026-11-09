@@ -94,3 +94,11 @@ export interface TransferFact {
   status: 'PENDING' | 'EFFECTIVE' | 'CANCELLED';
   closedAt: Date | null;
 }
+
+/** A person who is handing over before leaving (`OffboardingCase` `HANDING_OVER`): the seat of a rule that waits for the departure is not judged (`FR-4.9` gate 3). */
+export interface HandingOverCase {
+  employeeId: string;
+  caseId: string;
+  lastWorkingDay: BusinessDate;
+  handoverDueOn: BusinessDate | null;
+}

@@ -4,6 +4,7 @@ import type { ApiAccount } from './api-accounts';
 import { DecisionFollowUpService } from '../../src/modules/optimization/decision/decision-follow-up.service';
 import { InternalRulesService } from '../../src/modules/optimization/internal-rules/internal-rules.service';
 import type { RuleRunRecord } from '../../src/modules/optimization/rule-run/rule-run.repo';
+import { seedUsageColumns, seedUsageEvidence } from './ghost-seat-usage-evidence';
 import { RevocationHarness } from './revocation-harness';
 
 export interface GhostRow {
@@ -34,15 +35,13 @@ export interface GhostRow {
 }
 
 /**
- * The world the rules of wasted seats are judged in (`qd103-ghost-seat-g1-g2`; reused by `g3-g4` and `manager-decision`): an
- * installation with an IT Admin in charge of a department, subscriptions of the kinds the rules tell apart, seats made in bulk, people
- * who leave, and a run of the rules on a day the test names. Every day a test asks for is a different one (`nextDay`), so each run claims
- * its own period. No assertion lives here.
+ * The world the rules of wasted seats are judged in (`qd103-ghost-seat-g1-g2`; reused by `manager-decision`): an installation with an IT
+ * Admin in charge of a department, subscriptions of the kinds the rules tell apart, seats made in bulk, people who leave, and a run of the
+ * rules on a day the test names (`nextDay` makes each run claim its own period). No assertion lives here.
  */
 export class GhostSeatWorld extends RevocationHarness {
   private day = 0;
   private bulk = 0;
-  /** The department the seats of the world belong to, and the IT Admin in charge of it (an account that can sign in). */
   worldDepartment = '';
   worldItAdmin = { employeeId: '', account: this.it1 };
 
@@ -205,16 +204,16 @@ export class GhostSeatWorld extends RevocationHarness {
     await this.ctx.sql.query(
       `INSERT INTO ghost_seat_recommendations (id, organization_id, "group", state, close_reason, tier, application_id, plan_id,
          subscription_id, assignment_id, seat_chain_id, employee_id, evidence, created_run_id, created_at, closed_at, revocation_task_id, superseded_by_id,
-         decider_department_id, routed_at, decision_due_on, return_count, revocation_not_before, paused_at, pause_transfer_id)
+         decider_department_id, routed_at, decision_due_on, return_count, revocation_not_before, paused_at, pause_transfer_id, confidence, activity_status)
        VALUES ($1, $2, $3::"GhostSeatGroup", $4::"GhostSeatState", $5::"GhostSeatCloseReason", $6::"GhostSeatTier", $7, $8, $9, $10, $10,
-         $11, $16::jsonb, $12, COALESCE($13::timestamptz, now()), $14, $15, $17, $18, $19, $20::date, $21, $22::date, $23, $24)`,
+         $11, $16::jsonb, $12, COALESCE($13::timestamptz, now()), $14, $15, $17, $18, $19, $20::date, $21, $22::date, $23, $24, $25::"GhostSeatConfidence", $26::"GhostSeatActivityStatus")`,
       [
         id,
         this.seed.organizationId,
         input.group,
         input.state,
         input.closeReason ?? null,
-        input.group === 'G1' ? null : (input.tier ?? 'MONITOR'),
+        input.group === 'G1' ? null : input.group === 'G3' ? 'ACTION' : (input.tier ?? 'MONITOR'),
         seat[0].application_id,
         seat[0].plan_id,
         seat[0].subscription_id,
@@ -234,7 +233,9 @@ export class GhostSeatWorld extends RevocationHarness {
                 provisioningType: 'K2',
                 terminatingAccess: null,
               }
-            : { group: input.group },
+            : input.group === 'G1'
+              ? { group: 'G1' }
+              : seedUsageEvidence(input.group, seat[0].employee_id, seat[0].plan_id),
         ),
         input.supersededById ?? null,
         input.deciderDepartmentId ?? null,
@@ -242,8 +243,9 @@ export class GhostSeatWorld extends RevocationHarness {
         input.decisionDueOn ?? null,
         input.returnCount ?? 0,
         input.revocationNotBefore ?? null,
-        input.pausedAt ?? null,
-        input.pauseTransferId ?? null,
+        input.pausedAt ?? (input.state === 'PAUSED' ? new Date() : null),
+        input.pauseTransferId ?? (input.state === 'PAUSED' ? randomUUID() : null),
+        ...seedUsageColumns(input.group),
       ],
     );
 

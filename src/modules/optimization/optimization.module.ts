@@ -8,6 +8,7 @@ import { NotificationsModule } from '../notifications/notifications.module';
 import { OperatingParametersModule } from '../operating-parameters/operating-parameters.module';
 import { OrganizationModule } from '../organization/organization.module';
 import { PersonnelModule } from '../personnel/personnel.module';
+import { UsageModule } from '../usage/usage.module';
 import { BoardController } from './board/board.controller';
 import { BoardKpiService } from './board/board-kpi.service';
 import { BoardQueryService } from './board/board-query.service';
@@ -35,6 +36,14 @@ import { OptimizationApi } from './public/optimization.api';
 import { RuleRunQueryService } from './rule-run/rule-run-query.service';
 import { RuleRunRepo } from './rule-run/rule-run.repo';
 import { RuleRunService } from './rule-run/rule-run.service';
+import { UsageImportListener } from './usage-rules/usage-import.listener';
+import { UsageNegationService } from './usage-rules/usage-negation.service';
+import { UsageRulesSweeper } from './usage-rules/usage-rules.job';
+import { UsageRulesRepo } from './usage-rules/usage-rules.repo';
+import { UsageRulesContextService } from './usage-rules/usage-rules-context.service';
+import { UsageRulesSeatService } from './usage-rules/usage-rules-seat.service';
+import { UsageStaleNoticeService } from './usage-rules/usage-stale-notice.service';
+import { UsageRulesService } from './usage-rules/usage-rules.service';
 
 /**
  * The recommendations of wasted seats (`G1`, `G2`; `FR-4.9` gates 1 and 8, `FR-4.12`): the runs that make them every day, the table of
@@ -52,6 +61,7 @@ import { RuleRunService } from './rule-run/rule-run.service';
     NotificationsModule,
     IdentityAccessFacadeModule,
     PersonnelModule,
+    UsageModule,
   ],
   controllers: [BoardController, DecisionController],
   providers: [
@@ -80,6 +90,14 @@ import { RuleRunService } from './rule-run/rule-run.service';
     DecisionReturnService,
     DecisionReminderService,
     GhostSeatDecisionRepo,
+    UsageRulesRepo,
+    UsageNegationService,
+    UsageRulesContextService,
+    UsageStaleNoticeService,
+    UsageRulesSeatService,
+    UsageRulesService,
+    UsageRulesSweeper,
+    UsageImportListener,
   ],
   exports: [OptimizationApi],
 })

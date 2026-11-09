@@ -36,11 +36,26 @@ describe('ghost seat evidence codec', () => {
     });
   });
 
-  it('reads the evidence of a G3 or a G4 as an object that names its group (theirs to define)', () => {
-    expect(ghostSeatEvidenceJson.decode({ group: 'G4', lastUsedOn: '2026-08-01' })).toEqual({
+  it('reads the evidence of a G3 or a G4 with every field, and refuses one that lacks a field (TC-3)', () => {
+    const evidence = {
       group: 'G4',
-      lastUsedOn: '2026-08-01',
-    });
+      employeeId: EMPLOYEE,
+      planId: PLAN,
+      sources: [],
+      matchMethod: null,
+      activityStatus: 'INACTIVE',
+      lastActiveDate: '2026-06-28',
+      inactiveDays: 65,
+      coverageDays: 91,
+      thresholds: { values: { monitor: 30, review: 60, action: 90 }, origin: 'DEFAULT' },
+      confidence: { level: 'HIGH', reasons: [] },
+      labels: [],
+      timeBound: null,
+      potentialSaving: null,
+    } as const;
+
+    expect(ghostSeatEvidenceJson.decode(evidence)).toEqual(evidence);
+    expect(() => ghostSeatEvidenceJson.decode({ group: 'G4', lastUsedOn: '2026-08-01' })).toThrow(JsonColumnShapeError);
   });
 
   it('refuses a shape of another group, an unknown key and a missing group, naming the column and no value', () => {

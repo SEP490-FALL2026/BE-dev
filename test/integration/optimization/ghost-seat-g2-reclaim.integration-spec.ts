@@ -244,10 +244,10 @@ describe('the board of wasted seats and the reclaim of a G2 (integration, real P
       { group: 'G4', tier: 'REVIEW' },
       { group: 'G4', tier: 'ACTION' },
       { group: 'G4', tier: 'REVIEW' },
-      { group: 'G3', tier: 'MONITOR' },
+      { group: 'G4', tier: 'MONITOR' },
     ];
     const replacement = await w.seedRecommendation({
-      group: 'G3',
+      group: 'G4',
       state: 'OPEN',
       tier: 'MONITOR',
       assignmentId: seats[9].assignmentId,

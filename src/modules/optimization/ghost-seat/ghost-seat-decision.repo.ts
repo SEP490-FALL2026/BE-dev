@@ -178,6 +178,27 @@ export class GhostSeatDecisionRepo {
     return new Map(rows.map((row) => [row.recommendationId, { reason: row.reason, returnedAt: row.returnedAt }]));
   }
 
+  /** For each of these seat chains, the last day of the exemption that is still running on `today` (gate 7 of `G3`/`G4`); a chain with none is absent. */
+  async runningExemptionOf(
+    seatChainIds: readonly string[],
+    today: BusinessDate,
+    tx?: DbTx,
+  ): Promise<Map<string, BusinessDate>> {
+    if (seatChainIds.length === 0) return new Map();
+    const rows = await (tx ?? this.prisma).ghostSeatExemption.findMany({
+      where: { seatChainId: { in: [...seatChainIds] }, endedAt: null, exemptUntil: { gte: toDateColumn(today) } },
+      select: { seatChainId: true, exemptUntil: true },
+    });
+    const out = new Map<string, BusinessDate>();
+    for (const row of rows) {
+      const until = fromDateColumn(row.exemptUntil);
+      const known = out.get(row.seatChainId);
+      if (!known || until > known) out.set(row.seatChainId, until);
+    }
+
+    return out;
+  }
+
   /** The exemptions that end within a week and were not reminded: the head of the holder's department is told once (`US-10-08` AC-1). */
   async exemptionsToRemind(
     organizationId: string,

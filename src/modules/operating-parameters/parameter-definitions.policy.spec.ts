@@ -130,6 +130,7 @@ const EXPECTED_KEYS = [
   'RENEWAL_ALERT_DAYS_BEFORE_DEADLINE',
   'ACTIVITY_WINDOW_MINUTES',
   'DETECTION_THRESHOLD_DAYS',
+  'GHOST_SEAT_NEW_ASSIGNMENT_GRACE_DAYS',
   'GHOST_SEAT_DECISION_WORKING_DAYS',
   'GHOST_SEAT_REVOCATION_GRACE_DAYS',
   'RULE_SCHEDULE_G1_G2',
@@ -139,7 +140,7 @@ const EXPECTED_KEYS = [
 ];
 
 describe('operating parameter labels and groups (QĐ93-PARAM-LABEL)', () => {
-  it('pins the twenty-five keys, ordered by group and, inside a group, as the spec table lists them', () => {
+  it('pins the twenty-six keys, ordered by group and, inside a group, as the spec table lists them', () => {
     expect(PARAMETER_DEFINITIONS.map((definition) => definition.key)).toEqual(EXPECTED_KEYS);
   });
 
@@ -252,6 +253,7 @@ describe('operating parameter labels and groups (QĐ93-PARAM-LABEL)', () => {
       ['RENEWAL_ALERT_DAYS_BEFORE_DEADLINE', 'Cảnh báo trước hạn báo hủy thuê bao', 'SUBSCRIPTION', 'days', 'ngày'],
       ['ACTIVITY_WINDOW_MINUTES', 'Số phút tính là một ngày có hoạt động', 'USAGE', 'minutes per day', 'phút mỗi ngày'],
       ['DETECTION_THRESHOLD_DAYS', 'Ngưỡng ngày không dùng của ghế', 'USAGE', 'days', 'ngày'],
+      ['GHOST_SEAT_NEW_ASSIGNMENT_GRACE_DAYS', 'Ân hạn cho ghế mới cấp', 'USAGE', 'days', 'ngày'],
       [
         'GHOST_SEAT_DECISION_WORKING_DAYS',
         'Hạn trưởng phòng quyết định ghost seat',

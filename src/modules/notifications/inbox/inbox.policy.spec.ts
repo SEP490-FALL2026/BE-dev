@@ -183,6 +183,10 @@ describe('the alerts of the rights (a03-license-inbox-alerts, FR-5.14 lines 3, 1
         },
       }),
       notice({
+        code: 'USAGE_SOURCE_STALE',
+        params: { applicationId: ID, source: 'Figma admin export', coverageTo: '2026-09-01', freshnessDays: 8 },
+      }),
+      notice({
         code: 'REVOCATION_UPCOMING',
         params: { taskId: ID, planId: ID, applicationId: ID, source: 'GHOST_SEAT', notBefore: '2026-11-08' },
       }),

@@ -195,6 +195,7 @@ describe('the evidence of the usage of an application, vendors and collector thr
             'sourceId',
             'stale',
             'strictness',
+            'windows',
           ].sort(),
         );
       }

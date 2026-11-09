@@ -3,10 +3,11 @@ import { fromDateColumn, toDateColumn, type BusinessDate } from '../../../core/b
 import type { Prisma } from '../../../generated/prisma/client';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
-import { ghostSeatEvidenceJson } from './ghost-seat-evidence.json';
+import { ghostSeatEvidenceJson, type GhostSeatEvidence } from './ghost-seat-evidence.json';
 import { QUEUE_STATES } from './ghost-seat-state.policy';
 import type {
   GhostSeatCloseReason,
+  GhostSeatConfidence,
   GhostSeatGroup,
   GhostSeatRecord,
   GhostSeatState,
@@ -32,6 +33,13 @@ export interface GhostSeatPatch {
   revocationNotBefore?: BusinessDate | null;
   pausedAt?: Date | null;
   pauseTransferId?: string | null;
+  /** A `MONITOR` that is still `OPEN` is re-read by the weekly pass: its tier, evidence and numbers follow the seat (a trigger allows only that). */
+  tier?: GhostSeatTier;
+  evidence?: GhostSeatEvidence;
+  confidence?: GhostSeatConfidence;
+  inactiveDays?: number | null;
+  lastActiveDate?: BusinessDate | null;
+  activityAfterDecisionOn?: BusinessDate | null;
 }
 
 export interface GhostSeatFilter {
@@ -78,9 +86,26 @@ const toRecord = (row: Row): GhostSeatRecord => ({
   revocationNotBefore: row.revocationNotBefore ? fromDateColumn(row.revocationNotBefore) : null,
   pausedAt: row.pausedAt,
   pauseTransferId: row.pauseTransferId,
+  usage:
+    row.confidence && row.activityStatus
+      ? {
+          confidence: row.confidence,
+          activityStatus: row.activityStatus,
+          inactiveDays: row.inactiveDays,
+          lastActiveDate: row.lastActiveDate ? fromDateColumn(row.lastActiveDate) : null,
+          previousRecommendationId: row.previousRecommendationId,
+        }
+      : null,
+  activityAfterDecisionOn: row.activityAfterDecisionOn ? fromDateColumn(row.activityAfterDecisionOn) : null,
 });
 
-const DATE_COLUMNS: ReadonlySet<string> = new Set(['holderLeftOn', 'decisionDueOn', 'revocationNotBefore']);
+const DATE_COLUMNS: ReadonlySet<string> = new Set([
+  'holderLeftOn',
+  'decisionDueOn',
+  'revocationNotBefore',
+  'lastActiveDate',
+  'activityAfterDecisionOn',
+]);
 
 /** The columns a patch sets: every key it gives (not `undefined`), the business days turned into date columns. */
 function dataOf(patch: GhostSeatPatch): Prisma.GhostSeatRecommendationUncheckedUpdateInput {
@@ -88,7 +113,11 @@ function dataOf(patch: GhostSeatPatch): Prisma.GhostSeatRecommendationUncheckedU
     .filter(([, value]) => value !== undefined)
     .map(([key, value]): [string, unknown] => [
       key,
-      DATE_COLUMNS.has(key) && typeof value === 'string' ? toDateColumn(value) : value,
+      key === 'evidence'
+        ? ghostSeatEvidenceJson.encode(value as GhostSeatEvidence)
+        : DATE_COLUMNS.has(key) && typeof value === 'string'
+          ? toDateColumn(value)
+          : value,
     ]);
 
   return Object.fromEntries(entries);
@@ -130,6 +159,16 @@ export class GhostSeatRepo {
         revocationTaskId: input.revocationTaskId,
         evidence: ghostSeatEvidenceJson.encode(input.evidence),
         createdRunId: input.createdRunId,
+        ...(input.pause ? { pausedAt: input.pause.at, pauseTransferId: input.pause.transferId } : {}),
+        ...(input.usage
+          ? {
+              confidence: input.usage.confidence,
+              activityStatus: input.usage.activityStatus,
+              inactiveDays: input.usage.inactiveDays,
+              lastActiveDate: input.usage.lastActiveDate ? toDateColumn(input.usage.lastActiveDate) : null,
+              previousRecommendationId: input.usage.previousRecommendationId,
+            }
+          : {}),
       },
     });
 
@@ -219,6 +258,44 @@ export class GhostSeatRepo {
   async unclosedOfSeats(organizationId: string, tx?: DbTx): Promise<GhostSeatRecord[]> {
     const rows = await (tx ?? this.prisma).ghostSeatRecommendation.findMany({
       where: { organizationId, group: { not: 'G1' }, state: { not: 'CLOSED' } },
+      orderBy: { id: 'asc' },
+    });
+
+    return rows.map(toRecord);
+  }
+
+  /** For each of these seat chains, the newest recommendation a head kept or exempted: what a new one follows (`US-10-08` AC-2). */
+  async lastKeptOrExemptedOf(
+    seatChainIds: readonly string[],
+    tx?: DbTx,
+  ): Promise<Map<string, { id: string; closeReason: 'KEPT' | 'EXEMPTED'; closedOn: BusinessDate }>> {
+    if (seatChainIds.length === 0) return new Map();
+    const rows = await (tx ?? this.prisma).ghostSeatRecommendation.findMany({
+      where: { seatChainId: { in: [...seatChainIds] }, state: 'CLOSED', closeReason: { in: ['KEPT', 'EXEMPTED'] } },
+      orderBy: [{ closedAt: 'desc' }, { id: 'asc' }],
+      select: { id: true, seatChainId: true, closeReason: true, closedAt: true },
+    });
+    const out = new Map<string, { id: string; closeReason: 'KEPT' | 'EXEMPTED'; closedOn: BusinessDate }>();
+    for (const row of rows) {
+      if (!row.seatChainId || out.has(row.seatChainId) || !row.closedAt) continue;
+      out.set(row.seatChainId, {
+        id: row.id,
+        closeReason: row.closeReason as 'KEPT' | 'EXEMPTED',
+        closedOn: row.closedAt.toISOString().slice(0, 10),
+      });
+    }
+
+    return out;
+  }
+
+  /** The `G3`/`G4` recommendations of an application that are not closed, by id. */
+  async unclosedUsageOfApplication(
+    organizationId: string,
+    applicationId: string,
+    tx?: DbTx,
+  ): Promise<GhostSeatRecord[]> {
+    const rows = await (tx ?? this.prisma).ghostSeatRecommendation.findMany({
+      where: { organizationId, applicationId, group: { in: ['G3', 'G4'] }, state: { not: 'CLOSED' } },
       orderBy: { id: 'asc' },
     });
 

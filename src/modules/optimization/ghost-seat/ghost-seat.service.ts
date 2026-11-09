@@ -258,4 +258,59 @@ export class GhostSeatService {
       }),
     );
   }
+
+  /**
+   * A `MONITOR` still open that rose a tier: its tier, numbers and evidence are read again before it reaches a head (`US-10-03` AC-5); the
+   * trigger of the table lets only this rewrite the evidence.
+   */
+  async reassess(
+    tx: DbTx,
+    record: GhostSeatRecord,
+    patch: Required<Pick<GhostSeatPatch, 'tier' | 'evidence' | 'confidence' | 'inactiveDays' | 'lastActiveDate'>>,
+    actor: GhostSeatActor,
+  ): Promise<GhostSeatRecord> {
+    const updated = await this.repo.update(tx, record.id, patch);
+    await this.audit.record(
+      tx,
+      ghostSeatAuditEvent(
+        actor,
+        record.organizationId,
+        'GHOST_SEAT.TIER_RAISED',
+        record.id,
+        { ...snapshot(record), tier: record.tier },
+        {
+          ...snapshot(updated),
+          tier: updated.tier,
+          inactiveDays: updated.usage?.inactiveDays ?? null,
+        },
+      ),
+    );
+
+    return updated;
+  }
+
+  /** Activity came after a reclaim was decided: the row stays, the table flags the day and the IT Admin weighs giving the seat back (`Q-92`). */
+  async flagActivityAfterDecision(
+    tx: DbTx,
+    record: GhostSeatRecord,
+    day: BusinessDate,
+    actor: GhostSeatActor,
+  ): Promise<void> {
+    if (record.activityAfterDecisionOn) return;
+    await this.repo.update(tx, record.id, { activityAfterDecisionOn: day });
+    await this.audit.record(
+      tx,
+      ghostSeatAuditEvent(
+        actor,
+        record.organizationId,
+        'GHOST_SEAT.ACTIVITY_AFTER_DECISION',
+        record.id,
+        snapshot(record),
+        {
+          ...snapshot(record),
+          activityAfterDecisionOn: day,
+        },
+      ),
+    );
+  }
 }

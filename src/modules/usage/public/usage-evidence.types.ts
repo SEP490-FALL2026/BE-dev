@@ -38,6 +38,8 @@ export interface EvidenceSource {
   name: string;
   /** The days the confirmed reports cover together (a vendor), or the first and the last day collected (a collector); null when there is none. */
   coverage: { from: BusinessDate; to: BusinessDate } | null;
+  /** The days each confirmed report covers (a vendor), or the one run of the collector; the days between two reports are not covered. */
+  windows: Array<{ from: BusinessDate; to: BusinessDate }>;
   /** The days from the end of the coverage to the day of the request; null without coverage. */
   ageDays: number | null;
   /** The source is older than a source of its kind may be to conclude anything from its silence (7 days a vendor, 14 a collector). */

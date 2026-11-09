@@ -15,6 +15,8 @@ export interface VendorSourceFacts {
   capEventDetail: boolean;
   coverageFrom: BusinessDate;
   coverageTo: BusinessDate;
+  /** The days each confirmed report covers, oldest first: the days between two reports that no report covers are not covered (`FR-4.14a`(3)). */
+  windows: Array<{ from: BusinessDate; to: BusinessDate }>;
 }
 
 export interface VendorDay {
@@ -53,11 +55,13 @@ export class UsageEvidenceRepo {
         cap_event_detail: boolean;
         coverage_from: string;
         coverage_to: string;
+        windows: Array<{ from: string; to: string }>;
       }>
     >`
       SELECT s.id, s.name, s.activity_definition, s.definition_strictness::text AS definition_strictness,
              s.evidence_direction::text AS evidence_direction, s.cap_member_list, s.cap_last_activity, s.cap_event_detail,
-             to_char(min(i.coverage_from), 'YYYY-MM-DD') AS coverage_from, to_char(max(i.coverage_to), 'YYYY-MM-DD') AS coverage_to
+             to_char(min(i.coverage_from), 'YYYY-MM-DD') AS coverage_from, to_char(max(i.coverage_to), 'YYYY-MM-DD') AS coverage_to,
+             json_agg(json_build_object('from', to_char(i.coverage_from, 'YYYY-MM-DD'), 'to', to_char(i.coverage_to, 'YYYY-MM-DD')) ORDER BY i.coverage_from, i.coverage_to) AS windows
         FROM usage_sources s
         JOIN usage_imports i ON i.source_id = s.id AND i.status = 'COMPLETED'
        WHERE s.application_id = ${applicationId}::uuid
@@ -75,6 +79,7 @@ export class UsageEvidenceRepo {
       capEventDetail: row.cap_event_detail,
       coverageFrom: row.coverage_from,
       coverageTo: row.coverage_to,
+      windows: row.windows,
     }));
   }
 

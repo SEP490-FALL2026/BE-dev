@@ -42,9 +42,10 @@ describe('ghost seat recommendations (integration, PostgreSQL constraints)', () 
     sqlState(
       sql,
       `INSERT INTO ghost_seat_recommendations (id, organization_id, "group", state, close_reason, tier, application_id, plan_id,
-         subscription_id, assignment_id, seat_chain_id, employee_id, evidence, created_run_id, closed_at, superseded_by_id)
+         subscription_id, assignment_id, seat_chain_id, employee_id, evidence, created_run_id, closed_at, superseded_by_id,
+         confidence, activity_status)
        VALUES ($1, $2, $3::"GhostSeatGroup", $4::"GhostSeatState", $5::"GhostSeatCloseReason", $6::"GhostSeatTier", $7, $8,
-         $9, $10, $11, $12, $13::jsonb, $14, $15::timestamptz, $16)`,
+         $9, $10, $11, $12, $13::jsonb, $14, $15::timestamptz, $16, $17::"GhostSeatConfidence", $18::"GhostSeatActivityStatus")`,
       [
         randomUUID(),
         organizationId,
@@ -66,6 +67,8 @@ describe('ghost seat recommendations (integration, PostgreSQL constraints)', () 
         runId,
         input.closedAt ?? null,
         input.supersededById ?? null,
+        ['G3', 'G4'].includes(input.group ?? 'G1') ? 'HIGH' : null,
+        input.group === 'G3' ? 'NEVER_ACTIVE' : input.group === 'G4' ? 'INACTIVE' : null,
       ],
     );
 

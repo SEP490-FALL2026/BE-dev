@@ -144,6 +144,8 @@ export const IN_APP_NOTIFICATION_CODES = [
   'SUBSCRIPTION_EXPIRY_MARKED',
   // The usage of an application is tracked from a vendor report (`qd103-vendor-usage-import`, `US-08-05` AC-2): told to each person who holds it.
   'USAGE_TRACKING_NOTICE',
+  // Every vendor report of an application is older than a week, so no seat of it can be judged unused (`qd103-ghost-seat-g3-g4`, `Q-91`): told once to the IT Admin.
+  'USAGE_SOURCE_STALE',
 ] as const;
 
 export type InAppNotificationCode = (typeof IN_APP_NOTIFICATION_CODES)[number];

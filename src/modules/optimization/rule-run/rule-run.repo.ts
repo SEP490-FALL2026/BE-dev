@@ -6,7 +6,22 @@ import { RUN_MAX_ATTEMPTS, RUN_TAKEOVER_AFTER_MS } from './rule-run.policy';
 
 export type RuleSetCode = 'G1_G2' | 'G3_G4';
 export type RunStatus = 'RUNNING' | 'COMPLETED' | 'FAILED';
-export type SkipGate = 'PER_SEAT' | 'INTERNAL_SOFTWARE' | 'OPEN_RECOMMENDATION';
+export type SkipGate =
+  | 'PER_SEAT'
+  | 'INTERNAL_SOFTWARE'
+  | 'OPEN_RECOMMENDATION'
+  | 'SERVICE_ACCOUNT'
+  | 'LEAVE_OR_HANDOVER'
+  | 'NOT_USABLE'
+  | 'NEW_ASSIGNMENT'
+  | 'COVERAGE'
+  | 'STALE_SOURCE'
+  | 'EXEMPT'
+  | 'TIME_BOUND_ENDING'
+  | 'REVOCATION_IN_PROGRESS'
+  | 'NO_DATA'
+  | 'UNMATCHED_IDENTITY'
+  | 'INSUFFICIENT_EVIDENCE';
 export type SkipSubject = 'SUBSCRIPTION' | 'ASSIGNMENT';
 
 export interface RuleRunRecord {

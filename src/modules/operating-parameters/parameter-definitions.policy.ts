@@ -307,6 +307,18 @@ export const PARAMETER_DEFINITIONS: readonly ParameterDefinition[] = [
     source: 'FR-4.12',
   },
   {
+    key: 'GHOST_SEAT_NEW_ASSIGNMENT_GRACE_DAYS',
+    label: 'Ân hạn cho ghế mới cấp',
+    group: 'USAGE',
+    shape: { kind: 'int', min: 1, max: 60 },
+    default: 14,
+    unit: 'days',
+    unitLabel: 'ngày',
+    description:
+      'How many days after a seat could first be used it is left out of the rules of unused seats (a person needs time to start).',
+    source: 'FR-4.9, A.4',
+  },
+  {
     key: 'GHOST_SEAT_DECISION_WORKING_DAYS',
     label: 'Hạn trưởng phòng quyết định ghost seat',
     group: 'USAGE',
