@@ -70,6 +70,22 @@ function lastDayCounted(year: number, endDate: BusinessDate | null): BusinessDat
   return endDate !== null && endDate < yearEnd ? endDate : yearEnd;
 }
 
+/**
+ * What one seat of a commitment costs a month, rounded up (`R-B01`): the cost of the year held over its months and its seats, kept on the
+ * commitment for the release by day (`RV-07`, `M-10`). Null for a price that is not by the month (a one-time price) or a cost of nothing.
+ */
+export function seatMonthlyOf(input: {
+  costMinor: bigint;
+  kind: 'RECURRING' | 'ONE_TIME' | null;
+  months: number | null;
+  seats: number;
+}): bigint | null {
+  if (input.kind !== 'RECURRING' || input.months === null || input.months <= 0 || input.seats <= 0) return null;
+  if (input.costMinor <= 0n) return null;
+
+  return ceilDiv(input.costMinor, BigInt(input.months) * BigInt(input.seats));
+}
+
 /** The latest day a right asked for may end: a year from `today`, the day before the same day twelve months later (`QĐ-104a`, `US-05-23` AC-9). */
 export const maxEndDateOf = (today: BusinessDate): BusinessDate => addDays(addMonths(today, 12), -1);
 

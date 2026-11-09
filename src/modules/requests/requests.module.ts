@@ -14,6 +14,9 @@ import { IdentityAccessFacadeModule } from '../identity-access/identity-access-f
 import { OperatingParametersModule } from '../operating-parameters/operating-parameters.module';
 import { OrganizationModule } from '../organization/organization.module';
 import { AccessRequestGrantGate } from './grant/access-request-grant.listener';
+import { SeatReleaseRepo } from './grant/seat-release.repo';
+import { SeatReleaseService } from './grant/seat-release.service';
+import { SeatRevocationHook } from './grant/seat-revocation.listener';
 import { GrantQueueController } from './grant-queue/grant-queue.controller';
 import { GrantQueueRepo } from './grant-queue/grant-queue.repo';
 import { GrantQueueService } from './grant-queue/grant-queue.service';
@@ -259,6 +262,10 @@ import { MyRequestsService } from './my-requests/my-requests.service';
     RequestsApi,
     SimilarSeatsService,
     AccessRequestGrantGate,
+    // The release by day of the money held for a seat: when its revocation is completed, and before a late K2 grant (`RV-07`, `M-10`).
+    SeatReleaseRepo,
+    SeatReleaseService,
+    SeatRevocationHook,
     RequestCommitmentReleaseGuard,
     RequestCommitmentFacts,
     SpendRequestRepo,

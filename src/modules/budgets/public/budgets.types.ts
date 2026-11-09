@@ -25,6 +25,11 @@ export interface CommitmentHoldInput {
   now: Date;
   /** The cost that falls on the company in the one year, in the reporting currency: exactly one entry, of the current year (`BR-MF1-07d`). */
   items: readonly { year: number; amountMinor: bigint }[];
+  /**
+   * What one seat costs a month in the reporting currency, rounded up: what the release by day takes from (`RV-07`, `M-10`). Null or absent
+   * for a price that is not by the month (a one-time price), whose commitment is never released by day.
+   */
+  seatMonthlyMinor?: bigint | null;
 }
 
 /**
@@ -66,9 +71,12 @@ export interface HeldCommitment {
   attachedVersionId: string | null;
 }
 
-/** Why money held for a request goes back to the budget (`US-06-06`). Finance letting a remainder go has its own route. */
+/**
+ * Why money held for a request goes back to the budget (`US-06-06`). Finance letting a remainder go has its own route. `REVOKED` and
+ * `LATE_GRANT` are the release by day of one seat (`RV-07`, `M-06`, `M-10`): the right was taken back, or granted after its commitment began.
+ */
 export type CommitmentReleaseReason =
-  'REQUEST_CANCELLED' | 'REQUEST_WITHDRAWN' | 'GRANT_FAILED' | 'PARTICIPANT_WITHDRAWN';
+  'REQUEST_CANCELLED' | 'REQUEST_WITHDRAWN' | 'GRANT_FAILED' | 'PARTICIPANT_WITHDRAWN' | 'REVOKED' | 'LATE_GRANT';
 
 /** What goes back to the budget when a request ends or a share of it is withdrawn. */
 export interface CommitmentReleaseInput {
@@ -79,7 +87,25 @@ export interface CommitmentReleaseInput {
    * back, one for each year named, which is how a share, or what is not yet spent, is released.
    */
   amounts?: readonly { year: number; amountMinor: bigint }[];
+  /**
+   * What caused it, kept on the release (`revocationTask:<id>`, `grantTask:<id>`): a commitment that already gave money back for the same
+   * reason and reference gives nothing again, so the event is released once whatever repeats it.
+   */
+  reference?: string;
   now: Date;
+}
+
+/**
+ * A commitment of a request as the release by day of one seat reads it (`RV-07`), with its row locked until the transaction ends: the year,
+ * where it came from (the approval, or the pass of 01/01, which counts from January), what one seat costs a month in it (null when it was
+ * made before that was kept, or for a one-time price) and what it still holds.
+ */
+export interface SeatCommitment {
+  requestId: string;
+  year: number;
+  origin: 'APPROVAL' | 'YEAR_START';
+  seatMonthlyMinor: bigint | null;
+  heldMinor: bigint;
 }
 
 /** A commitment after money went back: what was released now, what it still holds, and whether none is left. */

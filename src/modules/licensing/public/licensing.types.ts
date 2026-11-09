@@ -333,6 +333,11 @@ export interface OpenedRevocation {
 export interface RevocationCompletedFacts {
   /** The request whose grant made the right, found through the chain of assignments (a renewal, a handover); null when no request made it. */
   grantRequestId: string | null;
+  /**
+   * The assignment taken back and every one it continues (`predecessor_id`), the one taken back first: what a request to go on using names, so
+   * the money held for the right by such a request is found too (G4-01, G9-02).
+   */
+  chainAssignmentIds: string[];
   provisioningType: ProvisioningKind;
   /** The day the right ends: it holds the seat on every day before it (`valid_until`). */
   endedOn: BusinessDate | null;

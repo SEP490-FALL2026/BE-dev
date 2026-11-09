@@ -14,6 +14,7 @@ import type {
   CommitmentReleaseReason,
   HeldCommitment,
   ReleasedCommitment,
+  SeatCommitment,
   YearStartHoldInput,
   YearStartHoldResult,
 } from '../public/budgets.types';
@@ -60,21 +61,31 @@ export class CommitmentService {
   /**
    * Money goes back to the budget because the request ended or a share of it was withdrawn, in the transaction of that event
    * (`US-06-06` AC-2, AC-3, `US-05-08` AC-5, `US-05-17` AC-10). The system does it, so there is no actor. What became an expense
-   * stays one, and a request that holds nothing releases nothing. Throws BudgetCommitmentRefusedError.
+   * stays one, and a request that holds nothing releases nothing. With a `reference`, a commitment that already gave money back for the same
+   * reason and reference gives nothing again, and the reference is kept on the release. Throws BudgetCommitmentRefusedError.
    */
   async release(tx: DbTx, input: CommitmentReleaseInput): Promise<ReleasedCommitment[]> {
     const rows = await this.commitments.lockOfRequest(tx, input.requestId);
     const plan = planRelease(rows, input.amounts);
     if (!plan.ok) throw new BudgetCommitmentRefusedError(plan.refusal, plan.year ?? null);
+    const reference = input.reference ?? null;
+    const already =
+      reference === null
+        ? new Set<string>()
+        : await this.commitments.releasedFor(
+            tx,
+            plan.items.map((item) => item.id),
+            { reason: input.reason, reference },
+          );
 
     const done: ReleasedCommitment[] = [];
     for (const item of plan.items) {
       const row = rows.find((candidate) => candidate.id === item.id);
-      if (!row) continue;
+      if (!row || already.has(item.id)) continue;
       done.push(
         await this.give(tx, null, row, item, {
           reason: input.reason,
-          reasonText: null,
+          reasonText: reference,
           now: input.now,
           requestId: input.requestId,
         }),
@@ -82,6 +93,14 @@ export class CommitmentService {
     }
 
     return done;
+  }
+
+  /**
+   * The commitments still held of these requests for the years from `fromYear`, locked until the transaction ends: what the release by day
+   * of one seat is worked out on (`RV-07`, `M-10`) before it is given back with `release`.
+   */
+  lockSeatCommitments(tx: DbTx, requestIds: readonly string[], fromYear: number): Promise<SeatCommitment[]> {
+    return this.commitments.lockSeatCommitmentsOf(tx, requestIds, fromYear);
   }
 
   /**
@@ -156,6 +175,7 @@ export class CommitmentService {
       amountMinor: item.takeMinor.toString(),
       heldMinor: result.heldMinor.toString(),
       reason: event.reason,
+      reasonText: event.reasonText,
     };
     await this.audit.record(
       tx,

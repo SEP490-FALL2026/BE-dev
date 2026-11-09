@@ -70,8 +70,19 @@ export const releaseListQuerySchema = z.strictObject({
 const releaseSchema = z.strictObject({
   id: z.uuid(),
   amount: moneyView,
-  reason: z.enum(['REQUEST_CANCELLED', 'REQUEST_WITHDRAWN', 'GRANT_FAILED', 'PARTICIPANT_WITHDRAWN', 'REMAINDER']),
-  /** Why Finance let the remainder go; the other reasons are the event itself. */
+  reason: z.enum([
+    'REQUEST_CANCELLED',
+    'REQUEST_WITHDRAWN',
+    'GRANT_FAILED',
+    'PARTICIPANT_WITHDRAWN',
+    'REMAINDER',
+    'REVOKED',
+    'LATE_GRANT',
+  ]),
+  /**
+   * Why Finance let the remainder go; for `REVOKED` and `LATE_GRANT` the task that caused it (`revocationTask:<id>`, `grantTask:<id>`); the
+   * other reasons are the event itself.
+   */
   reasonText: z.string().nullable(),
   releasedBy: z.strictObject({ employeeId: z.uuid(), employeeCode: z.string(), fullName: z.string() }).nullable(),
   releasedAt: z.iso.datetime(),

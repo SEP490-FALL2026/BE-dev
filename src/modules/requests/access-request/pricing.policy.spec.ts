@@ -1,4 +1,11 @@
-import { maxEndDateOf, monthsBetween, pricingRecordFor, requestAmountOf, type PricingInput } from './pricing.policy';
+import {
+  maxEndDateOf,
+  monthsBetween,
+  pricingRecordFor,
+  requestAmountOf,
+  seatMonthlyOf,
+  type PricingInput,
+} from './pricing.policy';
 
 const SEAT = { amountMinor: 2000n, currency: 'USD' }; // 20.00 per seat per month
 
@@ -238,5 +245,20 @@ describe('the months and the last day a right may end', () => {
   it('is the day before the same day twelve months later (US-05-23 AC-9)', () => {
     expect(maxEndDateOf('2026-11-10')).toBe('2027-11-09');
     expect(maxEndDateOf('2028-02-29')).toBe('2029-02-27');
+  });
+});
+
+describe('seatMonthlyOf (RV-07, M-10: what one seat of a commitment costs a month)', () => {
+  it('is the cost held over its months and seats, rounded up', () => {
+    expect(seatMonthlyOf({ costMinor: 2_000_000n, kind: 'RECURRING', months: 10, seats: 1 })).toBe(200_000n);
+    expect(seatMonthlyOf({ costMinor: 2_100n, kind: 'RECURRING', months: 7, seats: 3 })).toBe(100n);
+    expect(seatMonthlyOf({ costMinor: 1_001n, kind: 'RECURRING', months: 10, seats: 1 })).toBe(101n);
+  });
+
+  it('is null for a one-time price, no months, no seats or a cost of nothing', () => {
+    expect(seatMonthlyOf({ costMinor: 5_000n, kind: 'ONE_TIME', months: null, seats: 1 })).toBeNull();
+    expect(seatMonthlyOf({ costMinor: 5_000n, kind: 'RECURRING', months: 0, seats: 1 })).toBeNull();
+    expect(seatMonthlyOf({ costMinor: 5_000n, kind: 'RECURRING', months: 3, seats: 0 })).toBeNull();
+    expect(seatMonthlyOf({ costMinor: 0n, kind: 'RECURRING', months: 3, seats: 1 })).toBeNull();
   });
 });

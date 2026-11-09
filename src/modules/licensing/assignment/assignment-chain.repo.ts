@@ -31,4 +31,20 @@ export class AssignmentChainRepo {
 
     return rows[0]?.request_id ?? null;
   }
+
+  /**
+   * The assignment and every one it continues (`predecessor_id`: a renewal, a handover), the given one first: the records a request to go
+   * on using names (`access_request_renewals`), so the module of requests finds every request that holds money for the right.
+   */
+  async chainOf(tx: DbTx, assignmentId: string): Promise<string[]> {
+    const rows = await tx.$queryRaw<{ id: string }[]>`
+      WITH RECURSIVE chain AS (
+        SELECT "id", "predecessor_id", 0 AS depth FROM "license_assignments" WHERE "id" = ${assignmentId}::uuid
+        UNION
+        SELECT a."id", a."predecessor_id", c.depth + 1 FROM "license_assignments" a JOIN chain c ON a."id" = c."predecessor_id"
+      )
+      SELECT "id"::text AS id FROM chain ORDER BY depth`;
+
+    return rows.map((row) => row.id);
+  }
 }

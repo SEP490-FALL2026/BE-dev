@@ -29,7 +29,8 @@ export class GroupSpendHold {
     approved: readonly LineVerdict[],
     held: { checkId: string | null; now: Date },
   ): Promise<void> {
-    const check = await this.effects.hold(tx, actor, request, held.checkId, held.now);
+    // The check was made for the people approved, so one seat is the cost over them.
+    const check = await this.effects.hold(tx, actor, request, held.checkId, held.now, approved.length);
     // One commitment for the one year of the check (`BR-MF1-07d`): a cost of nothing holds nothing, so no person stands for a part of it.
     const costs = check.years
       .filter((year) => year.code !== null && year.costMinor > 0n)

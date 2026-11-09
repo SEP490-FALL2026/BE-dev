@@ -280,6 +280,10 @@ enum CommitmentReleaseReason {
   GRANT_FAILED
   PARTICIPANT_WITHDRAWN
   REMAINDER
+  // The right was taken back: what its days after the end of the right would have cost goes back (`RV-07`, `M-06`).
+  REVOKED
+  // A K2 right granted after its commitment began: what the days before the grant would have cost goes back (`M-10`).
+  LATE_GRANT
 }
 
 // The electronic record of the decision of the spending approver on a version (US-06-11 AC-1): who, in which role, what,

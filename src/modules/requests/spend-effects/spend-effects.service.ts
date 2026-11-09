@@ -5,6 +5,7 @@ import { AuditApi } from '../../audit/public/audit.api';
 import { BudgetsApi } from '../../budgets/public/budgets.api';
 import { accessRequestAuditEvent } from '../access-request/access-request-audit-event.mapper';
 import { chargedCostCenterId } from '../access-request/access-request.policy';
+import { seatMonthlyOf } from '../access-request/pricing.policy';
 import { AccessRequestRepo } from '../access-request/access-request.repo';
 import type { AccessRequestRecord } from '../access-request/access-request.types';
 import { BudgetCheckRepo, type CheckRecord } from '../spend/budget-check.repo';
@@ -30,7 +31,9 @@ export class SpendEffectsService {
   /**
    * The request holds the cost of the one year it was checked for: one commitment, attached to the approved budget of that year in the Cost
    * Center the check read (`FR-5.8`(1), `INV-16`). A cost of nothing (a request to go on using whose new period begins next year, `QĐ-109b`)
-   * holds nothing, and the audit says so; the part of next year is the commitment made on 01/01. Returns the check.
+   * holds nothing, and the audit says so; the part of next year is the commitment made on 01/01. What one seat costs a month is kept with it
+   * for the release by day (`RV-07`, `M-10`): the cost over the months of the amount and over `seats`, the people the check was for (the
+   * people approved of a group; by default the people the request is for). Returns the check.
    */
   async hold(
     tx: DbTx,
@@ -38,6 +41,7 @@ export class SpendEffectsService {
     request: AccessRequestRecord,
     checkId: string | null,
     now: Date,
+    seats: number = Math.max(1, request.beneficiaryEmployeeIds.length),
   ): Promise<CheckRecord> {
     const check = checkId ? await this.checkRepo.findById(checkId, tx) : null;
     if (!check) throw new Error(`The approval of the request ${request.id} has no snapshot to hold a commitment on.`);
@@ -69,6 +73,13 @@ export class SpendEffectsService {
       currency: check.currency,
       now,
       items: [{ year: year.year, amountMinor: year.costMinor }],
+      seatMonthlyMinor: seatMonthlyOf({
+        costMinor: year.costMinor,
+        kind: request.pricing.kind,
+        // The months of the amount are those of the year it was worked out for, the year of the check.
+        months: request.pricing.budgetYear === year.year ? request.pricing.amountMonths : null,
+        seats,
+      }),
     });
 
     return check;
