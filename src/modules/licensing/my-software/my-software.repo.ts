@@ -94,7 +94,7 @@ function toRow(row: {
   validFromBasis: AssignmentDateBasis;
   validUntil: Date | null;
   expectedEndDate: Date | null;
-  provisioningTasks: { kind: 'GRANT' | 'REVOKE'; status: string }[];
+  provisioningTasks: { kind: 'GRANT' | 'REVOKE' | 'EXTEND'; status: string }[];
   successors: { id: string }[];
 }): MyRightRow {
   const tasks = row.provisioningTasks;

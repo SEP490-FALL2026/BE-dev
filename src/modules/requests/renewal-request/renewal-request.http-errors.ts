@@ -13,7 +13,12 @@ import {
 } from '../access-request/access-request.errors';
 import { RequestPartyIneligibleError } from '../../identity-access/public/request-party.errors';
 import { toAccessRequestApiException } from '../access-request/access-request.http-errors';
-import { RenewalRequestRefusedError, type RenewalRefusal } from './renewal-request.errors';
+import {
+  RenewalEndDateOutOfRangeError,
+  RenewalRequestRefusedError,
+  RenewalWindowNotOpenError,
+  type RenewalRefusal,
+} from './renewal-request.errors';
 
 const STATUS: Record<RenewalRefusal, HttpStatus> = {
   NOT_HOLDER: HttpStatus.FORBIDDEN,
@@ -34,6 +39,21 @@ export function toRenewalApiException(error: unknown): unknown {
     });
   }
 
+  if (error instanceof RenewalWindowNotOpenError) {
+    return new ApiException(HttpStatus.CONFLICT, {
+      code: 'RENEWAL_REQUEST.WINDOW_NOT_OPEN',
+      message: error.message,
+      details: { opensOn: error.opensOn, windowDays: error.windowDays },
+    });
+  }
+  if (error instanceof RenewalEndDateOutOfRangeError) {
+    return new ApiException(HttpStatus.UNPROCESSABLE_ENTITY, {
+      code: 'RENEWAL_REQUEST.END_DATE_OUT_OF_RANGE',
+      message: error.message,
+      details: { previousEndDate: error.previousEndDate, maxEndDate: error.maxEndDate },
+    });
+  }
+
   return toAccessRequestApiException(error);
 }
 
@@ -45,6 +65,8 @@ export const RENEWAL_ERROR_EXAMPLES = {
   ASSIGNMENT_NOT_FOUND: example(new RenewalRequestRefusedError('ASSIGNMENT_NOT_FOUND')),
   ASSIGNMENT_NOT_RENEWABLE: example(new RenewalRequestRefusedError('ASSIGNMENT_NOT_RENEWABLE', 'NOT_OPEN')),
   ALREADY_REQUESTED: example(new RenewalRequestRefusedError('ALREADY_REQUESTED')),
+  WINDOW_NOT_OPEN: example(new RenewalWindowNotOpenError('2026-12-01', 30)),
+  END_DATE_OUT_OF_RANGE: example(new RenewalEndDateOutOfRangeError('2026-12-31', '2027-12-31')),
   APPLICATION_RETIRED: example(new AccessRequestApplicationRetiredError()),
   ALREADY_HOLDS_ACCESS: example(
     new AccessRequestAlreadyHoldsAccessError({

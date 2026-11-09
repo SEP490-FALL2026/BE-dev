@@ -1,4 +1,11 @@
-import { checkRenewable, checkRenewalSender, monthsBetween, routeRenewal } from './renewal-request.policy';
+import {
+  checkRenewable,
+  checkRenewalSender,
+  monthsBetween,
+  newEndFits,
+  renewalWindowOf,
+  routeRenewal,
+} from './renewal-request.policy';
 
 describe('the months of a renewal, rounded up (US-05-14 AC-1, AC-3)', () => {
   it('counts a whole month for a part of one', () => {
@@ -71,5 +78,43 @@ describe('before or after the end (US-05-14 AC-4, AC-5)', () => {
     expect(routeRenewal({ today: '2026-09-25', previousEnd: '2026-09-30' })).toBe('RENEWAL');
     expect(routeRenewal({ today: '2026-09-30', previousEnd: '2026-09-30' })).toBe('RENEWAL');
     expect(routeRenewal({ today: '2026-10-01', previousEnd: '2026-09-30' })).toBe('NEW_REQUEST');
+  });
+});
+
+describe('BR-MF1-08a QĐ-108b: the window of the renewal', () => {
+  it.each([
+    ['before it opens', '2026-05-30', false],
+    ['the day it opens', '2026-05-31', true],
+    ['the last day of the right', '2026-06-30', true],
+  ])('a right ending 30/06 with a window of 30 days, sent %s', (_name, today, open) => {
+    expect(renewalWindowOf({ today, previousEnd: '2026-06-30', windowDays: 30 })).toEqual({
+      open,
+      opensOn: '2026-05-31',
+    });
+  });
+
+  it('a right ending 31/12 opens its window on 01/12', () => {
+    expect(renewalWindowOf({ today: '2026-12-01', previousEnd: '2026-12-31', windowDays: 30 })).toEqual({
+      open: true,
+      opensOn: '2026-12-01',
+    });
+  });
+
+  it('Q-34: with no recorded window and the parameter lowered, the window opens later', () => {
+    expect(renewalWindowOf({ today: '2026-05-31', previousEnd: '2026-06-30', windowDays: 15 }).open).toBe(false);
+  });
+});
+
+describe('QĐ-108a RV-25: the new end date of the renewal', () => {
+  const facts = { previousEnd: '2026-06-30', maxEnd: '2027-06-30' };
+
+  it.each([
+    ['the current end', '2026-06-30', false],
+    ['a day before it', '2026-06-29', false],
+    ['the day after it', '2026-07-01', true],
+    ['twelve months on', '2027-06-30', true],
+    ['a day past twelve months', '2027-07-01', false],
+  ])('%s', (_name, newEnd, fits) => {
+    expect(newEndFits({ ...facts, newEnd })).toBe(fits);
   });
 });

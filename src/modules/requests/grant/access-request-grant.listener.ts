@@ -8,6 +8,8 @@ import { GroupGrantService } from '../group-request/group-grant.service';
 import { AccessRequestRepo } from '../access-request/access-request.repo';
 import { grantAnswerFor } from './grant.policy';
 import { RequestOutcomeService } from '../outcome/request-outcome.service';
+import { RenewalApplyService } from '../renewal-apply/renewal-apply.service';
+import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 
 /**
  * What the grant of a seat asks of the module of requests (`GrantRequestGate`, bound to licensing's `GrantRequestGateHook` when the
@@ -29,7 +31,19 @@ export class AccessRequestGrantGate implements GrantRequestGate, OnModuleInit {
     private readonly group: GroupGrantService,
     private readonly outcomes: RequestOutcomeService,
     private readonly hook: GrantRequestGateHook,
+    private readonly renewals: RenewalApplyService,
   ) {}
+
+  /**
+   * The IT Admin completed the task that extends a right (`BR-MF1-08d`): the renewal it answers for is applied. A request that is not a
+   * renewal waiting for it (withdrawn, or already applied) changes nothing.
+   */
+  async reportExtended(tx: DbTx, actor: AuthenticatedPrincipal, requestId: string, now: Date): Promise<void> {
+    const request = await this.repo.lockById(tx, requestId);
+    if (!request || request.type !== 'RENEWAL' || request.state !== 'AWAITING_EXECUTION') return;
+
+    await this.renewals.apply(tx, actor, request, now);
+  }
 
   onModuleInit(): void {
     this.hook.bind(this);

@@ -58,7 +58,7 @@ dashboards; gốc `src/app/app.module.ts`.
 ## Bảng sở hữu
 
 - `license_assignments`, `seat_baseline_states`, `provisioning_tasks`, `provisioning_task_reasons`, `handover_duties`,
-  `service_account_duty_notices`, `assignment_expiry_reminders`, `license_keys`, `license_key_reveal_windows`,
+  `service_account_duty_notices`, `assignment_expiry_reminders`, `assignment_renewal_windows`, `license_keys`, `license_key_reveal_windows`,
   `saas_issues`, `saas_issue_entries`, `saas_issue_counters`, `subscription_renewals`,
   `subscription_renewal_released_seats`, `subscription_deadline_events` (`prisma/models/licensing.prisma`).
 
@@ -113,6 +113,9 @@ dịch vụ nào đọc cả ghế lẫn thu hồi thì đứng trên cả hai (
   (`departmentId` null, `D-S18`): `requirementOf` bỏ nguồn `DEPARTURE`/`ABRUPT_DEPARTURE`, nên không có nghĩa vụ trưởng phòng ở
   `open` lẫn `openFromTask` và tác vụ thu hồi không bị giữ; nguồn khác (IT, trả về) giữ nguyên.
 - `expiry/` — quyền đã hết hạn, nhắc trước 7 ngày (US-03-05); `expiry.controller.ts`; `expiry-reminder.job.ts`.
+  Cửa sổ Request tiếp tục (BR-MF1-08a): `expiry-renewal-window.job.ts` mỗi giờ ghi `assignment_renewal_windows` (số ngày lúc mở, bất biến)
+  và báo người giữ + trưởng phòng một lần (`RENEWAL_WINDOW_OPENED`). Tác vụ `EXTEND` (`provisioning/tasks/provisioning-extension.service.ts`,
+  mở qua `LicensingRenewalApi.openExtension`) hoàn tất ⟹ `GrantRequestGate.reportExtended`.
 - `license-key/` — kho key của mua đứt K4 (US-04-12); `license-keys.controller.ts`; `LicenseKeyService`.
 - `my-software/` — "Phần mềm của tôi" (US-12-15 AC-2, US-16-01 AC-1): `my-software.controller.ts`
   (`GET /me/software-rights`, mọi tài khoản đã đăng nhập (`QĐ-95d`), chỉ quyền cá nhân của chính người gọi), `MySoftwareService`, `MySoftwareRepo`;

@@ -197,7 +197,7 @@ export class ProvisioningTasksController {
   @ApiSuccessResponse(TaskResponseDto, {
     message: 'PROVISIONING_TASK.COMPLETED',
     description:
-      'The task is completed under the name of this IT Admin, whoever is in charge by default. The evidence is a note of what was done, never a password or a key.',
+      'The task is completed under the name of this IT Admin, whoever is in charge by default. The evidence is a note of what was done, never a password or a key. A task of the kind EXTEND (the extension of a right whose renewal was approved, BR-MF1-08d) grants nothing: completing it writes the record that follows the renewed one and completes the renewal.',
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,

@@ -124,7 +124,7 @@ const revocationDetailSchema = revocationSummarySchema.extend({
 /** A row of the list: the task without its steps, evidence and errors; the detail is this and those. */
 const taskSummarySchema = z.strictObject({
   id: z.uuid(),
-  kind: z.enum(['GRANT', 'REVOKE']),
+  kind: z.enum(['GRANT', 'REVOKE', 'EXTEND']),
   channel: z.enum(['MANUAL', 'CONNECTOR']),
   status: z.enum(TASK_STATUSES),
   requestId: z.uuid().nullable(),

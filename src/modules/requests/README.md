@@ -162,7 +162,10 @@ cùng cần; phần ghi nằm ở `assessment/assessment.repo.ts`.
   - `return-request/` (US-05-13; mọi vai trừ Super Admin, `ACCESS_REQUEST.SUPER_ADMIN_CANNOT_REQUEST`; `ReturnSeatGate` xét ghế trả, `ReturnHandoverService` mở bàn giao; `return-request.policy.ts`),
     `renewal-request/` (US-05-14; `renewal-requests.controller.ts`; `RenewalRequestWriter` ghi, `renewal-request-submission.mapper.ts`
     dựng dòng và audit) với `renewal-apply/`
-    (`renewal-apply.service.ts`, `renewal-request.repo.ts`: áp gia hạn khi được duyệt), `service-account-request/` (US-05-21).
+    (`renewal-apply.service.ts`, `renewal-request.repo.ts`: duyệt ⟹ mở tác vụ IT `EXTEND` (`requestExtension`), IT hoàn tất ⟹
+    `AccessRequestGrantGate.reportExtended` ⟹ `apply` ghi Assignment kế tiếp, BR-MF1-08d), `service-account-request/` (US-05-21).
+    Request tiếp tục chỉ gửi trong cửa sổ `RENEWAL_WINDOW_DAYS` ngày trước ngày kết thúc (409 `RENEWAL_REQUEST.WINDOW_NOT_OPEN`;
+    cửa sổ đã ghi giữ số ngày lúc mở, QĐ-108b), body `newEndDate` ≤ ngày kết thúc + 12 tháng (422 `RENEWAL_REQUEST.END_DATE_OUT_OF_RANGE`).
 - **Trạng thái, SLA, chuyển bước**
   - `status/` — chiếu audit event của request thành thông báo inbox (US-05-15); nhóm `rules/` là bảng luật sự kiện → thông báo.
   - `timing/` (thời gian từng bước, KPI-2), `sla/` (nhắc bước trễ, tồn đọng, nghẽn; US-05-09, US-05-10),

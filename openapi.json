@@ -31087,7 +31087,7 @@
         },
         "responses": {
           "200": {
-            "description": "The task is completed under the name of this IT Admin, whoever is in charge by default. The evidence is a note of what was done, never a password or a key.",
+            "description": "The task is completed under the name of this IT Admin, whoever is in charge by default. The evidence is a note of what was done, never a password or a key. A task of the kind EXTEND (the extension of a right whose renewal was approved, BR-MF1-08d) grants nothing: completing it writes the record that follows the renewed one and completes the renewal.",
             "content": {
               "application/json": {
                 "schema": {
@@ -49388,7 +49388,7 @@
             }
           },
           "409": {
-            "description": "The seat cannot be renewed (RENEWAL_REQUEST.ASSIGNMENT_NOT_RENEWABLE, with the reason in details: it is a service account, another record follows it, it has ended, it has no end date, its grant is not done, or it is being revoked), it already has a renewal waiting (RENEWAL_REQUEST.ALREADY_REQUESTED), the application is retired (ACCESS_REQUEST.APPLICATION_RETIRED) or, after the end, the person holds another seat of the tool (ACCESS_REQUEST.ALREADY_HOLDS_ACCESS). After the end the ask is a request for new access, so GH-1/GH-2 judge it too (ACCESS_REQUEST.OPEN_REQUEST_EXISTS, ACCESS_REQUEST.OPEN_LIMIT_REACHED). Nothing is written.",
+            "description": "The seat cannot be renewed (RENEWAL_REQUEST.ASSIGNMENT_NOT_RENEWABLE, with the reason in details: it is a service account, another record follows it, it has ended, it has no end date, its grant is not done, or it is being revoked), it already has a renewal waiting (RENEWAL_REQUEST.ALREADY_REQUESTED), its window is not open yet (RENEWAL_REQUEST.WINDOW_NOT_OPEN, with details.opensOn and details.windowDays: a renewal is sent from RENEWAL_WINDOW_DAYS days before the approved end, BR-MF1-08a), the application is retired (ACCESS_REQUEST.APPLICATION_RETIRED) or, after the end, the person holds another seat of the tool (ACCESS_REQUEST.ALREADY_HOLDS_ACCESS). After the end the ask is a request for new access, so GH-1/GH-2 judge it too (ACCESS_REQUEST.OPEN_REQUEST_EXISTS, ACCESS_REQUEST.OPEN_LIMIT_REACHED). Nothing is written.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -49412,6 +49412,18 @@
                       "error": {
                         "code": "RENEWAL_REQUEST.ALREADY_REQUESTED",
                         "message": "The renewal is refused: ALREADY_REQUESTED.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "RENEWAL_REQUEST.WINDOW_NOT_OPEN": {
+                    "summary": "The renewal can be sent only from the day its window opens.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "RENEWAL_REQUEST.WINDOW_NOT_OPEN",
+                        "message": "The renewal can be sent only from the day its window opens.",
+                        "details": { "opensOn": "2026-12-01", "windowDays": 30 },
                         "requestId": "req_example"
                       }
                     }
@@ -49538,7 +49550,7 @@
             }
           },
           "422": {
-            "description": "The form is incomplete or invalid (VALIDATION_ERROR): the seat, the months more (1 to 12) and the reason are required, and nothing else is taken. The sender or the holder of the seat is the spending approver (REQUEST_PARTY.INELIGIBLE). After the end, a holder who uses as many paid applications as the threshold must give manyPaidSoftwareReason (ACCESS_REQUEST.MANY_PAID_SOFTWARE_REASON_REQUIRED). Nothing is written.",
+            "description": "The form is incomplete or invalid (VALIDATION_ERROR): the seat, the new end date (newEndDate; or, deprecated, the months more extensionMonths 1 to 12, exactly one of the two) and the reason are required, and nothing else is taken. The new end must be after the end the right has and at most twelve months after it (RENEWAL_REQUEST.END_DATE_OUT_OF_RANGE, with details.previousEndDate and details.maxEndDate; QĐ-108a). The sender or the holder of the seat is the spending approver (REQUEST_PARTY.INELIGIBLE). After the end, a holder who uses as many paid applications as the threshold must give manyPaidSoftwareReason (ACCESS_REQUEST.MANY_PAID_SOFTWARE_REASON_REQUIRED). Nothing is written.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -49579,6 +49591,18 @@
                         "code": "ACCESS_REQUEST.MANY_PAID_SOFTWARE_REASON_REQUIRED",
                         "message": "The person uses many paid applications already: a reason is required to ask for another one.",
                         "details": { "count": 10, "threshold": 10 },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "RENEWAL_REQUEST.END_DATE_OUT_OF_RANGE": {
+                    "summary": "The new end date must be after the current end date and at most twelve months after it.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "RENEWAL_REQUEST.END_DATE_OUT_OF_RANGE",
+                        "message": "The new end date must be after the current end date and at most twelve months after it.",
+                        "details": { "previousEndDate": "2026-12-31", "maxEndDate": "2027-12-31" },
                         "requestId": "req_example"
                       }
                     }
@@ -94482,7 +94506,7 @@
                 "type": "object",
                 "properties": {
                   "id": { "type": "string", "format": "uuid" },
-                  "kind": { "type": "string", "enum": ["GRANT", "REVOKE"] },
+                  "kind": { "type": "string", "enum": ["GRANT", "REVOKE", "EXTEND"] },
                   "channel": { "type": "string", "enum": ["MANUAL", "CONNECTOR"] },
                   "status": {
                     "type": "string",
@@ -94786,7 +94810,7 @@
                   "type": "object",
                   "properties": {
                     "id": { "type": "string", "format": "uuid" },
-                    "kind": { "type": "string", "enum": ["GRANT", "REVOKE"] },
+                    "kind": { "type": "string", "enum": ["GRANT", "REVOKE", "EXTEND"] },
                     "channel": { "type": "string", "enum": ["MANUAL", "CONNECTOR"] },
                     "status": {
                       "type": "string",
@@ -95004,7 +95028,7 @@
                 "type": "object",
                 "properties": {
                   "id": { "type": "string", "format": "uuid" },
-                  "kind": { "type": "string", "enum": ["GRANT", "REVOKE"] },
+                  "kind": { "type": "string", "enum": ["GRANT", "REVOKE", "EXTEND"] },
                   "channel": { "type": "string", "enum": ["MANUAL", "CONNECTOR"] },
                   "status": {
                     "type": "string",
@@ -102108,11 +102132,16 @@
         "type": "object",
         "properties": {
           "assignmentId": { "type": "string", "format": "uuid" },
+          "newEndDate": {
+            "type": "string",
+            "format": "date",
+            "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."
+          },
           "extensionMonths": { "type": "integer", "minimum": 1, "maximum": 12 },
           "businessReason": { "type": "string", "minLength": 1, "maxLength": 1000 },
           "manyPaidSoftwareReason": { "type": "string", "minLength": 1, "maxLength": 1000 }
         },
-        "required": ["assignmentId", "extensionMonths", "businessReason"],
+        "required": ["assignmentId", "businessReason"],
         "additionalProperties": false
       },
       "RenewalResponseDto": {

@@ -120,6 +120,8 @@ export const IN_APP_NOTIFICATION_CODES = [
   // The alerts of the rights (`a03-license-inbox-alerts`, `FR-5.14`): a right about to end, a handover not confirmed, a service
   // account whose person leaves, a person who left and keeps a K1 access to the end of the paid period. Ids, codes and days only.
   'LICENSE_EXPIRY_REMINDER',
+  // The window of the renewal of a right opened (BR-MF1-08a): told once to the holder and the head of their department.
+  'RENEWAL_WINDOW_OPENED',
   'HANDOVER_CONFIRMATION_DUE',
   'HANDOVER_CONFIRMATION_OVERDUE',
   'SERVICE_ACCOUNT_RESPONSIBLE_DUE',

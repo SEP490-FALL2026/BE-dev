@@ -111,6 +111,7 @@ export const PARAM_KEYS_BY_CODE: Readonly<Record<InAppNotificationCode, readonly
   // The alerts of the rights (`a03-license-inbox-alerts`): the right, the person, the day and the role asked; never a key, an
   // account identifier, a price or the text of a note.
   LICENSE_EXPIRY_REMINDER: ['assignmentId', 'holderEmployeeId', 'planId', 'expectedEndDate', 'audience'],
+  RENEWAL_WINDOW_OPENED: ['assignmentId', 'holderEmployeeId', 'planId', 'expectedEndDate', 'opensOn', 'audience'],
   HANDOVER_CONFIRMATION_DUE: HANDOVER,
   HANDOVER_CONFIRMATION_OVERDUE: HANDOVER,
   SERVICE_ACCOUNT_RESPONSIBLE_DUE: ['employeeId', 'fileKind', 'fileId', 'dueOn', 'accountCount'],

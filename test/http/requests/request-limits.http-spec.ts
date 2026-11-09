@@ -62,6 +62,25 @@ describe('the GH-3 reason of the forms that send a request for new access (http 
     });
   });
 
+  describe('accessRequestRenewalSubmit: the new end date (BR-MF1-08b, QĐ-108a)', () => {
+    const path = '/api/v1/access-requests/renewals';
+    const base = { assignmentId: ID, businessReason: 'Work' };
+
+    it('takes a new end date, or the deprecated months, but not both and not neither', async () => {
+      const day = await post(path, { ...base, newEndDate: '2027-03-31' });
+      const months = await post(path, { ...base, extensionMonths: 3 });
+      const both = await post(path, { ...base, newEndDate: '2027-03-31', extensionMonths: 3 });
+      const neither = await post(path, base);
+      const notADay = await post(path, { ...base, newEndDate: 'next month' });
+
+      expect(bodyOf(day).error?.code).not.toBe('VALIDATION_ERROR');
+      expect(bodyOf(months).error?.code).not.toBe('VALIDATION_ERROR');
+      for (const refused of [both, neither, notADay]) {
+        expect([refused.status, bodyOf(refused).error?.code]).toEqual([422, 'VALIDATION_ERROR']);
+      }
+    });
+  });
+
   describe('groupRequestSubmit and groupRequestCheck: the reason of each line (QĐ-106g, BR-MF1-01g)', () => {
     it.each(['/api/v1/group-requests', '/api/v1/group-requests/check'])('%s takes a reason per line', async (path) => {
       const response = await post(path, {

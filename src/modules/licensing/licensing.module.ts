@@ -42,6 +42,10 @@ import { ExpiryQueueService } from './expiry/expiry-queue.service';
 import { ExpiryReminderRepo } from './expiry/expiry-reminder.repo';
 import { ExpiryReminderService } from './expiry/expiry-reminder.service';
 import { ExpiryReminderSweeper } from './expiry/expiry-reminder.job';
+import { ExpiryRenewalWindowSweeper } from './expiry/expiry-renewal-window.job';
+import { ExpiryRenewalWindowRepo } from './expiry/expiry-renewal-window.repo';
+import { ExpiryRenewalWindowService } from './expiry/expiry-renewal-window.service';
+import { ProvisioningExtensionService } from './provisioning/tasks/provisioning-extension.service';
 import { HandoverAlertService } from './handover/handover-alert.service';
 import { HandoverCaseFacts } from './handover/handover-case-facts.service';
 import { HandoverConfirmationService } from './handover/handover-confirmation.service';
@@ -244,6 +248,10 @@ import { SubscriptionRenewalsController } from './subscription-renewal/subscript
     ExpiryReminderRepo,
     ExpiryReminderService,
     ExpiryReminderSweeper,
+    ExpiryRenewalWindowRepo,
+    ExpiryRenewalWindowService,
+    ExpiryRenewalWindowSweeper,
+    ProvisioningExtensionService,
     ExpiryQueueRepo,
     ExpiryQueueService,
     SaasIssueRepo,

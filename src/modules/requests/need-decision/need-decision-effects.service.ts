@@ -38,9 +38,9 @@ export class NeedDecisionEffects {
     // A refusal ends the request for the person it was for, without a grant.
     if (!approved) await this.outcomes.ended(tx, request, request.beneficiaryEmployeeIds, decidedAt);
 
-    // A renewal needs nobody to carry it out: approved in full, it is applied here, in the transaction of the decision.
+    // A renewal approved in full is extended by the IT Admin (`BR-MF1-08d`): its task is opened here, in the transaction of the decision.
     if (approved && request.type === 'RENEWAL' && requestState === 'AWAITING_EXECUTION') {
-      await this.renewals.apply(tx, actor, request, decidedAt);
+      await this.renewals.requestExtension(tx, actor, request, decidedAt);
     }
     if (approved && request.branch === 'NEW_SOFTWARE') await this.requestAssessment(tx, actor, request, decidedAt);
 

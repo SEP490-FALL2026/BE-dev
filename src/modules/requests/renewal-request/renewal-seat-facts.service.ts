@@ -5,6 +5,8 @@ import { AssignmentNotFoundError } from '../../licensing/public/licensing.errors
 import { LicensingRenewalApi } from '../../licensing/public/licensing-renewal.api';
 import type { AssignmentFacts } from '../../licensing/public/licensing-renewal.types';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
+import { OperatingParametersApi } from '../../operating-parameters/public/operating-parameters.api';
+import type { BusinessDate } from '../../../core/business-date';
 import { RenewalRequestRefusedError } from './renewal-request.errors';
 
 /**
@@ -18,7 +20,18 @@ export class RenewalSeatFactsService {
     private readonly licensingRenewals: LicensingRenewalApi,
     private readonly organizationReads: OrganizationReadApi,
     private readonly requestParties: RequestPartyEligibilityApi,
+    private readonly parameters: OperatingParametersApi,
   ) {}
+
+  /**
+   * The days of the window of the renewal of the right ending on `previousEnd` (`QĐ-108b`): those it was recorded with when it opened, or
+   * the parameter in force when it has not been recorded yet. Read without a lock: a recorded window never changes.
+   */
+  async windowDaysOf(tx: DbTx, assignmentId: string, previousEnd: BusinessDate): Promise<number> {
+    const recorded = await this.licensingRenewals.renewalWindowOf(assignmentId, previousEnd, tx);
+
+    return recorded?.windowDays ?? Number(await this.parameters.getValue('RENEWAL_WINDOW_DAYS'));
+  }
 
   /** Throws RenewalRequestRefusedError (the seat is not there) and RequestPartyIneligibleError. */
   async lockedFactsOf(tx: DbTx, senderEmployeeId: string, assignmentId: string): Promise<AssignmentFacts> {

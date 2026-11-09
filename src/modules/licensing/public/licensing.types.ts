@@ -117,7 +117,7 @@ export interface AssignmentListFilter {
 }
 
 export type ProvisioningKind = 'K1' | 'K2' | 'K3' | 'K4' | 'K5';
-export type ProvisioningTaskKind = 'GRANT' | 'REVOKE';
+export type ProvisioningTaskKind = 'GRANT' | 'REVOKE' | 'EXTEND';
 export type ProvisioningChannel = 'MANUAL' | 'CONNECTOR';
 export type ProvisioningTaskStatus =
   'QUEUED' | 'RETRY_SCHEDULED' | 'IN_PROGRESS' | 'COMPLETED' | 'FAILED' | 'CLOSED_FAILED' | 'CANCELLED';

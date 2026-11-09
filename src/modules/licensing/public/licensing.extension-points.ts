@@ -44,6 +44,12 @@ export interface GrantRequestGate {
     employeeId?: string,
     facts?: GrantOutcomeFacts,
   ): Promise<void>;
+  /**
+   * Inside the transaction in which the IT Admin completes the task of an extension (`BR-MF1-08d`): the renewal the task answers for is
+   * applied (the record that follows the old one is written) and the request ends, as the module of requests decides. `actor` is the IT
+   * Admin who completed it.
+   */
+  reportExtended(tx: DbTx, actor: AuthenticatedPrincipal, requestId: string, now: Date): Promise<void>;
   /** Whether the request waits for the IT Admin to close the task of its grant as cancelled: nothing else is decided on it. */
   isWithdrawing(tx: DbTx, requestId: string, employeeId?: string): Promise<boolean>;
   /**

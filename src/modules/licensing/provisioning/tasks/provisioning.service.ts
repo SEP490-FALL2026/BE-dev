@@ -123,6 +123,12 @@ export class ProvisioningService {
       },
       write: async ({ tx, task: locked, now, organizationId }) => {
         await this.repo.markCompleted(tx, locked.id, actor.appUserId, evidence, now);
+        // An extension grants nothing: the renewal it answers for is applied by the module of requests (`BR-MF1-08d`).
+        if (locked.kind === 'EXTEND' && locked.requestId !== null) {
+          await this.gate.get().reportExtended(tx, actor, locked.requestId, now);
+
+          return { action: 'COMPLETED', after: { status: 'COMPLETED', completedBy: actor.appUserId } };
+        }
         const completedOn = await this.organizationReads.businessToday(now, tx);
         await this.assignments.recordGranted(tx, locked.assignmentId, completedOn);
         if (locked.requestId !== null) {

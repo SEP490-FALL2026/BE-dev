@@ -45,6 +45,8 @@ export class RenewalRequestWriter {
       settings: RequestSettings;
       previousEnd: BusinessDate;
       newEnd: BusinessDate;
+      /** The months from the end the right has to the new end, worked out by the system (`BR-MF1-08b`). */
+      termMonths: number;
       /** The day the new term begins: the money is priced and charged to the budget year from this day, not from today (R-M3). */
       spendStartsOn: BusinessDate;
       now: Date;
@@ -52,7 +54,7 @@ export class RenewalRequestWriter {
   ): Promise<RenewalSubmitted> {
     const { body, facts, now } = input;
     const { newEnd } = input;
-    const termMonths = body.extensionMonths;
+    const { termMonths } = input;
     const consecutiveMonths = monthsBetween(facts.chainStartsOn, newEnd);
 
     const assessed = await this.assessment.assess(tx, {
