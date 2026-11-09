@@ -48,6 +48,36 @@ describe('what the check of the budget tells in the inbox (BR-MF1-06g, BR-MF1-06
 
       expect(planned).toEqual([]);
     });
+
+    it('BR-MF1-02: a one-step request that opens its spend step tells the spending approver who holds it, whatever the outcome', () => {
+      for (const outcome of ['WITHIN_BASE', 'USES_RESERVE']) {
+        const planned = plan(
+          event(
+            'ACCESS_REQUEST.BUDGET_CHECKED',
+            { outcome, routingMode: 'ONE_STEP', opened: 'SPEND_APPROVAL', spendAssigneeEmployeeId: PEOPLE.approver },
+            { actorEmployeeId: PEOPLE.requester },
+          ),
+          facts(holders),
+        );
+
+        expect(told(planned)).toEqual([`${PEOPLE.approver}:STEP_ASSIGNED`]);
+        expect(planned[0].params).toEqual({ requestId: REQUEST_ID, stepKind: 'SPEND_APPROVAL', cause: 'SUBMITTED' });
+      }
+    });
+
+    it('BR-MF1-02: a one-step request whose spend step waits for an approver tells nobody it is theirs', () => {
+      const planned = plan(
+        event('ACCESS_REQUEST.BUDGET_CHECKED', {
+          outcome: 'WITHIN_BASE',
+          routingMode: 'ONE_STEP',
+          opened: 'SPEND_APPROVAL',
+          spendAssigneeEmployeeId: null,
+        }),
+        facts(holders),
+      );
+
+      expect(planned).toEqual([]);
+    });
   });
 
   describe('BR-MF1-06i: the request is blocked', () => {

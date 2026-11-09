@@ -135,10 +135,12 @@ export class SpendRoutingService {
     const opened = this.opensSpend(check.outcome, oneStep) ? await this.openSpend(tx, request, now) : null;
     const state = opened?.state ?? (oneStep ? 'AWAITING_REQUESTER_REVISION' : 'AWAITING_SPEND_SUBMISSION');
 
-    await this.requests.setState(tx, request.id, state);
-    await this.recordChecked(tx, actor, request, check, state, opened !== null);
+    const step = opened?.step ?? null;
 
-    return { status: 'ROUTED', outcome: check.outcome ?? 'BLOCKED', check, step: opened?.step ?? null };
+    await this.requests.setState(tx, request.id, state);
+    await this.recordChecked(tx, actor, request, check, state, step);
+
+    return { status: 'ROUTED', outcome: check.outcome ?? 'BLOCKED', check, step };
   }
 
   /** The audit event of a check and where it sent the request; the notices of the head and the requester are projected from it. */
@@ -148,7 +150,7 @@ export class SpendRoutingService {
     request: AccessRequestRecord,
     check: CheckRecord,
     state: AccessRequestState,
-    opened: boolean,
+    opened: SpendStepRecord | null,
   ): Promise<void> {
     await this.audit.record(
       tx,
@@ -172,6 +174,8 @@ export class SpendRoutingService {
           codes: codesOf(check).join(','),
           state,
           opened: opened ? 'SPEND_APPROVAL' : null,
+          // Who holds the spend step just opened, for the notice of a one-step request (null while it waits).
+          spendAssigneeEmployeeId: opened?.assigneeEmployeeId ?? null,
         },
       ),
     );
