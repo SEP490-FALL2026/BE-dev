@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../../audit/public/audit.api';
+import { DecisionFollowUpService } from '../decision/decision-follow-up.service';
 import { InternalRulesService } from '../internal-rules/internal-rules.service';
 import { RuleRunQueryService } from '../rule-run/rule-run-query.service';
 import type { RuleRunRecord, RuleSetCode, SkipGate } from '../rule-run/rule-run.repo';
@@ -28,6 +29,7 @@ export class BoardRuleRunService {
     private readonly queries: RuleRunQueryService,
     private readonly runner: TransactionRunner,
     private readonly audit: AuditApi,
+    private readonly followUp: DecisionFollowUpService,
   ) {}
 
   /**
@@ -48,6 +50,8 @@ export class BoardRuleRunService {
       }
       done.push(run);
     }
+    // What the rules made reaches the queue of the heads now, not at the next hourly pass (AF-01: the demo of MF-5 runs in a day).
+    await this.followUp.routeNow();
     const runs = [];
     for (const run of done) {
       const skippedByGate = skippedByGateOf(await this.queries.skipCountsOf(run.id));

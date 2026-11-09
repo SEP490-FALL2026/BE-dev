@@ -40,6 +40,20 @@ export class DecisionFollowUpService {
     };
   }
 
+  /**
+   * Puts the recommendations a run of the rules just made in front of the heads now (pause/resume of people in a transfer first, as the
+   * hourly pass does), without the reminders of the pass: a run by hand (`POST /ghost-seat-rule-runs`) must not wait for the next tick
+   * to reach the queue (AF-01). Returns how many were routed, or null while the installation has no organization.
+   */
+  async routeNow(now: Date = new Date()): Promise<number | null> {
+    const day = await this.dayOf(now);
+    if (!day) return null;
+    await this.transfers.pause(day);
+    await this.transfers.resume(day);
+
+    return this.routing.routeNew(day);
+  }
+
   /** Runs the pass for `now`; each step reads what the step before left. */
   async run(now: Date = new Date()): Promise<FollowUpTally | null> {
     const day = await this.dayOf(now);
