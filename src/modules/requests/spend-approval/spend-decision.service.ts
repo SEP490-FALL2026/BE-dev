@@ -1,3 +1,4 @@
+import { isSingleStep } from '../spend/spend-submission.policy';
 import { Injectable } from '@nestjs/common';
 import { TransactionRunner, type DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
@@ -115,7 +116,7 @@ export class SpendDecisionService {
     if (outcome.status === 'NOT_CHECKABLE') throw new SpendDecisionRefusedError('NOT_CHECKABLE');
 
     const confirmation = await this.confirmations.ofStep(step.id, tx);
-    const verdict = judgeApproval(outcome.check, confirmation !== null);
+    const verdict = judgeApproval(outcome.check, confirmation !== null || isSingleStep(request));
     if (verdict.kind === 'RETURNED') {
       await this.effects.sendBack(tx, actor, request, step, { now, reasons: verdict.reasons, check: outcome.check });
 

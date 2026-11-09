@@ -32,6 +32,14 @@ export function entryFor(input: { deciderRole: ReadDeciderRole }): 'HEAD_QUEUE' 
   return input.deciderRole === 'MANAGER' ? 'HEAD_QUEUE' : 'DIRECT';
 }
 
+/**
+ * Whether the request goes in one step (`BR-MF1-02`, `QĐ-103b`): its need was not decided by a head, so no head sends it on in a batch or
+ * confirms the reserve — the spending approver decides need and spend at once, the reserve included (`BR-MF1-06`, `BR-MF1-07c`).
+ */
+export function isSingleStep(request: { needDecision: { deciderRole: ReadDeciderRole } | null }): boolean {
+  return request.needDecision !== null && entryFor({ deciderRole: request.needDecision.deciderRole }) === 'DIRECT';
+}
+
 export type SupplementRefusal =
   /** The request is not in the queue of the head: it is being decided, or has been. */
   | 'NOT_IN_QUEUE'

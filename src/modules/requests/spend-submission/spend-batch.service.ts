@@ -166,12 +166,14 @@ export class SpendBatchService {
     if (routed.outcome === 'WITHIN_BASE') {
       return { requestId: request.id, outcome: 'SENT_TO_APPROVER', stopReason: null, reserveConfirmation: ignored };
     }
-    if (given.reason === undefined) {
+    // The head never confirms the reserve of a request they are one of the people for (`BR-MF1-06h`): it waits, as without a reason.
+    const selfConfirm = request.beneficiaryEmployeeIds.includes(actor.employeeId);
+    if (given.reason === undefined || selfConfirm) {
       return {
         requestId: request.id,
         outcome: 'AWAITING_RESERVE_CONFIRMATION',
         stopReason: null,
-        reserveConfirmation: 'NOT_GIVEN',
+        reserveConfirmation: given.reason === undefined ? 'NOT_GIVEN' : 'IGNORED',
       };
     }
     await this.reserve.confirmOnCheck(tx, actor, request, routed.check, { reason: given.reason, now: given.now });

@@ -67,6 +67,7 @@ export class RepricingService {
       beneficiaries: peopleOf(request),
       checkDate: asOf,
       endDate: request.expectedEndDate,
+      expiredStillPrices: true,
     });
     // A quote that is not in force, has no price or is too large is a request that cannot be priced that day.
     if (priced.status === 'REFUSED') throw new AccessRequestNotPriceableError();

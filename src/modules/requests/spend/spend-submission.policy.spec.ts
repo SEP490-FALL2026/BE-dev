@@ -1,4 +1,10 @@
-import { checkSupplement, entryFor, supplementAuditDetail, supplementChangeOf } from './spend-submission.policy';
+import {
+  checkSupplement,
+  entryFor,
+  isSingleStep,
+  supplementAuditDetail,
+  supplementChangeOf,
+} from './spend-submission.policy';
 
 describe('where an approved request goes (US-06-14 AC-8)', () => {
   it('is the queue of the head when the head decided the need', () => {
@@ -11,6 +17,12 @@ describe('where an approved request goes (US-06-14 AC-8)', () => {
 
   it('is straight to the check for a need decided before QĐ-93 by the fallback approver, who had no queue', () => {
     expect(entryFor({ deciderRole: 'FALLBACK_APPROVER' })).toBe('DIRECT');
+  });
+
+  it('BR-MF1-02 (review G23-02): a request whose need no head decided goes in one step, the reserve decided by the spending approver', () => {
+    expect(isSingleStep({ needDecision: { deciderRole: 'SPENDING_APPROVER' } })).toBe(true);
+    expect(isSingleStep({ needDecision: { deciderRole: 'MANAGER' } })).toBe(false);
+    expect(isSingleStep({ needDecision: null })).toBe(false);
   });
 });
 

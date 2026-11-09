@@ -35,6 +35,21 @@ describe('what the check of the budget tells in the inbox (BR-MF1-06g, BR-MF1-06
     });
   });
 
+  describe('BR-MF1-02 / review G23-02, G23-09: the request uses the reserve but went on to the approver', () => {
+    it('tells nobody to confirm: a one-step request, or one the head has just confirmed', () => {
+      const planned = plan(
+        event(
+          'ACCESS_REQUEST.BUDGET_CHECKED',
+          { outcome: 'USES_RESERVE', opened: 'SPEND_APPROVAL' },
+          { actorEmployeeId: PEOPLE.other },
+        ),
+        facts(holders),
+      );
+
+      expect(planned).toEqual([]);
+    });
+  });
+
   describe('BR-MF1-06i: the request is blocked', () => {
     it('tells the one who asked and the head, with the reasons as codes and not Finance, who has no step', () => {
       const planned = plan(

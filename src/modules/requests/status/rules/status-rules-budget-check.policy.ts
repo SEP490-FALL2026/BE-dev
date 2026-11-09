@@ -14,6 +14,8 @@ const BUDGET_CHECKED = (event: StatusEvent, facts: StatusFacts): NotificationInt
   const request = requestOf(facts);
   const outcome = text(event.after, 'outcome');
   if (outcome === 'USES_RESERVE') {
+    // Only when the request waits for the head: not when it went on to the approver (a one-step request, or the head just confirmed it).
+    if (text(event.after, 'opened') !== null) return [];
     return [
       {
         recipients: [facts.departmentHeadEmployeeId],

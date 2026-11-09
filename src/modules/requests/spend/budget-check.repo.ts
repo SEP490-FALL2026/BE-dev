@@ -199,7 +199,8 @@ export class BudgetCheckRepo {
         JOIN request_budget_check_years y ON y.check_id = latest.id AND y.year = ${year}
        WHERE COALESCE(latest.cost_center_id, r.cost_center_id) = ${costCenterId}::uuid
          AND (${exceptRequestId}::uuid IS NULL OR r.id <> ${exceptRequestId}::uuid)
-         AND latest.outcome IN ('WITHIN_BASE', 'USES_RESERVE')
+         -- A check made before the three outcomes has none; with a spend step still open it waits all the same (review G23-08).
+         AND (latest.outcome IN ('WITHIN_BASE', 'USES_RESERVE') OR latest.outcome IS NULL)
          AND (
            EXISTS (
              SELECT 1 FROM access_request_steps s

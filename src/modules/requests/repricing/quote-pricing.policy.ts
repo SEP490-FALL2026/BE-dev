@@ -18,6 +18,11 @@ export interface QuotePricingInput {
   checkDate: BusinessDate;
   /** The day the right ends; null when it has no end, so the amount runs to the end of the year. */
   endDate: BusinessDate | null;
+  /**
+   * True when a check prices the request again (`QĐ-109e`): a quote that is no longer valid still gives the amount, and the check blocks
+   * the request with `PRICE_EXPIRED` (`BR-MF1-06g`(iv)) instead of failing to price it. The IT Admin recording a quote never sets it.
+   */
+  expiredStillPrices?: boolean;
 }
 
 export type QuoteRefusal =
@@ -39,7 +44,8 @@ export type QuotePricing =
 
 export function priceFromQuote(input: QuotePricingInput): QuotePricing {
   const { quote } = input;
-  if (quote.validFrom > input.checkDate || (quote.validUntil !== null && quote.validUntil < input.checkDate)) {
+  const expired = quote.validUntil !== null && quote.validUntil < input.checkDate;
+  if (quote.validFrom > input.checkDate || (expired && input.expiredStillPrices !== true)) {
     return { status: 'REFUSED', reason: 'QUOTE_NOT_IN_FORCE' };
   }
   const priced = requestAmountOf({

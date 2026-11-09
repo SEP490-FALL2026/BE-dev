@@ -56,6 +56,22 @@ describe('the amount of a request from a quote (US-05-06 AC-14, BR-MF1-06)', () 
       expect(priceFromQuote(input({ quote: given }))).toEqual({ status: 'REFUSED', reason: 'QUOTE_NOT_IN_FORCE' });
     });
 
+    it('BR-MF1-06g(iv) (review G23-01): an expired quote still prices a check made again, which then blocks it with PRICE_EXPIRED', () => {
+      const result = priceFromQuote(
+        input({ quote: quote({ validUntil: day('2026-10-22') }), expiredStillPrices: true }),
+      );
+
+      expect(result.status).toBe('PRICED');
+    });
+
+    it('a quote not yet in force is refused even for a check made again', () => {
+      const result = priceFromQuote(
+        input({ quote: quote({ validFrom: day('2026-11-01'), validUntil: null }), expiredStillPrices: true }),
+      );
+
+      expect(result).toEqual({ status: 'REFUSED', reason: 'QUOTE_NOT_IN_FORCE' });
+    });
+
     it('is in force on its last day', () => {
       expect(priceFromQuote(input({ quote: quote({ validUntil: day('2026-10-23') }) })).status).toBe('PRICED');
     });

@@ -130,7 +130,11 @@ function judgeYear(slice: YearSlice, budget: YearBudget): YearResult {
     remainingMinor: remainingWithReserve,
     remainingBaseMinor: remainingBase,
     remainingWithReserveMinor: remainingWithReserve,
-    shareBasisPoints: remainingWithReserve > 0n ? Number((slice.costMinor * 10_000n) / remainingWithReserve) : null,
+    // Capped so a tiny remainder never overflows the INTEGER column (review G23-06): a share above 2^31 − 1 basis points says the same.
+    shareBasisPoints:
+      remainingWithReserve > 0n
+        ? Number(min((slice.costMinor * 10_000n) / remainingWithReserve, 2_147_483_647n))
+        : null,
     pendingMinor: slice.pendingMinor,
   };
 }
@@ -190,3 +194,5 @@ export function codesOf(
 
   return codes;
 }
+
+const min = (a: bigint, b: bigint): bigint => (a < b ? a : b);

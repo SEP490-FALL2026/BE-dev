@@ -41,9 +41,15 @@ const livePricedOf = (): Prisma.SubscriptionWhereInput => ({
   renewedBy: null,
   unitPriceMinor: { not: null },
   unitPriceCurrency: { not: null },
-  // A perpetual purchase has a price and no billing cycle: its price is the price of the purchase (`QĐ-106d`).
-  OR: [{ billingCycle: { not: null } }, { kind: 'PERPETUAL' }],
+  AND: [
+    // A perpetual purchase has a price and no billing cycle: its price is the price of the purchase (`QĐ-106d`).
+    { OR: [{ billingCycle: { not: null } }, { kind: 'PERPETUAL' }] },
+    // A period that has already ended does not price the plan any more (review G23-05); the UTC day is close enough here.
+    { OR: [{ endDate: null }, { endDate: { gte: new Date(new Date().toISOString().slice(0, 10)) } }] },
+  ],
 });
+/** A K4 plan always carries its purchase price, paid once (`QĐ-106d`, review G23-04), whatever kind of subscription records it. */
+const PLAN_KIND = { plan: { select: { provisioningType: true } } } as const;
 const PRICE_FIELDS = {
   kind: true,
   unitPriceMinor: true,
@@ -349,13 +355,13 @@ export class SubscriptionRepo {
   } | null> {
     const rows = await (tx ?? this.prisma).subscription.findMany({
       where: { planId, ...livePricedOf() },
-      select: { id: true, startDate: true, isPrimaryForPlan: true, ...PRICE_FIELDS },
+      select: { id: true, startDate: true, isPrimaryForPlan: true, ...PRICE_FIELDS, ...PLAN_KIND },
     });
     const row = pickPriceSource(rows.map(withPriceSource));
     if (!row || row.unitPriceMinor === null || row.unitPriceCurrency === null) return null;
 
     return {
-      subscriptionKind: row.kind,
+      subscriptionKind: row.plan.provisioningType === 'K4' ? 'PERPETUAL' : row.kind,
       unitPriceMinor: row.unitPriceMinor,
       currency: row.unitPriceCurrency,
       billingCycle: row.billingCycle,
@@ -372,11 +378,12 @@ export class SubscriptionRepo {
     if (planIds.length === 0) return cycles;
     const rows = await (tx ?? this.prisma).subscription.findMany({
       where: { planId: { in: [...planIds] }, ...livePricedOf() },
-      select: { id: true, planId: true, startDate: true, isPrimaryForPlan: true, ...PRICE_FIELDS },
+      select: { id: true, planId: true, startDate: true, isPrimaryForPlan: true, ...PRICE_FIELDS, ...PLAN_KIND },
     });
     const byPlan = new Map<string, Array<ReturnType<typeof withPriceSource> & { kind: SubscriptionKind }>>();
     for (const row of rows) {
-      byPlan.set(row.planId, [...(byPlan.get(row.planId) ?? []), { ...withPriceSource(row), kind: row.kind }]);
+      const kind: SubscriptionKind = row.plan.provisioningType === 'K4' ? 'PERPETUAL' : row.kind;
+      byPlan.set(row.planId, [...(byPlan.get(row.planId) ?? []), { ...withPriceSource(row), kind }]);
     }
     for (const [planId, sources] of byPlan) {
       const chosen = pickPriceSource(sources);

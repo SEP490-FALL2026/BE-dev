@@ -1,3 +1,4 @@
+import { isSingleStep } from './spend-submission.policy';
 import { Injectable } from '@nestjs/common';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
@@ -52,7 +53,9 @@ export class SpendRoutingService {
     if (outcome.status === 'NOT_CHECKABLE') return outcome;
 
     const { check } = outcome;
-    const opened = check.outcome === 'WITHIN_BASE' ? await this.openSpend(tx, request, now) : null;
+    // A one-step request that needs the reserve goes on too: the spending approver decides the reserve themself (`BR-MF1-06`).
+    const goesOn = check.outcome === 'WITHIN_BASE' || (check.outcome === 'USES_RESERVE' && isSingleStep(request));
+    const opened = goesOn ? await this.openSpend(tx, request, now) : null;
     const state = opened?.state ?? 'AWAITING_SPEND_SUBMISSION';
 
     await this.requests.setState(tx, request.id, state);
