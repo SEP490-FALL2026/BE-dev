@@ -1,12 +1,12 @@
 import type { DemoFixture } from '../demo-fixture.types';
-import { ORGANIZATION } from './organization';
 import { CATALOG } from './catalog';
 import { FINANCE } from './finance';
+import { ORGANIZATION } from './organization';
 import { REQUESTS } from './requests';
-import { EXTRAS } from './extras';
+import { USAGE } from './usage';
 
-export const SHARED_DEMO_V3: DemoFixture = {
-  id: 'shared-demo-v3',
+export const SHARED_DEMO_V4: DemoFixture = {
+  id: 'shared-demo-v4',
   marker: 'SV',
   emailDomain: 'saoviet.example',
   currency: 'VND',
@@ -14,5 +14,5 @@ export const SHARED_DEMO_V3: DemoFixture = {
   ...CATALOG,
   ...FINANCE,
   ...REQUESTS,
-  ...EXTRAS,
+  ...USAGE,
 };

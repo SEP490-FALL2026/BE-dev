@@ -1,6 +1,6 @@
 # Seed demo local và VPS
 
-Một lệnh Nest `seed` dùng [fixture shared-demo-v3](../../src/cli/seed/fixture/shared-demo-v3/README.md). Nó có thể bootstrap tổ chức demo rồi ghi dữ liệu qua HTTP API bằng đúng vai. Reset chỉ nằm ở hai wrapper; không có endpoint seed và CI/CD không tự seed.
+Một lệnh Nest `seed` dùng [fixture shared-demo-v4](../../src/cli/seed/fixture/shared-demo-v4/README.md). Nó có thể bootstrap tổ chức demo rồi ghi dữ liệu qua HTTP API bằng đúng vai. Reset chỉ nằm ở hai wrapper; không có endpoint seed và CI/CD không tự seed.
 
 Các lệnh cũ `dev-seed`, `demo-dataset` và alias đã bỏ theo OD-S3. Cài đặt thật cho khách hàng vẫn dùng [bootstrap](bootstrap-installation.md).
 
@@ -8,7 +8,7 @@ Các lệnh cũ `dev-seed`, `demo-dataset` và alias đã bỏ theo OD-S3. Cài 
 
 ```text
 node dist/cli.js seed <check|plan|apply> --environment LOCAL_TEST|SHARED
-  [--fixture shared-demo-v3] [--api-url <origin>]
+  [--fixture shared-demo-v4] [--api-url <origin>]
   [--operator-reference <reference>] [--allow-bootstrap] [--super-admin-email <email>] [--secrets-stdin] [--json]
 ```
 
@@ -202,7 +202,7 @@ theo `SEED_SUPER_ADMIN_EMAIL`, trống thì `system.admin@saoviet.example`) rồ
 
 - Đăng nhập Super Admin (`SEED_SUPER_ADMIN_EMAIL`, hoặc `system.admin@saoviet.example` khi để trống) bằng
   `SEED_SUPER_ADMIN_PASSWORD`; `/me.roles` = `["SUPER_ADMIN"]`.
-- Đăng nhập vài tài khoản demo bằng `SEED_DEMO_ACCOUNT_PASSWORD` (email, vai, phòng ở [README fixture](../../src/cli/seed/fixture/shared-demo-v3/README.md));
+- Đăng nhập vài tài khoản demo bằng `SEED_DEMO_ACCOUNT_PASSWORD` (email, vai, phòng ở [README fixture](../../src/cli/seed/fixture/shared-demo-v4/README.md));
   mỗi tài khoản có đúng một vai.
 - Chạy lại bước 3 với `--continue`: exit `2` (không ghi thêm).
 
@@ -228,9 +228,13 @@ Kiểm ready và dữ liệu phục hồi trước khi nhả khóa. Không gọi
 
 ## Lịch và giới hạn dataset
 
-Seed được mọi ngày, nhưng năm tài chính phải bắt đầu tháng 1. ENG/MKT/SAL luôn có ngân sách đã duyệt của năm hiện tại và năm sau (qua luồng đề xuất → phiên bản → Người duyệt chi), nên Request 1–12 tháng bắt đầu hôm nay đi thẳng tới duyệt chi; Thiết kế không có ngân sách nào, để R9 nằm ở hàng đợi của trưởng phòng và bị chặn (NO_APPROVED_BUDGET) khi trình lô. Dataset đã được nạp ở năm khác bị từ chối; dùng wrapper và chọn reset.
+Mọi ngày của dataset tính tương đối theo ngày chạy seed, nên chạy hôm nào cũng ra đúng các trạng thái trong [README fixture](../../src/cli/seed/fixture/shared-demo-v4/README.md). Dataset đã nạp ở năm khác bị từ chối; dùng wrapper và chọn reset. Năm ngân sách phải bắt đầu tháng 1.
 
-Phòng Công nghệ thông tin không có ngân sách nào cho năm sau mà chỉ có **đề xuất ngân sách năm sau đang chờ Finance** (bước `budget.next-year`, màn đề xuất của Finance). Ba hóa đơn do Finance ghi qua `POST /budget-commitments/{id}/invoices` (bước `finance.invoices`) trên cam kết của R1, R10 (Marketing) và R11 (Kinh doanh): một khớp (`MATCHED`), một chỉ lệch thuế (`TAX_ONLY`), một cao hơn cam kết (`PRICE_QUANTITY_EXCEPTION`); số hóa đơn là `SV-HD1`..`SV-HD3` nên chạy lại không ghi thêm. R1 cấp từ thuê bao năm hiện tại. Seed cuối tháng 11/tháng 12 có thể tạo sự kiện gia hạn cho mốc đã qua. Không cam kết luôn có thuê bao trong cửa sổ cảnh báo 15/7 ngày (OD-S6). Mục đích từng bản ghi, bảng tài khoản, ứng viên dữ liệu tương lai và cách mở rộng nằm trong README fixture.
+Thứ tự của lệnh: tổ chức → Cost Center và tỷ giá → danh mục (ứng dụng, gói, **một thuê bao mỗi gói**) → ghế nền (tệp CSV, rồi đóng baseline) → kho khóa K4 → kỳ ngân sách năm và năm sau → ngân sách năm đã duyệt của mọi phòng có Cost Center → ngân sách năm sau (đề xuất chờ Finance, phiên bản đã gửi, phiên bản bị yêu cầu sửa) → 24 Request MF-1 → bản nháp, báo lỗi, BM-09 → sự kiện nhân sự → nguồn và tệp usage → chạy luật G1–G4 → trưởng phòng Thiết kế quyết một phần khuyến nghị.
+
+**Bước cuối chờ job hàng chờ.** Khuyến nghị G3/G4 chỉ vào hàng chờ của trưởng phòng khi job theo dõi hàng chờ chạy lượt đầu, 6 phút sau khi API khởi động. Wrapper khởi động API ngay trước `apply`, nên bước `ghost.decisions` tự chờ tới 9 phút; lần seed đầu vì thế lâu hơn vài phút. Chạy lại (`--continue`) khi mọi thứ đã có thì không chờ.
+
+**Hạn chế đã biết.** Không có điều chuyển hiệu lực hôm nay (API chặn điều chuyển trong ngày nhân viên được xếp phòng); không có hóa đơn mua hàng, điểm điều chỉnh thuê bao hay quyền theo vai (code hiện hành chưa có các API đó). Ba lượt mô tả đầy đủ nằm trong README fixture.
 
 ## Bằng chứng và việc Owner còn phải chạy
 
@@ -246,4 +250,4 @@ Nhật ký vận hành VPS demo:
 
 Lượt `seed:local` có reset thật và Task 9 tài liệu demo ở repo Docs vẫn **chờ Owner**.
 
-**Kỳ lập ngân sách (bước `budget.cycles`).** Trước ngân sách năm, Finance mở kỳ của năm hiện tại và năm sau, chia Trần năm (`cycle` trong `fixture/shared-demo-v3/finance.ts`: Trần năm, dự phòng kho, Trần mỗi phòng) cho mọi phòng đang hoạt động rồi phát hành (`QĐ-103i`): trưởng phòng chỉ nộp `BM-10` khi kỳ đã từng phát hành. Chạy lại không ghi thêm khi kỳ đã phát hành. Trên một database đã có đề xuất ngân sách nhưng chưa có kỳ, nộp đề xuất mới bị 409 `BUDGET.CYCLE_NOT_PUBLISHED` cho tới khi chạy seed (hoặc Finance mở và phát hành kỳ bằng API).
+**Kỳ lập ngân sách (bước `budget.cycles`).** Trước ngân sách năm, Finance mở kỳ của năm hiện tại và năm sau, chia Trần năm (`cycle` trong `fixture/shared-demo-v4/finance.ts`: Trần năm, dự phòng kho, Trần mỗi phòng) cho mọi phòng đang hoạt động rồi phát hành (`QĐ-103i`): trưởng phòng chỉ nộp `BM-10` khi kỳ đã từng phát hành. Chạy lại không ghi thêm khi kỳ đã phát hành. Trên một database đã có đề xuất ngân sách nhưng chưa có kỳ, nộp đề xuất mới bị 409 `BUDGET.CYCLE_NOT_PUBLISHED` cho tới khi chạy seed (hoặc Finance mở và phát hành kỳ bằng API).

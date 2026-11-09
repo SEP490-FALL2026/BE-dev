@@ -3,8 +3,8 @@ import type { AddressInfo, Server } from 'node:net';
 import { Client } from 'pg';
 import { randomBytes } from 'node:crypto';
 import { runSeed } from '../../../src/cli/seed/seed-run';
-import { INSTALLATION } from '../../../src/cli/seed/fixture/shared-demo-v3/installation';
-import { SHARED_DEMO_V3 } from '../../../src/cli/seed/fixture/shared-demo-v3';
+import { INSTALLATION } from '../../../src/cli/seed/fixture/shared-demo-v4/installation';
+import { SHARED_DEMO_V4 } from '../../../src/cli/seed/fixture/shared-demo-v4';
 import { BudgetAttachmentExpirySweeper } from '../../../src/modules/budgets/attachment/budget-attachment-expiry.job';
 import { BudgetYearEndSweeper } from '../../../src/modules/budgets/year-end/year-end.job';
 import { DocumentExpirySweeper } from '../../../src/modules/catalog/contract/document-expiry.job';
@@ -98,7 +98,7 @@ async function seedInto(database: DisposableDatabase): Promise<void> {
     const outcome = await runSeed({
       args: {
         mode: 'apply',
-        fixture: SHARED_DEMO_V3.id,
+        fixture: SHARED_DEMO_V4.id,
         apiUrl,
         operator: 'TEST-FLOWS-1',
         environment: 'LOCAL_TEST',

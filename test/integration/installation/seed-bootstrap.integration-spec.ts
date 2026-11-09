@@ -1,7 +1,7 @@
 import type { INestApplicationContext } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import type { AddressInfo, Server } from 'node:net';
-import { INSTALLATION } from '../../../src/cli/seed/fixture/shared-demo-v3/installation';
+import { INSTALLATION } from '../../../src/cli/seed/fixture/shared-demo-v4/installation';
 import { runSeed } from '../../../src/cli/seed/seed-run';
 import type { SeedCommandArguments } from '../../../src/cli/seed/seed.arguments';
 import { InstallationApi } from '../../../src/modules/installation/public/installation.api';
@@ -15,7 +15,7 @@ describe('seed bootstrap from an empty database (integration, real API and Postg
   const secrets = { superAdminPassword: SEED_PASSWORD, demoAccountPassword: 'a long demo test password' };
   const args = (allowBootstrap: boolean): SeedCommandArguments => ({
     mode: 'apply',
-    fixture: 'shared-demo-v3',
+    fixture: 'shared-demo-v4',
     apiUrl: baseUrl,
     operator: 'TEST-SEED-BOOTSTRAP',
     environment: 'LOCAL_TEST',
@@ -32,7 +32,7 @@ describe('seed bootstrap from an empty database (integration, real API and Postg
       await install
         .get(InstallationApi)
         .install(
-          { ...INSTALLATION, environment: 'LOCAL_TEST', operatorReference: 'SEED:shared-demo-v3:TEST' },
+          { ...INSTALLATION, environment: 'LOCAL_TEST', operatorReference: 'SEED:shared-demo-v4:TEST' },
           secrets.superAdminPassword,
         );
     } finally {

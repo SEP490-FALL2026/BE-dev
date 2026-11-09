@@ -1,6 +1,7 @@
-import { termEndOf } from '../../../core/term-limit';
-import { addDays, as, listAll, tag } from '../demo-step-kit';
+import { dayOffset } from '../demo-dates';
+import { as, listAll, tag } from '../demo-step-kit';
 import type { DemoRunContext, DemoStep, StepOutcome } from '../demo-run.types';
+import { endDateOf } from './request.steps';
 
 async function draft(ctx: DemoRunContext): Promise<StepOutcome> {
   const spec = ctx.fixture.draft;
@@ -13,8 +14,8 @@ async function draft(ctx: DemoRunContext): Promise<StepOutcome> {
   await ctx.api.call(email, 'POST', '/access-requests/drafts', {
     kind: 'INDIVIDUAL',
     planId,
-    businessReason: `${tag(ctx, 'DRAFT')} Bản nháp chưa gửi.`,
-    expectedEndDate: termEndOf(ctx.today, spec.termMonths),
+    businessReason: `${tag(ctx, 'DRAFT')} Bản nháp chưa gửi: phòng chưa có Cost Center nên chưa gửi được.`,
+    ...(endDateOf(ctx, spec.end) ? { expectedEndDate: endDateOf(ctx, spec.end) } : {}),
   });
 
   return { status: 'done', detail: spec.requester };
@@ -73,7 +74,7 @@ async function notice(ctx: DemoRunContext): Promise<StepOutcome> {
   await ctx.api.call(sender, 'POST', '/personnel-notices', {
     employeeId: ctx.ids.employees.get(spec.employee),
     kind: spec.kind,
-    proposedOn: addDays(ctx.today, spec.proposedInDays),
+    proposedOn: dayOffset(ctx.today, spec.proposedInDays),
     note: spec.note,
   });
 
@@ -82,7 +83,12 @@ async function notice(ctx: DemoRunContext): Promise<StepOutcome> {
 
 export function extraSteps(issueRequestKey: string): DemoStep[] {
   return [
-    { key: 'requests.draft', title: 'Bản nháp yêu cầu chưa gửi', needs: ['catalog.plans', 'org.accounts'], run: draft },
+    {
+      key: 'requests.draft',
+      title: 'Bản nháp yêu cầu chưa gửi',
+      needs: ['catalog.plans', 'org.accounts', 'finance.cost-centers'],
+      run: draft,
+    },
     {
       key: 'saas.issue',
       title: 'Báo lỗi SaaS trên ghế đã cấp',
