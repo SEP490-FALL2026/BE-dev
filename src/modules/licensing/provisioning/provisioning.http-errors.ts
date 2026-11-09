@@ -222,6 +222,7 @@ export const PROVISIONING_GRANT_EXAMPLES = {
     ),
     example(new ProvisioningSubscriptionError('NOT_ALLOWED')),
     example(new ProvisioningSubscriptionError('PLAN_MISMATCH')),
+    example(new ProvisioningSubscriptionError('NOT_GRANTABLE')),
     example(new SeatQuantityUnknownError()),
     example(new SeatSubscriptionDraftError(['START_DATE'])),
     example(new AssignmentConflictError('OVERLAP', 0)),

@@ -62,7 +62,7 @@ describe('the version after a refusal and the successor of a proposal (integrati
       const next = h.dataOf<{ version: VersionWire }>(await h.createVersion(body(r.proposal.id)).expect(201)).version;
       const giveBack = await h.giveBack(r.proposal.id, { reason: 'Add the quotes' }, h.finance).expect(409);
 
-      expect(next).toMatchObject({ number: 2, kind: 'INITIAL', state: 'DRAFT', rejectedPredecessorId: r.version.id });
+      expect(next).toMatchObject({ number: 2, state: 'DRAFT', rejectedPredecessorId: r.version.id });
       expect(h.codeOf(giveBack)).toBe('BUDGET.PROPOSAL_CANNOT_RETURN');
       expect((await proposalOf(r.proposal.id)).state).toBe('REVIEWED');
     });

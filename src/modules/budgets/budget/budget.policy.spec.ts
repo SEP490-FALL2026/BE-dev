@@ -16,6 +16,7 @@ import {
   quartersMismatchAfter,
   patchChangesLine,
   versionDecidedDetail,
+  versionLineOverCeiling,
   proposalIsSucceedable,
   quartersMatch,
   totalOf,
@@ -380,5 +381,26 @@ describe('the annual check of the versions of a year (R-I06, QĐ-103i)', () => {
       kind: 'CURRENCY',
       currency: 'USD',
     });
+  });
+});
+
+describe('G5-05 the over-the-ceiling flag a version line shows (AC-20, QĐ-109c)', () => {
+  const line = (
+    patch: Partial<{ lineType: 'RENEW' | 'CHANGE' | 'NEW' | 'CANCEL'; adjustmentReason: string | null }> = {},
+  ) => ({
+    lineType: 'NEW' as const,
+    adjustmentReason: null,
+    ...patch,
+  });
+
+  it('is the B3 flag of the proposal line while the version line is that line as it was', () => {
+    expect(versionLineOverCeiling(line(), 30_000_000n)).toBe(30_000_000n);
+    expect(versionLineOverCeiling(line(), null)).toBeNull();
+  });
+
+  it('is none once Finance changed the line (an adjustment reason) or made it a Cancel line', () => {
+    expect(versionLineOverCeiling(line({ adjustmentReason: 'Cut to 0' }), 30_000_000n)).toBeNull();
+    expect(versionLineOverCeiling(line({ lineType: 'CANCEL', adjustmentReason: 'Dropped' }), 30_000_000n)).toBeNull();
+    expect(versionLineOverCeiling(line({ lineType: 'CANCEL' }), 30_000_000n)).toBeNull();
   });
 });

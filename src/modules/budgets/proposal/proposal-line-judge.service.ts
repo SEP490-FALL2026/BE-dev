@@ -83,7 +83,11 @@ export class ProposalLineJudge {
     };
   }
 
-  /** The monthly price of a seat of each plan the lines name, as the main subscription of the plan has it now (`M-17`); only in the reporting currency, and for a recurring plan. */
+  /**
+   * The monthly price of a seat of each plan the lines name, as the main subscription of the plan has it now converted to the reporting
+   * currency (`M-17`): the converted price it recorded, or its own price when that is already in the reporting currency; a plan with
+   * neither, or one bought once, has none.
+   */
   private async monthlyPrices(tx: DbTx, lines: readonly RuledLine[], currency: string): Promise<Map<string, bigint>> {
     const planIds = [
       ...new Set(
@@ -93,8 +97,10 @@ export class ProposalLineJudge {
     const prices = new Map<string, bigint>();
     for (const planId of planIds) {
       const price = await this.catalog.getPlanPrice(planId, tx);
-      if (price?.kind !== 'RECURRING' || price.unitPrice.currency !== currency) continue;
-      const monthly = monthlyUnitPrice(price.unitPrice.amountMinor, price.billingCycle);
+      if (price?.kind !== 'RECURRING') continue;
+      const converted = [price.reportingUnitPrice, price.unitPrice].find((unit) => unit?.currency === currency);
+      if (converted === undefined || converted === null) continue;
+      const monthly = monthlyUnitPrice(converted.amountMinor, price.billingCycle);
       if (monthly !== null) prices.set(planId, monthly);
     }
 

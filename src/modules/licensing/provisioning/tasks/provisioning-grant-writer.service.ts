@@ -18,7 +18,7 @@ import { ProvisioningTaskFrame } from '../provisioning-task-frame.service';
 import { ProvisioningTaskRepo } from '../provisioning-task.repo';
 import type { ProvisioningTaskRecord } from '../provisioning-task.types';
 import type { GrantInput, ProvisioningGrantPlanner } from './provisioning-grant-planner.service';
-import { claimMatchesAnswer, grantTaskAudit } from './provisioning-grant.policy';
+import { claimMatchesAnswer, grantPurchaseOf, grantTaskAudit } from './provisioning-grant.policy';
 import { effectiveEndOf } from '../../../../core/term-limit';
 import type { GrantRequestAnswer } from '../../public/licensing.types';
 import { ProvisioningHolderService } from './provisioning-holder.service';
@@ -58,6 +58,7 @@ export class ProvisioningGrantWriter {
     if (claimed.status !== 'GRANTABLE') throw new GrantRequestRefusedError(claimed.status);
     if (!claimMatchesAnswer(claimed, answer)) throw new GrantRequestRefusedError('NOT_APPROVED');
     const subscriptionId = await this.subscriptionOf(tx, plan, input.subscriptionId, today);
+    await this.requireGrantable(tx, plan, input.subscriptionId, today);
     const target = await this.lockTarget(tx, plan, subscriptionId);
     // Judged under the locks of the grant, so the count of the free seats cannot change before the seat is written (`BR-MF1-09a`).
     const { decision: purchase, stock } = await this.sharedPool.judgePurchase(tx, {
@@ -78,6 +79,7 @@ export class ProvisioningGrantWriter {
       expectedEndDate: this.endOfSeat(claimed, today),
     });
 
+    const bought = grantPurchaseOf(plan.provisioningType, purchase, new Date());
     const task = await this.repo.insert(tx, {
       organizationId: organization.id,
       assignmentId: assignment.id,
@@ -86,9 +88,7 @@ export class ProvisioningGrantWriter {
       defaultResponsibleEmployeeId: inCharge?.itAdminEmployeeId ?? null,
       createdByAppUserId: actor.appUserId,
       maxAttempts,
-      ...(purchase.purchased && {
-        purchase: { kind: purchase.kind, reason: purchase.reason, purchasedAt: new Date() },
-      }),
+      ...(bought && { purchase: bought }),
     });
     await this.audit.record(
       tx,
@@ -128,6 +128,23 @@ export class ProvisioningGrantWriter {
     if (chosen === null) throw new SeatTargetNotFoundError('SUBSCRIPTION');
 
     return chosen;
+  }
+
+  /**
+   * A subscription the IT Admin names must be one a seat can be taken from today (`BR-MF1-09a`): of the plan, active, its period not over
+   * and not taken over by a next period that runs. A period that ended or was taken over would get the seat (or the seat bought) on a term
+   * that no longer runs, never carried on. Read before the subscription is locked, like the choice of one. Throws
+   * ProvisioningSubscriptionError (`NOT_GRANTABLE`).
+   */
+  private async requireGrantable(tx: DbTx, plan: SeatTarget, named: string | undefined, today: string): Promise<void> {
+    if (named === undefined || plan.provisioningType === 'K5') return;
+    const grantable = await this.catalog.getGrantableSubscriptions(plan.planId, today, tx);
+    if (grantable.some((subscription) => subscription.subscriptionId === named)) return;
+    // Another plan's subscription, a draft or none at all keeps the answer it had (`lockTarget`).
+    const target = await this.catalog.findSeatTarget({ subscriptionId: named }, tx);
+    if (target !== null && target.planId === plan.planId && target.status === 'ACTIVE') {
+      throw new ProvisioningSubscriptionError('NOT_GRANTABLE');
+    }
   }
 
   /**

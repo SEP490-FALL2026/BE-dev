@@ -59,8 +59,8 @@ export class ProvisioningTaskRepo {
       createdByAppUserId: string;
       /** The tries the task gets, from the retries the configuration allows now. */
       maxAttempts: number;
-      /** What was bought with the grant when the pool had nothing free; absent when the seat comes from the pool. */
-      purchase?: { kind: 'POOL_TOP_UP' | 'KEY_PURCHASE'; reason: string | null; purchasedAt: Date };
+      /** What was bought with the grant (a K1 seat, or a pool that had nothing free); absent when the seat comes from the pool. */
+      purchase?: { kind: 'POOL_TOP_UP' | 'KEY_PURCHASE' | 'K1_SUBSCRIPTION'; reason: string | null; purchasedAt: Date };
     },
   ): Promise<ProvisioningTaskRecord> {
     const { purchase, ...task } = input;

@@ -48,8 +48,8 @@ describe('budgets over HTTP: the versions Finance builds (integration, real Post
         .expect(201);
 
       const version = h.dataOf<{ version: VersionWire }>(response).version;
+      expect(version).not.toHaveProperty('kind');
       expect(version).toMatchObject({
-        kind: 'INITIAL',
         state: 'DRAFT',
         number: 1,
         proposalId: proposal.id,

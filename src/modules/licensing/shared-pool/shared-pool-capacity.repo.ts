@@ -3,7 +3,7 @@ import type { BusinessDate } from '../../../core/business-date';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 
-/** The seats a subscription holds today, and how many of them are held by a right whose revocation is still open. */
+/** The seats a subscription holds from today on, and how many of them are held by a right whose revocation is still open. */
 export interface SubscriptionOccupancy {
   occupied: number;
   inRevocation: number;
@@ -15,8 +15,10 @@ export class SharedPoolCapacityRepo {
   constructor(private readonly prisma: PrismaService) {}
 
   /**
-   * For each subscription, the assignments in force on `today` (the reading the seats of a subscription are counted by: it has
-   * started and has not ended) and, of those, the ones with a revocation task not yet completed, closed or cancelled.
+   * For each subscription, the most assignments it holds on any day from `today` on (the reading the database counts a new seat by,
+   * `license_assignments_seat_capacity`: an assignment that starts later, a seat carried to a period recorded ahead of its start
+   * included, takes its place from its first day) and, of the assignments not ended, the ones with a revocation task not yet completed,
+   * closed or cancelled.
    */
   occupancyOf(
     tx: DbTx,
@@ -41,20 +43,34 @@ export class SharedPoolCapacityRepo {
   ): Promise<Map<string, SubscriptionOccupancy>> {
     const result = new Map<string, SubscriptionOccupancy>();
     if (subscriptionIds.length === 0) return result;
+    // The count only rises on the day an assignment starts, so its peak from today on is on today or on one of those days.
     const rows = await client.$queryRaw<{ subscription_id: string; occupied: bigint; in_revocation: bigint }[]>`
-      SELECT a."subscription_id" AS subscription_id,
-             count(*) AS occupied,
-             count(*) FILTER (WHERE EXISTS (
-               SELECT 1 FROM "provisioning_tasks" t
-                WHERE t."assignment_id" = a."id"
-                  AND t."kind" = 'REVOKE'
-                  AND t."status" NOT IN ('COMPLETED', 'CLOSED_FAILED', 'CANCELLED')
+      WITH "open" AS (
+        SELECT a."subscription_id", a."valid_from", a."valid_until",
+               EXISTS (
+                 SELECT 1 FROM "provisioning_tasks" t
+                  WHERE t."assignment_id" = a."id"
+                    AND t."kind" = 'REVOKE'
+                    AND t."status" NOT IN ('COMPLETED', 'CLOSED_FAILED', 'CANCELLED')
+               ) AS "revoking"
+          FROM "license_assignments" a
+         WHERE a."subscription_id" = ANY(${[...subscriptionIds]}::uuid[])
+           AND (a."valid_until" IS NULL OR ${today}::date < a."valid_until")
+      ), "days" AS (
+        SELECT DISTINCT o."subscription_id", GREATEST(o."valid_from", ${today}::date) AS "day" FROM "open" o
+      )
+      SELECT d."subscription_id" AS subscription_id,
+             MAX((
+               SELECT count(*) FROM "open" b
+                WHERE b."subscription_id" = d."subscription_id"
+                  AND b."valid_from" <= d."day"
+                  AND (b."valid_until" IS NULL OR d."day" < b."valid_until")
+             )) AS occupied,
+             MAX((
+               SELECT count(*) FROM "open" r WHERE r."subscription_id" = d."subscription_id" AND r."revoking"
              )) AS in_revocation
-        FROM "license_assignments" a
-       WHERE a."subscription_id" = ANY(${[...subscriptionIds]}::uuid[])
-         AND a."valid_from" <= ${today}::date
-         AND (a."valid_until" IS NULL OR ${today}::date < a."valid_until")
-       GROUP BY a."subscription_id"`;
+        FROM "days" d
+       GROUP BY d."subscription_id"`;
     for (const row of rows) {
       result.set(row.subscription_id, { occupied: Number(row.occupied), inRevocation: Number(row.in_revocation) });
     }

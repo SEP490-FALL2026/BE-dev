@@ -143,9 +143,12 @@ export class ProvisioningTypeNotSupportedError extends Error {
   }
 }
 
-export type ProvisioningSubscriptionProblem = 'REQUIRED' | 'NOT_ALLOWED' | 'PLAN_MISMATCH';
+export type ProvisioningSubscriptionProblem = 'REQUIRED' | 'NOT_ALLOWED' | 'PLAN_MISMATCH' | 'NOT_GRANTABLE';
 
-/** A grant names a subscription when it needs none (K5), none when it needs one (K1, K2), or one of another plan. */
+/**
+ * A grant names a subscription when it needs none (K5), none when it needs one (K1, K2), one of another plan, or one of the plan a seat
+ * cannot be taken from today (its period ended, or a next period that runs took it over).
+ */
 export class ProvisioningSubscriptionError extends Error {
   constructor(readonly problem: ProvisioningSubscriptionProblem) {
     super(`The subscription of the grant is not right: ${problem}.`);

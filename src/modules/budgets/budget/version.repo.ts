@@ -336,7 +336,7 @@ export class VersionRepo {
       id: string;
       year: number;
       number: number;
-      state: 'SENT' | 'APPROVED' | 'REJECTED' | 'CHANGES_REQUESTED' | 'SUPERSEDED' | 'EXPIRED';
+      state: 'SENT' | 'APPROVED' | 'REJECTED' | 'CHANGES_REQUESTED' | 'EXPIRED';
       sentAt: Date;
     }[];
     total: number;
@@ -369,7 +369,8 @@ export class VersionRepo {
             id: r.id,
             year: r.year,
             number: r.number,
-            state: r.state as 'SENT' | 'APPROVED' | 'REJECTED' | 'CHANGES_REQUESTED' | 'SUPERSEDED' | 'EXPIRED',
+            // A sent version: never a draft, and never SUPERSEDED (`budget_versions_no_superseded`).
+            state: r.state as 'SENT' | 'APPROVED' | 'REJECTED' | 'CHANGES_REQUESTED' | 'EXPIRED',
             sentAt: r.sentAt!,
           })),
           total,

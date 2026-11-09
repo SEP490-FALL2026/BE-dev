@@ -33,19 +33,31 @@ type Row = Prisma.SubscriptionGetPayload<{ include: typeof WITH_PLAN }>;
 
 /**
  * The subscriptions that can price a plan: active, with a unit price, a currency and a billing cycle, and not already continued by a later
- * period (`isLive`: its end date is not looked at here, the repository has no calendar). No department is asked: the pool is the plan's.
- * A draft has no price to rely on. `pickPriceSource` chooses the one that prices the plan among them (`Q-04` C).
+ * period that is active itself (that one prices the plan; a later period still a draft leaves the price with this one, F-012). Its end date
+ * is not looked at here, the repository has no calendar. No department is asked: the pool is the plan's. A draft has no price to rely on.
+ * `pickPriceSource` chooses the one that prices the plan among them (`Q-04` C).
  */
 const livePricedOf = (): Prisma.SubscriptionWhereInput => ({
   status: 'ACTIVE',
-  renewedBy: null,
   unitPriceMinor: { not: null },
   unitPriceCurrency: { not: null },
   AND: [
+    { OR: [{ renewedBy: null }, { renewedBy: { is: { status: { not: 'ACTIVE' } } } }] },
     // A perpetual purchase has a price and no billing cycle: its price is the price of the purchase (`QĐ-106d`).
     { OR: [{ billingCycle: { not: null } }, { kind: 'PERPETUAL' }] },
     // A period that has already ended does not price the plan any more (review G23-05); the UTC day is close enough here.
     { OR: [{ endDate: null }, { endDate: { gte: new Date(new Date().toISOString().slice(0, 10)) } }] },
+  ],
+});
+
+/**
+ * A period a seat can still be taken from on `today` as far as its successor goes (`BR-MF1-09a`): no later period continues it, or the one
+ * that does is still a draft or has not started. Until the next period runs, the period that runs and the next one are one pool.
+ */
+const notTakenOverOn = (today: BusinessDate): Prisma.SubscriptionWhereInput => ({
+  OR: [
+    { renewedBy: null },
+    { renewedBy: { is: { OR: [{ status: { not: 'ACTIVE' } }, { startDate: { gt: toDateColumn(today) } }] } } },
   ],
 });
 /** A K4 plan always carries its purchase price, paid once (`QĐ-106d`, review G23-04), whatever kind of subscription records it. */
@@ -54,6 +66,8 @@ const PRICE_FIELDS = {
   kind: true,
   unitPriceMinor: true,
   unitPriceCurrency: true,
+  priceReportingMinor: true,
+  priceReportingCurrency: true,
   billingCycle: true,
   allowsMidTermReduction: true,
 } as const;
@@ -65,6 +79,7 @@ const withPriceSource = <
     startDate: Date | null;
     isPrimaryForPlan: boolean;
     unitPriceMinor: bigint | null;
+    priceReportingMinor: bigint | null;
     billingCycle: BillingCycle | null;
   },
 >(
@@ -73,6 +88,7 @@ const withPriceSource = <
   ...row,
   startDate: row.startDate ? fromDateColumn(row.startDate) : null,
   unitPriceMinor: row.unitPriceMinor ?? 0n,
+  reportingPriceMinor: row.priceReportingMinor,
   billingCycle: row.billingCycle ?? 'OTHER',
 });
 
@@ -292,8 +308,9 @@ export class SubscriptionRepo {
 
   /**
    * The same for many plans in one read, by plan (a plan with none is absent). A draft is left out (its seats cannot be granted), and so is
-   * a subscription that a later period continues or whose period already ended. Per plan the primary subscription comes first, then the
-   * one that would price the plan: the order a grant with no subscription named takes them.
+   * a subscription whose period already ended or that a later period has taken over (active and started: `notTakenOverOn`); a period
+   * recorded ahead of its start is in, next to the one that still runs. Per plan the primary subscription comes first, then the one that
+   * would price the plan: the order a grant with no subscription named takes them.
    */
   async findGrantableOfPlans(
     planIds: readonly string[],
@@ -309,8 +326,7 @@ export class SubscriptionRepo {
       where: {
         planId: { in: [...planIds] },
         status: 'ACTIVE',
-        renewedBy: null,
-        OR: [{ endDate: null }, { endDate: { gte: toDateColumn(today) } }],
+        AND: [notTakenOverOn(today), { OR: [{ endDate: null }, { endDate: { gte: toDateColumn(today) } }] }],
       },
       select: {
         id: true,
@@ -319,6 +335,7 @@ export class SubscriptionRepo {
         startDate: true,
         isPrimaryForPlan: true,
         unitPriceMinor: true,
+        priceReportingMinor: true,
         billingCycle: true,
       },
     });
@@ -350,6 +367,8 @@ export class SubscriptionRepo {
     subscriptionKind: 'TERM' | 'PERPETUAL';
     unitPriceMinor: bigint;
     currency: string;
+    /** The unit price converted to the reporting currency when it was recorded; null when it was not converted. */
+    reporting: { amountMinor: bigint; currency: string } | null;
     billingCycle: 'MONTHLY' | 'QUARTERLY' | 'ANNUAL' | 'OTHER';
     allowsMidTermReduction: boolean;
   } | null> {
@@ -364,6 +383,10 @@ export class SubscriptionRepo {
       subscriptionKind: row.plan.provisioningType === 'K4' ? 'PERPETUAL' : row.kind,
       unitPriceMinor: row.unitPriceMinor,
       currency: row.unitPriceCurrency,
+      reporting:
+        row.priceReportingMinor !== null && row.priceReportingCurrency !== null
+          ? { amountMinor: row.priceReportingMinor, currency: row.priceReportingCurrency }
+          : null,
       billingCycle: row.billingCycle,
       allowsMidTermReduction: row.allowsMidTermReduction,
     };

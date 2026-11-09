@@ -99,6 +99,42 @@ describe('avoidedCostOf', () => {
     ).toEqual({ provisioningType: 'K4', months: null, unitMinor: 250n, amountMinor: 250n, currency: 'VND' });
   });
 
+  it('G9-03 BR-MF1-09c: a seat priced in USD is avoided at its monthly price converted to the reporting currency', () => {
+    expect(
+      avoidedCostOf({
+        provisioningType: 'K2',
+        completedOn: '2026-09-10',
+        price: {
+          kind: 'RECURRING',
+          unitPrice: { amountMinor: 1_500n, currency: 'USD' },
+          reportingUnitPrice: { amountMinor: 375_000n, currency: 'VND' },
+          billingCycle: 'MONTHLY',
+        },
+      }),
+    ).toEqual({ provisioningType: 'K2', months: 4, unitMinor: 375_000n, amountMinor: 1_500_000n, currency: 'VND' });
+  });
+
+  it('G9-03 BR-MF1-09c: a K4 key of a perpetual purchase (no billing cycle, read OTHER) is its converted purchase price', () => {
+    expect(
+      avoidedCostOf({
+        provisioningType: 'K4',
+        completedOn: '2026-09-10',
+        price: {
+          kind: 'ONE_TIME',
+          unitPrice: { amountMinor: 100n, currency: 'USD' },
+          reportingUnitPrice: { amountMinor: 2_500_000n, currency: 'VND' },
+          billingCycle: 'OTHER',
+        },
+      }),
+    ).toEqual({
+      provisioningType: 'K4',
+      months: null,
+      unitMinor: 2_500_000n,
+      amountMinor: 2_500_000n,
+      currency: 'VND',
+    });
+  });
+
   it('BR-MF1-09c: nothing is recorded without a price, for a cycle that has no month, or for another kind of plan', () => {
     expect(avoidedCostOf({ provisioningType: 'K2', completedOn: '2026-07-14', price: null })).toBeNull();
     expect(

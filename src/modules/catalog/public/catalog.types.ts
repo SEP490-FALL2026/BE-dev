@@ -52,6 +52,9 @@ export interface PoolSubscription {
 export interface SubscriptionPrice {
   kind: 'RECURRING' | 'ONE_TIME';
   unitPrice: { amountMinor: bigint; currency: string };
+  /** The unit price converted to the reporting currency when it was recorded; null when it was not converted. */
+  reportingUnitPrice: { amountMinor: bigint; currency: string } | null;
+  /** `OTHER` for a perpetual purchase, which has no billing cycle. */
   billingCycle: 'MONTHLY' | 'QUARTERLY' | 'ANNUAL' | 'OTHER';
 }
 
