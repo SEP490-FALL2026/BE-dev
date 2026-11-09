@@ -190,12 +190,12 @@ export class InvoiceRepo {
   ): Promise<Map<string, bigint>> {
     if (pairs.length === 0) return new Map();
     const wanted = Prisma.join(pairs.map((pair) => Prisma.sql`(${pair.costCenterId}::uuid, ${pair.year}::int)`));
-    const rows = await this.prisma.$queryRaw<{ cost_center_id: string; year: number; amount: bigint }[]>`
-      SELECT c.cost_center_id, c.year, SUM(i.actual_cost_minor)::bigint AS amount
+    const rows = await this.prisma.$queryRaw<{ cost_center_id: string; year: number; amount: string }[]>`
+      SELECT c.cost_center_id, c.year, SUM(i.actual_cost_minor)::text AS amount
         FROM invoices i JOIN budget_commitments c ON c.id = i.commitment_id
        WHERE (c.cost_center_id, c.year) IN (${wanted})
          AND i.recorded_at >= (make_date(c.year + 1, 1, 1)::timestamp AT TIME ZONE ${timeZone})
        GROUP BY c.cost_center_id, c.year`;
-    return new Map(rows.map((row) => [`${row.cost_center_id}:${row.year}`, row.amount]));
+    return new Map(rows.map((row) => [`${row.cost_center_id}:${row.year}`, BigInt(row.amount)]));
   }
 }

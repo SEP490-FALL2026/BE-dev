@@ -57609,7 +57609,7 @@
         ],
         "responses": {
           "200": {
-            "description": "The Cost Center of the department the caller heads, the year, whether it has a current budget (ACTIVE) or not (NO_ACTIVE_BUDGET), the total, and the proposal behind it. No part of this says what is left.",
+            "description": "The Cost Center of the department the caller heads, the year, whether it has a current budget (ACTIVE) or not (NO_ACTIVE_BUDGET), its base, reserve, commitments, spend, pending spend, both remaining amounts, the published department ceiling and cycle deadlines, and the proposal behind it.",
             "content": {
               "application/json": {
                 "schema": {
@@ -58202,7 +58202,7 @@
         ],
         "responses": {
           "200": {
-            "description": "The base, reserve, total, held, spent and remaining of all the current budgets of the year, added up for each currency (keyed by currency code), with the number of Cost Centers and how many are over budget, and when the last invoice was recorded. Only Finance reads it.",
+            "description": "The base, reserve, total, held, spent, pending spend and both remaining levels of the year, added per currency. Includes commitment-only Cost Centers, the annual ceiling and shared-pool reserve, and when the last invoice was recorded. Finance and the spending approver read it.",
             "content": {
               "application/json": {
                 "schema": {
@@ -58247,7 +58247,7 @@
             }
           },
           "403": {
-            "description": "Only Finance reads the budgets of the company.",
+            "description": "Finance and the spending approver read the budgets of the company.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -58379,7 +58379,7 @@
         ],
         "responses": {
           "200": {
-            "description": "One row for each Cost Center and year that has a current version. Only Finance reads the company-wide table.",
+            "description": "One row per Cost Center and year with a reference budget or commitments, including NO_BUDGET rows. Finance and the spending approver read the table.",
             "content": {
               "application/json": {
                 "schema": {
@@ -58424,7 +58424,7 @@
             }
           },
           "403": {
-            "description": "Only Finance reads the budgets of the company.",
+            "description": "Finance and the spending approver read the budgets of the company.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -97989,10 +97989,108 @@
                   },
                   "year": { "type": "integer", "minimum": -9007199254740991, "maximum": 9007199254740991 },
                   "status": { "type": "string", "enum": ["ACTIVE", "NO_ACTIVE_BUDGET"] },
+                  "base": {
+                    "type": "object",
+                    "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                    "required": ["amount", "currency"],
+                    "additionalProperties": false,
+                    "nullable": true
+                  },
+                  "reserve": {
+                    "type": "object",
+                    "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                    "required": ["amount", "currency"],
+                    "additionalProperties": false,
+                    "nullable": true
+                  },
                   "total": {
                     "type": "object",
                     "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
                     "required": ["amount", "currency"],
+                    "additionalProperties": false,
+                    "nullable": true
+                  },
+                  "committed": {
+                    "type": "object",
+                    "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                    "required": ["amount", "currency"],
+                    "additionalProperties": false
+                  },
+                  "spent": {
+                    "type": "object",
+                    "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                    "required": ["amount", "currency"],
+                    "additionalProperties": false
+                  },
+                  "pendingSpend": {
+                    "type": "object",
+                    "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                    "required": ["amount", "currency"],
+                    "additionalProperties": false
+                  },
+                  "remainingBase": {
+                    "type": "object",
+                    "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                    "required": ["amount", "currency"],
+                    "additionalProperties": false,
+                    "nullable": true
+                  },
+                  "remainingWithReserve": {
+                    "type": "object",
+                    "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                    "required": ["amount", "currency"],
+                    "additionalProperties": false,
+                    "nullable": true
+                  },
+                  "overBudget": { "type": "boolean" },
+                  "departmentCeiling": {
+                    "type": "object",
+                    "properties": {
+                      "total": {
+                        "type": "object",
+                        "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                        "required": ["amount", "currency"],
+                        "additionalProperties": false
+                      },
+                      "signedCommitments": {
+                        "type": "object",
+                        "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                        "required": ["amount", "currency"],
+                        "additionalProperties": false
+                      },
+                      "plannedSeats": {
+                        "type": "object",
+                        "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                        "required": ["amount", "currency"],
+                        "additionalProperties": false
+                      },
+                      "priority": {
+                        "type": "object",
+                        "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                        "required": ["amount", "currency"],
+                        "additionalProperties": false
+                      }
+                    },
+                    "required": ["total", "signedCommitments", "plannedSeats", "priority"],
+                    "additionalProperties": false,
+                    "nullable": true
+                  },
+                  "cycle": {
+                    "type": "object",
+                    "properties": {
+                      "submissionDeadline": {
+                        "type": "string",
+                        "format": "date",
+                        "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                      },
+                      "decisionDeadline": {
+                        "type": "string",
+                        "format": "date",
+                        "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+                      },
+                      "published": { "type": "boolean" }
+                    },
+                    "required": ["submissionDeadline", "decisionDeadline", "published"],
                     "additionalProperties": false,
                     "nullable": true
                   },
@@ -98035,7 +98133,25 @@
                     "nullable": true
                   }
                 },
-                "required": ["costCenter", "year", "status", "total", "version", "latestRefusal", "proposal"],
+                "required": [
+                  "costCenter",
+                  "year",
+                  "status",
+                  "base",
+                  "reserve",
+                  "total",
+                  "committed",
+                  "spent",
+                  "pendingSpend",
+                  "remainingBase",
+                  "remainingWithReserve",
+                  "overBudget",
+                  "departmentCeiling",
+                  "cycle",
+                  "version",
+                  "latestRefusal",
+                  "proposal"
+                ],
                 "additionalProperties": false
               }
             },
@@ -98228,6 +98344,20 @@
             "type": "object",
             "properties": {
               "year": { "type": "integer", "minimum": -9007199254740991, "maximum": 9007199254740991 },
+              "annualCeiling": {
+                "type": "object",
+                "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                "required": ["amount", "currency"],
+                "additionalProperties": false,
+                "nullable": true
+              },
+              "sharedPoolReserve": {
+                "type": "object",
+                "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                "required": ["amount", "currency"],
+                "additionalProperties": false,
+                "nullable": true
+              },
               "totals": {
                 "type": "object",
                 "additionalProperties": {
@@ -98270,6 +98400,24 @@
                       "required": ["amount", "currency"],
                       "additionalProperties": false
                     },
+                    "pendingSpend": {
+                      "type": "object",
+                      "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                      "required": ["amount", "currency"],
+                      "additionalProperties": false
+                    },
+                    "remainingBase": {
+                      "type": "object",
+                      "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                      "required": ["amount", "currency"],
+                      "additionalProperties": false
+                    },
+                    "remainingWithReserve": {
+                      "type": "object",
+                      "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                      "required": ["amount", "currency"],
+                      "additionalProperties": false
+                    },
                     "costCenterCount": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
                     "overBudgetCount": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
                   },
@@ -98281,6 +98429,9 @@
                     "committed",
                     "spent",
                     "remaining",
+                    "pendingSpend",
+                    "remainingBase",
+                    "remainingWithReserve",
                     "costCenterCount",
                     "overBudgetCount"
                   ],
@@ -98289,7 +98440,7 @@
               },
               "lastInvoiceRecordedAt": { "type": "string", "format": "date-time", "nullable": true }
             },
-            "required": ["year", "totals", "lastInvoiceRecordedAt"],
+            "required": ["year", "annualCeiling", "sharedPoolReserve", "totals", "lastInvoiceRecordedAt"],
             "additionalProperties": false,
             "nullable": true
           }
@@ -98321,30 +98472,35 @@
                       "additionalProperties": false
                     },
                     "year": { "type": "integer", "minimum": -9007199254740991, "maximum": 9007199254740991 },
-                    "versionId": { "type": "string", "format": "uuid" },
+                    "status": { "type": "string", "enum": ["ACTIVE", "NO_BUDGET"] },
+                    "versionId": { "type": "string", "format": "uuid", "nullable": true },
                     "number": {
                       "type": "integer",
                       "exclusiveMinimum": true,
                       "maximum": 9007199254740991,
+                      "nullable": true,
                       "minimum": 0
                     },
                     "base": {
                       "type": "object",
                       "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
                       "required": ["amount", "currency"],
-                      "additionalProperties": false
+                      "additionalProperties": false,
+                      "nullable": true
                     },
                     "reserve": {
                       "type": "object",
                       "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
                       "required": ["amount", "currency"],
-                      "additionalProperties": false
+                      "additionalProperties": false,
+                      "nullable": true
                     },
                     "total": {
                       "type": "object",
                       "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
                       "required": ["amount", "currency"],
-                      "additionalProperties": false
+                      "additionalProperties": false,
+                      "nullable": true
                     },
                     "committed": {
                       "type": "object",
@@ -98358,17 +98514,47 @@
                       "required": ["amount", "currency"],
                       "additionalProperties": false
                     },
-                    "remaining": {
+                    "pendingSpend": {
                       "type": "object",
                       "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
                       "required": ["amount", "currency"],
                       "additionalProperties": false
                     },
-                    "overCommitted": { "type": "boolean" }
+                    "remainingBase": {
+                      "type": "object",
+                      "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                      "required": ["amount", "currency"],
+                      "additionalProperties": false,
+                      "nullable": true
+                    },
+                    "remainingWithReserve": {
+                      "type": "object",
+                      "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                      "required": ["amount", "currency"],
+                      "additionalProperties": false,
+                      "nullable": true
+                    },
+                    "overBudget": { "type": "boolean" },
+                    "remaining": {
+                      "type": "object",
+                      "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                      "required": ["amount", "currency"],
+                      "additionalProperties": false,
+                      "nullable": true
+                    },
+                    "overCommitted": { "type": "boolean" },
+                    "priorPeriodAdjustment": {
+                      "type": "object",
+                      "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                      "required": ["amount", "currency"],
+                      "additionalProperties": false,
+                      "description": "Invoices of the commitment year recorded on or after local midnight on 1 January of the next year."
+                    }
                   },
                   "required": [
                     "costCenter",
                     "year",
+                    "status",
                     "versionId",
                     "number",
                     "base",
@@ -98376,8 +98562,13 @@
                     "total",
                     "committed",
                     "spent",
+                    "pendingSpend",
+                    "remainingBase",
+                    "remainingWithReserve",
+                    "overBudget",
                     "remaining",
-                    "overCommitted"
+                    "overCommitted",
+                    "priorPeriodAdjustment"
                   ],
                   "additionalProperties": false
                 }
@@ -99363,6 +99554,11 @@
           "data": {
             "type": "object",
             "properties": {
+              "basis": {
+                "type": "string",
+                "description": "Costs follow subscription ownership until seat-month allocation is available.",
+                "enum": ["OWNER_DEPARTMENT"]
+              },
               "year": { "type": "integer", "minimum": -9007199254740991, "maximum": 9007199254740991 },
               "currency": { "type": "string" },
               "computedAt": { "type": "string", "format": "date-time" },
@@ -99491,7 +99687,7 @@
                 "description": "The departments of the year, by id: at most 500 are listed (the most a division of the ceiling names); departmentsTotal says how many there are."
               }
             },
-            "required": ["year", "currency", "computedAt", "kpi3", "departmentsTotal", "departments"],
+            "required": ["basis", "year", "currency", "computedAt", "kpi3", "departmentsTotal", "departments"],
             "additionalProperties": false,
             "nullable": true
           }

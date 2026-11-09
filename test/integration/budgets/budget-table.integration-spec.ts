@@ -78,7 +78,8 @@ describe('BR-MF4-05 budgetTable commitment-only years over PostgreSQL', () => {
   it('BR-MF4-05 counts late invoices at organization-local 1 January, including NO_BUDGET rows, without moving expense to next year', async () => {
     const u = await unit();
     const year = h.year;
-    await h.ctx.sql.query("UPDATE organizations SET time_zone = 'Asia/Bangkok'");
+    const organization = await h.ctx.sql.query<{ time_zone: string }>('SELECT time_zone FROM organizations');
+    expect(organization.rows[0].time_zone).toBe('Asia/Ho_Chi_Minh');
     const commitment = await h.unattached(u, year, 100);
     await h.invoiceAt(commitment, 11, `${year}-12-31T23:59:59+07:00`);
     await h.invoiceAt(commitment, 13, `${year + 1}-01-01T00:00:00+07:00`);

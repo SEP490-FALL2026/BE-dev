@@ -87,9 +87,12 @@ import lõi (`pnpm arch:capabilities --module budgets`).
 - `invoice/` — Finance ghi và đọc hóa đơn của một commitment (US-12-02, `C-16`): `POST/GET /budget-commitments/{id}/invoices`;
   `budget-invoices.controller.ts`; `InvoiceService`. Quy tắc thuần ở `budget/invoice.policy.ts` (`planInvoice`), SQL ở
   `budget/invoice.repo.ts`.
-- `budget-view/` — trưởng phòng đọc ngân sách phòng mình và danh sách phiên bản đã gửi (`budgetMineVersionList`), Finance đọc bảng mọi version hiện hành
-  (`base`, `reserve`, `total`, `committed`, `spent`, `remaining`) và **ô tổng toàn công ty** `GET /budgets/summary?year=` (cộng theo từng
-  đồng tiền, `totals` là map theo mã đồng tiền, kèm `lastInvoiceRecordedAt`); `budgets.controller.ts`; `BudgetViewService`.
+- `budget-view/` — trưởng phòng đọc đủ số ngân sách phòng mình (cơ sở, dự phòng, cam kết, thực chi, chờ duyệt chi, hai mức còn lại),
+  Trần phòng đang phát hành và hạn kỳ; danh sách phiên bản đã gửi vẫn ở `budgetMineVersionList`. Finance và Người duyệt chi đọc bảng
+  reference budget hoặc dòng `NO_BUDGET` có cam kết, `priorPeriodAdjustment` theo mốc 01/01 năm sau trong timezone tổ chức, và ô tổng
+  toàn công ty `GET /budgets/summary?year=` (cộng theo từng đồng tiền, có Trần năm/dự phòng kho, `lastInvoiceRecordedAt`).
+  `BudgetViewService` giữ đọc phòng mình; `BudgetTableViewService`, `BudgetViewRepo` đọc bảng/tổng; `BudgetViewNumbersService`
+  gom số theo lô qua `PendingSpendContributions` cùng nguồn với kiểm ngân sách, gồm cam kết chưa attached khi đọc view.
 - `year-end/` — đóng ngân sách của năm đã hết (F62, `QĐ-91c`); `year-end.job.ts` chạy mỗi giờ trong tiến
   trình API (ADR-0018), `year-end.service.ts`.
 - `attachment/` — tài liệu đính kèm của đề xuất và phiên bản ngân sách: khai báo, hoàn tất tải lên, kiểm tra chữ ký tệp (`UploadInspection`), gỡ khỏi phiên bản, danh sách và liên kết tải về có thời hạn (US-06-09, US-06-10, QĐ-93j); `budget-attachment-uploads.controller.ts`, `budget-attachment-reads.controller.ts`; `BudgetAttachmentDeclarationService`, `BudgetAttachmentCompletionService`, `BudgetAttachmentRemovalService`, `BudgetAttachmentDiscardService`, `BudgetAttachmentQueryService`, `BudgetAttachmentLinkService`, `ProposalAttachmentBinder`, `BudgetAttachmentRepo`, `budget-attachment.policy.ts`. `BudgetAttachmentExpirySweeper` chạy mỗi giờ quét tệp quá hạn (`BudgetAttachmentExpiryService`).

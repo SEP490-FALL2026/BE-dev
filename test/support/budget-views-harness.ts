@@ -29,7 +29,7 @@ export class BudgetViewsHarness extends SpendHarness {
       [
         this.seed.organizationId,
         commitmentId,
-        `BV-${commitmentId}-${recordedAt}`,
+        `BV-${commitmentId.slice(0, 8)}-${Date.parse(recordedAt)}`,
         recordedAt,
         this.reporting,
         amount,
