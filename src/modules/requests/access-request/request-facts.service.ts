@@ -16,7 +16,7 @@ import { hasSpendStep, policyFor, proposalPolicy, type RequestPolicy } from './a
 import type { PricingRecord } from './access-request.types';
 import { maxEndDateOf, requestAmountOf } from './pricing.policy';
 import { RoutingFactsService, type GatheredRouting } from './routing-facts.service';
-import { routeNeedStep, type RoutingDecision } from './routing.policy';
+import { routeNeedStep, requestRoutingOf, type RoutingDecision } from './routing.policy';
 
 /** The parameter that says how long an approval step may wait; read when a request is sent and fixed in its policy. */
 const APPROVAL_SLA_PARAMETER = 'APPROVAL_SLA_WORKING_DAYS';
@@ -167,7 +167,7 @@ export class RequestFactsService {
       today,
       unit,
       target,
-      policy,
+      policy: policyFor(target.applicationKind, input.settings.slaWorkingDays, requestRoutingOf(routeNeedStep(gathered.facts))),
       pricing,
       routing: { ...gathered, decision: routeNeedStep(gathered.facts) },
       heldAccess: await this.heldAccess(input.employeeId, input.planId),
@@ -206,7 +206,7 @@ export class RequestFactsService {
     return {
       today,
       unit,
-      policy,
+      policy: proposalPolicy(input.settings.slaWorkingDays, requestRoutingOf(routeNeedStep(gathered.facts))),
       pricing: {
         status: 'MISSING',
         missingReason: 'AWAITING_QUOTE',

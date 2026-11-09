@@ -1,3 +1,4 @@
+import { SpendRoutingService } from '../spend/spend-routing.service';
 import { Injectable } from '@nestjs/common';
 import type { BusinessDate } from '../../../core/business-date';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
@@ -26,6 +27,7 @@ export interface RenewalSubmitted {
 @Injectable()
 export class RenewalRequestWriter {
   constructor(
+    private readonly spendRouting: SpendRoutingService,
     private readonly requests: AccessRequestRepo,
     private readonly renewals: RenewalRequestRepo,
     private readonly assessment: RequestFactsService,
@@ -80,6 +82,7 @@ export class RenewalRequestWriter {
       previousEnd: input.previousEnd,
       consecutiveMonths,
     });
+    await this.spendRouting.start(tx, actor, created.id, new Date());
     const record = await this.requests.findById(created.id, tx);
     if (!record) throw new Error(`The request ${created.id} was not found after it was written.`);
     const final = await this.requests.findById(created.id, tx);

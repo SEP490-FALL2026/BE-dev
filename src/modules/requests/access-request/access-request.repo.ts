@@ -43,6 +43,8 @@ export class AccessRequestRepo {
       type: input.type ?? 'GRANT',
       branch: input.branch,
       state: input.state,
+      routingMode: needStep.state === 'NOT_REQUIRED' ? 'ONE_STEP' as const : 'VIA_HEAD' as const,
+      oneStepReason: needStep.state === 'NOT_REQUIRED' ? (needStep.routingRow === 2 ? 'REQUESTER_IS_HEAD' : 'NO_DEPARTMENT_HEAD') : null,
       planId: input.planId,
       requesterEmployeeId: input.requesterEmployeeId,
       departmentId: input.departmentId,
@@ -54,7 +56,7 @@ export class AccessRequestRepo {
       ...(input.expectedEndDate === undefined
         ? {}
         : { expectedEndDate: input.expectedEndDate ? toDateColumn(input.expectedEndDate) : null }),
-      policy: requestPolicyJson.encode(input.policy),
+      policy: requestPolicyJson.encode(needStep.state === 'NOT_REQUIRED' ? { ...input.policy, version: 2, chain: input.policy.chain.filter((kind) => kind !== 'NEED') } : { ...input.policy, chain: input.policy.chain.includes('NEED') ? input.policy.chain : ['NEED', ...input.policy.chain] }),
       createdByAppUserId: input.createdByAppUserId,
       submittedAt: input.now,
     };
@@ -65,7 +67,7 @@ export class AccessRequestRepo {
       assigneeEmployeeId: needStep.assigneeEmployeeId,
       routingRow: needStep.routingRow,
       waitingReason: needStep.waitingReason,
-      samePersonAsSpend: needStep.samePersonAsSpend,
+      samePersonAsSpend: false,
       slaWorkingDays: needStep.slaWorkingDays,
       createdAt: input.now,
       assignedAt: needStep.state === 'PENDING' ? input.now : null,
@@ -92,6 +94,19 @@ export class AccessRequestRepo {
     return { id: created.id, needStepId: created.steps[0].id };
   }
 
+  async setOneStepBlockedReason(tx: DbTx, id: string, reason: 'PRICE_MISSING' | 'RATE_MISSING' | null): Promise<void> {
+    await tx.accessRequest.update({ where: { id }, data: { oneStepBlockedReason: reason } });
+  }
+
+  async addAssessmentStep(tx: DbTx, requestId: string, assignee: string | null, slaWorkingDays: number, now: Date): Promise<void> {
+    const existing = await tx.accessRequestStep.findFirst({ where: { requestId, kind: 'IT_ASSESSMENT' }, select: { id: true } });
+    if (existing) return;
+    await tx.accessRequestStep.create({ data: {
+      requestId, kind: 'IT_ASSESSMENT', sequence: 2, state: assignee === null ? 'WAITING' : 'PENDING', assigneeEmployeeId: assignee,
+      routingRow: 9, waitingReason: assignee === null ? 'NO_IT_ADMIN_IN_CHARGE' : null, slaWorkingDays, createdAt: now, assignedAt: assignee === null ? null : now,
+    } });
+  }
+
   /**
    * Adds a need step after the ones the request has: a request for a group has one for the people the head decides on and one for
    * the head themselves, which a different person decides (`US-05-03` AC-8). Returns its id.
@@ -111,7 +126,7 @@ export class AccessRequestRepo {
         assigneeEmployeeId: step.assigneeEmployeeId,
         routingRow: step.routingRow,
         waitingReason: step.waitingReason,
-        samePersonAsSpend: step.samePersonAsSpend,
+        samePersonAsSpend: false,
         slaWorkingDays: step.slaWorkingDays,
         createdAt: input.now,
         assignedAt: step.state === 'PENDING' ? input.now : null,

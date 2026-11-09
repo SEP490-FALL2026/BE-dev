@@ -1,3 +1,4 @@
+import { SpendRoutingService } from '../spend/spend-routing.service';
 import { Injectable } from '@nestjs/common';
 import { TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
@@ -33,6 +34,7 @@ import { ServiceAccountRequestRepo } from './service-account-request.repo';
 @Injectable()
 export class ServiceAccountRequestService {
   constructor(
+    private readonly spendRouting: SpendRoutingService,
     private readonly runner: TransactionRunner,
     private readonly requests: AccessRequestRepo,
     private readonly details: ServiceAccountRequestRepo,
@@ -106,11 +108,10 @@ export class ServiceAccountRequestService {
         createdByAppUserId: actor.appUserId,
         now,
         needStep: {
-          state: assigned ? 'PENDING' : 'WAITING',
+          state: decision.outcome === 'NOT_REQUIRED' ? 'NOT_REQUIRED' : assigned ? 'PENDING' : 'WAITING',
           assigneeEmployeeId: assigned ? decision.assigneeEmployeeId : null,
           routingRow: decision.row,
           waitingReason: assigned ? null : decision.reason,
-          samePersonAsSpend: assigned && decision.samePersonAsSpend,
           slaWorkingDays: policy.slaWorkingDays,
         },
         draftId: options.draftId ?? null,
@@ -166,7 +167,6 @@ export class ServiceAccountRequestService {
             assigneeEmployeeId: assigned ? decision.assigneeEmployeeId : null,
             role: assigned ? decision.role : null,
             waitingReason: assigned ? null : decision.reason,
-            samePersonAsSpend: assigned && decision.samePersonAsSpend,
             requesterEmployeeId: actor.employeeId,
             departmentId: unit.departmentId,
             departmentHeadEmployeeId,
@@ -174,6 +174,7 @@ export class ServiceAccountRequestService {
         ),
       );
 
+    await this.spendRouting.start(tx, actor, created.id, now);
       const record = await this.requests.findById(created.id, tx);
       if (!record) throw new Error(`The request ${created.id} was not found after it was written.`);
 

@@ -12,7 +12,7 @@ export interface DecisionFacts {
   beneficiaryEmployeeIds: readonly string[];
   /** Who holds the need step; null while it waits for somebody. */
   assigneeEmployeeId: string | null;
-  stepState: 'PENDING' | 'WAITING' | 'APPROVED' | 'REJECTED' | 'CLOSED';
+  stepState: 'PENDING' | 'WAITING' | 'APPROVED' | 'REJECTED' | 'CLOSED' | 'NOT_REQUIRED';
 }
 
 export interface DecisionInput {

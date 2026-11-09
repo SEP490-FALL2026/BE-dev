@@ -1,3 +1,4 @@
+import { SpendRoutingService } from '../spend/spend-routing.service';
 import { Injectable } from '@nestjs/common';
 import { TransactionRunner, type DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
@@ -47,6 +48,7 @@ export interface SubmitOptions {
 @Injectable()
 export class AccessRequestService {
   constructor(
+    private readonly spendRouting: SpendRoutingService,
     private readonly runner: TransactionRunner,
     private readonly repo: AccessRequestRepo,
     private readonly sender: RequestSenderService,
@@ -108,6 +110,7 @@ export class AccessRequestService {
     };
     const created = await this.repo.insert(tx, newRequestOf(sent));
     await this.auditSubmitted(tx, actor, sent, created);
+    await this.spendRouting.start(tx, actor, created.id, now);
 
     const record = await this.repo.findById(created.id, tx);
     if (!record) throw new Error(`The request ${created.id} was not found after it was written.`);

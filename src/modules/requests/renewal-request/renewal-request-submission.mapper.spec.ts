@@ -11,7 +11,6 @@ const assigned = {
   row: 1,
   role: 'MANAGER',
   assigneeEmployeeId: 'head-1',
-  samePersonAsSpend: true,
 };
 const waiting = { outcome: 'WAITING', row: 8, reason: 'NO_VALID_APPROVER' };
 
@@ -62,7 +61,6 @@ describe('the row of a request that asks to renew a right (US-05-14)', () => {
         assigneeEmployeeId: 'head-1',
         routingRow: 1,
         waitingReason: null,
-        samePersonAsSpend: true,
         slaWorkingDays: 2,
       },
     });
@@ -73,7 +71,6 @@ describe('the row of a request that asks to renew a right (US-05-14)', () => {
         assigneeEmployeeId: null,
         routingRow: 8,
         waitingReason: 'NO_VALID_APPROVER',
-        samePersonAsSpend: false,
       },
     });
   });
@@ -137,14 +134,12 @@ describe('the audit entries of a request that asks to renew a right (US-05-14)',
       outcome: 'ASSIGNED',
       assigneeEmployeeId: 'head-1',
       role: 'MANAGER',
-      samePersonAsSpend: true,
     });
     expect(renewalRoutedDetail(sent(waiting), 'req-1')).toMatchObject({
       outcome: 'WAITING',
       assigneeEmployeeId: null,
       role: null,
       waitingReason: 'NO_VALID_APPROVER',
-      samePersonAsSpend: false,
     });
   });
 });

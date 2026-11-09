@@ -1,3 +1,4 @@
+import { SpendRoutingService } from '../spend/spend-routing.service';
 import { Injectable } from '@nestjs/common';
 import { TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
@@ -32,6 +33,7 @@ function assertTermAllowed(assessed: { endDateOutOfRange: boolean; maxEndDate: s
 @Injectable()
 export class ProposalService {
   constructor(
+    private readonly spendRouting: SpendRoutingService,
     private readonly runner: TransactionRunner,
     private readonly repo: AccessRequestRepo,
     private readonly assessments: AssessmentRepo,
@@ -80,11 +82,10 @@ export class ProposalService {
         createdByAppUserId: actor.appUserId,
         now,
         needStep: {
-          state: assigned ? 'PENDING' : 'WAITING',
+          state: decision.outcome === 'NOT_REQUIRED' ? 'NOT_REQUIRED' : assigned ? 'PENDING' : 'WAITING',
           assigneeEmployeeId: assigned ? decision.assigneeEmployeeId : null,
           routingRow: decision.row,
           waitingReason: assigned ? null : decision.reason,
-          samePersonAsSpend: assigned && decision.samePersonAsSpend,
           slaWorkingDays: policy.slaWorkingDays,
         },
       });
@@ -138,7 +139,6 @@ export class ProposalService {
             assigneeEmployeeId: assigned ? decision.assigneeEmployeeId : null,
             role: assigned ? decision.role : null,
             waitingReason: assigned ? null : decision.reason,
-            samePersonAsSpend: assigned && decision.samePersonAsSpend,
             requesterEmployeeId: actor.employeeId,
             departmentId: unit.departmentId,
             departmentHeadEmployeeId,
@@ -146,6 +146,7 @@ export class ProposalService {
         ),
       );
 
+    await this.spendRouting.start(tx, actor, created.id, now);
       const record = await this.repo.findById(created.id, tx);
       if (!record) throw new Error(`The request ${created.id} was not found after it was written.`);
 
