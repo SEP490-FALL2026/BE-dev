@@ -1,5 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import { FlowWorld } from '../support/flows/flow-world';
+import { seedUsageEvidence } from '../support/ghost-seat-usage-evidence';
 
 /**
  * MF-5, the core of the ghost seat (qd103-ghost-seat-manager-decision): a recommendation of the review tier goes to the head of the
@@ -7,8 +8,7 @@ import { FlowWorld } from '../support/flows/flow-world';
  * ends (409 NOT_BEFORE) and can after it, and completing it ends the recommendation ACCEPTED. A second recommendation is kept, a third
  * is exempted. Real sign-in, the seeded dataset, the clock of the flows.
  *
- * NOT RUN YET (09/11/2026): the seed of this runner calls `POST /budget-proposals`, which answers 500 on the base of this branch
- * (`priorityRank`, `budgets/**`, outside this item). The recommendations of `G3`/`G4` are written straight into the table because the
+ * Runs on the seeded dataset since 10/11/2026 (seats of its own, see `holdSeat`). The recommendations of `G3`/`G4` are written straight into the table because the
  * rules that make them (`qd103-ghost-seat-g3-g4`) and the import of vendor usage (`qd103-vendor-usage-import`) are not delivered
  * yet; when they are, replace `recommend` by the import and the weekly pass. The same path is proved without the seed by
  * `test/integration/optimization/ghost-seat-decision.integration-spec.ts`.
@@ -29,14 +29,45 @@ describe('MF-5 trưởng phòng quyết định ghost seat: Thu hồi có ân h�
       [employeeId, planName],
     );
     const id = randomUUID();
+    // A G4 carries its confidence and its activity status (CHECK `ghost_seat_recommendations_usage`) and the evidence the pass writes.
     await sql().query(
       `INSERT INTO ghost_seat_recommendations (id, organization_id, "group", state, tier, application_id, plan_id, assignment_id,
-         seat_chain_id, employee_id, evidence, created_run_id)
-       SELECT $1, organization_id, 'G4', 'OPEN', 'REVIEW', $3, $4, $2, $2, $5, '{"group":"G4"}'::jsonb, $6 FROM employees WHERE id = $5`,
-      [id, seat.id, seat.application_id, seat.plan_id, employeeId, runId],
+         seat_chain_id, employee_id, evidence, created_run_id, confidence, activity_status, inactive_days)
+       SELECT $1, organization_id, 'G4', 'OPEN', 'REVIEW', $3, $4, $2, $2, $5, $7::jsonb, $6, 'HIGH', 'INACTIVE', 70
+         FROM employees WHERE id = $5`,
+      [
+        id,
+        seat.id,
+        seat.application_id,
+        seat.plan_id,
+        employeeId,
+        runId,
+        JSON.stringify(seedUsageEvidence('G4', employeeId, seat.plan_id)),
+      ],
     );
 
     return { id, employeeId };
+  };
+
+  /**
+   * A seat of the plan for a person of ENG who holds none in the seeded dataset, on the subscription ENG owns, as a finished grant leaves it.
+   * The one seat the dataset grants (NV-DEV1, R1) ends within a month: a head's reclaim of it is LEFT_TO_EXPIRE (FR-4.9 gate 7), so the
+   * flow uses seats of its own, with no end or one far enough.
+   */
+  const holdSeat = async (
+    employeeCode: string,
+    planName: string,
+    expectedEndDate: string | null = null,
+  ): Promise<void> => {
+    const subscriptionId = await call().subscriptionOf(planName, 'ENG');
+    await sql().query(
+      `INSERT INTO license_assignments (id, organization_id, kind, source, plan_id, subscription_id, employee_id, account_identifier,
+         normalized_account_identifier, valid_from, valid_from_basis, owning_department_id, created_by_app_user_id, expected_end_date)
+       SELECT gen_random_uuid(), s.organization_id, 'PERSONAL', 'REQUEST', s.plan_id, s.id, e.id, e.work_email, e.normalized_work_email,
+              '2026-01-05', 'RECORDED', s.owner_department_id, $3::uuid, $4::date
+         FROM subscriptions s JOIN employees e ON e.employee_code = $2 WHERE s.id = $1`,
+      [subscriptionId, employeeCode, randomUUID(), expectedEndDate],
+    );
   };
 
   const decide = (choice: string, recommendationId: string, extra: object = {}) =>
@@ -62,7 +93,8 @@ describe('MF-5 trưởng phòng quyết định ghost seat: Thu hồi có ân h�
   });
 
   it('định tuyến tới trưởng phòng ⟹ Thu hồi ⟹ claim sớm 409 NOT_BEFORE ⟹ sau ân hạn hoàn tất ⟹ ACCEPTED @B5', async () => {
-    const rec = await recommend('NV-DEV1', 'Jira Standard');
+    await holdSeat('NV-DEV2', 'Jira Standard');
+    const rec = await recommend('NV-DEV2', 'Jira Standard');
 
     await world.clock.sweep('ghostSeatQueue');
 
@@ -83,6 +115,8 @@ describe('MF-5 trưởng phòng quyết định ghost seat: Thu hồi có ân h�
     expect([early.status, call().codeOf(early)]).toEqual([409, 'PROVISIONING_TASK.NOT_BEFORE']);
 
     world.clock.jumpDays(7);
+    // A week later the sessions of the morning have expired: the IT Admin and the head sign in again (as the other flows do after a jump).
+    for (const code of ['NV-ITA1', 'NV-ENGH']) await world.actors.signIn(code);
     expect((await call().post('NV-ITA1', `/provisioning-tasks/${item.revocationTaskId}/claim`)).status).toBe(200);
     const done = await call().post('NV-ITA1', `/provisioning-tasks/${item.revocationTaskId}/revocation-completion`, {
       completion: 'ACCOUNT_REMOVED',
@@ -98,8 +132,11 @@ describe('MF-5 trưởng phòng quyết định ghost seat: Thu hồi có ân h�
   });
 
   it('Giữ đóng KEPT không báo người giữ; Miễn trừ đóng EXEMPTED và ghi miễn trừ @B5', async () => {
-    const kept = await recommend('NV-DEV2', 'Jira Standard');
-    const exempt = await recommend('NV-DEV4', 'Jira Standard');
+    // NV-DEV4 is not a person of the seeded dataset: the holders are NV-DEV3 and the intern NV-INT1 (whose seat ends in six months).
+    await holdSeat('NV-DEV3', 'Jira Standard');
+    await holdSeat('NV-INT1', 'Jira Standard', call().inDays(180));
+    const kept = await recommend('NV-DEV3', 'Jira Standard');
+    const exempt = await recommend('NV-INT1', 'Jira Standard');
     await world.clock.sweep('ghostSeatQueue');
 
     expect((await decide('KEEP', kept.id)).status).toBe(201);
