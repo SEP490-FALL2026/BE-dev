@@ -75395,6 +75395,1961 @@
         "tags": ["intake-rejections"]
       }
     },
+    "/api/v1/usage-sources": {
+      "post": {
+        "operationId": "usageSourceCreate",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/UsageSourceCreateBodyDto" } } }
+        },
+        "responses": {
+          "201": {
+            "description": "The source with the groups it can detect and the sentence that says what it cannot tell. The activity definition is required.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/UsageSourceResponseDto" },
+                    { "properties": { "message": { "example": "USAGE_SOURCE.CREATED" } } }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_BAD_REQUEST": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_BAD_REQUEST",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHENTICATION_REQUIRED": {
+                    "summary": "A Bearer access token is required.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHENTICATION_REQUIRED",
+                        "message": "A Bearer access token is required.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "INVALID_ACCESS_TOKEN": {
+                    "summary": "The access token is invalid.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "INVALID_ACCESS_TOKEN",
+                        "message": "The access token is invalid.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only an IT Admin declares and reads the usage sources.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHORIZATION.FORBIDDEN": {
+                    "summary": "You do not have permission to perform this action.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHORIZATION.FORBIDDEN",
+                        "message": "You do not have permission to perform this action.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The application already has a source of this name (USAGE_SOURCE.NAME_TAKEN).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "USAGE_SOURCE.NAME_TAKEN": {
+                    "summary": "The usage source cannot be used: NAME_TAKEN.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "USAGE_SOURCE.NAME_TAKEN",
+                        "message": "The usage source cannot be used: NAME_TAKEN.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_PAYLOAD_TOO_LARGE": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_PAYLOAD_TOO_LARGE",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_UNSUPPORTED_MEDIA_TYPE": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_UNSUPPORTED_MEDIA_TYPE",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The request is invalid (VALIDATION_ERROR), the application does not exist, is internal software, is retired or is a communication service whose usage is not collected (USAGE_SOURCE.APPLICATION_*, COMMUNICATION_APP), or the template does not fit the shape or the capabilities (TEMPLATE_INVALID, TEMPLATE_CAPABILITY_MISMATCH).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "VALIDATION_ERROR": {
+                    "summary": "Request validation failed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "VALIDATION_ERROR",
+                        "message": "Request validation failed.",
+                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "USAGE_SOURCE.APPLICATION_NOT_FOUND": {
+                    "summary": "The usage source cannot be used: APPLICATION_NOT_FOUND.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "USAGE_SOURCE.APPLICATION_NOT_FOUND",
+                        "message": "The usage source cannot be used: APPLICATION_NOT_FOUND.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "USAGE_SOURCE.APPLICATION_INTERNAL": {
+                    "summary": "The usage source cannot be used: APPLICATION_INTERNAL.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "USAGE_SOURCE.APPLICATION_INTERNAL",
+                        "message": "The usage source cannot be used: APPLICATION_INTERNAL.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "USAGE_SOURCE.APPLICATION_RETIRED": {
+                    "summary": "The usage source cannot be used: APPLICATION_RETIRED.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "USAGE_SOURCE.APPLICATION_RETIRED",
+                        "message": "The usage source cannot be used: APPLICATION_RETIRED.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "USAGE_SOURCE.COMMUNICATION_APP": {
+                    "summary": "The usage source cannot be used: COMMUNICATION_APP.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "USAGE_SOURCE.COMMUNICATION_APP",
+                        "message": "The usage source cannot be used: COMMUNICATION_APP.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "USAGE_SOURCE.TEMPLATE_INVALID": {
+                    "summary": "The usage source cannot be used: TEMPLATE_INVALID.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "USAGE_SOURCE.TEMPLATE_INVALID",
+                        "message": "The usage source cannot be used: TEMPLATE_INVALID.",
+                        "details": { "reason": "EVENT_NEEDS_CLASSES" },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "USAGE_SOURCE.TEMPLATE_CAPABILITY_MISMATCH": {
+                    "summary": "The usage source cannot be used: TEMPLATE_CAPABILITY_MISMATCH.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "USAGE_SOURCE.TEMPLATE_CAPABILITY_MISMATCH",
+                        "message": "The usage source cannot be used: TEMPLATE_CAPABILITY_MISMATCH.",
+                        "details": { "reason": "CAPABILITY_MISMATCH" },
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_TOO_MANY_REQUESTS": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_TOO_MANY_REQUESTS",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "TOKEN_VERIFICATION_UNAVAILABLE": {
+                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
+                        "message": "Authentication is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SERVICE_UNAVAILABLE": {
+                    "summary": "The service is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SERVICE_UNAVAILABLE",
+                        "message": "The service is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "bearer": [] }],
+        "summary": "Declare the usage source of an application",
+        "tags": ["usage-sources"]
+      },
+      "get": {
+        "operationId": "usageSourceList",
+        "parameters": [
+          {
+            "name": "applicationId",
+            "required": false,
+            "in": "query",
+            "schema": { "format": "uuid", "type": "string" }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": { "minimum": 1, "maximum": 9007199254740991, "default": 1, "type": "integer" }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": { "minimum": 1, "maximum": 100, "default": 20, "type": "integer" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A page of the sources, newest first; applicationId keeps those of one application.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/UsageSourcePageResponseDto" },
+                    { "properties": { "message": { "example": "USAGE_SOURCE.LISTED" } } }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHENTICATION_REQUIRED": {
+                    "summary": "A Bearer access token is required.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHENTICATION_REQUIRED",
+                        "message": "A Bearer access token is required.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "INVALID_ACCESS_TOKEN": {
+                    "summary": "The access token is invalid.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "INVALID_ACCESS_TOKEN",
+                        "message": "The access token is invalid.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only an IT Admin declares and reads the usage sources.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHORIZATION.FORBIDDEN": {
+                    "summary": "You do not have permission to perform this action.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHORIZATION.FORBIDDEN",
+                        "message": "You do not have permission to perform this action.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The query is invalid (VALIDATION_ERROR).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "VALIDATION_ERROR": {
+                    "summary": "Request validation failed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "VALIDATION_ERROR",
+                        "message": "Request validation failed.",
+                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_TOO_MANY_REQUESTS": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_TOO_MANY_REQUESTS",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "TOKEN_VERIFICATION_UNAVAILABLE": {
+                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
+                        "message": "Authentication is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SERVICE_UNAVAILABLE": {
+                    "summary": "The service is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SERVICE_UNAVAILABLE",
+                        "message": "The service is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "bearer": [] }],
+        "summary": "List the usage sources",
+        "tags": ["usage-sources"]
+      }
+    },
+    "/api/v1/usage-sources/{id}": {
+      "get": {
+        "operationId": "usageSourceGet",
+        "parameters": [
+          { "name": "id", "required": true, "in": "path", "schema": { "format": "uuid", "type": "string" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "The source with the groups it can detect and what it cannot tell.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/UsageSourceResponseDto" },
+                    { "properties": { "message": { "example": "USAGE_SOURCE.FETCHED" } } }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHENTICATION_REQUIRED": {
+                    "summary": "A Bearer access token is required.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHENTICATION_REQUIRED",
+                        "message": "A Bearer access token is required.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "INVALID_ACCESS_TOKEN": {
+                    "summary": "The access token is invalid.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "INVALID_ACCESS_TOKEN",
+                        "message": "The access token is invalid.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only an IT Admin declares and reads the usage sources.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHORIZATION.FORBIDDEN": {
+                    "summary": "You do not have permission to perform this action.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHORIZATION.FORBIDDEN",
+                        "message": "You do not have permission to perform this action.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The source does not exist (USAGE_SOURCE.NOT_FOUND).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "USAGE_SOURCE.NOT_FOUND": {
+                    "summary": "The usage source cannot be used: NOT_FOUND.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "USAGE_SOURCE.NOT_FOUND",
+                        "message": "The usage source cannot be used: NOT_FOUND.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The identifier is not a UUID (VALIDATION_ERROR).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "VALIDATION_ERROR": {
+                    "summary": "Request validation failed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "VALIDATION_ERROR",
+                        "message": "Request validation failed.",
+                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_TOO_MANY_REQUESTS": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_TOO_MANY_REQUESTS",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "TOKEN_VERIFICATION_UNAVAILABLE": {
+                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
+                        "message": "Authentication is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SERVICE_UNAVAILABLE": {
+                    "summary": "The service is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SERVICE_UNAVAILABLE",
+                        "message": "The service is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "bearer": [] }],
+        "summary": "Get a usage source",
+        "tags": ["usage-sources"]
+      },
+      "patch": {
+        "operationId": "usageSourceUpdate",
+        "parameters": [
+          { "name": "id", "required": true, "in": "path", "schema": { "format": "uuid", "type": "string" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/UsageSourceUpdateBodyDto" } } }
+        },
+        "responses": {
+          "200": {
+            "description": "The source after the change; imports already confirmed are not judged again.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/UsageSourceResponseDto" },
+                    { "properties": { "message": { "example": "USAGE_SOURCE.UPDATED" } } }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_BAD_REQUEST": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_BAD_REQUEST",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHENTICATION_REQUIRED": {
+                    "summary": "A Bearer access token is required.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHENTICATION_REQUIRED",
+                        "message": "A Bearer access token is required.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "INVALID_ACCESS_TOKEN": {
+                    "summary": "The access token is invalid.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "INVALID_ACCESS_TOKEN",
+                        "message": "The access token is invalid.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only an IT Admin declares and reads the usage sources.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHORIZATION.FORBIDDEN": {
+                    "summary": "You do not have permission to perform this action.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHORIZATION.FORBIDDEN",
+                        "message": "You do not have permission to perform this action.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The source does not exist (USAGE_SOURCE.NOT_FOUND).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "USAGE_SOURCE.NOT_FOUND": {
+                    "summary": "The usage source cannot be used: NOT_FOUND.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "USAGE_SOURCE.NOT_FOUND",
+                        "message": "The usage source cannot be used: NOT_FOUND.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The name is taken (USAGE_SOURCE.NAME_TAKEN), or an import was confirmed and who the source identifies cannot change (USAGE_SOURCE.IN_USE).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "USAGE_SOURCE.NAME_TAKEN": {
+                    "summary": "The usage source cannot be used: NAME_TAKEN.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "USAGE_SOURCE.NAME_TAKEN",
+                        "message": "The usage source cannot be used: NAME_TAKEN.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "USAGE_SOURCE.IN_USE": {
+                    "summary": "The usage source cannot be used: IN_USE.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "USAGE_SOURCE.IN_USE",
+                        "message": "The usage source cannot be used: IN_USE.",
+                        "details": { "fields": ["identifierType"] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_PAYLOAD_TOO_LARGE": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_PAYLOAD_TOO_LARGE",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_UNSUPPORTED_MEDIA_TYPE": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_UNSUPPORTED_MEDIA_TYPE",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The request is invalid (VALIDATION_ERROR), the application does not exist, is internal software, is retired or is a communication service whose usage is not collected (USAGE_SOURCE.APPLICATION_*, COMMUNICATION_APP), or the template does not fit the shape or the capabilities (TEMPLATE_INVALID, TEMPLATE_CAPABILITY_MISMATCH).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "VALIDATION_ERROR": {
+                    "summary": "Request validation failed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "VALIDATION_ERROR",
+                        "message": "Request validation failed.",
+                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "USAGE_SOURCE.APPLICATION_NOT_FOUND": {
+                    "summary": "The usage source cannot be used: APPLICATION_NOT_FOUND.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "USAGE_SOURCE.APPLICATION_NOT_FOUND",
+                        "message": "The usage source cannot be used: APPLICATION_NOT_FOUND.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "USAGE_SOURCE.APPLICATION_INTERNAL": {
+                    "summary": "The usage source cannot be used: APPLICATION_INTERNAL.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "USAGE_SOURCE.APPLICATION_INTERNAL",
+                        "message": "The usage source cannot be used: APPLICATION_INTERNAL.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "USAGE_SOURCE.APPLICATION_RETIRED": {
+                    "summary": "The usage source cannot be used: APPLICATION_RETIRED.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "USAGE_SOURCE.APPLICATION_RETIRED",
+                        "message": "The usage source cannot be used: APPLICATION_RETIRED.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "USAGE_SOURCE.COMMUNICATION_APP": {
+                    "summary": "The usage source cannot be used: COMMUNICATION_APP.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "USAGE_SOURCE.COMMUNICATION_APP",
+                        "message": "The usage source cannot be used: COMMUNICATION_APP.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "USAGE_SOURCE.TEMPLATE_INVALID": {
+                    "summary": "The usage source cannot be used: TEMPLATE_INVALID.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "USAGE_SOURCE.TEMPLATE_INVALID",
+                        "message": "The usage source cannot be used: TEMPLATE_INVALID.",
+                        "details": { "reason": "EVENT_NEEDS_CLASSES" },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "USAGE_SOURCE.TEMPLATE_CAPABILITY_MISMATCH": {
+                    "summary": "The usage source cannot be used: TEMPLATE_CAPABILITY_MISMATCH.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "USAGE_SOURCE.TEMPLATE_CAPABILITY_MISMATCH",
+                        "message": "The usage source cannot be used: TEMPLATE_CAPABILITY_MISMATCH.",
+                        "details": { "reason": "CAPABILITY_MISMATCH" },
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_TOO_MANY_REQUESTS": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_TOO_MANY_REQUESTS",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "TOKEN_VERIFICATION_UNAVAILABLE": {
+                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
+                        "message": "Authentication is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SERVICE_UNAVAILABLE": {
+                    "summary": "The service is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SERVICE_UNAVAILABLE",
+                        "message": "The service is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "bearer": [] }],
+        "summary": "Change a usage source for the imports that come after",
+        "tags": ["usage-sources"]
+      }
+    },
+    "/api/v1/usage-imports": {
+      "post": {
+        "operationId": "usageImportUpload",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "type": "object",
+                "required": ["file", "sourceId"],
+                "properties": {
+                  "file": { "type": "string", "format": "binary" },
+                  "sourceId": { "type": "string", "format": "uuid" },
+                  "coverageFrom": { "type": "string", "format": "date" },
+                  "coverageTo": { "type": "string", "format": "date" }
+                }
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The report was read and every row judged against the people and the seats as they are: nothing of the usage is written yet. The summary gives the window it covers, the rows not matched, the seats it affects, the groups it can detect and what counts as activity.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/UsageImportResponseDto" },
+                    { "properties": { "message": { "example": "USAGE_IMPORT.UPLOADED" } } }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The form breaks a limit of the upload before it is read — more than one file, more than three text fields, a text field over 64 bytes — or it is not a readable multipart form (HTTP_BAD_REQUEST).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_BAD_REQUEST": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_BAD_REQUEST",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHENTICATION_REQUIRED": {
+                    "summary": "A Bearer access token is required.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHENTICATION_REQUIRED",
+                        "message": "A Bearer access token is required.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "INVALID_ACCESS_TOKEN": {
+                    "summary": "The access token is invalid.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "INVALID_ACCESS_TOKEN",
+                        "message": "The access token is invalid.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only an IT Admin imports the usage of a vendor: a head of department never reads the raw usage.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHORIZATION.FORBIDDEN": {
+                    "summary": "You do not have permission to perform this action.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHORIZATION.FORBIDDEN",
+                        "message": "You do not have permission to perform this action.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The source does not exist (USAGE_SOURCE.NOT_FOUND).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "USAGE_SOURCE.NOT_FOUND": {
+                    "summary": "The usage source cannot be used: NOT_FOUND.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "USAGE_SOURCE.NOT_FOUND",
+                        "message": "The usage source cannot be used: NOT_FOUND.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The file is larger than 10 MiB (HTTP_PAYLOAD_TOO_LARGE).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_PAYLOAD_TOO_LARGE": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_PAYLOAD_TOO_LARGE",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The request is invalid (VALIDATION_ERROR), the application of the source is internal, retired or a communication service (USAGE_SOURCE.APPLICATION_*, COMMUNICATION_APP), or the file cannot be used as a whole (USAGE_IMPORT.FILE_*, SCHEMA_UNSUPPORTED, REPORT_INVALID, SOURCE_MISMATCH, WINDOW_REQUIRED, WINDOW_INVALID).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "VALIDATION_ERROR": {
+                    "summary": "Request validation failed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "VALIDATION_ERROR",
+                        "message": "Request validation failed.",
+                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "USAGE_SOURCE.APPLICATION_INTERNAL": {
+                    "summary": "The usage source cannot be used: APPLICATION_INTERNAL.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "USAGE_SOURCE.APPLICATION_INTERNAL",
+                        "message": "The usage source cannot be used: APPLICATION_INTERNAL.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "USAGE_SOURCE.APPLICATION_RETIRED": {
+                    "summary": "The usage source cannot be used: APPLICATION_RETIRED.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "USAGE_SOURCE.APPLICATION_RETIRED",
+                        "message": "The usage source cannot be used: APPLICATION_RETIRED.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "USAGE_SOURCE.COMMUNICATION_APP": {
+                    "summary": "The usage source cannot be used: COMMUNICATION_APP.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "USAGE_SOURCE.COMMUNICATION_APP",
+                        "message": "The usage source cannot be used: COMMUNICATION_APP.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "USAGE_IMPORT.FILE_REQUIRED": {
+                    "summary": "The usage report cannot be imported: FILE_REQUIRED.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "USAGE_IMPORT.FILE_REQUIRED",
+                        "message": "The usage report cannot be imported: FILE_REQUIRED.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "USAGE_IMPORT.FILE_EMPTY": {
+                    "summary": "The usage report cannot be imported: FILE_EMPTY.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "USAGE_IMPORT.FILE_EMPTY",
+                        "message": "The usage report cannot be imported: FILE_EMPTY.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "USAGE_IMPORT.FILE_NOT_TEXT": {
+                    "summary": "The usage report cannot be imported: FILE_NOT_TEXT.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "USAGE_IMPORT.FILE_NOT_TEXT",
+                        "message": "The usage report cannot be imported: FILE_NOT_TEXT.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "USAGE_IMPORT.FILE_TOO_MANY_ROWS": {
+                    "summary": "The usage report cannot be imported: FILE_TOO_MANY_ROWS.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "USAGE_IMPORT.FILE_TOO_MANY_ROWS",
+                        "message": "The usage report cannot be imported: FILE_TOO_MANY_ROWS.",
+                        "details": { "maxRows": 50000 },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "USAGE_IMPORT.FILE_UNREADABLE": {
+                    "summary": "The usage report cannot be imported: FILE_UNREADABLE.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "USAGE_IMPORT.FILE_UNREADABLE",
+                        "message": "The usage report cannot be imported: FILE_UNREADABLE.",
+                        "details": { "reason": "UNTERMINATED_QUOTE", "line": 3 },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "USAGE_IMPORT.FILE_MISSING_COLUMNS": {
+                    "summary": "The usage report cannot be imported: FILE_MISSING_COLUMNS.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "USAGE_IMPORT.FILE_MISSING_COLUMNS",
+                        "message": "The usage report cannot be imported: FILE_MISSING_COLUMNS.",
+                        "details": { "missing": ["email"] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "USAGE_IMPORT.SCHEMA_UNSUPPORTED": {
+                    "summary": "The usage report cannot be imported: SCHEMA_UNSUPPORTED.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "USAGE_IMPORT.SCHEMA_UNSUPPORTED",
+                        "message": "The usage report cannot be imported: SCHEMA_UNSUPPORTED.",
+                        "details": { "supported": "saas-sentry.vendor-usage-report/0.1-proposal" },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "USAGE_IMPORT.REPORT_INVALID": {
+                    "summary": "The usage report cannot be imported: REPORT_INVALID.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "USAGE_IMPORT.REPORT_INVALID",
+                        "message": "The usage report cannot be imported: REPORT_INVALID.",
+                        "details": { "path": "subjects.0.activity" },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "USAGE_IMPORT.SOURCE_MISMATCH": {
+                    "summary": "The usage report cannot be imported: SOURCE_MISMATCH.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "USAGE_IMPORT.SOURCE_MISMATCH",
+                        "message": "The usage report cannot be imported: SOURCE_MISMATCH.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "USAGE_IMPORT.WINDOW_REQUIRED": {
+                    "summary": "The usage report cannot be imported: WINDOW_REQUIRED.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "USAGE_IMPORT.WINDOW_REQUIRED",
+                        "message": "The usage report cannot be imported: WINDOW_REQUIRED.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "USAGE_IMPORT.WINDOW_INVALID": {
+                    "summary": "The usage report cannot be imported: WINDOW_INVALID.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "USAGE_IMPORT.WINDOW_INVALID",
+                        "message": "The usage report cannot be imported: WINDOW_INVALID.",
+                        "details": { "reason": "TOO_LONG", "maxDays": 366 },
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_TOO_MANY_REQUESTS": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_TOO_MANY_REQUESTS",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "TOKEN_VERIFICATION_UNAVAILABLE": {
+                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
+                        "message": "Authentication is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SERVICE_UNAVAILABLE": {
+                    "summary": "The service is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SERVICE_UNAVAILABLE",
+                        "message": "The service is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "bearer": [] }],
+        "summary": "Upload a vendor usage report for preview",
+        "tags": ["usage-imports"]
+      }
+    },
+    "/api/v1/usage-imports/{id}": {
+      "get": {
+        "operationId": "usageImportGet",
+        "parameters": [
+          { "name": "id", "required": true, "in": "path", "schema": { "format": "uuid", "type": "string" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "The import with its preview or its result.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/UsageImportResponseDto" },
+                    { "properties": { "message": { "example": "USAGE_IMPORT.FETCHED" } } }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHENTICATION_REQUIRED": {
+                    "summary": "A Bearer access token is required.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHENTICATION_REQUIRED",
+                        "message": "A Bearer access token is required.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "INVALID_ACCESS_TOKEN": {
+                    "summary": "The access token is invalid.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "INVALID_ACCESS_TOKEN",
+                        "message": "The access token is invalid.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only an IT Admin imports the usage of a vendor: a head of department never reads the raw usage.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHORIZATION.FORBIDDEN": {
+                    "summary": "You do not have permission to perform this action.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHORIZATION.FORBIDDEN",
+                        "message": "You do not have permission to perform this action.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The import does not exist (USAGE_IMPORT.NOT_FOUND).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "USAGE_IMPORT.NOT_FOUND": {
+                    "summary": "Usage import not found.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "USAGE_IMPORT.NOT_FOUND",
+                        "message": "Usage import not found.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The identifier is not a UUID (VALIDATION_ERROR).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "VALIDATION_ERROR": {
+                    "summary": "Request validation failed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "VALIDATION_ERROR",
+                        "message": "Request validation failed.",
+                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_TOO_MANY_REQUESTS": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_TOO_MANY_REQUESTS",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "TOKEN_VERIFICATION_UNAVAILABLE": {
+                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
+                        "message": "Authentication is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SERVICE_UNAVAILABLE": {
+                    "summary": "The service is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SERVICE_UNAVAILABLE",
+                        "message": "The service is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "bearer": [] }],
+        "summary": "Get a usage import",
+        "tags": ["usage-imports"]
+      }
+    },
+    "/api/v1/usage-imports/{id}/rows": {
+      "get": {
+        "operationId": "usageImportRowList",
+        "parameters": [
+          { "name": "id", "required": true, "in": "path", "schema": { "format": "uuid", "type": "string" } },
+          {
+            "name": "outcome",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string", "enum": ["MATCHED", "UNMATCHED", "AMBIGUOUS", "NOT_A_PERSON", "INVALID"] }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maximum": 9007199254740991,
+              "exclusiveMinimum": true,
+              "default": 1,
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": { "maximum": 100, "exclusiveMinimum": true, "default": 50, "type": "integer", "minimum": 0 }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A page of the rows in the order of the file, each with its days, who it was matched to and how, and the reasons it is wrong; outcome filters. An identifier that looks like a secret is shown masked.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/UsageImportRowsResponseDto" },
+                    { "properties": { "message": { "example": "USAGE_IMPORT.ROWS_LISTED" } } }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHENTICATION_REQUIRED": {
+                    "summary": "A Bearer access token is required.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHENTICATION_REQUIRED",
+                        "message": "A Bearer access token is required.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "INVALID_ACCESS_TOKEN": {
+                    "summary": "The access token is invalid.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "INVALID_ACCESS_TOKEN",
+                        "message": "The access token is invalid.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only an IT Admin imports the usage of a vendor: a head of department never reads the raw usage.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHORIZATION.FORBIDDEN": {
+                    "summary": "You do not have permission to perform this action.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHORIZATION.FORBIDDEN",
+                        "message": "You do not have permission to perform this action.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The import does not exist (USAGE_IMPORT.NOT_FOUND).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "USAGE_IMPORT.NOT_FOUND": {
+                    "summary": "Usage import not found.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "USAGE_IMPORT.NOT_FOUND",
+                        "message": "Usage import not found.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The identifier is not a UUID (VALIDATION_ERROR).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "VALIDATION_ERROR": {
+                    "summary": "Request validation failed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "VALIDATION_ERROR",
+                        "message": "Request validation failed.",
+                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_TOO_MANY_REQUESTS": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_TOO_MANY_REQUESTS",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "TOKEN_VERIFICATION_UNAVAILABLE": {
+                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
+                        "message": "Authentication is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SERVICE_UNAVAILABLE": {
+                    "summary": "The service is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SERVICE_UNAVAILABLE",
+                        "message": "The service is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "bearer": [] }],
+        "summary": "List the rows of a usage import",
+        "tags": ["usage-imports"]
+      }
+    },
+    "/api/v1/usage-imports/{id}/cancel": {
+      "post": {
+        "operationId": "usageImportCancel",
+        "parameters": [
+          { "name": "id", "required": true, "in": "path", "schema": { "format": "uuid", "type": "string" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "Nothing was written and nothing will be; cancelling twice is the same as once.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/UsageImportResponseDto" },
+                    { "properties": { "message": { "example": "USAGE_IMPORT.CANCELLED" } } }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHENTICATION_REQUIRED": {
+                    "summary": "A Bearer access token is required.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHENTICATION_REQUIRED",
+                        "message": "A Bearer access token is required.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "INVALID_ACCESS_TOKEN": {
+                    "summary": "The access token is invalid.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "INVALID_ACCESS_TOKEN",
+                        "message": "The access token is invalid.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only an IT Admin imports the usage of a vendor: a head of department never reads the raw usage.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHORIZATION.FORBIDDEN": {
+                    "summary": "You do not have permission to perform this action.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHORIZATION.FORBIDDEN",
+                        "message": "You do not have permission to perform this action.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The import does not exist (USAGE_IMPORT.NOT_FOUND).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "USAGE_IMPORT.NOT_FOUND": {
+                    "summary": "Usage import not found.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "USAGE_IMPORT.NOT_FOUND",
+                        "message": "Usage import not found.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The import was already confirmed (USAGE_IMPORT.NOT_PREVIEW).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "USAGE_IMPORT.NOT_PREVIEW": {
+                    "summary": "The usage import cannot be used: NOT_PREVIEW.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "USAGE_IMPORT.NOT_PREVIEW",
+                        "message": "The usage import cannot be used: NOT_PREVIEW.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The identifier is not a UUID (VALIDATION_ERROR).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "VALIDATION_ERROR": {
+                    "summary": "Request validation failed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "VALIDATION_ERROR",
+                        "message": "Request validation failed.",
+                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_TOO_MANY_REQUESTS": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_TOO_MANY_REQUESTS",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "TOKEN_VERIFICATION_UNAVAILABLE": {
+                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
+                        "message": "Authentication is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SERVICE_UNAVAILABLE": {
+                    "summary": "The service is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SERVICE_UNAVAILABLE",
+                        "message": "The service is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "bearer": [] }],
+        "summary": "Throw a usage import preview away",
+        "tags": ["usage-imports"]
+      }
+    },
     "/api/v1/notifications": {
       "get": {
         "operationId": "notificationList",
@@ -106166,6 +108121,538 @@
                     "rejectedAt": { "type": "string", "format": "date-time" }
                   },
                   "required": ["id", "endpoint", "date", "reasonCode", "rejectedAt"],
+                  "additionalProperties": false
+                }
+              },
+              "pagination": {
+                "type": "object",
+                "properties": {
+                  "page": { "type": "integer", "exclusiveMinimum": true, "maximum": 9007199254740991, "minimum": 0 },
+                  "pageSize": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "maximum": 9007199254740991,
+                    "minimum": 0
+                  },
+                  "totalItems": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                  "totalPages": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+                },
+                "required": ["page", "pageSize", "totalItems", "totalPages"],
+                "additionalProperties": false
+              }
+            },
+            "required": ["items", "pagination"],
+            "additionalProperties": false,
+            "nullable": true
+          }
+        },
+        "required": ["success", "message", "data"],
+        "additionalProperties": false
+      },
+      "UsageSourceCreateBodyDto": {
+        "type": "object",
+        "properties": {
+          "applicationId": { "type": "string", "format": "uuid" },
+          "name": { "type": "string", "minLength": 1, "maxLength": 120 },
+          "identifierType": { "type": "string", "enum": ["EMAIL", "USERNAME", "ACCOUNT_ID"] },
+          "reportShape": { "type": "string", "enum": ["AGGREGATE", "EVENT"] },
+          "template": {
+            "type": "object",
+            "properties": {
+              "columns": {
+                "type": "object",
+                "properties": {
+                  "identifier": { "type": "string", "minLength": 1, "maxLength": 120 },
+                  "activeDates": { "type": "string", "minLength": 1, "maxLength": 120 },
+                  "lastActivityDate": { "type": "string", "minLength": 1, "maxLength": 120 },
+                  "date": { "type": "string", "minLength": 1, "maxLength": 120 },
+                  "eventType": { "type": "string", "minLength": 1, "maxLength": 120 }
+                },
+                "required": ["identifier"],
+                "additionalProperties": false
+              },
+              "eventClasses": {
+                "default": {},
+                "type": "object",
+                "additionalProperties": { "type": "string", "enum": ["VALUE", "PASSIVE", "AUTH_ONLY", "IGNORED"] }
+              }
+            },
+            "required": ["columns"],
+            "additionalProperties": false
+          },
+          "timeZone": { "type": "string", "minLength": 1, "maxLength": 64 },
+          "activityDefinition": { "type": "string", "minLength": 3, "maxLength": 500 },
+          "definitionStrictness": { "default": "STRICT", "type": "string", "enum": ["STRICT", "LOOSE"] },
+          "evidenceDirection": {
+            "default": "POSITIVE_ONLY",
+            "type": "string",
+            "enum": ["POSITIVE_ONLY", "POSITIVE_AND_NEGATIVE"]
+          },
+          "capabilities": {
+            "type": "object",
+            "properties": {
+              "memberList": { "type": "boolean" },
+              "lastActivity": { "type": "boolean" },
+              "eventDetail": { "type": "boolean" },
+              "maxHistoryDays": { "type": "integer", "minimum": 1, "maximum": 3660, "default": null, "nullable": true }
+            },
+            "required": ["memberList", "lastActivity", "eventDetail"],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "applicationId",
+          "name",
+          "identifierType",
+          "reportShape",
+          "template",
+          "timeZone",
+          "activityDefinition",
+          "capabilities"
+        ],
+        "additionalProperties": false
+      },
+      "UsageSourceResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "enum": [true] },
+          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string", "format": "uuid" },
+              "application": {
+                "type": "object",
+                "properties": { "id": { "type": "string", "format": "uuid" }, "name": { "type": "string" } },
+                "required": ["id", "name"],
+                "additionalProperties": false
+              },
+              "name": { "type": "string" },
+              "identifierType": { "type": "string", "enum": ["EMAIL", "USERNAME", "ACCOUNT_ID"] },
+              "reportShape": { "type": "string", "enum": ["AGGREGATE", "EVENT"] },
+              "template": {
+                "type": "object",
+                "properties": {
+                  "columns": {
+                    "type": "object",
+                    "properties": {
+                      "identifier": { "type": "string", "minLength": 1, "maxLength": 120 },
+                      "activeDates": { "type": "string", "minLength": 1, "maxLength": 120 },
+                      "lastActivityDate": { "type": "string", "minLength": 1, "maxLength": 120 },
+                      "date": { "type": "string", "minLength": 1, "maxLength": 120 },
+                      "eventType": { "type": "string", "minLength": 1, "maxLength": 120 }
+                    },
+                    "required": ["identifier"],
+                    "additionalProperties": false
+                  },
+                  "eventClasses": {
+                    "default": {},
+                    "type": "object",
+                    "additionalProperties": { "type": "string", "enum": ["VALUE", "PASSIVE", "AUTH_ONLY", "IGNORED"] }
+                  }
+                },
+                "required": ["columns"],
+                "additionalProperties": false
+              },
+              "timeZone": { "type": "string" },
+              "activityDefinition": { "type": "string" },
+              "definitionStrictness": { "type": "string", "enum": ["STRICT", "LOOSE"] },
+              "evidenceDirection": { "type": "string", "enum": ["POSITIVE_ONLY", "POSITIVE_AND_NEGATIVE"] },
+              "capabilities": {
+                "type": "object",
+                "properties": {
+                  "memberList": { "type": "boolean" },
+                  "lastActivity": { "type": "boolean" },
+                  "eventDetail": { "type": "boolean" },
+                  "maxHistoryDays": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "maximum": 3660,
+                    "default": null,
+                    "nullable": true
+                  }
+                },
+                "required": ["memberList", "lastActivity", "eventDetail"],
+                "additionalProperties": false
+              },
+              "detectableGroups": {
+                "maxItems": 4,
+                "type": "array",
+                "items": { "type": "string", "enum": ["G1", "G2", "G3", "G4"] }
+              },
+              "limitation": { "type": "string", "nullable": true },
+              "canConcludeAbsence": { "type": "boolean" },
+              "createdAt": { "type": "string", "format": "date-time" },
+              "updatedAt": { "type": "string", "format": "date-time" }
+            },
+            "required": [
+              "id",
+              "application",
+              "name",
+              "identifierType",
+              "reportShape",
+              "template",
+              "timeZone",
+              "activityDefinition",
+              "definitionStrictness",
+              "evidenceDirection",
+              "capabilities",
+              "detectableGroups",
+              "limitation",
+              "canConcludeAbsence",
+              "createdAt",
+              "updatedAt"
+            ],
+            "additionalProperties": false,
+            "nullable": true
+          }
+        },
+        "required": ["success", "message", "data"],
+        "additionalProperties": false
+      },
+      "UsageSourcePageResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "enum": [true] },
+          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "items": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": { "type": "string", "format": "uuid" },
+                    "application": {
+                      "type": "object",
+                      "properties": { "id": { "type": "string", "format": "uuid" }, "name": { "type": "string" } },
+                      "required": ["id", "name"],
+                      "additionalProperties": false
+                    },
+                    "name": { "type": "string" },
+                    "identifierType": { "type": "string", "enum": ["EMAIL", "USERNAME", "ACCOUNT_ID"] },
+                    "reportShape": { "type": "string", "enum": ["AGGREGATE", "EVENT"] },
+                    "timeZone": { "type": "string" },
+                    "activityDefinition": { "type": "string" },
+                    "definitionStrictness": { "type": "string", "enum": ["STRICT", "LOOSE"] },
+                    "evidenceDirection": { "type": "string", "enum": ["POSITIVE_ONLY", "POSITIVE_AND_NEGATIVE"] },
+                    "capabilities": {
+                      "type": "object",
+                      "properties": {
+                        "memberList": { "type": "boolean" },
+                        "lastActivity": { "type": "boolean" },
+                        "eventDetail": { "type": "boolean" },
+                        "maxHistoryDays": {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 3660,
+                          "default": null,
+                          "nullable": true
+                        }
+                      },
+                      "required": ["memberList", "lastActivity", "eventDetail"],
+                      "additionalProperties": false
+                    },
+                    "detectableGroups": {
+                      "maxItems": 4,
+                      "type": "array",
+                      "items": { "type": "string", "enum": ["G1", "G2", "G3", "G4"] }
+                    },
+                    "limitation": { "type": "string", "nullable": true },
+                    "canConcludeAbsence": { "type": "boolean" },
+                    "createdAt": { "type": "string", "format": "date-time" },
+                    "updatedAt": { "type": "string", "format": "date-time" }
+                  },
+                  "required": [
+                    "id",
+                    "application",
+                    "name",
+                    "identifierType",
+                    "reportShape",
+                    "timeZone",
+                    "activityDefinition",
+                    "definitionStrictness",
+                    "evidenceDirection",
+                    "capabilities",
+                    "detectableGroups",
+                    "limitation",
+                    "canConcludeAbsence",
+                    "createdAt",
+                    "updatedAt"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "pagination": {
+                "type": "object",
+                "properties": {
+                  "page": { "type": "integer", "exclusiveMinimum": true, "maximum": 9007199254740991, "minimum": 0 },
+                  "pageSize": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "maximum": 9007199254740991,
+                    "minimum": 0
+                  },
+                  "totalItems": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                  "totalPages": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+                },
+                "required": ["page", "pageSize", "totalItems", "totalPages"],
+                "additionalProperties": false
+              }
+            },
+            "required": ["items", "pagination"],
+            "additionalProperties": false,
+            "nullable": true
+          }
+        },
+        "required": ["success", "message", "data"],
+        "additionalProperties": false
+      },
+      "UsageSourceUpdateBodyDto": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string", "minLength": 1, "maxLength": 120 },
+          "identifierType": { "type": "string", "enum": ["EMAIL", "USERNAME", "ACCOUNT_ID"] },
+          "reportShape": { "type": "string", "enum": ["AGGREGATE", "EVENT"] },
+          "template": {
+            "type": "object",
+            "properties": {
+              "columns": {
+                "type": "object",
+                "properties": {
+                  "identifier": { "type": "string", "minLength": 1, "maxLength": 120 },
+                  "activeDates": { "type": "string", "minLength": 1, "maxLength": 120 },
+                  "lastActivityDate": { "type": "string", "minLength": 1, "maxLength": 120 },
+                  "date": { "type": "string", "minLength": 1, "maxLength": 120 },
+                  "eventType": { "type": "string", "minLength": 1, "maxLength": 120 }
+                },
+                "required": ["identifier"],
+                "additionalProperties": false
+              },
+              "eventClasses": {
+                "default": {},
+                "type": "object",
+                "additionalProperties": { "type": "string", "enum": ["VALUE", "PASSIVE", "AUTH_ONLY", "IGNORED"] }
+              }
+            },
+            "required": ["columns"],
+            "additionalProperties": false
+          },
+          "timeZone": { "type": "string", "minLength": 1, "maxLength": 64 },
+          "activityDefinition": { "type": "string", "minLength": 3, "maxLength": 500 },
+          "definitionStrictness": { "type": "string", "enum": ["STRICT", "LOOSE"] },
+          "evidenceDirection": { "type": "string", "enum": ["POSITIVE_ONLY", "POSITIVE_AND_NEGATIVE"] },
+          "capabilities": {
+            "type": "object",
+            "properties": {
+              "memberList": { "type": "boolean" },
+              "lastActivity": { "type": "boolean" },
+              "eventDetail": { "type": "boolean" },
+              "maxHistoryDays": { "type": "integer", "minimum": 1, "maximum": 3660, "default": null, "nullable": true }
+            },
+            "required": ["memberList", "lastActivity", "eventDetail"],
+            "additionalProperties": false
+          }
+        },
+        "additionalProperties": false
+      },
+      "UsageImportResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "enum": [true] },
+          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string", "format": "uuid" },
+              "sourceId": { "type": "string", "format": "uuid" },
+              "format": { "type": "string", "enum": ["JSON", "CSV"] },
+              "status": { "type": "string", "enum": ["PREVIEW", "COMPLETED", "CANCELLED"] },
+              "previewVersion": {
+                "type": "integer",
+                "exclusiveMinimum": true,
+                "maximum": 9007199254740991,
+                "minimum": 0
+              },
+              "summary": {
+                "type": "object",
+                "properties": {
+                  "window": {
+                    "type": "object",
+                    "properties": {
+                      "from": { "type": "string" },
+                      "to": { "type": "string" },
+                      "basis": { "type": "string", "enum": ["DECLARED", "DERIVED"] }
+                    },
+                    "required": ["from", "to", "basis"],
+                    "additionalProperties": false
+                  },
+                  "totalRows": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                  "matched": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                  "unmatched": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                  "ambiguous": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                  "notAPerson": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                  "invalid": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                  "byCode": {
+                    "type": "object",
+                    "additionalProperties": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+                  },
+                  "distinctIdentifiers": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                  "affectedSeats": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                  "detectableGroups": {
+                    "maxItems": 4,
+                    "type": "array",
+                    "items": { "type": "string", "enum": ["G1", "G2", "G3", "G4"] }
+                  },
+                  "activityDefinition": { "type": "string" },
+                  "warnings": { "maxItems": 10, "type": "array", "items": { "type": "string" } },
+                  "unmappedEventTypes": { "maxItems": 200, "type": "array", "items": { "type": "string" } },
+                  "trackingNoticeRequired": { "type": "boolean" },
+                  "recordedOn": { "type": "string" }
+                },
+                "required": [
+                  "window",
+                  "totalRows",
+                  "matched",
+                  "unmatched",
+                  "ambiguous",
+                  "notAPerson",
+                  "invalid",
+                  "byCode",
+                  "distinctIdentifiers",
+                  "affectedSeats",
+                  "detectableGroups",
+                  "activityDefinition",
+                  "warnings",
+                  "unmappedEventTypes",
+                  "trackingNoticeRequired",
+                  "recordedOn"
+                ],
+                "additionalProperties": false
+              },
+              "result": {
+                "type": "object",
+                "properties": {
+                  "daysWritten": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                  "matched": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                  "unmatched": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                  "ambiguous": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                  "notAPerson": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                  "invalid": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                  "mappingsCreated": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                  "daysSuperseded": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                  "findingsOpened": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                  "findingsClosed": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                  "noticesSent": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+                },
+                "required": [
+                  "daysWritten",
+                  "matched",
+                  "unmatched",
+                  "ambiguous",
+                  "notAPerson",
+                  "invalid",
+                  "mappingsCreated",
+                  "daysSuperseded",
+                  "findingsOpened",
+                  "findingsClosed",
+                  "noticesSent"
+                ],
+                "additionalProperties": false,
+                "nullable": true
+              },
+              "noticeMode": {
+                "type": "string",
+                "enum": ["CONFIRMED_DELIVERED", "SYSTEM_SENT", null],
+                "nullable": true
+              },
+              "createdAt": { "type": "string", "format": "date-time" },
+              "expiresAt": { "type": "string", "format": "date-time" },
+              "confirmedAt": { "type": "string", "format": "date-time", "nullable": true },
+              "cancelledAt": { "type": "string", "format": "date-time", "nullable": true }
+            },
+            "required": [
+              "id",
+              "sourceId",
+              "format",
+              "status",
+              "previewVersion",
+              "summary",
+              "result",
+              "noticeMode",
+              "createdAt",
+              "expiresAt",
+              "confirmedAt",
+              "cancelledAt"
+            ],
+            "additionalProperties": false,
+            "nullable": true
+          }
+        },
+        "required": ["success", "message", "data"],
+        "additionalProperties": false
+      },
+      "UsageImportRowsResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "enum": [true] },
+          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "items": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "lineNumber": {
+                      "type": "integer",
+                      "exclusiveMinimum": true,
+                      "maximum": 9007199254740991,
+                      "minimum": 0
+                    },
+                    "identifier": { "type": "string" },
+                    "days": {
+                      "maxItems": 400,
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "date": { "type": "string" },
+                          "eventClass": {
+                            "type": "string",
+                            "enum": ["VALUE", "PASSIVE", "AUTH_ONLY", null],
+                            "nullable": true
+                          },
+                          "eventType": { "type": "string" },
+                          "basis": { "type": "string", "enum": ["ACTIVE_DATE", "LAST_ACTIVITY"] }
+                        },
+                        "required": ["date", "eventClass", "basis"],
+                        "additionalProperties": false
+                      }
+                    },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["MATCHED", "UNMATCHED", "AMBIGUOUS", "NOT_A_PERSON", "INVALID"]
+                    },
+                    "matchMethod": {
+                      "type": "string",
+                      "enum": ["EXACT_EMAIL", "ACCOUNT_IDENTIFIER", "ALIAS_RULE", "MANUAL", null],
+                      "nullable": true
+                    },
+                    "errors": {
+                      "maxItems": 20,
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": { "code": { "type": "string" }, "detail": { "type": "string" } },
+                        "required": ["code"],
+                        "additionalProperties": false
+                      }
+                    }
+                  },
+                  "required": ["lineNumber", "identifier", "days", "outcome", "matchMethod", "errors"],
                   "additionalProperties": false
                 }
               },

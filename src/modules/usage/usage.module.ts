@@ -3,6 +3,7 @@ import { DatabaseModule } from '../../infrastructure/database/database.module';
 import { AuditModule } from '../audit/audit.module';
 import { CatalogModule } from '../catalog/catalog.module';
 import { DevicesModule } from '../devices/devices.module';
+import { LicensingModule } from '../licensing/licensing.module';
 import { OrganizationModule } from '../organization/organization.module';
 import { AiUsageController } from './ai-usage/ai-usage.controller';
 import { AiUsageBatchService } from './ai-usage/ai-usage-batch.service';
@@ -17,6 +18,18 @@ import { AllowlistSessionListener } from './allowlist/allowlist-session.listener
 import { IntakeRejectionController } from './intake-gate/intake-rejection.controller';
 import { IntakeRejectionQueryService } from './intake-gate/intake-rejection-query.service';
 import { IntakeRejectionRepo } from './intake-gate/intake-rejection.repo';
+import { IdentityRepo } from './identity/identity.repo';
+import { NoAssignmentFindingRepo } from './identity/no-assignment-finding.repo';
+import { VendorImportController } from './vendor-import/vendor-import.controller';
+import { VendorImportQueryService } from './vendor-import/vendor-import-query.service';
+import { VendorImportRepo } from './vendor-import/vendor-import.repo';
+import { VendorImportService } from './vendor-import/vendor-import.service';
+import { VendorImportMatchService } from './vendor-import/match/vendor-import-match.service';
+import { VendorImportPreviewService } from './vendor-import/preview/vendor-import-preview.service';
+import { VendorSourceController } from './vendor-source/vendor-source.controller';
+import { VendorSourceQueryService } from './vendor-source/vendor-source-query.service';
+import { VendorSourceRepo } from './vendor-source/vendor-source.repo';
+import { VendorSourceService } from './vendor-source/vendor-source.service';
 import { ToolStatusController } from './tool-status/tool-status.controller';
 import { ToolStatusQueryService } from './tool-status/tool-status-query.service';
 import { ToolStatusRepo } from './tool-status/tool-status.repo';
@@ -28,8 +41,15 @@ import { ToolStatusSnapshotService } from './tool-status/tool-status-snapshot.se
  * shows and answers HTTP.
  */
 @Module({
-  imports: [DatabaseModule, AuditModule, OrganizationModule, CatalogModule, DevicesModule],
-  controllers: [AllowlistController, AiUsageController, ToolStatusController, IntakeRejectionController],
+  imports: [DatabaseModule, AuditModule, OrganizationModule, CatalogModule, DevicesModule, LicensingModule],
+  controllers: [
+    AllowlistController,
+    AiUsageController,
+    ToolStatusController,
+    IntakeRejectionController,
+    VendorSourceController,
+    VendorImportController,
+  ],
   providers: [
     AllowlistRepo,
     AllowlistFactsService,
@@ -44,6 +64,16 @@ import { ToolStatusSnapshotService } from './tool-status/tool-status-snapshot.se
     ToolStatusRepo,
     ToolStatusSnapshotService,
     ToolStatusQueryService,
+    VendorSourceRepo,
+    VendorSourceService,
+    VendorSourceQueryService,
+    IdentityRepo,
+    NoAssignmentFindingRepo,
+    VendorImportRepo,
+    VendorImportService,
+    VendorImportQueryService,
+    VendorImportMatchService,
+    VendorImportPreviewService,
   ],
 })
 export class UsageModule {}

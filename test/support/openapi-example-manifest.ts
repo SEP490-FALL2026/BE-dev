@@ -22,6 +22,7 @@ import { ROUTE_ERROR_CODES_CATALOG } from './openapi-example-route-codes-catalog
 import { ROUTE_ERROR_CODES_DATA_IMPORT } from './openapi-example-route-codes-data-import';
 import { SUCCESS_MESSAGES_DEVICES } from './openapi-example-messages-devices';
 import { SUCCESS_MESSAGES_OPTIMIZATION } from './openapi-example-messages-optimization';
+import { SUCCESS_MESSAGES_USAGE } from './openapi-example-messages-usage';
 import { ROUTE_ERROR_CODES_DEVICES } from './openapi-example-route-codes-devices';
 import { ROUTE_ERROR_CODES_FINANCE } from './openapi-example-route-codes-finance';
 import { ROUTE_ERROR_CODES_HEALTH } from './openapi-example-route-codes-health';
@@ -33,12 +34,14 @@ import { ROUTE_ERROR_CODES_OPTIMIZATION } from './openapi-example-route-codes-op
 import { ROUTE_ERROR_CODES_PERSONNEL } from './openapi-example-route-codes-personnel';
 import { ROUTE_ERROR_CODES_REQUESTS } from './openapi-example-route-codes-requests';
 import { ROUTE_ERROR_CODES_REQUESTS_SPEND } from './openapi-example-route-codes-requests-spend';
+import { ROUTE_ERROR_CODES_USAGE } from './openapi-example-route-codes-usage';
 
 export type RouteErrorStatus = '400' | '401' | '403' | '404' | '409' | '413' | '422' | '429' | '500' | '503';
 
 export const SUCCESS_MESSAGES: Readonly<Record<string, string>> = {
   ...SUCCESS_MESSAGES_DEVICES,
   ...SUCCESS_MESSAGES_OPTIMIZATION,
+  ...SUCCESS_MESSAGES_USAGE,
   accessRequestAssessmentComplete: 'ACCESS_REQUEST.ASSESSMENT_COMPLETED',
   accessRequestAssessmentGet: 'ACCESS_REQUEST.ASSESSMENT_FETCHED',
   accessRequestAssessmentReject: 'ACCESS_REQUEST.ASSESSMENT_REJECTED',
@@ -390,6 +393,7 @@ const PARTS = [
   ROUTE_ERROR_CODES_PERSONNEL,
   ROUTE_ERROR_CODES_REQUESTS,
   ROUTE_ERROR_CODES_REQUESTS_SPEND,
+  ROUTE_ERROR_CODES_USAGE,
 ];
 export const ROUTE_ERROR_CODE_PARTS: readonly string[][] = PARTS.map((part) => Object.keys(part));
 export const ROUTE_ERROR_CODES: Readonly<Record<string, Partial<Record<RouteErrorStatus, readonly string[]>>>> =

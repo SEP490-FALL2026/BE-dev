@@ -377,6 +377,32 @@ export class EmployeeRepo {
     return rows.map(toEmployeeRecord);
   }
 
+  /** The people whose normalized work email is one of these, those who left included: a vendor report names people who have left. */
+  async findEmployeesByNormalizedEmails(
+    normalizedEmails: readonly string[],
+    tx?: DbTx,
+  ): Promise<
+    {
+      id: string;
+      employeeCode: string;
+      workEmail: string;
+      normalizedWorkEmail: string;
+      status: EmployeeRecord['status'];
+    }[]
+  > {
+    if (normalizedEmails.length === 0) return [];
+    const rows = await (tx ?? this.prisma).employee.findMany({
+      where: { normalizedWorkEmail: { in: [...normalizedEmails] } },
+      select: { id: true, employeeCode: true, workEmail: true, normalizedWorkEmail: true, status: true },
+    });
+
+    return rows.flatMap((row) =>
+      row.workEmail !== null && row.normalizedWorkEmail !== null
+        ? [{ ...row, workEmail: row.workEmail, normalizedWorkEmail: row.normalizedWorkEmail }]
+        : [],
+    );
+  }
+
   /** The distinct, lower-case domains of the work emails of everyone the organization has ever employed. */
   async workEmailDomains(tx?: DbTx): Promise<string[]> {
     const rows = await (tx ?? this.prisma).$queryRaw<{ domain: string }[]>`

@@ -236,6 +236,14 @@ export class OrganizationReadApi {
     return this.employees.findManyByCodes(employeeCodes, tx);
   }
 
+  /**
+   * The people whose normalized work email is one of these, those who have left included (a vendor report still names them): only the code and
+   * the email, never the name (`US-08-04` AC-4). An email nobody has is simply absent.
+   */
+  getEmployeesByWorkEmails(normalizedEmails: readonly string[], tx?: DbTx) {
+    return this.employees.findManyByNormalizedEmails(normalizedEmails, tx);
+  }
+
   /** The domains of the work emails of its people: all the organization can tell of its domains (`OQ-A-22`). */
   getCompanyEmailDomains(tx?: DbTx): Promise<string[]> {
     return this.employees.workEmailDomains(tx);

@@ -87,7 +87,7 @@ flowchart BT
   licensing -->|8| identity_access
   licensing -->|7| notifications
   licensing -->|6| operating_parameters
-  licensing -->|54| organization
+  licensing -->|55| organization
   onboarding -->|2| catalog
   onboarding -->|2| data_import
   onboarding -->|2| identity_access
@@ -124,10 +124,11 @@ flowchart BT
   requests -->|7| notifications
   requests -->|9| operating_parameters
   requests -->|76| organization
-  usage -->|3| audit
-  usage -->|3| catalog
+  usage -->|5| audit
+  usage -->|6| catalog
   usage -->|14| devices
-  usage -->|3| organization
+  usage -->|5| licensing
+  usage -->|6| organization
 ```
 
-88 module edges.
+89 module edges.

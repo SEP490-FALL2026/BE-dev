@@ -20,6 +20,7 @@ import { ServiceAccountDutySweeper } from './assignment/service-account-duty/ser
 import { ServiceAccountSpendingApproverGrantCheck } from './assignment/service-account-duty/spending-approver-grant.listener';
 import { AssignmentDepartmentRepo } from './assignment/assignment-department.repo';
 import { AssignmentRepo } from './assignment/assignment.repo';
+import { UsageFactsRepo } from './assignment/usage-facts.repo';
 import { RuleSeatsFactsService } from './assignment/rule-seats-facts.service';
 import { RuleSeatsRepo } from './assignment/rule-seats.repo';
 import { SharedPoolCapacityRepo } from './shared-pool/shared-pool-capacity.repo';
@@ -77,6 +78,7 @@ import { LicensingApi } from './public/licensing.api';
 import { LicensingDashboardApi } from './public/licensing-dashboard.api';
 import { LicensingHandoverApi } from './public/licensing-handover.api';
 import { LicensingGhostSeatApi } from './public/licensing-ghost-seat.api';
+import { LicensingUsageApi } from './public/licensing-usage.api';
 import { LicensingOpenGrantsApi } from './public/licensing-open-grants.api';
 import { LicensingRenewalApi } from './public/licensing-renewal.api';
 import { LicensingSeatBaselineApi } from './public/licensing-seat-baseline.api';
@@ -288,6 +290,8 @@ import { SubscriptionRenewalsController } from './subscription-renewal/subscript
     LicensingDashboardApi,
     LicensingHandoverApi,
     LicensingGhostSeatApi,
+    LicensingUsageApi,
+    UsageFactsRepo,
     RuleSeatsFactsService,
     RuleSeatsRepo,
     SharedPoolCapacityRepo,
@@ -304,6 +308,7 @@ import { SubscriptionRenewalsController } from './subscription-renewal/subscript
     LicensingDashboardApi,
     LicensingHandoverApi,
     LicensingGhostSeatApi,
+    LicensingUsageApi,
     LicensingOpenGrantsApi,
     LicensingRenewalApi,
     LicensingSeatBaselineApi,

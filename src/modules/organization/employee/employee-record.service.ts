@@ -126,6 +126,10 @@ export class EmployeeRecordService {
     return this.repo.findEmployeesByCodes(employeeCodes, tx);
   }
 
+  findManyByNormalizedEmails(normalizedEmails: readonly string[], tx?: DbTx) {
+    return this.repo.findEmployeesByNormalizedEmails(normalizedEmails, tx);
+  }
+
   workEmailDomains(tx?: DbTx): Promise<string[]> {
     return this.repo.workEmailDomains(tx);
   }
