@@ -122,6 +122,16 @@ export class RequestHarness extends ProvisioningHarness {
         RETURN NEW;
       END;
       $$ LANGUAGE plpgsql`);
+
+    // The function belongs to whoever owns the tables, as every object of the schema does: a reconcile of the database roles run by a
+    // suite on the same database (`_serial/database-runtime-role-*`) finds no object owned by the role of the test.
+    await this.ctx.sql.query(`DO $$
+      DECLARE owner text := (SELECT pg_get_userbyid(relowner) FROM pg_class WHERE oid = to_regclass('access_requests'));
+      BEGIN
+        IF owner IS NOT NULL AND owner <> current_user THEN
+          EXECUTE format('ALTER FUNCTION test_harness_exempt_from_request_limits() OWNER TO %I', owner);
+        END IF;
+      END $$`);
     for (const table of ['access_requests', 'access_request_lines']) {
       await this.ctx.sql.query(`CREATE TRIGGER test_harness_exempt_from_request_limits BEFORE INSERT ON ${table}
         FOR EACH ROW EXECUTE FUNCTION test_harness_exempt_from_request_limits()`);

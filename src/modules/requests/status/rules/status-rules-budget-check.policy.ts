@@ -13,6 +13,18 @@ const reasonsOf = (event: StatusEvent): string[] =>
 const BUDGET_CHECKED = (event: StatusEvent, facts: StatusFacts): NotificationIntent[] => {
   const request = requestOf(facts);
   const outcome = text(event.after, 'outcome');
+  // A one-step request opens its spend step when it is sent (BR-MF1-02): the spending approver who holds it is told, as the holder of a
+  // need step is when a request is sent through a head.
+  if (text(event.after, 'routingMode') === 'ONE_STEP' && text(event.after, 'opened') === 'SPEND_APPROVAL') {
+    const holder = text(event.after, 'spendAssigneeEmployeeId');
+    return [
+      {
+        recipients: holder !== request.requesterEmployeeId ? [holder] : [],
+        code: 'STEP_ASSIGNED',
+        params: { requestId: request.id, stepKind: 'SPEND_APPROVAL', cause: 'SUBMITTED' },
+      },
+    ];
+  }
   if (outcome === 'USES_RESERVE' && text(event.after, 'routingMode') === 'ONE_STEP') return [];
   if (outcome === 'USES_RESERVE') {
     // Only when the request waits for the head: not when it went on to the approver (a one-step request, or the head just confirmed it).
