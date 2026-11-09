@@ -1,4 +1,5 @@
 import type { Department, Person } from '../../support/request-harness';
+import { declareSubscription } from '../../support/builders/catalog.builder';
 import { SpendHarness } from '../../support/spend-harness';
 
 /**
@@ -46,7 +47,16 @@ describe('what a request is priced by (integration, real PostgreSQL)', () => {
     // Rewritten from "by the subscription its own department owns": the pool is the plan's, so the price is too (QĐ-103d).
     const cheap = await department();
     const dear = await department();
-    await setUnitPrice(dear.department.id, pricedPlan, 2_500_000);
+    // A second subscription of the plan, dearer (allowed while the seat baseline is open): the pool is the plan's, no department owns a copy.
+    await declareSubscription(h.ctx, h.it1.accessToken, {
+      ownerDepartmentId: h.seed.departmentId,
+      planId: pricedPlan,
+      kind: 'TERM',
+      purchasedQuantity: 5,
+      unitPrice: { amount: '2500000', currency: 'VND' },
+      billingCycle: 'MONTHLY',
+      startDate: '2026-01-05',
+    });
 
     const first = await h.sent(cheap.member, pricedPlan, { termMonths: 2 });
     const second = await h.sent(dear.member, pricedPlan, { termMonths: 2 });

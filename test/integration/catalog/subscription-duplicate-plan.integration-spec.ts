@@ -64,11 +64,22 @@ describe('a second live subscription of a K2 or K4 plan (integration, real Postg
         .set(h.as(h.it1))
         .send({ isPrimaryForPlan: true })
         .expect(200);
-      const next = idOf(await post(body(planId, { startDate: '2026-02-05' })).expect(201));
-      await h.ctx.sql.query(`UPDATE subscriptions SET status = 'DRAFT', renewed_from_id = $2 WHERE id = $1`, [
-        next,
-        previous,
-      ]);
+      // The draft renewal period of the first (the vendor confirmed it with data still missing): written by SQL, since only a renewal may point back.
+      const next = (
+        await h.ctx.sql.query<{ id: string }>(
+          `INSERT INTO subscriptions (id, organization_id, plan_id, owner_department_id, kind, status, purchased_quantity, unit_price_minor,
+             unit_price_currency, price_recorded_on, price_rate, price_rate_date, price_rate_source, price_reporting_minor,
+             price_reporting_currency, billing_cycle, commitment_term_months, start_date, responsible_it_admin_employee_id, auto_renew,
+             allows_mid_term_reduction, renewed_from_id, updated_at)
+           SELECT gen_random_uuid(), organization_id, plan_id, owner_department_id, kind, 'DRAFT', purchased_quantity, unit_price_minor,
+                  unit_price_currency, price_recorded_on, price_rate, price_rate_date, price_rate_source, price_reporting_minor,
+                  price_reporting_currency, billing_cycle, commitment_term_months, '2026-02-05', responsible_it_admin_employee_id, auto_renew,
+                  allows_mid_term_reduction, id, now()
+             FROM subscriptions WHERE id = $1
+           RETURNING id`,
+          [previous],
+        )
+      ).rows[0].id;
       const flags = async () =>
         (
           await h.ctx.sql.query<{ id: string; is_primary_for_plan: boolean }>(
