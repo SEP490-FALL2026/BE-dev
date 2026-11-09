@@ -10,6 +10,7 @@ import type { FetchLike } from '../../../src/cli/seed/demo-api-client';
 import { SHARED_DEMO_V4 } from '../../../src/cli/seed/fixture/shared-demo-v4';
 import { DemoAccountsApi } from '../../../src/modules/installation/public/demo-accounts.api';
 import { createHttpTestApp, HttpTestApp, SEED_PASSWORD } from '../../support/http-test-app';
+import { SHARED_DEMO_V4_REQUEST_STATES } from '../../support/seed-demo-v4-states';
 
 /**
  * `pnpm ops:seed` against a real installation: the whole application listens on a disposable PostgreSQL, the
@@ -128,7 +129,7 @@ describe('ops:seed (integration, real API and PostgreSQL)', () => {
 
     expect(report.exitCode).toBe(0);
     expect(report.steps.find((step) => step.key === 'org.departments')).toMatchObject({ status: 'planned' });
-    expect(report.steps.find((step) => step.key === 'requests.R1')).toMatchObject({ status: 'waiting' });
+    expect(report.steps.find((step) => step.key === 'requests.R01')).toMatchObject({ status: 'waiting' });
     expect(await businessRows()).toEqual(before);
   }, 120000);
 
@@ -167,60 +168,32 @@ describe('ops:seed (integration, real API and PostgreSQL)', () => {
     const resumed = reportOf(await run('apply'));
     expect(resumed.steps.filter((step) => step.status !== 'done' && step.status !== 'present')).toEqual([]);
     expect(resumed.exitCode).toBe(0);
-    expect(await requestStates()).toEqual({
-      R1: 'COMPLETED',
-      R2: 'AWAITING_SPEND_DECISION',
-      R3: 'PENDING',
-      R4: 'REJECTED',
-      R5: 'WITHDRAWN',
-      R6: 'AWAITING_EXECUTION',
-      R7: 'AWAITING_SPEND_SUBMISSION',
-      R8: 'AWAITING_IT_ASSESSMENT',
-      R9: 'AWAITING_SPEND_SUBMISSION',
-      R10: 'COMPLETED',
-      R11: 'COMPLETED',
-    });
-    // Finance recorded one invoice on each of three commitments, each in another match (HD1 part of the price, HD2 with tax, HD3 over).
-    const recorded = await ctx.sql.query<{
-      number: string;
-      match: string;
-      state: string;
-      deductible: string;
-      nonDeductible: string;
-      cost: string;
-      net: string;
-    }>(
-      `SELECT i.number, i.match_result::text AS match, c.state::text AS state, i.deductible_tax_minor::text AS deductible,
-              i.non_deductible_tax_minor::text AS "nonDeductible", i.actual_cost_minor::text AS cost, i.net_minor::text AS net
-         FROM invoices i JOIN budget_commitments c ON c.id = i.commitment_id ORDER BY i.number`,
+    expect(await requestStates()).toEqual(SHARED_DEMO_V4_REQUEST_STATES);
+    // Shared demo v4 records no invoice (no purchase-invoice route in this wave); every department with a Cost Center holds the approved
+    // budget of this year, and of next year Marketing's version waits for the spending approver and Sales' was sent back for changes.
+    const year = new Date().getFullYear();
+    const versions = await ctx.sql.query<{ code: string; year: number; state: string }>(
+      `SELECT c.code, v.year, v.state::text AS state FROM budget_versions v JOIN cost_centers c ON c.id = v.cost_center_id
+        ORDER BY v.year, c.code`,
     );
-    expect(recorded.rows.map((row) => [row.number, row.match, row.state])).toEqual([
-      ['SV-HD1', 'MATCHED', 'HELD'],
-      ['SV-HD2', 'TAX_ONLY', 'HELD'],
-      ['SV-HD3', 'PRICE_QUANTITY_EXCEPTION', 'EXPENSED'],
+    const withUnit = SHARED_DEMO_V4.departments
+      .flatMap((department) => (department.costCenter ? [department.costCenter.code] : []))
+      .sort();
+    expect(versions.rows).toEqual([
+      ...withUnit.map((code) => ({ code, year, state: 'APPROVED' })),
+      { code: 'CC-MKT', year: year + 1, state: 'SENT' },
+      { code: 'CC-SAL', year: year + 1, state: 'CHANGES_REQUESTED' },
     ]);
-    const taxed = recorded.rows[1];
-    expect(Number(taxed.deductible)).toBeGreaterThan(0);
-    expect(Number(taxed.nonDeductible)).toBeGreaterThan(0);
-    // The cost is the price and the tax that cannot be deducted; the deductible tax is not part of it.
-    expect(Number(taxed.cost)).toBe(Number(taxed.net) + Number(taxed.nonDeductible));
-    // The proposal of Information Technology for next year waits for Finance, with no version made from it.
-    const proposals = await ctx.sql.query<{ code: string; state: string; year: number }>(
-      `SELECT c.code, p.state::text AS state, p.year FROM budget_proposals p JOIN cost_centers c ON c.id = p.cost_center_id
-        WHERE c.code = 'CC-ITO'`,
+    // Engineering and Information Technology proposed next year and wait for Finance, with no version made from it.
+    const proposals = await ctx.sql.query<{ code: string; state: string }>(
+      `SELECT c.code, p.state::text AS state FROM budget_proposals p JOIN cost_centers c ON c.id = p.cost_center_id
+        WHERE p.year = $1 AND c.code IN ('CC-ENG', 'CC-ITO') ORDER BY c.code`,
+      [year + 1],
     );
-    expect(proposals.rows).toEqual([{ code: 'CC-ITO', state: 'SUBMITTED', year: new Date().getFullYear() + 1 }]);
-    // Three departments hold an approved budget of this year and of the next one (ENG, MKT, SAL); Design has none, for R9.
-    const approved = await ctx.sql.query<{ code: string }>(
-      `SELECT c.code FROM budget_versions v JOIN cost_centers c ON c.id = v.cost_center_id
-        WHERE v.state = 'APPROVED' AND c.code LIKE 'CC-%' ORDER BY c.code, v.year`,
-    );
-    // Every budget of both years is the approved, current one of its Cost Center and year (INV-21).
-    expect(
-      (await ctx.sql.query<{ n: number }>("SELECT count(*)::int AS n FROM budget_versions WHERE state <> 'APPROVED'"))
-        .rows[0].n,
-    ).toBe(0);
-    expect(approved.rows.map((row) => row.code)).toEqual(['CC-ENG', 'CC-ENG', 'CC-MKT', 'CC-MKT', 'CC-SAL', 'CC-SAL']);
+    expect(proposals.rows).toEqual([
+      { code: 'CC-ENG', state: 'SUBMITTED' },
+      { code: 'CC-ITO', state: 'SUBMITTED' },
+    ]);
     // Heads hold MANAGER as a direct grant and the spending approver holds SPENDING_APPROVER, nothing derived (QĐ-93a).
     const grants = await ctx.sql.query<{ code: string; role: string }>(
       `SELECT e.employee_code AS code, g.role::text AS role FROM role_grants g
@@ -228,16 +201,14 @@ describe('ops:seed (integration, real API and PostgreSQL)', () => {
         WHERE g.revoked_at IS NULL AND g.role IN ('MANAGER', 'SPENDING_APPROVER') AND e.employee_code LIKE 'NV-%'
         ORDER BY e.employee_code, g.role`,
     );
-    expect(grants.rows).toEqual([
-      { code: 'NV-CEO', role: 'SPENDING_APPROVER' },
-      { code: 'NV-DEP', role: 'MANAGER' },
-      { code: 'NV-DESH', role: 'MANAGER' },
-      { code: 'NV-ENGH', role: 'MANAGER' },
-      { code: 'NV-FINH', role: 'MANAGER' },
-      { code: 'NV-ITOH', role: 'MANAGER' },
-      { code: 'NV-MKTH', role: 'MANAGER' },
-      { code: 'NV-SALH', role: 'MANAGER' },
-    ]);
+    expect(grants.rows).toEqual(
+      [
+        { code: 'NV-CEO', role: 'SPENDING_APPROVER' },
+        ...SHARED_DEMO_V4.departments.flatMap((department) =>
+          department.head ? [{ code: department.head, role: 'MANAGER' }] : [],
+        ),
+      ].sort((a, b) => a.code.localeCompare(b.code)),
+    );
     const invalid = await ctx.sql.query(
       `SELECT u.id FROM app_users u JOIN employees e ON e.id = u.employee_id
        LEFT JOIN role_grants g ON g.app_user_id = u.id AND g.revoked_at IS NULL
