@@ -105,8 +105,6 @@ import { RevocationViewService } from './provisioning/revocation-view.service';
 import { RevocationRecorder } from './provisioning/revocation-recorder.service';
 import { RevocationTaskFactory } from './provisioning/revocation-task-factory.service';
 import { RevocationService } from './provisioning/revocation.service';
-import { SharedPoolCapacityRepo } from './shared-pool/shared-pool-capacity.repo';
-import { SharedPoolService } from './shared-pool/shared-pool.service';
 import { RevocationWithdrawalService } from './provisioning/revocation-withdrawal/revocation-withdrawal.service';
 import { ProvisioningTaskReasonRepo } from './provisioning/provisioning-task-reason.repo';
 import { SaasIssueCalendar } from './saas-issue/saas-issue-calendar.service';
@@ -212,9 +210,6 @@ import { SubscriptionRenewalsController } from './subscription-renewal/subscript
     RevocationTaskFactory,
     RevocationRecorder,
     RevocationService,
-    // TẠM (nền 95aab022 thiếu wiring, app không boot): SharedPoolService do ProvisioningService cần; nhánh qd103-108-mf145 đã có.
-    SharedPoolCapacityRepo,
-    SharedPoolService,
     RevocationWithdrawalService,
     RevocationCompletionService,
     RevocationLeaverAlert,
