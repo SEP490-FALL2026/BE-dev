@@ -1,7 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { OpenGrantTaskService } from '../provisioning/open-grants/open-grant-task.service';
-import type { OpenGrantTask } from './licensing-open-grants.types';
+import type { BusinessDate } from '../../../core/business-date';
+import type { GrantedSeatOfRequest, OpenGrantTask } from './licensing-open-grants.types';
 
 /**
  * The licensing facade for the grant tasks of a person that are not finished (`US-03-04` AC-24).
@@ -20,5 +21,18 @@ export class LicensingOpenGrantsApi {
     tx?: DbTx,
   ): Promise<{ items: OpenGrantTask[]; total: number }> {
     return this.openGrants.pageOf(employeeId, page, tx);
+  }
+
+  /**
+   * The seats the grants of these requests made that are still held on `onDate`: not failed, not cancelled, not closed by that day and not
+   * expected to end before it (`BR-MF1-09e`). A request for a group has one for each person granted; a request nobody granted has none.
+   * One statement, whatever the number of requests; nothing here changes a seat.
+   */
+  listHeldSeatsOfRequests(
+    requestIds: readonly string[],
+    onDate: BusinessDate,
+    tx?: DbTx,
+  ): Promise<GrantedSeatOfRequest[]> {
+    return this.openGrants.heldSeatsOfRequests(requestIds, onDate, tx);
   }
 }

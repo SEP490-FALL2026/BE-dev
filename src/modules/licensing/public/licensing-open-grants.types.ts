@@ -22,3 +22,16 @@ export interface OpenGrantTask {
   plan: { planId: string; planName: string; applicationId: string; applicationName: string };
   createdAt: Date;
 }
+
+/**
+ * A seat that a request's grant made and that is still held on a day: the person, and when it is expected to end (the day the request named)
+ * and when its period closes (exclusive; null while it is open). What the commitment of 01/01 counts a request's seats from (`BR-MF1-09e`).
+ */
+export interface GrantedSeatOfRequest {
+  requestId: string;
+  assignmentId: string;
+  employeeId: string;
+  planId: string;
+  expectedEndDate: string | null;
+  validUntil: string | null;
+}

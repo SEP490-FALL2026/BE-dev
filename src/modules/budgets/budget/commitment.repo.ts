@@ -138,6 +138,68 @@ export class CommitmentRepo {
     }));
   }
 
+  /** The requests, among these, that hold a commitment for the year already, whatever its state: one request holds one for a year (`INV-16`). */
+  async requestsHoldingYear(tx: DbTx, requestIds: readonly string[], year: number): Promise<Set<string>> {
+    if (requestIds.length === 0) return new Set();
+    const rows = await tx.budgetCommitment.findMany({
+      where: { requestId: { in: [...requestIds] }, year },
+      select: { requestId: true },
+    });
+
+    return new Set(rows.map((row) => row.requestId));
+  }
+
+  /**
+   * Holds the commitment of 01/01 of one request for the year (`FR-5.8`(6)): attached to the approved version of the Cost Center and year when there
+   * is one, waiting for a budget with the reason *no budget* when there is not (`FR-5.8a`, the one exception), never backed by a check. The
+   * lock of the Cost Center and year comes first, as in `hold`, so a version approved at the same moment either attaches it or is read here.
+   */
+  async holdYearStart(
+    tx: DbTx,
+    input: {
+      organizationId: string;
+      requestId: string;
+      costCenterId: string;
+      year: number;
+      amountMinor: bigint;
+      currency: string;
+      seatMonthlyMinor: bigint;
+      now: Date;
+    },
+  ): Promise<HeldCommitment & { costCenterId: string }> {
+    await this.yearLock.lock(tx, input.costCenterId, [input.year]);
+    const current = await tx.budgetVersion.findFirst({
+      where: { costCenterId: input.costCenterId, year: input.year, state: 'APPROVED' },
+      select: { id: true },
+    });
+    const created = await tx.budgetCommitment.create({
+      data: {
+        organizationId: input.organizationId,
+        requestId: input.requestId,
+        costCenterId: input.costCenterId,
+        year: input.year,
+        amountMinor: input.amountMinor,
+        currency: input.currency,
+        state: 'HELD',
+        origin: 'YEAR_START',
+        seatMonthlyMinor: input.seatMonthlyMinor,
+        attachedVersionId: current?.id ?? null,
+        attachedAt: current ? input.now : null,
+        unattachedReason: current ? null : 'NO_BUDGET',
+        snapshotCheckId: null,
+      },
+      select: { id: true },
+    });
+
+    return {
+      id: created.id,
+      year: input.year,
+      amountMinor: input.amountMinor,
+      attachedVersionId: current?.id ?? null,
+      costCenterId: input.costCenterId,
+    };
+  }
+
   /** One commitment with its row locked, so that two releases of it queue. */
   async lockById(
     tx: DbTx,

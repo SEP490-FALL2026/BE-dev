@@ -15,6 +15,8 @@ audit, notifications. Được dùng bởi: requests; gốc `src/app/app.module.
   - `planLine`, `currentLine`, `currentLines` — dòng kế hoạch mà request nêu, đọc từ version hiện hành.
   - `holdForRequest` — request giữ số tiền mỗi năm, trong transaction của quyết định duyệt (US-06-04).
   - `releaseForRequest` — trả phần request còn giữ về ngân sách khi request kết thúc/rút bớt (US-06-06).
+  - `holdYearStart`, `listRequestsHoldingYear` — khoản cam kết ngày 01/01 (`FR-5.8`(6), `QĐ-109a`): job của `requests` giữ một khoản cho mỗi Request
+    có quyền `K1`/`K2` đang chạy hoặc đã duyệt chi chưa cấp; chỉ Request mới có khoản, không có khoản theo Assignment.
   - `requestHoldsCommitment` — request có giữ commitment không, điều kiện để Finance đọc nó (US-06-09 AC-2).
   - `committedByRequests` — số tiền mỗi commitment của một loạt request, một lần đọc (danh sách lô chi của Finance).
 - `public/budgets.types.ts` — input/output của facade (`YearBudgetFacts`, `PlanLineFacts`, `CommitmentHoldInput`…).
@@ -25,7 +27,7 @@ audit, notifications. Được dùng bởi: requests; gốc `src/app/app.module.
 
 - `budget_proposals`, `budget_proposal_lines`, `budget_versions`, `budget_version_lines`,
   `budget_version_line_changes` (còn trong DB, không còn code ghi), `budget_version_decisions`, `budget_version_history`, `budget_commitments`,
-  `budget_commitment_releases`, `invoices`, `budget_attachments` (`prisma/models/budgets.prisma`). Kiểm ngân sách của request
+  `budget_commitment_releases` (`budget_commitments.origin` = `APPROVAL` hoặc `YEAR_START`; `seat_monthly_minor` giá tháng một seat lúc ghi khoản 01/01), `invoices`, `budget_attachments` (`prisma/models/budgets.prisma`). Kiểm ngân sách của request
   (`request_budget_checks`…) thuộc `requests`.
 
 ## Extension point
@@ -120,4 +122,4 @@ vendor, number)`; bảng `invoices` chỉ ghi thêm (trigger + quyền runtime `
   `budget-invoices`, `budget-summary`, `budget-commitment-list`), `test/integration/_serial/database-runtime-role-invoice-write` (vai runtime),
   migration: `test/integration/platform/finance-invoices-upgrade`.
 
-- Cam kết (BR-MF1-07d, FR-5.8a, INV-16): duyệt chi giữ **đúng một** khoản cho năm hiện hành, trên phiên bản `APPROVED`; `commitment-hold.policy.ts` từ chối `MORE_THAN_ONE_YEAR`, `NOT_CURRENT_YEAR`, `NOT_POSITIVE`, `NO_APPROVED_BUDGET` (409 `BUDGET.COMMITMENT_NOT_HOLDABLE`). Số tiền 0 không giữ khoản. Khoản năm sau / `NO_BUDGET` ghi trước giữ nguyên (Q-27). Điều kiện cho job 01/01: bỏ qua (Request, năm) đã có khoản (UNIQUE INV-16); `CommitmentRepo.hold(..., { allowUnattached: true })` chỉ dành cho khoản 01/01.
+- Cam kết (BR-MF1-07d, FR-5.8a, INV-16): duyệt chi giữ **đúng một** khoản cho năm hiện hành, trên phiên bản `APPROVED`; `commitment-hold.policy.ts` từ chối `MORE_THAN_ONE_YEAR`, `NOT_CURRENT_YEAR`, `NOT_POSITIVE`, `NO_APPROVED_BUDGET` (409 `BUDGET.COMMITMENT_NOT_HOLDABLE`). Số tiền 0 không giữ khoản. Khoản năm sau / `NO_BUDGET` ghi trước giữ nguyên (Q-27). Khoản 01/01 do `CommitmentService.holdYearStart` ghi (`origin = YEAR_START`, không `snapshot_check_id`, không kiểm ngân sách): bỏ qua (Request, năm) đã có khoản (UNIQUE INV-16), năm chưa có phiên bản `APPROVED` ⟹ `unattached_reason = 'NO_BUDGET'` rồi `attachWaiting` gắn khi phiên bản được duyệt (`FR-5.8a`, ngoại lệ duy nhất); thứ tự khóa Request → khóa năm (job `requests/year-start-commitments`).

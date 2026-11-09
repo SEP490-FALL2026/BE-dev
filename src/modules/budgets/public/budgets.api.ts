@@ -9,6 +9,8 @@ import type {
   HeldCommitment,
   ReleasedCommitment,
   YearBudgetFacts,
+  YearStartHoldInput,
+  YearStartHoldResult,
 } from './budgets.types';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 
@@ -46,6 +48,21 @@ export class BudgetsApi {
    */
   releaseForRequest(tx: DbTx, input: CommitmentReleaseInput): Promise<ReleasedCommitment[]> {
     return this.commitments.release(tx, input);
+  }
+
+  /**
+   * The pass of 01/01 holds one commitment for the new year for each request (`FR-5.8`(6), `QĐ-109a`), in the transaction of the caller, which holds
+   * the rows of the requests locked before it calls (the order of the locks of this context: the request, then the year). A request that holds one for
+   * the year already is left as it was; one whose Cost Center has no approved budget of the year holds it waiting for a budget, attached when a
+   * version is approved. Nothing is judged against the budget. Throws BudgetCommitmentNotHoldableError for an amount that is not above nothing.
+   */
+  holdYearStart(tx: DbTx, input: YearStartHoldInput): Promise<YearStartHoldResult> {
+    return this.commitments.holdYearStart(tx, input);
+  }
+
+  /** The requests, among these, that hold a commitment for the year already, whatever its state and origin, in one read. */
+  listRequestsHoldingYear(tx: DbTx, requestIds: readonly string[], year: number): Promise<Set<string>> {
+    return this.commitments.requestsHoldingYear(tx, requestIds, year);
   }
 
   /** What each of the requests was committed for, one entry for each commitment, in one read: for a list that counts and adds them. */

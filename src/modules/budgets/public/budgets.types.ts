@@ -27,6 +27,32 @@ export interface CommitmentHoldInput {
   items: readonly { year: number; amountMinor: bigint }[];
 }
 
+/**
+ * What the pass of 01/01 holds for the requests whose right goes on into the new year or that were approved and not yet granted (`FR-5.8`(6),
+ * `QĐ-109a`): one commitment for each request, for the year, in the Cost Center of the department that bears it, whatever the budget says.
+ */
+export interface YearStartHoldInput {
+  organizationId: string;
+  /** The year that begins; the day it is made on is only for the record. */
+  year: number;
+  now: Date;
+  items: readonly {
+    requestId: string;
+    costCenterId: string;
+    currency: string;
+    /** The cost of the year, above nothing. */
+    amountMinor: bigint;
+    /** What one seat costs a month, kept for the release by day of a later slice. */
+    seatMonthlyMinor: bigint;
+  }[];
+}
+
+/** What the pass held: the commitments it made, and the requests that already held one for the year (left as they were). */
+export interface YearStartHoldResult {
+  created: { requestId: string; commitmentId: string; costCenterId: string; attachedVersionId: string | null }[];
+  alreadyHeld: string[];
+}
+
 /** A commitment as it was made: attached to the current budget of its year, or waiting for one. */
 export interface HeldCommitment {
   id: string;

@@ -1,7 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../../../infrastructure/database/prisma.service';
 import type { DbTx } from '../../../../infrastructure/database/transaction-runner';
-import { OPEN_GRANT_TASK_STATUSES } from '../../public/licensing-open-grants.types';
+import { fromDateColumn, toDateColumn, type BusinessDate } from '../../../../core/business-date';
+import { OPEN_GRANT_TASK_STATUSES, type GrantedSeatOfRequest } from '../../public/licensing-open-grants.types';
 
 export interface OpenGrantTaskRow {
   taskId: string;
@@ -59,5 +60,56 @@ export class OpenGrantTaskRepo {
       })),
       total,
     };
+  }
+
+  /**
+   * The seats the grants of these requests made that are still held on `onDate`: not failed, not cancelled, not closed by the day (a period
+   * that closes after it, or none) and not expected to end before it. A request for a group has one for each person granted. Read with the
+   * request rows locked by the caller; nothing here changes a seat. One statement.
+   */
+  async heldSeatsOfRequests(
+    requestIds: readonly string[],
+    onDate: BusinessDate,
+    tx?: DbTx,
+  ): Promise<GrantedSeatOfRequest[]> {
+    if (requestIds.length === 0) return [];
+    const day = toDateColumn(onDate);
+    const rows = await (tx ?? this.prisma).provisioningTask.findMany({
+      where: {
+        kind: 'GRANT',
+        requestId: { in: [...requestIds] },
+        status: { notIn: ['CANCELLED', 'CLOSED_FAILED'] },
+        assignment: {
+          failedAt: null,
+          cancelledAt: null,
+          AND: [
+            { OR: [{ validUntil: null }, { validUntil: { gt: day } }] },
+            { OR: [{ expectedEndDate: null }, { expectedEndDate: { gte: day } }] },
+          ],
+        },
+      },
+      select: {
+        requestId: true,
+        assignment: {
+          select: { id: true, employeeId: true, planId: true, expectedEndDate: true, validUntil: true },
+        },
+      },
+      orderBy: [{ requestId: 'asc' }, { assignmentId: 'asc' }],
+    });
+
+    return rows.flatMap((row) =>
+      row.requestId === null
+        ? []
+        : [
+            {
+              requestId: row.requestId,
+              assignmentId: row.assignment.id,
+              employeeId: row.assignment.employeeId,
+              planId: row.assignment.planId,
+              expectedEndDate: row.assignment.expectedEndDate ? fromDateColumn(row.assignment.expectedEndDate) : null,
+              validUntil: row.assignment.validUntil ? fromDateColumn(row.assignment.validUntil) : null,
+            },
+          ],
+    );
   }
 }

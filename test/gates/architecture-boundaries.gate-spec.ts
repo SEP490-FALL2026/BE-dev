@@ -92,6 +92,7 @@ const PRISMA_MODEL_OWNER: Readonly<Record<string, string>> = {
   StepSlaReminderRecipient: 'requests',
   CongestionIncident: 'requests',
   RequestStatusCursor: 'requests',
+  YearStartCommitmentRun: 'requests',
   AccessRequestProposal: 'requests',
   AccessRequestAssessment: 'requests',
   AccessRequestServiceAccount: 'requests',
