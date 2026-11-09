@@ -81,7 +81,7 @@ function toRecord(row: Row): SubscriptionRecord {
     planId: row.planId,
     planName: row.plan.name,
     planPricingModel: row.plan.pricingModel,
-    ownerDepartmentId: row.ownerDepartmentId as string | null, // Gói 9: nullable kho chung, tạm type cast
+    ownerDepartmentId: row.ownerDepartmentId, // Gói 9: nullable kho chung
     applicationId: application.id,
     applicationName: application.name,
     applicationKind: application.kind,
