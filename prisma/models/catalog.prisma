@@ -324,8 +324,8 @@ model Subscription {
   vendorMinimumSeats     Int?               @map("vendor_minimum_seats")
   // The subscription that prices the plan when there are several of it (Q-04): at most one per plan (a unique partial index).
   isPrimaryForPlan       Boolean            @default(false) @map("is_primary_for_plan")
-  // The department that owns the purchase (QĐ-89a): required, and never changed once set (a trigger).
-  ownerDepartmentId      String             @map("owner_department_id") @db.Uuid
+  // The department that owns the purchase (QĐ-89a): nullable since gói 9 (phần cấp từ kho không được ghi phòng sở hữu).
+  ownerDepartmentId      String?            @map("owner_department_id") @db.Uuid
   // The period this one continues (QĐ-16): set once, when the outcome of a renewal is recorded; a period has at most one
   // successor (the unique index) and the link never changes (a trigger).
   renewedFromId          String?            @unique @map("renewed_from_id") @db.Uuid
@@ -334,7 +334,7 @@ model Subscription {
 
   organization        Organization                 @relation(fields: [organizationId], references: [id])
   plan                Plan                         @relation(fields: [planId], references: [id])
-  ownerDepartment     Department                   @relation("SubscriptionOwnerDepartment", fields: [ownerDepartmentId], references: [id], onDelete: Restrict)
+  ownerDepartment     Department?                  @relation("SubscriptionOwnerDepartment", fields: [ownerDepartmentId], references: [id], onDelete: Restrict)
   responsibleItAdmin  Employee?                    @relation("SubscriptionResponsibleItAdmin", fields: [responsibleItAdminEmployeeId], references: [id], onDelete: Restrict)
   renewedFrom         Subscription?                @relation("SubscriptionRenewalChain", fields: [renewedFromId], references: [id], onDelete: Restrict)
   renewedBy           Subscription?                @relation("SubscriptionRenewalChain")

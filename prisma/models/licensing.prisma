@@ -121,6 +121,12 @@ enum ProvisioningFailureKind {
   NOT_DONE
 }
 
+enum ProvisioningPurchaseKind {
+  POOL_TOP_UP
+  KEY_PURCHASE
+  K1_SUBSCRIPTION
+}
+
 // One piece of work the IT team does to make a decision real: today the grant of a seat (US-07-01), by hand or through a
 // connector, in one queue. The assignment is the decision and holds the seat from the day it is made, so a seat stays
 // taken while the task is queued, in progress or failed (BR-10.4). A manual task completes only with a person's evidence;
@@ -168,6 +174,10 @@ model ProvisioningTask {
   accessCutOn                  DateTime?                @map("access_cut_on") @db.Date
   accessEvidence               String?                  @map("access_evidence")
   completionNote               String?                  @map("completion_note")
+  // Purchase when provisioning from shared pool: reason to buy additional seats, when bought, what kind.
+  purchaseKind                 ProvisioningPurchaseKind? @map("purchase_kind")
+  purchaseReason               String?                  @map("purchase_reason")
+  purchasedAt                  DateTime?                @map("purchased_at") @db.Timestamptz(3)
   createdByAppUserId           String                   @map("created_by_app_user_id") @db.Uuid
   createdAt                    DateTime                 @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt                    DateTime                 @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
@@ -626,4 +636,35 @@ model SubscriptionDeadlineEvent {
 
   @@index([kind, recordedOn])
   @@map("subscription_deadline_events")
+}
+
+// Cost avoided when granting a seat from the shared pool (MF1-F, qd103-grant-from-shared-pool):
+// one row per task completed from the pool, grid value = price of the subscription had the seat been purchased instead.
+// Append-only: triggers block UPDATE/DELETE (QĐ-106e, R-E06).
+// No Prisma relations (queried by SQL raw to avoid circular dependencies during parallel worktree development).
+model PoolGrantAvoidedCost {
+  id                 String   @id @default(uuid()) @db.Uuid
+  organizationId     String   @map("organization_id") @db.Uuid
+  provisioningTaskId String   @unique @map("provisioning_task_id") @db.Uuid
+  assignmentId       String   @map("assignment_id") @db.Uuid
+  requestId          String   @map("request_id") @db.Uuid
+  planId             String   @map("plan_id") @db.Uuid
+  // K2 (recurring) or K4 (one-time); null means no provisioning type (should not happen, but for completeness).
+  provisioningType   String   @map("provisioning_type")
+  // Months of the cost (≤ 12 for K2; NULL for K4 one-time cost).
+  months             Int?
+  // Unit price (per month for K2, total for K4), in minor currency units.
+  unitMinor          BigInt   @map("unit_minor")
+  // Total avoided cost = unitMinor × coalesce(months, 1).
+  amountMinor        BigInt   @map("amount_minor")
+  currency           String   @db.Char(3)
+  // Date the cost was recorded (the date the task was completed).
+  recordedOn         DateTime @map("recorded_on") @db.Date
+  createdAt          DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  @@index([organizationId])
+  @@index([assignmentId])
+  @@index([requestId])
+  @@index([recordedOn])
+  @@map("pool_grant_avoided_costs")
 }
