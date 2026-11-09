@@ -105,8 +105,8 @@ describe('the guards of the budget lifecycle (integration, real PostgreSQL)', ()
       const route = 'SPEND_APPROVAL';
       const check = await h.ctx.sql.query<{ id: string }>(
         `INSERT INTO request_budget_checks (id, organization_id, request_id, number, trigger, route, stale_cost_evidence, plan_line_overdue,
-                                            period_closed, off_plan, currency, binding_total_minor)
-         VALUES (gen_random_uuid(), $1, $2, 1, $3::"BudgetCheckTrigger", $4::"BudgetCheckRoute", false, false, false, false, $5, 1) RETURNING id`,
+                                            period_closed, off_plan, currency, binding_total_minor, outcome)
+         VALUES (gen_random_uuid(), $1, $2, 1, $3::"BudgetCheckTrigger", $4::"BudgetCheckRoute", false, false, false, false, $5, 1, 'WITHIN_BASE') RETURNING id`,
         [h.seed.organizationId, requestId, trigger, route, h.reporting],
       );
 
