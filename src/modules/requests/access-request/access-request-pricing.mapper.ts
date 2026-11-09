@@ -9,7 +9,10 @@ type PricingRow = Pick<
   Prisma.AccessRequestGetPayload<object>,
   | 'pricingStatus'
   | 'priceMissingReason'
+  | 'priceKind'
   | 'expectedSpendOn'
+  | 'expectedEndDate'
+  | 'amountMonths'
   | 'budgetYear'
   | 'amountMinor'
   | 'amountCurrency'
@@ -24,7 +27,10 @@ export function toPricing(row: PricingRow): PricingRecord {
   return {
     status: row.pricingStatus,
     missingReason: row.priceMissingReason as MissingPriceReason | null,
+    kind: row.priceKind ?? null,
     expectedSpendOn: row.expectedSpendOn ? fromDateColumn(row.expectedSpendOn) : null,
+    expectedEndDate: row.expectedEndDate ? fromDateColumn(row.expectedEndDate) : null,
+    amountMonths: row.amountMonths ?? null,
     budgetYear: row.budgetYear,
     amount: row.amountMinor !== null && currency !== null ? { amountMinor: row.amountMinor, currency } : null,
     unitPrice: row.unitPriceMinor !== null && currency !== null ? { amountMinor: row.unitPriceMinor, currency } : null,
@@ -38,7 +44,10 @@ export function pricingColumns(pricing: PricingRecord) {
   return {
     pricingStatus: pricing.status,
     priceMissingReason: pricing.missingReason,
+    priceKind: pricing.kind ?? null,
     expectedSpendOn: pricing.expectedSpendOn ? toDateColumn(pricing.expectedSpendOn) : null,
+    expectedEndDate: pricing.expectedEndDate ? toDateColumn(pricing.expectedEndDate) : null,
+    amountMonths: pricing.amountMonths ?? null,
     budgetYear: pricing.budgetYear,
     amountMinor: pricing.amount?.amountMinor ?? null,
     amountCurrency: pricing.amount?.currency ?? null,
