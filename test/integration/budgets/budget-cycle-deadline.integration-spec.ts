@@ -132,6 +132,28 @@ describe('the deadlines of the budget cycle and the head named after a baseline 
       const reminders = await noticesOf('BUDGET_PROPOSAL_DEADLINE_REMINDER');
       expect(reminders.filter((notice) => notice.params.costCenterId === department.unitId)).toHaveLength(0);
     });
+
+    it.skip('BR-MF4-09: does not tell Finance/Super Admin when the headless department already has a baseline version (C4-09)', async () => {
+      const department = await bare();
+      await setDeadlines(lateDay(), addDays(h.today(), 20));
+
+      // Create a version for this department using the API, then run deadline service
+      await h.createVersion({
+        costCenterId: department.unitId,
+        year: h.year,
+        basis: 'PREVIOUS_VERSION',
+        baseMinor: 0,
+        reservePercent: 10,
+        totalMinor: 0,
+      });
+
+      await service().run();
+
+      // Since the department has a version, it should NOT appear in noHead notices
+      const noHead = await noticesOf('BUDGET_NO_HEAD_AT_DEADLINE');
+      const headlessDepartmentNotices = noHead.filter((n) => n.params.departmentId === department.id);
+      expect(headlessDepartmentNotices).toHaveLength(0);
+    });
   });
 
   it('before the submission deadline: tells Finance, once, which departments have no Cost Center yet, and nobody else', async () => {

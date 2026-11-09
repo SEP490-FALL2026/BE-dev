@@ -107,6 +107,15 @@ export class CycleDeadlineService {
     const proposed = await this.proposals.proposedCostCenters([...pass.costCenters.values()], cycle.year, tx);
     const missing = pass.departmentIds.filter((id) => !proposed.has(pass.costCenters.get(id) ?? ''));
     const noHead: string[] = [];
+    
+    // C4-09: Lấy danh sách Cost Center đã có phiên bản (DRAFT/SENT/CHANGES_REQUESTED/APPROVED) của năm kỳ
+    const versionedCostCenters = await tx.budgetVersion.findMany({
+      where: { organizationId: cycle.organizationId, year: cycle.year, state: { in: ['DRAFT', 'SENT', 'CHANGES_REQUESTED', 'APPROVED'] }, detachedAt: null },
+      select: { costCenterId: true },
+      distinct: ['costCenterId'],
+    });
+    const versionedCostCenterIds = new Set(versionedCostCenters.map((v) => v.costCenterId));
+    
     // The heads of all the departments in one read; only a department with none asks who is to head it (a successor).
     const heads = await this.organizationReads.getDepartmentHeads(missing, today, tx);
     for (const departmentId of missing) {
@@ -125,7 +134,8 @@ export class CycleDeadlineService {
             submissionDeadline: cycle.submissionDeadline,
           },
         );
-      } else if (!head && !(await this.organizationReads.hasHeadStartingAfter(departmentId, today, tx))) {
+      } else if (!head && !(await this.organizationReads.hasHeadStartingAfter(departmentId, today, tx)) && costCenterId && !versionedCostCenterIds.has(costCenterId)) {
+        // C4-09: Chỉ báo nếu phòm không có phiên bản nào
         noHead.push(departmentId);
       }
     }
