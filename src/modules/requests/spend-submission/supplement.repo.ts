@@ -12,8 +12,8 @@ export interface SupplementRecord {
   afterExpectedSpendOn: BusinessDate | null;
   beforeBudgetYear: number | null;
   afterBudgetYear: number | null;
-  beforeAmountMinor: bigint;
-  afterAmountMinor: bigint;
+  beforeAmountMinor: bigint | null;
+  afterAmountMinor: bigint | null;
   currency: string | null;
 }
 
@@ -41,8 +41,8 @@ export class SupplementRepo {
         reason: input.reason,
         changedByEmployeeId: input.changedByEmployeeId,
         createdAt: input.now,
-        beforeExpectedSpendOn: toDateColumn(input.beforeExpectedSpendOn),
-        afterExpectedSpendOn: toDateColumn(input.afterExpectedSpendOn),
+        beforeExpectedSpendOn: input.beforeExpectedSpendOn ? toDateColumn(input.beforeExpectedSpendOn) : null,
+        afterExpectedSpendOn: input.afterExpectedSpendOn ? toDateColumn(input.afterExpectedSpendOn) : null,
         beforeBudgetYear: input.beforeBudgetYear,
         afterBudgetYear: input.afterBudgetYear,
         beforeAmountMinor: input.beforeAmountMinor,
