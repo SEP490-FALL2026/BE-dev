@@ -21,7 +21,7 @@ export const myRequestsQuerySchema = z
     }),
     state: z.string().max(400).refine(isStateList, 'A comma-separated list of states of a request.').optional().meta({
       description:
-        'One or more states of a request, comma-separated and none twice (for example PENDING,AWAITING_BUDGET); a draft is not a state of a request. Narrows within view when both are given.',
+        'One or more states of a request, comma-separated and none twice (for example PENDING,AWAITING_SPEND_DECISION); a draft is not a state of a request. Narrows within view when both are given.',
     }),
     type: z.enum(MY_REQUEST_TYPES).optional(),
     from: instant.optional().meta({

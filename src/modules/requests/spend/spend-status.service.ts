@@ -1,88 +1,85 @@
 import { Injectable } from '@nestjs/common';
 import { hasSpendStep } from '../access-request/access-request.policy';
 import type { AccessRequestRecord, SpendStage } from '../access-request/access-request.types';
+import type { BlockReason } from './budget-check.policy';
 import { BudgetCheckRepo, type CheckRecord } from './budget-check.repo';
-import { FinanceReviewRepo, type FinanceReviewRecord } from './finance-review.repo';
 import { SpendDecisionRepo } from './spend-decision.repo';
 import { SpendStepRepo } from './spend-step.repo';
 
-/** The two problems of the data a head or the IT Admin can mend; the figures of the budget are not among them. */
-export type BlockedReason = 'STALE_COST_EVIDENCE' | 'CLOSED_OR_EXPIRED_BUDGET_PERIOD';
+/** The reasons a check of a request made before the three outcomes gave, read as the reasons they are now. */
+const LEGACY_REASONS = (check: Pick<CheckRecord, 'staleCostEvidence'>): BlockReason[] =>
+  check.staleCostEvidence ? ['PRICE_EXPIRED'] : ['NO_APPROVED_BUDGET'];
 
 export interface SpendStatusView {
   stage: SpendStage;
-  blockedReason: BlockedReason | null;
-  /** What Finance wrote when it gave the request back to the head. */
-  financeReturnReason: string | null;
+  /** Why the request is blocked, every reason that applies; empty unless the stage is `BLOCKED`. */
+  blockedReasons: BlockReason[];
+  /**
+   * How much the request is over what it may use, in the reporting currency: over the base when it waits for the head to confirm the
+   * reserve (`RESERVE_CONFIRMATION`), over the reserve when it is blocked for being over it. Null otherwise. Never what is left.
+   */
+  overBy: { minor: bigint; currency: string } | null;
   /** What the spending approver wrote when they refused it. */
   refusalReason: string | null;
 }
 
-/** Where a request in the queue of the head stands, from its newest check and the newest way a review of it ended. */
-export function queuedStatus(
-  check: Pick<CheckRecord, 'route' | 'staleCostEvidence' | 'ranAt'> | null,
-  review: Pick<FinanceReviewRecord, 'outcome' | 'reason' | 'decidedAt'> | null,
-): SpendStatusView {
-  if (review?.outcome === 'RETURNED_TO_HEAD' && (!check || review.decidedAt >= check.ranAt)) {
-    return {
-      stage: 'RETURNED_BY_FINANCE',
-      blockedReason: null,
-      financeReturnReason: review.reason,
-      refusalReason: null,
-    };
+type QueuedCheck = Pick<
+  CheckRecord,
+  'outcome' | 'route' | 'blockReasons' | 'staleCostEvidence' | 'overBaseByMinor' | 'overByMinor' | 'currency'
+>;
+
+const status = (stage: SpendStage, rest: Partial<SpendStatusView> = {}): SpendStatusView => ({
+  stage,
+  blockedReasons: [],
+  overBy: null,
+  refusalReason: null,
+  ...rest,
+});
+
+/**
+ * Where a request in the queue of the head stands, from its newest check: blocked (and why), waiting for the head to confirm the reserve,
+ * or not yet sent on. A check made before the three outcomes that blocked the request is read with the reasons it gave then.
+ */
+export function queuedStatus(check: QueuedCheck | null): SpendStatusView {
+  if (check?.outcome === 'USES_RESERVE') {
+    return status('RESERVE_CONFIRMATION', {
+      overBy: check.overBaseByMinor === null ? null : { minor: check.overBaseByMinor, currency: check.currency },
+    });
   }
-  if (check?.route === 'BLOCKED') {
-    return {
-      stage: 'BLOCKED',
-      blockedReason: check.staleCostEvidence ? 'STALE_COST_EVIDENCE' : 'CLOSED_OR_EXPIRED_BUDGET_PERIOD',
-      financeReturnReason: null,
-      refusalReason: null,
-    };
+  const blocked = check?.outcome === 'BLOCKED' || (check?.outcome === null && check.route === 'BLOCKED');
+  if (check && blocked) {
+    return status('BLOCKED', {
+      blockedReasons: check.outcome === null ? LEGACY_REASONS(check) : check.blockReasons,
+      overBy: check.overByMinor === null ? null : { minor: check.overByMinor, currency: check.currency },
+    });
   }
 
-  return { stage: 'NOT_SUBMITTED', blockedReason: null, financeReturnReason: null, refusalReason: null };
+  return status('NOT_SUBMITTED');
 }
 
 @Injectable()
 export class SpendStatusService {
   constructor(
     private readonly checks: BudgetCheckRepo,
-    private readonly reviews: FinanceReviewRepo,
     private readonly steps: SpendStepRepo,
     private readonly decisions: SpendDecisionRepo,
   ) {}
 
   async of(request: AccessRequestRecord): Promise<SpendStatusView | null> {
     if (!hasSpendStep(request.policy)) return null;
-    const status = (stage: SpendStage, refusalReason: string | null = null) => ({
-      stage,
-      blockedReason: null,
-      financeReturnReason: null,
-      refusalReason,
-    });
 
     switch (request.state) {
-      case 'AWAITING_SPEND_SUBMISSION': {
-        const [check, review] = await Promise.all([this.checks.latest(request.id), this.reviews.latest(request.id)]);
-
-        return queuedStatus(check, review);
-      }
-      case 'AWAITING_FINANCE_REVIEW':
-        return status('WAITING_FINANCE_REVIEW');
-      case 'AWAITING_BUDGET':
-        return status('WAITING_BUDGET');
+      case 'AWAITING_SPEND_SUBMISSION':
+        return queuedStatus(await this.checks.latest(request.id));
       case 'AWAITING_SPEND_DECISION':
         return status('WAITING_SPEND_DECISION');
-      case 'WAITING_CONTROLLED': {
-        if (await this.steps.findOpen(request.id, 'FINANCE_REVIEW')) return status('WAITING_FINANCE_REVIEW');
-
+      case 'WAITING_CONTROLLED':
         return (await this.steps.findOpen(request.id, 'SPEND_APPROVAL')) ? status('WAITING_SPEND_DECISION') : null;
-      }
       case 'REJECTED': {
         // A refusal of the need is the head's, and is read from the need step; this is the one of the spending approver.
         const decided = await this.decisions.latest(request.id);
 
-        return decided?.decision === 'REJECTED' ? status('REFUSED', decided.reason) : null;
+        return decided?.decision === 'REJECTED' ? status('REFUSED', { refusalReason: decided.reason }) : null;
       }
       default:
         return null;

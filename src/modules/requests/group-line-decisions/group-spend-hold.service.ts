@@ -4,7 +4,7 @@ import type { AuthenticatedPrincipal } from '../../../infrastructure/security/to
 import { AccessRequestRepo } from '../access-request/access-request.repo';
 import type { AccessRequestRecord } from '../access-request/access-request.types';
 import { pricedPeople } from '../access-request/group-request.types';
-import { SpendEffectsService } from '../budget-information/spend-effects.service';
+import { SpendEffectsService } from '../spend-effects/spend-effects.service';
 import type { LineVerdict } from '../group-request/group-line-decision.policy';
 import { LineAmountRepo } from '../group-request/line-amount.repo';
 import { scaledPricing, sharesOf } from '../spend/line-allocation.policy';
@@ -30,8 +30,9 @@ export class GroupSpendHold {
     held: { checkId: string | null; now: Date },
   ): Promise<void> {
     const check = await this.effects.hold(tx, actor, request, held.checkId, held.now);
+    // One commitment for the one year of the check (`BR-MF1-07d`): a cost of nothing holds nothing, so no person stands for a part of it.
     const costs = check.years
-      .filter((year) => year.code !== null)
+      .filter((year) => year.code !== null && year.costMinor > 0n)
       .map((year) => ({ year: year.year, amountMinor: year.costMinor }));
     await this.amounts.insertMany(
       tx,

@@ -18,8 +18,11 @@ import type {
 import {
   BudgetCommitmentExistsError,
   BudgetCommitmentNotFoundError,
+  BudgetCommitmentNotHoldableError,
   BudgetCommitmentRefusedError,
 } from '../budget/budget.errors';
+import { checkHoldable } from './commitment-hold.policy';
+import { fiscalYearOf } from '../../../core/fiscal-year';
 import {
   heldOf,
   planRelease,
@@ -34,10 +37,11 @@ import type { CommittedAmount } from '../public/budgets.types';
 import type { CommitmentWire, ReleaseWire } from './commitment.dto';
 
 /**
- * What a request holds against the budget (`US-06-04`, `US-06-07`): one commitment for each year its binding payments fall in,
- * made when the spending approver approves it, in the transaction of the decision. A commitment is attached to the current
- * budget of its year, or waits for one and is attached when one is approved (`US-06-07` AC-7); it never makes a budget of nothing
- * (`US-06-07` AC-5). A year that is only a forecast has none (`QĐ-84a`). Finance reads the commitments and has nothing to confirm.
+ * What a request holds against the budget (`US-06-04`, `US-06-07`, `BR-MF1-07d`): one commitment, for the current fiscal year, made when the
+ * spending approver approves it, in the transaction of the decision, attached to the approved version of that year. It is never made for
+ * another year (the part of next year is the commitment made on 01/01), for an amount that is not above nothing, or without an approved
+ * version (`FR-5.8a`: the one commitment that waits for a budget is the one made on 01/01). Commitments written before this rule, of a later
+ * year or waiting for a budget, stay as they are (`Q-27`). Finance reads the commitments and has nothing to confirm.
  */
 @Injectable()
 export class CommitmentService {
@@ -176,8 +180,14 @@ export class CommitmentService {
     };
   }
 
-  /** Throws BudgetCommitmentExistsError when the request already holds one for a year of the input. */
+  /**
+   * Throws BudgetCommitmentNotHoldableError (not one year, not the current year, not above nothing, or no approved version of the year) and
+   * BudgetCommitmentExistsError when the request already holds one for the year of the input. Nothing is written when it throws.
+   */
   async hold(tx: DbTx, actor: AuthenticatedPrincipal, input: CommitmentHoldInput): Promise<HeldCommitment[]> {
+    const today = await this.facts.today(input.now, tx);
+    const refusal = checkHoldable({ items: input.items, currentYear: fiscalYearOf(today) });
+    if (refusal) throw new BudgetCommitmentNotHoldableError(refusal, input.items[0]?.year ?? null);
     const taken = await this.commitments.yearsHeldBy(
       tx,
       input.requestId,

@@ -1,143 +1,122 @@
 import { checkBudget, codesOf, type YearBudget, type YearSlice } from './budget-check.policy';
 
-const M = 1_000_000n;
-
+/** Base 100, reserve 10, spent 40, held 20 and 15 waiting to be decided: 25 left of the base and 35 with the reserve. */
 const budget = (over: Partial<YearBudget> = {}): YearBudget => ({
-  versionId: 'v1',
-  totalMinor: 100n * M,
-  heldMinor: 20n * M,
-  spentMinor: 40n * M,
+  versionId: 'v-1',
+  baseMinor: 100n,
+  reserveMinor: 10n,
+  heldMinor: 20n,
+  spentMinor: 40n,
   ...over,
 });
-const slice = (costMinor: bigint, over: Partial<YearSlice> = {}): YearSlice => ({
-  year: 2026,
-  costMinor,
-  closed: false,
-  budget: budget(),
-  pendingMinor: 0n,
-  ...over,
-});
-const check = (slices: YearSlice[], over: { staleCostEvidence?: boolean; planLineOverdue?: boolean } = {}) =>
-  checkBudget({ slices, staleCostEvidence: false, planLineOverdue: false, ...over });
 
-describe('the check of the budget of a request (US-06-12)', () => {
-  it('is BUDGET_OK under the share and under what is left, and goes to the spending approver (AC-1)', () => {
-    const result = check([slice(15n * M)]);
-
-    expect(result.route).toBe('SPEND_APPROVAL');
-    expect(result.years[0]).toMatchObject({ code: 'BUDGET_OK', remainingMinor: 40n * M, shareBasisPoints: 3750 });
-    expect(codesOf(result)).toEqual(['BUDGET_OK']);
+const check = (costMinor: bigint, slice: Partial<YearSlice> = {}, priceExpired = false) =>
+  checkBudget({
+    slice: { year: 2026, costMinor, budget: budget(), pendingMinor: 15n, ...slice },
+    priceExpired,
   });
 
-  it('is BUDGET_OK however large the share of what is left, as long as the money is there: no route by size (AC-2, B-M1, QĐ-97c)', () => {
-    const result = check([slice(25n * M)]);
+describe('the check of the budget of a request (BR-MF1-06e..g)', () => {
+  describe('BR-MF1-06g: three outcomes on the base and the reserve of the approved version', () => {
+    it.each([
+      [25n, 'WITHIN_BASE', null],
+      [26n, 'USES_RESERVE', 1n],
+      [35n, 'USES_RESERVE', 10n],
+    ] as const)('a cost of %s is %s, over the base by %s', (cost, outcome, overBase) => {
+      const result = check(cost);
 
-    expect(result.years[0].code).toBe('BUDGET_OK');
-    expect(result.years[0].shareBasisPoints).toBe(6250);
-    expect(result.route).toBe('SPEND_APPROVAL');
-    // Up to the last unit that is left.
-    expect(check([slice(40n * M)]).years[0].code).toBe('BUDGET_OK');
-    expect(check([slice(40n * M + 1n)]).years[0].code).toBe('INSUFFICIENT_BUDGET');
-  });
+      expect(result.outcome).toBe(outcome);
+      expect(result.overBaseByMinor).toBe(overBase);
+      expect(result.blockReasons).toEqual([]);
+      expect(result.route).toBe('SPEND_APPROVAL');
+    });
 
-  it('is INSUFFICIENT_BUDGET over what is left, and that is not a hard stop: it goes to Finance (AC-4)', () => {
-    const result = check([slice(45n * M)]);
+    it('BR-MF1-06g: one more than what is left with the reserve is blocked, over the reserve by 1', () => {
+      const result = check(36n);
 
-    expect(result.years[0].code).toBe('INSUFFICIENT_BUDGET');
-    expect(result.route).toBe('FINANCE_REVIEW');
-  });
+      expect(result).toMatchObject({
+        outcome: 'BLOCKED',
+        blockReasons: ['OVER_RESERVE'],
+        overBaseByMinor: 11n,
+        overByMinor: 1n,
+        route: 'BLOCKED',
+      });
+    });
 
-  it('is INSUFFICIENT_BUDGET when nothing is left or more is held than the budget', () => {
-    const over = budget({ heldMinor: 90n * M, spentMinor: 30n * M });
+    it('BR-MF1-06e: the two levels of what is left count what is spent, held and waiting, and the reserve is added for the second', () => {
+      const [year] = check(1n).years;
 
-    expect(check([slice(1n, { budget: over })]).years[0]).toMatchObject({
-      code: 'INSUFFICIENT_BUDGET',
-      remainingMinor: -20n * M,
-      shareBasisPoints: null,
+      expect(year).toMatchObject({
+        baseMinor: 100n,
+        reserveMinor: 10n,
+        spentMinor: 40n,
+        heldMinor: 20n,
+        pendingMinor: 15n,
+        remainingBaseMinor: 25n,
+        remainingWithReserveMinor: 35n,
+        code: 'BUDGET_OK',
+      });
     });
   });
 
-  it('says NO_ACTIVE_BUDGET for a year with no budget, which is not a budget of nothing (AC-5)', () => {
-    const result = check([slice(10n * M, { budget: null })]);
+  describe('BR-MF1-06g(3)(ii): the Cost Center has no approved version of the year', () => {
+    it('is blocked with NO_APPROVED_BUDGET and has no figure of a budget (that is not a budget of 0)', () => {
+      const result = check(1n, { budget: null });
 
-    expect(result.years[0]).toMatchObject({ code: 'NO_ACTIVE_BUDGET', budgetMinor: null, remainingMinor: null });
-    expect(result.route).toBe('FINANCE_REVIEW');
-  });
-
-  it('sends a year that has ended nowhere: no step for Finance or the approver (AC-7)', () => {
-    const result = check([slice(20n * M, { closed: true, budget: null })]);
-
-    expect(result.route).toBe('BLOCKED');
-    expect(result.periodClosed).toBe(true);
-    expect(result.years[0]).toMatchObject({ code: null, remainingMinor: null });
-    expect(codesOf(result)).toEqual(['CLOSED_OR_EXPIRED_BUDGET_PERIOD']);
-  });
-
-  it('sends a quote that has expired nowhere (AC-8)', () => {
-    const result = check([slice(15n * M)], { staleCostEvidence: true });
-
-    expect(result.route).toBe('BLOCKED');
-    expect(codesOf(result)).toEqual(['STALE_COST_EVIDENCE', 'BUDGET_OK']);
-  });
-
-  it('records every code that applies and puts the data first, and still blocks (AC-9)', () => {
-    const result = check([slice(45n * M)], { staleCostEvidence: true });
-
-    expect(codesOf(result)).toEqual(['STALE_COST_EVIDENCE', 'INSUFFICIENT_BUDGET']);
-    expect(result.route).toBe('BLOCKED');
-  });
-
-  it('judges every year on its own slice, never the total against one year (AC-15, AC-16)', () => {
-    const y2026 = slice(2_400n, {
-      year: 2026,
-      budget: budget({ totalMinor: 5_000n, heldMinor: 0n, spentMinor: 0n }),
+      expect(result).toMatchObject({ outcome: 'BLOCKED', blockReasons: ['NO_APPROVED_BUDGET'], overByMinor: null });
+      expect(result.years[0]).toMatchObject({
+        code: 'NO_ACTIVE_BUDGET',
+        baseMinor: null,
+        remainingBaseMinor: null,
+        pendingMinor: 15n,
+      });
     });
-    const noBudget = slice(2_400n, { year: 2027, budget: null });
-    const result = check([y2026, noBudget]);
-
-    expect(result.years.map((year) => year.code)).toEqual(['BUDGET_OK', 'NO_ACTIVE_BUDGET']);
-    expect(result.years[0].shareBasisPoints).toBe(4800);
-    expect(result.route).toBe('FINANCE_REVIEW');
-
-    const rich = (remaining: bigint) => budget({ totalMinor: remaining, heldMinor: 0n, spentMinor: 0n });
-    const split = check([
-      slice(2_400n, { year: 2026, budget: rich(4_000n) }),
-      slice(2_400n, { year: 2027, budget: rich(30_000n) }),
-    ]);
-
-    expect(split.years.map((year) => year.code)).toEqual(['BUDGET_OK', 'BUDGET_OK']);
-    expect(split.years.map((year) => year.shareBasisPoints)).toEqual([6000, 800]);
   });
 
-  it('keeps the worst code of the years in front of the others', () => {
-    const result = check([
-      slice(1n, { year: 2026 }),
-      slice(1n, { year: 2027, budget: null }),
-      slice(45n * M, { year: 2028 }),
-    ]);
+  describe('BR-MF1-06g(3)(iv), US-06-12 AC-9: the quote is no longer valid', () => {
+    it('is blocked with PRICE_EXPIRED even when the money is there', () => {
+      expect(check(10n, {}, true)).toMatchObject({ outcome: 'BLOCKED', blockReasons: ['PRICE_EXPIRED'] });
+    });
 
-    expect(codesOf(result)).toEqual(['NO_ACTIVE_BUDGET', 'INSUFFICIENT_BUDGET', 'BUDGET_OK']);
+    it('keeps every reason, the data first: the quote, then the budget', () => {
+      expect(check(36n, {}, true).blockReasons).toEqual(['PRICE_EXPIRED', 'OVER_RESERVE']);
+      expect(check(1n, { budget: null }, true).blockReasons).toEqual(['PRICE_EXPIRED', 'NO_APPROVED_BUDGET']);
+    });
   });
 
-  it('carries what the others that wait cost into the year, and none into a year that has ended (US-06-01 AC-9)', () => {
-    const result = check([
-      slice(15n * M, { pendingMinor: 15n * M }),
-      slice(1n, { year: 2025, closed: true, budget: null, pendingMinor: 7n }),
-    ]);
-
-    expect(result.years.map((year) => year.pendingMinor)).toEqual([15n * M, null]);
+  describe('BR-MF1-07f: what is left may be negative', () => {
+    it('is blocked for a request of 1 when what is left with the reserve is already negative', () => {
+      expect(check(1n, { budget: budget({ heldMinor: 60n }) })).toMatchObject({
+        outcome: 'BLOCKED',
+        blockReasons: ['OVER_RESERVE'],
+      });
+    });
   });
 
-  it('is never an approval or a refusal: the only routes are the three that decide who looks next (AC-14)', () => {
-    const routes = new Set(
-      [
-        check([slice(1n)]),
-        check([slice(45n * M)]),
-        check([slice(1n)], { staleCostEvidence: true }),
-        check([slice(1n)], { planLineOverdue: true }),
-      ].map((result) => result.route),
-    );
+  describe('A5-2 (QĐ-109b): a request that costs nothing this year', () => {
+    it('is within the base whatever is left, even when it is negative: nothing is deducted and it still reaches the approver', () => {
+      const result = check(0n, { budget: budget({ heldMinor: 90n }) });
 
-    expect([...routes].sort()).toEqual(['BLOCKED', 'FINANCE_REVIEW', 'SPEND_APPROVAL']);
+      expect(result).toMatchObject({
+        outcome: 'WITHIN_BASE',
+        blockReasons: [],
+        overBaseByMinor: null,
+        overByMinor: null,
+      });
+      expect(result.years[0].remainingWithReserveMinor).toBe(-35n);
+      expect(result.route).toBe('SPEND_APPROVAL');
+    });
+
+    it('is still blocked when the year has no approved version, or the quote is no longer valid', () => {
+      expect(check(0n, { budget: null }).blockReasons).toEqual(['NO_APPROVED_BUDGET']);
+      expect(check(0n, {}, true).blockReasons).toEqual(['PRICE_EXPIRED']);
+    });
+  });
+
+  describe('the codes a check carries', () => {
+    it('gives the data first, then the code of the year', () => {
+      expect(codesOf(check(36n, {}, true))).toEqual(['STALE_COST_EVIDENCE', 'INSUFFICIENT_BUDGET']);
+      expect(codesOf(check(1n))).toEqual(['BUDGET_OK']);
+    });
   });
 });

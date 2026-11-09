@@ -3,6 +3,7 @@ import { fromDateColumn } from '../../../core/business-date';
 import { toPricing } from './access-request-pricing.mapper';
 import type { NeedStepState, AccessRequestRecord, ReadableNeedWaitingReason } from './access-request.types';
 import { requestPolicyJson } from './access-request.json';
+import { currentStateOf } from './access-request.policy';
 
 /** What a request is read as: the columns, the people it is for, its need steps with their decisions, and the lines of a group. */
 export const SELECT_REQUEST = {
@@ -149,7 +150,7 @@ export function toRecord(row: RequestRow): AccessRequestRecord {
     organizationId: row.organizationId,
     type: row.type,
     branch: row.branch,
-    state: row.state,
+    state: currentStateOf(row.state),
     planId: row.planId,
     requesterEmployeeId: row.requesterEmployeeId,
     departmentId: row.departmentId,

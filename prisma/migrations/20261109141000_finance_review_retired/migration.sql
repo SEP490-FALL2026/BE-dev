@@ -22,6 +22,10 @@ UPDATE "access_request_steps"
    SET "state" = 'CLOSED', "waiting_reason" = NULL, "decided_at" = now()
  WHERE "kind" = 'FINANCE_REVIEW' AND "state" IN ('PENDING', 'WAITING');
 
+-- 2b. A late need step is told to its holder and to the person who asked for the request, and to nobody above them (QĐ-100j). The value is not
+-- used in this migration (a new enum value cannot be).
+ALTER TYPE "SlaReminderRole" ADD VALUE 'REQUESTER';
+
 -- 3. Nothing new is written in what is retired.
 ALTER TABLE "access_requests"
     ADD CONSTRAINT "access_requests_state_not_retired_check"

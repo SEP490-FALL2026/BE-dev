@@ -83,7 +83,10 @@ function toRequest(row: RequestRow): ReassignableRequest {
     chainHasSpendStep: requestPolicyJson.decode(row.policy).chain.includes('SPEND_APPROVAL'),
     beneficiaryEmployeeIds: row.beneficiaries.map((beneficiary) => beneficiary.employeeId),
     lines: row.lines,
-    steps: row.steps,
+    // The review of Finance no longer exists: a step of that kind is a closed old one and is never looked at again (`QĐ-97c`).
+    steps: row.steps.filter(
+      (step): step is typeof step & { kind: ReassignableStepKind } => step.kind !== 'FINANCE_REVIEW',
+    ),
   };
 }
 

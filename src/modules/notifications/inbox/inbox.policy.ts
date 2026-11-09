@@ -90,6 +90,10 @@ export const PARAM_KEYS_BY_CODE: Readonly<Record<InAppNotificationCode, readonly
   REQUEST_RETURNED_BY_FINANCE: ['requestId', 'reason'],
   REQUEST_AWAITING_BUDGET: ['requestId', 'costCenterId', 'year'],
   REQUEST_BUDGET_VERSION_ENDED: ['requestId', 'versionId', 'costCenterId', 'year', 'decision'],
+  // The check of the budget of a request: the codes of why, never how far over (a figure is read on the request).
+  REQUEST_RESERVE_CONFIRMATION_NEEDED: ['requestId'],
+  REQUEST_BUDGET_BLOCKED: ['requestId', 'reasons'],
+  REQUEST_RETURNED_AT_DECISION: ['requestId', 'reasons'],
   BUDGET_VERSION_CLOSED_UNAPPROVED: ['versionId', 'costCenterId', 'year'],
   BUDGET_PROPOSAL_CLOSED_YEAR_END: ['proposalId', 'costCenterId', 'year'],
   BUDGET_PROPOSAL_TASK_ASSIGNED: ['costCenterId', 'departmentId', 'year'],

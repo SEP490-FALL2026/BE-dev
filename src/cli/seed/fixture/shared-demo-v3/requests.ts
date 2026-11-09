@@ -77,8 +77,9 @@ export const REQUESTS: Pick<DemoFixture, 'requests'> = {
       requester: 'NV-DES2',
       plan: 'figma-professional',
       termMonths: 6,
-      target: 'AWAITING_FINANCE_REVIEW',
-      summary: 'Phòng Thiết kế chưa có ngân sách năm: kiểm tra NO_ACTIVE_BUDGET, chờ Finance rà soát.',
+      target: 'AWAITING_SPEND_SUBMISSION',
+      summary:
+        'Phòng Thiết kế chưa có ngân sách năm: nằm ở hàng đợi của trưởng phòng; trình lô sẽ bị chặn NO_APPROVED_BUDGET.',
     },
     {
       key: 'R10',

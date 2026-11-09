@@ -59,7 +59,6 @@ export class RequestPreviewService {
 
       return found ? { employeeId: found.id, employeeCode: found.employeeCode, fullName: found.fullName } : null;
     };
-    const paid = policy.branch === 'PAID_IN_CATALOG';
 
     return {
       plan: {
@@ -83,7 +82,6 @@ export class RequestPreviewService {
       costEstimate,
       spendSubmission: spendSubmissionOf(policy, pricing.status),
       chain: chain.map(({ assigneeEmployeeId, ...step }) => ({ ...step, assignee: person(assigneeEmployeeId) })),
-      possibleExtraSteps: paid ? [{ kind: 'FINANCE_REVIEW', beforeStep: 'SPEND_APPROVAL' }] : [],
       totalExpectedWorkingDays: chain.reduce((sum, step) => sum + step.expectedWorkingDays, 0),
     };
   }

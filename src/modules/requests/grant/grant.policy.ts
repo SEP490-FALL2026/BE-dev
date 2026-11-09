@@ -81,8 +81,6 @@ export function grantAnswerFor(
     case 'WAITING_CONTROLLED':
     case 'AWAITING_IT_ASSESSMENT':
     case 'AWAITING_SPEND_SUBMISSION':
-    case 'AWAITING_FINANCE_REVIEW':
-    case 'AWAITING_BUDGET':
     case 'AWAITING_SPEND_DECISION':
       return { status: 'NOT_APPROVED' };
     case 'REJECTED':

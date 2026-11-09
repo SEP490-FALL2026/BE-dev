@@ -1,84 +1,38 @@
 import { Injectable } from '@nestjs/common';
+import { Contributions } from '../../../core/extension/contributions';
 import { Hook } from '../../../core/extension/hook';
-import { Listeners } from '../../../core/extension/listeners';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
-import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 
 // The points the budgets open for the contexts above them (ADR-0016, `core/extension`): they add to them or bind them from a
 // `*.listener.ts` when their module starts, so the budgets never import them. One instance of each per application.
 
-/** A budget of a Cost Center and a year changed in a way a request waiting on it must hear of. */
-export interface BudgetVersionEvent {
-  costCenterId: string;
-  year: number;
-  versionId: string;
-}
-
-/** A version the spending approver did not approve: refused, or sent back to Finance to look again. */
-export interface BudgetRefusalEvent extends BudgetVersionEvent {
-  decision: 'REJECTED' | 'CHANGES_REQUESTED';
-}
-
 /**
- * What another context does when a budget changes, one method for each kind of change. It runs in the transaction of the change,
- * so a request is never left waiting on a budget that has already moved, and a failure undoes the change as well. The listener
- * adds `budgetChangeHandler(itself)` to `BudgetChangeListeners` when its module starts.
+ * What the requests that wait to be decided as spend cost in one Cost Center and year, in the reporting currency (`BR-MF1-06f`, RV-10). The
+ * requests context holds the one definition of _a request that waits to be decided_ and gives it to the budgets, so the check of a request and
+ * the screens of the budgets count the same requests and the budgets never import it (ADR-0016).
  */
-export interface BudgetChangeListener {
-  /**
-   * Takes, before the budget year lock, the locks of the rows this listener will change for the Cost Center and the year when a
-   * version is decided or the year is closed. The order of the whole system is the row of the request first, then the year: a
-   * listener that locked its rows only after the year lock would wait for a writer that holds its row and waits for the year.
-   */
-  lockWaiting(tx: DbTx, scope: { costCenterId: string; year: number }): Promise<void>;
-  versionApproved(tx: DbTx, actor: AuthenticatedPrincipal, event: BudgetVersionEvent): Promise<void>;
-  /**
-   * The spending approver refused a version or sent it back to Finance: the year still has no new budget. `decision` is what
-   * the approver decided, so a request that waits for the version is told which of the two it was.
-   */
-  versionRefused(tx: DbTx, actor: AuthenticatedPrincipal, event: BudgetRefusalEvent): Promise<void>;
-  /**
-   * The year-end closure closed a version that never became current (`QĐ-91e`): the system does it, so there is no actor.
-   * A version that was current stays as the reference budget of the year and is not told here.
-   */
-  versionExpired(tx: DbTx, event: BudgetVersionEvent): Promise<void>;
+export interface PendingSpendContribution {
+  /** What the requests of the Cost Center that wait to be decided cost in the year; `exceptRequestId` is one that does not count. */
+  pendingOf(costCenterId: string, year: number, exceptRequestId: string | null, tx?: DbTx): Promise<bigint>;
 }
 
 /**
- * One change of a budget, as `BudgetChangeListeners` tells it: the kind names the method of `BudgetChangeListener` that hears it.
- * `LOCK_WAITING` is emitted before the budget year lock is taken, the others once the change is written.
- */
-export type BudgetChange =
-  | { kind: 'LOCK_WAITING'; scope: { costCenterId: string; year: number } }
-  | { kind: 'VERSION_APPROVED'; actor: AuthenticatedPrincipal; event: BudgetVersionEvent }
-  | { kind: 'VERSION_REFUSED'; actor: AuthenticatedPrincipal; event: BudgetRefusalEvent }
-  | { kind: 'VERSION_EXPIRED'; event: BudgetVersionEvent };
-
-/**
- * The contexts told when a budget changes, in the transaction of the change and in the order they were added; one that throws
- * rolls the change back. With nobody added a change is told to nobody.
+ * The contexts that tell the budgets what waits to be decided as spend. The answers are added up. With nobody added, nothing waits: every
+ * graph that loads the budgets loads the requests and adds its answer.
  */
 @Injectable()
-export class BudgetChangeListeners extends Listeners<BudgetChange, DbTx> {
+export class PendingSpendContributions extends Contributions<PendingSpendContribution> {
   constructor() {
-    super('budgets.change-listeners');
+    super('budgets.pending-spend');
   }
-}
 
-/** The handler `BudgetChangeListeners.add` takes for a listener with one method for each kind of change. */
-export function budgetChangeHandler(listener: BudgetChangeListener): (tx: DbTx, change: BudgetChange) => Promise<void> {
-  return (tx, change) => {
-    switch (change.kind) {
-      case 'LOCK_WAITING':
-        return listener.lockWaiting(tx, change.scope);
-      case 'VERSION_APPROVED':
-        return listener.versionApproved(tx, change.actor, change.event);
-      case 'VERSION_REFUSED':
-        return listener.versionRefused(tx, change.actor, change.event);
-      case 'VERSION_EXPIRED':
-        return listener.versionExpired(tx, change.event);
-    }
-  };
+  /** What waits in the Cost Center and the year, from every context that adds its part. */
+  async total(costCenterId: string, year: number, tx?: DbTx): Promise<bigint> {
+    let sum = 0n;
+    for (const contribution of this.all()) sum += await contribution.pendingOf(costCenterId, year, null, tx);
+
+    return sum;
+  }
 }
 
 /** What a commitment shows of the request it is held for, as the context that keeps requests tells it. */

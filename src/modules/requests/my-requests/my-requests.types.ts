@@ -7,7 +7,6 @@ import type {
 } from '../access-request/access-request.types';
 import type { AccessRequestBranchCode } from '../access-request/access-request.policy';
 import type { CheckRecord } from '../spend/budget-check.repo';
-import type { FinanceReviewRecord } from '../spend/finance-review.repo';
 
 /** The state of a request that was sent: every state but `DRAFT`, which is not a request until it is sent. */
 export type SentState = Exclude<AccessRequestState, 'DRAFT'>;
@@ -65,18 +64,16 @@ export interface MyRequestRow {
   withdrawal: { withdrawnAt: Date | null } | null;
 }
 
-/** The newest budget check of a request, as far as the stage of a request in the queue of its head needs it: no figure of a budget. */
-export type QueuedCheck = Pick<CheckRecord, 'route' | 'staleCostEvidence' | 'ranAt'>;
-
-/** The newest review of Finance of a request: how it ended and when. The note Finance wrote stays in the detail. */
-export type QueuedReview = Pick<FinanceReviewRecord, 'outcome' | 'decidedAt'>;
+/** The newest budget check of a request, as far as the stage of a request in the queue of its head needs it: no figure of what is left. */
+export type QueuedCheck = Pick<
+  CheckRecord,
+  'outcome' | 'route' | 'blockReasons' | 'staleCostEvidence' | 'overBaseByMinor' | 'overByMinor' | 'currency'
+>;
 
 /** What decides the stage of the requests of one page, read once for the page. */
 export interface SpendStageFacts {
   checks: ReadonlyMap<string, QueuedCheck>;
-  reviews: ReadonlyMap<string, QueuedReview>;
-  /** The requests that hold an open Finance review step, and those that hold an open spend step. */
-  openFinanceReview: ReadonlySet<string>;
+  /** The requests that hold an open spend step. */
   openSpendApproval: ReadonlySet<string>;
   /** The requests whose newest spend decision refused them, with what the approver wrote. */
   spendRefusals: ReadonlyMap<string, { reason: string | null }>;

@@ -15,7 +15,7 @@ import {
 
 const OLD = 'employee-old';
 const NEW = 'employee-new';
-const KINDS: ReassignableStepKind[] = ['NEED', 'SPEND_APPROVAL', 'FINANCE_REVIEW', 'IT_ASSESSMENT'];
+const KINDS: ReassignableStepKind[] = ['NEED', 'SPEND_APPROVAL', 'IT_ASSESSMENT'];
 
 const held = (kind: ReassignableStepKind, extra: Partial<OpenStep> = {}): OpenStep => ({
   kind,
@@ -71,8 +71,6 @@ describe('which steps an event may touch (FR-3.16, US-05-12)', () => {
     ['SPEND_APPROVAL', 'DEPARTMENT_CHANGED', false],
     ['SPEND_APPROVAL', 'HEAD_CHANGED', false],
     ['SPEND_APPROVAL', 'EFFECTIVE_DATE_REACHED', false],
-    ['FINANCE_REVIEW', 'DEPARTMENT_CHANGED', false],
-    ['FINANCE_REVIEW', 'HEAD_CHANGED', false],
     ['IT_ASSESSMENT', 'DEPARTMENT_CHANGED', false],
     ['IT_ASSESSMENT', 'HEAD_CHANGED', false],
   ] as const)('a held %s step on %s: touched = %s', (kind, trigger, touched) => {
@@ -87,7 +85,6 @@ describe('which steps an event may touch (FR-3.16, US-05-12)', () => {
   it.each([
     ['NEED', OLD, true],
     ['SPEND_APPROVAL', OLD, true],
-    ['FINANCE_REVIEW', OLD, false],
     ['IT_ASSESSMENT', OLD, false],
     ['NEED', 'somebody-else', false],
     ['SPEND_APPROVAL', 'somebody-else', false],
@@ -125,7 +122,7 @@ describe('keep, give or wait', () => {
 
   it('leaves a held step alone when the event may not touch it, whatever the table says', () => {
     expect(decideReassignment(held('SPEND_APPROVAL'), on('HEAD_CHANGED'), goesTo(NEW))).toEqual({ action: 'KEEP' });
-    expect(decideReassignment(held('FINANCE_REVIEW'), on('ROLE_HOLDER_CHANGED', OLD), nobody)).toEqual({
+    expect(decideReassignment(held('IT_ASSESSMENT'), on('ROLE_HOLDER_CHANGED', OLD), nobody)).toEqual({
       action: 'KEEP',
     });
   });
@@ -166,7 +163,7 @@ describe('keep, give or wait', () => {
   });
 
   it('takes a step from a holder who has left, to the one the table names or to a wait', () => {
-    const left = held('FINANCE_REVIEW', { holderGone: true });
+    const left = held('SPEND_APPROVAL', { holderGone: true });
 
     expect(decideReassignment(left, on('HOLDER_LEFT'), goesTo(NEW, null))).toEqual({
       action: 'ASSIGN',
@@ -174,10 +171,10 @@ describe('keep, give or wait', () => {
       routingRow: null,
     });
     expect(
-      decideReassignment(left, on('HOLDER_LEFT'), { assigneeEmployeeId: null, reason: 'NO_FINANCE_REVIEWER' }),
+      decideReassignment(left, on('HOLDER_LEFT'), { assigneeEmployeeId: null, reason: 'NO_SPENDING_APPROVER' }),
     ).toEqual({
       action: 'WAIT',
-      reason: 'NO_FINANCE_REVIEWER',
+      reason: 'NO_SPENDING_APPROVER',
     });
   });
 });
@@ -187,7 +184,6 @@ describe('what a waiting step needs to be put right (US-05-11)', () => {
     ['NO_SPENDING_APPROVER', 'CONFIGURE_SPENDING_APPROVER'],
     ['NO_DEPARTMENT_HEAD', 'ASSIGN_DEPARTMENT_HEAD'],
     ['SPENDING_APPROVER_IS_PARTY', 'CONFIGURE_SPENDING_APPROVER'],
-    ['NO_FINANCE_REVIEWER', 'GRANT_FINANCE_ROLE'],
     ['NO_IT_ADMIN_IN_CHARGE', 'NAME_IT_ADMIN_IN_CHARGE'],
   ] as const)('%s asks for %s', (reason, hint) => {
     expect(configurationHintOf(reason)).toBe(hint);
@@ -213,8 +209,6 @@ describe('what a waiting step needs to be put right (US-05-11)', () => {
   it.each([
     ['NEED', true, 'PENDING'],
     ['NEED', false, 'WAITING_CONTROLLED'],
-    ['FINANCE_REVIEW', true, 'AWAITING_FINANCE_REVIEW'],
-    ['FINANCE_REVIEW', false, 'WAITING_CONTROLLED'],
     ['SPEND_APPROVAL', true, 'AWAITING_SPEND_DECISION'],
     ['SPEND_APPROVAL', false, 'WAITING_CONTROLLED'],
     ['IT_ASSESSMENT', true, null],

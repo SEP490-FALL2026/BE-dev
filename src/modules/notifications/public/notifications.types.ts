@@ -93,10 +93,15 @@ export const IN_APP_NOTIFICATION_CODES = [
   'BUDGET_PROPOSAL_SUBMITTED',
   'BUDGET_PROPOSAL_RETURNED',
   'BUDGET_VERSION_DECIDED',
+  // Not given any more (Finance has no review of a request, `QĐ-97c`): the codes stay so that a notice already in an inbox still reads.
   'REQUEST_FINANCE_REVIEW_OPENED',
   'REQUEST_RETURNED_BY_FINANCE',
   'REQUEST_AWAITING_BUDGET',
   'REQUEST_BUDGET_VERSION_ENDED',
+  // The check of the budget of a request (`BR-MF1-06g`, `BR-MF1-07c`): it uses the reserve and waits for the head, it is blocked, it went back at the decision.
+  'REQUEST_RESERVE_CONFIRMATION_NEEDED',
+  'REQUEST_BUDGET_BLOCKED',
+  'REQUEST_RETURNED_AT_DECISION',
   'BUDGET_VERSION_CLOSED_UNAPPROVED',
   'BUDGET_PROPOSAL_CLOSED_YEAR_END',
   'BUDGET_PROPOSAL_TASK_ASSIGNED',

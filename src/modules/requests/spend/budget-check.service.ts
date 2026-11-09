@@ -1,6 +1,5 @@
 import { Injectable } from '@nestjs/common';
 import type { BusinessDate } from '../../../core/business-date';
-import { fiscalYearOf } from '../../../core/fiscal-year';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { BudgetsApi } from '../../budgets/public/budgets.api';
@@ -9,13 +8,12 @@ import { FinanceApi } from '../../finance/public/finance.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { accessRequestAuditEvent } from '../access-request/access-request-audit-event.mapper';
 import { AccessRequestNotPriceableError } from '../access-request/access-request.errors';
-import { chargedCostCenterId } from '../access-request/access-request.policy';
 import { AccessRequestRepo } from '../access-request/access-request.repo';
 import type { AccessRequestRecord, PricingRecord } from '../access-request/access-request.types';
 import { RepricingService } from '../repricing/repricing.service';
 import { AssessmentReadRepo } from '../access-request/assessment-read.repo';
 import { scaleAmount } from './line-allocation.policy';
-import { checkBudget, type CheckResult, type YearBudget, type YearSlice } from './budget-check.policy';
+import { checkBudget, type CheckResult, type YearBudget } from './budget-check.policy';
 import { BudgetCheckRepo, type CheckRecord, type CheckTrigger } from './budget-check.repo';
 
 /** The same amount for the same year and months: nothing to write. */
@@ -38,12 +36,32 @@ export interface CheckScope {
 export type CheckOutcome =
   { status: 'CHECKED'; check: CheckRecord } | { status: 'NOT_CHECKABLE'; reason: NotCheckable };
 
+type Computed =
+  | {
+      status: 'COMPUTED';
+      result: CheckResult;
+      currency: string;
+      bindingTotalMinor: bigint;
+      costCenterId: string | null;
+    }
+  | { status: 'NOT_CHECKABLE'; reason: NotCheckable };
+
+/**
+ * The Cost Center a check reads (`BR-MF1-06d`, `M-12`): the one the department has now, not the one the request was sent with. At the
+ * decision the check is made again and a Cost Center that is not the one of the check before is blocked, with the reason that there is no
+ * approved budget (RV-09); the commitment held before stays in the Cost Center it was held in.
+ */
+interface CostCenterRead {
+  id: string | null;
+  changed: boolean;
+}
+
 /**
  * Makes one check of the budget of a request (`US-06-12`) and keeps it. It works the amount of the request out again for the day of the
  * check (`QĐ-109e`: the months left of that year, at the price of that day), reads the year it falls in, turns the amount into the
- * estimate that falls on the company in the reporting currency at the rate of the day, reads the current budget of that year, and gives
- * the whole to the pure judgement. It decides nothing about who looks next: the routing does, from what is kept here. It runs in the
- * transaction of the caller, so the check and the move it leads to are one.
+ * estimate that falls on the company in the reporting currency at the rate of the day, reads the approved budget of that year in the
+ * current Cost Center of the department, and gives the whole to the pure judgement. It decides nothing about who looks next: the routing
+ * does, from what is kept here. It runs in the transaction of the caller, so the check and the move it leads to are one.
  */
 @Injectable()
 export class BudgetCheckService {
@@ -77,8 +95,9 @@ export class BudgetCheckService {
     if (repriced === null) return { status: 'NOT_CHECKABLE', reason: 'PRICE_MISSING' };
     await this.keepRepriced(tx, request, repriced, { trigger, actor, today });
 
-    await this.checks.lockBudgetYears(tx, chargedCostCenterId(request), this.bindingYears(request));
-    const computed = await this.computeOn(tx, request, today, scope);
+    const costCenter = await this.costCenterOf(tx, request, trigger);
+    if (costCenter.id !== null) await this.checks.lockBudgetYears(tx, costCenter.id, this.bindingYears(request));
+    const computed = await this.computeOn(tx, request, today, costCenter, scope);
     if (computed.status === 'NOT_CHECKABLE') return computed;
 
     const { result } = computed;
@@ -88,9 +107,11 @@ export class BudgetCheckService {
       trigger,
       route: result.route,
       staleCostEvidence: result.staleCostEvidence,
-      planLineOverdue: result.planLineOverdue,
-      periodClosed: result.periodClosed,
-      offPlan: false,
+      outcome: result.outcome,
+      blockReasons: result.blockReasons,
+      overBaseByMinor: result.overBaseByMinor,
+      overByMinor: result.overByMinor,
+      costCenterId: computed.costCenterId,
       currency: computed.currency,
       bindingTotalMinor: computed.bindingTotalMinor,
       years: result.years,
@@ -99,6 +120,26 @@ export class BudgetCheckService {
     });
 
     return { status: 'CHECKED', check };
+  }
+
+  /**
+   * What a check would say now, as it reads the figures at this moment, without keeping it: the spending approver opens their
+   * step and sees what is left and what the others that wait cost today, not as they were when the request was sent. The amount is the
+   * one of today, in memory only. `trigger` says what the check is for: a decision compares the Cost Center with the check before.
+   */
+  async compute(
+    tx: DbTx,
+    request: AccessRequestRecord,
+    now: Date,
+    scope?: CheckScope,
+    trigger: CheckTrigger = 'SPEND_DECISION',
+  ): Promise<Computed> {
+    const today = await this.organizationReads.businessToday(now, tx);
+    const repriced = await this.priceOn(tx, request, today);
+    if (repriced === null) return { status: 'NOT_CHECKABLE', reason: 'PRICE_MISSING' };
+    const costCenter = await this.costCenterOf(tx, request, trigger);
+
+    return this.computeOn(tx, { ...request, pricing: repriced }, today, costCenter, scope);
   }
 
   /**
@@ -153,7 +194,7 @@ export class BudgetCheckService {
     );
   }
 
-  /** The year the amount that binds falls in, whichever of them is open: what the check reads and what a commitment holds. */
+  /** The year the amount that binds falls in: what the check reads and what a commitment holds. */
   private bindingYears(request: AccessRequestRecord): number[] {
     const { pricing } = request;
     if (pricing.status !== 'PRICED' || pricing.budgetYear === null) return [];
@@ -161,48 +202,32 @@ export class BudgetCheckService {
     return [pricing.budgetYear];
   }
 
-  /**
-   * What a check would say now, as it reads the figures at this moment, without keeping it: the spending approver opens their
-   * step and sees what is left and what the others that wait cost today, not as they were when the request was sent. The amount is the
-   * one of today, in memory only.
-   */
-  async compute(
-    tx: DbTx,
-    request: AccessRequestRecord,
-    now: Date,
-    scope?: CheckScope,
-  ): Promise<
-    | { status: 'COMPUTED'; result: CheckResult; currency: string; bindingTotalMinor: bigint }
-    | { status: 'NOT_CHECKABLE'; reason: NotCheckable }
-  > {
-    const today = await this.organizationReads.businessToday(now, tx);
-    const repriced = await this.priceOn(tx, request, today);
-    if (repriced === null) return { status: 'NOT_CHECKABLE', reason: 'PRICE_MISSING' };
+  /** The Cost Center in use of the department now, and whether a decision finds it is not the one the request was last checked against. */
+  private async costCenterOf(tx: DbTx, request: AccessRequestRecord, trigger: CheckTrigger): Promise<CostCenterRead> {
+    const current = (await this.organizationReads.getUnitCostCenterIds([request.departmentId], tx)).get(
+      request.departmentId,
+    );
+    if (current === undefined) return { id: null, changed: false };
+    if (trigger !== 'SPEND_DECISION') return { id: current, changed: false };
+    const prior = (await this.checks.latest(request.id, tx))?.costCenterId ?? request.costCenterId;
 
-    return this.computeOn(tx, { ...request, pricing: repriced }, today, scope);
+    return { id: current, changed: prior !== null && prior !== current };
   }
 
-  /** The one year the request is counted in: its budget, what waits to be decided against it, and whether it is closed. */
-  private async sliceOf(
-    tx: DbTx,
-    request: AccessRequestRecord,
-    year: { year: number; currentYear: number; costMinor: bigint },
-  ): Promise<YearSlice> {
-    const isOpen = year.year >= year.currentYear;
-    const costCenterId = chargedCostCenterId(request);
-    const facts = await this.budgets.yearFacts(costCenterId, isOpen ? [year.year] : [], tx);
-    const pendingMinor = isOpen ? await this.checks.pendingFor(costCenterId, year.year, request.id, tx) : 0n;
-    const found = facts.get(year.year);
-    const budget: YearBudget | null = found
+  /** The approved budget of the year in the Cost Center, with what is held and spent; null when there is none, or the Cost Center changed. */
+  private async budgetOf(tx: DbTx, costCenter: CostCenterRead, year: number): Promise<YearBudget | null> {
+    if (costCenter.id === null || costCenter.changed) return null;
+    const found = (await this.budgets.yearFacts(costCenter.id, [year], tx)).get(year);
+
+    return found
       ? {
           versionId: found.versionId,
-          totalMinor: found.totalMinor,
+          baseMinor: found.baseMinor,
+          reserveMinor: found.reserveMinor,
           heldMinor: found.heldMinor,
           spentMinor: found.spentMinor,
         }
       : null;
-
-    return { year: year.year, costMinor: year.costMinor, closed: !isOpen, budget, pendingMinor };
   }
 
   /** The check of a request whose `pricing` is already the amount of `today`. */
@@ -210,45 +235,62 @@ export class BudgetCheckService {
     tx: DbTx,
     request: AccessRequestRecord,
     today: BusinessDate,
+    costCenter: CostCenterRead,
     scope?: CheckScope,
-  ): Promise<
-    | { status: 'COMPUTED'; result: CheckResult; currency: string; bindingTotalMinor: bigint }
-    | { status: 'NOT_CHECKABLE'; reason: NotCheckable }
-  > {
+  ): Promise<Computed> {
     const { pricing } = request;
-    if (pricing.status !== 'PRICED' || pricing.amount === null || pricing.budgetYear === null) {
-      return { status: 'NOT_CHECKABLE', reason: 'PRICE_MISSING' };
+    const converted = await this.costOf(tx, request, today, scope);
+    if (converted.status === 'NOT_CHECKABLE' || pricing.budgetYear === null) {
+      return converted.status === 'NOT_CHECKABLE' ? converted : { status: 'NOT_CHECKABLE', reason: 'PRICE_MISSING' };
     }
-    // A request for a group is checked on the people approved: the amount is the part of it for fewer people.
-    const checked = scope
-      ? scaleAmount(pricing.amount.amountMinor, scope.priced, scope.scoped)
-      : pricing.amount.amountMinor;
-    if (checked === null) return { status: 'NOT_CHECKABLE', reason: 'PRICE_MISSING' };
+    const costMinor = converted.costMinor;
 
-    const currentYear = fiscalYearOf(today);
-    const assessment = request.branch === 'NEW_SOFTWARE' ? await this.assessments.findAssessment(request.id, tx) : null;
-
-    // What the company bears is the price before tax (`FR-3.2`): no estimate of tax is added to the amount that is checked.
+    // The year is the one the amount was worked out for, which is the year of the day of the check (`QĐ-109e`).
     const year = pricing.budgetYear;
-    const converted = await this.finance.snapshotMoney(
-      tx,
-      { amountMinor: checked, currency: pricing.amount.currency },
-      today,
-    );
-    if (converted.status === 'MISSING_RATE') return { status: 'NOT_CHECKABLE', reason: 'RATE_MISSING' };
-    const reporting = converted.snapshot.reportingCurrency;
-    const costMinor = converted.snapshot.reportingAmountMinor;
-
-    const slices = [await this.sliceOf(tx, request, { year, currentYear, costMinor })];
-
+    const budget = await this.budgetOf(tx, costCenter, year);
+    const pendingMinor =
+      costCenter.id === null ? 0n : await this.checks.pendingFor(costCenter.id, year, request.id, tx);
+    const assessment = request.branch === 'NEW_SOFTWARE' ? await this.assessments.findAssessment(request.id, tx) : null;
     const quoteValidUntil = assessment?.quote?.validUntil ?? null;
     const result = checkBudget({
-      slices,
-      staleCostEvidence: quoteValidUntil !== null && quoteValidUntil < today,
-      // A request is not attached to a line of the plan any more (`QĐ-101n`): none is overdue.
-      planLineOverdue: false,
+      slice: { year, costMinor, budget, pendingMinor },
+      priceExpired: quoteValidUntil !== null && quoteValidUntil < today,
     });
 
-    return { status: 'COMPUTED', result, currency: reporting, bindingTotalMinor: costMinor };
+    return {
+      status: 'COMPUTED',
+      result,
+      currency: converted.currency,
+      bindingTotalMinor: costMinor,
+      costCenterId: costCenter.id,
+    };
+  }
+
+  /**
+   * What the request costs the company, in the reporting currency at the rate of the day: the price before tax (`FR-3.2`), so no estimate of
+   * tax is added. A request for a group is checked on the people approved: the amount is the part of it for fewer people.
+   */
+  private async costOf(
+    tx: DbTx,
+    request: AccessRequestRecord,
+    today: BusinessDate,
+    scope?: CheckScope,
+  ): Promise<
+    { status: 'COST'; costMinor: bigint; currency: string } | { status: 'NOT_CHECKABLE'; reason: NotCheckable }
+  > {
+    const { amount } = request.pricing;
+    if (request.pricing.status !== 'PRICED' || amount === null)
+      return { status: 'NOT_CHECKABLE', reason: 'PRICE_MISSING' };
+    const checked = scope ? scaleAmount(amount.amountMinor, scope.priced, scope.scoped) : amount.amountMinor;
+    if (checked === null) return { status: 'NOT_CHECKABLE', reason: 'PRICE_MISSING' };
+
+    const converted = await this.finance.snapshotMoney(tx, { amountMinor: checked, currency: amount.currency }, today);
+    if (converted.status === 'MISSING_RATE') return { status: 'NOT_CHECKABLE', reason: 'RATE_MISSING' };
+
+    return {
+      status: 'COST',
+      costMinor: converted.snapshot.reportingAmountMinor,
+      currency: converted.snapshot.reportingCurrency,
+    };
   }
 }

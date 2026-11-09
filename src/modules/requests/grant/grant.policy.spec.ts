@@ -64,7 +64,7 @@ describe('grantAnswerFor a request of a person (US-07-01 AC-3, AC-16)', () => {
   });
 
   it('is not approved enough while a step is open, and ended once the request is over', () => {
-    for (const state of ['PENDING', 'AWAITING_SPEND_DECISION', 'AWAITING_FINANCE_REVIEW'] as const) {
+    for (const state of ['PENDING', 'AWAITING_SPEND_DECISION', 'AWAITING_SPEND_SUBMISSION'] as const) {
       expect(grantAnswerFor(request(state))).toEqual({ status: 'NOT_APPROVED' });
     }
     for (const state of ['REJECTED', 'IT_REJECTED', 'EXECUTING', 'COMPLETED', 'FAILED', 'WITHDRAWN'] as const) {

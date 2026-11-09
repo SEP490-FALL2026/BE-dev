@@ -1027,8 +1027,11 @@ enum SlaSubjectKind {
 enum SlaReminderRole {
   HOLDER
   SUPERIOR
+  // Legacy: the reminder to Finance of a question that is retired; read, never written (QĐ-97c).
   FINANCE_QUESTION
   SUPER_ADMIN
+  // The person who asked for the request, told with the holder of a need step that is late (QĐ-100j).
+  REQUESTER
 }
 
 /// One reminder of a step, or of a request in the queue of the head, that waited past its deadline (US-05-09): at most one for each

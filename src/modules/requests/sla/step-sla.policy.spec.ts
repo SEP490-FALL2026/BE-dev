@@ -20,7 +20,8 @@ const alone: StepRecipientFacts = {
   holderUsable: true,
   superiorEmployeeId: 'head',
   superAdminEmployeeId: 'admin',
-  financeQuestionEmployeeId: null,
+  stepKind: 'SPEND_APPROVAL',
+  requesterEmployeeId: 'requester',
 };
 
 describe('the deadline of a step and what it makes due (US-05-09 AC-6)', () => {
@@ -148,20 +149,32 @@ describe('who is told that a step is late (US-05-09 AC-1, AC-4, AC-8, AC-9)', ()
     );
   });
 
-  it('adds Finance for a question that is still open, and never names a person twice', () => {
-    expect(recipientsOf({ ...alone, financeQuestionEmployeeId: 'fin' }).map((entry) => entry.role)).toEqual([
-      'HOLDER',
-      'SUPERIOR',
-      'FINANCE_QUESTION',
+  it('QĐ-100j: tells the holder of a late need step and the person who asked for the request, and nobody above them', () => {
+    expect(recipientsOf({ ...alone, stepKind: 'NEED' })).toEqual([
+      { employeeId: 'holder', role: 'HOLDER', cause: null },
+      { employeeId: 'requester', role: 'REQUESTER', cause: null },
     ]);
-    expect(recipientsOf({ ...alone, financeQuestionEmployeeId: 'holder' }).map((entry) => entry.role)).toEqual([
+  });
+
+  it('QĐ-100j: tells only the holder of a late need step when the requester has left or is the holder, and never names a person twice', () => {
+    expect(recipientsOf({ ...alone, stepKind: 'NEED', requesterEmployeeId: null }).map((entry) => entry.role)).toEqual([
       'HOLDER',
-      'SUPERIOR',
     ]);
-    expect(recipientsOf({ ...alone, financeQuestionEmployeeId: 'head' }).map((entry) => entry.role)).toEqual([
-      'HOLDER',
-      'SUPERIOR',
+    expect(
+      recipientsOf({ ...alone, stepKind: 'NEED', requesterEmployeeId: 'holder' }).map((entry) => entry.role),
+    ).toEqual(['HOLDER']);
+  });
+
+  it('QĐ-100j: still tells the Super Admin of a need step nobody holds, and never the requester then', () => {
+    expect(recipientsOf({ ...alone, stepKind: 'NEED', holderEmployeeId: null, holderUsable: false })).toEqual([
+      { employeeId: 'admin', role: 'SUPER_ADMIN', cause: 'NO_HOLDER' },
     ]);
+  });
+
+  it('QĐ-100j: does not tell the requester of any step but the need step, and keeps the superior of those', () => {
+    for (const stepKind of ['SPEND_APPROVAL', 'IT_ASSESSMENT'] as const) {
+      expect(recipientsOf({ ...alone, stepKind }).map((entry) => entry.role)).toEqual(['HOLDER', 'SUPERIOR']);
+    }
   });
 
   it('names nobody twice when the Super Admin is also the superior', () => {
@@ -199,14 +212,13 @@ describe('what the notice of a reminder says', () => {
     ageWorkingDays: 4,
     overdueWorkingDays: 2,
     holderEmployeeId: 'holder',
-    questionId: 'q1',
   };
 
   it.each([
     ['STEP', 'HOLDER', 'STEP_SLA_REMINDER'],
     ['STEP', 'SUPERIOR', 'STEP_SLA_ESCALATION'],
     ['STEP', 'SUPER_ADMIN', 'STEP_SLA_NO_SUPERIOR'],
-    ['STEP', 'FINANCE_QUESTION', 'FINANCE_QUESTION_REMINDER'],
+    ['STEP', 'REQUESTER', 'STEP_SLA_REMINDER'],
     ['SPEND_QUEUE', 'HOLDER', 'SPEND_QUEUE_REMINDER'],
     ['SPEND_QUEUE', 'SUPER_ADMIN', 'SPEND_QUEUE_REMINDER'],
   ] as const)('is the code for %s and %s', (subject, role, code) => {
@@ -233,7 +245,6 @@ describe('what the notice of a reminder says', () => {
       overdueWorkingDays: 2,
       cause: null,
     });
-    expect(noticeParamsOf('FINANCE_QUESTION_REMINDER', facts, null)).toMatchObject({ questionId: 'q1' });
   });
 });
 

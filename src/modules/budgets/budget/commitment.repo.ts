@@ -8,6 +8,7 @@ import type {
   CommitmentReleaseReason,
   HeldCommitment,
 } from '../public/budgets.types';
+import { BudgetCommitmentNotHoldableError } from './budget.errors';
 import { BudgetYearLockRepo } from './budget-year-lock.repo';
 import { InvoiceRepo } from './invoice.repo';
 import type { CommitmentRow } from './commitment-release.policy';
@@ -61,15 +62,20 @@ export class CommitmentRepo {
   }
 
   /**
-   * Holds the amount of each year for the request, one commitment for each year (`INV-16`): attached to the current budget of
-   * the year when there is one, and waiting for one with the reason *no budget* when there is not (`US-06-07` AC-1). The
-   * database refuses a second commitment for the same request and year.
+   * Holds the amount of each year for the request, one commitment for each year (`INV-16`), attached to the approved version of the
+   * year; with no version it refuses (`BudgetCommitmentNotHoldableError`), unless the caller is the one that makes the commitment on 01/01
+   * (`allowUnattached`), which waits for a budget with the reason *no budget* (`US-06-07` AC-1). The database refuses a second commitment
+   * for the same request and year.
    *
    * The budget of each Cost Center and year is locked first, the earliest year first, after the row of the request the caller
    * holds: what the decision of a version attaches and what is held here never read the current budget at the same moment,
    * so a commitment never waits for a budget that was approved while it was being made.
    */
-  async hold(tx: DbTx, input: CommitmentHoldInput): Promise<HeldCommitment[]> {
+  async hold(
+    tx: DbTx,
+    input: CommitmentHoldInput,
+    options: { allowUnattached: boolean } = { allowUnattached: false },
+  ): Promise<HeldCommitment[]> {
     await this.yearLock.lock(
       tx,
       input.costCenterId,
@@ -81,6 +87,9 @@ export class CommitmentRepo {
         where: { costCenterId: input.costCenterId, year: item.year, state: 'APPROVED' },
         select: { id: true },
       });
+      // No commitment is made without an approved version of the year (`FR-5.8a`), but the one made on 01/01 (`allowUnattached`).
+      if (!current && !options.allowUnattached)
+        throw new BudgetCommitmentNotHoldableError('NO_APPROVED_BUDGET', item.year);
       const created = await tx.budgetCommitment.create({
         data: {
           organizationId: input.organizationId,

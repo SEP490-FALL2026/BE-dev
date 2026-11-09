@@ -1,6 +1,7 @@
 import {
   approvalDetailOf,
   approvalSummaryOf,
+  budgetSnapshotOf,
   detailPeopleIds,
   detailPlanIds,
   type DetailFacts,
@@ -19,7 +20,6 @@ const row = (request: Record<string, unknown> = {}): Row =>
     createdAt: new Date('2026-10-01T02:00:00Z'),
     slaWorkingDays: 2,
     samePersonAsSpend: false,
-    noIndependentReview: true,
     request: {
       type: 'GRANT',
       planId: 'plan-1',
@@ -63,7 +63,7 @@ describe('a row of the queue of the spending approver (US-06-01 AC-1)', () => {
       costCenter: { id: 'cc-1', code: 'CC-01' },
       amount: { amount: '123456', currency: 'VND' },
       primaryCode: null,
-      noIndependentReview: true,
+      outcome: null,
       batchId: 'batch-1',
     });
   });
@@ -108,7 +108,6 @@ describe('the spend step of one request and what surrounds it (US-06-01 AC-3, AC
         decidedAt: null,
         slaWorkingDays: 2,
         samePersonAsSpend: false,
-        noIndependentReview: false,
       },
       request: {
         state: 'AWAITING_SPEND_DECISION',
@@ -133,7 +132,8 @@ describe('the spend step of one request and what surrounds it (US-06-01 AC-3, AC
       person,
       center: { id: 'cc-1', code: 'CC-01' },
       cost: null,
-      latestBudgetInformation: null,
+      budgetSnapshot: null,
+      annualVendorAmount: null,
       ...extra,
     }) as unknown as DetailFacts;
 
@@ -214,5 +214,100 @@ describe('what is looked up for the detail of one request (US-06-01 AC-3, AC-9)'
     expect(
       detailPeopleIds({ assigneeEmployeeId: null }, { ...request, type: 'GROUP_GRANT', needDecision: null }, null),
     ).toEqual([null, 'emp-1', null, null, null]);
+  });
+});
+
+describe('BR-MF1-07b: the budget snapshot of the spending approver', () => {
+  const money = (minor: bigint) => ({ amount: minor.toString(), currency: 'VND' });
+  const year = {
+    year: 2026,
+    costMinor: 30n,
+    code: 'BUDGET_OK' as const,
+    versionId: 'v-1',
+    budgetMinor: 110n,
+    baseMinor: 100n,
+    reserveMinor: 10n,
+    heldMinor: 20n,
+    spentMinor: 40n,
+    remainingMinor: 35n,
+    remainingBaseMinor: 25n,
+    remainingWithReserveMinor: 35n,
+    shareBasisPoints: 8571,
+    pendingMinor: 15n,
+  };
+
+  it('BR-MF1-07b: shows the base, the reserve, what is spent, held and waiting, what is left at the two levels, and how far over the base', () => {
+    const snapshot = budgetSnapshotOf({
+      year,
+      outcome: 'USES_RESERVE',
+      blockReasons: [],
+      overBaseByMinor: 5n,
+      overByMinor: null,
+      decisionCheckId: null,
+      computedAt: new Date('2026-10-05T01:00:00Z'),
+      confirmation: {
+        reason: 'Dự án gấp',
+        confirmedByEmployeeId: 'emp-2',
+        confirmedAt: new Date('2026-10-04T01:00:00Z'),
+      },
+      money,
+      person,
+    });
+
+    expect(snapshot).toMatchObject({
+      year: 2026,
+      base: money(100n),
+      reserve: money(10n),
+      spent: money(40n),
+      committed: money(20n),
+      pending: money(15n),
+      remainingBase: money(25n),
+      remainingWithReserve: money(35n),
+      outcome: 'USES_RESERVE',
+      overBaseBy: money(5n),
+      overBy: null,
+      decisionSnapshotCheckId: null,
+      reserveConfirmation: {
+        reason: 'Dự án gấp',
+        confirmedBy: person('emp-2'),
+        confirmedAt: '2026-10-04T01:00:00.000Z',
+      },
+    });
+  });
+
+  it('BR-MF1-07b: a year with no approved version has no figure of a budget, which is not a budget of 0', () => {
+    const snapshot = budgetSnapshotOf({
+      year: {
+        ...year,
+        code: 'NO_ACTIVE_BUDGET',
+        versionId: null,
+        budgetMinor: null,
+        baseMinor: null,
+        reserveMinor: null,
+        heldMinor: null,
+        spentMinor: null,
+        remainingMinor: null,
+        remainingBaseMinor: null,
+        remainingWithReserveMinor: null,
+        shareBasisPoints: null,
+      },
+      outcome: 'BLOCKED',
+      blockReasons: ['NO_APPROVED_BUDGET'],
+      overBaseByMinor: null,
+      overByMinor: null,
+      decisionCheckId: 'check-1',
+      computedAt: new Date('2026-10-05T01:00:00Z'),
+      confirmation: null,
+      money,
+      person,
+    });
+
+    expect(snapshot).toMatchObject({
+      base: null,
+      remainingBase: null,
+      blockedReasons: ['NO_APPROVED_BUDGET'],
+      reserveConfirmation: null,
+      decisionSnapshotCheckId: 'check-1',
+    });
   });
 });

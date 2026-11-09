@@ -14,11 +14,12 @@ import {
  */
 
 /** The kinds of step that have a deadline: a closed list, so a new kind of step is an addition made here on purpose. */
-export const SLA_STEP_KINDS = ['NEED', 'IT_ASSESSMENT', 'FINANCE_REVIEW', 'SPEND_APPROVAL'] as const;
+export const SLA_STEP_KINDS = ['NEED', 'IT_ASSESSMENT', 'SPEND_APPROVAL'] as const;
 export type SlaStepKind = (typeof SLA_STEP_KINDS)[number];
 
 export type SlaSubjectKind = 'STEP' | 'SPEND_QUEUE';
-export type SlaReminderRole = 'HOLDER' | 'SUPERIOR' | 'FINANCE_QUESTION' | 'SUPER_ADMIN';
+/** `REQUESTER` is told with the holder of a need step that is late (`QĐ-100j`); `FINANCE_QUESTION` is read from reminders of before. */
+export type SlaReminderRole = 'HOLDER' | 'SUPERIOR' | 'REQUESTER' | 'SUPER_ADMIN';
 
 /** Why the Super Admin is told instead of, or besides, the people who hold the subject. */
 export type ReminderCause = 'NO_SUPERIOR' | 'NO_HOLDER' | 'HOLDER_NOT_USABLE';
@@ -101,8 +102,10 @@ export interface StepRecipientFacts {
   holderUsable: boolean;
   superiorEmployeeId: string | null;
   superAdminEmployeeId: string | null;
-  /** The Finance employee to remind of a question still open on the step; null when there is none or Finance cannot act. */
-  financeQuestionEmployeeId: string | null;
+  /** The kind of the late step: the need step is told to the holder and the requester, with nobody above them (`QĐ-100j`). */
+  stepKind: SlaStepKind;
+  /** The person who asked for the request, when they still work: told with the holder of a need step. */
+  requesterEmployeeId: string | null;
 }
 
 export interface Recipient {
@@ -126,9 +129,9 @@ function withoutRepeats(candidates: readonly Recipient[]): Recipient[] {
 /**
  * Who is told that a step is late: the holder when they still work, and their superior; the Super Admin when there is no
  * superior, when nobody holds the step (it waits under control, and the reminder goes on every working day until the
- * configuration is put right) or when the holder has left and the step was not given to anybody yet; Finance besides, when a
- * question to Finance is open. A person who is missing is simply not in the list, so a missing Super Admin leaves a reminder
- * that is recorded and told to nobody.
+ * configuration is put right) or when the holder has left and the step was not given to anybody yet. A need step that is late is told to
+ * its holder and to the person who asked for the request, and to nobody above them (`QĐ-100j`, `QĐ-52c`). A person who is missing is
+ * simply not in the list, so a missing Super Admin leaves a reminder that is recorded and told to nobody.
  */
 export function recipientsOf(facts: StepRecipientFacts): Recipient[] {
   const found: Recipient[] = [];
@@ -143,14 +146,15 @@ export function recipientsOf(facts: StepRecipientFacts): Recipient[] {
     tellSuperAdmin('HOLDER_NOT_USABLE');
   } else {
     found.push({ employeeId: facts.holderEmployeeId, role: 'HOLDER', cause: null });
-    if (facts.superiorEmployeeId !== null && facts.superiorEmployeeId !== facts.holderEmployeeId) {
+    if (facts.stepKind === 'NEED') {
+      if (facts.requesterEmployeeId !== null) {
+        found.push({ employeeId: facts.requesterEmployeeId, role: 'REQUESTER', cause: null });
+      }
+    } else if (facts.superiorEmployeeId !== null && facts.superiorEmployeeId !== facts.holderEmployeeId) {
       found.push({ employeeId: facts.superiorEmployeeId, role: 'SUPERIOR', cause: null });
     } else {
       tellSuperAdmin('NO_SUPERIOR');
     }
-  }
-  if (facts.financeQuestionEmployeeId !== null) {
-    found.push({ employeeId: facts.financeQuestionEmployeeId, role: 'FINANCE_QUESTION', cause: null });
   }
 
   return withoutRepeats(found);
@@ -176,16 +180,11 @@ export function queueRecipientsOf(facts: QueueRecipientFacts): Recipient[] {
 
 /** The code of the notice a part of a reminder gives. */
 export type ReminderNoticeCode =
-  | 'STEP_SLA_REMINDER'
-  | 'STEP_SLA_ESCALATION'
-  | 'STEP_SLA_NO_SUPERIOR'
-  | 'SPEND_QUEUE_REMINDER'
-  | 'FINANCE_QUESTION_REMINDER';
+  'STEP_SLA_REMINDER' | 'STEP_SLA_ESCALATION' | 'STEP_SLA_NO_SUPERIOR' | 'SPEND_QUEUE_REMINDER';
 
 export function noticeCodeOf(subject: SlaSubjectKind, role: SlaReminderRole): ReminderNoticeCode {
-  if (role === 'FINANCE_QUESTION') return 'FINANCE_QUESTION_REMINDER';
   if (subject === 'SPEND_QUEUE') return 'SPEND_QUEUE_REMINDER';
-  if (role === 'HOLDER') return 'STEP_SLA_REMINDER';
+  if (role === 'HOLDER' || role === 'REQUESTER') return 'STEP_SLA_REMINDER';
 
   return role === 'SUPERIOR' ? 'STEP_SLA_ESCALATION' : 'STEP_SLA_NO_SUPERIOR';
 }
@@ -198,7 +197,6 @@ export interface ReminderNoticeFacts {
   ageWorkingDays: number;
   overdueWorkingDays: number;
   holderEmployeeId: string | null;
-  questionId: string | null;
 }
 
 /** The parameters of the notice of `code`, exactly the keys the closed table of the inbox allows for it. */
@@ -232,8 +230,6 @@ export function noticeParamsOf(
       };
     case 'SPEND_QUEUE_REMINDER':
       return { requestId: facts.requestId, ...numbers, cause };
-    case 'FINANCE_QUESTION_REMINDER':
-      return { requestId: facts.requestId, stepKind: facts.stepKind, questionId: facts.questionId, ...numbers };
   }
 }
 

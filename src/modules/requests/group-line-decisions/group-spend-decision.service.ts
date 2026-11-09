@@ -4,10 +4,10 @@ import type { AuthenticatedPrincipal } from '../../../infrastructure/security/to
 import { AccessRequestNotFoundError } from '../access-request/access-request.errors';
 import { AccessRequestRepo } from '../access-request/access-request.repo';
 import { BudgetCheckService } from '../spend/budget-check.service';
-import { checkSpendDecider, judgeApproval, type BlockedReason } from '../spend/spend-decision.policy';
+import { checkSpendDecider, judgeApproval, type ReturnReason } from '../spend/spend-decision.policy';
 import { SpendDecisionRefusedError } from '../spend/spend.errors';
-import { SpendEffectsService } from '../budget-information/spend-effects.service';
-import { SpendRoutingService } from '../spend/spend-routing.service';
+import { ReserveConfirmationRepo } from '../reserve-confirmation/reserve-confirmation.repo';
+import { SpendEffectsService } from '../spend-effects/spend-effects.service';
 import { SpendStepRepo } from '../spend/spend-step.repo';
 import { compareLines, type LineVerdict } from '../group-request/group-line-decision.policy';
 import { GroupRequestLinesMismatchError } from '../group-request/group-request.errors';
@@ -17,23 +17,19 @@ import { RequestLineRepo } from '../group-request/request-line.repo';
 
 export interface LineSpendDecisionInput {
   lines: readonly LineVerdict[];
-  /** The exception an approval accepts: why, and the years it names. */
-  override?: { reason: string; years: readonly number[] };
 }
 
 export type LineSpendDecisionResult =
   | { status: 'DECIDED'; requestState: string }
-  /** The request was checked again as the approver decided and it is not for them yet: nothing was decided (`US-06-01` AC-18). */
-  | { status: 'BOUNCED'; to: 'FINANCE_REVIEW' }
-  | { status: 'BOUNCED'; to: 'HEAD'; reason: BlockedReason };
+  /** The request was checked again as the approver decided and it is not for them now: it went back to its head, nothing was decided (`US-06-01` AC-18). */
+  | { status: 'BOUNCED'; to: 'HEAD'; reasons: ReturnReason[] };
 
 /**
  * The spending approver decides the people of a request for a group (`US-05-17` AC-9, `US-06-01` AC-15, `US-06-08` AC-10). The step
  * is one, the check is one and the snapshot is one, but the decision is for each person: the approver sees the people with what each
  * costs, approves some and refuses others, and decides all of them at once. The check is made again on the people approved, so the
- * snapshot, the override and the commitment are always those of what was approved. A request that turned out to be an exception, or
- * whose data is at fault, goes back as a request of one person does and nobody is decided. The approver who is named in a line holds
- * no step: the substitute does (`SpendRoutingService`).
+ * snapshot and the commitment are always those of what was approved. A request that is blocked now, or uses a reserve nobody confirmed,
+ * goes back to its head as a request of one person does and nobody is decided.
  */
 @Injectable()
 export class GroupSpendDecisionService {
@@ -43,8 +39,8 @@ export class GroupSpendDecisionService {
     private readonly steps: SpendStepRepo,
     private readonly lines: RequestLineRepo,
     private readonly checks: BudgetCheckService,
+    private readonly confirmations: ReserveConfirmationRepo,
     private readonly effects: SpendEffectsService,
-    private readonly routing: SpendRoutingService,
     private readonly records: GroupSpendRecordService,
   ) {}
 
@@ -67,9 +63,6 @@ export class GroupSpendDecisionService {
         stepState: step.state,
       });
       if (refusal) throw new SpendDecisionRefusedError(refusal);
-      // The person who completed the review of Finance of this request does not decide its spend step (`SoD-8`).
-      await this.effects.refuseReviewer(tx, request, actor.employeeId);
-
       const lines = await this.lines.lock(tx, request.id);
       const confirmed = lines.filter((line) => line.state === 'NEED_CONFIRMED');
       const mismatch = compareLines(
@@ -92,40 +85,37 @@ export class GroupSpendDecisionService {
       if (approved === 0) {
         return {
           status: 'DECIDED',
-          ...(await this.records.record(tx, actor, request, { step, verdicts, checkId, override: null, now })),
+          ...(await this.records.record(tx, actor, request, {
+            step,
+            verdicts,
+            checkId,
+            usesReserve: false,
+            reserveReason: null,
+            now,
+          })),
         };
       }
       if (outcome.status === 'NOT_CHECKABLE') throw new SpendDecisionRefusedError('NOT_CHECKABLE');
 
-      const reviewed = await this.effects.reviewed(tx, request, step);
-      const verdict = judgeApproval(outcome.check, reviewed, input.override ? { years: input.override.years } : null);
-      switch (verdict.kind) {
-        case 'BLOCKED':
-          await this.effects.sendBack(tx, actor, request, step, now, verdict.reason);
+      const confirmation = await this.confirmations.ofStep(step.id, tx);
+      const verdict = judgeApproval(outcome.check, confirmation !== null);
+      if (verdict.kind === 'RETURNED') {
+        await this.effects.sendBack(tx, actor, request, step, { now, reasons: verdict.reasons, check: outcome.check });
 
-          return { status: 'BOUNCED', to: 'HEAD', reason: verdict.reason };
-        case 'NEEDS_REVIEW':
-          await this.effects.sendBack(tx, actor, request, step, now, 'NEEDS_FINANCE_REVIEW');
-          await this.routing.reopenReview(tx, actor, request, now);
-
-          return { status: 'BOUNCED', to: 'FINANCE_REVIEW' };
-        case 'OVERRIDE_REQUIRED':
-        case 'OVERRIDE_MISMATCH':
-          throw new SpendDecisionRefusedError(verdict.kind, verdict.years);
-        case 'OVERRIDE_NOT_NEEDED':
-          throw new SpendDecisionRefusedError('OVERRIDE_NOT_NEEDED');
-        case 'OK':
-          return {
-            status: 'DECIDED',
-            ...(await this.records.record(tx, actor, request, {
-              step,
-              verdicts,
-              checkId,
-              override: input.override ? { reason: input.override.reason, years: verdict.overriddenYears } : null,
-              now,
-            })),
-          };
+        return { status: 'BOUNCED', to: 'HEAD', reasons: verdict.reasons };
       }
+
+      return {
+        status: 'DECIDED',
+        ...(await this.records.record(tx, actor, request, {
+          step,
+          verdicts,
+          checkId,
+          usesReserve: verdict.usesReserve,
+          reserveReason: verdict.usesReserve ? (confirmation?.reason ?? null) : null,
+          now,
+        })),
+      };
     });
   }
 }

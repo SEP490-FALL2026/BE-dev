@@ -93,19 +93,19 @@ The invoices are numbered with the tag of the dataset and their key (`SV-HD1`), 
 
 ## Requests and extras
 
-| Record | Requester | Target                    | Demo purpose                                                                          |
-| ------ | --------- | ------------------------- | ------------------------------------------------------------------------------------- |
-| R1     | NV-DEV1   | COMPLETED                 | Trọn luồng D-1: duyệt nhu cầu → trình lô → duyệt chi → IT cấp xong.                   |
-| R2     | NV-DEV2   | AWAITING_SPEND_DECISION   | Đang chờ Người duyệt chi (đã kiểm tra ngân sách BUDGET_OK).                           |
-| R3     | NV-DEV3   | PENDING                   | Đang chờ trưởng phòng duyệt nhu cầu.                                                  |
-| R4     | NV-DES1   | REJECTED                  | Trưởng phòng Thiết kế từ chối ở bước nhu cầu.                                         |
-| R5     | NV-DEV1   | WITHDRAWN                 | Người yêu cầu tự rút khi còn chờ.                                                     |
-| R6     | NV-DES1   | AWAITING_EXECUTION        | Phần mềm nội bộ không phí: đã duyệt nhu cầu, chờ IT Admin cấp.                        |
-| R7     | NV-DEV2   | AWAITING_SPEND_SUBMISSION | Đã duyệt nhu cầu, nằm trong hàng trình lô của trưởng phòng.                           |
-| R8     | NV-DEV1   | AWAITING_IT_ASSESSMENT    | Đề xuất phần mềm ngoài danh mục: đã duyệt nhu cầu, chờ IT Admin thẩm định.            |
-| R9     | NV-DES2   | AWAITING_FINANCE_REVIEW   | Phòng Thiết kế chưa có ngân sách năm: kiểm tra NO_ACTIVE_BUDGET, chờ Finance rà soát. |
-| R10    | NV-MKT1   | COMPLETED                 | Marketing: duyệt chi xong, cam kết có thuế GTGT được khấu trừ, đã nhận hóa đơn.       |
-| R11    | NV-SAL1   | COMPLETED                 | Kinh doanh: duyệt chi xong, hóa đơn về cao hơn cam kết.                               |
+| Record | Requester | Target                    | Demo purpose                                                                                                   |
+| ------ | --------- | ------------------------- | -------------------------------------------------------------------------------------------------------------- |
+| R1     | NV-DEV1   | COMPLETED                 | Trọn luồng D-1: duyệt nhu cầu → trình lô → duyệt chi → IT cấp xong.                                            |
+| R2     | NV-DEV2   | AWAITING_SPEND_DECISION   | Đang chờ Người duyệt chi (đã kiểm tra ngân sách BUDGET_OK).                                                    |
+| R3     | NV-DEV3   | PENDING                   | Đang chờ trưởng phòng duyệt nhu cầu.                                                                           |
+| R4     | NV-DES1   | REJECTED                  | Trưởng phòng Thiết kế từ chối ở bước nhu cầu.                                                                  |
+| R5     | NV-DEV1   | WITHDRAWN                 | Người yêu cầu tự rút khi còn chờ.                                                                              |
+| R6     | NV-DES1   | AWAITING_EXECUTION        | Phần mềm nội bộ không phí: đã duyệt nhu cầu, chờ IT Admin cấp.                                                 |
+| R7     | NV-DEV2   | AWAITING_SPEND_SUBMISSION | Đã duyệt nhu cầu, nằm trong hàng trình lô của trưởng phòng.                                                    |
+| R8     | NV-DEV1   | AWAITING_IT_ASSESSMENT    | Đề xuất phần mềm ngoài danh mục: đã duyệt nhu cầu, chờ IT Admin thẩm định.                                     |
+| R9     | NV-DES2   | AWAITING_SPEND_SUBMISSION | Phòng Thiết kế chưa có ngân sách năm: nằm ở hàng đợi của trưởng phòng; trình lô sẽ bị chặn NO_APPROVED_BUDGET. |
+| R10    | NV-MKT1   | COMPLETED                 | Marketing: duyệt chi xong, cam kết có thuế GTGT được khấu trừ, đã nhận hóa đơn.                                |
+| R11    | NV-SAL1   | COMPLETED                 | Kinh doanh: duyệt chi xong, hóa đơn về cao hơn cam kết.                                                        |
 
 | Record           | Purpose                                                    |
 | ---------------- | ---------------------------------------------------------- |

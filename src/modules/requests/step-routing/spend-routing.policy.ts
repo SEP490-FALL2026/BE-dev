@@ -1,5 +1,5 @@
 /**
- * Who holds the steps after the check of the budget, as pure decisions (`US-06-13`, `US-06-01`, `FR-3.15`). Nobody picks the
+ * Who holds the spend step after the check of the budget, as pure decisions (`US-06-01`, `FR-3.15`). Nobody picks the
  * holder (`FR-3.5`): the roles do. Nobody decides a request of their own or one they are given, whatever role they hold
  * (`SoD-4`), and a step nobody valid can hold waits under control and is never given to someone else (`US-05-11`).
  */
@@ -31,20 +31,4 @@ export function routeSpendStep(people: RequestPeople, spendingApproverEmployeeId
   if (isParty(people, spendingApproverEmployeeId)) return { outcome: 'WAITING', reason: 'SPENDING_APPROVER_IS_PARTY' };
 
   return { outcome: 'ASSIGNED', assigneeEmployeeId: spendingApproverEmployeeId };
-}
-
-export const NO_FINANCE_REVIEWER = 'NO_FINANCE_REVIEWER';
-
-export type ReviewAssignment =
-  | { outcome: 'ASSIGNED'; assigneeEmployeeId: string }
-  /** Nobody who can act holds the role of Finance now: the request waits and Finance is not replaced (`US-06-13` AC-6). */
-  | { outcome: 'WAITING'; reason: typeof NO_FINANCE_REVIEWER }
-  /** Finance is the one the request is for: there is nobody independent to review it (`US-06-13` AC-5). */
-  | { outcome: 'SKIPPED' };
-
-export function routeFinanceReview(people: RequestPeople, financeEmployeeId: string | null): ReviewAssignment {
-  if (financeEmployeeId === null) return { outcome: 'WAITING', reason: NO_FINANCE_REVIEWER };
-  if (isParty(people, financeEmployeeId)) return { outcome: 'SKIPPED' };
-
-  return { outcome: 'ASSIGNED', assigneeEmployeeId: financeEmployeeId };
 }

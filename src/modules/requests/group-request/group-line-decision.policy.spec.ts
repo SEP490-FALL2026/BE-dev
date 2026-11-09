@@ -171,15 +171,16 @@ describe('what the audit says of a spend decision taken on the people of a group
     ).toMatchObject({ decision: 'APPROVED', reason: null });
   });
 
-  it('says of the whole decision what was checked, whether it was overridden and for which years, who was approved and who refused', () => {
+  it('says of the whole decision what was checked, whether it used the reserve and why, who was approved and who refused', () => {
     expect(
       groupSpendDecidedDetail(
         request,
-        { id: 'step-1', samePersonAsSpend: false, noIndependentReview: true },
+        { id: 'step-1', samePersonAsSpend: false },
         {
           verdicts,
           checkId: 'check-1',
-          override: { reason: 'Cần gấp', years: [2026, 2027] },
+          usesReserve: true,
+          reserveReason: 'Cần gấp',
           decision: 'APPROVED',
           deciderRole: 'SPENDING_APPROVER',
         },
@@ -189,10 +190,9 @@ describe('what the audit says of a spend decision taken on the people of a group
       checkId: 'check-1',
       decision: 'APPROVED',
       deciderRole: 'SPENDING_APPROVER',
-      override: true,
-      overrideYears: '2026,2027',
+      usesReserve: true,
+      reserveReason: 'Cần gấp',
       samePersonAsSpend: false,
-      noIndependentReview: true,
       requestState: 'AWAITING_EXECUTION',
       lineCount: 2,
       approvedEmployeeIds: ['p1'],
@@ -200,19 +200,20 @@ describe('what the audit says of a spend decision taken on the people of a group
     });
   });
 
-  it('goes to REJECTED when nobody is approved, with no override', () => {
+  it('goes to REJECTED when nobody is approved, with no reserve used', () => {
     expect(
       groupSpendDecidedDetail(
         request,
-        { id: 'step-1', samePersonAsSpend: true, noIndependentReview: false },
+        { id: 'step-1', samePersonAsSpend: true },
         {
           verdicts: [verdicts[1]],
           checkId: null,
-          override: null,
+          usesReserve: false,
+          reserveReason: null,
           decision: 'REJECTED',
           deciderRole: 'SPENDING_APPROVER',
         },
       ),
-    ).toMatchObject({ requestState: 'REJECTED', override: false, overrideYears: '', checkId: null });
+    ).toMatchObject({ requestState: 'REJECTED', usesReserve: false, reserveReason: null, checkId: null });
   });
 });

@@ -2,7 +2,12 @@
 export interface YearBudgetFacts {
   versionId: string;
   currency: string;
+  /** Base and reserve together. */
   totalMinor: bigint;
+  /** The base of the approved version: what the department may spend without the reserve (`BR-MF1-06e`). */
+  baseMinor: bigint;
+  /** The reserve of the approved version: what is left to use, with the head's confirmation, once the base is gone. */
+  reserveMinor: bigint;
   /** What the commitments attached to the budget hold now. */
   heldMinor: bigint;
   /** What has become an expense in the year. */
@@ -18,7 +23,7 @@ export interface CommitmentHoldInput {
   snapshotCheckId: string;
   currency: string;
   now: Date;
-  /** The cost that falls on the company in each year, in the reporting currency; none for a year that is only a forecast. */
+  /** The cost that falls on the company in the one year, in the reporting currency: exactly one entry, of the current year (`BR-MF1-07d`). */
   items: readonly { year: number; amountMinor: bigint }[];
 }
 

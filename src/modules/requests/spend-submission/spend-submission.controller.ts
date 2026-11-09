@@ -11,6 +11,7 @@ import { ApiSuccessResponse } from '../../../infrastructure/http/decorators/api-
 import { AuthenticatedOnly, RequireRoles } from '../../../infrastructure/security/decorators/access.decorators';
 import { CurrentPrincipal } from '../../../infrastructure/security/models/current-principal';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
+import { ReserveConfirmationService } from '../reserve-confirmation/reserve-confirmation.service';
 import { SpendBatchService } from './spend-batch.service';
 import { SpendBatchListService } from './spend-batch-list.service';
 import { SpendBatchViewService } from './spend-batch-view.service';
@@ -22,7 +23,10 @@ import {
   IdParamDto,
   PageQueryDto,
   QueueResponseDto,
+  ReserveConfirmationBodyDto,
+  ReserveConfirmationResponseDto,
   SubmitBatchBodyDto,
+  SubmitBatchResponseDto,
   SupplementBodyDto,
   SupplementListResponseDto,
   SupplementResponseDto,
@@ -55,10 +59,10 @@ const BATCH_NOT_FOUND = {
 } as const;
 
 /**
- * Sending requests that cost money on to be decided as spend (`US-06-14`, `US-05-04` AC-11 to AC-16). Only the head of a
- * department keeps its queue, sends its requests on in a batch, attaches them to the plan of the budget and changes the day
- * the money goes out in a supplementary file; the Employee, Finance, the IT Admin and the Super Admin cannot. Nothing here shows
- * a figure of the budget.
+ * Sending requests that cost money on to be decided as spend (`US-06-14`, `US-05-04` AC-11 to AC-16, `BR-MF1-06g`). Only the head of a
+ * department keeps its queue, sends its requests on in a batch, confirms with a line of reason that a request uses the reserve, and
+ * shortens a request in a supplementary file; the Employee, Finance, the IT Admin and the Super Admin cannot. Nothing here shows a figure
+ * of what is left of the budget.
  */
 @ApiTags('spend-submission')
 @Controller({ version: '1' })
@@ -66,6 +70,7 @@ export class SpendSubmissionController {
   constructor(
     private readonly queue: SpendQueueService,
     private readonly batches: SpendBatchService,
+    private readonly reserve: ReserveConfirmationService,
     private readonly batchViews: SpendBatchViewService,
     private readonly batchList: SpendBatchListService,
     private readonly supplements: SupplementService,
@@ -78,7 +83,7 @@ export class SpendSubmissionController {
   @ApiSuccessResponse(QueueResponseDto, {
     message: 'SPEND_QUEUE.LISTED',
     description:
-      'The requests of the department of the head that cost money and whose need is approved, not yet sent on, with the reason for one that stopped or that Finance gave back. Each request also says since when it waits in the queue, how many working days that is, whether it has waited longer than the days the head may take (the days in force when it entered the queue) and how many reminders the head has had about it. Never a figure of the budget, what is left or a code of the check.',
+      'The requests of the department of the head that cost money and whose need is approved, not yet sent on, each with where it stands (not sent, waiting for the head to confirm the reserve, or blocked with its reasons) and what a check made now says (budgetOutcome: WITHIN_BASE, USES_RESERVE, BLOCKED), so the head knows which of them needs a line of reason to be sent on, and how far over the base or the reserve a request is. Each also says since when it waits in the queue, how many working days that is, whether it has waited longer than the days the head may take and how many reminders the head has had about it. Never what is left of the budget.',
   })
   @ApiErrorResponses(...AUTH_ERRORS, NOT_HEAD, INVALID)
   async list(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Query() query: PageQueryDto) {
@@ -92,11 +97,11 @@ export class SpendSubmissionController {
   @Post('spend-batches')
   @RequireRoles('MANAGER')
   @ApiOperation({ operationId: 'spendBatchSubmit', summary: 'Send requests on to be decided as spend' })
-  @ApiSuccessResponse(BatchResponseDto, {
+  @ApiSuccessResponse(SubmitBatchResponseDto, {
     status: HttpStatus.CREATED,
     message: 'SPEND_BATCH.SUBMITTED',
     description:
-      'Sends the requests chosen, one or more, on in one batch. Each request is checked against the budget and given the step the check says (to the spending approver, or to Finance for a review first); one that has no line of the plan or "outside the plan", or whose data is at fault, stays in the queue with the reason and the others go on. The items of the batch say how each fared.',
+      'Sends the requests chosen, one or more, on in one batch. The amount of each is worked out again for the month of the batch and each is checked against the budget (BR-MF1-06g): within the base it goes to the spending approver; if it uses the reserve it goes only when the head gives a line of reason for it in the same act (reserveConfirmations, 1 to 500 characters, only for a request of the batch, only used when its check says it uses the reserve; the answer says IGNORED for one that does not), and otherwise stays in the queue waiting for the confirmation (AWAITING_RESERVE_CONFIRMATION); blocked (over the reserve, no approved budget in the current Cost Center, a quote that is no longer valid) or with a price or a rate missing, it stays in the queue with the reason and the others go on. results says how each fared and what became of its confirmation.',
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,
@@ -108,13 +113,58 @@ export class SpendSubmissionController {
         'A request chosen is not waiting in the queue: it was sent on, or does not cost money (SPEND.NOT_IN_QUEUE), or the department has no Cost Center in use now, which stops the batch before any request is checked against a budget (FINANCE.SETUP_INCOMPLETE). Nothing is written.',
       examples: [SPEND_ERROR_EXAMPLES.NOT_IN_QUEUE, SPEND_ERROR_EXAMPLES.FINANCE_SETUP_INCOMPLETE],
     },
-    INVALID,
+    {
+      status: HttpStatus.UNPROCESSABLE_ENTITY,
+      description:
+        'The body is invalid (VALIDATION_ERROR: a reason that is empty, over 500 characters or on more than one line), or a confirmation names a request that is not in the batch (SPEND_BATCH.CONFIRMATION_NOT_IN_BATCH). Nothing is written.',
+      examples: [VALIDATION_EXAMPLE, SPEND_ERROR_EXAMPLES.CONFIRMATION_NOT_IN_BATCH],
+    },
   )
   async submit(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Body() body: SubmitBatchBodyDto) {
     try {
-      const id = await this.batches.submit(actor, body.requestIds);
+      const { batchId, results } = await this.batches.submit(actor, body.requestIds, body.reserveConfirmations);
 
-      return { batch: await this.batchViews.get(actor, id) };
+      return { batch: await this.batchViews.get(actor, batchId), results };
+    } catch (error) {
+      throw toSpendApiException(error);
+    }
+  }
+
+  @Post('access-requests/:id/reserve-confirmation')
+  @RequireRoles('MANAGER')
+  @ApiOperation({
+    operationId: 'spendReserveConfirm',
+    summary: 'Confirm that a request uses the reserve, with a line of reason',
+  })
+  @ApiSuccessResponse(ReserveConfirmationResponseDto, {
+    message: 'SPEND.RESERVE_CONFIRMED',
+    description:
+      'The head of the department confirms, with one line of reason (1 to 500 characters), a request in their queue whose check says it uses the reserve. The request is checked again for today: if it still uses the reserve, the spend step is opened for the spending approver with the confirmation kept on it and its SLA counted from now (result SPEND_STEP_OPENED, confirmationKept true); if it is within the base now, the step is opened with no confirmation (confirmationKept false); if it is blocked now, nothing is opened or kept and the answer says so (result BLOCKED, with the reasons). A confirmation stays when the head of the department changes. The head cannot confirm a request they asked for or are given.',
+  })
+  @ApiErrorResponses(
+    ...AUTH_ERRORS,
+    NOT_HEAD,
+    NOT_FOUND,
+    {
+      status: HttpStatus.FORBIDDEN,
+      description: 'The head asked for the request or is given it (SPEND.RESERVE_CONFIRMER_IS_BENEFICIARY).',
+      examples: [FORBIDDEN_EXAMPLE, SPEND_ERROR_EXAMPLES.RESERVE_CONFIRMER_IS_BENEFICIARY],
+    },
+    {
+      status: HttpStatus.CONFLICT,
+      description:
+        'The request does not wait for the confirmation of the reserve: its check is within the base or blocked, a spend step is open, it was withdrawn or is not in the queue, or another confirmation came first (SPEND.RESERVE_NOT_PENDING).',
+      examples: [SPEND_ERROR_EXAMPLES.RESERVE_NOT_PENDING],
+    },
+    INVALID,
+  )
+  async confirmReserve(
+    @CurrentPrincipal() actor: AuthenticatedPrincipal,
+    @Param() params: IdParamDto,
+    @Body() body: ReserveConfirmationBodyDto,
+  ) {
+    try {
+      return { reserveConfirmation: await this.reserve.confirm(actor, params.id, body.reason) };
     } catch (error) {
       throw toSpendApiException(error);
     }

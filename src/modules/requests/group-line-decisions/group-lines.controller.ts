@@ -145,24 +145,18 @@ export class GroupLinesController {
     {
       status: HttpStatus.CONFLICT,
       description:
-        'The request has no spend step open (SPEND.NO_SPEND_STEP), the step is decided (SPEND.STEP_NOT_PENDING), the request cannot be checked now (SPEND.NOT_CHECKABLE), the caller completed the review of Finance of this request, and the two are two people (SPEND.REVIEWER_IS_APPROVER), or it was checked again and went back to Finance (SPEND.RECHECKED_NEEDS_FINANCE_REVIEW) or to its head (SPEND.RECHECKED_RETURNED_TO_HEAD).',
+        'The request has no spend step open (SPEND.NO_SPEND_STEP), the step is decided (SPEND.STEP_NOT_PENDING), the request cannot be checked now (SPEND.NOT_CHECKABLE), or it was checked again on the people approved and went back to its head (SPEND.RECHECKED_RETURNED_TO_HEAD, with the reasons: OVER_RESERVE, NO_APPROVED_BUDGET, PRICE_EXPIRED, RESERVE_UNCONFIRMED).',
       examples: [
         GROUP_REQUEST_ERROR_EXAMPLES.NO_SPEND_STEP,
-        GROUP_REQUEST_ERROR_EXAMPLES.REVIEWER_IS_APPROVER,
         GROUP_REQUEST_ERROR_EXAMPLES.NOT_CHECKABLE,
-        GROUP_REQUEST_ERROR_EXAMPLES.RECHECKED_NEEDS_FINANCE_REVIEW,
         GROUP_REQUEST_ERROR_EXAMPLES.RECHECKED_RETURNED_TO_HEAD,
       ],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
-        'The body is invalid (VALIDATION_ERROR: a refusal without its reason); the decision leaves out people whose need is confirmed or names others (GROUP_REQUEST.LINES_MISMATCH, with who); a year of the budget has less money than the request costs, or none (SPEND.OVERRIDE_REQUIRED, with the years): it cannot be approved.',
-      examples: [
-        VALIDATION_EXAMPLE,
-        GROUP_REQUEST_ERROR_EXAMPLES.LINES_MISMATCH,
-        GROUP_REQUEST_ERROR_EXAMPLES.OVERRIDE_REQUIRED,
-      ],
+        'The body is invalid (VALIDATION_ERROR: a refusal without its reason); the decision leaves out people whose need is confirmed or names others (GROUP_REQUEST.LINES_MISMATCH, with who).',
+      examples: [VALIDATION_EXAMPLE, GROUP_REQUEST_ERROR_EXAMPLES.LINES_MISMATCH],
     },
   )
   async decideSpend(
@@ -172,7 +166,7 @@ export class GroupLinesController {
   ) {
     try {
       const result = await this.spends.decide(actor, params.id, body);
-      if (result.status === 'BOUNCED') throw toRecheckedApiException(result);
+      if (result.status === 'BOUNCED') throw toRecheckedApiException(result.reasons);
 
       return { spendApproval: await this.approvals.detail(actor, params.id) };
     } catch (error) {

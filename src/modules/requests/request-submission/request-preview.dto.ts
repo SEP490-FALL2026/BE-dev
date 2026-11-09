@@ -76,10 +76,6 @@ const previewSchema = z.strictObject({
   /** Whether the request can go on to be decided as spend once the need is approved. */
   spendSubmission: z.enum(['NOT_NEEDED', 'ALLOWED', 'BLOCKED_UNTIL_PRICED']),
   chain: z.array(chainStepSchema),
-  /** Steps that may be added after sending, by a check that cannot be known now: only the kind and where it would stand. */
-  possibleExtraSteps: z.array(
-    z.strictObject({ kind: z.enum(['FINANCE_REVIEW']), beforeStep: z.enum(['SPEND_APPROVAL']) }),
-  ),
   totalExpectedWorkingDays: z.number().int().positive(),
 });
 

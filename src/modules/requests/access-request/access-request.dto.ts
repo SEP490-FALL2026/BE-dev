@@ -103,8 +103,6 @@ export const requestStateSchema = z.enum([
   'AWAITING_EXECUTION',
   'AWAITING_IT_ASSESSMENT',
   'AWAITING_SPEND_SUBMISSION',
-  'AWAITING_FINANCE_REVIEW',
-  'AWAITING_BUDGET',
   'AWAITING_SPEND_DECISION',
   'REJECTED',
   'IT_REJECTED',
@@ -186,22 +184,17 @@ export const requestSchema = z.strictObject({
     })
     .nullable(),
   /**
-   * Where a request that costs money stands on its way to the spending approver, and for one that stopped, why. It never
-   * carries a figure of the budget, what is left or a code of the check beyond the two problems of the data.
+   * Where a request that costs money stands on its way to the spending approver, and for one that stopped, why (`BR-MF1-06g`): not yet
+   * sent, waiting for the head to confirm the reserve, blocked (with every reason), waiting for the spending approver, or refused. The
+   * requester and the head read how far over the base or the reserve the request is; never what is left of the budget.
    */
   spend: z
     .strictObject({
-      stage: z.enum([
-        'NOT_SUBMITTED',
-        'BLOCKED',
-        'RETURNED_BY_FINANCE',
-        'WAITING_FINANCE_REVIEW',
-        'WAITING_BUDGET',
-        'WAITING_SPEND_DECISION',
-        'REFUSED',
-      ]),
-      blockedReason: z.enum(['STALE_COST_EVIDENCE', 'CLOSED_OR_EXPIRED_BUDGET_PERIOD']).nullable(),
-      financeReturnReason: z.string().nullable(),
+      stage: z.enum(['NOT_SUBMITTED', 'RESERVE_CONFIRMATION', 'BLOCKED', 'WAITING_SPEND_DECISION', 'REFUSED']),
+      /** Why the request is blocked, every reason that applies; empty unless the stage is `BLOCKED`. */
+      blockedReasons: z.array(z.enum(['PRICE_EXPIRED', 'NO_APPROVED_BUDGET', 'OVER_RESERVE'])),
+      /** How far over the base (it waits for the reserve to be confirmed) or over the reserve (blocked for that); null otherwise. */
+      overBy: moneySchema.nullable(),
       /** What the spending approver wrote when they refused the request. */
       refusalReason: z.string().nullable(),
     })

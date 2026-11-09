@@ -22,6 +22,7 @@ import {
   BudgetCycleReasonRequiredError,
   BudgetCycleYearPastError,
   BudgetCommitmentExistsError,
+  BudgetCommitmentNotHoldableError,
   BudgetCommitmentNotFoundError,
   BudgetCommitmentRefusedError,
   BudgetCostCenterNotFoundError,
@@ -108,6 +109,14 @@ export function toBudgetApiException(error: unknown): unknown {
   }
   if (error instanceof BudgetCommitmentExistsError) {
     return refuse(HttpStatus.CONFLICT, 'BUDGET.COMMITMENT_EXISTS', error.message, { year: error.year });
+  }
+  if (error instanceof BudgetCommitmentNotHoldableError) {
+    return refuse(
+      HttpStatus.CONFLICT,
+      'BUDGET.COMMITMENT_NOT_HOLDABLE',
+      error.message,
+      error.year === null ? { reason: error.reason } : { reason: error.reason, year: error.year },
+    );
   }
   if (error instanceof BudgetDecisionRefusedError) {
     return error.reason === 'NOT_SENT'

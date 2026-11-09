@@ -7,15 +7,10 @@ const AFTER_NEED: ReadonlySet<DemoRequestTarget> = new Set([
   'AWAITING_SPEND_SUBMISSION',
   'AWAITING_EXECUTION',
   'AWAITING_SPEND_DECISION',
-  'AWAITING_FINANCE_REVIEW',
   'AWAITING_IT_ASSESSMENT',
   'COMPLETED',
 ]);
-const AFTER_BATCH: ReadonlySet<DemoRequestTarget> = new Set([
-  'AWAITING_SPEND_DECISION',
-  'AWAITING_FINANCE_REVIEW',
-  'COMPLETED',
-]);
+const AFTER_BATCH: ReadonlySet<DemoRequestTarget> = new Set(['AWAITING_SPEND_DECISION', 'COMPLETED']);
 
 function fromPending(target: DemoRequestTarget): ScenarioAction | null {
   if (target === 'REJECTED') return 'NEED_REJECT';

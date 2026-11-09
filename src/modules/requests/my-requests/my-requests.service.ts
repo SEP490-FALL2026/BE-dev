@@ -70,17 +70,14 @@ export class MyRequestsService {
       idsOf(rows, (row) => (row.needStep.state === 'PENDING' ? row.needStep.assigneeEmployeeId : null)),
     );
     const planIds = idsOf(rows, (row) => row.planId);
-    const [people, plans, softwareNames, checks, reviews, openFinanceReview, openSpendApproval, spendRefusals] =
-      await Promise.all([
-        personIds.length === 0 ? Promise.resolve([]) : this.organizationReads.getEmployees([...new Set(personIds)]),
-        planIds.length === 0 ? Promise.resolve([]) : this.catalog.getPlanSummaries(planIds),
-        this.requests.proposalNames(idsOf(rows, (row) => (row.branch === 'NEW_SOFTWARE' ? row.id : null))),
-        this.facts.latestChecks(queued),
-        this.facts.latestReviews(queued),
-        this.facts.withOpenStep(controlled, 'FINANCE_REVIEW'),
-        this.facts.withOpenStep(controlled, 'SPEND_APPROVAL'),
-        this.facts.spendRefusals(rejected),
-      ]);
+    const [people, plans, softwareNames, checks, openSpendApproval, spendRefusals] = await Promise.all([
+      personIds.length === 0 ? Promise.resolve([]) : this.organizationReads.getEmployees([...new Set(personIds)]),
+      planIds.length === 0 ? Promise.resolve([]) : this.catalog.getPlanSummaries(planIds),
+      this.requests.proposalNames(idsOf(rows, (row) => (row.branch === 'NEW_SOFTWARE' ? row.id : null))),
+      this.facts.latestChecks(queued),
+      this.facts.withOpenSpendStep(controlled),
+      this.facts.spendRefusals(rejected),
+    ]);
     const needRefused = rows.filter((row) => row.state === 'REJECTED' && row.type !== 'GROUP_GRANT');
     const [needRefusals, assessmentRefusals] = await Promise.all([
       this.facts.needRefusals(needRefused.map((row) => row.needStepId)),
@@ -95,8 +92,6 @@ export class MyRequestsService {
       softwareNames,
       facts: {
         checks,
-        reviews,
-        openFinanceReview,
         openSpendApproval,
         spendRefusals,
         needRefusals,

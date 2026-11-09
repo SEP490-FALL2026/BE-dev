@@ -24,9 +24,9 @@ import { BudgetViewService } from './budget-view/budget-view.service';
 import { BudgetsController } from './budget-view/budgets.controller';
 import { BudgetsApi } from './public/budgets.api';
 import {
-  BudgetChangeListeners,
   CommitmentReleaseGuardHook,
   CommitmentRequestFactsHook,
+  PendingSpendContributions,
 } from './public/budgets.extension-points';
 import { BudgetCommitmentsController } from './commitment/budget-commitments.controller';
 import { CommitmentRepo } from './budget/commitment.repo';
@@ -161,7 +161,7 @@ import { BudgetAttachmentExpirySweeper } from './attachment/budget-attachment-ex
     CycleDeadlineService,
     CycleDeadlineSweeper,
     DepartmentCreationWindowListener,
-    BudgetChangeListeners,
+    PendingSpendContributions,
     CommitmentReleaseGuardHook,
     CommitmentRequestFactsHook,
     BudgetCostCenterUseReader,
@@ -172,6 +172,6 @@ import { BudgetAttachmentExpirySweeper } from './attachment/budget-attachment-ex
     InvoiceService,
     BudgetsApi,
   ],
-  exports: [BudgetsApi, BudgetChangeListeners, CommitmentReleaseGuardHook, CommitmentRequestFactsHook],
+  exports: [BudgetsApi, PendingSpendContributions, CommitmentReleaseGuardHook, CommitmentRequestFactsHook],
 })
 export class BudgetsModule {}

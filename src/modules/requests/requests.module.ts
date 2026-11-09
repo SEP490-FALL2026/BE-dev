@@ -103,14 +103,12 @@ import { CongestionService } from './sla/congestion.service';
 import { RequestsWorkFacadeModule } from './requests-work-facade.module';
 import { BudgetCheckRepo } from './spend/budget-check.repo';
 import { BudgetCheckService } from './spend/budget-check.service';
-import { FinanceReviewRepo } from './spend/finance-review.repo';
-import { FinanceReviewWriter } from './finance-review/finance-review-writer.service';
-import { FinanceReviewService } from './finance-review/finance-review.service';
-import { FinanceReviewsController } from './finance-review/finance-reviews.controller';
-import { BudgetInformationController } from './budget-questions/budget-information.controller';
-import { BudgetInformationRepo } from './budget-information/budget-information.repo';
-import { BudgetInformationService } from './budget-information/budget-information.service';
-import { BudgetInformationViewService } from './budget-information/budget-information-view.service';
+import { BudgetCheckController } from './budget-check/budget-check.controller';
+import { BudgetCheckViewService } from './budget-check/budget-check-view.service';
+import { BudgetCheckYearsViewService } from './budget-check/budget-check-years-view.service';
+import { ReserveConfirmationRepo } from './reserve-confirmation/reserve-confirmation.repo';
+import { ReserveConfirmationService } from './reserve-confirmation/reserve-confirmation.service';
+import { PendingSpendListener } from './spend/pending-spend.listener';
 import { SpendApprovalQueueService } from './spend-approval-view/spend-approval-queue.service';
 import { SpendApprovalSourcesService } from './spend-approval-view/spend-approval-sources.service';
 import { SpendApprovalViewService } from './spend-approval-view/spend-approval-view.service';
@@ -124,10 +122,12 @@ import { SpendDecisionService } from './spend-approval/spend-decision.service';
 import { SpendBatchService } from './spend-submission/spend-batch.service';
 import { SpendBatchListService } from './spend-submission/spend-batch-list.service';
 import { SpendBatchViewService } from './spend-submission/spend-batch-view.service';
-import { SpendEffectsService } from './budget-information/spend-effects.service';
+import { SpendEffectsService } from './spend-effects/spend-effects.service';
 import { SpendEntryService } from './spend/spend-entry.service';
 import { SpendHeadService } from './spend-submission/spend-head.service';
 import { SpendQueueService } from './spend-submission/spend-queue.service';
+import { SpendQueueOutcomeService } from './spend-submission/spend-queue-outcome.service';
+import { SpendApprovalSnapshotService } from './spend-approval-view/spend-approval-snapshot.service';
 import { SpendWireViewService } from './spend/spend-wire-view.service';
 import { SpendSubmissionController } from './spend-submission/spend-submission.controller';
 import { SupplementRepo } from './spend-submission/supplement.repo';
@@ -136,13 +136,10 @@ import { SupplementQueryService } from './spend-submission/supplement-query.serv
 import { SupplementRecorder } from './spend-submission/supplement-recorder.service';
 import { SupplementService } from './spend-submission/supplement.service';
 import { RepricingService } from './repricing/repricing.service';
-import { SpendBudgetListener } from './finance-review/spend-budget.listener';
 import { SpendRequestRepo } from './spend/spend-request.repo';
 import { SpendRoutingService } from './spend/spend-routing.service';
 import { SpendStatusService } from './spend/spend-status.service';
 import { SpendStepRepo } from './spend/spend-step.repo';
-import { SpendViewService } from './finance-review/spend-view.service';
-import { SpendYearsViewService } from './finance-review/spend-years-view.service';
 import { RenewalApplyService } from './renewal-apply/renewal-apply.service';
 import { RenewalHoldReader } from './renewal-request/renewal-hold.listener';
 import { RenewalRequestRepo } from './renewal-apply/renewal-request.repo';
@@ -202,11 +199,10 @@ import { MyRequestsService } from './my-requests/my-requests.service';
     SimilarSeatsController,
     CancellationController,
     ProposalsController,
-    FinanceReviewsController,
+    BudgetCheckController,
     SpendSubmissionController,
     SpendApprovalsController,
     NeedDecisionQueueController,
-    BudgetInformationController,
     GrantQueueController,
     AssessmentQueueController,
     ServiceAccountRequestsController,
@@ -268,16 +264,15 @@ import { MyRequestsService } from './my-requests/my-requests.service';
     RequestCommitmentFacts,
     SpendStepRepo,
     BudgetCheckRepo,
-    FinanceReviewRepo,
     SpendRequestRepo,
     BudgetCheckService,
     SpendRoutingService,
     SpendStatusService,
-    SpendViewService,
-    SpendYearsViewService,
-    FinanceReviewWriter,
-    FinanceReviewService,
-    SpendBudgetListener,
+    BudgetCheckViewService,
+    BudgetCheckYearsViewService,
+    PendingSpendListener,
+    ReserveConfirmationRepo,
+    ReserveConfirmationService,
     RepricingService,
     SpendWireViewService,
     SpendHeadService,
@@ -287,6 +282,8 @@ import { MyRequestsService } from './my-requests/my-requests.service';
     SpendBatchViewService,
     SpendBatchListService,
     SpendQueueService,
+    SpendQueueOutcomeService,
+    SpendApprovalSnapshotService,
     SupplementRepo,
     SupplementPricing,
     SupplementRecorder,
@@ -302,9 +299,6 @@ import { MyRequestsService } from './my-requests/my-requests.service';
     StepDueOnService,
     NeedDecisionQueueRepo,
     NeedDecisionQueueService,
-    BudgetInformationRepo,
-    BudgetInformationService,
-    BudgetInformationViewService,
     GrantQueueRepo,
     GrantQueueService,
     AssessmentQueueRepo,

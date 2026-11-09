@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
-import type { OutcomeFacts, QueuedCheck, QueuedReview } from './my-requests.types';
+import type { BlockReason } from '../spend/budget-check.policy';
+import type { OutcomeFacts, QueuedCheck } from './my-requests.types';
 
 const unique = (ids: readonly string[]): string[] => [...new Set(ids)];
 
@@ -21,30 +22,26 @@ export class MyRequestsFactsRepo {
       where: { requestId: { in: unique(requestIds) } },
       orderBy: [{ requestId: 'asc' }, { number: 'desc' }],
       distinct: ['requestId'],
-      select: { requestId: true, route: true, staleCostEvidence: true, ranAt: true },
+      select: {
+        requestId: true,
+        route: true,
+        staleCostEvidence: true,
+        outcome: true,
+        blockReasons: true,
+        overBaseByMinor: true,
+        overByMinor: true,
+        currency: true,
+      },
     });
 
-    return new Map(rows.map((row) => [row.requestId, row]));
+    return new Map(rows.map((row) => [row.requestId, { ...row, blockReasons: row.blockReasons as BlockReason[] }]));
   }
 
-  /** How the newest review of Finance of each request ended, and when. */
-  async latestReviews(requestIds: readonly string[]): Promise<Map<string, QueuedReview>> {
-    if (requestIds.length === 0) return new Map();
-    const rows = await this.prisma.requestFinanceReview.findMany({
-      where: { requestId: { in: unique(requestIds) } },
-      orderBy: [{ requestId: 'asc' }, { decidedAt: 'desc' }],
-      distinct: ['requestId'],
-      select: { requestId: true, outcome: true, decidedAt: true },
-    });
-
-    return new Map(rows.map((row) => [row.requestId, row]));
-  }
-
-  /** The requests that hold an open step of the kind (held or waiting). */
-  async withOpenStep(requestIds: readonly string[], kind: 'FINANCE_REVIEW' | 'SPEND_APPROVAL'): Promise<Set<string>> {
+  /** The requests that hold an open spend step (held or waiting). */
+  async withOpenSpendStep(requestIds: readonly string[]): Promise<Set<string>> {
     if (requestIds.length === 0) return new Set();
     const rows = await this.prisma.accessRequestStep.findMany({
-      where: { requestId: { in: unique(requestIds) }, kind, state: { in: ['PENDING', 'WAITING'] } },
+      where: { requestId: { in: unique(requestIds) }, kind: 'SPEND_APPROVAL', state: { in: ['PENDING', 'WAITING'] } },
       select: { requestId: true },
     });
 

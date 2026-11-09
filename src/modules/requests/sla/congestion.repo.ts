@@ -136,10 +136,15 @@ export class CongestionRepo {
     skip: number,
     take: number,
   ): Promise<{ rows: OpenStepRow[]; total: number }> {
+    // The review of Finance is retired: an old step of that kind is closed and is never one that waits.
     const where: Prisma.AccessRequestStepWhereInput =
       holderEmployeeId === null
-        ? { state: 'WAITING', assigneeEmployeeId: null }
-        : { state: { in: ['PENDING', 'WAITING'] }, assigneeEmployeeId: holderEmployeeId };
+        ? { state: 'WAITING', assigneeEmployeeId: null, kind: { not: 'FINANCE_REVIEW' } }
+        : {
+            state: { in: ['PENDING', 'WAITING'] },
+            assigneeEmployeeId: holderEmployeeId,
+            kind: { not: 'FINANCE_REVIEW' },
+          };
 
     return this.prisma.$transaction(
       async (tx) => {
@@ -168,7 +173,7 @@ export class CongestionRepo {
             return {
               stepId: step.id,
               requestId: step.requestId,
-              kind: step.kind,
+              kind: step.kind as OpenStepRow['kind'],
               state: step.state as 'PENDING' | 'WAITING',
               createdAt: step.createdAt,
               slaWorkingDays: step.slaWorkingDays,

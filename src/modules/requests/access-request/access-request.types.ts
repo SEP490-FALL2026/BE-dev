@@ -21,8 +21,6 @@ export type AccessRequestState =
   | 'AWAITING_EXECUTION'
   | 'AWAITING_IT_ASSESSMENT'
   | 'AWAITING_SPEND_SUBMISSION'
-  | 'AWAITING_FINANCE_REVIEW'
-  | 'AWAITING_BUDGET'
   | 'AWAITING_SPEND_DECISION'
   | 'REJECTED'
   | 'IT_REJECTED'
@@ -265,15 +263,14 @@ export const NOT_OPEN_FOR_LEAVER: readonly AccessRequestState[] = [...ENDED_STAT
 
 /**
  * Where a request that costs money stands on its way to the spending approver, as the people with a part in it read it
- * (`US-06-14` AC-9, AC-13). It says what is waiting and, for a request that stopped, why: and it is never a figure of a
- * budget, a code of the check that is not a problem with the head's own data, or what is left (`QĐ-82m` `INF-06`).
+ * (`US-06-14` AC-9, AC-13). It says what is waiting and, for a request that stopped, why: and it is never what is left of a
+ * budget (`QĐ-82m` `INF-06`).
  */
 export type SpendStage =
   | 'NOT_SUBMITTED'
+  /** Its check says it uses the reserve and the head has not confirmed it with a line of reason (`BR-MF1-06h`). */
+  | 'RESERVE_CONFIRMATION'
   | 'BLOCKED'
-  | 'RETURNED_BY_FINANCE'
-  | 'WAITING_FINANCE_REVIEW'
-  | 'WAITING_BUDGET'
   | 'WAITING_SPEND_DECISION'
   /** The spending approver refused it, with the reason (`US-06-01` AC-4). */
   | 'REFUSED';

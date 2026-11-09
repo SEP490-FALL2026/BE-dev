@@ -45,7 +45,7 @@ describe('withdrawing one person of a request for a group (US-05-08, US-05-17 AC
     ).toBe('NOT_REQUESTER');
   });
 
-  it.each(['BLOCKED', 'RETURNED_BY_FINANCE', 'WAITING_BUDGET'] as const)(
+  it.each(['BLOCKED', 'RESERVE_CONFIRMATION'] as const)(
     'lets the head withdraw in the stage %s with a reason, and not without one',
     (spendStage) => {
       const head = { ...facts, actorEmployeeId: 'head', actorHeadsDepartment: true, spendStage };

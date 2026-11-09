@@ -10,7 +10,6 @@ import { budgetAuditEvent } from '../budget/budget-facts.service';
 import { CommitmentRepo } from '../budget/commitment.repo';
 import { DecisionRepo } from '../budget/decision.repo';
 import { VersionRepo, type VersionRecord } from '../budget/version.repo';
-import { BudgetChangeListeners } from '../public/budgets.extension-points';
 import type { JudgedDecision } from './version-decision-judge.service';
 
 /**
@@ -26,7 +25,6 @@ export class VersionDecisionWriter {
     private readonly decisions: DecisionRepo,
     private readonly commitments: CommitmentRepo,
     private readonly notifier: BudgetNotifierService,
-    private readonly listeners: BudgetChangeListeners,
     private readonly audit: AuditApi,
   ) {}
 
@@ -71,18 +69,6 @@ export class VersionDecisionWriter {
       ),
     );
     if (outcome.decision === 'APPROVED') await this.attachWaiting(tx, version, now);
-
-    // Whoever waits on this budget hears of it in the same transaction, after the commitments are attached (`US-06-13` AC-11).
-    const event = { costCenterId: version.costCenterId, year: version.year, versionId: id };
-    if (outcome.decision === 'APPROVED') {
-      await this.listeners.emit(tx, { kind: 'VERSION_APPROVED', actor, event });
-    } else {
-      await this.listeners.emit(tx, {
-        kind: 'VERSION_REFUSED',
-        actor,
-        event: { ...event, decision: outcome.decision },
-      });
-    }
 
     const record = await this.versions.findById(id, tx);
     if (!record) throw new BudgetVersionNotFoundError();

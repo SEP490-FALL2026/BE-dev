@@ -25,8 +25,6 @@ export interface ReminderToWrite {
   holderEmployeeId: string | null;
   standing: SlaStanding;
   recipients: readonly Recipient[];
-  /** The question to Finance the reminder to Finance names; null when it does not go to Finance. */
-  questionId: string | null;
   correlationId: string;
 }
 
@@ -79,7 +77,6 @@ export class ReminderWriter {
             ageWorkingDays: input.standing.ageWorkingDays,
             overdueWorkingDays: input.standing.overdueWorkingDays,
             holderEmployeeId: input.holderEmployeeId,
-            questionId: input.questionId,
           },
           recipient.cause,
         ),

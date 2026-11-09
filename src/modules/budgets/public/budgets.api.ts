@@ -30,8 +30,10 @@ export class BudgetsApi {
   }
 
   /**
-   * The request holds the amount of each year against the budget of its Cost Center, in the transaction of the decision that
-   * approved it (`US-06-04`). Throws BudgetCommitmentExistsError when it already holds one for a year.
+   * The request holds one commitment, for the current fiscal year, against the approved budget of its Cost Center, in the transaction of the
+   * decision that approved it (`US-06-04`, `FR-5.8`): `items` is exactly one entry, above nothing, of the current year. Throws
+   * BudgetCommitmentNotHoldableError (BUDGET.COMMITMENT_NOT_HOLDABLE: not one year, not the current year, not above nothing, or no approved
+   * version of the year) and BudgetCommitmentExistsError when it already holds one for the year.
    */
   holdForRequest(tx: DbTx, actor: AuthenticatedPrincipal, input: CommitmentHoldInput): Promise<HeldCommitment[]> {
     return this.commitments.hold(tx, actor, input);

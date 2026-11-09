@@ -3,11 +3,11 @@ import type { BusinessDate } from '../../../core/business-date';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
-import { superiorOf, type QueueRecipientFacts, type StepRecipientFacts } from './step-sla.policy';
+import { superiorOf, type QueueRecipientFacts, type SlaStepKind, type StepRecipientFacts } from './step-sla.policy';
 
 /**
  * Reads, on the day of the pass and in the transaction of the reminder, who is who around a late step: whether the holder still
- * works, who is above them, who the Super Admin and Finance are. It reads the organization and the accounts through their facades
+ * works, who is above them, who the requester and the Super Admin are. It reads the organization and the accounts through their facades
  * and writes nothing. A person counts only while their employment is active; a name that is missing is `null`, never a guess.
  */
 @Injectable()
@@ -17,10 +17,15 @@ export class SlaRecipientFactsService {
     private readonly identity: IdentityAccessApi,
   ) {}
 
-  /** The people to tell about a step held by `holderEmployeeId` (or by nobody), with the question to Finance when one is open. */
+  /** The people to tell about a step held by `holderEmployeeId` (or by nobody): the holder, who is above them, the requester, the Super Admin. */
   async forStep(
     tx: DbTx,
-    input: { holderEmployeeId: string | null; today: BusinessDate; questionOpen: boolean },
+    input: {
+      holderEmployeeId: string | null;
+      today: BusinessDate;
+      stepKind: SlaStepKind;
+      requesterEmployeeId: string;
+    },
   ): Promise<StepRecipientFacts> {
     const holder = input.holderEmployeeId;
     const holderUsable = holder !== null && (await this.working(tx, [holder])).has(holder);
@@ -32,7 +37,10 @@ export class SlaRecipientFactsService {
       holderUsable,
       superiorEmployeeId,
       superAdminEmployeeId: await this.identity.findUsableSuperAdminEmployeeId(tx),
-      financeQuestionEmployeeId: input.questionOpen ? await this.identity.findUsableFinanceEmployeeId(tx) : null,
+      stepKind: input.stepKind,
+      requesterEmployeeId: (await this.working(tx, [input.requesterEmployeeId])).has(input.requesterEmployeeId)
+        ? input.requesterEmployeeId
+        : null,
     };
   }
 

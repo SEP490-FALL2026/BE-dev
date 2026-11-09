@@ -4,11 +4,11 @@ import type { AuthenticatedPrincipal } from '../../../infrastructure/security/to
 import { AccessRequestGroupUsesLinesError, AccessRequestNotFoundError } from '../access-request/access-request.errors';
 import { AccessRequestRepo } from '../access-request/access-request.repo';
 import type { AccessRequestRecord } from '../access-request/access-request.types';
-import { SpendEffectsService } from '../budget-information/spend-effects.service';
+import { ReserveConfirmationRepo } from '../reserve-confirmation/reserve-confirmation.repo';
+import { SpendEffectsService } from '../spend-effects/spend-effects.service';
 import { BudgetCheckService, type CheckOutcome } from '../spend/budget-check.service';
 import { checkSpendDecider, judgeApproval } from '../spend/spend-decision.policy';
 import { SpendDecisionRefusedError } from '../spend/spend.errors';
-import { SpendRoutingService } from '../spend/spend-routing.service';
 import { SpendStepRepo, type SpendStepRecord } from '../spend/spend-step.repo';
 import { SpendDecisionRecorder, type SpendDecisionResult } from './spend-decision-recorder.service';
 
@@ -16,18 +16,15 @@ export interface SpendDecisionInput {
   decision: 'APPROVE' | 'REJECT';
   /** The reason of a refusal. */
   reason?: string;
-  /** The exception an approval accepts: why, and the years it names. */
-  override?: { reason: string; years: readonly number[] };
 }
 
 /**
- * The spending approver decides the spend step (`US-06-01`). The request is locked, the check is made again, and the decision
- * is made on what that check says, which is the snapshot the decision keeps (`AC-2`): approving a request that has less money
- * than it costs, or none, needs an override with its reason that names the years (`AC-5`, `AC-16`, `AC-21`); a request that
- * turned out to be an exception since it was sent, or whose data is now at fault, is not decided but goes back, and the step
- * closes without a decision (`AC-18`). Refusing needs its reason (`AC-4`). The system never decides (`SoD-6`). The step, the
- * request, the electronic approval record, the snapshot and the audit event are written together; a refused decision changes
- * nothing, and a request that goes back keeps only that it went back.
+ * The spending approver decides the spend step (`US-06-01`). The request is locked, the check is made again for the day of the decision
+ * (`BR-MF1-07c`), and the decision is made on what that check says, which is the snapshot the decision keeps (`AC-2`): a request that is now
+ * blocked, or that uses the reserve with no confirmation of the head on this step, is not decided but goes back to its head, the step closes
+ * without a decision, and the requester and the head are told (`AC-18`). There is no override. Refusing needs its reason (`AC-4`). The
+ * system never decides (`SoD-6`). The step, the request, the electronic approval record, the snapshot and the audit event are written
+ * together; a refused decision changes nothing, and a request that goes back keeps only that it went back.
  */
 @Injectable()
 export class SpendDecisionService {
@@ -36,8 +33,8 @@ export class SpendDecisionService {
     private readonly requests: AccessRequestRepo,
     private readonly steps: SpendStepRepo,
     private readonly checks: BudgetCheckService,
+    private readonly confirmations: ReserveConfirmationRepo,
     private readonly effects: SpendEffectsService,
-    private readonly routing: SpendRoutingService,
     private readonly recorder: SpendDecisionRecorder,
   ) {}
 
@@ -57,18 +54,19 @@ export class SpendDecisionService {
           decision: 'REJECTED',
           checkId: outcome.status === 'CHECKED' ? outcome.check.id : null,
           reason: input.reason ?? null,
-          override: null,
+          usesReserve: false,
+          reserveReason: null,
         });
       }
 
-      return this.approve(tx, actor, of, { input, outcome });
+      return this.approve(tx, actor, of, outcome);
     });
   }
 
   /**
-   * The request locked, with the spend step the person holds; the person who reviewed it for Finance does not decide it (`SoD-8`).
-   * Who may decide, and in which state, is judged on a plain read first, so a person who may not decide never takes the row lock of
-   * the request (`R-D2`); the judgement is made again under the lock, since the step may have moved meanwhile.
+   * The request locked, with the spend step the person holds. Who may decide, and in which state, is judged on a plain read first, so a
+   * person who may not decide never takes the row lock of the request (`R-D2`); the judgement is made again under the lock, since the step
+   * may have moved meanwhile.
    */
   private async lockDecidable(
     tx: DbTx,
@@ -79,7 +77,6 @@ export class SpendDecisionService {
     const request = await this.requests.lockById(tx, requestId);
     const step = await this.judge(tx, actor, request);
     if (!request) throw new AccessRequestNotFoundError();
-    await this.effects.refuseReviewer(tx, request, actor.employeeId);
 
     return { request, step };
   }
@@ -107,41 +104,30 @@ export class SpendDecisionService {
     return step;
   }
 
-  /** An approval is made on what the check says: it is recorded, goes back to the head or to Finance, or is refused for its override. */
+  /** An approval is made on what the check says: it is recorded, or the request goes back to its head. */
   private async approve(
     tx: DbTx,
     actor: AuthenticatedPrincipal,
     of: { request: AccessRequestRecord; step: SpendStepRecord; now: Date },
-    decided: { input: SpendDecisionInput; outcome: CheckOutcome },
+    outcome: CheckOutcome,
   ): Promise<SpendDecisionResult> {
     const { request, step, now } = of;
-    const { input, outcome } = decided;
     if (outcome.status === 'NOT_CHECKABLE') throw new SpendDecisionRefusedError('NOT_CHECKABLE');
 
-    const reviewed = await this.effects.reviewed(tx, request, step);
-    const verdict = judgeApproval(outcome.check, reviewed, input.override ? { years: input.override.years } : null);
-    switch (verdict.kind) {
-      case 'BLOCKED':
-        await this.effects.sendBack(tx, actor, request, step, now, verdict.reason);
+    const confirmation = await this.confirmations.ofStep(step.id, tx);
+    const verdict = judgeApproval(outcome.check, confirmation !== null);
+    if (verdict.kind === 'RETURNED') {
+      await this.effects.sendBack(tx, actor, request, step, { now, reasons: verdict.reasons, check: outcome.check });
 
-        return { status: 'BOUNCED', to: 'HEAD', reason: verdict.reason };
-      case 'NEEDS_REVIEW':
-        await this.effects.sendBack(tx, actor, request, step, now, 'NEEDS_FINANCE_REVIEW');
-        await this.routing.reopenReview(tx, actor, request, now);
-
-        return { status: 'BOUNCED', to: 'FINANCE_REVIEW' };
-      case 'OVERRIDE_REQUIRED':
-      case 'OVERRIDE_MISMATCH':
-        throw new SpendDecisionRefusedError(verdict.kind, verdict.years);
-      case 'OVERRIDE_NOT_NEEDED':
-        throw new SpendDecisionRefusedError('OVERRIDE_NOT_NEEDED');
-      case 'OK':
-        return this.recorder.record(tx, actor, of, {
-          decision: 'APPROVED',
-          checkId: outcome.check.id,
-          reason: null,
-          override: input.override ? { reason: input.override.reason, years: verdict.overriddenYears } : null,
-        });
+      return { status: 'BOUNCED', to: 'HEAD', reasons: verdict.reasons };
     }
+
+    return this.recorder.record(tx, actor, of, {
+      decision: 'APPROVED',
+      checkId: outcome.check.id,
+      reason: null,
+      usesReserve: verdict.usesReserve,
+      reserveReason: verdict.usesReserve ? (confirmation?.reason ?? null) : null,
+    });
   }
 }

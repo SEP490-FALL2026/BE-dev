@@ -24,8 +24,6 @@ describe('checkWithdrawal (US-05-08)', () => {
       'AWAITING_EXECUTION',
       'AWAITING_IT_ASSESSMENT',
       'AWAITING_SPEND_SUBMISSION',
-      'AWAITING_FINANCE_REVIEW',
-      'AWAITING_BUDGET',
       'AWAITING_SPEND_DECISION',
       'EXECUTING',
     ] as const) {
@@ -58,8 +56,8 @@ describe('checkWithdrawal (US-05-08)', () => {
   describe('the head of the department (US-06-14 AC-14)', () => {
     const head = { actorEmployeeId: 'head', actorHeadsDepartment: true, state: 'AWAITING_SPEND_SUBMISSION' as const };
 
-    it('withdraws, with a reason, a request Finance gave back, one stopped by the data, or one that waits for a budget', () => {
-      for (const spendStage of ['RETURNED_BY_FINANCE', 'BLOCKED', 'WAITING_BUDGET'] as const) {
+    it('BR-MF1-06h/06i: withdraws, with a reason, a request that is blocked or one that waits for the confirmation of the reserve', () => {
+      for (const spendStage of ['BLOCKED', 'RESERVE_CONFIRMATION'] as const) {
         expect(checkWithdrawal(withFacts({ ...head, spendStage, reason: 'Moved to next year' }))).toBeNull();
       }
     });
@@ -70,7 +68,7 @@ describe('checkWithdrawal (US-05-08)', () => {
     });
 
     it('does not withdraw a request that is anywhere else, nor one of another department', () => {
-      for (const spendStage of ['NOT_SUBMITTED', 'WAITING_FINANCE_REVIEW', 'WAITING_SPEND_DECISION', null] as const) {
+      for (const spendStage of ['NOT_SUBMITTED', 'WAITING_SPEND_DECISION', null] as const) {
         expect(checkWithdrawal(withFacts({ ...head, spendStage, reason: 'x' }))).toBe('NOT_REQUESTER');
       }
       expect(

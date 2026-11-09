@@ -4,6 +4,7 @@ import { PrismaService } from '../../../../infrastructure/database/prisma.servic
 import type { DbTx } from '../../../../infrastructure/database/transaction-runner';
 import type { AccessRequestKind, AccessRequestState } from '../access-request.types';
 import { NOT_OPEN_FOR_LEAVER } from '../access-request.types';
+import { currentStateOf } from '../access-request.policy';
 
 /** The states of the person of a request for a group whose request is still open for them. */
 const OPEN_LINE_STATES = ['AWAITING_NEED', 'NEED_CONFIRMED', 'APPROVED', 'EXECUTING'] as const;
@@ -59,7 +60,7 @@ export class OpenRequestRepo {
           if (row.submittedAt === null)
             throw new Error(`The request ${row.id} is listed as open but has not been sent.`);
 
-          return { ...row, submittedAt: row.submittedAt };
+          return { ...row, state: currentStateOf(row.state), submittedAt: row.submittedAt };
         }),
         total,
       };

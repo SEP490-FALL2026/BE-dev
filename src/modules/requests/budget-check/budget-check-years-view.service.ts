@@ -8,17 +8,17 @@ import { BudgetCheckRepo, type CheckRecord } from '../spend/budget-check.repo';
 import { BudgetCheckService } from '../spend/budget-check.service';
 import { SpendReviewNotFoundError } from '../spend/spend.errors';
 import { SpendStepRepo } from '../spend/spend-step.repo';
-import type { YearWire } from './finance-review.dto';
-import { SpendViewService, type Money } from './spend-view.service';
+import type { YearWire } from './budget-check.dto';
+import { BudgetCheckViewService, type Money } from './budget-check-view.service';
 
 /**
- * The years of the check of a request, one page of them (`US-06-01` AC-1, AC-9, AC-18): what Finance reads of the newest check, and what
- * the person whose spend step is open reads of the check as it is now. Nobody else reads it (`QĐ-82m` `INF-06`).
+ * The year of the check of a request (`US-06-01` AC-1, AC-9, AC-18): what Finance reads of the newest check, and what the person whose
+ * spend step is open reads of the check as it is now. Nobody else reads it (`QĐ-82m` `INF-06`).
  */
 @Injectable()
-export class SpendYearsViewService {
+export class BudgetCheckYearsViewService {
   constructor(
-    private readonly views: SpendViewService,
+    private readonly views: BudgetCheckViewService,
     private readonly requests: AccessRequestRepo,
     private readonly steps: SpendStepRepo,
     private readonly checks: BudgetCheckRepo,
@@ -49,9 +49,13 @@ export class SpendYearsViewService {
         cost: money(year.costMinor),
         code: year.code,
         budget: nullable(year.budgetMinor),
+        base: nullable(year.baseMinor),
+        reserve: nullable(year.reserveMinor),
         held: nullable(year.heldMinor),
         spent: nullable(year.spentMinor),
         remaining: nullable(year.remainingMinor),
+        remainingBase: nullable(year.remainingBaseMinor),
+        remainingWithReserve: nullable(year.remainingWithReserveMinor),
         shareBasisPoints: year.shareBasisPoints,
         pending: nullable(year.pendingMinor),
       })),
@@ -62,10 +66,9 @@ export class SpendYearsViewService {
   }
 
   /**
-   * What the check says now, for the person whose spend step is open: they see what is left and what the others that wait cost
-   * as they are at this moment, and what they decide on is made again when they decide (`US-06-01` AC-1, AC-9, AC-18). The
-   * years of a request are few, since the term is bounded, so the page is cut from them here. Null for anybody else, and for a
-   * request that cannot be checked, which is read as it was kept.
+   * What the check says now, for the person whose spend step is open: they see what is left and what the others that wait cost as they
+   * are at this moment, and what they decide on is made again when they decide (`US-06-01` AC-1, AC-9, AC-18). A request has one year, so
+   * the page is cut from it here. Null for anybody else, and for a request that cannot be checked, which is read as it was kept.
    */
   private async liveYears(
     actor: AuthenticatedPrincipal,

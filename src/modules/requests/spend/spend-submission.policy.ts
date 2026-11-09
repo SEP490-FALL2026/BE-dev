@@ -7,8 +7,19 @@ import type { DeciderRole as ReadDeciderRole } from '../access-request/access-re
  * rule (`budget-check.policy.ts`).
  */
 
-/** Why a request stays in the queue of its head when they send it: it says what is missing, never a figure of the budget. */
-export type StopReason = 'STALE_COST_EVIDENCE' | 'CLOSED_OR_EXPIRED_BUDGET_PERIOD' | 'PRICE_MISSING' | 'RATE_MISSING';
+/**
+ * Why a request stays in the queue of its head when they send it: it says what is missing or why it is blocked, never a figure of the
+ * budget. The first reason of the check is kept here (the head reads them all on the request); the two codes of the data of a batch made
+ * before the three outcomes are read, never given.
+ */
+export type StopReason =
+  | 'PRICE_MISSING'
+  | 'RATE_MISSING'
+  | 'PRICE_EXPIRED'
+  | 'NO_APPROVED_BUDGET'
+  | 'OVER_RESERVE'
+  | 'STALE_COST_EVIDENCE'
+  | 'CLOSED_OR_EXPIRED_BUDGET_PERIOD';
 
 /**
  * Where a request goes once its need is approved and it costs money: the queue of the head, who sends it on, or straight to

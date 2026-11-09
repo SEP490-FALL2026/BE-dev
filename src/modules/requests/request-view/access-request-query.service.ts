@@ -5,7 +5,9 @@ import { CatalogApi } from '../../catalog/public/catalog.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { AssessmentReadRepo } from '../access-request/assessment-read.repo';
 import type { ProposalRecord } from '../access-request/assessment-record.types';
-import { PricingViewService, type PricingView } from './pricing-view.service';
+import { PricingViewService, type MoneyView, type PricingView } from './pricing-view.service';
+import type { BlockReason } from '../spend/budget-check.policy';
+import type { SpendStage } from '../access-request/access-request.types';
 import { SpendStatusService, type SpendStatusView } from '../spend/spend-status.service';
 import { AccessRequestNotFoundError } from '../access-request/access-request.errors';
 import { canViewRequest, viewFactsOf, hasSpendStep } from '../access-request/access-request.policy';
@@ -26,6 +28,15 @@ export interface NeedDecisionView extends Omit<ApprovalRecordRecord, 'decidedByE
 
 export interface NeedStepView extends Omit<NeedStepRecord, 'assigneeEmployeeId'> {
   assignee: EmployeeRefView | null;
+}
+
+/** Where the request stands on its way to the spending approver, as the wire writes it (`BR-MF1-06g`). */
+export interface SpendView {
+  stage: SpendStage;
+  blockedReasons: BlockReason[];
+  /** How far over the base (waiting for the reserve to be confirmed) or over the reserve (blocked for that); null otherwise. */
+  overBy: MoneyView | null;
+  refusalReason: string | null;
 }
 
 /** A request as a reader sees it: the record with the names of the people, the plan, the department and the Cost Center. */
@@ -66,8 +77,8 @@ export interface AccessRequestView extends Omit<
   policy: { version: number; hasSpendStep: boolean; slaWorkingDays: number };
   budgetYear: number | null;
   pricing: PricingView;
-  /** Where the request stands on its way to the spending approver, for a request that costs money; never a figure of the budget. */
-  spend: SpendStatusView | null;
+  /** Where the request stands on its way to the spending approver, for a request that costs money; never what is left of the budget. */
+  spend: SpendView | null;
   needStep: NeedStepView;
   /** Null until the need step is decided. */
   needDecision: NeedDecisionView | null;
@@ -172,6 +183,7 @@ export class AccessRequestQueryService {
       record.branch === 'NEW_SOFTWARE' ? this.assessments.findProposal(record.id) : Promise.resolve(null),
       this.spendStatus.of(record),
     ]);
+    const spendView = spend && (await this.spendViewOf(spend));
     const person = (id: string): EmployeeRefView => {
       const found = people.find((candidate) => candidate.id === id);
       if (!found) throw new Error(`The employee ${id} of the request ${record.id} does not exist.`);
@@ -207,7 +219,7 @@ export class AccessRequestQueryService {
       businessReason: record.businessReason,
       termMonths: record.termMonths,
       expectedEndDate: record.expectedEndDate,
-      spend,
+      spend: spendView,
       budgetYear: record.pricing.budgetYear,
       pricing: await this.pricing.view(record.pricing),
       policy: {
@@ -250,6 +262,17 @@ export class AccessRequestQueryService {
               reason: decision.reason,
               decidedAt: decision.decidedAt,
             },
+    };
+  }
+
+  private async spendViewOf(status: SpendStatusView): Promise<SpendView> {
+    return {
+      stage: status.stage,
+      blockedReasons: status.blockedReasons,
+      overBy:
+        status.overBy &&
+        (await this.pricing.moneyView({ amountMinor: status.overBy.minor, currency: status.overBy.currency })),
+      refusalReason: status.refusalReason,
     };
   }
 
