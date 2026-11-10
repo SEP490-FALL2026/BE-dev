@@ -230,13 +230,15 @@ describe('my software rights (integration, real PostgreSQL)', () => {
     for (const secret of [
       KEY,
       keyMask,
+      // Fragments that a random id (lower-case hex) can never hold: a bare '98765' or '1000000' is found in a uuid now and then.
       'ABCDE',
-      '98765',
+      'ABCDE-98765',
       'fingerprint',
       'ciphertext',
       'device-',
       '@acme.vn',
-      '1000000',
+      ':1000000',
+      '"1000000',
       'costCenter',
     ]) {
       expect(wire).not.toContain(secret);
