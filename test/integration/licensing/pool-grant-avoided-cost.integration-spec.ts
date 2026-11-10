@@ -110,12 +110,13 @@ describe('the cost avoided by a grant from the pool, and the grant that names no
              responsible_it_admin_employee_id, updated_at, price_rate, price_rate_date, price_rate_source, price_reporting_minor, price_reporting_currency)
            SELECT gen_random_uuid(), s.organization_id, $1, s.owner_department_id, 'TERM', 'ACTIVE', $2, $3::bigint, 'VND', '2026-01-05',
                   'MONTHLY', 1, '2026-01-05', s.responsible_it_admin_employee_id, now(), s.price_rate, s.price_rate_date,
-                  s.price_rate_source, s.price_reporting_minor, s.price_reporting_currency
+                  s.price_rate_source, $3::bigint, s.price_reporting_currency
              FROM subscriptions s WHERE s.id = (SELECT id FROM subscriptions WHERE price_rate IS NOT NULL LIMIT 1)
            RETURNING id`,
           [planId, quantity, price],
         )
       ).rows[0].id;
+    // The reporting price is the one the plan is priced by: each declares its own, or the two tie and only the id decides.
     const cheap = await declare(1, '100');
     const dear = await declare(1, '900');
 
