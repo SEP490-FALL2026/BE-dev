@@ -8,9 +8,14 @@ const PDF = 'application/pdf';
  * builds the version with the default reserve of 10 % (a different one needs its reason), the spending approver decides, and the
  * revisions and high-value thresholds of before are gone. Real sign-in, the seeded dataset, the bytes of the file through the fake
  * object storage and nothing else replaced.
+ *
+ * On the dataset of 2026 (`shared-demo-v4`) every department with a Cost Center has its proposal and its approved version of the current
+ * year, so the scenarios that build a version work on the year after: its cycle is published and the dataset left no proposal in it for
+ * Design, Finance and the Board (Engineering and IT have one waiting for Finance, Marketing and Sales are further on).
  */
 describe('MF-4 ngân sách năm: đề xuất → phiên bản → duyệt @MF4 @D1', () => {
   let world: FlowWorld;
+  /** The year the scenarios propose for: the year after the one of the clock (see the note above). */
   let year: number;
   let figma: string;
 
@@ -47,6 +52,13 @@ describe('MF-4 ngân sách năm: đề xuất → phiên bản → duyệt @MF4 
           amount: { amount: '13500000' },
           lineType: 'RENEW',
           priorityRank: 1,
+          // The usage of Figma in the dataset is low (KPI-3 under the threshold): a Renew line of it carries the reduced explanation (QĐ-109d).
+          zbb: {
+            purpose: 'Thiết kế giao diện sản phẩm',
+            alternatives: 'Không có công cụ thay thế phù hợp',
+            consequenceIfNot: 'Nhóm thiết kế không làm việc được',
+            usageIndicator: 'Số ghế hoạt động hằng tuần',
+          },
         },
         {
           description: 'Công cụ khác',
@@ -68,7 +80,7 @@ describe('MF-4 ngân sách năm: đề xuất → phiên bản → duyệt @MF4 
 
   beforeAll(async () => {
     world = await FlowWorld.open();
-    year = Number(call().today().slice(0, 4));
+    year = Number(call().today().slice(0, 4)) + 1;
     figma = await call().planId('Figma Professional');
   }, 300000);
 
@@ -77,7 +89,7 @@ describe('MF-4 ngân sách năm: đề xuất → phiên bản → duyệt @MF4 
   });
 
   describe('F4-01 đề xuất chỉ có số tiền và tệp; dự phòng mặc định 10 % @MF4 @D1', () => {
-    it('phòng Thiết kế chưa có ngân sách: trưởng phòng gửi, Finance lập, Người duyệt chi duyệt #14 12b @B2', async () => {
+    it('phòng Thiết kế chưa có ngân sách năm sau: trưởng phòng gửi, Finance lập, Người duyệt chi duyệt #14 12b @B2', async () => {
       const file = await uploadedFile('NV-DESH');
       const proposalId = await proposal('NV-DESH', [file]);
       expect(await world.facts.count('budget_proposals', 'id = $1', [proposalId])).toBe(1);
@@ -120,11 +132,13 @@ describe('MF-4 ngân sách năm: đề xuất → phiên bản → duyệt @MF4 
       });
     });
 
-    it('sau khi có ngân sách, Request của phòng Thiết kế được trình lô và có bước duyệt chi #6 @B1', async () => {
-      const id = await call().submitRequest('NV-DES1', figma);
-      expect((await call().approveNeed('NV-DESH', id)).status).toBe(200);
+    it('phòng có ngân sách của năm: Request của phòng Kỹ thuật được trình lô và có bước duyệt chi #6 @B1', async () => {
+      // Design already holds Figma (nobody of the department is without it) and its budget of the year is a few hundred thousand: the
+      // department with the room the scenario needs is Engineering, whose budget the dataset made wide.
+      const id = await call().submitRequest('NV-DEV3', figma);
+      expect((await call().approveNeed('NV-ENGH', id)).status).toBe(200);
 
-      expect((await call().submitBatch('NV-DESH', [id])).status).toBe(201);
+      expect((await call().submitBatch('NV-ENGH', [id])).status).toBe(201);
 
       const check = await call().get('NV-FIN1', `/access-requests/${id}/budget-check`);
       expect(check.status).toBe(200);
@@ -215,7 +229,14 @@ describe('MF-4 ngân sách năm: đề xuất → phiên bản → duyệt @MF4 
 
   describe('F4-02 dự phòng khác 10 % phải có lý do; yêu cầu sửa và từ chối @MF4 @D1', () => {
     it('dự phòng khác 10 % không lý do ⟹ 422; có lý do thì gửi được; Người duyệt chi yêu cầu sửa, Finance sửa và gửi lại #14 @B2', async () => {
-      const proposalId = await proposal('NV-ITOH');
+      // IT's proposal of the year is the one the dataset left waiting for Finance: the version is built from it.
+      const proposalId = (
+        await world.facts.one<{ id: string }>(
+          `SELECT p.id FROM budget_proposals p JOIN cost_centers c ON c.id = p.cost_center_id
+            WHERE c.code = 'CC-ITO' AND p.year = $1 AND p.state = 'SUBMITTED'`,
+          [year],
+        )
+      ).id;
       const created = await call().post('NV-FIN1', '/budget-versions', {
         proposalId,
         base: { amount: '30000000' },

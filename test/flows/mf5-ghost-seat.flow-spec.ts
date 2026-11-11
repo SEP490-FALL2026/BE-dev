@@ -8,10 +8,10 @@ import { seedUsageEvidence } from '../support/ghost-seat-usage-evidence';
  * ends (409 NOT_BEFORE) and can after it, and completing it ends the recommendation ACCEPTED. A second recommendation is kept, a third
  * is exempted. Real sign-in, the seeded dataset, the clock of the flows.
  *
- * Runs on the seeded dataset since 10/11/2026 (seats of its own, see `holdSeat`). The recommendations of `G3`/`G4` are written straight into the table because the
- * rules that make them (`qd103-ghost-seat-g3-g4`) and the import of vendor usage (`qd103-vendor-usage-import`) are not delivered
- * yet; when they are, replace `recommend` by the import and the weekly pass. The same path is proved without the seed by
- * `test/integration/optimization/ghost-seat-decision.integration-spec.ts`.
+ * Runs on the seeded dataset (`shared-demo-v4`) with seats of its own (see `holdSeat`). The recommendation is written straight into the table
+ * rather than waited for from the rules of `G3`/`G4` (`qd103-ghost-seat-g3-g4`, which the seed runs for the dataset's own recommendations),
+ * so that the seat, the holder and the head are the ones this scenario names and the weekly pass is not part of what it proves. The same
+ * path is proved without the seed by `test/integration/optimization/ghost-seat-decision.integration-spec.ts`.
  */
 describe('MF-5 trưởng phòng quyết định ghost seat: Thu hồi có ân hạn, Giữ, Miễn trừ @MF5 @D1', () => {
   let world: FlowWorld;
@@ -50,21 +50,21 @@ describe('MF-5 trưởng phòng quyết định ghost seat: Thu hồi có ân h�
   };
 
   /**
-   * A seat of the plan for a person of ENG who holds none in the seeded dataset, on the subscription ENG owns, as a finished grant leaves it.
-   * The one seat the dataset grants (NV-DEV1, R1) ends within a month: a head's reclaim of it is LEFT_TO_EXPIRE (FR-4.9 gate 7), so the
-   * flow uses seats of its own, with no end or one far enough.
+   * A seat of the plan for a person of ENG who holds none of it in the seeded dataset, on the one subscription of the plan, as a finished
+   * grant leaves it. The seats the dataset grants to Engineering are granted today (or end within weeks, as R16, R17): a head's reclaim of
+   * a seat that ends soon is LEFT_TO_EXPIRE (FR-4.9 gate 7), so the flow uses seats of its own, with no end or one far enough.
    */
   const holdSeat = async (
     employeeCode: string,
     planName: string,
     expectedEndDate: string | null = null,
   ): Promise<void> => {
-    const subscriptionId = await call().subscriptionOf(planName, 'ENG');
+    const subscriptionId = await call().subscriptionOf(planName);
     await sql().query(
       `INSERT INTO license_assignments (id, organization_id, kind, source, plan_id, subscription_id, employee_id, account_identifier,
          normalized_account_identifier, valid_from, valid_from_basis, owning_department_id, created_by_app_user_id, expected_end_date)
        SELECT gen_random_uuid(), s.organization_id, 'PERSONAL', 'REQUEST', s.plan_id, s.id, e.id, e.work_email, e.normalized_work_email,
-              '2026-01-05', 'RECORDED', s.owner_department_id, $3::uuid, $4::date
+              '2026-01-05', 'RECORDED', (SELECT id FROM departments WHERE code = 'ENG'), $3::uuid, $4::date
          FROM subscriptions s JOIN employees e ON e.employee_code = $2 WHERE s.id = $1`,
       [subscriptionId, employeeCode, randomUUID(), expectedEndDate],
     );

@@ -122,7 +122,7 @@ describe('F1-08 Request nhóm: nhu cầu → trình lô → duyệt chi → cấ
     expect(await stateOf(id)).toBe('AWAITING_EXECUTION');
     expect(await world.facts.count('budget_commitments', 'request_id = $1', [id])).toBe(1);
 
-    const subscription = await call().subscriptionOf('Jira Standard', 'ENG');
+    const subscription = await call().subscriptionOf('Jira Standard');
     await grantLine(id, subscription, dev2);
     await grantLine(id, subscription, dev3);
 
@@ -141,16 +141,7 @@ describe('F1-08 Request nhóm: nhu cầu → trình lô → duyệt chi → cấ
   });
 
   it('nhà thầu được cấp quyền, Assignment có ngày kết thúc = hôm nay + thời hạn − 1 ngày (R1) #20 @B3', async () => {
-    const created = await call().post('NV-SA', '/employees', {
-      employeeCode: 'NV-CTR1',
-      fullName: 'Nguyễn Văn Thầu',
-      workEmail: 'thau.nguyen@saoviet.example',
-      employmentType: 'CONTRACTOR',
-      hireDate: call().today(),
-      departmentCode: 'ENG',
-      jobTitle: 'Lập trình viên hợp đồng',
-    });
-    expect(created.status).toBe(201);
+    // NV-CTR1 is the contractor of Engineering the dataset already has (Jira, R16); no Figma, so a Request for it is not a duplicate.
     const [contractor, dev1] = [await world.facts.employeeId('NV-CTR1'), await world.facts.employeeId('NV-DEV1')];
 
     const end = await oneMonthTerm();
@@ -174,7 +165,7 @@ describe('F1-08 Request nhóm: nhu cầu → trình lô → duyệt chi → cấ
     expect(decided.status).toBe(200);
     expect(await stateOf(id)).toBe('AWAITING_EXECUTION');
 
-    const subscription = await call().subscriptionOf('Figma Professional', 'ENG');
+    const subscription = await call().subscriptionOf('Figma Professional');
     await grantLine(id, subscription, contractor);
     await grantLine(id, subscription, dev1);
 
