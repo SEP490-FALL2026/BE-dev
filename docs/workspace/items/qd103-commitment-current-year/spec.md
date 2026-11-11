@@ -7,7 +7,7 @@
   01/01_, `BR-MF1-07`; `QĐ-104a`, `QĐ-103f`(3), `QĐ-103i`, `QĐ-30b` _không có cam kết chuyển tiếp của một Request_; QT v1.7 mục 1.8;
   L1 MF-1 bước 9, 13), BE `1cd81101`. Ledger: L2-19, L1-14; luật R-C01, R-C03. Câu TẠM CHỌN: Q-27 (khoản cam kết cũ của năm sau
   và khoản `NO_BUDGET` của Request); dùng Q-29 (Request tiếp tục có kỳ mới ở năm sau ⟹ số tiền năm hiện hành 0).
-- Nhóm roadmap: không — bó finding `qd103-108-alignment`.
+- Nhóm roadmap: G5 (từ re-pin scope map 11/11/2026) — bó finding `qd103-108-alignment`.
 - [Kế hoạch](plan.md).
 
 ## Business outcome
@@ -21,8 +21,8 @@ requests.
 
 ## Sizing decision
 
-- Container: bó finding `qd103-108-alignment` (đợt W3), ngoài nhóm G.
-- Mode: `technical-enabler`.
+- Container: G5 (nhóm giao việc, không phải ranh giới hạng mục); bó finding `qd103-108-alignment` (đợt W3). Trước re-pin 11/11/2026 là ngoài nhóm.
+- Mode: `grouped-stories`.
 - Outcome and owner: `budgets/commitment` + `budgets/budget/commitment.repo.ts` sở hữu luật giữ khoản cam kết; `requests`
   (`spend-effects` / `group-spend-hold`) chỉ đưa một mục hoặc không gọi khi số tiền 0.
 - Boundaries: không migration; đổi hành vi `BudgetsApi.holdForRequest`; một lỗi mới; không đổi operation HTTP.
@@ -30,19 +30,23 @@ requests.
   `qd103-new-year-auto-commitments`; giải phóng khi thu hồi ở W4 `qd103-commitment-release-on-revocation`; cột `origin` ở W4.
 - Not smaller: một luật, một service; tách nữa không có lợi.
 - Siblings: `qd103-request-amount-and-term`, `qd103-budget-check-three-outcomes` (đều trước).
-- Scope map: n/a
+- Scope map: [G5](../../../roadmap.md#work-item-decomposition-g5).
 
 ## Primary Story/AC
 
-| Story | AC           | Coverage | Phần còn lại thuộc                                                                     |
-| ----- | ------------ | -------- | -------------------------------------------------------------------------------------- |
-| —     | L2-19, L1-14 | n/a      | gỡ chặn W4 `qd103-new-year-auto-commitments`, `qd103-commitment-release-on-revocation` |
+| Story    | AC                                   | Coverage | Phần còn lại thuộc                                                                                     |
+| -------- | ------------------------------------ | -------- | ------------------------------------------------------------------------------------------------------ |
+| US-05-23 | AC-5, AC-8                           | partial  | AC còn lại và vế chung theo scope map: `qd103-request-amount-and-term`, `qd103-renewal-request-window` |
+| US-06-04 | AC-1, AC-3, AC-7, AC-10, AC-17→AC-19 | partial  | AC còn lại và vế chung theo scope map: `g5-commitment-creation`, `qd103-subscription-adjustment-point` |
+| US-06-17 | AC-3                                 | partial  | AC còn lại và vế chung theo scope map: `qd103-request-single-step-routing`                             |
 
 ## Supporting references
 
 `US-06-04` AC-1, AC-3, AC-7, AC-10, AC-17, AC-18, AC-19; `US-06-01` AC-21; `US-05-23` AC-5, AC-8 (phần năm sau là khoản 01/01);
 `US-06-17` AC-3 (khoản cam kết mang cờ dùng dự phòng). `FR-5.8`(1): _tối đa một khoản mỗi (Request, năm tài chính) — `INV-16`_;
 `FR-5.8a`: _không có khoản cam kết năm hiện hành nào sinh ra khi chưa có ngân sách; ngoại lệ duy nhất là khoản 01/01_.
+
+_Re-pin 11/11/2026 ([C3](../../../reviews/mf2-mf3-2026-11-10/C3-SCOPE-MAP-REPIN.md)):_ trước là `technical-enabler`, dòng `n/a` của bảng Primary: L2-19, L1-14 — gỡ chặn W4 `qd103-new-year-auto-commitments`, `qd103-commitment-release-on-revocation`. Bảng Primary claim AC của tối đa ba Story chính lấy từ danh sách trên, chỉ AC đang dùng ở Docs `5bb2e6a` (số AC của EP-05/EP-06/EP-12 không đổi giữa `9c7f386` và `5bb2e6a`); khóa khác của danh sách trên giữ chủ hiện có hoặc là `deferred` tới hạng mục này trong scope map. Claim theo spec và commit đã merge (PR #36), chưa đối chiếu từng AC trên code.
 
 ## Explicit out of scope
 

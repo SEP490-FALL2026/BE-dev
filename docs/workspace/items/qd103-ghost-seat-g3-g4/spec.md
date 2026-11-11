@@ -9,7 +9,7 @@
   `QĐ-35b`, `QĐ-101b`, `QĐ-101j`, `QĐ-77n`, `QĐ-35c`, `QĐ-28a`, `QĐ-90c`, `QĐ-103j`, `QĐ-103y`(1), `QĐ-104a`, `QĐ-104h`, `QĐ-94h`, `QĐ-57c`),
   BE `46b6a94e` (đọc ở `712044f9`). Ledger: L4-05, L4-07. Luật R-J01, R-J02 (vế cổng 3), R-J03 (vế tạo mới khi điều chuyển), R-J09. Theo nguồn:
   Q-86, Q-91, Q-93; kỹ thuật (chốt ở đây): Q-92, cách đếm ngày bao phủ, CF-6, đơn vị tiềm năng.
-- Nhóm roadmap: không — bó finding `qd103-108-alignment` (đợt W6).
+- Nhóm roadmap: G7 (từ re-pin scope map 11/11/2026) — bó finding `qd103-108-alignment` (đợt W6).
 - Kế hoạch: `plan.md` cùng thư mục.
 
 ## Business outcome
@@ -23,8 +23,8 @@ Cần xem xét / Cần xử lý_ (ngưỡng **ứng dụng > tổ chức > mặc
 
 ## Sizing decision
 
-- Container: bó finding `qd103-108-alignment` (W6).
-- Mode: `technical-enabler`
+- Container: G7 (nhóm giao việc, không phải ranh giới hạng mục); bó finding `qd103-108-alignment` (W6). Trước re-pin 11/11/2026 là ngoài nhóm.
+- Mode: `grouped-stories`.
 - Outcome and owner: `optimization` capability mới `usage-rules/` (L3 vì nhóm `threshold/` có controller; không ai import) — job, cổng, đánh giá,
   mức tin cậy, tiết kiệm tiềm năng, listener phủ định; `ghost-seat/` (L0) thêm repo miễn trừ dùng chung; `board/` thêm trạng thái nguồn/seat;
   `personnel/public` 2 hàm đọc (L4-07); `LicensingApi` 1 hàm giá.
@@ -33,19 +33,23 @@ Cần xem xét / Cần xử lý_ (ngưỡng **ứng dụng > tổ chức > mặc
 - Not larger: định tuyến, tạm dừng/tiếp tục khuyến nghị **đang có**, quyết định, ghi miễn trừ ở `qd103-ghost-seat-manager-decision`.
 - Not smaller: cổng, ba trạng thái và mức tin cậy cùng quyết _có khuyến nghị hay không_ (`QĐ-35b`: cổng trước, mức sau).
 - Siblings: `qd103-vendor-usage-import` (bằng chứng), `qd103-ghost-seat-g1-g2` (bảng, lượt chạy, `listSeatsForRules`), `qd103-ghost-seat-manager-decision`.
-- Scope map: n/a
+- Scope map: [G7](../../../roadmap.md#work-item-decomposition-g7).
 
 ## Primary Story/AC
 
-| Story | AC           | Coverage | Phần còn lại thuộc                                                                        |
-| ----- | ------------ | -------- | ----------------------------------------------------------------------------------------- |
-| —     | L4-05, L4-07 | n/a      | định tuyến/tạm dừng khuyến nghị có sẵn, kết cục MF-3: `qd103-ghost-seat-manager-decision` |
+| Story    | AC                     | Coverage | Phần còn lại thuộc                                                                                                                          |
+| -------- | ---------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| US-10-02 | AC-1→AC-9, AC-11→AC-14 | full     | —                                                                                                                                           |
+| US-10-03 | AC-1→AC-13             | full     | —                                                                                                                                           |
+| US-10-04 | AC-1→AC-7, AC-9        | partial  | AC còn lại và vế chung theo scope map: `qd103-ghost-seat-manager-decision`; AC-8 `deferred` tới chính `qd103-ghost-seat-g3-g4` (chưa claim) |
 
 ## Supporting references
 
 `US-10-02` AC-1→AC-14 (trừ AC-10 bỏ), `US-10-03` AC-1→AC-13 (vế tạo khuyến nghị), `US-10-04` AC-1→AC-7, AC-9, `US-10-05` AC-1, AC-4, AC-6,
 AC-7, `US-10-06` AC-17 (vế quét), `US-10-08` AC-2, AC-3, AC-5, `US-08-04` AC-2 (định danh trong hàng đợi không dùng), `US-12-15` dòng 23. Spec cũ
 `g7-g3-g4-decisions` chỉ là khung — không lấy gì ngoài ý định dùng chung bảng của `G1`/`G2`.
+
+_Re-pin 11/11/2026 ([C3](../../../reviews/mf2-mf3-2026-11-10/C3-SCOPE-MAP-REPIN.md)):_ trước là `technical-enabler`, dòng `n/a` của bảng Primary: L4-05, L4-07 — định tuyến/tạm dừng khuyến nghị có sẵn, kết cục MF-3: `qd103-ghost-seat-manager-decision`. Bảng Primary claim AC của tối đa ba Story chính lấy từ danh sách trên, chỉ AC đang dùng ở Docs `5bb2e6a` (số AC của EP-05/EP-06/EP-12 không đổi giữa `9c7f386` và `5bb2e6a`); khóa khác của danh sách trên giữ chủ hiện có hoặc là `deferred` tới hạng mục này trong scope map. Claim theo spec và commit đã merge (PR #36), chưa đối chiếu từng AC trên code.
 
 ## Explicit out of scope
 

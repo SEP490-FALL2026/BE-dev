@@ -7,7 +7,7 @@
   BE `5fd5f594`. Ledger: L2-20, L4-12. Luật R-C05, R-J07 (vế _thu hồi sớm giải phóng cam kết_), R-J08. Theo nguồn: vế _thu hồi đúng ngày 1
   ⟹ tháng đó giải phóng_ của Q-05 (`US-07-05` AC-21), `K1` _các tháng sau ngày hết kỳ đã trả_ (AC-21 vế `K1`). Câu TẠM CHỌN: Q-05 = A (vế
   giữa tháng), Q-39 ([REVISION-NOTES](../../../reviews/qd103-108-alignment-2026-11-08/QUESTIONS.md)).
-- Nhóm roadmap: không — bó finding `qd103-108-alignment`.
+- Nhóm roadmap: G6, G7 (từ re-pin scope map 11/11/2026) — bó finding `qd103-108-alignment`.
 - [Kế hoạch](plan.md).
 
 ## Business outcome
@@ -19,8 +19,8 @@ gọi hiện có không đổi hành vi ngoài việc ngân sách _còn lại_ c
 
 ## Sizing decision
 
-- Container: bó finding `qd103-108-alignment` (đợt W4), ngoài nhóm G.
-- Mode: `technical-enabler`.
+- Container: G6, G7 (nhóm giao việc, không phải ranh giới hạng mục); bó finding `qd103-108-alignment` (đợt W4). Trước re-pin 11/11/2026 là ngoài nhóm.
+- Mode: `grouped-stories`.
 - Outcome and owner: `budgets/commitment` (listener + phép tính phần giải phóng); `licensing` **thêm** dữ kiện vào `RevocationTaskFacts`
   và hàm chuỗi `predecessor_id` ở `licensing/assignment` (capability thấp — `provisioning` đã import nó, DA4-36); `requests` bind thêm một
   phương thức của hook có sẵn (file binder có sẵn, repo ở `renewal-apply/` — `requests/spend` đã đủ 25 file, DA4-16).
@@ -32,19 +32,22 @@ gọi hiện có không đổi hành vi ngoài việc ngân sách _còn lại_ c
 - Not smaller: một listener cho mọi nguồn — tách theo nơi gọi thì mỗi luồng một phép tính khác nhau.
 - Siblings: `qd103-k4-key-pool` (thu hồi `K4` không đụng cam kết), `qd103-role-based-access` (quyền theo vai không có cam kết),
   `qd103-new-year-auto-commitments` (dùng lại hàm chuỗi).
-- Scope map: n/a
+- Scope map: [G6](../../../roadmap.md#work-item-decomposition-g6), [G7](../../../roadmap.md#work-item-decomposition-g7).
 
 ## Primary Story/AC
 
-| Story | AC           | Coverage | Phần còn lại thuộc                                                                           |
-| ----- | ------------ | -------- | -------------------------------------------------------------------------------------------- |
-| —     | L2-20, L4-12 | n/a      | gỡ chặn `qd103-new-year-auto-commitments` (listener theo Assignment), W5 seat-tháng, W6 MF-5 |
+| Story    | AC           | Coverage | Phần còn lại thuộc                                                                                                                                                                                                                                  |
+| -------- | ------------ | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| US-07-05 | AC-21        | partial  | AC còn lại và vế chung theo scope map: `g6-revocation-by-grant-kind`, `qd103-k4-key-pool`, `g6-transfer-tool-review`, `qd103-revocation-grace-notice`, `g6-downstream-integration`, `g6-handover-confirmation`, `qd103-ghost-seat-manager-decision` |
+| US-10-07 | AC-19, AC-20 | partial  | AC còn lại và vế chung theo scope map: `qd103-ghost-seat-manager-decision`, `qd103-ghost-seat-g1-g2`, `qd103-revocation-grace-notice`                                                                                                               |
 
 ## Supporting references
 
 `US-07-05` AC-21 (thu hồi 01/09, cam kết 03→12 × 200 ⟹ giải phóng 800; `K1` trả tới 30/09, hủy 10/09 ⟹ giải phóng các tháng sau 30/09);
 `US-10-07` AC-19, AC-20 (ghost seat thu hồi sớm giải phóng); `US-06-06` (_chỉ phần chưa phát sinh chi_, phần đã khớp hóa đơn không đảo);
 `FR-5.8`(5)(a) _quyền có thời hạn hết hạn trước 31/12_; `FR-5.8`(2) _đóng thất bại_ đã có ở `requests/grant/access-request-grant.listener.ts:85-89`.
+
+_Re-pin 11/11/2026 ([C3](../../../reviews/mf2-mf3-2026-11-10/C3-SCOPE-MAP-REPIN.md)):_ trước là `technical-enabler`, dòng `n/a` của bảng Primary: L2-20, L4-12 — gỡ chặn `qd103-new-year-auto-commitments` (listener theo Assignment), W5 seat-tháng, W6 MF-5. Bảng Primary claim AC của tối đa ba Story chính lấy từ danh sách trên, chỉ AC đang dùng ở Docs `5bb2e6a` (số AC của EP-05/EP-06/EP-12 không đổi giữa `9c7f386` và `5bb2e6a`); khóa khác của danh sách trên giữ chủ hiện có hoặc là `deferred` tới hạng mục này trong scope map. Claim theo spec và commit đã merge (PR #36), chưa đối chiếu từng AC trên code.
 
 ## Explicit out of scope
 

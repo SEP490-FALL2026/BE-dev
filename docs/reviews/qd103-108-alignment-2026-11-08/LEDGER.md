@@ -12,7 +12,7 @@
 > seat hay kỳ lập ngân sách.
 >
 > **ID** `Lv-nn`: `v` = vùng (1 MF-4/SBF-11 · 2 MF-1/SBF-15/17/19/03 · 3 SBF-20 · 4 MF-5/SBF-04a/04/18). `L-nnn` (không có
-> số vùng) trong cột căn cứ là ID ledger đợt QĐ-96 → QĐ-100 (`../qd96-100-alignment-2026-11-05/LEDGER.md`). Câu hỏi `Q…`
+> số vùng) trong cột căn cứ là ID ledger đợt QĐ-96 → QĐ-100 (`../qd96-100-alignment-2026-11-05/LEDGER.md` (nhật ký review đã xóa 11/11/2026 — xem git history)). Câu hỏi `Q…`
 > trong dòng trỏ [QUESTIONS.md](QUESTIONS.md) theo cột _Nguồn_ ở đó; `T…` là lựa chọn kỹ thuật trong báo cáo vùng — chép
 > vào spec của đợt.
 >

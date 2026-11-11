@@ -6,7 +6,7 @@
 - **Mức FE-tonight: Phần A = `A`** (mục 1 + `needsNewRequest` K5 + mã cảnh báo Business Owner — chỉ DTO/mapper, **không migration**); **Phần B = `B`** (mục 2–8: mô hình hạn, job báo trước/áp mặc định/tạm dừng, wire `defaultRevocationAfter`, M10/M11). Hệ quả cho demo: MF-3 bước 3.8 (F19 P0) **chưa chạy** tối nay — quá hạn vẫn chỉ nhắc như hiện tại (`transfer-review-overdue.service.ts:15-60`); FE không hiện ngày áp mặc định.
 - Nguồn: Docs `3d73a7f` (BRD 4.0 `FR-2.16`(2)(4)(7), `FR-8.2`; `US-03-07` AC-6, AC-7, AC-11, AC-12; `US-03-12` AC-5, AC-6, AC-11;
   `QĐ-50b`, `QĐ-62c`, `QĐ-87h`(3), `QĐ-89e`, `QĐ-94f`(4), `QĐ-94l`(2)(5), `QĐ-94m`(4)(10), `QĐ-99k`(c)), BE `3e4553b9`.
-  Tracker: `docs/reviews/qd96-100-alignment-2026-11-05/` (L-502, L-503, L-506, L-507, L-508, L-510; S-13).
+  Tracker: `docs/reviews/qd96-100-alignment-2026-11-05/` (nhật ký review đã xóa 11/11/2026 — xem git history) (L-502, L-503, L-506, L-507, L-508, L-510; S-13).
 - Nhóm roadmap: G6 — chỉ là planning container; container giao việc là bó finding `qd96-100-alignment`.
 - [Kế hoạch](plan.md).
 
@@ -19,7 +19,7 @@ có trưởng phòng thì hạn bắt đầu, tới trần thì áp mặc địn
 ## Sizing decision
 
 - Container: bó finding `qd96-100-alignment` (Track T), Story thuộc G6.
-- Mode: `grouped-stories`.
+- Mode: `technical-enabler`.
 - Outcome and owner: mô hình hạn của rà soát sau điều chuyển và job áp mặc định — capability `personnel/transfer-review`.
 - Boundaries: bảng `transfer_reviews`, `transfer_review_items` (+ trigger); job theo giờ đã có (`TransferReviewSweeper`);
   `licensing.openRevocation` (nguồn `TRANSFER_REVIEW`); thông báo; tham số. Wire `transferReviewDecide`, `transferReview*` (đọc).
@@ -31,10 +31,11 @@ có trưởng phòng thì hạn bắt đầu, tới trần thì áp mặc địn
 
 ## Primary Story/AC
 
-| Story      | AC                | Coverage | Phần còn lại thuộc                                                                                                                                                                                                                                                            |
-| ---------- | ----------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `US-03-07` | AC-6, AC-7, AC-12 | partial  | AC-1, AC-2, AC-4, AC-5, AC-8, AC-9, AC-11, AC-13→AC-15: `g6-transfer-tool-review`; AC-3: `qd96-100-transfer-replacement-request`; AC-10: `g3-downstream-finance-integration`; AC-16, AC-17: `qd96-100-transfer-labels-and-overlap`; AC-18: `qd96-100-seat-transfer-and-reuse` |
-| `US-03-12` | AC-5, AC-6, AC-11 | partial  | AC-1→AC-4, AC-7→AC-10, AC-12, AC-13: `qd96-100-transfer-labels-and-overlap`                                                                                                                                                                                                   |
+| Story | AC              | Coverage | Phần còn lại thuộc                                                                                                                                        |
+| ----- | --------------- | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| —     | Story `RETIRED` | n/a      | US-03-07, US-03-12 `RETIRED`; thay bởi `US-03-13` (chưa có hạng mục) — code rà soát sau điều chuyển gỡ ở đợt `MF-2`/`MF-3` cùng `g6-transfer-tool-review` |
+
+_Re-pin 11/11/2026 ([C3](../../../reviews/mf2-mf3-2026-11-10/C3-SCOPE-MAP-REPIN.md)):_ bỏ khỏi bảng `US-03-07` AC-6, AC-7, AC-12 (partial); `US-03-12` AC-5, AC-6, AC-11 (partial) — Story `RETIRED` ở Docs `5bb2e6a` (`US-03-07` `QĐ-103h`, `US-03-12` `QĐ-103h`); code đã merge là lịch sử, khóa ở scope map là `not affected`. Không còn Story nào nên `Mode` đổi `technical-enabler` (dòng `n/a` nêu hạng mục thay thế).
 
 ## Supporting references
 

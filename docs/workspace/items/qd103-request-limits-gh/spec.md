@@ -7,7 +7,7 @@
   `BR-MF1-01`; `QĐ-103c`, `QĐ-103t`(2), `QĐ-103u`(1)(2), `QĐ-104b`, `QĐ-106g`, `QĐ-106h`(2), `QĐ-108c`, `QĐ-103b`; QT v1.7 mục
   1.1, A.4 dòng `GH-2`, `GH-3`), BE `1cd81101`. Ledger: L2-05, L2-06, L2-37 (vế GH-2/GH-3); luật R-A02→R-A05, R-K01. Câu
   TẠM CHỌN mới: Q-28 (loại Request áp GH), Q-30 (lý do GH-3 của Request nhóm), Q-32 (GH-3 khi xin gói khác của phần mềm đang dùng).
-- Nhóm roadmap: không — bó finding `qd103-108-alignment`.
+- Nhóm roadmap: G5 (từ re-pin scope map 11/11/2026) — bó finding `qd103-108-alignment`.
 - [Kế hoạch](plan.md).
 
 ## Business outcome
@@ -21,8 +21,8 @@ GH-1/GH-2; Request tiếp tục **gửi muộn** (thành cấp mới) thì chị
 
 ## Sizing decision
 
-- Container: bó finding `qd103-108-alignment` (đợt W3), ngoài nhóm G.
-- Mode: `technical-enabler`.
+- Container: G5 (nhóm giao việc, không phải ranh giới hạng mục); bó finding `qd103-108-alignment` (đợt W3). Trước re-pin 11/11/2026 là ngoài nhóm.
+- Mode: `grouped-stories`.
 - Outcome and owner: capability mới `requests/request-limits/` (policy + repo đếm và khóa tư vấn + service kiểm) sở hữu luật giới
   hạn — là **capability**, không phải nhóm của `access-request/`, vì `request-intake`, `assessment`, `draft`,
   `group-request-submission`, `renewal-request` cùng gọi (`docs/rules/module-structure.md:56-66`, DA3-07); `operating-parameters`
@@ -34,19 +34,23 @@ GH-1/GH-2; Request tiếp tục **gửi muộn** (thành cấp mới) thì chị
   vai: W4 `qd103-role-based-access`).
 - Not smaller: GH-1/2/3 cùng một lần đọc và một khóa theo người thụ hưởng; tách ra thì hai đường gửi đếm khác nhau.
 - Siblings: `qd103-request-single-step-routing` (trước — trạng thái `AWAITING_REQUESTER_REVISION` tính là _đang mở_).
-- Scope map: n/a
+- Scope map: [G5](../../../roadmap.md#work-item-decomposition-g5).
 
 ## Primary Story/AC
 
-| Story | AC                                | Coverage | Phần còn lại thuộc                                                                |
-| ----- | --------------------------------- | -------- | --------------------------------------------------------------------------------- |
-| —     | L2-05, L2-06 (vế ứng viên), L2-37 | n/a      | gỡ chặn W4 `qd103-role-based-access` (ngoại lệ `ROLE_ENDED`), W8 lịch sử theo vai |
+| Story    | AC                    | Coverage | Phần còn lại thuộc                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                       |
+| -------- | --------------------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| US-05-02 | AC-19                 | partial  | AC còn lại và vế chung theo scope map: `g5-request-amount-and-payment-schedule`, `qd103-request-amount-and-term`, `qd96-100-request-term-limit`, `qd96-100-approved-end-date`, `qd96-100-request-year-without-spend-date`, `g5-group-requests`, `g5-request-submission-and-routing`, `g5-delegated-requests`, `qd96-100-request-sender-rules`, `g5-it-assessment-of-new-software`, `qd93-remove-fallback-substitute-approvers`, `qd93-unplaced-employee-first-placement`, `qd103-request-single-step-routing`, `qd103-role-based-access` |
+| US-05-03 | AC-8, AC-17           | partial  | AC còn lại và vế chung theo scope map: `g5-request-submission-and-routing`, `qd103-request-single-step-routing`, `qd93-remove-fallback-substitute-approvers`, `g5-spend-submission-batches`, `g5-step-reassignment-and-controlled-wait`, `g5-delegated-requests`, `g5-group-requests`, `qd93-unplaced-employee-first-placement`                                                                                                                                                                                                          |
+| US-05-22 | AC-1→AC-4, AC-6→AC-11 | partial  | AC-5, AC-12 `deferred` tới chính `qd103-request-limits-gh` (chưa claim)                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
 
 ## Supporting references
 
 `US-05-22` AC-1→AC-4, AC-6→AC-11 (AC-5 chồng lấn `MF-3`: chỉ phần policy); `US-05-02` AC-19; `US-05-03` AC-8, AC-17;
 `US-05-17`; `US-06-14` AC-6; `US-06-01` (cờ GH-3 trên snapshot, `FR-3.14`(1)). Spec cũ `qd96-100-request-sender-rules`,
 `-head-group-request-queue` chỉ đọc tham khảo (còn: nhóm của trưởng phòng từ 2 người; bỏ: dòng trưởng phòng trong nhóm).
+
+_Re-pin 11/11/2026 ([C3](../../../reviews/mf2-mf3-2026-11-10/C3-SCOPE-MAP-REPIN.md)):_ trước là `technical-enabler`, dòng `n/a` của bảng Primary: L2-05, L2-06 (vế ứng viên), L2-37 — gỡ chặn W4 `qd103-role-based-access` (ngoại lệ `ROLE_ENDED`), W8 lịch sử theo vai. Bảng Primary claim AC của tối đa ba Story chính lấy từ danh sách trên, chỉ AC đang dùng ở Docs `5bb2e6a` (số AC của EP-05/EP-06/EP-12 không đổi giữa `9c7f386` và `5bb2e6a`); khóa khác của danh sách trên giữ chủ hiện có hoặc là `deferred` tới hạng mục này trong scope map. Claim theo spec và commit đã merge (PR #36), chưa đối chiếu từng AC trên code.
 
 ## Explicit out of scope
 

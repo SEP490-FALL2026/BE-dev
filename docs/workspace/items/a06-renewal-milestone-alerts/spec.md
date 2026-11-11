@@ -18,7 +18,7 @@ quyết định lẫn kết quả đã ghi; kỳ thiếu dữ liệu mốc chỉ
 ## Sizing decision
 
 - Container: G8 (nhóm giao việc, không phải ranh giới hạng mục).
-- Mode: `split-story`.
+- Mode: `technical-enabler`.
 - Outcome and owner: cảnh báo đúng mốc, đúng người, một lần; capability `licensing/subscription-renewal` nhóm `alerts/` và
   `subscription-renewal-sweep.service.ts`, `subscription-renewal.job.ts`.
 - Boundaries: không bảng mới (idempotency là unique `(recipient, event_key)` của `in_app_notifications`); một transaction mỗi kỳ
@@ -31,9 +31,11 @@ quyết định lẫn kết quả đã ghi; kỳ thiếu dữ liệu mốc chỉ
 
 ## Primary Story/AC
 
-| Story    | AC         | Coverage | Phần còn lại thuộc                                                                                                        |
-| -------- | ---------- | -------- | ------------------------------------------------------------------------------------------------------------------------- |
-| US-11-01 | AC-1→AC-14 | partial  | vế khuyến nghị `G1`/`G3`/`G4` của AC-3: `a06-renewal-usage-evidence`; vế thư điện tử của AC-12: `a06-renewal-open-inputs` |
+| Story | AC              | Coverage | Phần còn lại thuộc                                                 |
+| ----- | --------------- | -------- | ------------------------------------------------------------------ |
+| —     | Story `RETIRED` | n/a      | US-11-01 `RETIRED`; thay bởi `qd103-subscription-alerts-incidents` |
+
+_Re-pin 11/11/2026 ([C3](../../../reviews/mf2-mf3-2026-11-10/C3-SCOPE-MAP-REPIN.md)):_ bỏ khỏi bảng `US-11-01` AC-1→AC-14 (partial) — Story `RETIRED` ở Docs `5bb2e6a` (`US-11-01` `QĐ-103e`); code đã merge là lịch sử, khóa ở scope map là `not affected`. Không còn Story nào nên `Mode` đổi `technical-enabler` (dòng `n/a` nêu hạng mục thay thế).
 
 ## Supporting references
 

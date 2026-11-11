@@ -23,10 +23,14 @@ Finance có đủ API cho 4 màn: (1) trung tâm chi phí theo phòng + ô tổn
 
 ## Primary Story/AC
 
-| Story    | AC                                  | Coverage | Phần còn lại thuộc |
-| -------- | ----------------------------------- | -------- | ------------------ |
-| US-12-01 | AC-1, AC-6, AC-10, AC-13            | full     | —                  |
-| US-12-02 | AC-4, AC-5, AC-6, AC-8, AC-9, AC-11 | full     | —                  |
+| Story    | AC                                  | Coverage | Phần còn lại thuộc                                                                                                                              |
+| -------- | ----------------------------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| US-12-01 | AC-1, AC-6, AC-10, AC-13            | partial  | re-pin 11/11/2026 — AC-2→AC-5, AC-7→AC-9, AC-12, AC-14, AC-17: `qd103-budget-vs-actual-report` (`deferred`); AC-11, AC-16: `qd103-budget-views` |
+| US-12-02 | AC-4, AC-5, AC-6, AC-8, AC-9, AC-11 | partial  | re-pin 11/11/2026 — AC-1, AC-2, AC-7, AC-13, AC-14: `qd103-purchase-invoice-sbf19` (`deferred`)                                                 |
+
+_Re-pin 11/11/2026 ([C3](../../../reviews/mf2-mf3-2026-11-10/C3-SCOPE-MAP-REPIN.md)):_ `US-12-01` đổi `full` → `partial` vì Docs `5bb2e6a` thêm AC hoặc hạng mục khác cùng hiện thực khóa của Story này (scope map); phần đã code không đổi.
+
+_Re-pin 11/11/2026 ([C3](../../../reviews/mf2-mf3-2026-11-10/C3-SCOPE-MAP-REPIN.md)):_ `US-12-02` đổi `full` → `partial` vì Docs `5bb2e6a` thêm AC hoặc hạng mục khác cùng hiện thực khóa của Story này (scope map); phần đã code không đổi.
 
 ## Supporting references
 

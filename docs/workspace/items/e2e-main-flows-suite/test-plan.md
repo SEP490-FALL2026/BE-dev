@@ -1,7 +1,7 @@
 # Test plan: e2e-main-flows-suite — kịch bản theo 5 main flow
 
 [Spec](spec.md) · [Plan](plan.md). Mọi đường dẫn có tiền tố `/api/v1`. Contract là bản **sau sửa** của hạng mục ghi ở cột
-`Item` (`#n` = số trong `docs/reviews/qd96-100-alignment-2026-11-05/ITEMS.md`). Chưa chạy: mọi dòng là `planned`.
+`Item` (`#n` = số trong `docs/reviews/qd96-100-alignment-2026-11-05/ITEMS.md` (nhật ký review đã xóa 11/11/2026 — xem git history)). Chưa chạy: mọi dòng là `planned`.
 
 ## 1. Quy ước
 

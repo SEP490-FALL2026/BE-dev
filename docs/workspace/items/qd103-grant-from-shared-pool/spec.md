@@ -7,7 +7,7 @@
   `QĐ-103v`(3), `QĐ-104k`(3), `QĐ-106e`, `QĐ-108d`, `QĐ-89e` (hệ quả); QT v1.7 `C-13`, mục 1.9–1.11, C.2), BE `5fd5f594`. Ledger:
   L2-27, L2-28, L2-29, L4-19, L3-06 (vế chặn trùng + bỏ ràng buộc phòng; drop cột ở W5); finding F-012. Luật R-E02, R-E05, R-E06,
   R-H01 (vế _phòng người nhận từ ngày cấp_). Câu TẠM CHỌN: Q-04 = C; Q-35, Q-36 ([REVISION-NOTES](../../../reviews/qd103-108-alignment-2026-11-08/QUESTIONS.md)).
-- Nhóm roadmap: không — bó finding `qd103-108-alignment`.
+- Nhóm roadmap: G3, G4 (từ re-pin scope map 11/11/2026) — bó finding `qd103-108-alignment`.
 - [Kế hoạch](plan.md).
 
 ## Business outcome
@@ -19,8 +19,8 @@ thuê bao thứ hai cùng (ứng dụng, gói) `K2`/`K4` bị chặn. Cờ thuê
 
 ## Sizing decision
 
-- Container: bó finding `qd103-108-alignment` (đợt W4), ngoài nhóm G.
-- Mode: `technical-enabler`.
+- Container: G3, G4 (nhóm giao việc, không phải ranh giới hạng mục); bó finding `qd103-108-alignment` (đợt W4). Trước re-pin 11/11/2026 là ngoài nhóm.
+- Mode: `grouped-stories`.
 - Outcome and owner: `catalog/subscription` (chặn trùng, giá, cờ chính), `licensing/assignment` + `licensing/provisioning`
   (cấp không theo phòng), capability mới `licensing/shared-pool` (đếm kho, mua thêm, _tránh được_ — L0, không controller, vì
   `provisioning` và `role-based` cùng dùng, `docs/rules/module-structure.md:66-67`), `licensing/seat-baseline` (cổng khởi tạo).
@@ -31,18 +31,22 @@ thuê bao thứ hai cùng (ứng dụng, gói) `K2`/`K4` bị chặn. Cờ thuê
   khóa `K4` ở `qd103-k4-key-pool`; hóa đơn của lần mua ở `qd103-purchase-invoice-sbf19`.
 - Not smaller: bỏ guard phòng, giá theo phòng và chặn trùng phải đổi **cùng lúc** (audit W1 DA1-05), nếu không MF-1 tắc.
 - Siblings: `qd103-k4-key-pool`, `qd103-role-based-access` (cùng import `shared-pool`), `qd103-purchase-invoice-sbf19` (cột mua).
-- Scope map: n/a
+- Scope map: [G3](../../../roadmap.md#work-item-decomposition-g3), [G4](../../../roadmap.md#work-item-decomposition-g4).
 
 ## Primary Story/AC
 
-| Story | AC                                                  | Coverage | Phần còn lại thuộc                                                                     |
-| ----- | --------------------------------------------------- | -------- | -------------------------------------------------------------------------------------- |
-| —     | L2-27, L2-28, L2-29, L4-19, L3-06 (một phần), F-012 | n/a      | gỡ chặn `qd103-k4-key-pool`, `qd103-role-based-access`, `qd103-purchase-invoice-sbf19` |
+| Story    | AC                    | Coverage | Phần còn lại thuộc                                                                                                                                                                                                                                                      |
+| -------- | --------------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| US-04-14 | AC-2, AC-3            | partial  | AC còn lại và vế chung theo scope map: `qd103-shared-pool-subscription`                                                                                                                                                                                                 |
+| US-07-01 | AC-1, AC-2            | partial  | AC còn lại và vế chung theo scope map: `g4-provisioning-queue-manual`, `g4-request-and-transfer-integration`, `qd103-k4-key-pool`, `g4-seat-baseline-import`, `qd103-new-year-auto-commitments`; AC-21 `deferred` tới chính `qd103-grant-from-shared-pool` (chưa claim) |
+| US-07-13 | AC-1→AC-4, AC-6, AC-8 | partial  | AC còn lại và vế chung theo scope map: `qd103-k4-key-pool`; AC-5, AC-7 `deferred` tới chính `qd103-grant-from-shared-pool` (chưa claim)                                                                                                                                 |
 
 ## Supporting references
 
 `US-07-13` AC-1→AC-4, AC-8 (vế _mua 2 seat cho Request 1 người ⟹ từ chối_), AC-6 (vế _tránh được_ `K4`); `US-07-01` AC-1, AC-2;
 `US-04-14` AC-2, AC-3; `US-02-05` AC-19 (khởi tạo cho phép trùng); `US-12-04` (_tránh được_ là chỉ số, không cộng).
+
+_Re-pin 11/11/2026 ([C3](../../../reviews/mf2-mf3-2026-11-10/C3-SCOPE-MAP-REPIN.md)):_ trước là `technical-enabler`, dòng `n/a` của bảng Primary: L2-27, L2-28, L2-29, L4-19, L3-06 (một phần), F-012 — gỡ chặn `qd103-k4-key-pool`, `qd103-role-based-access`, `qd103-purchase-invoice-sbf19`. Bảng Primary claim AC của tối đa ba Story chính lấy từ danh sách trên, chỉ AC đang dùng ở Docs `5bb2e6a` (số AC của EP-05/EP-06/EP-12 không đổi giữa `9c7f386` và `5bb2e6a`); khóa khác của danh sách trên giữ chủ hiện có hoặc là `deferred` tới hạng mục này trong scope map. Claim theo spec và commit đã merge (PR #36), chưa đối chiếu từng AC trên code.
 
 ## Explicit out of scope
 

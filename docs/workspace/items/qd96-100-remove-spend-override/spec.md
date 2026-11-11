@@ -1,7 +1,7 @@
 # Spec: qd96-100-remove-spend-override — Người duyệt chi không còn override; gỡ giá trị lịch sử người thay
 
 - Phụ trách: AI theo giao việc Owner (05/11/2026); người nhận implement tiếp quản spec/plan và evidence.
-- Thiết kế ban đầu bởi: AI (agent C-SPEC-B) theo [tracker qd96-100](../../../reviews/qd96-100-alignment-2026-11-05/README.md),
+- Thiết kế ban đầu bởi: AI (agent C-SPEC-B) theo tracker qd96-100 (nhật ký review đã xóa 11/11/2026 — xem git history),
   `LEDGER.md` L-110, L-117; Q-02 B.
 - Thiết kế: `draft`. Owner review: chưa review. Peer review: chưa có.
 - Nguồn: Docs `3d73a7f` (BRD 4.0 `FR-3.20`; US 05/11/2026 — `US-06-01` AC-23 (AC-5, AC-16 bỏ); `QĐ-97c`, `QĐ-93c`, `QĐ-93d(1)`),

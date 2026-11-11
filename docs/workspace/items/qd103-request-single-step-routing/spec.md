@@ -8,7 +8,7 @@
   `QĐ-106h`(1), `QĐ-62c`, `QĐ-53c`; QT v1.7 mục 1.2, 1.4, 1.6, 1.7; L1 MF-1 bước 2 _không còn trưởng phòng **và chưa có kế
   nhiệm**_), BE `1cd81101`. Ledger: L2-01, L2-02, L2-03, L2-15, L2-34, L2-06 (vế `HEAD_IN_GROUP`); luật R-A07→R-A12, R-B06,
   R-B07 (vế một bước). Câu chọn: Q-06 = B; Q-24 (cải tiến), Q-25, Q-31, Q-33 (mới).
-- Nhóm roadmap: không — bó finding `qd103-108-alignment`.
+- Nhóm roadmap: G5 (từ re-pin scope map 11/11/2026) — bó finding `qd103-108-alignment`.
 - [Kế hoạch](plan.md).
 
 ## Business outcome
@@ -23,8 +23,8 @@ phải kèm phương án thay thế.
 
 ## Sizing decision
 
-- Container: bó finding `qd103-108-alignment` (đợt W3), ngoài nhóm G.
-- Mode: `technical-enabler`.
+- Container: G5 (nhóm giao việc, không phải ranh giới hạng mục); bó finding `qd103-108-alignment` (đợt W3). Trước re-pin 11/11/2026 là ngoài nhóm.
+- Mode: `grouped-stories`.
 - Outcome and owner: lõi `requests/access-request` (`routing.policy.ts`, `access-request.policy.ts`) sở hữu bảng định tuyến;
   `request-intake`, `group-request-submission`, `renewal-request`, `service-account-request`, `assessment` gửi theo bảng;
   `requests/spend` mở bước một bước; `requests/reassignment` chuyển khi mất trưởng phòng và hoàn tất chuyển (sweep).
@@ -36,19 +36,23 @@ phải kèm phương án thay thế.
   và **một** trạng thái mới; tách ra thì có Request một bước không có đường sửa. Giao code chia 4 lượt (plan).
 - Siblings: `qd103-budget-check-three-outcomes`, `qd103-request-amount-and-term`, `qd103-commitment-current-year` (trước);
   `qd103-request-limits-gh` (sau).
-- Scope map: n/a
+- Scope map: [G5](../../../roadmap.md#work-item-decomposition-g5).
 
 ## Primary Story/AC
 
-| Story | AC                                                            | Coverage | Phần còn lại thuộc                                                    |
-| ----- | ------------------------------------------------------------- | -------- | --------------------------------------------------------------------- |
-| —     | L2-01, L2-02, L2-03, L2-15, L2-34, L2-06 (vế `HEAD_IN_GROUP`) | n/a      | gỡ chặn `qd103-request-limits-gh`, W8 `qd103-request-history-by-role` |
+| Story    | AC                                           | Coverage | Phần còn lại thuộc                                                                                                                                                                                                                                                                                                    |
+| -------- | -------------------------------------------- | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| US-05-03 | AC-2, AC-4, AC-9, AC-13, AC-16, AC-18, AC-19 | partial  | AC còn lại và vế chung theo scope map: `g5-request-submission-and-routing`, `qd93-remove-fallback-substitute-approvers`, `g5-spend-submission-batches`, `g5-step-reassignment-and-controlled-wait`, `g5-delegated-requests`, `g5-group-requests`, `qd103-request-limits-gh`, `qd93-unplaced-employee-first-placement` |
+| US-05-24 | AC-1→AC-3, AC-5, AC-6                        | partial  | AC còn lại và vế chung theo scope map: `qd103-request-history-by-role`                                                                                                                                                                                                                                                |
+| US-06-17 | AC-1→AC-13                                   | partial  | AC còn lại và vế chung theo scope map: `qd103-commitment-current-year`                                                                                                                                                                                                                                                |
 
 ## Supporting references
 
 `US-06-17` AC-1→AC-13; `US-05-03` AC-2, AC-4, AC-9, AC-13, AC-16, AC-18, AC-19; `US-05-02` AC-18; `US-05-24` AC-1→AC-3, AC-5,
 AC-6; `US-06-12` AC-30, AC-31; `US-06-14` AC-8, AC-18, AC-20; `US-06-16` AC-7, AC-10; `US-05-14` AC-16; `US-05-18`. Spec cũ
 `qd96-100-request-sender-rules`, `-head-group-request-queue` chỉ đọc tham khảo (bỏ: chặn trưởng phòng tự gửi, dòng trưởng phòng trong nhóm).
+
+_Re-pin 11/11/2026 ([C3](../../../reviews/mf2-mf3-2026-11-10/C3-SCOPE-MAP-REPIN.md)):_ trước là `technical-enabler`, dòng `n/a` của bảng Primary: L2-01, L2-02, L2-03, L2-15, L2-34, L2-06 (vế `HEAD_IN_GROUP`) — gỡ chặn `qd103-request-limits-gh`, W8 `qd103-request-history-by-role`. Bảng Primary claim AC của tối đa ba Story chính lấy từ danh sách trên, chỉ AC đang dùng ở Docs `5bb2e6a` (số AC của EP-05/EP-06/EP-12 không đổi giữa `9c7f386` và `5bb2e6a`); khóa khác của danh sách trên giữ chủ hiện có hoặc là `deferred` tới hạng mục này trong scope map. Claim theo spec và commit đã merge (PR #36), chưa đối chiếu từng AC trên code.
 
 ## Explicit out of scope
 
