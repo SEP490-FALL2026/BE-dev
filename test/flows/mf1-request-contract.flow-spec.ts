@@ -98,31 +98,24 @@ describe('MF-1 request contract: field cũ, sai vai, gọi lại @MF1 @D1', () =
     });
 
     it('ngân sách: dòng BM-10 còn khoảng mua, phiên bản còn ngưỡng giá trị cao ⟹ 422 #13 12b @B2', async () => {
-      await refusedWithNothingWritten('budget_proposals', () =>
-        call().post('NV-DESH', '/budget-proposals', {
-          year: Number(call().today().slice(0, 4)),
-          lines: [
-            {
-              description: 'Figma',
-              planId: figma,
-              seats: 2,
-              amount: { amount: '1000000' },
-              windowFrom: call().today(),
-              lineType: 'RENEW',
-              priorityRank: 1,
-            },
-          ],
-        }),
-      );
+      // The year after: Design already has its proposal for this year (it is how the dataset gave the department its budget), and the
+      // cycle of the next year is published with no proposal of Design in it.
+      const year = Number(call().today().slice(0, 4)) + 1;
+      // A line with no plan: a line that names Figma would be asked for the zero-based explanation (KPI-3 of the usage of the dataset),
+      // which is not what this scenario proves. The only difference between the refusal and the proposal is the retired field.
       const proposalLine = {
-        description: 'Figma',
-        planId: figma,
+        description: 'Công cụ thiết kế khác',
         seats: 2,
         amount: { amount: '1000000' },
         lineType: 'RENEW',
         priorityRank: 1,
       };
-      const year = Number(call().today().slice(0, 4));
+      await refusedWithNothingWritten('budget_proposals', () =>
+        call().post('NV-DESH', '/budget-proposals', {
+          year,
+          lines: [{ ...proposalLine, windowFrom: call().today() }],
+        }),
+      );
       const proposals = await count('budget_proposals');
       expect((await call().post('NV-DESH', '/budget-proposals', { year, lines: [proposalLine] })).status).toBe(201);
       expect(await count('budget_proposals')).toBe(proposals + 1);
@@ -192,7 +185,7 @@ describe('MF-1 request contract: field cũ, sai vai, gọi lại @MF1 @D1', () =
       const grant = async () =>
         call().post('NV-ITA1', '/provisioning-tasks', {
           requestId: pendingId,
-          subscriptionId: await call().subscriptionOf('Figma Professional', 'ENG'),
+          subscriptionId: await call().subscriptionOf('Figma Professional'),
         });
 
       const wrongHead = await call().submitBatch('NV-SALH', [pendingId]);
@@ -282,8 +275,9 @@ describe('MF-1 request contract: field cũ, sai vai, gọi lại @MF1 @D1', () =
 
   describe('F1-04 gọi lại không tạo bản ghi trùng @MF1 @D1', () => {
     it('BR-MF1-02 trưởng phòng tự gửi đi thẳng duyệt chi, không vào lô và chỉ quyết một lần @MF1', async () => {
+      // The head of Engineering holds Jira already: the plan is one they do not hold and have no Request open for.
       const sent = await call().post('NV-ENGH', '/access-requests', {
-        planId: await call().planId('Jira Standard'),
+        planId: await call().planId('Mailchimp Standard'),
         businessReason: 'Trưởng phòng dùng cho điều phối',
       });
       expect(sent.status).toBe(201);
@@ -318,7 +312,7 @@ describe('MF-1 request contract: field cũ, sai vai, gọi lại @MF1 @D1', () =
       expect(call().codeOf(twice)).toBe('SPEND.NO_SPEND_STEP');
       expect(await world.facts.count('budget_commitments', 'request_id = $1', [id])).toBe(1);
 
-      const subscriptionId = await call().subscriptionOf('Figma Professional', 'ENG');
+      const subscriptionId = await call().subscriptionOf('Figma Professional');
       const task = await call().post('NV-ITA1', '/provisioning-tasks', { requestId: id, subscriptionId });
       expect(task.status).toBe(201);
       const taskId = call().data<{ task: { id: string } }>(task).task.id;
