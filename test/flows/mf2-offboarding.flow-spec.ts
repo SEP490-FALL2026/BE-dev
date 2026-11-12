@@ -7,11 +7,17 @@ import { FlowWorld } from '../support/flows/flow-world';
  * MF-2, a departure with a last working day (test-plan section 4): the Super Admin records it with its basis, the access of the person
  * is refused by the date alone — no one presses "has left" — and a handover that is cancelled before the last day leaves nothing
  * behind. Real sign-in, the seeded dataset, the clock moved by hand, nothing mocked.
+ *
+ * The person who leaves is NV-DEV1, who holds five rights in the dataset (1Password, Jira, GitHub, ChatGPT, Postman), and the dataset
+ * already holds one departure that is over (NV-OFF1, state LEFT): the counts below are of this file's case, never of the table.
  */
 describe('MF-2 nghỉ việc có ngày cuối @MF2 @D1', () => {
   let world: FlowWorld;
   let lastDay: string;
   let caseId: string;
+  /** The rights NV-DEV1 holds when the case is recorded, and the departures already over in the dataset (NV-OFF1). */
+  let heldRights: number;
+  let leftBefore: number;
 
   const call = () => world.calls;
   const grounds = () => ({
@@ -31,6 +37,12 @@ describe('MF-2 nghỉ việc có ngày cuối @MF2 @D1', () => {
     world = await FlowWorld.open();
     lastDay = addWorkingDays(call().today(), 3, new Set());
     await world.actors.ensure('NV-SA', 'NV-ITA1', 'NV-DEV1', 'NV-DEV2', 'NV-DEV3');
+    heldRights = await world.facts.count(
+      'license_assignments',
+      'employee_id = $1 AND valid_until IS NULL AND cancelled_at IS NULL',
+      [await world.facts.employeeId('NV-DEV1')],
+    );
+    leftBefore = await world.facts.count('offboarding_cases', "state = 'LEFT'");
   }, 300000);
 
   afterAll(async () => {
@@ -138,7 +150,7 @@ describe('MF-2 nghỉ việc có ngày cuối @MF2 @D1', () => {
         lastWorkingDay: lastDay,
         accessBlocked: false,
         accessBlockedFrom: addDays(lastDay, 1),
-        heldRights: 1,
+        heldRights,
       });
       expect(
         await world.facts.one<{ cause: string; releasable: boolean }>(
@@ -154,7 +166,13 @@ describe('MF-2 nghỉ việc có ngày cuối @MF2 @D1', () => {
       const revoke = await call().post('NV-ITA1', `/offboarding-cases/${caseId}/revocations`, {});
       expect([lock.status, call().codeOf(lock)]).toEqual([409, 'OFFBOARDING_CASE.CASE_NOT_BLOCKED']);
       expect([revoke.status, call().codeOf(revoke)]).toEqual([409, 'OFFBOARDING_CASE.CASE_NOT_BLOCKED']);
-      expect(await world.facts.count('provisioning_tasks', "kind = 'REVOKE'")).toBe(0);
+      expect(
+        await world.facts.count(
+          'provisioning_tasks',
+          "kind = 'REVOKE' AND assignment_id IN (SELECT id FROM license_assignments WHERE employee_id = $1)",
+          [dev1],
+        ),
+      ).toBe(0);
     });
 
     it('đến hết ngày cuối: người đó vẫn đăng nhập và làm việc được #2 @B2', async () => {
@@ -180,13 +198,13 @@ describe('MF-2 nghỉ việc có ngày cuối @MF2 @D1', () => {
       expect(me.status).toBe(401);
       await world.actors.signIn('NV-SA');
       expect(await caseOf()).toMatchObject({ state: 'HANDING_OVER', accessBlocked: true });
-      expect(await world.facts.count('offboarding_cases', "state = 'LEFT'")).toBe(0);
+      expect(await world.facts.count('offboarding_cases', "state = 'LEFT'")).toBe(leftBefore);
     });
 
     it('khi đã chặn, IT Admin ghi khóa tài khoản và mở thu hồi quyền: tác vụ nguồn DEPARTURE, ghế còn nguyên #1 #24 @B2', async () => {
       await world.actors.signIn('NV-ITA1');
       const rights = await call().get('NV-ITA1', `/offboarding-cases/${caseId}/rights`);
-      expect(call().data<{ items: unknown[] }>(rights).items).toHaveLength(1);
+      expect(call().data<{ items: unknown[] }>(rights).items).toHaveLength(heldRights);
 
       const withoutLock = await call().post('NV-ITA1', `/offboarding-cases/${caseId}/revocations`, {});
       expect(call().codeOf(withoutLock)).toBe('OFFBOARDING_CASE.ACCOUNT_LOCK_NOT_RECORDED');
@@ -196,20 +214,25 @@ describe('MF-2 nghỉ việc có ngày cuối @MF2 @D1', () => {
       expect(lock.status).toBe(200);
       const opened = await call().post('NV-ITA1', `/offboarding-cases/${caseId}/revocations`, {});
       expect(opened.status).toBe(200);
-      expect(call().data<{ revocations: { created: number } }>(opened).revocations.created).toBe(1);
+      expect(call().data<{ revocations: { created: number } }>(opened).revocations.created).toBe(heldRights);
 
+      // Every right of the person gets a task of its own, from the departure, queued; the tasks the dataset already has (the head's
+      // reclaim of NV-DES11, the departure of NV-OFF1) are other people's.
       expect(
-        await world.facts.one<{ revocation_source: string; status: string }>(
-          `SELECT revocation_source::text, status::text FROM provisioning_tasks WHERE kind = 'REVOKE'`,
+        await world.facts.rows<{ revocation_source: string; status: string }>(
+          `SELECT t.revocation_source::text, t.status::text
+             FROM provisioning_tasks t JOIN license_assignments a ON a.id = t.assignment_id
+            WHERE t.kind = 'REVOKE' AND a.employee_id = $1`,
+          [await world.facts.employeeId('NV-DEV1')],
         ),
-      ).toEqual({ revocation_source: 'DEPARTURE', status: 'QUEUED' });
+      ).toEqual(Array.from({ length: heldRights }, () => ({ revocation_source: 'DEPARTURE', status: 'QUEUED' })));
       expect(
         await world.facts.count(
           'license_assignments',
           'employee_id = $1 AND valid_until IS NULL AND cancelled_at IS NULL',
           [await world.facts.employeeId('NV-DEV1')],
         ),
-      ).toBe(1);
+      ).toBe(heldRights);
       const again = await call().post('NV-ITA1', `/offboarding-cases/${caseId}/account-lock`, { note: 'lần hai' });
       expect(call().codeOf(again)).toBe('OFFBOARDING_CASE.ALREADY_RECORDED');
     });

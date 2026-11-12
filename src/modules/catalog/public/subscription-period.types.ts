@@ -17,6 +17,8 @@ export interface RenewalPeriodFacts {
   applicationName: string;
   applicationKind: 'SAAS' | 'LICENSED' | 'INTERNAL';
   ownerDepartmentId: string;
+  /** The IT Admin who answers for the subscription; null when it names none (`QĐ-103v`(4)). */
+  responsibleItAdminEmployeeId: string | null;
   kind: 'TERM' | 'PERPETUAL';
   status: 'DRAFT' | 'ACTIVE';
   purchasedQuantity: number | null;

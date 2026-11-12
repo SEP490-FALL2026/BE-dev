@@ -26,7 +26,7 @@ const toRecord = (row: Row): ApplicationRecord => ({
   dictionaryServiceLineId: row.dictionaryLineId,
   domains: row.domains,
   dataSensitivity: row.dataSensitivity,
-  businessOwnerEmployeeId: row.businessOwnerEmployeeId,
+  responsibleItAdminEmployeeId: row.responsibleItAdminEmployeeId,
   communication: {
     personToPersonMessaging: row.commPersonToPersonMessaging,
     callsOrMeetings: row.commCallsOrMeetings,
@@ -55,7 +55,7 @@ export class ApplicationRepo {
         normalizedName: searchKey(input.name),
         dictionaryLineId: input.dictionaryServiceLineId,
         functionalGroupId: input.functionalGroupId,
-        businessOwnerEmployeeId: input.businessOwnerEmployeeId,
+        responsibleItAdminEmployeeId: input.responsibleItAdminEmployeeId,
         dataSensitivity: input.dataSensitivity,
         commPersonToPersonMessaging: input.communication.personToPersonMessaging,
         commCallsOrMeetings: input.communication.callsOrMeetings,
@@ -68,6 +68,11 @@ export class ApplicationRepo {
     });
 
     return toRecord(row);
+  }
+
+  /** Names the IT Admin responsible for the application (`QĐ-111g`): the one writer of the column after the declaration. */
+  async setResponsible(tx: DbTx, id: string, employeeId: string): Promise<void> {
+    await tx.application.update({ where: { id }, data: { responsibleItAdminEmployeeId: employeeId } });
   }
 
   /** The application, locked for the rest of the transaction, or null. */
@@ -96,9 +101,6 @@ export class ApplicationRepo {
         ...(changes.name !== undefined ? { name: changes.name, normalizedName: searchKey(changes.name) } : {}),
         ...(changes.dictionaryServiceLineId !== undefined ? { dictionaryLineId: changes.dictionaryServiceLineId } : {}),
         ...(changes.functionalGroupId !== undefined ? { functionalGroupId: changes.functionalGroupId } : {}),
-        ...(changes.businessOwnerEmployeeId !== undefined
-          ? { businessOwnerEmployeeId: changes.businessOwnerEmployeeId }
-          : {}),
         ...(changes.dataSensitivity !== undefined ? { dataSensitivity: changes.dataSensitivity } : {}),
         ...(changes.domains !== undefined ? { domains: changes.domains } : {}),
         ...(communication
@@ -150,102 +152,6 @@ export class ApplicationRepo {
     return rows.length === 0
       ? null
       : { id: rows[0].id, name: rows[0].name, kind: rows[0].kind, status: rows[0].catalog_status };
-  }
-
-  /** Opens a Business Owner period for the application: the person, now, and who made the change. */
-  async openOwnerPeriod(
-    tx: DbTx,
-    input: { applicationId: string; employeeId: string; assignedByAppUserId: string },
-  ): Promise<void> {
-    await tx.applicationBusinessOwner.create({ data: input });
-  }
-
-  /** Closes the open Business Owner period of the application, if it has one. */
-  async closeOpenOwnerPeriod(tx: DbTx, applicationId: string): Promise<void> {
-    await tx.applicationBusinessOwner.updateMany({
-      where: { applicationId, endedAt: null },
-      data: { endedAt: new Date() },
-    });
-  }
-
-  /** One page of the Business Owner periods of an application, the latest first, and the total, from one snapshot. */
-  listOwnerPeriods(applicationId: string, skip: number, take: number) {
-    return this.prisma.$transaction(
-      async (tx) => ({
-        items: await tx.applicationBusinessOwner.findMany({
-          where: { applicationId },
-          orderBy: [{ assignedAt: 'desc' }, { id: 'desc' }],
-          skip,
-          take,
-        }),
-        total: await tx.applicationBusinessOwner.count({ where: { applicationId } }),
-      }),
-      { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead },
-    );
-  }
-
-  /** The distinct Business Owners of all applications now: whose status decides which applications need a new one. */
-  async currentOwnerIds(): Promise<string[]> {
-    const rows = await this.prisma.application.findMany({
-      where: { businessOwnerEmployeeId: { not: null } },
-      distinct: ['businessOwnerEmployeeId'],
-      select: { businessOwnerEmployeeId: true },
-    });
-
-    return rows.flatMap((row) => (row.businessOwnerEmployeeId === null ? [] : [row.businessOwnerEmployeeId]));
-  }
-
-  /** The first `take` applications still in use whose Business Owner is this employee, by name, and how many there are. */
-  async ownedBy(
-    employeeId: string,
-    take: number,
-    tx?: DbTx,
-  ): Promise<{ items: { id: string; name: string }[]; total: number }> {
-    const where: Prisma.ApplicationWhereInput = { businessOwnerEmployeeId: employeeId, retiredAt: null };
-    const client = tx ?? this.prisma;
-    const items = await client.application.findMany({
-      where,
-      select: { id: true, name: true },
-      orderBy: [{ normalizedName: 'asc' }, { id: 'asc' }],
-      take,
-    });
-
-    return { items, total: await client.application.count({ where }) };
-  }
-
-  /** One page of the applications of these Business Owners, by name, and the total, from one snapshot. */
-  async listByOwners(
-    ownerIds: readonly string[],
-    skip: number,
-    take: number,
-  ): Promise<{
-    items: { id: string; name: string; kind: ApplicationKind; businessOwnerEmployeeId: string }[];
-    total: number;
-  }> {
-    const where: Prisma.ApplicationWhereInput = { businessOwnerEmployeeId: { in: [...ownerIds] } };
-
-    return this.prisma.$transaction(
-      async (tx) => {
-        const rows = await tx.application.findMany({
-          where,
-          select: { id: true, name: true, kind: true, businessOwnerEmployeeId: true },
-          orderBy: [{ normalizedName: 'asc' }, { id: 'asc' }],
-          skip,
-          take,
-        });
-
-        // The filter names the owners, so every row has one.
-        return {
-          items: rows.flatMap((row) =>
-            row.businessOwnerEmployeeId === null
-              ? []
-              : [{ ...row, businessOwnerEmployeeId: row.businessOwnerEmployeeId }],
-          ),
-          total: await tx.application.count({ where }),
-        };
-      },
-      { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead },
-    );
   }
 
   /** The first `take` other approved applications of a functional group, by name: the similar tools, and how many there are. */
@@ -302,7 +208,7 @@ export class ApplicationRepo {
             catalogStatus: true,
             dataSensitivity: true,
             isCommunicationService: true,
-            businessOwnerEmployeeId: true,
+            responsibleItAdminEmployeeId: true,
             updatedAt: true,
             vendor: { select: { id: true, name: true } },
             functionalGroup: { select: { id: true, name: true } },
@@ -319,7 +225,7 @@ export class ApplicationRepo {
             kind: row.kind,
             vendor: row.vendor,
             dataSensitivity: row.dataSensitivity,
-            businessOwnerEmployeeId: row.businessOwnerEmployeeId,
+            responsibleItAdminEmployeeId: row.responsibleItAdminEmployeeId,
             isCommunicationService: row.isCommunicationService,
             functionalGroup: row.functionalGroup,
             status: row.catalogStatus,

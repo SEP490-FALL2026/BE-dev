@@ -6,7 +6,7 @@
 - Nguồn: Docs `9c7f386` (BRD 4.10 `FR-5.8`(1)(5)(c)(6), `FR-5.8a`, `FR-3.23` đoạn 31/12; `QĐ-104a`, `QĐ-103f`(3), `QĐ-106c`, `QĐ-103u`(5), `QĐ-104e`(2);
   QT v1.7 `C-10`, mục 1.8, 1.10), BE `5fd5f594`. Ledger: L1-13, L2-39. Luật R-C02, R-C03, R-C06, R-C01 (ngoại lệ 01/01). Câu TẠM CHỌN: Q-01 = B,
   Q-27 = A (hai điều kiện), Q-29 = B'; Q-47 = B (đổi theo audit), Q-48 ([REVISION-NOTES](../../../reviews/qd103-108-alignment-2026-11-08/QUESTIONS.md)).
-- Nhóm roadmap: không — bó finding `qd103-108-alignment`.
+- Nhóm roadmap: G5 (từ re-pin scope map 11/11/2026) — bó finding `qd103-108-alignment`.
 - [Kế hoạch](plan.md).
 
 ## Business outcome
@@ -19,8 +19,8 @@ khoản cho `K4`, `K5`, quyền theo vai, quyền/Request đã kết thúc **lú
 
 ## Sizing decision
 
-- Container: bó finding `qd103-108-alignment` (đợt W4), ngoài nhóm G.
-- Mode: `technical-enabler`.
+- Container: G5 (nhóm giao việc, không phải ranh giới hạng mục); bó finding `qd103-108-alignment` (đợt W4). Trước re-pin 11/11/2026 là ngoài nhóm.
+- Mode: `single-story`.
 - Outcome and owner: capability mới `requests/year-start-commitments/` (job + chọn nguồn — `requests` T5 import `licensing`, `catalog`, `organization`,
   `budgets`; `budgets` không import `requests` nên job **không** ở `budgets/year-end`); `budgets` thêm phương thức ghi khoản 01/01 và cột nguồn gốc.
 - Boundaries: 1 migration; 1 phương thức `BudgetsApi`; 2 phương thức `LicensingApi`; 1 tham số `on` của `CatalogApi.getPlanPrice`; 1 sweeper; 2 operation
@@ -29,18 +29,20 @@ khoản cho `K4`, `K5`, quyền theo vai, quyền/Request đã kết thúc **lú
 - Not smaller: chọn nguồn, số tiền, Cost Center và ghi khoản phải cùng một lượt có dấu chạy để idempotent.
 - Siblings: `qd103-commitment-release-on-revocation` (`seat_monthly_minor`, listener, hàm chuỗi `licensing/assignment/assignment-chain.repo.ts`),
   `qd103-role-based-access` (loại `ROLE_BASED`), `qd103-grant-from-shared-pool` (`getPlanPrice` theo thuê bao chính).
-- Scope map: n/a
+- Scope map: [G5](../../../roadmap.md#work-item-decomposition-g5).
 
 ## Primary Story/AC
 
-| Story | AC           | Coverage | Phần còn lại thuộc                                                         |
-| ----- | ------------ | -------- | -------------------------------------------------------------------------- |
-| —     | L1-13, L2-39 | n/a      | W5 `qd103-seat-month-cost-pool-line`, W7 `qd103-seed-demo-v4` (demo 01/01) |
+| Story    | AC        | Coverage | Phần còn lại thuộc                                                        |
+| -------- | --------- | -------- | ------------------------------------------------------------------------- |
+| US-06-18 | AC-1→AC-9 | partial  | AC-10 `deferred` tới chính `qd103-new-year-auto-commitments` (chưa claim) |
 
 ## Supporting references
 
 `US-06-18` AC-1→AC-9 (AC-2 `K1`; AC-6 loại `K4`/`K5`/quyền theo vai/Request kết thúc; AC-7 audit lần chạy lại; AC-8 Request của khoản sau điều chuyển);
 `US-06-04`, `US-06-06`; `US-06-07` (gắn ngược — `commitment.repo.ts:39-61` `attachWaiting`).
+
+_Re-pin 11/11/2026 ([C3](../../../reviews/mf2-mf3-2026-11-10/C3-SCOPE-MAP-REPIN.md)):_ trước là `technical-enabler`, dòng `n/a` của bảng Primary: L1-13, L2-39 — W5 `qd103-seat-month-cost-pool-line`, W7 `qd103-seed-demo-v4` (demo 01/01). Bảng Primary claim AC của tối đa ba Story chính lấy từ danh sách trên, chỉ AC đang dùng ở Docs `5bb2e6a` (số AC của EP-05/EP-06/EP-12 không đổi giữa `9c7f386` và `5bb2e6a`); khóa khác của danh sách trên giữ chủ hiện có hoặc là `deferred` tới hạng mục này trong scope map. Claim theo spec và commit đã merge (PR #36), chưa đối chiếu từng AC trên code.
 
 ## Explicit out of scope
 

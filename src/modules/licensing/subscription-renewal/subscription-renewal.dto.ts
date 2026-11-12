@@ -33,7 +33,6 @@ export const proposeRenewalBodySchema = z.strictObject({
   choice,
   proposedQuantity: quantity.optional(),
   note: text.optional(),
-  businessOwnerOpinion: text.optional(),
   /** The seats to take back when reducing below the seats in use: exactly the excess (`QĐ-66x`); none for another choice. */
   releasedAssignmentIds: z.array(z.uuid()).max(10_000).optional(),
 });
@@ -153,7 +152,6 @@ export const renewalDetailSchema = renewalSummarySchema.extend({
     choice,
     quantity: z.number().int().nullable(),
     note: z.string().nullable(),
-    businessOwnerOpinion: z.string().nullable(),
     proposedByEmployeeId: z.uuid(),
     proposedAt: z.iso.datetime(),
     /** How many seats the IT Admin proposed to take back. */

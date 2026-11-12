@@ -18,8 +18,8 @@ export interface ApplicationRecord {
   dictionaryServiceLineId: string | null;
   domains: string[];
   dataSensitivity: DataSensitivity;
-  /** QĐ-104 removed the Business Owner: null for an application declared without one; older rows keep the person they named. */
-  businessOwnerEmployeeId: string | null;
+  /** QĐ-111g: the IT Admin who answers for the application; null when the creator was not a usable IT Admin and nobody took it over. */
+  responsibleItAdminEmployeeId: string | null;
   communication: ApplicationCommunication;
   functionalGroup: { id: string; name: string } | null;
   status: CatalogStatus;
@@ -34,31 +34,29 @@ export interface ApplicationSummaryRecord {
   kind: ApplicationKind;
   vendor: { id: string; name: string } | null;
   dataSensitivity: DataSensitivity;
-  businessOwnerEmployeeId: string | null;
+  responsibleItAdminEmployeeId: string | null;
   isCommunicationService: boolean;
   functionalGroup: { id: string; name: string } | null;
   status: CatalogStatus;
   updatedAt: Date;
 }
 
-export interface BusinessOwnerView {
+export interface ResponsibleItAdminView {
   employeeId: string;
   employeeCode: string;
   fullName: string;
-  status: 'ACTIVE' | 'TERMINATED';
 }
 
-/** An application as it is answered: the record and the Business Owner read from the organization. */
+/** An application as it is answered: the record and the IT Admin who answers for it, read from the organization. */
 export interface ApplicationView extends ApplicationRecord {
-  /** Null when the application names none (`QĐ-104`). */
-  businessOwner: BusinessOwnerView | null;
-  /** The Business Owner has left and has not been replaced (`INV-06`: the previous one is kept until then). */
-  businessOwnerReplacementRequired: boolean;
+  responsibleItAdmin: ResponsibleItAdminView | null;
+  /** Nobody is responsible, or the one named is no longer a usable IT Admin (`QĐ-111g`): any IT Admin may take it over. */
+  needsResponsible: boolean;
 }
 
 export interface ApplicationSummaryView extends ApplicationSummaryRecord {
-  businessOwner: BusinessOwnerView | null;
-  businessOwnerReplacementRequired: boolean;
+  responsibleItAdmin: ResponsibleItAdminView | null;
+  needsResponsible: boolean;
 }
 
 export interface ApplicationListFilter {
@@ -77,7 +75,7 @@ export interface NewApplication {
   vendorId: string | null;
   dictionaryServiceLineId: string | null;
   functionalGroupId: string | null;
-  businessOwnerEmployeeId: string | null;
+  responsibleItAdminEmployeeId: string | null;
   dataSensitivity: DataSensitivity;
   communication: ApplicationCommunication;
   domains: string[];
@@ -87,7 +85,6 @@ export interface ApplicationChanges {
   name?: string;
   dictionaryServiceLineId?: string | null;
   functionalGroupId?: string | null;
-  businessOwnerEmployeeId?: string;
   dataSensitivity?: DataSensitivity;
   communication?: ApplicationCommunication;
   domains?: string[];

@@ -21,23 +21,6 @@ export interface TermsRecord {
 /** The fields of a `PUT`: the whole terms; what is absent becomes empty. */
 export type TermsContent = Omit<TermsRecord, 'planId' | 'updatedAt'>;
 
-export interface OpinionRecord {
-  id: string;
-  planId: string;
-  businessOwnerEmployeeId: string;
-  opinion: string;
-  recordedByAppUserId: string;
-  recordedAt: Date;
-}
-
-export interface OpinionView {
-  id: string;
-  businessOwner: { employeeId: string; employeeCode: string; fullName: string };
-  opinion: string;
-  recordedBy: string;
-  recordedAt: Date;
-}
-
 /** An open alert: the terms of a plan need a new review before the deadline of one of its subscriptions. */
 export interface ReviewWarning {
   code: 'TERMS_REVIEW_DUE';

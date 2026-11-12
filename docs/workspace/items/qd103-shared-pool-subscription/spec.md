@@ -7,7 +7,7 @@
 - Nguồn: Docs `9c7f386` (BRD 4.10 `FR-1.3`, `FR-1.12`(1)(2); `QĐ-103d`(2), `QĐ-103e`, `QĐ-103v`(4), `QĐ-104d`(3), `QĐ-104l`;
   quy trình v1.7 C.2), BE `b9854ef5`. Ledger: L3-05 (vế trường thuê bao); luật R-E01, R-E03, R-G01. Câu TẠM CHỌN: Q-04 (C —
   thuê bao chính), Q-09 (A, làm rõ ở _Behavior_ 3).
-- Nhóm roadmap: không — bó finding `qd103-108-alignment`.
+- Nhóm roadmap: G3, G8 (từ re-pin scope map 11/11/2026) — bó finding `qd103-108-alignment`.
 - [Kế hoạch](plan.md).
 
 ## Business outcome
@@ -19,8 +19,8 @@ cùng nhau ở W4 `qd103-grant-from-shared-pool`, để MF-1 không tắc giữa
 
 ## Sizing decision
 
-- Container: bó finding `qd103-108-alignment` (đợt W1), ngoài nhóm G.
-- Mode: `technical-enabler`.
+- Container: G3, G8 (nhóm giao việc, không phải ranh giới hạng mục); bó finding `qd103-108-alignment` (đợt W1). Trước re-pin 11/11/2026 là ngoài nhóm.
+- Mode: `grouped-stories`.
 - Outcome and owner: dữ liệu thuê bao của capability `catalog/subscription`; luồng dùng (cấp từ kho, điểm điều chỉnh, seat-tháng)
   ở hạng mục phía sau.
 - Boundaries: một migration `subscriptions` (thêm cột, không đổi enum dùng chung); DTO ghi/đọc của 5 operation `subscription*`;
@@ -29,18 +29,21 @@ cùng nhau ở W4 `qd103-grant-from-shared-pool`, để MF-1 không tắc giữa
   `nextBillingDate`, điểm điều chỉnh, drop cột phòng sở hữu ở W5; bỏ Business Owner ở W5.
 - Not smaller: các trường mới cùng một bảng, một migration, một DTO.
 - Siblings: `qd103-calendar-fiscal-year` (làm trước — cùng chạm `requests/access-request/pricing.policy.ts`).
-- Scope map: n/a
+- Scope map: [G3](../../../roadmap.md#work-item-decomposition-g3), [G8](../../../roadmap.md#work-item-decomposition-g8).
 
 ## Primary Story/AC
 
-| Story | AC    | Coverage | Phần còn lại thuộc                                                                                               |
-| ----- | ----- | -------- | ---------------------------------------------------------------------------------------------------------------- |
-| —     | L3-05 | n/a      | gỡ chặn `qd103-grant-from-shared-pool`, `qd103-subscription-adjustment-point`, `qd103-seat-month-cost-pool-line` |
+| Story    | AC    | Coverage | Phần còn lại thuộc                                                                                                                                                      |
+| -------- | ----- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| US-04-14 | AC-10 | partial  | AC còn lại và vế chung theo scope map: `qd103-grant-from-shared-pool`; AC-1, AC-4→AC-9, AC-11, AC-12 `deferred` tới chính `qd103-shared-pool-subscription` (chưa claim) |
+| US-11-08 | AC-26 | partial  | AC còn lại và vế chung theo scope map: `qd103-subscription-adjustment-point`                                                                                            |
 
 ## Supporting references
 
 `US-04-14` AC-10; `US-11-08` AC-26. `QĐ-103v`(4): mỗi thuê bao dùng chung một IT Admin phụ trách, gán khi khai báo.
 `QĐ-104d`(3): kỳ cam kết và chu kỳ trả là hai thuộc tính riêng; gói năm trả theo tháng được phép.
+
+_Re-pin 11/11/2026 ([C3](../../../reviews/mf2-mf3-2026-11-10/C3-SCOPE-MAP-REPIN.md)):_ trước là `technical-enabler`, dòng `n/a` của bảng Primary: L3-05 — gỡ chặn `qd103-grant-from-shared-pool`, `qd103-subscription-adjustment-point`, `qd103-seat-month-cost-pool-line`. Bảng Primary claim AC của tối đa ba Story chính lấy từ danh sách trên, chỉ AC đang dùng ở Docs `5bb2e6a` (số AC của EP-05/EP-06/EP-12 không đổi giữa `9c7f386` và `5bb2e6a`); khóa khác của danh sách trên giữ chủ hiện có hoặc là `deferred` tới hạng mục này trong scope map. Claim theo spec và commit đã merge (PR #36), chưa đối chiếu từng AC trên code.
 
 ## Explicit out of scope
 

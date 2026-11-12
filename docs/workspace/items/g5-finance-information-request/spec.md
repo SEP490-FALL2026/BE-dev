@@ -14,7 +14,7 @@ Người duyệt chi (hay người thay thế khi họ là một bên) đang gi�
 ## Sizing decision
 
 - Container: G5 (nhóm giao việc, không phải ranh giới hạng mục).
-- Mode: `grouped-stories`.
+- Mode: `single-story`.
 - Outcome and owner: Người duyệt chi hỏi Finance thông tin ngân sách và Finance trả lời.
 - Boundaries: Một transaction ghi câu hỏi hoặc câu trả lời; bảng `budget_information_requests`; chỉ web; SoD-8.
 - Not larger: các AC còn lại của những Story này thuộc hạng mục khác trong scope map, vì chúng đi qua ranh giới transaction, dữ liệu hoặc vai khác.
@@ -24,11 +24,11 @@ Người duyệt chi (hay người thay thế khi họ là một bên) đang gi�
 
 ## Primary Story/AC
 
-| Story    | AC                           | Coverage | Phần còn lại thuộc                                                                                                                              |
-| -------- | ---------------------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
-| US-05-08 | AC-2                         | partial  | AC-1, AC-3, AC-4, AC-6→AC-9, AC-11, AC-12: `g5-request-withdrawal`; AC-5: `g5-commitment-lifecycle`; AC-10: `g3-downstream-finance-integration` |
-| US-06-02 | AC-1, AC-2, AC-4, AC-5, AC-7 | partial  | AC-3: `g5-step-sla-and-alerts`                                                                                                                  |
-| US-06-03 | AC-1→AC-7                    | full     | —                                                                                                                                               |
+| Story    | AC   | Coverage | Phần còn lại thuộc                                                                                                                              |
+| -------- | ---- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------- |
+| US-05-08 | AC-2 | partial  | AC-1, AC-3, AC-4, AC-6→AC-9, AC-11, AC-12: `g5-request-withdrawal`; AC-5: `g5-commitment-lifecycle`; AC-10: `g3-downstream-finance-integration` |
+
+_Re-pin 11/11/2026 ([C3](../../../reviews/mf2-mf3-2026-11-10/C3-SCOPE-MAP-REPIN.md)):_ bỏ khỏi bảng `US-06-02` AC-1, AC-2, AC-4, AC-5, AC-7 (partial); `US-06-03` AC-1→AC-7 (full) — Story `RETIRED` ở Docs `5bb2e6a` (`US-06-02` `QĐ-29b`, `QĐ-97c`, `US-06-03` `QĐ-29b`, `QĐ-97c`); code đã merge là lịch sử, khóa ở scope map là `not affected`. Còn một Story nên `Mode` đổi `single-story`.
 
 ## Supporting references
 

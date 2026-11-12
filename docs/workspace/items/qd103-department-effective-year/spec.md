@@ -6,7 +6,7 @@
 - Nguồn: Docs `9c7f386` (BRD 4.10 `FR-3.1`, `FR-5.15`(0)(1)(6); `QĐ-104e`(3), `QĐ-106k`, `QĐ-108e`, `QĐ-87g`; quy trình v1.7
   mục 4.4, 4.9; `US-06-15` AC-16; `US-06-19` AC-4), BE `d9c46552`. Ledger: L1-12; luật R-I05 (vế phòng mới), R-I10.
   Câu tạm chọn mới (đề xuất, xem REVISION-NOTES W2): ngoại lệ khởi tạo, một người hai nhiệm kỳ.
-- Nhóm roadmap: không — bó finding `qd103-108-alignment` (xem tracker §5 về hình thức hạng mục).
+- Nhóm roadmap: G5 (từ re-pin scope map 11/11/2026) — bó finding `qd103-108-alignment` (xem tracker §5 về hình thức hạng mục).
 - [Kế hoạch](plan.md).
 
 ## Business outcome
@@ -19,8 +19,8 @@ khi kỳ năm hiện tại chưa phát hành) tạo phòng bị từ chối — 
 
 ## Sizing decision
 
-- Container: bó finding `qd103-108-alignment` (đợt W2), ngoài nhóm G.
-- Mode: `technical-enabler`.
+- Container: G5 (nhóm giao việc, không phải ranh giới hạng mục); bó finding `qd103-108-alignment` (đợt W2). Trước re-pin 11/11/2026 là ngoài nhóm.
+- Mode: `single-story`.
 - Outcome and owner: `organization` sở hữu ngày hiệu lực và luật tạo phòng; `budgets` trả cửa sổ tạo phòng qua Hook
   (organization ở tầng thấp hơn) và sở hữu phép tra _trưởng phòng của (Cost Center, năm)_.
 - Boundaries: 1 cột mới `departments.effective_from`; `departmentCreate` thêm điều kiện; xếp phòng lần đầu/điều chuyển và
@@ -30,13 +30,13 @@ khi kỳ năm hiện tại chưa phát hành) tạo phòng bị từ chối — 
   Finance liên kết Cost Center (`QĐ-108e`) ở job của `qd103-budget-baseline-annual-check`.
 - Not smaller: tạo phòng và làm B3 cho phòng mới là một ca của `MF-4` (B1 → B3).
 - Siblings: `qd103-budget-cycle-ceilings`, `qd103-budget-baseline-annual-check`.
-- Scope map: n/a
+- Scope map: [G5](../../../roadmap.md#work-item-decomposition-g5).
 
 ## Primary Story/AC
 
-| Story | AC    | Coverage | Phần còn lại thuộc                           |
-| ----- | ----- | -------- | -------------------------------------------- |
-| —     | L1-12 | n/a      | gỡ chặn `qd103-budget-baseline-annual-check` |
+| Story    | AC    | Coverage | Phần còn lại thuộc                                                                                                                                             |
+| -------- | ----- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| US-06-15 | AC-16 | partial  | AC còn lại và vế chung theo scope map: `qd103-budget-cycle-ceilings`, `qd103-calendar-fiscal-year`, `qd103-budget-baseline-annual-check`, `qd103-budget-views` |
 
 ## Supporting references
 
@@ -44,6 +44,8 @@ khi kỳ năm hiện tại chưa phát hành) tạo phòng bị từ chối — 
 lực từ 01/01 năm sau … giữa năm không tạo phòng mới … ngoại lệ duy nhất là lúc khởi tạo hệ thống (`SBF-01`)_. `QĐ-106k`,
 `FR-5.15`(1): trưởng phòng được gán cho phòng mới lập và nộp `BM-10` trước ngày hiệu lực, rút được, đính kèm tài liệu.
 `QĐ-108e`: phòng mới cần Cost Center trước khi nộp `BM-10`.
+
+_Re-pin 11/11/2026 ([C3](../../../reviews/mf2-mf3-2026-11-10/C3-SCOPE-MAP-REPIN.md)):_ trước là `technical-enabler`, dòng `n/a` của bảng Primary: L1-12 — gỡ chặn `qd103-budget-baseline-annual-check`. Bảng Primary claim AC của tối đa ba Story chính lấy từ danh sách trên, chỉ AC đang dùng ở Docs `5bb2e6a` (số AC của EP-05/EP-06/EP-12 không đổi giữa `9c7f386` và `5bb2e6a`); khóa khác của danh sách trên giữ chủ hiện có hoặc là `deferred` tới hạng mục này trong scope map. Claim theo spec và commit đã merge (PR #36), chưa đối chiếu từng AC trên code.
 
 ## Explicit out of scope
 

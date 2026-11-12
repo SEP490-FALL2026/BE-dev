@@ -58,7 +58,7 @@ describe('requests over HTTP: registering internal software (integration, real P
   const asOwner = (extra: Record<string, unknown> = {}) => ({ ...extra });
 
   describe('the way with no spend (US-05-20 AC-3, AC-5)', () => {
-    it('registers the software with its Business Owner and a plan granted by hand, and sends the request to the IT Admin', async () => {
+    it('registers the software, answered for by the IT Admin who registers it (QĐ-111g), with a plan granted by hand, and sends the request to the IT Admin', async () => {
       const proposed = await classified();
 
       const done = h.dataOf<{ request: AccessRequestWire }>(await register(proposed.id, asOwner()).expect(200)).request;
@@ -78,13 +78,13 @@ describe('requests over HTTP: registering internal software (integration, real P
         type: string;
         model: string | null;
       }>(
-        `SELECT a.kind, a.business_owner_employee_id AS owner, a.vendor_id, p.provisioning_type AS type, p.pricing_model AS model
+        `SELECT a.kind, a.responsible_it_admin_employee_id AS owner, a.vendor_id, p.provisioning_type AS type, p.pricing_model AS model
            FROM plans p JOIN applications a ON a.id = p.application_id WHERE p.id = $1`,
         [done.plan?.planId],
       );
       expect(registered.rows[0]).toEqual({
         kind: 'INTERNAL',
-        owner: designer.employeeId,
+        owner: itAdmin.employeeId,
         vendor_id: null,
         type: 'K5',
         model: null,
@@ -130,8 +130,8 @@ describe('requests over HTTP: registering internal software (integration, real P
         status: 'COMPLETED',
         classification: 'INTERNAL',
         step: { state: 'APPROVED' },
-        proposedBusinessOwner: null,
       });
+      expect(wire).not.toHaveProperty('proposedBusinessOwner');
       await h.saveAssessment(proposed.id, { sso: true }, itAdmin.account).expect(409);
     });
 

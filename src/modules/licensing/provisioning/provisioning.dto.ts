@@ -58,7 +58,7 @@ export const revocationCompletionBodySchema = z.strictObject({
   accessState: z.enum(['CUT', 'UNTIL_PAID_END']).optional(),
   accessCutOn: businessDate.optional(),
   accessEvidence: z.string().max(EVIDENCE_MAX_LENGTH).optional(),
-  /** K4 only: the key goes back to the store (the default), or back and withdrawn from it at once (`WITHDRAW`, with a reason). */
+  /** K4 only, required for K4 (422 `REVOCATION.KEY_DISPOSITION_REQUIRED`): the key goes back to the store, or is withdrawn from it at once (`WITHDRAW`, with a reason). */
   keyDisposition: z.enum(['RETURN_TO_STORE', 'WITHDRAW']).optional(),
   withdrawalReason: z.string().max(WITHDRAWAL_REASON_MAX_LENGTH).optional(),
 });

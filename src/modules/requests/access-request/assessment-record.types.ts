@@ -55,7 +55,6 @@ export interface AssessmentRecord extends AssessmentFields {
   status: 'DRAFT' | 'COMPLETED' | 'REJECTED';
   vendorId: string | null;
   equivalentPlanId: string | null;
-  proposedBusinessOwnerEmployeeId: string | null;
   controlRiskNote: string | null;
   rejectionKind: 'UNCONTROLLABLE' | 'NOT_ELIGIBLE' | null;
   rejectionReason: string | null;

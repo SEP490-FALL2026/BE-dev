@@ -148,7 +148,6 @@ export const PARAM_KEYS_BY_CODE: Readonly<Record<InAppNotificationCode, readonly
     'usageData',
   ],
   SUBSCRIPTION_RENEWAL_DATA_QUALITY: ['subscriptionId', 'problem'],
-  SUBSCRIPTION_BUSINESS_OWNER_LEFT: ['subscriptionId', 'applicationId'],
   SUBSCRIPTION_RENEWAL_PROPOSED: ['renewalId', 'subscriptionId', 'choice'],
   SUBSCRIPTION_RENEWAL_DECIDED: ['renewalId', 'subscriptionId', 'choice', 'executionPoint'],
   SUBSCRIPTION_RENEWAL_LATE: ['renewalId', 'subscriptionId', 'baseDate'],

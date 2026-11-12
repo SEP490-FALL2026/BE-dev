@@ -3,7 +3,6 @@ import { TransactionRunner } from '../../../infrastructure/database/transaction-
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../../audit/public/audit.api';
 import { CatalogApi } from '../../catalog/public/catalog.api';
-import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { accessRequestAuditEvent } from '../access-request/access-request-audit-event.mapper';
 import {
   AccessRequestApplicationRetiredError,
@@ -19,8 +18,7 @@ import { canLinkCatalogPlan } from './assessment.policy';
  * Linking a proposal to the plan the IT Admin registered in the catalog (`US-05-06` AC-4, AC-8). The software of a request
  * enters the catalog only through the registration that follows the decision of the spending approver: a request that has
  * not been decided as spend cannot be linked, so the IT Admin has no way to put it into the catalog by way of the request.
- * And the plan linked must belong to an application that has a Business Owner who still works (`INV-06`), so that the
- * seat is never granted for software nobody answers for.
+ * The audit names the IT Admin who answers for the application of the plan (`QĐ-111g`); the link does not wait for one.
  */
 @Injectable()
 export class CatalogLinkService {
@@ -28,7 +26,6 @@ export class CatalogLinkService {
     private readonly runner: TransactionRunner,
     private readonly requests: AccessRequestRepo,
     private readonly catalog: CatalogApi,
-    private readonly organizationReads: OrganizationReadApi,
     private readonly audit: AuditApi,
   ) {}
 
@@ -45,9 +42,7 @@ export class CatalogLinkService {
       const [target] = await this.catalog.findPlanSeatTargets([planId], tx);
       if (!target) throw new AccessRequestPlanNotFoundError();
       if (target.applicationStatus === 'RETIRED') throw new AccessRequestApplicationRetiredError();
-      const ownerId = await this.catalog.getPlanBusinessOwnerId(planId, tx);
-      const [owner] = ownerId === null ? [] : await this.organizationReads.getEmployees([ownerId], tx);
-      if (!owner || owner.status !== 'ACTIVE') throw new CatalogLinkRefusedError('BUSINESS_OWNER_REQUIRED');
+      const responsibleItAdminEmployeeId = await this.catalog.getPlanResponsibleItAdminId(planId, tx);
 
       await this.requests.setPlan(tx, requestId, planId);
       await this.audit.record(
@@ -58,7 +53,7 @@ export class CatalogLinkService {
           'ACCESS_REQUEST.CATALOG_LINKED',
           'ACCESS_REQUEST',
           requestId,
-          { requestId, planId, businessOwnerEmployeeId: owner.id },
+          { requestId, planId, responsibleItAdminEmployeeId },
         ),
       );
 

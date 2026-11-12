@@ -277,6 +277,14 @@ export class OrganizationReadApi {
     return this.employees.searchActive(search, onDate, limit, excludeEmployeeIds);
   }
 
+  /** One page of the employees among `employeeIds` (code and name), by code, matched on code or name, with the total (one snapshot). */
+  getEmployeePageAmong(
+    employeeIds: readonly string[],
+    query: { search?: string | undefined; skip: number; take: number },
+  ): Promise<{ items: { id: string; employeeCode: string; fullName: string }[]; total: number }> {
+    return this.employees.pageAmong(employeeIds, query.search, query.skip, query.take);
+  }
+
   getEmployeeProfile(employeeId: string, onDate: Date): Promise<EmployeeProfile | null> {
     return this.employees.profile(employeeId, onDate);
   }

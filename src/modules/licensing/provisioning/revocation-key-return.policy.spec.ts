@@ -34,7 +34,7 @@ describe('US-10-07 AC-18: a revocation is not done before its day not before', (
   });
 });
 
-describe('BR-MF1-09: a K4 seat is revoked and its key goes back to the store (US-07-05 AC-6, AC-7, QĐ-103d, Q-10 B)', () => {
+describe('BR-MF1-09: a K4 seat is revoked and the IT Admin says where its key goes (US-07-05 AC-6, AC-7, QĐ-103d, QĐ-111p)', () => {
   const k4 = (extra: Partial<CompletionInput> = {}): CompletionInput => ({
     completion: 'KEY_DEACTIVATED',
     evidence: 'Deactivated on the laptop',
@@ -53,40 +53,58 @@ describe('BR-MF1-09: a K4 seat is revoked and its key goes back to the store (US
     expect(() => planCompletion(k4({ evidence: '  ' }), context('K4'))).toThrow(ProvisioningEvidenceRequiredError);
   });
 
-  it('puts the key back in the store when nothing else is said', () => {
-    expect(planKeyReturn(k4(), 'K4')).toEqual({ disposition: 'RETURN_TO_STORE', withdrawalReason: null });
-    expect(planKeyReturn(k4({ keyDisposition: 'RETURN_TO_STORE' }), 'K4')).toEqual({
+  it('refuses a K4 completion that does not say where the key goes (QĐ-111p, US-07-05 AC-6, AC-7)', () => {
+    expect(problemOf(() => planKeyReturn(k4(), 'K4', true))).toBe('KEY_DISPOSITION_REQUIRED');
+    expect(problemOf(() => planKeyReturn(k4({ withdrawalReason: 'why' }), 'K4', true))).toBe(
+      'KEY_DISPOSITION_REQUIRED',
+    );
+  });
+
+  it('asks nothing of a K4 seat that holds no key (granted before the key pool) and plans no key, whatever was sent (Owner 12/11/2026)', () => {
+    expect(planKeyReturn(k4(), 'K4', false)).toBeNull();
+    expect(planKeyReturn(k4({ keyDisposition: 'RETURN_TO_STORE' }), 'K4', false)).toBeNull();
+    expect(planKeyReturn(k4({ keyDisposition: 'WITHDRAW', withdrawalReason: 'why' }), 'K4', false)).toBeNull();
+  });
+
+  it('puts the key back in the store when the IT Admin says so', () => {
+    expect(planKeyReturn(k4({ keyDisposition: 'RETURN_TO_STORE' }), 'K4', true)).toEqual({
       disposition: 'RETURN_TO_STORE',
       withdrawalReason: null,
     });
   });
 
   it('withdraws the key from the store at once with a reason, trimmed', () => {
-    expect(planKeyReturn(k4({ keyDisposition: 'WITHDRAW', withdrawalReason: '  No transfer clause  ' }), 'K4')).toEqual(
-      {
-        disposition: 'WITHDRAW',
-        withdrawalReason: 'No transfer clause',
-      },
-    );
+    expect(
+      planKeyReturn(k4({ keyDisposition: 'WITHDRAW', withdrawalReason: '  No transfer clause  ' }), 'K4', true),
+    ).toEqual({
+      disposition: 'WITHDRAW',
+      withdrawalReason: 'No transfer clause',
+    });
   });
 
   it('refuses a withdrawal with no reason, and a reason with no withdrawal', () => {
-    expect(problemOf(() => planKeyReturn(k4({ keyDisposition: 'WITHDRAW' }), 'K4'))).toBe('WITHDRAWAL_REASON_REQUIRED');
-    expect(problemOf(() => planKeyReturn(k4({ keyDisposition: 'WITHDRAW', withdrawalReason: ' ' }), 'K4'))).toBe(
+    expect(problemOf(() => planKeyReturn(k4({ keyDisposition: 'WITHDRAW' }), 'K4', true))).toBe(
       'WITHDRAWAL_REASON_REQUIRED',
     );
-    expect(problemOf(() => planKeyReturn(k4({ withdrawalReason: 'why' }), 'K4'))).toBe('COMPLETION_NOT_ALLOWED');
+    expect(problemOf(() => planKeyReturn(k4({ keyDisposition: 'WITHDRAW', withdrawalReason: ' ' }), 'K4', true))).toBe(
+      'WITHDRAWAL_REASON_REQUIRED',
+    );
+    expect(
+      problemOf(() => planKeyReturn(k4({ keyDisposition: 'RETURN_TO_STORE', withdrawalReason: 'why' }), 'K4', true)),
+    ).toBe('COMPLETION_NOT_ALLOWED');
   });
 
   it.each(['K1', 'K2', 'K5'] as const)('has no key for %s and refuses the fields of one', (type) => {
-    expect(planKeyReturn({ completion: 'ACCOUNT_REMOVED', evidence: 'x' }, type)).toBeNull();
+    expect(planKeyReturn({ completion: 'ACCOUNT_REMOVED', evidence: 'x' }, type, false)).toBeNull();
     expect(
       problemOf(() =>
-        planKeyReturn({ completion: 'ACCOUNT_REMOVED', evidence: 'x', keyDisposition: 'WITHDRAW' }, type),
+        planKeyReturn({ completion: 'ACCOUNT_REMOVED', evidence: 'x', keyDisposition: 'WITHDRAW' }, type, false),
       ),
     ).toBe('COMPLETION_NOT_ALLOWED');
     expect(
-      problemOf(() => planKeyReturn({ completion: 'ACCOUNT_REMOVED', evidence: 'x', withdrawalReason: 'why' }, type)),
+      problemOf(() =>
+        planKeyReturn({ completion: 'ACCOUNT_REMOVED', evidence: 'x', withdrawalReason: 'why' }, type, false),
+      ),
     ).toBe('COMPLETION_NOT_ALLOWED');
   });
 });

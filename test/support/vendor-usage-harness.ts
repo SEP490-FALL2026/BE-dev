@@ -81,7 +81,6 @@ export class UsageHarness extends SeatHarness {
       kind,
       ...(kind === 'INTERNAL' ? {} : { vendorName: this.unique('Vendor') }),
       dataSensitivity: 'LOW',
-      businessOwnerEmployeeId: this.businessOwner,
       communication: options.communication ? { ...NO, personToPersonMessaging: true } : NO,
     });
     if (kind === 'INTERNAL') return { applicationId, planId: null, subscriptionId: null };

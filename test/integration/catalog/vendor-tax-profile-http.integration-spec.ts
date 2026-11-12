@@ -48,7 +48,6 @@ describe('vendor tax profiles over HTTP (integration, real PostgreSQL)', () => {
   let it1: ApiAccount;
   let finance: ApiAccount;
   let employee: ApiAccount;
-  let businessOwner: string;
   let counter = 0;
   const server = () => ctx.app.getHttpServer();
   const as = (account: ApiAccount) => ({ Authorization: `Bearer ${account.accessToken}` });
@@ -70,7 +69,7 @@ describe('vendor tax profiles over HTTP (integration, real PostgreSQL)', () => {
       role: 'EMPLOYEE',
       admin,
     });
-    businessOwner = (await insertEmployeeFixture(ctx.app, seed, { code: 'E-OWN', email: 'owner@acme.vn' })).employeeId;
+    await insertEmployeeFixture(ctx.app, seed, { code: 'E-OWN', email: 'owner@acme.vn' });
   }, 120000);
 
   afterAll(async () => {
@@ -91,7 +90,6 @@ describe('vendor tax profiles over HTTP (integration, real PostgreSQL)', () => {
           kind: 'SAAS',
           vendorName: name,
           dataSensitivity: 'LOW',
-          businessOwnerEmployeeId: businessOwner,
           communication: NO,
         })
         .expect(201),

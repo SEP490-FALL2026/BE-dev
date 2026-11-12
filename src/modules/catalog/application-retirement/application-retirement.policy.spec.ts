@@ -1,52 +1,9 @@
-import {
-  ApplicationAlreadyRetiredError,
-  ApplicationRetirementBlockedError,
-  ApplicationRetirementNeedsConfirmationError,
-  ApplicationRetirementNoteRequiredError,
-  ApplicationRetirementNotBusinessOwnerError,
-} from '../catalog-entry/application.errors';
-import {
-  RETIREMENT_NOTE_MAX_LENGTH,
-  activeTermSubscriptions,
-  assertConfirmable,
-  cleanConfirmationNote,
-  decideRetirement,
-  ownerConfirmationNeeded,
-} from './application-retirement.policy';
+import { ApplicationAlreadyRetiredError, ApplicationRetirementBlockedError } from '../catalog-entry/application.errors';
+import { activeTermSubscriptions, decideRetirement } from './application-retirement.policy';
 
 const TODAY = '2026-10-20';
 const assignment = { assignmentId: 'a1', employeeId: 'e1', planId: 'p1', subscriptionId: 's1' };
 const termSubscription = { subscriptionId: 's1', planId: 'p1', endDate: '2027-01-01' };
-
-describe('the note of the Business Owner confirmation (US-04-01 AC-8)', () => {
-  it('is kept trimmed, and a blank one is none', () => {
-    expect(cleanConfirmationNote('  đã dọn xong, đồng ý ngừng  ')).toBe('đã dọn xong, đồng ý ngừng');
-    expect(() => cleanConfirmationNote('')).toThrow(ApplicationRetirementNoteRequiredError);
-    expect(() => cleanConfirmationNote(' \n\t ')).toThrow(ApplicationRetirementNoteRequiredError);
-  });
-
-  it('has a bound the DTO shares', () => {
-    expect(RETIREMENT_NOTE_MAX_LENGTH).toBe(2000);
-  });
-});
-
-describe('who may confirm (US-04-01 AC-8)', () => {
-  it('is the Business Owner of the application today, still working', () => {
-    expect(() => {
-      assertConfirmable({ currentOwnerEmployeeId: 'b2', businessOwnerEmployeeId: 'b2', ownerStatus: 'ACTIVE' });
-    }).not.toThrow();
-  });
-
-  it.each([
-    ['someone who is not the Business Owner', { businessOwnerEmployeeId: 'x', ownerStatus: 'ACTIVE' }],
-    ['a Business Owner who has left', { businessOwnerEmployeeId: 'b2', ownerStatus: 'TERMINATED' }],
-    ['a person who does not exist', { businessOwnerEmployeeId: 'b2', ownerStatus: null }],
-  ])('refuses %s', (_name, who) => {
-    expect(() => {
-      assertConfirmable({ currentOwnerEmployeeId: 'b2', ...who });
-    }).toThrow(ApplicationRetirementNotBusinessOwnerError);
-  });
-});
 
 describe('the subscriptions that stop a software from being retired (US-04-01 AC-9, AC-14)', () => {
   it('are the term ones that have not run out: no end date, or an end date today or later', () => {
@@ -69,33 +26,15 @@ describe('the subscriptions that stop a software from being retired (US-04-01 AC
   });
 });
 
-describe('the confirmation a retirement waits for (US-04-01 AC-8, QĐ-104)', () => {
-  it('is asked for only when the application names a Business Owner; one that names none is retired on the act of the IT Admin', () => {
-    expect(ownerConfirmationNeeded('owner-1')).toBe(true);
-    expect(ownerConfirmationNeeded(null)).toBe(false);
-  });
-});
+describe('the decision to retire (US-04-01 AC-9, AC-14, QĐ-111g: nobody confirms, the IT Admin who retires decides)', () => {
+  const clean = { retired: false, assignments: [], subscriptions: [] };
 
-describe('the decision to retire (US-04-01 AC-8, AC-9, AC-14)', () => {
-  const clean = { retired: false, confirmedByCurrentOwner: true, assignments: [], subscriptions: [] };
-
-  it('retires an application that is confirmed and has nothing holding it', () => {
+  it('retires an application that has nothing holding it, with no confirmation to wait for', () => {
     expect(decideRetirement(clean)).toBe('RETIRE');
   });
 
   it('refuses one that is retired already, first of all', () => {
-    expect(() => decideRetirement({ ...clean, retired: true, confirmedByCurrentOwner: false })).toThrow(
-      ApplicationAlreadyRetiredError,
-    );
-  });
-
-  it('asks for the confirmation before it looks at what holds the application, even when nothing does', () => {
-    expect(() => decideRetirement({ ...clean, confirmedByCurrentOwner: false })).toThrow(
-      ApplicationRetirementNeedsConfirmationError,
-    );
-    expect(() => decideRetirement({ ...clean, confirmedByCurrentOwner: false, assignments: [assignment] })).toThrow(
-      ApplicationRetirementNeedsConfirmationError,
-    );
+    expect(() => decideRetirement({ ...clean, retired: true })).toThrow(ApplicationAlreadyRetiredError);
   });
 
   it('refuses one with assignments or subscriptions, and lists exactly them', () => {

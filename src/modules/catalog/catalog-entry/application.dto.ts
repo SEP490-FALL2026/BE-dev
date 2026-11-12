@@ -21,8 +21,6 @@ export const declareApplicationBodySchema = z.strictObject({
   dictionaryServiceLineId: z.uuid().optional(),
   domains: textList.optional(),
   dataSensitivity: sensitivity,
-  // QĐ-104 removed the Business Owner: no longer asked for; an application declared without one has none.
-  businessOwnerEmployeeId: z.uuid().optional(),
   communication: z.strictObject({
     personToPersonMessaging: z.boolean(),
     callsOrMeetings: z.boolean(),
@@ -37,7 +35,6 @@ export const updateApplicationBodySchema = z.strictObject({
   name: text.optional(),
   domains: textList.optional(),
   dataSensitivity: sensitivity.optional(),
-  businessOwnerEmployeeId: z.uuid().optional(),
   communication: z
     .strictObject({
       personToPersonMessaging: z.boolean().optional(),
@@ -68,16 +65,17 @@ const applicationSummarySchema = z.strictObject({
   vendor: z.strictObject({ id: z.uuid(), name: z.string() }).nullable(),
   dataSensitivity: sensitivity,
   isCommunicationService: z.boolean(),
-  businessOwner: z
-    .strictObject({
-      employeeId: z.uuid(),
-      employeeCode: z.string(),
-      fullName: z.string(),
-      status: z.enum(['ACTIVE', 'TERMINATED']),
-    })
+  responsibleItAdmin: z
+    .strictObject({ employeeId: z.uuid(), employeeCode: z.string(), fullName: z.string() })
     .nullable()
-    .meta({ description: 'Null for an application declared without one: the Business Owner is no longer required.' }),
-  businessOwnerReplacementRequired: z.boolean(),
+    .meta({
+      description:
+        'The IT Admin who answers for the application (the one who declared it, or who took it over); null when nobody does.',
+    }),
+  needsResponsible: z.boolean().meta({
+    description:
+      'True when nobody is responsible, or the one named is no longer a working IT Admin: any IT Admin may take it over with the responsibility transfer.',
+  }),
   usageCollectionDefault: z.literal('NOT_COLLECTED').nullable(),
   functionalGroup: z.strictObject({ id: z.uuid(), name: z.string() }).nullable(),
   status: z.enum(['APPROVED', 'RETIRED']),

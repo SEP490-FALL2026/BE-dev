@@ -9,7 +9,7 @@
 
 ## Before coding
 
-Đọc `docs/rules/api-contract.md` _Handoff_; `docs/reviews/qd96-100-alignment-2026-11-05/fe-batch/FIELD-CHANGES-DOT-1.md` và
+Đọc `docs/rules/api-contract.md` _Handoff_; `docs/reviews/qd96-100-alignment-2026-11-05/fe-batch/FIELD-CHANGES-DOT-1.md` (nhật ký review đã xóa 11/11/2026 — xem git history) và
 `PROMPT-FE-DOCS-DOT-1.md` (mẫu); `D:\FPT\FALL2026\Docs\Figma UI-UX\API-Integration\changes\maintenance.md` (_Lệnh_, _Phép so contract_, _Khi BE đổi
 contract_) — **chỉ đọc** repo Docs; mục _Ownership_ và _Lệch so với thiết kế_ của mọi `docs/workspace/items/qd103-*/{spec,plan}.md`;
 `test/flows/mf2-offboarding.flow-spec.ts`, `test/flows/mf3-transfer.flow-spec.ts` (fixture, nhãn, cách gọi API trong flow). Lệnh dưới đã kiểm trong

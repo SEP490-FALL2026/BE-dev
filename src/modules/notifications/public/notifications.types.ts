@@ -143,7 +143,6 @@ export const IN_APP_NOTIFICATION_CODES = [
   // The renewal of a subscription (EP-11): the milestones, the quality of the contract data, the case and its deadline.
   'SUBSCRIPTION_RENEWAL_ALERT',
   'SUBSCRIPTION_RENEWAL_DATA_QUALITY',
-  'SUBSCRIPTION_BUSINESS_OWNER_LEFT',
   'SUBSCRIPTION_RENEWAL_PROPOSED',
   'SUBSCRIPTION_RENEWAL_DECIDED',
   'SUBSCRIPTION_RENEWAL_LATE',

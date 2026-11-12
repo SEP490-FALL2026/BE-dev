@@ -150,19 +150,6 @@ const NESTED_ARRAYS_SECOND_HALF: readonly NestedArrayEntry[] = [
     removeWhen: 'Review when noticeWarnings or SubscriptionWarning changes.',
   },
   {
-    key: 'planTermsGet#opinions',
-    classification: 'bounded',
-    findings: ['LD-06'],
-    owner: 'catalog-application-plan-read-contracts',
-    businessMaximum: {
-      maxItems: 50,
-      source:
-        'OPINIONS_IN_VIEW in plan-terms.service.ts (the newest; opinionTotal counts all, GET /plans/{id}/term-opinions pages them)',
-    },
-    rationale: 'The newest opinions on the plan terms.',
-    removeWhen: 'Review when OPINIONS_IN_VIEW changes.',
-  },
-  {
     key: 'planTermsGet#warnings',
     classification: 'bounded',
     findings: ['LD-16'],
@@ -177,11 +164,6 @@ const NESTED_ARRAYS_SECOND_HALF: readonly NestedArrayEntry[] = [
   },
   ...(
     [
-      [
-        'confirmations',
-        'retirement.confirmations',
-        'The newest Business Owner confirmations; confirmationTotal counts all.',
-      ],
       [
         'assignments',
         'retirement.blockers.assignments',

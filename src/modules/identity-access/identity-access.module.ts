@@ -16,6 +16,8 @@ import { ACCOUNT_SESSIONS } from './accounts/account-sessions.types';
 import { APPROVAL_ROLE_HOLDINGS } from './accounts/account.types';
 import { ActionLinkRevocation } from './accounts/action-link-revocation.service';
 import { AppUsersController } from './accounts/app-users/app-users.controller';
+import { ItAdminDirectoryController } from './it-admin-directory/it-admin-directory.controller';
+import { ItAdminQueryService } from './it-admin-directory/it-admin-query.service';
 import { InvitationMailService } from './accounts/app-users/invitation-mail.service';
 import { InvitationRedemptionService } from './accounts/invitation-redemption.service';
 import { JwtAccessTokenVerifier } from './access/jwt-access-token-verifier.service';
@@ -66,8 +68,9 @@ import { RecoveryRepo } from './recovery/recovery.repo';
       }),
     }),
   ],
-  controllers: [AuthController, MeController, AppUsersController],
+  controllers: [AuthController, MeController, AppUsersController, ItAdminDirectoryController],
   providers: [
+    ItAdminQueryService,
     ApprovalRoleFactsService,
     AccountQueryService,
     ActionLinkRevocation,

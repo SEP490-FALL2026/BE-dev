@@ -4,7 +4,12 @@ import { FlowWorld } from '../support/flows/flow-world';
  * MF-5, the edges of F5-02 (review D-M4): what the IT Admin may propose and what the head may confirm. The reduction names exactly the
  * seats above the new number, the fields of one choice are refused on another, a cancellation of a subscription in use is confirmed
  * after the warning, the head of another department finds no case, and a proposal that went out of date is closed so the IT Admin can
- * propose again (A-H2). Real sign-in, the seats granted through the whole Request flow, nothing mocked.
+ * propose again (A-H2); the department with no head has its own file (`mf5-rightsizing-no-head`). Real sign-in, the seats granted through the whole Request flow, nothing mocked.
+ *
+ * Whose subscription it is: only a subscription that a department owns has a head who decides it. The subscriptions of the shared pool
+ * (`QĐ-103d`) have no owner department and are not proposed or decided here yet, so the scenarios run on the two the dataset gives
+ * Engineering: Cursor Pro (K1, no seat yet) for the reduction and the cancellation, ChatGPT Plus (K1, the seat of NV-DEV1 from R18) for
+ * the proposal that goes out of date. Each K1 grant buys one more seat, so the seats bought follow the seats held.
  */
 describe('MF-5 giảm, hủy và đề xuất lỗi thời: các biên của F5-02 @MF5 @D1', () => {
   let world: FlowWorld;
@@ -13,7 +18,9 @@ describe('MF-5 giảm, hủy và đề xuất lỗi thời: các biên của F5-
   const stateOf = async (id: string) =>
     (await world.facts.one<{ state: string }>(`SELECT state::text FROM subscription_renewals WHERE id = $1`, [id]))
       .state;
-  const revokeTasks = () => world.facts.count('provisioning_tasks', "kind = 'REVOKE'");
+  /** The revocation tasks this file made: the dataset already holds one (the Thu hồi of NV-DES11, R-MF5), which is not ours. */
+  let revokeBaseline = 0;
+  const revokeTasks = async () => (await world.facts.count('provisioning_tasks', "kind = 'REVOKE'")) - revokeBaseline;
 
   /** One seat through the whole flow: need, batch, spend decision, the grant task of the IT Admin. Returns the assignment id. */
   const grantSeat = async (employeeCode: string, planName: string, subscriptionName: string): Promise<string> => {
@@ -25,7 +32,7 @@ describe('MF-5 giảm, hủy và đề xuất lỗi thời: các biên của F5-
       decision: 'APPROVE',
     });
     expect(approved.status).toBe(200);
-    const subscriptionId = await call().subscriptionOf(subscriptionName, 'ENG');
+    const subscriptionId = await call().subscriptionOf(subscriptionName);
     const task = await call().post('NV-ITA1', '/provisioning-tasks', { requestId, subscriptionId });
     expect(task.status).toBe(201);
     const taskId = call().data<{ task: { id: string } }>(task).task.id;
@@ -47,23 +54,24 @@ describe('MF-5 giảm, hủy và đề xuất lỗi thời: các biên của F5-
   const confirm = (code: string, id: string, body: Record<string, unknown> = {}) =>
     call().post(code, `/subscription-renewals/${id}/decision`, { decision: 'CONFIRM', ...body });
 
-  let jira: string[];
+  let cursor: string[];
   let chatgpt: string[];
 
   beforeAll(async () => {
     world = await FlowWorld.open();
-    // DEV1 holds a Jira seat in the dataset; two more people of Engineering get one, and three get ChatGPT.
-    const dev1Seat = (
+    // Nobody holds Cursor Pro in the dataset: two people of Engineering get a seat. DEV1 holds a ChatGPT Plus seat (R18) and DEV2 gets one.
+    const dev1ChatgptSeat = (
       await world.facts.one<{ id: string }>(
         `SELECT id FROM license_assignments WHERE employee_id = $1 AND plan_id = $2 AND kind = 'PERSONAL'`,
-        [await world.facts.employeeId('NV-DEV1'), await call().planId('Jira Standard')],
+        [await world.facts.employeeId('NV-DEV1'), await call().planId('ChatGPT Plus')],
       )
     ).id;
-    jira = [dev1Seat, await grantSeat('NV-DEV2', 'Jira Standard', 'Jira Standard')];
-    chatgpt = [
-      await grantSeat('NV-DEV1', 'ChatGPT Plus', 'ChatGPT Plus'),
-      await grantSeat('NV-DEV2', 'ChatGPT Plus', 'ChatGPT Plus'),
+    cursor = [
+      await grantSeat('NV-DEV1', 'Cursor Pro', 'Cursor Pro'),
+      await grantSeat('NV-DEV2', 'Cursor Pro', 'Cursor Pro'),
     ];
+    chatgpt = [dev1ChatgptSeat, await grantSeat('NV-DEV2', 'ChatGPT Plus', 'ChatGPT Plus')];
+    revokeBaseline = await world.facts.count('provisioning_tasks', "kind = 'REVOKE'");
   }, 400000);
 
   afterAll(async () => {
@@ -72,7 +80,7 @@ describe('MF-5 giảm, hủy và đề xuất lỗi thời: các biên của F5-
 
   describe('đề xuất: danh sách ghế thu hồi và trường theo lựa chọn @B5', () => {
     it('giảm phải nêu đúng số ghế vượt; thiếu, thừa hoặc ghế không phải của thuê bao ⟹ 422 và không ghi gì #9', async () => {
-      const subscriptionId = await call().subscriptionOf('Jira Standard', 'ENG');
+      const subscriptionId = await call().subscriptionOf('Cursor Pro');
       const cases = await world.facts.count('subscription_renewals');
       const unknown = '5b1b4f7e-0a52-4b0e-9f5b-9f3c1a2d7e10';
 
@@ -80,17 +88,17 @@ describe('MF-5 giảm, hủy và đề xuất lỗi thời: các biên của F5-
       const short = await propose(subscriptionId, {
         choice: 'REDUCE',
         proposedQuantity: 0,
-        releasedAssignmentIds: [jira[0]],
+        releasedAssignmentIds: [cursor[0]],
       });
       const foreign = await propose(subscriptionId, {
         choice: 'REDUCE',
         proposedQuantity: 0,
-        releasedAssignmentIds: [jira[0], unknown],
+        releasedAssignmentIds: [cursor[0], unknown],
       });
       const extra = await propose(subscriptionId, {
         choice: 'REDUCE',
         proposedQuantity: 1,
-        releasedAssignmentIds: [jira[0], jira[1]],
+        releasedAssignmentIds: [cursor[0], cursor[1]],
       });
 
       for (const response of [none, short, foreign, extra]) {
@@ -102,13 +110,13 @@ describe('MF-5 giảm, hủy và đề xuất lỗi thời: các biên của F5-
     });
 
     it('trường của lựa chọn khác bị từ chối: số lượng với giữ nguyên hoặc hủy, danh sách ghế với giữ nguyên hoặc hủy #9', async () => {
-      const subscriptionId = await call().subscriptionOf('Jira Standard', 'ENG');
+      const subscriptionId = await call().subscriptionOf('Cursor Pro');
       const cases = await world.facts.count('subscription_renewals');
 
       const renewWithQuantity = await propose(subscriptionId, { choice: 'RENEW', proposedQuantity: 1 });
       const cancelWithQuantity = await propose(subscriptionId, { choice: 'CANCEL', proposedQuantity: 0 });
-      const renewWithSeats = await propose(subscriptionId, { choice: 'RENEW', releasedAssignmentIds: [jira[0]] });
-      const cancelWithSeats = await propose(subscriptionId, { choice: 'CANCEL', releasedAssignmentIds: [jira[0]] });
+      const renewWithSeats = await propose(subscriptionId, { choice: 'RENEW', releasedAssignmentIds: [cursor[0]] });
+      const cancelWithSeats = await propose(subscriptionId, { choice: 'CANCEL', releasedAssignmentIds: [cursor[0]] });
       const reduceAboveBought = await propose(subscriptionId, { choice: 'REDUCE', proposedQuantity: 999 });
 
       expect(call().codeOf(renewWithQuantity)).toBe('SUBSCRIPTION_RENEWAL.QUANTITY_INVALID');
@@ -133,10 +141,10 @@ describe('MF-5 giảm, hủy và đề xuất lỗi thời: các biên của F5-
     let cancelId: string;
 
     it('trưởng phòng khác không thấy hồ sơ (404), IT Admin và Finance bị 403, trưởng phòng sở hữu đọc được #9', async () => {
-      const subscriptionId = await call().subscriptionOf('Jira Standard', 'ENG');
+      const subscriptionId = await call().subscriptionOf('Cursor Pro');
       const proposed = await propose(subscriptionId, {
         choice: 'CANCEL',
-        businessOwnerOpinion: 'Chuyển sang công cụ khác',
+        note: 'Chuyển sang công cụ khác',
       });
       expect(proposed.status).toBe(201);
       cancelId = call().data<{ renewal: { id: string } }>(proposed).renewal.id;
@@ -161,7 +169,7 @@ describe('MF-5 giảm, hủy và đề xuất lỗi thời: các biên của F5-
         409,
         'SUBSCRIPTION_RENEWAL.ACTIVE_USERS_NOT_ACKNOWLEDGED',
       ]);
-      expect(call().detailsOf(warned)).toEqual({ seatsInUse: jira.length });
+      expect(call().detailsOf(warned)).toEqual({ seatsInUse: cursor.length });
       expect(await stateOf(cancelId)).toBe('PROPOSED');
       expect(await revokeTasks()).toBe(0);
 
@@ -172,13 +180,13 @@ describe('MF-5 giảm, hủy và đề xuất lỗi thời: các biên của F5-
 
       expect(confirmed.status).toBe(200);
       expect(await stateOf(cancelId)).toBe('DECIDED');
-      expect(await revokeTasks()).toBe(jira.length);
+      expect(await revokeTasks()).toBe(cursor.length);
     });
   });
 
   describe('đề xuất lỗi thời: đóng lại để đề xuất lại (A-H2) @B5', () => {
     it('một ghế nữa được cấp sau đề xuất: xác nhận ⟹ 409 PROPOSAL_STALE, hồ sơ đóng STALE, IT đề xuất lại và xác nhận được', async () => {
-      const subscriptionId = await call().subscriptionOf('ChatGPT Plus', 'ENG');
+      const subscriptionId = await call().subscriptionOf('ChatGPT Plus');
       const first = await propose(subscriptionId, {
         choice: 'REDUCE',
         proposedQuantity: 1,
@@ -194,7 +202,7 @@ describe('MF-5 giảm, hủy và đề xuất lỗi thời: các biên của F5-
       expect([stale.status, call().codeOf(stale)]).toEqual([409, 'SUBSCRIPTION_RENEWAL.PROPOSAL_STALE']);
       expect(call().detailsOf(stale)).toEqual({ required: 2, stillHeld: 1 });
       expect(await stateOf(staleId)).toBe('STALE');
-      expect(await revokeTasks()).toBe(jira.length);
+      expect(await revokeTasks()).toBe(cursor.length);
       const again = await confirm('NV-ENGH', staleId);
       expect(call().codeOf(again)).toBe('SUBSCRIPTION_RENEWAL.NOT_AWAITING_DECISION');
 
@@ -210,39 +218,7 @@ describe('MF-5 giảm, hủy và đề xuất lỗi thời: các biên của F5-
         'SUBSCRIPTION_RENEWAL.ALREADY_PROPOSED',
       );
       expect((await confirm('NV-ENGH', secondId)).status).toBe(200);
-      expect(await revokeTasks()).toBe(jira.length + 2);
-    });
-  });
-  describe('phòng sở hữu không có trưởng phòng: hồ sơ chờ và Super Admin được báo #9 @B5', () => {
-    it('trưởng phòng nghỉ việc, IT Admin vẫn đề xuất được; hồ sơ chờ NO_HEAD, không ai xác nhận, Super Admin được báo một lần', async () => {
-      await call().post('NV-SA', '/offboarding-cases', {
-        employeeId: await world.facts.employeeId('NV-DESH'),
-        lastWorkingDay: call().today(),
-        accessBlockMode: 'BLOCK_NOW',
-        grounds: { type: 'HR_DECISION', reference: 'QĐ-NV-2026-09', issuer: 'Phòng Nhân sự', issuedOn: call().today() },
-        successor: { kind: 'NONE' },
-      });
-      world.clock.jumpDays(1);
-      await world.actors.signIn('NV-ITA1');
-      await world.actors.signIn('NV-SA');
-      await world.actors.signIn('NV-DES1');
-
-      const proposed = await propose(await call().subscriptionOf('Figma Professional', 'DES'), { choice: 'RENEW' });
-
-      expect(proposed.status).toBe(201);
-      const id = call().data<{ renewal: { id: string } }>(proposed).renewal.id;
-      const detail = call().data<{ renewal: { state: string; waitingReason: string | null } }>(
-        await call().get('NV-ITA1', `/subscription-renewals/${id}`),
-      ).renewal;
-      expect(detail).toMatchObject({ state: 'PROPOSED', waitingReason: 'NO_HEAD' });
-      const alerts = await world.facts.notices('CONTROLLED_WAIT_ALERT', id);
-      expect(alerts.map((row) => row.recipient_employee_id)).toEqual([await world.facts.employeeId('NV-SA')]);
-      for (const code of ['NV-ITA1', 'NV-DES1', 'NV-CEO']) {
-        await world.actors.signIn(code);
-        const refused = await confirm(code, id);
-        expect([code, refused.status]).toEqual([code, 403]);
-      }
-      expect(await stateOf(id)).toBe('PROPOSED');
+      expect(await revokeTasks()).toBe(cursor.length + 2);
     });
   });
 });

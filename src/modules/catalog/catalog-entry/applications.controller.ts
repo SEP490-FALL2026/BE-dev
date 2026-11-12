@@ -39,7 +39,7 @@ const READERS = {
   examples: [FORBIDDEN_EXAMPLE],
 } as const;
 const INVALID_DESCRIPTION =
-  'The request is invalid (VALIDATION_ERROR) or a rule refuses it: NAME_INVALID, VENDOR_NAME_INVALID, DOMAIN_INVALID, TOO_MANY_DOMAINS, NOTE_INVALID, VENDOR_REQUIRED, VENDOR_SOURCE_AMBIGUOUS, INTERNAL_HAS_NO_VENDOR, BUSINESS_OWNER_INVALID, FUNCTIONAL_GROUP_INVALID, DICTIONARY_LINE_NOT_FOUND, DICTIONARY_LINE_MISMATCH or UPDATE_EMPTY.';
+  'The request is invalid (VALIDATION_ERROR) or a rule refuses it: NAME_INVALID, VENDOR_NAME_INVALID, DOMAIN_INVALID, TOO_MANY_DOMAINS, NOTE_INVALID, VENDOR_REQUIRED, VENDOR_SOURCE_AMBIGUOUS, INTERNAL_HAS_NO_VENDOR, FUNCTIONAL_GROUP_INVALID, DICTIONARY_LINE_NOT_FOUND, DICTIONARY_LINE_MISMATCH or UPDATE_EMPTY.';
 /** The rule refusals both a declaration and a change can meet. */
 const SHARED_RULE_EXAMPLES = [
   EXAMPLES.NAME_INVALID,
@@ -47,7 +47,6 @@ const SHARED_RULE_EXAMPLES = [
   EXAMPLES.TOO_MANY_DOMAINS,
   EXAMPLES.NOTE_INVALID,
   EXAMPLES.INTERNAL_HAS_NO_VENDOR,
-  EXAMPLES.BUSINESS_OWNER_INVALID,
   EXAMPLES.FUNCTIONAL_GROUP_INVALID,
   EXAMPLES.DICTIONARY_LINE_NOT_FOUND,
   EXAMPLES.DICTIONARY_LINE_MISMATCH,
@@ -88,8 +87,8 @@ function toSummaryWire(application: ApplicationSummaryView) {
     vendor: application.vendor ? { id: application.vendor.id, name: application.vendor.name } : null,
     dataSensitivity: application.dataSensitivity,
     isCommunicationService: application.isCommunicationService,
-    businessOwner: application.businessOwner,
-    businessOwnerReplacementRequired: application.businessOwnerReplacementRequired,
+    responsibleItAdmin: application.responsibleItAdmin,
+    needsResponsible: application.needsResponsible,
     usageCollectionDefault: usageCollectionDefault(application.isCommunicationService),
     functionalGroup: application.functionalGroup,
     status: application.status,
@@ -110,8 +109,8 @@ function toWire(application: ApplicationView) {
 
 /**
  * The application catalog (`US-04-01`). The IT Admin declares and changes applications; Finance reads them. Finance,
- * the department head, employees and the Super Admin do not declare or change one (AC-6, `SoD-1`); the Business Owner is
- * an attribute, not an account. Retiring an application is `g3-catalog-retire`; there is no route that deletes one.
+ * the department head, employees and the Super Admin do not declare or change one (AC-6, `SoD-1`); the responsible IT Admin is
+ * the one who declared it. Retiring an application is `g3-catalog-retire`; there is no route that deletes one.
  */
 @ApiTags('applications')
 @Controller({ path: 'applications', version: '1' })

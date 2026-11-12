@@ -73,14 +73,6 @@ export class CatalogApi {
   }
 
   /**
-   * The first `limit` applications in use whose Business Owner is this employee, and how many there are (a read, `US-03-01`
-   * AC-13): a person who moves to another department or leaves needs someone to take them over (`US-04-06`).
-   */
-  getApplicationsOwnedBy(employeeId: string, limit: number, tx?: DbTx) {
-    return this.applicationLookup.ownedBy(employeeId, limit, tx);
-  }
-
-  /**
    * The applications with these ids as a collector's allowlist needs to judge them: name, kind, whether the application is a
    * communication service (never reported, `QĐ-62o`) and whether it is retired. An id that does not exist is absent.
    */
@@ -194,19 +186,19 @@ export class CatalogApi {
     return this.plans.vendorIdsOf(planIds);
   }
 
-  /** The Business Owner of the application of the plan now, or null when the plan does not exist. */
-  getPlanBusinessOwnerId(planId: string, tx?: DbTx): Promise<string | null> {
-    return this.plans.businessOwnerIdOf(planId, tx);
+  /** The IT Admin responsible for the application of the plan now (`QĐ-111g`), or null when there is none or the plan does not exist. */
+  getPlanResponsibleItAdminId(planId: string, tx?: DbTx): Promise<string | null> {
+    return this.plans.responsibleItAdminIdOf(planId, tx);
   }
 
   /**
-   * Registers software the company built itself, with its Business Owner and one plan granted by hand, in the transaction
-   * of the caller (`US-05-20`). A Business Owner who has left, or a name already taken, is a `REFUSED` answer.
+   * Registers software the company built itself, with the calling IT Admin responsible for it and one plan granted by hand, in the
+   * transaction of the caller (`US-05-20`). A name already taken is a `REFUSED` answer.
    */
   registerInternalSoftware(
     tx: DbTx,
     actor: AuthenticatedPrincipal,
-    input: { name: string; businessOwnerEmployeeId: string; dataSensitivity: 'LOW' | 'MEDIUM' | 'HIGH' },
+    input: { name: string; dataSensitivity: 'LOW' | 'MEDIUM' | 'HIGH' },
   ): Promise<InternalRegistration> {
     return this.internalRegistration.register(tx, actor, input);
   }

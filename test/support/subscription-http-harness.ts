@@ -128,7 +128,6 @@ export class SubscriptionHttpHarness {
           kind,
           ...(kind === 'INTERNAL' ? {} : { vendorName: setup.vendorName ?? this.unique('Vendor') }),
           dataSensitivity: 'LOW',
-          businessOwnerEmployeeId: this.businessOwner,
           communication: NO,
         })
         .expect(201),

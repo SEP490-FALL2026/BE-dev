@@ -8,7 +8,7 @@
   `BR-MF1-07`; `QĐ-103f`(1)(3), `QĐ-104a`, `QĐ-104k`(1)(6), `QĐ-106a`, `QĐ-106b`, `QĐ-106d`; QT v1.7 mục 1.1, 1.5, A.4; L1 MF-1 bước 9),
   BE `1cd81101`. Ledger: L2-10, L2-11, L2-12, L2-38; luật R-B01, R-B02, R-B03, R-D01. Câu chọn: Q-23 (ngày kết thúc thay số
   tháng — theo nguồn), Q-29 (Request tiếp tục có kỳ mới ở năm sau — TẠM CHỌN).
-- Nhóm roadmap: không — bó finding `qd103-108-alignment` (scope map chưa re-pin, xem tracker §5).
+- Nhóm roadmap: G5 (từ re-pin scope map 11/11/2026) — bó finding `qd103-108-alignment` (scope map chưa re-pin, xem tracker §5).
 - [Kế hoạch](plan.md).
 
 ## Business outcome
@@ -22,8 +22,8 @@ phòng lập hồ sơ bổ sung **giảm thời hạn**. Không còn lịch than
 
 ## Sizing decision
 
-- Container: bó finding `qd103-108-alignment` (đợt W3), ngoài nhóm G.
-- Mode: `technical-enabler`.
+- Container: G5 (nhóm giao việc, không phải ranh giới hạng mục); bó finding `qd103-108-alignment` (đợt W3). Trước re-pin 11/11/2026 là ngoài nhóm.
+- Mode: `grouped-stories`.
 - Outcome and owner: lõi `requests/access-request` (`pricing.policy.ts`, `request-facts.service.ts`) sở hữu số tiền và thời hạn;
   `requests/spend` tính lại trong mọi lần kiểm (nhóm `spend/repricing/`); `catalog/subscription` trả giá một lần của `K4`;
   `licensing/provisioning` đặt ngày kết thúc theo ngày Request mang (trần 12 tháng từ ngày cấp xong).
@@ -35,13 +35,15 @@ phòng lập hồ sơ bổ sung **giảm thời hạn**. Không còn lịch than
 - Not smaller: số tiền lúc gửi, lúc kiểm, lúc bổ sung và ngày kết thúc lúc cấp phải dùng **một** hàm; tách ra thì giữa hai task hệ
   thống tính hai kiểu số tiền.
 - Siblings: `qd103-budget-check-three-outcomes`, `qd103-commitment-current-year`, `qd103-renewal-request-window`.
-- Scope map: n/a
+- Scope map: [G5](../../../roadmap.md#work-item-decomposition-g5).
 
 ## Primary Story/AC
 
-| Story | AC                         | Coverage | Phần còn lại thuộc                                                                                                 |
-| ----- | -------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------ |
-| —     | L2-10, L2-11, L2-12, L2-38 | n/a      | gỡ chặn `qd103-budget-check-three-outcomes`, `qd103-commitment-current-year`, W4 `qd103-new-year-auto-commitments` |
+| Story    | AC                         | Coverage | Phần còn lại thuộc                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                          |
+| -------- | -------------------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| US-05-02 | AC-1, AC-11, AC-17         | partial  | AC còn lại và vế chung theo scope map: `g5-request-amount-and-payment-schedule`, `qd96-100-request-term-limit`, `qd96-100-approved-end-date`, `qd96-100-request-year-without-spend-date`, `g5-group-requests`, `g5-request-submission-and-routing`, `g5-delegated-requests`, `qd96-100-request-sender-rules`, `g5-it-assessment-of-new-software`, `qd93-remove-fallback-substitute-approvers`, `qd93-unplaced-employee-first-placement`, `qd103-request-single-step-routing`, `qd103-request-limits-gh`, `qd103-role-based-access`; AC-20 `deferred` tới chính `qd103-request-amount-and-term` (chưa claim) |
+| US-05-23 | AC-1→AC-10                 | partial  | AC còn lại và vế chung theo scope map: `qd103-commitment-current-year`, `qd103-renewal-request-window`; AC-11 `deferred` tới chính `qd103-request-amount-and-term` (chưa claim)                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| US-06-01 | AC-14, AC-21, AC-25, AC-29 | partial  | AC còn lại và vế chung theo scope map: `g5-spend-approval-decision`, `qd103-budget-check-three-outcomes`, `g5-group-requests`, `qd93-remove-fallback-substitute-approvers`, `qd96-100-remove-spend-override`, `qd96-100-request-year-without-spend-date`, `qd103-request-single-step-routing`, `qd103-grant-from-shared-pool`                                                                                                                                                                                                                                                                               |
 
 ## Supporting references
 
@@ -49,6 +51,8 @@ phòng lập hồ sơ bổ sung **giảm thời hạn**. Không còn lịch than
 AC-13; `US-05-14` AC-3 (số tiền Request tiếp tục). Ví dụ chuẩn `FR-3.20`: 10 người × 200 × 7 (06 → 12) = 14 000; `US-05-23` AC-6:
 01/07→30/09 × 200 = 600. Spec cũ `qd96-100-request-term-limit`, `-request-year-without-spend-date`, `-approved-end-date` chỉ đọc
 tham khảo (còn dùng: bỏ ngày dự kiến chi, trần 12 tháng; bỏ: `termMonths` bắt buộc, lịch trả nhiều năm).
+
+_Re-pin 11/11/2026 ([C3](../../../reviews/mf2-mf3-2026-11-10/C3-SCOPE-MAP-REPIN.md)):_ trước là `technical-enabler`, dòng `n/a` của bảng Primary: L2-10, L2-11, L2-12, L2-38 — gỡ chặn `qd103-budget-check-three-outcomes`, `qd103-commitment-current-year`, W4 `qd103-new-year-auto-commitments`. Bảng Primary claim AC của tối đa ba Story chính lấy từ danh sách trên, chỉ AC đang dùng ở Docs `5bb2e6a` (số AC của EP-05/EP-06/EP-12 không đổi giữa `9c7f386` và `5bb2e6a`); khóa khác của danh sách trên giữ chủ hiện có hoặc là `deferred` tới hạng mục này trong scope map. Claim theo spec và commit đã merge (PR #36), chưa đối chiếu từng AC trên code.
 
 ## Explicit out of scope
 

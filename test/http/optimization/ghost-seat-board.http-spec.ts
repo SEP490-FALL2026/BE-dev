@@ -32,7 +32,7 @@ const DETAIL = {
   plan: { planId: ID, planName: 'Standard' },
   subscriptionId: ID,
   assignmentId: ID,
-  holder: { employeeId: ID, employeeCode: 'E1', fullName: 'Person E1' },
+  holder: { employeeId: ID, employeeCode: 'E1' },
   freeSeats: null,
   countsTowardVacantCost: null,
   revocationTaskId: null,
@@ -117,7 +117,7 @@ describe('ghost seat board routes (no database)', () => {
           seatChainId: ID,
           assignmentId: ID,
           application: { applicationId: ID, applicationName: 'Notion' },
-          holder: { employeeId: ID, employeeCode: 'E1', fullName: 'Person E1' },
+          holder: { employeeId: ID, employeeCode: 'E1' },
           status: 'NO_DATA',
           reason: 'NO_DATA',
           lastActiveDate: null,
@@ -234,8 +234,10 @@ describe('ghost seat board routes (no database)', () => {
       inactiveDays: null,
     });
     expect(queries.listSeatStates).toHaveBeenCalledWith(
-      expect.objectContaining({ applicationId: ID, status: 'NO_DATA' }),
+      expect.objectContaining({ roles: ['IT_ADMIN'] }),
+      expect.objectContaining({ applicationId: ID, status: 'NO_DATA', departmentScope: 'MINE' }),
     );
+    expect(JSON.stringify(response.body)).not.toContain('fullName');
     await request(app.getHttpServer())
       .get('/api/v1/ghost-seat-seat-states')
       .query({ status: 'DEAD' })

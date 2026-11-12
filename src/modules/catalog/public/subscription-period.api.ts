@@ -40,9 +40,4 @@ export class SubscriptionPeriodApi {
   recordNextPeriod(tx: DbTx, actor: AuthenticatedPrincipal, input: NextPeriodInput): Promise<RenewalPeriodFacts> {
     return this.periods.recordNext(tx, actor, input);
   }
-
-  /** The Business Owner of the application who receives its renewal alerts, or null when they have left (`BR-06.7`). */
-  getRenewalAlertRecipient(applicationId: string): Promise<string | null> {
-    return this.applications.renewalAlertRecipient(applicationId);
-  }
 }

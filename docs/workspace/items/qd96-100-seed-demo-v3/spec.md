@@ -1,7 +1,7 @@
 # Spec: qd96-100-seed-demo-v3 — dataset demo `shared-demo-v3` theo QĐ-96 → QĐ-100
 
 - Phụ trách: AI theo giao việc Owner (05/11/2026); người nhận implement tiếp quản spec/plan và evidence.
-- Thiết kế ban đầu bởi: AI (agent C-SPEC-SEED) theo [tracker qd96-100](../../../reviews/qd96-100-alignment-2026-11-05/README.md),
+- Thiết kế ban đầu bởi: AI (agent C-SPEC-SEED) theo tracker qd96-100 (nhật ký review đã xóa 11/11/2026 — xem git history),
   `LEDGER.md` L-901…L-905, `audit/A5-CROSS.md` A5-28…A5-33; Owner `QUESTIONS.md` mục D (Q-01 B bỏ MF-5, Q-02 B).
 - Thiết kế: `draft`. Owner review: chưa review. Peer review: chưa có.
 - Nguồn: Docs `3d73a7f` (`QĐ-97c`, `QĐ-98a`, `QĐ-100h`, `QĐ-100q`, `QĐ-100x`, `QĐ-62c`, `QĐ-41c(2)`, `FR-3.22`), BE `3e4553b9`.

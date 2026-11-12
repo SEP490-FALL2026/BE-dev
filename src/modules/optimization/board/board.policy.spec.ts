@@ -1,11 +1,11 @@
 import {
   canReclaim,
   confidenceLabelOf,
-  departmentsOfScope,
   headEvidenceOf,
   INTERNAL_SOFTWARE_LIMITATION,
   isValidKpi5Period,
   labelsOf,
+  narrowToDepartment,
 } from './board.policy';
 
 const g2Evidence = {
@@ -49,12 +49,6 @@ describe('board policy', () => {
       ...none,
       holderLeft: true,
     });
-  });
-
-  it('limits the read to the departments in charge for MINE and to none for ALL', () => {
-    expect(departmentsOfScope('MINE', ['d1', 'd2'])).toEqual(['d1', 'd2']);
-    expect(departmentsOfScope('MINE', [])).toEqual([]);
-    expect(departmentsOfScope('ALL', ['d1'])).toBeUndefined();
   });
 
   it('DA6-40: carries a limitation for internal software that says there is no usage source yet', () => {
@@ -122,5 +116,22 @@ describe('headEvidenceOf — M5-44 (SoD-2, FR-4.12): a head reads the evidence i
       // `"ageDays"` as a key: `coverageDays`, which the head does read, also ends with those letters.
       /matchMethod|ALIAS_RULE|"ageDays"|activityDefinition|strictness|sourceId|reasons|employeeId/,
     );
+  });
+});
+
+describe('narrowToDepartment: a filter on a department stays inside the scope of the reader (QĐ-111aw, R-20)', () => {
+  it('keeps the scope when no department is asked for, whole organization or not', () => {
+    expect(narrowToDepartment(['d1', 'd2'], undefined)).toEqual({ departmentIds: ['d1', 'd2'] });
+    expect(narrowToDepartment(undefined, undefined)).toEqual({});
+  });
+
+  it('reads exactly the department asked for when it is in the scope, or when the scope is the whole organization', () => {
+    expect(narrowToDepartment(['d1', 'd2'], 'd2')).toEqual({ departmentId: 'd2' });
+    expect(narrowToDepartment(undefined, 'd9')).toEqual({ departmentId: 'd9' });
+  });
+
+  it('reads nothing for a department outside the scope, and nothing for a department of an empty scope', () => {
+    expect(narrowToDepartment(['d1'], 'd2')).toBe('OUT_OF_SCOPE');
+    expect(narrowToDepartment([], 'd1')).toBe('OUT_OF_SCOPE');
   });
 });

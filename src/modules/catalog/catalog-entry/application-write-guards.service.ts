@@ -1,12 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { isCheckViolation, isUniqueViolation } from '../../../infrastructure/database/unique-violation';
-import { EmployeeNotFoundError } from '../../organization/public/organization.errors';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { FunctionalGroupFactsService } from '../functional-group/functional-group-facts.service';
 import { VendorDictionaryGroupChangedError, VendorNameHeldByAnotherGroupError } from '../vendor/vendor.errors';
 import {
-  ApplicationBusinessOwnerInvalidError,
   ApplicationDictionaryLineMismatchError,
   ApplicationDictionaryLineTakenError,
   ApplicationFunctionalGroupInvalidError,
@@ -15,9 +13,8 @@ import {
 } from './application.errors';
 
 /**
- * What a write of an application checks about what it refers to (`US-04-01`, `INV-06`): that the organization exists, that the Business
- * Owner still works (the employee is locked `FOR SHARE` so a departure cannot slip in), that the functional group is active; and the
- * answer to what the database refused by the column it names.
+ * What a write of an application checks about what it refers to (`US-04-01`): that the organization exists, that the functional group
+ * is active; and the answer to what the database refused by the column it names.
  */
 @Injectable()
 export class ApplicationWriteGuards {
@@ -25,18 +22,6 @@ export class ApplicationWriteGuards {
     private readonly organizationReads: OrganizationReadApi,
     private readonly functionalGroups: FunctionalGroupFactsService,
   ) {}
-
-  /** Locks the employee `FOR SHARE` so a departure cannot slip in, then requires them to be still working (`INV-06`). */
-  async requireWorkingOwner(tx: DbTx, employeeId: string): Promise<void> {
-    try {
-      await this.organizationReads.lockEmployeeForShare(tx, employeeId);
-    } catch (error) {
-      if (error instanceof EmployeeNotFoundError) throw new ApplicationBusinessOwnerInvalidError();
-      throw error;
-    }
-    const employee = await this.organizationReads.getEmployee(employeeId, tx);
-    if (!employee || employee.status !== 'ACTIVE') throw new ApplicationBusinessOwnerInvalidError();
-  }
 
   async requireActiveGroup(tx: DbTx, id: string): Promise<{ id: string; name: string }> {
     const group = await this.functionalGroups.findActive(tx, id);

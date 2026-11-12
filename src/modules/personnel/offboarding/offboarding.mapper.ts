@@ -73,7 +73,6 @@ export interface DetailFacts {
   workspaces: Record<string, string>;
   checklist: Checklist | null;
   blockers: Record<string, number>;
-  businessOwnerApplications: number;
   registeredWarnings: Record<string, number>;
 }
 
@@ -176,7 +175,6 @@ export function toDetail(
     warnings: {
       // From the day the person is no longer a member nobody heads the department, unless somebody was chosen to follow.
       departmentWithoutHeadFrom: handover && handover.successorEmployeeId === null ? record.departureEffectiveOn : null,
-      businessOwnerApplications: facts.businessOwnerApplications,
       accountLockNotRecorded: record.state === 'LEFT' && !locked && record.closedAt === null,
       workspaces: facts.workspaces,
       registered: facts.registeredWarnings,

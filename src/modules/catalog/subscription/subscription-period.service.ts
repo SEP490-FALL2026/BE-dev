@@ -44,6 +44,7 @@ function factsOf(record: OwnedRecord, renewedById: string | null): RenewalPeriod
     applicationName: record.applicationName,
     applicationKind: record.applicationKind,
     ownerDepartmentId: record.ownerDepartmentId,
+    responsibleItAdminEmployeeId: record.responsibleItAdminEmployeeId,
     kind: record.kind,
     status: record.status,
     purchasedQuantity: record.purchasedQuantity,

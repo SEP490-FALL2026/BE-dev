@@ -138,9 +138,13 @@ describe('the shared-pool fields of a subscription over HTTP (integration, real 
 
   describe('the IT Admin who answers for the subscription (R-E03)', () => {
     it('is needed once it is active: refused when missing, when the person is not an IT Admin who works and signs in', async () => {
-      const { planId } = await plan();
+      const { planId, applicationId } = await plan();
       const body = { ...BASE, planId, billingCycle: 'ANNUAL' };
 
+      // BB-3: a declaration that names nobody takes the IT Admin responsible for the application, so it is missing only when that is empty too.
+      await h.ctx.sql.query(`UPDATE applications SET responsible_it_admin_employee_id = NULL WHERE id = $1`, [
+        applicationId,
+      ]);
       expect(codeOf(await create({ ...body, responsibleItAdminEmployeeId: undefined }).expect(422))).toBe(
         'SUBSCRIPTION.RESPONSIBLE_REQUIRED',
       );
@@ -163,8 +167,56 @@ describe('the shared-pool fields of a subscription over HTTP (integration, real 
       });
     });
 
+    it('QĐ-111g, BB-3: a new subscription that names nobody takes the IT Admin responsible for its application while they still work as one, and keeps the one the body names', async () => {
+      const second = await createActivatedAccount(h.ctx, h.seed, {
+        code: 'E-IT-DEF',
+        email: 'it-def@acme.vn',
+        role: 'IT_ADMIN',
+        admin: h.admin,
+      });
+      const { planId, applicationId } = await plan();
+      const body = { ...BASE, planId, billingCycle: 'ANNUAL' };
+      const setApplicationResponsible = (employeeId: string | null) =>
+        h.ctx.sql.query(`UPDATE applications SET responsible_it_admin_employee_id = $2 WHERE id = $1`, [
+          applicationId,
+          employeeId,
+        ]);
+
+      await setApplicationResponsible(second.employeeId);
+      const inherited = dataOf<PoolWire>(
+        await create({ ...body, responsibleItAdminEmployeeId: undefined }).expect(201),
+      );
+      const named = dataOf<PoolWire>(
+        await create({ ...body, responsibleItAdminEmployeeId: h.it1.employeeId }).expect(201),
+      );
+      expect(await stored(inherited.id)).toMatchObject({ responsible: second.employeeId });
+      expect(await stored(named.id)).toMatchObject({ responsible: h.it1.employeeId });
+
+      // The one the application names has lost the role: nothing is taken, and an active subscription is refused as before.
+      await h.ctx.sql.query(`UPDATE app_users SET status = 'LOCKED' WHERE employee_id = $1`, [second.employeeId]);
+      try {
+        expect(codeOf(await create({ ...body, responsibleItAdminEmployeeId: undefined }).expect(422))).toBe(
+          'SUBSCRIPTION.RESPONSIBLE_REQUIRED',
+        );
+        const draft = dataOf<PoolWire>(
+          await create({ kind: 'TERM', planId, responsibleItAdminEmployeeId: undefined }).expect(201),
+        );
+        expect(await stored(draft.id)).toMatchObject({ responsible: null });
+      } finally {
+        await h.ctx.sql.query(`UPDATE app_users SET status = 'ACTIVE' WHERE employee_id = $1`, [second.employeeId]);
+      }
+
+      // Only a declaration is judged: a subscription that exists keeps its person when the application changes hands.
+      await setApplicationResponsible(h.it1.employeeId);
+      expect(await stored(inherited.id)).toMatchObject({ responsible: second.employeeId });
+    });
+
     it('is needed to complete a draft, and a draft may be given the person before it', async () => {
-      const { planId } = await plan();
+      const { planId, applicationId } = await plan();
+      // A draft that names nobody and whose application names nobody either (BB-3): otherwise it would take the application's IT Admin.
+      await h.ctx.sql.query(`UPDATE applications SET responsible_it_admin_employee_id = NULL WHERE id = $1`, [
+        applicationId,
+      ]);
       // The rate of the day of the price is missing, so the subscription is a draft whatever else it holds.
       today('2026-03-16');
       const draft = dataOf<PoolWire>(

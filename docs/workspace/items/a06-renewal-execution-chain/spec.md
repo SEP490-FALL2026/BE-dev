@@ -18,7 +18,7 @@ người quyết. Không tạo khoản cam kết. Kiểm bằng `POST /subscript
 ## Sizing decision
 
 - Container: G8 (nhóm giao việc, không phải ranh giới hạng mục).
-- Mode: `grouped-stories`.
+- Mode: `single-story`.
 - Outcome and owner: từ quyết định tới kết quả thực tế và kỳ nối chuỗi; capability `licensing/subscription-renewal` nhóm
   `outcome/` và phần cờ trễ của `deadline/`; catalog `SubscriptionPeriodApi.recordNextPeriod`.
 - Boundaries: một transaction (case `FOR UPDATE` → subscription cũ `FOR UPDATE` → Assignment); cột kết quả của
@@ -34,7 +34,8 @@ người quyết. Không tạo khoản cam kết. Kiểm bằng `POST /subscript
 | Story    | AC                      | Coverage | Phần còn lại thuộc                                                                                                                                |
 | -------- | ----------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
 | US-11-03 | AC-1→AC-10, AC-12→AC-21 | partial  | test người xác nhận bàn giao với gói mất dữ liệu của AC-7, AC-8, AC-10, AC-19 và tiết kiệm của hủy theo báo cáo (AC-9): `a06-renewal-open-inputs` |
-| US-11-05 | AC-9→AC-14              | partial  | AC-1→AC-8, AC-15, AC-17: `a06-renewal-proposal-decision`; AC-16, AC-18: `a06-renewal-open-inputs`                                                 |
+
+_Re-pin 11/11/2026 ([C3](../../../reviews/mf2-mf3-2026-11-10/C3-SCOPE-MAP-REPIN.md)):_ bỏ khỏi bảng `US-11-05` AC-9→AC-14 (partial) — Story `RETIRED` ở Docs `5bb2e6a` (`US-11-05` `QĐ-103e`, `QĐ-103q`); code đã merge là lịch sử, khóa ở scope map là `not affected`. Còn một Story nên `Mode` đổi `single-story`.
 
 ## Supporting references
 

@@ -1,5 +1,4 @@
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import type { SubscriptionPeriodApi } from '../../catalog/public/subscription-period.api';
 import type { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
 import type { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { RenewalPartiesService } from './subscription-renewal-parties.service';
@@ -11,7 +10,6 @@ const service = (headed: { departmentId: string } | null) =>
   new RenewalPartiesService(
     { getHeadedDepartment: jest.fn().mockResolvedValue(headed) } as unknown as OrganizationReadApi,
     {} as unknown as IdentityAccessApi,
-    {} as unknown as SubscriptionPeriodApi,
   );
 
 describe('the read scope of the renewals', () => {
