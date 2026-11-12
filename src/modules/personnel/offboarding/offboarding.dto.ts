@@ -181,7 +181,7 @@ const rightSchema = z.strictObject({
   grantReason: z.string().nullable(),
   effectiveFrom: z.string(),
   validUntil: z.string().nullable(),
-  /** A task can take it away: false for the kinds of provisioning that have no revocation yet (K3, K4). */
+  /** A task can take it away: false only for K3 (SSO/SCIM), which is specified and has no revocation; K4 is revoked and its key goes back to the store. */
   revocable: z.boolean(),
   revocation: z
     .strictObject({

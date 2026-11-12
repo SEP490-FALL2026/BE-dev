@@ -1,8 +1,8 @@
-import type { EmployeeRecord } from '../../organization/public/organization.types';
-import { ROLE_FLAGS } from '../public/personnel.types';
-import { offboardingSummarySchema } from './offboarding.dto';
-import { toSummary } from './offboarding.mapper';
-import type { OffboardingSummaryRecord } from './offboarding.types';
+import type { EmployeeRecord } from '../../../organization/public/organization.types';
+import { ROLE_FLAGS } from '../../public/personnel.types';
+import { offboardingSummarySchema } from '../offboarding.dto';
+import { toSummary } from '../offboarding.mapper';
+import type { OffboardingSummaryRecord } from '../offboarding.types';
 
 const PERSON: EmployeeRecord = {
   id: '11111111-1111-4111-8111-111111111111',

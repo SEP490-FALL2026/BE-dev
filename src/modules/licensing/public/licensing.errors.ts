@@ -101,7 +101,7 @@ export class GrantRequestRefusedError extends Error {
   }
 }
 
-/** The plan is K3 (specified only) or K4 (needs the key store and the company devices): no grant for it yet (`RB-4`). */
+/** The plan is K3 (SSO/SCIM, specified only): no grant for it yet (`RB-4`). K4 is granted from the key pool of its plan (`QĐ-103d`). */
 export class ProvisioningTypeNotSupportedError extends Error {
   constructor(readonly provisioningType: string) {
     super(`A ${provisioningType} plan cannot be granted yet.`);
@@ -296,7 +296,7 @@ export type RevocationProblem = 'SOURCE_REQUIRED' | 'ASSIGNMENT_IS_SERVICE_ACCOU
 
 /**
  * The seat cannot be revoked: no source says why, the assignment is a service account (answered for by a person, not part
- * of the personal rights a departure takes away: `US-03-04` AC-17), or its kind of provisioning has no revocation (K3, K4).
+ * of the personal rights a departure takes away: `US-03-04` AC-17), or its kind of provisioning has no revocation (K3, which is specified only; K4 is revoked and its key goes back to the store, `QĐ-103d`).
  */
 export class RevocationRefusedError extends Error {
   constructor(

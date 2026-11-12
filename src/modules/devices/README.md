@@ -50,4 +50,4 @@ phiên bản → khóa mọi đăng ký mở theo id.
 
 ## Chưa làm (mức B, sau demo)
 
-Yêu cầu dừng và SLA, lịch sử `/me`, `PATCH /devices`, kết thúc đăng ký theo ngày làm việc cuối, `DeviceRegistryPort` cho licensing.
+Yêu cầu dừng và SLA, lịch sử `/me`, `PATCH /devices`, kết thúc đăng ký theo ngày làm việc cuối, cổng đọc sổ thiết bị cho licensing K4 (contract `licensing/device-binding` đã gỡ ở MF2-A, `QĐ-110`: thiết kế lại từ sổ thiết bị thật khi làm K4 theo thiết bị).

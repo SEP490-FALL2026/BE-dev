@@ -81,7 +81,7 @@ dashboards; gốc `src/app/app.module.ts`.
 ## Hướng phụ thuộc giữa capability (R6)
 
 Không vòng (`pnpm arch:capabilities --module licensing`, gate `capability-graph`). Từ thấp lên cao: `assignment`,
-`license-key`, `saas-issue`, `device-binding` → `provisioning`, `seat-baseline` → `department-tools`, `expiry` →
+`license-key`, `saas-issue` → `provisioning`, `seat-baseline` → `department-tools`, `expiry` →
 `my-software`, `subscription-renewal` (đọc ghế, mở thu hồi qua `RevocationService`, không capability nào import nó) →
 `dashboard-facts`. Cạnh
 ngược là vòng:
@@ -113,9 +113,6 @@ dịch vụ nào đọc cả ghế lẫn thu hồi thì đứng trên cả hai (
 - `my-software/` — "Phần mềm của tôi" (US-12-15 AC-2, US-16-01 AC-1): `my-software.controller.ts`
   (`GET /me/software-rights`, mọi tài khoản đã đăng nhập (`QĐ-95d`), chỉ quyền cá nhân của chính người gọi), `MySoftwareService`, `MySoftwareRepo`;
   trạng thái theo ngày nghiệp vụ ở `my-software.policy.ts`. Không đọc khóa K4, giá, Cost Center hay định danh tài khoản.
-- `device-binding/` — contract sổ thiết bị G7 cho K4 (`DeviceRegistryPort`) và luật thuần gán/gỡ/giới hạn khóa theo thiết
-  bị; **chưa dùng ở đâu, chưa bind**: sổ thiết bị của Owner chưa có, chỉ có contract test với mock
-  (`device-binding.policy.spec.ts`, stand-in `test/support/device-registry-contract-double.ts`). Không import capability nào.
 - `dashboard-facts/` — số đếm mà trang tổng quan theo vai đọc (US-12-15 AC-2, AC-3, AC-4), mỗi số bằng tổng của danh sách
   hiện có cùng phạm vi: quyền và quyền sắp hết của Employee (dùng luật của `my-software.policy.ts`), báo lỗi SaaS, ghế phòng ban
   (qua `AssignmentDepartmentRepo`), task cấp/thu hồi và báo lỗi IT Admin phụ trách, key trong kho. `DashboardFactsService`,
