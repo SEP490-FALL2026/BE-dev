@@ -12,7 +12,12 @@ export type OffboardingChangeKind =
   | 'MARKED_LEFT'
   | 'ACCOUNT_LOCK_RECORDED'
   | 'REVOCATIONS_OPENED'
-  | 'CLOSED';
+  | 'CLOSED'
+  | 'ACCESS_BLOCKED'
+  | 'REVOCATIONS_WITHDRAWN'
+  | 'IT_ADMIN_HANDED_OVER'
+  | 'CLOSED_BY_SYSTEM'
+  | 'MAILBOX_LOCKED';
 
 /** What the person was doing before the handover began. */
 export type PriorWorkState = 'WORKING' | 'ON_LONG_LEAVE';

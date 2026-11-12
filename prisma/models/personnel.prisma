@@ -275,6 +275,16 @@ enum OffboardingChangeKind {
   ACCOUNT_LOCK_RECORDED
   REVOCATIONS_OPENED
   CLOSED
+  // The system blocked the person's access at the block moment (QĐ-110b, QĐ-110d).
+  ACCESS_BLOCKED
+  // A cancellation after the last day withdrew the revocation tasks not yet done (QĐ-110c, R-41).
+  REVOCATIONS_WITHDRAWN
+  // An IT Admin moved every subscription and application the leaver answered for to another IT Admin (QĐ-110j).
+  IT_ADMIN_HANDED_OVER
+  // The system closed the case: gone, every revocation done, the mailbox locked for good (QĐ-110e).
+  CLOSED_BY_SYSTEM
+  // The IT Admin recorded item (1b) of BM-08, the mailbox locked for good (B-1).
+  MAILBOX_LOCKED
 }
 
 // The record of a person who leaves, from the day it is written until it is closed (g6-offboarding-record): a planned handover

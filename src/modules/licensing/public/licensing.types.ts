@@ -3,7 +3,7 @@ import type { SeatTarget } from '../../catalog/public/catalog.types';
 
 export type AssignmentKind = 'PERSONAL' | 'SERVICE';
 /** Where a seat came from; `RENEWAL_CARRY` is a seat carried to the period that renews its subscription (`QĐ-35c`). */
-export type AssignmentSource = 'BASELINE' | 'HANDOVER' | 'REQUEST' | 'RENEWAL_CARRY';
+export type AssignmentSource = 'BASELINE' | 'HANDOVER' | 'REQUEST' | 'RENEWAL_CARRY' | 'MACHINE_ACCOUNT_CONVERSION';
 export type AssignmentDateBasis = 'ACTUAL' | 'RECORDED';
 
 /** One seat held by one person on one subscription (or one internal plan) over `[effectiveFrom, validUntil)`. */
@@ -263,6 +263,8 @@ export const REVOCATION_SOURCES = [
   'RE_EXECUTION',
   // The head of the holder's department decided, after the installation, that a seat on another department's subscription goes.
   'POST_SETUP_REVIEW',
+  // The holder moved to another department and the grace of five working days ran out (QĐ-110p).
+  'TRANSFER',
 ] as const;
 export type RevocationSource = (typeof REVOCATION_SOURCES)[number];
 

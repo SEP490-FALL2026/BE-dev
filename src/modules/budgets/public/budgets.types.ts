@@ -83,7 +83,8 @@ export type CommitmentReleaseReason =
   | 'PARTICIPANT_WITHDRAWN'
   | 'REVOKED'
   | 'LATE_GRANT'
-  | 'GRANTED_FROM_POOL';
+  | 'GRANTED_FROM_POOL'
+  | 'TRANSFER_EFFECTIVE';
 
 /** What goes back to the budget when a request ends or a share of it is withdrawn. */
 export interface CommitmentReleaseInput {

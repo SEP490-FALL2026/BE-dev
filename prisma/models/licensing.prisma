@@ -9,6 +9,8 @@ enum AssignmentSource {
   REQUEST
   // The seat of a person carried from a subscription period to the period that renews it (QĐ-35c): names its predecessor.
   RENEWAL_CARRY
+  // A service-account seat ended and written again as the personal seat of an IT Admin flagged as a machine account (QĐ-110m).
+  MACHINE_ACCOUNT_CONVERSION
 }
 
 enum AssignmentDateBasis {
@@ -222,6 +224,8 @@ enum RevocationSource {
   RE_EXECUTION
   // The review the new head makes after a transfer took the seat away (spec L.10). Read only here.
   POST_SETUP_REVIEW
+  // The holder moved to another department and the grace ran out without the seat being asked for again (QĐ-110p).
+  TRANSFER
 }
 
 enum RevocationCompletion {
