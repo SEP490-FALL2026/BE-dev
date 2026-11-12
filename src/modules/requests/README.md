@@ -19,7 +19,7 @@ controller) và `requests-work-facade.module.ts` (phần worker chạy, API dùn
   nghỉ/chuyển, trong giao dịch của bên gọi. `ALL_OPEN` (MF-2, mốc chặn) = mọi Request mở (trả phí, `K5`, đề xuất case B, Request tiếp tục, dòng nhóm);
   `PAID_OLD_DEPARTMENT` (MF-3, ngày hiệu lực) = Request trả phí `GRANT`/`RENEWAL`/nhóm gửi từ phòng cũ. Chưa có tác vụ cấp chạy ⟹ `CANCELLED` với
   nguyên nhân `SYSTEM_BENEFICIARY_LEFT`/`SYSTEM_BENEFICIARY_TRANSFERRED` (không ai đóng, `cancelled_by_employee_id` rỗng), cam kết chưa chi về ngân
-  sách, thông báo `REQUEST_CANCELLED_BENEFICIARY_GONE` (người gửi + Finance); đang cấp (`EXECUTING`) ⟹ không đụng, trả về `needsItCheck` và gửi
+  sách, thông báo `REQUEST_CANCELLED_BENEFICIARY_GONE` (người gửi + Finance); có tác vụ cấp sống (Request `EXECUTING`, hoặc `RENEWAL` đã duyệt chờ tác vụ `EXTEND` ở `AWAITING_EXECUTION`) ⟹ không đụng, trả về `needsItCheck` và gửi
   `REQUEST_BENEFICIARY_GONE_IT_CHECK` cho IT phụ trách để đối chiếu nhà cung cấp rồi đóng tay. Chạy lại không đóng lần hai.
 - `RequestsAiSourceApi` ([public/requests-ai-source.api.ts](public/requests-ai-source.api.ts)) — `openStepsHeldBy`: bước nhu
   cầu và bước duyệt chi đang chờ một người (cùng bộ lọc với hai hàng đợi `need-decision-queue` và hàng đợi của người duyệt chi),

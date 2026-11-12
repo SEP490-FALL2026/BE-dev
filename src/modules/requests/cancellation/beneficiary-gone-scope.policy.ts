@@ -31,8 +31,9 @@ export interface GoneRequestFacts {
 /**
  * What the system does to a request, or to the line of the person in a request for a group:
  * - `CANCEL`: no grant task has begun, so the request (or the line) ends as cancelled and what was held for it goes back to the budget;
- * - `NEEDS_IT_CHECK`: the grant is being carried out, so nothing is cancelled: the vendor may already have sent the invitation, and the IT
- *   Admin checks it and closes the request by hand;
+ * - `NEEDS_IT_CHECK`: a task of the grant is alive on the request (see `hasLiveTask`), so nothing is cancelled: the vendor may already have
+ *   sent the invitation, and a task that stays alive under a cancelled request would be completed with nothing held for it. The IT Admin
+ *   checks it and closes the request by hand, which cancels the task with the request;
  * - `SKIP`: outside the scope, or not open (over, a draft, a withdrawal waiting for the IT Admin, no line of the person).
  */
 export type GoneVerdict = 'CANCEL' | 'NEEDS_IT_CHECK' | 'SKIP';
@@ -48,16 +49,26 @@ function inScope(scope: GoneScope, request: GoneRequestFacts): boolean {
 }
 
 /**
+ * Whether a task of the grant, or of the extension of a renewal, is alive on the request, from its state under the lock: a grant makes its
+ * task in the move to `EXECUTING`, and the approval of a renewal opens the task that extends the right (`EXTEND`, `BR-MF1-08d`) in the
+ * transaction that moves it to `AWAITING_EXECUTION`, where it waits for the IT Admin. A renewal never waits there without it: when the task
+ * cannot be opened the request fails (`RenewalApplyService`).
+ */
+function hasLiveTask(request: GoneRequestFacts): boolean {
+  return request.state === 'EXECUTING' || (request.type === 'RENEWAL' && request.state === 'AWAITING_EXECUTION');
+}
+
+/**
  * The verdict on one request of the person. A request for a group is judged by the line of the person (`line`, null when they have none),
- * since the others carry on; any other request by its own state. The grant is being carried out exactly when the request is `EXECUTING`
- * (or the line is): it is the move that makes the task of the grant.
+ * since the others carry on; any other request by its own state. A task is alive when the request is `EXECUTING` (or the line is), or when
+ * it is a renewal that waits for its extension.
  */
 export function verdictOf(scope: GoneScope, request: GoneRequestFacts, line: LineState | null): GoneVerdict {
   if (!inScope(scope, request)) return 'SKIP';
   if (request.type === 'GROUP_GRANT') return line === null ? 'SKIP' : byState(OPEN_LINE_STATES, line);
   if (request.state === 'DRAFT' || NOT_OPEN_FOR_LEAVER.includes(request.state)) return 'SKIP';
 
-  return request.state === 'EXECUTING' ? 'NEEDS_IT_CHECK' : 'CANCEL';
+  return hasLiveTask(request) ? 'NEEDS_IT_CHECK' : 'CANCEL';
 }
 
 function byState(open: readonly LineState[], line: LineState): GoneVerdict {

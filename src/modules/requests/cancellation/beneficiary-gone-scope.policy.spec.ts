@@ -36,6 +36,13 @@ describe('what the system does to the request of a person who is gone', () => {
       expect(verdictOf(ALL, free('EXECUTING'), null)).toBe('NEEDS_IT_CHECK');
     });
 
+    it('does not cancel an approved request to go on using: the task that extends the right was opened at approval, so it has one while it waits', () => {
+      const renewal = { ...paid('AWAITING_EXECUTION'), type: 'RENEWAL' } as const;
+
+      expect(verdictOf(ALL, renewal, null)).toBe('NEEDS_IT_CHECK');
+      expect(verdictOf(ALL, { ...renewal, branch: 'INTERNAL_FREE' }, null)).toBe('NEEDS_IT_CHECK');
+    });
+
     it('cancels what is free (K5), a proposal of new software (case B) and a request to go on using, whatever the department', () => {
       expect(verdictOf(ALL, free('AWAITING_EXECUTION'), null)).toBe('CANCEL');
       expect(verdictOf(ALL, free('PENDING', NEW), null)).toBe('CANCEL');
@@ -64,8 +71,11 @@ describe('what the system does to the request of a person who is gone', () => {
       expect(verdictOf(OLD_DEPARTMENT, { ...paid('AWAITING_SPEND_DECISION'), type: 'RENEWAL' }, null)).toBe('CANCEL');
     });
 
-    it('asks the IT Admin to check the vendor when the grant is being carried out', () => {
+    it('asks the IT Admin to check the vendor when the grant is being carried out, or the extension of a renewal waits for them', () => {
       expect(verdictOf(OLD_DEPARTMENT, paid('EXECUTING'), null)).toBe('NEEDS_IT_CHECK');
+      expect(verdictOf(OLD_DEPARTMENT, { ...paid('AWAITING_EXECUTION'), type: 'RENEWAL' }, null)).toBe(
+        'NEEDS_IT_CHECK',
+      );
     });
 
     it('leaves a request of the new department, a free one (K5) and a proposal of new software', () => {
