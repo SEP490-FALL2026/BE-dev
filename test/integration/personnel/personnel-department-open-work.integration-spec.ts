@@ -40,7 +40,7 @@ describe('what the personnel context keeps a department in use for (integration,
   const openWork = async (departmentId: string, limit = 50): Promise<Use> =>
     (await h.organizationService().getDepartmentUse(departmentId, h.today(), limit)).openWork;
   const move = (member: Person, to: Department, effectiveOn = h.day(20)) =>
-    h.recorded({ employeeId: member.employeeId, toDepartmentId: to.id, effectiveOn, grounds: h.grounds });
+    h.recorded({ employeeId: member.employeeId, toDepartmentId: to.id, effectiveOn, groundsNote: h.groundsNote });
   const depart = (member: Person) => h.recordedCase(member, { lastWorkingDay: h.day(10) });
   const leaveNotice = (member: Person, head: Person, extra: object = {}) =>
     h.sentNotice({ employeeId: member.employeeId, kind: 'DEPARTURE', proposedOn: h.day(5), ...extra }, head.account);
@@ -72,7 +72,7 @@ describe('what the personnel context keeps a department in use for (integration,
       const cancelled = await world();
       const effective = await world();
       const toCancel = await move(cancelled.member, fin);
-      await h.cancelTransfer(toCancel.id, { reason: 'No longer needed', grounds: h.grounds }).expect(200);
+      await h.cancelTransfer(toCancel.id, { reason: 'No longer needed', groundsNote: h.groundsNote }).expect(200);
       await move(effective.member, fin, h.today());
       await h.sweepAt();
 

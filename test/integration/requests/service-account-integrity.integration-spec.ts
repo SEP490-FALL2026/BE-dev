@@ -72,7 +72,12 @@ describe('the integrity of the handover of service accounts (integration, real P
     const transferFor = async (effectiveOn: string) => {
       const person = await h.worker(des, code());
 
-      return h.recorded({ employeeId: person.employeeId, toDepartmentId: fin.id, effectiveOn, grounds: h.grounds });
+      return h.recorded({
+        employeeId: person.employeeId,
+        toDepartmentId: fin.id,
+        effectiveOn,
+        groundsNote: h.groundsNote,
+      });
     };
     const close = (id: string, by: string | null = randomUUID()) =>
       sqlState(`UPDATE department_transfers SET closed_at = now(), closed_by_app_user_id = $2 WHERE id = $1`, [id, by]);

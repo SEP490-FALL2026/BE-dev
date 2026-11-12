@@ -18,10 +18,10 @@ describe('moving, cancelling and telling a transfer (integration, real PostgreSQ
     employeeId,
     toDepartmentId: fin.id,
     effectiveOn: h.day(30),
-    grounds: h.grounds,
+    groundsNote: h.groundsNote,
     ...extra,
   });
-  const why = { reason: 'The department asked for another day', grounds: h.grounds };
+  const why = { reason: 'The department asked for another day', groundsNote: h.groundsNote };
   const outcome = (response: { status: number }) => response.status;
   const headedDepartment = async (name: string) => {
     const department = await h.departmentWithUnit(name);
@@ -67,7 +67,7 @@ describe('moving, cancelling and telling a transfer (integration, real PostgreSQ
           oldEffectiveOn: h.day(30),
           newEffectiveOn: h.day(45),
           reason: why.reason,
-          grounds: h.grounds,
+          groundsNote: h.groundsNote,
         }),
       ]);
       const [event] = await h.auditEventsOf('DEPARTMENT_TRANSFER.RESCHEDULED', wire.id);
@@ -80,7 +80,7 @@ describe('moving, cancelling and telling a transfer (integration, real PostgreSQ
       const move = (extra: object) => h.rescheduleTransfer(wire.id, { newEffectiveOn: h.day(45), ...why, ...extra });
 
       const noReason = await move({ reason: undefined });
-      const noGrounds = await move({ grounds: undefined });
+      const noGrounds = await move({ groundsNote: undefined });
       const same = await move({ newEffectiveOn: h.day(30) });
       const past = await move({ newEffectiveOn: h.day(-2) });
 
@@ -222,7 +222,7 @@ describe('moving, cancelling and telling a transfer (integration, real PostgreSQ
       const person = await h.veteran(des, code('E'));
       const wire = await h.recorded(body(person.employeeId));
 
-      const noReason = await h.cancelTransfer(wire.id, { grounds: h.grounds });
+      const noReason = await h.cancelTransfer(wire.id, { groundsNote: h.groundsNote });
       const noGrounds = await h.cancelTransfer(wire.id, { reason: 'Not needed' });
       expect([noReason.status, h.codeOf(noReason)]).toEqual([422, 'VALIDATION_ERROR']);
       expect([noGrounds.status, h.codeOf(noGrounds)]).toEqual([422, 'VALIDATION_ERROR']);

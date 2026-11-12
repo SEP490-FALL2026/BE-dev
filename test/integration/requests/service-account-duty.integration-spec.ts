@@ -64,7 +64,7 @@ describe('the service accounts of a person who is transferred or leaves (integra
       employeeId: person.employeeId,
       toDepartmentId: fin.id,
       effectiveOn: h.day(10),
-      grounds: h.grounds,
+      groundsNote: h.groundsNote,
       ...extra,
     });
 
@@ -142,7 +142,7 @@ describe('the service accounts of a person who is transferred or leaves (integra
     await change(release, e5, h.day(10)).expect(200);
 
     await h
-      .rescheduleTransfer(transfer.id, { newEffectiveOn: h.day(20), reason: 'Dời ngày', grounds: h.grounds })
+      .rescheduleTransfer(transfer.id, { newEffectiveOn: h.day(20), reason: 'Dời ngày', groundsNote: h.groundsNote })
       .expect(200);
     await change(ci, e5, h.day(15)).expect(200);
     expect((await h.chainOf(ci)).length).toBe(2);
@@ -219,7 +219,7 @@ describe('the service accounts of a person who is transferred or leaves (integra
   it('never closes a transfer that was cancelled, and a cancelled transfer stops being a duty (AC-1)', async () => {
     const { person } = await owner();
     const transfer = await transferOf(person);
-    await h.cancelTransfer(transfer.id, { reason: 'Hủy điều chuyển', grounds: h.grounds }).expect(200);
+    await h.cancelTransfer(transfer.id, { reason: 'Hủy điều chuyển', groundsNote: h.groundsNote }).expect(200);
 
     const response = await h.closeTransfer(transfer.id);
 

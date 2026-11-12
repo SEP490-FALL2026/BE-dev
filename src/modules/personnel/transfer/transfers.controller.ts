@@ -1,5 +1,4 @@
 import { Body, Controller, Get, HttpStatus, Param, Post, Query } from '@nestjs/common';
-import { PersonnelGroundsDateService } from '../personnel-grounds-date.service';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   ApiErrorResponses,
@@ -54,10 +53,7 @@ const NOT_FOUND = {
 } as const;
 
 /** The refusals of the basis of a change, the same on every write that needs one. */
-const GROUNDS_EXAMPLES = [
-  EXAMPLES.GROUNDS_IS_NOTICE,
-  PERSONNEL_ACCESS_ERROR_EXAMPLES.GROUNDS_ISSUED_ON_FUTURE,
-] as const;
+const GROUNDS_EXAMPLES = [EXAMPLES.GROUNDS_IS_NOTICE] as const;
 /** The refusals of a change of a transfer that waits: it took effect or was cancelled, or the head or the placements were changed meanwhile. */
 const SETTLED_EXAMPLES = [EXAMPLES.ALREADY_EFFECTIVE, EXAMPLES.ALREADY_CANCELLED, EXAMPLES.CONCURRENT_CHANGE] as const;
 /** The refusals of the day of a change. */
@@ -68,7 +64,7 @@ const DAY_EXAMPLES = [
 ] as const;
 
 const GROUNDS_REFUSALS =
-  'the basis is the code of a notice and not a document (DEPARTMENT_TRANSFER.GROUNDS_IS_NOTICE), it is issued after today (PERSONNEL.GROUNDS_ISSUED_ON_FUTURE); a basis that is missing or lacks a part is a VALIDATION_ERROR';
+  'the basis (groundsNote) is only the code of a notice and not a document (DEPARTMENT_TRANSFER.GROUNDS_IS_NOTICE); a basis that is missing, blank or over 500 characters is a VALIDATION_ERROR';
 
 /**
  * Transfers of a person to another department with the day they take effect and the basis they rest on. The Super Admin records,
@@ -84,7 +80,6 @@ export class TransfersController {
     private readonly changes: TransferChangeService,
     private readonly query: TransferQueryService,
     private readonly closures: TransferClosureService,
-    private readonly groundsDate: PersonnelGroundsDateService,
   ) {}
 
   @Post()
@@ -130,7 +125,6 @@ export class TransfersController {
     },
   )
   async record(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Body() body: RecordTransferBodyDto) {
-    await this.groundsDate.assertNotInFuture(body.grounds);
     try {
       return await this.query.recordedOf(await this.transfers.record(userActor(actor), body));
     } catch (error) {
@@ -233,7 +227,6 @@ export class TransfersController {
     @Param() params: TransferIdParamDto,
     @Body() body: RescheduleTransferBodyDto,
   ) {
-    await this.groundsDate.assertNotInFuture(body.grounds);
     try {
       const record = await this.changes.reschedule(userActor(actor), params.id, body);
 
@@ -271,7 +264,6 @@ export class TransfersController {
     @Param() params: TransferIdParamDto,
     @Body() body: CancelTransferBodyDto,
   ) {
-    await this.groundsDate.assertNotInFuture(body.grounds);
     try {
       const record = await this.changes.cancel(userActor(actor), params.id, body);
 

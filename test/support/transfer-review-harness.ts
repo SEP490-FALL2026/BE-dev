@@ -107,7 +107,7 @@ export class TransferReviewHarness extends HandoverHarness {
       employeeId: person.employeeId,
       toDepartmentId: to.id,
       effectiveOn: this.today(),
-      grounds: this.grounds,
+      groundsNote: this.groundsNote,
       ...extra,
     });
   }

@@ -48,7 +48,7 @@ export function toDetail(
 
   return {
     ...toSummary(record, names),
-    grounds: full ? { ...record.grounds } : null,
+    groundsNote: full ? record.grounds.reference : null,
     headSuccessor:
       full && handover
         ? {
@@ -85,7 +85,7 @@ export const toChange = (change: TransferChangeRecord): TransferChangeWire => ({
   oldEffectiveOn: change.oldEffectiveOn,
   newEffectiveOn: change.newEffectiveOn,
   reason: change.reason,
-  grounds: { ...change.grounds },
+  groundsNote: change.grounds.reference,
   changedByAppUserId: change.changedByAppUserId,
   changedByProcedure: change.changedByTicketId !== null,
   changedAt: change.changedAt.toISOString(),

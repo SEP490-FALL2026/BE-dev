@@ -150,7 +150,7 @@ describe('the inbox alerts of handovers and of rights that run on (integration, 
         employeeId: person.employeeId,
         toDepartmentId: fin.id,
         effectiveOn: h.day(10),
-        grounds: h.grounds,
+        groundsNote: h.groundsNote,
       });
 
       const due = await inbox('SERVICE_ACCOUNT_RESPONSIBLE_DUE', [person.employeeId]);

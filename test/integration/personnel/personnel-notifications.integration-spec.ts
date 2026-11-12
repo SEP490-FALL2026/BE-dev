@@ -58,7 +58,7 @@ describe('the notices of the personnel context (integration, real PostgreSQL)', 
         employeeId: who.employeeId,
         toDepartmentId: fin.id,
         effectiveOn: h.day(20),
-        grounds: h.grounds,
+        groundsNote: h.groundsNote,
       });
 
       const rows = await noticesOf('PERSONNEL_EVENT_RECORDED', wire.id);
@@ -71,7 +71,7 @@ describe('the notices of the personnel context (integration, real PostgreSQL)', 
         });
         expect(Object.keys(row.params).sort()).toEqual(['departmentId', 'effectiveOn', 'employeeId', 'eventKind']);
       }
-      await h.cancelTransfer(wire.id, { reason: 'No longer needed', grounds: h.grounds }).expect(200);
+      await h.cancelTransfer(wire.id, { reason: 'No longer needed', groundsNote: h.groundsNote }).expect(200);
       expect(recipients(await noticesOf('PERSONNEL_EVENT_RECORDED', wire.id))).toHaveLength(6);
     });
 
@@ -83,7 +83,7 @@ describe('the notices of the personnel context (integration, real PostgreSQL)', 
         employeeId: who.employeeId,
         toDepartmentId: des.id,
         effectiveOn: h.day(20),
-        grounds: h.grounds,
+        groundsNote: h.groundsNote,
       });
 
       expect([response.status, h.codeOf(response)]).toEqual([422, 'DEPARTMENT_TRANSFER.NO_CHANGE']);

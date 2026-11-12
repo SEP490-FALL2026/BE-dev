@@ -1,6 +1,6 @@
 import { type BusinessDate } from '../../../core/business-date';
 import { placementReasons } from '../../organization/public/employee-placement.policy';
-import { groundsRefusal, type GroundsInput } from '../personnel-grounds.policy';
+import { groundsNoteRefusal } from '../personnel-grounds.policy';
 
 /**
  * What the policy of a transfer refuses, as a semantic code (`DEPARTMENT_TRANSFER.<code>` on the wire) and the facts a person
@@ -41,7 +41,7 @@ export interface NewTransferFacts {
   target: { departmentId: string };
   /** The department the person is to join: whether it exists and takes people. Its Cost Center is not asked (`QĐ-87d`(3)). */
   destinationDepartment: { active: boolean; effectiveFrom: BusinessDate } | null;
-  grounds: GroundsInput | undefined;
+  groundsNote: string | undefined;
   pending: { effectiveOn: BusinessDate } | null;
   /** Another waiting transfer names this person to follow the head of its department: they stay until it is settled. */
   namedAsSuccessor: boolean;
@@ -59,13 +59,11 @@ export function retiredDestinationRefusal(): TransferRefusal {
 }
 
 /** The basis of a change of the day or a cancellation, which also needs a reason (`US-03-01` AC-19, AC-20). */
-function reasonAndGrounds(reason: string, grounds: GroundsInput | undefined): TransferRefusal | null {
+function reasonAndGrounds(reason: string, groundsNote: string | undefined): TransferRefusal | null {
   if (reason.trim() === '') return { code: 'REASON_REQUIRED' };
-  const refused = groundsRefusal(grounds);
+  const refused = groundsNoteRefusal(groundsNote);
 
-  return refused
-    ? { code: refused.reason, details: 'missing' in refused ? { missing: refused.missing } : undefined }
-    : null;
+  return refused ? { code: refused.reason } : null;
 }
 
 /** Who the head of the old department is to be, or that nobody is (`US-03-01` AC-8, `QĐ-66a`). */
@@ -134,9 +132,8 @@ export function newTransferRefusal(facts: NewTransferFacts): TransferRefusal | n
 
   const destination = destinationRefusal(facts.destinationDepartment, facts.effectiveOn);
   if (destination) return destination;
-  const grounds = groundsRefusal(facts.grounds);
-  if (grounds)
-    return { code: grounds.reason, details: 'missing' in grounds ? { missing: grounds.missing } : undefined };
+  const grounds = groundsNoteRefusal(facts.groundsNote);
+  if (grounds) return { code: grounds.reason };
 
   if (facts.pending)
     return { code: 'PENDING_EVENT_EXISTS', details: { kind: 'TRANSFER', effectiveOn: facts.pending.effectiveOn } };
@@ -153,7 +150,7 @@ export interface PendingTransferFacts {
   /** The first day of the placement the transfer ends. */
   periodStart: BusinessDate;
   reason: string;
-  grounds: GroundsInput | undefined;
+  groundsNote: string | undefined;
 }
 
 /** A transfer can be moved or cancelled only while it has not taken effect (`US-03-01` AC-19, AC-20). */
@@ -175,7 +172,7 @@ export function rescheduleRefusal(
 ): TransferRefusal | null {
   const settled = notPendingRefusal(facts);
   if (settled) return settled;
-  const detail = reasonAndGrounds(facts.reason, facts.grounds);
+  const detail = reasonAndGrounds(facts.reason, facts.groundsNote);
   if (detail) return detail;
   if (facts.newEffectiveOn === facts.effectiveOn) return { code: 'NO_CHANGE' };
   const late = dateRefusal(facts.today, facts.newEffectiveOn, facts.periodStart);
@@ -190,7 +187,7 @@ export function rescheduleRefusal(
 export function cancelRefusal(facts: PendingTransferFacts): TransferRefusal | null {
   const settled = notPendingRefusal(facts);
   if (settled) return settled;
-  return reasonAndGrounds(facts.reason, facts.grounds);
+  return reasonAndGrounds(facts.reason, facts.groundsNote);
 }
 
 /** Whether a change of department may start at all, judged on what the person is before the locks: unknown, or gone. */

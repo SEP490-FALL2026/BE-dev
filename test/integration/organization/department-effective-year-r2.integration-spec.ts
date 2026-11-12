@@ -103,12 +103,12 @@ describe('the head of a department that starts next year, after the review (inte
   it('turns away the move of a transfer to a day before the destination starts, and accepts the day it starts (F-035)', async () => {
     const department = await upcoming();
     const mover = await h.veteran(origin, code('R2T'));
-    const why = { reason: 'The department asked for another day', grounds: h.grounds };
+    const why = { reason: 'The department asked for another day', groundsNote: h.groundsNote };
     const recorded = await h.recorded({
       employeeId: mover.employeeId,
       toDepartmentId: department.id,
       effectiveOn: start,
-      grounds: h.grounds,
+      groundsNote: h.groundsNote,
     });
 
     const early = await h.rescheduleTransfer(recorded.id, { newEffectiveOn: h.day(30), ...why });

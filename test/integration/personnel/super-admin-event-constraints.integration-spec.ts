@@ -197,11 +197,11 @@ describe('the approval tickets of Super Admin events (integration, PostgreSQL)',
           employeeId: (await worker(name)).employeeId,
           toDepartmentId: fin.id,
           effectiveOn: h.day(20),
-          grounds: h.grounds,
+          groundsNote: h.groundsNote,
         });
       pendingTransfer = { table: 'department_transfers', id: (await move('MV1')).id };
       const cancelled = await move('MV2');
-      await h.cancelTransfer(cancelled.id, { reason: 'No longer needed', grounds: h.grounds }).expect(200);
+      await h.cancelTransfer(cancelled.id, { reason: 'No longer needed', groundsNote: h.groundsNote }).expect(200);
       cancelledTransfer = { table: 'department_transfers', id: cancelled.id };
       transferChange = await idOf('department_transfer_changes', `transfer_id = '${cancelled.id}'`);
 

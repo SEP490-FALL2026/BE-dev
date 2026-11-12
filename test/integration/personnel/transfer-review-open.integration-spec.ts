@@ -117,7 +117,12 @@ describe('opening the review of the tools after a transfer (integration, real Po
   it('US-03-07 AC-2: a transfer set for a day to come opens the review when the day arrives, from that day', async () => {
     const { person } = await holder([figma]);
     const day = h.day(3);
-    await h.recorded({ employeeId: person.employeeId, toDepartmentId: fin.id, effectiveOn: day, grounds: h.grounds });
+    await h.recorded({
+      employeeId: person.employeeId,
+      toDepartmentId: fin.id,
+      effectiveOn: day,
+      groundsNote: h.groundsNote,
+    });
     expect(await reviewsFor(person.employeeId)).toEqual([]);
 
     await h.sweepAt(day);
@@ -134,13 +139,13 @@ describe('opening the review of the tools after a transfer (integration, real Po
       employeeId: person.employeeId,
       toJobTitleId: randomUUID(),
       effectiveOn: h.today(),
-      grounds: h.grounds,
+      groundsNote: h.groundsNote,
     });
     const sameDepartment = await h.recordTransfer({
       employeeId: person.employeeId,
       toDepartmentId: des.id,
       effectiveOn: h.today(),
-      grounds: h.grounds,
+      groundsNote: h.groundsNote,
     });
 
     expect([titleOnly.status, h.codeOf(titleOnly)]).toEqual([422, 'VALIDATION_ERROR']);
@@ -178,7 +183,12 @@ describe('opening the review of the tools after a transfer (integration, real Po
     await h.moveToday(person, fin);
     const [first] = await reviewsFor(person.employeeId);
     const day = h.day(2);
-    await h.recorded({ employeeId: person.employeeId, toDepartmentId: des.id, effectiveOn: day, grounds: h.grounds });
+    await h.recorded({
+      employeeId: person.employeeId,
+      toDepartmentId: des.id,
+      effectiveOn: day,
+      groundsNote: h.groundsNote,
+    });
 
     await h.sweepAt(day);
 

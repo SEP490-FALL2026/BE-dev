@@ -20,12 +20,7 @@ describe('MF-3 điều chuyển: quyết định công cụ của trưởng phò
   let revokesBefore: number;
 
   const call = () => world.calls;
-  const grounds = () => ({
-    type: 'HR_DECISION',
-    reference: 'QĐ-ĐC-2026-05',
-    issuer: 'Phòng Nhân sự',
-    issuedOn: call().today(),
-  });
+  const groundsNote = 'Quyết định điều chuyển QĐ-ĐC-2026-05 của Phòng Nhân sự';
   const decide = (code: string, body: Record<string, unknown>) =>
     call().post(code, `/transfer-reviews/${reviewId}/decisions`, { assignmentId, ...body });
   const decided = () => world.facts.count('transfer_review_items', "decision <> 'PENDING'");
@@ -42,7 +37,7 @@ describe('MF-3 điều chuyển: quyết định công cụ của trưởng phò
       employeeId: await world.facts.employeeId('NV-SA'),
       toDepartmentId: sales,
       effectiveOn: call().inDays(1),
-      grounds: grounds(),
+      groundsNote,
     });
     expect([self.status, call().codeOf(self)]).toEqual([403, 'PERSONNEL.SELF_CHANGE_FORBIDDEN']);
     expect(await world.facts.count('department_transfers')).toBe(0);
@@ -50,7 +45,7 @@ describe('MF-3 điều chuyển: quyết định công cụ của trưởng phò
       employeeId: contractor,
       toDepartmentId: sales,
       effectiveOn: call().inDays(1),
-      grounds: grounds(),
+      groundsNote,
     });
     expect(recorded.status).toBe(201);
 

@@ -13,7 +13,7 @@ import {
   type SuccessorFacts,
 } from './transfer.policy';
 
-const GROUNDS = { type: 'DECISION', reference: 'QD-12/2026', issuer: 'HR Department', issuedOn: '2026-06-20' };
+const NOTE = 'Quyết định điều chuyển số QD-12/2026 của HR';
 const NO_SUCCESSOR: SuccessorFacts = { required: false, chosen: undefined, candidate: null };
 
 const facts = (patch: Partial<NewTransferFacts> = {}): NewTransferFacts => ({
@@ -24,7 +24,7 @@ const facts = (patch: Partial<NewTransferFacts> = {}): NewTransferFacts => ({
   current: { departmentId: 'dep-des', validFrom: '2026-01-01' },
   target: { departmentId: 'dep-fin' },
   destinationDepartment: { active: true, effectiveFrom: '2026-01-01' },
-  grounds: GROUNDS,
+  groundsNote: NOTE,
   pending: null,
   successor: NO_SUCCESSOR,
   ...patch,
@@ -61,8 +61,9 @@ describe('whether a transfer may be recorded (US-03-01)', () => {
       { destinationDepartment: { active: false, effectiveFrom: '2026-01-01' } },
       'DEPARTMENT_INACTIVE',
     ],
-    ['the grounds are empty (AC-18)', { grounds: undefined }, 'GROUNDS_REQUIRED'],
-    ['the grounds are a notice', { grounds: { ...GROUNDS, reference: 'BM09-2026-000001' } }, 'GROUNDS_IS_NOTICE'],
+    ['the grounds are empty (AC-18)', { groundsNote: undefined }, 'GROUNDS_REQUIRED'],
+    ['the grounds are a notice', { groundsNote: 'BM09-2026-000001' }, 'GROUNDS_IS_NOTICE'],
+    ['the grounds are over 500 characters', { groundsNote: 'a'.repeat(501) }, 'GROUNDS_TOO_LONG'],
     ['another transfer waits (AC-21)', { pending: { effectiveOn: '2026-12-01' } }, 'PENDING_EVENT_EXISTS'],
     ['another transfer names the person to follow its head', { namedAsSuccessor: true }, 'PENDING_EVENT_EXISTS'],
     [
@@ -90,13 +91,6 @@ describe('whether a transfer may be recorded (US-03-01)', () => {
   it('changes the department only (QĐ-87e): a job title is not a fact of a transfer, and a department that stays is no transfer', () => {
     expect('jobTitleId' in facts().target).toBe(false);
     expect(code({ target: { departmentId: 'dep-des' }, destinationDepartment: null })).toBe('NO_CHANGE');
-  });
-
-  it('names the part of the basis that is missing', () => {
-    expect(newTransferRefusal(facts({ grounds: { ...GROUNDS, issuer: '' } }))).toEqual({
-      code: 'GROUNDS_INCOMPLETE',
-      details: { missing: ['issuer'] },
-    });
   });
 
   it('says the same as the policy does when the database finds the destination retired', () => {
@@ -184,7 +178,7 @@ describe('moving or cancelling a transfer that has not taken effect (US-03-01 AC
     today: '2026-11-20',
     periodStart: '2026-01-01',
     reason: 'The department asked for later',
-    grounds: GROUNDS,
+    groundsNote: NOTE,
     ...patch,
   });
   const move = (
@@ -209,7 +203,7 @@ describe('moving or cancelling a transfer that has not taken effect (US-03-01 AC
     ['has its day today or before (the placement began)', { effectiveOn: '2026-11-20' }, 'ALREADY_EFFECTIVE'],
     ['was cancelled', { status: 'CANCELLED' as const }, 'ALREADY_CANCELLED'],
     ['has no reason', { reason: '  ' }, 'REASON_REQUIRED'],
-    ['has no basis', { grounds: undefined }, 'GROUNDS_REQUIRED'],
+    ['has no basis', { groundsNote: undefined }, 'GROUNDS_REQUIRED'],
   ])('refuses a move of a transfer that %s', (_name, patch, expected) => {
     expect(move(patch)).toBe(expected);
   });
@@ -245,7 +239,7 @@ describe('moving or cancelling a transfer that has not taken effect (US-03-01 AC
     expect(cancelRefusal(pending({ status: 'CANCELLED' }))?.code).toBe('ALREADY_CANCELLED');
     expect(cancelRefusal(pending({ effectiveOn: '2026-11-19' }))?.code).toBe('ALREADY_EFFECTIVE');
     expect(cancelRefusal(pending({ reason: '' }))?.code).toBe('REASON_REQUIRED');
-    expect(cancelRefusal(pending({ grounds: { ...GROUNDS, type: '' } }))?.code).toBe('GROUNDS_INCOMPLETE');
+    expect(cancelRefusal(pending({ groundsNote: ' ' }))?.code).toBe('GROUNDS_REQUIRED');
   });
 });
 

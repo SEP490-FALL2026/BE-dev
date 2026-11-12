@@ -11,6 +11,7 @@ import { TransferRefusedError } from '../transfer/transfer.errors';
 import { toTransferApiException } from '../transfer/transfer.http-errors';
 import { TransferGuardService } from '../transfer/transfer-guard.service';
 import { TransferRepo } from '../transfer/transfer.repo';
+import { groundsNoteOfBasis } from '../personnel-grounds.policy';
 import { TransferService } from '../transfer/transfer.service';
 
 /**
@@ -47,7 +48,7 @@ export class TransferNoticeRecorder implements OnModuleInit, NoticeEventRecorder
           employeeId: notice.employeeId,
           toDepartmentId: event.toDepartmentId ?? notice.targetDepartmentId ?? undefined,
           effectiveOn,
-          grounds: request.grounds,
+          groundsNote: groundsNoteOfBasis(request.grounds),
           successor: event.successor,
           noticeId: notice.id,
         }),

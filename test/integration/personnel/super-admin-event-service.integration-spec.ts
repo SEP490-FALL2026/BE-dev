@@ -200,7 +200,7 @@ describe('the controlled procedure for an event about the Super Admin (integrati
         employeeId: other.employeeId,
         toDepartmentId: fin.id,
         effectiveOn: h.day(30),
-        grounds: h.grounds,
+        groundsNote: h.groundsNote,
       });
       const before = await counts();
 

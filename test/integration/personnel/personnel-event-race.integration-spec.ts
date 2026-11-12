@@ -37,7 +37,7 @@ describe('events about one person that meet at once (integration, real PostgreSQ
         employeeId: who.employeeId,
         toDepartmentId: fin.id,
         effectiveOn: h.day(20),
-        grounds: h.grounds,
+        groundsNote: h.groundsNote,
       });
   const departureOf =
     (who: Person): Call =>

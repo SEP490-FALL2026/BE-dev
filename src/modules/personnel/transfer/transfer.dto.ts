@@ -2,7 +2,7 @@ import { createZodDto } from '../../../infrastructure/http/dto/zod-dto';
 import { z } from 'zod';
 import { successEnvelopeSchema } from '../../../infrastructure/http/dto/success-envelope.dto';
 import { businessDay } from '../../../infrastructure/http/dto/business-date.dto';
-import { groundsBodySchema } from '../personnel-grounds.dto';
+import { groundsNoteBodySchema } from '../personnel-grounds.dto';
 
 const successorBodySchema = z.discriminatedUnion('kind', [
   z.strictObject({ kind: z.literal('EMPLOYEE'), employeeId: z.uuid() }),
@@ -14,20 +14,20 @@ const recordBodySchema = z.strictObject({
   employeeId: z.uuid(),
   toDepartmentId: z.uuid(),
   effectiveOn: businessDay,
-  grounds: groundsBodySchema,
+  groundsNote: groundsNoteBodySchema,
   successor: successorBodySchema.optional(),
 });
 
 const rescheduleBodySchema = z.strictObject({
   newEffectiveOn: businessDay,
   reason: z.string().trim().min(1).max(1000),
-  grounds: groundsBodySchema,
+  groundsNote: groundsNoteBodySchema,
   successor: successorBodySchema.optional(),
 });
 
 const cancelBodySchema = z.strictObject({
   reason: z.string().trim().min(1).max(1000),
-  grounds: groundsBodySchema,
+  groundsNote: groundsNoteBodySchema,
 });
 
 const listQuerySchema = z.strictObject({
@@ -56,14 +56,6 @@ const pagination = z.strictObject({
 const employeeBrief = z.strictObject({ id: z.uuid(), employeeCode: z.string(), fullName: z.string() });
 const departmentBrief = z.strictObject({ id: z.uuid(), code: z.string(), name: z.string() });
 const place = z.strictObject({ department: departmentBrief });
-/** The basis as it was kept: the box in `reference`; the other three parts are present only for an event written before the box. */
-const groundsSchema = z.strictObject({
-  type: z.string().nullable(),
-  reference: z.string(),
-  issuer: z.string().nullable(),
-  issuedOn: z.string().nullable(),
-});
-
 /** The row of the list: who, from where to where, when, and where it stands. */
 export const transferSummarySchema = z.strictObject({
   id: z.uuid(),
@@ -75,8 +67,8 @@ export const transferSummarySchema = z.strictObject({
 });
 
 export const transferDetailSchema = transferSummarySchema.extend({
-  /** The basis of the transfer. Null in the minimal projection an IT Admin reads. */
-  grounds: groundsSchema.nullable(),
+  /** The basis of the transfer in one box, what a form fills in again. Null in the minimal projection an IT Admin reads. */
+  groundsNote: z.string().nullable(),
   /** Who follows the head of the old department; null when the person did not head the department they leave, and in the minimal projection. */
   headSuccessor: z.strictObject({ kind: z.enum(['EMPLOYEE', 'NONE']), employee: employeeBrief.nullable() }).nullable(),
   /** The account that recorded it; null when the controlled procedure did (`recordedByProcedure`). */
@@ -107,7 +99,7 @@ const changeSchema = z.strictObject({
   oldEffectiveOn: z.string(),
   newEffectiveOn: z.string().nullable(),
   reason: z.string(),
-  grounds: groundsSchema,
+  groundsNote: z.string(),
   /** The account that changed it; null when the controlled procedure did (`changedByProcedure`). */
   changedByAppUserId: z.uuid().nullable(),
   changedByProcedure: z.boolean(),

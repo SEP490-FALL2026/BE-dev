@@ -144,7 +144,7 @@ export class TransferPreconditions {
       current: { departmentId: held.current.departmentId, validFrom: held.current.validFrom },
       target: { departmentId: seen.toDepartmentId },
       destinationDepartment: destination && { active: destination.active, effectiveFrom: destination.effectiveFrom },
-      grounds: input.grounds,
+      groundsNote: input.groundsNote,
       pending: await this.pendingOf(tx, input.employeeId),
       namedAsSuccessor: await this.transfers.isNamedSuccessorOfPending(tx, input.employeeId),
       successor: await this.guard.successorFacts(tx, {

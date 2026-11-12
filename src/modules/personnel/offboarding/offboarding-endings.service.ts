@@ -9,6 +9,7 @@ import { OffboardingRefusedError } from './offboarding.errors';
 import type { DepartureHeld, DepartureSeen } from './offboarding-preconditions.service';
 import { OffboardingPeriodsService, type ScheduledDeparture } from './offboarding-periods.service';
 import { leavesAtOnce } from './offboarding.policy';
+import { groundsNoteOfBasis } from '../personnel-grounds.policy';
 import type { RecordOffboardingInput } from './offboarding.types';
 
 /** The standard reason a transfer that waits is cancelled for when the person leaves before it takes effect (`QĐ-77j`). */
@@ -75,7 +76,7 @@ export class OffboardingEndings {
       tx,
       actor,
       transferId,
-      { reason: DEPARTURE_BEFORE_TRANSFER, grounds: input.grounds },
+      { reason: DEPARTURE_BEFORE_TRANSFER, groundsNote: groundsNoteOfBasis(input.grounds) },
       today,
     );
     if (refused) throw new OffboardingRefusedError('PENDING_EVENT_EXISTS', { kind: 'TRANSFER', reason: refused.code });

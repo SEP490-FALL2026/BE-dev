@@ -1,5 +1,5 @@
 import type { BusinessDate } from '../../../core/business-date';
-import type { GroundsInput, RecordedGrounds } from '../personnel-grounds.policy';
+import type { RecordedGrounds } from '../personnel-grounds.policy';
 
 export type TransferStatus = 'PENDING' | 'EFFECTIVE' | 'CANCELLED';
 
@@ -79,7 +79,8 @@ export interface RecordTransferInput {
   /** Left out, nothing changes and the policy says so (a notice that names no department). */
   toDepartmentId?: string;
   effectiveOn: BusinessDate;
-  grounds?: GroundsInput;
+  /** The basis in one box (`QĐ-110a`); the policy refuses it when missing, blank, over 500 characters or the code of a notice. */
+  groundsNote?: string | undefined;
   successor?: SuccessorChoice;
   /** The notice of a head this transfer is recorded from (`US-03-11`); a transfer recorded straight from a document has none. */
   noticeId?: string;
@@ -87,7 +88,7 @@ export interface RecordTransferInput {
 
 export interface ChangeTransferInput {
   reason: string;
-  grounds?: GroundsInput;
+  groundsNote?: string | undefined;
   /** Moving only: the new day. */
   newEffectiveOn?: BusinessDate;
   /** Moving only: who follows the head on the new day, when the person heads the department they leave. Left out, the one named before stays. */

@@ -19,7 +19,7 @@ export interface TransferWire {
   to: { department: { id: string; code: string; name: string } };
   effectiveOn: string;
   status: 'PENDING' | 'EFFECTIVE' | 'CANCELLED';
-  grounds: { type: string; reference: string; issuer: string; issuedOn: string } | null;
+  groundsNote: string | null;
   headSuccessor: { kind: 'EMPLOYEE' | 'NONE'; employee: { id: string } | null } | null;
   recordedByAppUserId: string | null;
   recordedByProcedure: boolean;

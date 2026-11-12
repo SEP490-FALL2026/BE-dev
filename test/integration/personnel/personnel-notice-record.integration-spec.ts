@@ -192,7 +192,7 @@ describe('verifying and recording the notices of the heads (integration, real Po
       const body = { employeeId: e1.employeeId, toDepartmentId: fin.id, effectiveOn: h.day(3) };
 
       const refused = await h.recordTransfer(body);
-      const recorded = await h.recorded({ ...body, grounds: h.grounds });
+      const recorded = await h.recorded({ ...body, groundsNote: h.groundsNote });
 
       expect([refused.status, h.codeOf(refused)]).toEqual([422, 'VALIDATION_ERROR']);
       expect(recorded.status).toBe('PENDING');
