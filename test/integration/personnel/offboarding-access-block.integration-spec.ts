@@ -222,7 +222,6 @@ describe('the block of the access from the day after the last working day (integ
       expect(wire).toMatchObject({
         state: 'HANDING_OVER',
         accessBlockMode: 'BLOCK_NOW',
-        abrupt: true,
         lastWorkingDay: h.day(30),
         handoverDueOn: null,
         accessBlocked: true,

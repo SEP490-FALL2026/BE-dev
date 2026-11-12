@@ -57,7 +57,6 @@ describe('recording a departure (integration, real PostgreSQL)', () => {
     expect(wire).toMatchObject({
       state: 'HANDING_OVER',
       accessBlockMode: 'WITH_LAST_DAY',
-      abrupt: false,
       lastWorkingDay: h.day(10),
       departureEffectiveOn: h.day(11),
       // No deadline of a handover is told any more (QĐ-110g): the key stays, always null, though the column is still written.
@@ -252,10 +251,10 @@ describe('recording a departure (integration, real PostgreSQL)', () => {
       expect(wire).toMatchObject({
         state: 'LEFT',
         accessBlockMode: 'BLOCK_NOW',
-        abrupt: true,
         handoverDueOn: null,
         accountLockMissing: true,
       });
+      expect(wire).not.toHaveProperty('abrupt');
       expect(wire.warnings).toMatchObject({ accountLockNotRecorded: true });
       expect(wire.checklist?.accountLock).toEqual({ state: 'PENDING', urgent: true });
       expect(await h.workState(person.employeeId)).toBe('TERMINATED/LEFT');
