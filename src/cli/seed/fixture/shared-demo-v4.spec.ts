@@ -294,6 +294,12 @@ describe('shared dataset v4: the usage and the people of MF-5', () => {
     expect(F.personnel.map((e) => e.kind).sort()).toEqual(['LONG_LEAVE', 'OFFBOARDING']);
     for (const d of F.ghostDecisions) expect(person(d.holder).department).toBe('DES');
   });
+
+  it('records a departure only of a person who heads no department: the seed names no successor, and a head who leaves must have one (QĐ-110h)', () => {
+    const heads = new Set(F.departments.flatMap((d) => (d.head ? [d.head] : [])));
+    for (const event of F.personnel.filter((e) => e.kind === 'OFFBOARDING'))
+      expect(heads.has(event.employee)).toBe(false);
+  });
 });
 
 describe('shared dataset v4: the documentation', () => {
