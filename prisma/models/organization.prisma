@@ -266,7 +266,8 @@ model Employee {
   appUser                         AppUser?
   itAdminOf                       Department[]                        @relation("DepartmentItAdmin")
   headPeriods                     DepartmentHeadPeriod[]
-  ownedApplications               Application[]
+  ownedApplications               Application[]                       @relation("ApplicationLegacyBusinessOwner")
+  applicationsInCharge            Application[]                       @relation("ApplicationResponsibleItAdmin")
   workspacePrimaryOwnerOf         PlanWorkspaceProfile[]              @relation("WorkspacePrimaryOwner")
   workspaceEmergencyHolderOf      PlanWorkspaceProfile[]              @relation("WorkspaceEmergencyHolder")
   workspaceMemberships            PlanWorkspaceAdmin[]                @relation("WorkspaceMember")
