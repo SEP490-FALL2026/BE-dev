@@ -1,10 +1,9 @@
 import { Injectable } from '@nestjs/common';
-import { addDays } from '../../../core/business-date';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { LicensingApi } from '../../licensing/public/licensing.api';
-import { OperatingParametersApi } from '../../operating-parameters/public/operating-parameters.api';
 import { RequestsApi } from '../../requests/public/requests.api';
-import { commitmentToRelease, impactWindowEnd, revocationDueOn, rightToRevokeOf } from './departure-impact.policy';
+import { DepartureDeadlineService } from './departure-deadline.service';
+import { commitmentToRelease, rightToRevokeOf } from './departure-impact.policy';
 import type { DepartureImpact, DepartureImpactInput } from './departure-impact.types';
 
 /**
@@ -23,7 +22,7 @@ export class DepartureImpactService {
   constructor(
     private readonly licensing: LicensingApi,
     private readonly requests: RequestsApi,
-    private readonly parameters: OperatingParametersApi,
+    private readonly deadlines: DepartureDeadlineService,
   ) {}
 
   async impactOf(tx: DbTx, input: DepartureImpactInput): Promise<DepartureImpact> {
@@ -47,18 +46,7 @@ export class DepartureImpactService {
       responsibilities: { subscriptions: null, applications: null },
       vendorAdminRoles: [],
       headSuccessorRequired: input.headSuccessorRequired,
-      revocationDueOn: await this.dueOn(input),
+      revocationDueOn: await this.deadlines.revocationDueOn(input.lastWorkingDay),
     };
-  }
-
-  /** The `DEPARTURE_REVOCATION_WORKING_DAYS`th working day from the day after the last one, over the days off of the calendar. */
-  private async dueOn(input: DepartureImpactInput) {
-    const days = Number(await this.parameters.getValue('DEPARTURE_REVOCATION_WORKING_DAYS'));
-    const nonWorking = await this.parameters.getNonWorkingDates(
-      addDays(input.lastWorkingDay, 1),
-      impactWindowEnd(input.lastWorkingDay),
-    );
-
-    return revocationDueOn(input.lastWorkingDay, days, nonWorking);
   }
 }

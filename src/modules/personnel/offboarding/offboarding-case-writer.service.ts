@@ -129,6 +129,8 @@ export class OffboardingCaseWriter {
       lastWorkingDay: input.lastWorkingDay as BusinessDate,
       departureEffectiveOn: seen.endsOn,
       handoverDueOn,
+      // Kept on the case from the day it is written, for both modes: the sweeper that announces the block writes it again from the same rule.
+      revocationDueOn: written.impact.revocationDueOn,
       grounds: normalizedGroundsNote(input.groundsNote ?? ''),
       headHandover: scheduled.headHandover,
       placementClosedId: scheduled.placementClosedId,

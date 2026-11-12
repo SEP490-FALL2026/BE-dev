@@ -305,6 +305,8 @@ model OffboardingCase {
   lastWorkingDay         DateTime              @map("last_working_day") @db.Date
   departureEffectiveOn   DateTime              @map("departure_effective_on") @db.Date
   handoverDueOn          DateTime?             @map("handover_due_on") @db.Date
+  // The day the IT Admin has until to take every right of the person away (QĐ-110c, M-09): null for a case that was closed or cancelled before the rule.
+  revocationDueOn        DateTime?             @map("revocation_due_on") @db.Date
   groundsType            String?                @map("grounds_type")
   groundsReference       String                @map("grounds_reference")
   groundsIssuer          String?                @map("grounds_issuer")

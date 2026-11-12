@@ -45,6 +45,8 @@ export interface OffboardingRecord {
   lastWorkingDay: BusinessDate;
   departureEffectiveOn: BusinessDate;
   handoverDueOn: BusinessDate | null;
+  /** The day the IT Admin has until to take every right away (`QĐ-110c`); null for a case closed or cancelled before the rule. */
+  revocationDueOn: BusinessDate | null;
   grounds: RecordedGrounds;
   headHandover: HeadHandoverFacts | null;
   placementClosedId: string | null;

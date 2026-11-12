@@ -32,6 +32,7 @@ export function toRecord(row: CaseRow): OffboardingRecord {
     lastWorkingDay: fromDateColumn(row.lastWorkingDay),
     departureEffectiveOn: fromDateColumn(row.departureEffectiveOn),
     handoverDueOn: date(row.handoverDueOn),
+    revocationDueOn: date(row.revocationDueOn),
     grounds: recordedGroundsOf(row),
     headHandover: offboardingHeadHandoverJson.decode(row.headHandover),
     placementClosedId: row.placementClosedId,
@@ -65,6 +66,7 @@ export interface NewOffboarding {
   lastWorkingDay: BusinessDate;
   departureEffectiveOn: BusinessDate;
   handoverDueOn: BusinessDate | null;
+  revocationDueOn: BusinessDate;
   grounds: RecordedGrounds;
   headHandover: HeadHandoverFacts | null;
   placementClosedId: string | null;
@@ -104,6 +106,7 @@ export class OffboardingRepo {
         lastWorkingDay: toDateColumn(input.lastWorkingDay),
         departureEffectiveOn: toDateColumn(input.departureEffectiveOn),
         handoverDueOn: input.handoverDueOn ? toDateColumn(input.handoverDueOn) : null,
+        revocationDueOn: toDateColumn(input.revocationDueOn),
         groundsType: input.grounds.type,
         groundsReference: input.grounds.reference,
         groundsIssuer: input.grounds.issuer,
@@ -164,6 +167,7 @@ export class OffboardingRepo {
       lastWorkingDay: BusinessDate;
       departureEffectiveOn: BusinessDate;
       handoverDueOn: BusinessDate | null;
+      revocationDueOn: BusinessDate;
       headHandover: HeadHandoverFacts | null;
       placementClosedId: string | null;
       cancelledPlacementId?: string | null;
@@ -177,6 +181,7 @@ export class OffboardingRepo {
         lastWorkingDay: toDateColumn(to.lastWorkingDay),
         departureEffectiveOn: toDateColumn(to.departureEffectiveOn),
         handoverDueOn: to.handoverDueOn ? toDateColumn(to.handoverDueOn) : null,
+        revocationDueOn: toDateColumn(to.revocationDueOn),
         headHandover: offboardingHeadHandoverJson.encode(to.headHandover),
         placementClosedId: to.placementClosedId,
       },

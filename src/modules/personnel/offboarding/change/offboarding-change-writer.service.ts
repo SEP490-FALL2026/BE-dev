@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import type { DbTx } from '../../../../infrastructure/database/transaction-runner';
 import { PersonnelNotifier } from '../../event-notice/personnel-notifier.service';
 import { PersonnelFileHooks } from '../../event-notice/personnel-file-hooks.service';
+import { DepartureDeadlineService } from '../../departure-deadline/departure-deadline.service';
 import { groundsSnapshot, normalizedGroundsNote } from '../../personnel-grounds.policy';
 import { actorColumns, type PersonnelActor } from '../../public/personnel.types';
 import { headSuccessorLabel } from '../../transfer/transfer.policy';
@@ -26,6 +27,7 @@ export class OffboardingChangeWriter {
     private readonly audit: OffboardingAuditService,
     private readonly hooks: PersonnelFileHooks,
     private readonly notifier: PersonnelNotifier,
+    private readonly deadlines: DepartureDeadlineService,
   ) {}
 
   async move(
@@ -52,6 +54,8 @@ export class OffboardingChangeWriter {
       // A departure blocked now has no deadline of the old handover column to move.
       handoverDueOn:
         held.accessBlockMode === 'BLOCK_NOW' ? null : await this.handovers.plannedDueOn(input.lastWorkingDay),
+      // The deadline of the revocations follows the last working day (`QĐ-110c`).
+      revocationDueOn: await this.deadlines.revocationDueOn(input.lastWorkingDay),
       headHandover: scheduled.headHandover,
       placementClosedId: scheduled.placementClosedId,
     });

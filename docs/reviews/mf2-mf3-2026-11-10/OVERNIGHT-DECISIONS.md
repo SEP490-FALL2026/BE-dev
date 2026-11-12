@@ -297,6 +297,15 @@ Không sửa code; SPEC không bị sửa trong lượt này (spec là của Own
 - **Đổi lại:** bỏ `tellItAdmin` và mã thông báo nếu Owner thấy con số là đủ; đổi sang một số nguyên chỉ cần đổi `revocationsWithdrawnOf` + DTO.
 - **Chạm:** `notifications.types.ts`, `inbox.policy.ts`, `inbox-mf23.policy.spec.ts`, `offboarding.dto.ts`, `offboarding.controller.ts`, `openapi.json`.
 
+### D-41 · MF2-D.1 · Khi nào cột `revocation_due_on` được ghi, "ngày sau mốc chặn" là ngày nào, và hồ sơ cũ
+
+- **A:** để NULL tới khi sweeper MF2-E chặn (đúng chữ SPEC §5 "ghi lúc chặn"). Ưu: một nơi ghi. Nhược: hồ sơ `WITH_LAST_DAY` chưa chặn không có hạn nên P3/dashboard/FE không hiện được "hạn" từ lúc ghi; backfill chỉ phủ hồ sơ đã chặn; cột NULL khắp nơi.
+- **B:** ghi lúc ghi hồ sơ cho cả hai chế độ và tính lại khi đổi ngày cuối (`last-day-changes`); MF2-E ghi lại cùng quy tắc lúc chặn. Ưu: hồ sơ mở luôn có hạn (backfill gọn, FE/job chỉ cần `< hôm nay`); hạn của hồ sơ chưa chặn luôn ở tương lai nên không báo quá hạn sớm. Nhược: nếu tham số/lịch nghỉ đổi giữa lúc ghi và lúc chặn, ngày lưu lệch tới khi MF2-E ghi lại.
+- **C:** không cột, tính khi đọc. Trái M-09 ("hạn trên hồ sơ"), mất hạn đã hứa khi tham số đổi.
+- **ĐÃ CHỌN: B.** Căn cứ: prompt gói ("tính sẵn cho `WITH_LAST_DAY` từ ngày cuối"), SPEC §1 S1 / §5 MF2-D, `QĐ-110c`. **Mốc:** công thức giữ nguyên hàm B.3 `nthWorkingDayFrom(ngày cuối + 1, N)` vì bảng T-MF2 bắt buộc (ngày cuối T4 30/09 ⟹ T5 01/10; chặn ngay T5 12/11 ⟹ T6 13/11): "mốc chặn" hiểu là cuối ngày làm việc cuối cùng cho cả hai chế độ (chặn hiệu lực từ ngày sau). Hồ sơ đã ghi không đổi hạn khi tham số đổi về sau (hạn là điều đã hứa với IT); chỉ đổi ngày cuối mới tính lại.
+- **Chạm:** `departure-deadline.policy.ts` (+spec; `revocationDueOn`, `deadlineWindowEnd` chuyển từ `departure-impact.policy.ts`), `departure-deadline.service.ts` (đọc tham số + lịch, dùng chung cho xem trước, ghi, đổi ngày cuối), migration `20261113001100_personnel_revocation_due_on` (cột nullable, CHECK `revocation_due_on > last_working_day` kiểm từng cột, backfill hồ sơ HANDING_OVER/LEFT chưa đóng bằng hàm `pg_temp`, `RAISE NOTICE` đếm, chạy lại an toàn; hồ sơ `CANCELLED` giữ NULL vì trigger cấm sửa), `prisma/models/personnel.prisma`, `offboarding.repo.ts` (`insert`, `reschedule`), `offboarding-case-writer.service.ts`, `change/offboarding-change-writer.service.ts`, `personnel.module.ts`; test `departure-revocation-deadline.integration-spec.ts`.
+- **Đổi sang A:** bỏ `revocationDueOn` khỏi `buildCaseRow` và `reschedule`, để MF2-E ghi; migration giữ nguyên (cột + backfill).
+
 ## Bị chặn
 
 (chưa có)

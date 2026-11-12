@@ -9,6 +9,7 @@ import { OperatingParametersModule } from '../operating-parameters/operating-par
 import { OrganizationModule } from '../organization/organization.module';
 import { RequestsModule } from '../requests/requests.module';
 import { DepartmentMemberController } from './department-member/department-member.controller';
+import { DepartureDeadlineService } from './departure-deadline/departure-deadline.service';
 import { DepartureImpactService } from './departure-deadline/departure-impact.service';
 import { DepartmentMemberQueryService } from './department-member/department-member-query.service';
 import { DepartmentOpenWorkReader } from './event-notice/department-open-work.listener';
@@ -152,6 +153,7 @@ import { TransferReviewsController } from './transfer-review/transfer-reviews.co
     NoticesController,
   ],
   providers: [
+    DepartureDeadlineService,
     DepartureImpactService,
     PersonnelFileHookContributions,
     PersonnelFileHooks,
