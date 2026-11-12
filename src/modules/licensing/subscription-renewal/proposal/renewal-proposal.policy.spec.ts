@@ -10,6 +10,7 @@ const period = (extra: Partial<RenewalPeriodFacts> = {}): RenewalPeriodFacts => 
   applicationName: 'Figma',
   applicationKind: 'SAAS',
   ownerDepartmentId: 'dep',
+  responsibleItAdminEmployeeId: null,
   kind: 'TERM',
   status: 'ACTIVE',
   purchasedQuantity: 100,

@@ -4,7 +4,6 @@ import { toUnavailableApiException } from '../../../infrastructure/http/errors/s
 import { errorExampleOf } from '../../../infrastructure/http/openapi-error-examples';
 import {
   ApplicationAlreadyRetiredError,
-  ApplicationBusinessOwnerInvalidError,
   ApplicationDictionaryLineMismatchError,
   ApplicationDictionaryLineNotFoundError,
   ApplicationDictionaryLineTakenError,
@@ -16,9 +15,6 @@ import {
   ApplicationNotFoundError,
   ApplicationNoteInvalidError,
   ApplicationRetirementBlockedError,
-  ApplicationRetirementNeedsConfirmationError,
-  ApplicationRetirementNotBusinessOwnerError,
-  ApplicationRetirementNoteRequiredError,
   ApplicationTooManyDomainsError,
   ApplicationUpdateEmptyError,
   ApplicationVendorGroupChangedError,
@@ -52,15 +48,6 @@ export function toApplicationApiException(error: unknown): unknown {
       subscriptionTotal: error.subscriptionTotal,
     });
   }
-  if (error instanceof ApplicationRetirementNeedsConfirmationError) {
-    return refuse(UNPROCESSABLE, 'APPLICATION.RETIREMENT_NEEDS_CONFIRMATION', error.message);
-  }
-  if (error instanceof ApplicationRetirementNotBusinessOwnerError) {
-    return refuse(UNPROCESSABLE, 'APPLICATION.RETIREMENT_NOT_BUSINESS_OWNER', error.message);
-  }
-  if (error instanceof ApplicationRetirementNoteRequiredError) {
-    return refuse(UNPROCESSABLE, 'APPLICATION.RETIREMENT_NOTE_REQUIRED', error.message);
-  }
   if (error instanceof ApplicationNameTakenError) {
     return refuse(HttpStatus.CONFLICT, 'APPLICATION.NAME_TAKEN', error.message);
   }
@@ -90,9 +77,6 @@ export function toApplicationApiException(error: unknown): unknown {
   }
   if (error instanceof ApplicationInternalHasNoVendorError) {
     return refuse(UNPROCESSABLE, 'APPLICATION.INTERNAL_HAS_NO_VENDOR', error.message);
-  }
-  if (error instanceof ApplicationBusinessOwnerInvalidError) {
-    return refuse(UNPROCESSABLE, 'APPLICATION.BUSINESS_OWNER_INVALID', error.message);
   }
   if (error instanceof ApplicationFunctionalGroupInvalidError) {
     return refuse(UNPROCESSABLE, 'APPLICATION.FUNCTIONAL_GROUP_INVALID', error.message);
@@ -141,9 +125,6 @@ export const APPLICATION_ERROR_EXAMPLES = {
   RETIREMENT_BLOCKED: example(
     new ApplicationRetirementBlockedError([blockingAssignment], [blockingSubscription], 1, 1),
   ),
-  RETIREMENT_NEEDS_CONFIRMATION: example(new ApplicationRetirementNeedsConfirmationError()),
-  RETIREMENT_NOT_BUSINESS_OWNER: example(new ApplicationRetirementNotBusinessOwnerError()),
-  RETIREMENT_NOTE_REQUIRED: example(new ApplicationRetirementNoteRequiredError()),
   NAME_TAKEN: example(new ApplicationNameTakenError()),
   DICTIONARY_LINE_TAKEN: example(new ApplicationDictionaryLineTakenError()),
   DICTIONARY_GROUP_CHANGED: example(new ApplicationVendorGroupChangedError()),
@@ -155,7 +136,6 @@ export const APPLICATION_ERROR_EXAMPLES = {
   VENDOR_REQUIRED: example(new ApplicationVendorRequiredError()),
   VENDOR_SOURCE_AMBIGUOUS: example(new ApplicationVendorSourceAmbiguousError()),
   INTERNAL_HAS_NO_VENDOR: example(new ApplicationInternalHasNoVendorError()),
-  BUSINESS_OWNER_INVALID: example(new ApplicationBusinessOwnerInvalidError()),
   FUNCTIONAL_GROUP_INVALID: example(new ApplicationFunctionalGroupInvalidError()),
   DICTIONARY_LINE_NOT_FOUND: example(new ApplicationDictionaryLineNotFoundError()),
   DICTIONARY_LINE_MISMATCH: example(new ApplicationDictionaryLineMismatchError()),

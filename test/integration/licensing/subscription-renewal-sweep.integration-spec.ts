@@ -50,7 +50,7 @@ describe('the pass over the milestones of the renewals (integration, real Postgr
 
       const early = await alerts(subscriptionId);
       expect(early.map((row) => row.recipient_employee_id).sort()).toEqual(
-        [h.it1.employeeId, h.finance.employeeId, h.businessOwner, h.boss.employeeId].sort(),
+        [h.it1.employeeId, h.finance.employeeId, h.boss.employeeId].sort(),
       );
       expect(early[0].params).toMatchObject({
         subscriptionId,
@@ -67,12 +67,12 @@ describe('the pass over the milestones of the renewals (integration, real Postgr
       await h.sweepOn(h.inDays(23));
       const late = (await alerts(subscriptionId)).filter((row) => row.params.milestoneDays === 7);
       expect(late.map((row) => row.recipient_employee_id).sort()).toEqual(
-        [h.it1.employeeId, h.finance.employeeId, h.businessOwner, h.boss.employeeId, superAdmin].sort(),
+        [h.it1.employeeId, h.finance.employeeId, h.boss.employeeId, superAdmin].sort(),
       );
       const sent = (await h.auditOf('Subscription', subscriptionId)).filter(
         (event) => event.action === 'SUBSCRIPTION_RENEWAL.ALERT_SENT',
       );
-      expect(sent).toHaveLength(9);
+      expect(sent).toHaveLength(7);
     });
 
     it('counts from the deadline, never from the renewal date, and says when the deadline was inferred (AC-2, AC-4)', async () => {
@@ -265,25 +265,53 @@ describe('the pass over the milestones of the renewals (integration, real Postgr
       ).rejects.toMatchObject({ constraint: 'subscription_deadline_events_immutable' });
     });
 
-    it('tells a Business Owner who left nothing and asks the IT Admin to name another (US-11-01 AC-10)', async () => {
+    it('QĐ-111g, BB-9: tells the IT Admin responsible for the subscription instead of the one in charge of the department, and the department one when the responsible one is NULL or no longer usable', async () => {
+      const itSub = await h.account('E-IT-SUB', await h.person('E-IT-SUB'), 'IT_ADMIN');
+      const named = async (responsible: string | null): Promise<string[]> => {
+        const subscriptionId = await h.term({
+          ownerDepartmentId: unit.department.id,
+          noticeDeadline: h.inDays(40),
+          endDate: h.inDays(70),
+        });
+        await h.ctx.sql.query(`UPDATE subscriptions SET responsible_it_admin_employee_id = $2 WHERE id = $1`, [
+          subscriptionId,
+          responsible,
+        ]);
+        await h.sweepOn(h.inDays(25));
+
+        return (await alerts(subscriptionId)).map((row) => row.recipient_employee_id).sort();
+      };
+      const others = [h.finance.employeeId, h.boss.employeeId];
+
+      expect(await named(itSub.employeeId)).toEqual([itSub.employeeId, ...others].sort());
+      expect(await named(null)).toEqual([h.it1.employeeId, ...others].sort());
+      await h.ctx.sql.query(`UPDATE app_users SET status = 'LOCKED' WHERE employee_id = $1`, [itSub.employeeId]);
+      try {
+        expect(await named(itSub.employeeId)).toEqual([h.it1.employeeId, ...others].sort());
+      } finally {
+        await h.ctx.sql.query(`UPDATE app_users SET status = 'ACTIVE' WHERE employee_id = $1`, [itSub.employeeId]);
+      }
+      // Left, the account not locked yet: no longer usable either.
+      await h.ctx.sql.query(`UPDATE employees SET status = 'TERMINATED' WHERE id = $1`, [itSub.employeeId]);
+      try {
+        expect(await named(itSub.employeeId)).toEqual([h.it1.employeeId, ...others].sort());
+      } finally {
+        await h.ctx.sql.query(`UPDATE employees SET status = 'ACTIVE' WHERE id = $1`, [itSub.employeeId]);
+      }
+    });
+
+    it('QĐ-111g: tells no Business Owner and asks nothing about one: the IT Admin, Finance and the decider are the people told', async () => {
       const subscriptionId = await h.term({
         ownerDepartmentId: unit.department.id,
         noticeDeadline: h.inDays(40),
         endDate: h.inDays(70),
       });
-      await h.ctx.sql.query(`UPDATE employees SET status = 'TERMINATED' WHERE id = $1`, [h.businessOwner]);
-      try {
-        await h.sweepOn(h.inDays(25));
 
-        const people = (await alerts(subscriptionId)).map((row) => row.recipient_employee_id);
-        expect(people).not.toContain(h.businessOwner);
-        expect(people).toEqual(expect.arrayContaining([h.it1.employeeId, h.finance.employeeId, h.boss.employeeId]));
-        expect(
-          (await h.notices('SUBSCRIPTION_BUSINESS_OWNER_LEFT', subscriptionId)).map((row) => row.recipient_employee_id),
-        ).toEqual([h.it1.employeeId]);
-      } finally {
-        await h.ctx.sql.query(`UPDATE employees SET status = 'ACTIVE' WHERE id = $1`, [h.businessOwner]);
-      }
+      await h.sweepOn(h.inDays(25));
+
+      const people = (await alerts(subscriptionId)).map((row) => row.recipient_employee_id);
+      expect(people.sort()).toEqual([h.it1.employeeId, h.finance.employeeId, h.boss.employeeId].sort());
+      expect(await h.notices('SUBSCRIPTION_BUSINESS_OWNER_LEFT', subscriptionId)).toEqual([]);
     });
   });
 });

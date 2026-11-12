@@ -1,6 +1,7 @@
 import type { DbTx, TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import type { AuditApi } from '../../audit/public/audit.api';
+import type { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
 import type { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { SeatOccupancyHook, type SeatOccupancyReader } from '../public/catalog.extension-points';
 import type { FunctionalGroupFactsService } from '../functional-group/functional-group-facts.service';
@@ -33,7 +34,7 @@ const record = (overrides: Partial<ApplicationRecord> = {}): ApplicationRecord =
   dictionaryServiceLineId: null,
   domains: [],
   dataSensitivity: 'LOW',
-  businessOwnerEmployeeId: 'owner-1',
+  responsibleItAdminEmployeeId: 'owner-1',
   communication: {
     personToPersonMessaging: false,
     callsOrMeetings: false,
@@ -65,6 +66,8 @@ function serviceWith(input: {
   employees?: ReturnType<typeof employee>[];
   plans?: { id: string; provisioningType: string }[];
   k1Holders?: number;
+  /** The employees that are usable IT Admins now. */
+  usableItAdmins?: string[];
 }) {
   const applications = {
     find: jest.fn().mockResolvedValue(input.found ?? null),
@@ -74,9 +77,9 @@ function serviceWith(input: {
     update: jest.fn((_tx: DbTx, id: string, changes: Partial<ApplicationRecord>) =>
       Promise.resolve({ ...(input.found as ApplicationRecord), ...changes, id }),
     ),
-    insert: jest.fn(() => Promise.resolve(input.found as ApplicationRecord)),
-    openOwnerPeriod: jest.fn().mockResolvedValue(undefined),
-    closeOpenOwnerPeriod: jest.fn().mockResolvedValue(undefined),
+    insert: jest
+      .fn<Promise<ApplicationRecord>, [DbTx, Record<string, unknown>]>()
+      .mockImplementation(() => Promise.resolve(input.found as ApplicationRecord)),
   };
   const openHolderCount = jest.fn().mockResolvedValue(input.k1Holders ?? 0);
   const organization = {
@@ -86,9 +89,13 @@ function serviceWith(input: {
     getEmployee: jest.fn((id: string) =>
       Promise.resolve((input.employees ?? []).find((candidate) => candidate.id === id) ?? null),
     ),
-    lockEmployeeForShare: jest.fn().mockResolvedValue(undefined),
     businessToday: jest.fn().mockResolvedValue(TODAY),
     getOrganization: jest.fn().mockResolvedValue({ id: 'organization-1' }),
+  };
+  const identity = {
+    findUsableItAdminEmployeeIds: jest.fn((ids: string[]) =>
+      Promise.resolve(new Set(ids.filter((id) => (input.usableItAdmins ?? ['owner-1']).includes(id)))),
+    ),
   };
   const plans = { plansOfApplication: jest.fn().mockResolvedValue(input.plans ?? []) };
   const occupancy = new SeatOccupancyHook();
@@ -100,7 +107,12 @@ function serviceWith(input: {
     {} as VendorRecordService,
     {} as VendorDictionaryFactsService,
     {} as ApplicationVendorLinkService,
-    new ApplicationViewService(organization as unknown as OrganizationReadApi, plans, occupancy),
+    new ApplicationViewService(
+      organization as unknown as OrganizationReadApi,
+      identity as unknown as IdentityAccessApi,
+      plans,
+      occupancy,
+    ),
     audit as unknown as AuditApi,
     runner as unknown as TransactionRunner,
     new ApplicationWriteGuards(
@@ -109,13 +121,13 @@ function serviceWith(input: {
     ),
   );
 
-  return { service, applications, organization, openHolderCount, audit };
+  return { service, applications, organization, openHolderCount, audit, identity };
 }
 
-const OWNER_VIEW = { employeeId: 'owner-1', employeeCode: 'E-owner-1', fullName: 'Person owner-1', status: 'ACTIVE' };
+const RESPONSIBLE = { employeeId: 'owner-1', employeeCode: 'E-owner-1', fullName: 'Person owner-1' };
 
 describe('ApplicationService.get (US-04-01, US-04-02 AC-9)', () => {
-  it('shows the application with its Business Owner, the similar tools and no recommendation without K1 plans', async () => {
+  it('shows the application with its responsible IT Admin, the similar tools and no recommendation without K1 plans', async () => {
     const { service, organization, openHolderCount } = serviceWith({
       found: record(),
       employees: [employee('owner-1', 'ACTIVE')],
@@ -123,7 +135,7 @@ describe('ApplicationService.get (US-04-01, US-04-02 AC-9)', () => {
     });
 
     await expect(service.get('application-1')).resolves.toEqual({
-      application: { ...record(), businessOwner: OWNER_VIEW, businessOwnerReplacementRequired: false },
+      application: { ...record(), responsibleItAdmin: RESPONSIBLE, needsResponsible: false },
       similar: [{ id: 'application-2', name: 'Other Design Tool' }],
       similarTotal: 1,
       recommendations: [],
@@ -133,10 +145,11 @@ describe('ApplicationService.get (US-04-01, US-04-02 AC-9)', () => {
     expect(openHolderCount).not.toHaveBeenCalled();
   });
 
-  it('recommends K2 from three holders of its K1 plans, counted today, and flags a Business Owner who left', async () => {
+  it('recommends K2 from three holders of its K1 plans, counted today, and flags that it needs a responsible IT Admin when the one named is no longer usable', async () => {
     const { service, openHolderCount } = serviceWith({
       found: record(),
       employees: [employee('owner-1', 'TERMINATED')],
+      usableItAdmins: [],
       plans: [
         { id: 'plan-k1-a', provisioningType: 'K1' },
         { id: 'plan-k2', provisioningType: 'K2' },
@@ -149,8 +162,8 @@ describe('ApplicationService.get (US-04-01, US-04-02 AC-9)', () => {
 
     expect(detail.recommendations).toEqual([{ code: 'CONSIDER_K2', k1Holders: 3, threshold: 3 }]);
     expect(openHolderCount).toHaveBeenCalledWith(['plan-k1-a', 'plan-k1-b'], TODAY);
-    expect(detail.application.businessOwner).toEqual({ ...OWNER_VIEW, status: 'TERMINATED' });
-    expect(detail.application.businessOwnerReplacementRequired).toBe(true);
+    expect(detail.application.responsibleItAdmin).toEqual(RESPONSIBLE);
+    expect(detail.application.needsResponsible).toBe(true);
   });
 
   it('recommends nothing under three holders, and reads no similar tool without a functional group', async () => {
@@ -169,17 +182,17 @@ describe('ApplicationService.get (US-04-01, US-04-02 AC-9)', () => {
     expect(applications.similarTo).not.toHaveBeenCalled();
   });
 
-  it('refuses an application that does not exist, and a Business Owner who is not an employee', async () => {
+  it('refuses an application that does not exist, and a responsible IT Admin who is not an employee', async () => {
     await expect(serviceWith({ found: null }).service.get('application-1')).rejects.toBeInstanceOf(
       ApplicationNotFoundError,
     );
     await expect(serviceWith({ found: record(), employees: [] }).service.get('application-1')).rejects.toThrow(
-      'The Business Owner of an application is not an employee',
+      'The IT Admin responsible for an application is not an employee',
     );
   });
 });
 
-describe('ApplicationService writes answer with the Business Owner view', () => {
+describe('ApplicationService writes answer with the responsible IT Admin (QĐ-111g)', () => {
   it('declares an application and reports whether the software was outside the dictionary', async () => {
     const { service } = serviceWith({ found: record(), employees: [employee('owner-1', 'ACTIVE')] });
 
@@ -188,39 +201,31 @@ describe('ApplicationService writes answer with the Business Owner view', () => 
         name: 'Design Tool',
         kind: 'INTERNAL',
         dataSensitivity: 'LOW',
-        businessOwnerEmployeeId: 'owner-1',
         communication: { personToPersonMessaging: false, callsOrMeetings: false, mailbox: false },
       }),
     ).resolves.toEqual({
-      application: { ...record(), businessOwner: OWNER_VIEW, businessOwnerReplacementRequired: false },
+      application: { ...record(), responsibleItAdmin: RESPONSIBLE, needsResponsible: false },
       proposed: false,
     });
   });
 
-  it('changes the Business Owner in one transaction: the owner period moves and the view names the new owner', async () => {
-    const { service, applications, audit } = serviceWith({
-      found: record(),
-      employees: [employee('owner-1', 'ACTIVE'), employee('owner-2', 'ACTIVE')],
+  it('makes the IT Admin who declares it the one responsible, with no field to choose another', async () => {
+    const { service, applications } = serviceWith({ found: record(), employees: [employee('owner-1', 'ACTIVE')] });
+
+    await service.declare(ACTOR, {
+      name: 'Design Tool',
+      kind: 'INTERNAL',
+      dataSensitivity: 'LOW',
+      communication: { personToPersonMessaging: false, callsOrMeetings: false, mailbox: false },
     });
 
-    const updated = await service.update(ACTOR, 'application-1', { businessOwnerEmployeeId: 'owner-2' });
-
-    expect(updated.businessOwner).toEqual({
-      employeeId: 'owner-2',
-      employeeCode: 'E-owner-2',
-      fullName: 'Person owner-2',
-      status: 'ACTIVE',
-    });
-    expect(applications.closeOpenOwnerPeriod).toHaveBeenCalledWith(TX, 'application-1');
-    expect(applications.openOwnerPeriod).toHaveBeenCalledWith(TX, {
-      applicationId: 'application-1',
-      employeeId: 'owner-2',
-      assignedByAppUserId: 'app-user-1',
-    });
-    expect(audit.record).toHaveBeenCalledTimes(1);
+    expect(applications.insert).toHaveBeenCalledWith(
+      TX,
+      expect.objectContaining({ responsibleItAdminEmployeeId: ACTOR.employeeId }),
+    );
   });
 
-  it('a change that changes nothing writes nothing and still answers with the owner view', async () => {
+  it('a change that changes nothing writes nothing and still answers with the responsible IT Admin', async () => {
     const { service, applications, audit } = serviceWith({
       found: record(),
       employees: [employee('owner-1', 'ACTIVE')],
@@ -228,8 +233,8 @@ describe('ApplicationService writes answer with the Business Owner view', () => 
 
     await expect(service.update(ACTOR, 'application-1', { name: 'Design Tool' })).resolves.toEqual({
       ...record(),
-      businessOwner: OWNER_VIEW,
-      businessOwnerReplacementRequired: false,
+      responsibleItAdmin: RESPONSIBLE,
+      needsResponsible: false,
     });
     expect(applications.update).not.toHaveBeenCalled();
     expect(audit.record).not.toHaveBeenCalled();

@@ -1,3 +1,5 @@
+import type { CollectionState } from '../devices-collection-state.policy';
+
 /** Why a registration of a machine to one person ended. */
 export type DeviceRegistrationEndCause = 'HOLDER_CHANGED' | 'DEVICE_RETIRED' | 'DEPARTURE' | 'EMPLOYEE_LEFT';
 
@@ -12,6 +14,9 @@ export interface EndRegistrationsOfHolderInput {
 export interface EndedRegistrations {
   registrationIds: string[];
 }
+
+/** Where a machine stands in the register: what `GET /devices?state=` filters by. */
+export type DeviceCollectionState = CollectionState;
 
 export type DeviceSessionState = 'ACTIVE' | 'AWAITING_ACKNOWLEDGEMENT' | 'COLLECTION_STOPPED';
 

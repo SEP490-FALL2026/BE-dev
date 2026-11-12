@@ -93,19 +93,3 @@ export interface ChangeTransferInput {
   /** Moving only: who follows the head on the new day, when the person heads the department they leave. Left out, the one named before stays. */
   successor?: SuccessorChoice;
 }
-
-/** A warning the answer carries and that does not stop the transfer: the person owns applications that need another owner. */
-export interface TransferWarning {
-  code: 'BUSINESS_OWNER_KEEP_OR_CHANGE';
-  applications: { id: string; name: string }[];
-  totalApplications: number;
-}
-
-/** What a recorded, moved or cancelled transfer answers with. */
-export interface TransferOutcome {
-  transfer: TransferRecord;
-  warnings: TransferWarning[];
-}
-
-/** How many applications the warning names; the rest are counted. */
-export const WARNING_APPLICATION_LIMIT = 20;

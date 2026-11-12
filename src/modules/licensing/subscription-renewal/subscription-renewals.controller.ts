@@ -89,7 +89,7 @@ export class SubscriptionRenewalsController {
   @ApiSuccessResponse(SubscriptionRenewalResponseDto, {
     message: 'SUBSCRIPTION_RENEWAL.FOUND',
     description:
-      'The case with its period (seats bought and in use, dates, automatic renewal, reduction mid-term), whether evidence of use is available (without it the usage cannot be judged, never 0), the proposal with the opinion of the Business Owner the IT Admin recorded and how many seats it proposes to take back, the decision with the seats chosen to take back and the snapshot frozen when it was taken (null for the IT Admin), the late flag, and the outcome with the new period and the savings at renewal when the new period costs less. A decision never holds a budget commitment.',
+      'The case with its period (seats bought and in use, dates, automatic renewal, reduction mid-term), whether evidence of use is available (without it the usage cannot be judged, never 0), the proposal the IT Admin recorded and how many seats it proposes to take back, the decision with the seats chosen to take back and the snapshot frozen when it was taken (null for the IT Admin), the late flag, and the outcome with the new period and the savings at renewal when the new period costs less. A decision never holds a budget commitment.',
   })
   @ApiErrorResponses(...AUTH_ERRORS, READERS_ONLY, NOT_FOUND, INVALID)
   async get(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Param() params: SubscriptionRenewalIdParamDto) {
@@ -131,7 +131,7 @@ export class SubscriptionRenewalsController {
     status: HttpStatus.CREATED,
     message: 'SUBSCRIPTION_RENEWAL.PROPOSED',
     description:
-      'The IT Admin proposes to renew the period as it is, to reduce it to a number of seats (naming exactly the seats in use above that number to take back), or to cancel it, with the opinion of the Business Owner if they gave one (an input, never a step). The point where the decision is carried out is worked out by the system, not sent. One proposal per period. It puts the case in the queue of the head of the department that owns the subscription, who is told; when the department has no head the case waits (waitingReason NO_HEAD) and the Super Admin is told. The IT Admin does not decide it.',
+      'The IT Admin proposes to renew the period as it is, to reduce it to a number of seats (naming exactly the seats in use above that number to take back), or to cancel it. The point where the decision is carried out is worked out by the system, not sent. One proposal per period. It puts the case in the queue of the head of the department that owns the subscription, who is told; when the department has no head the case waits (waitingReason NO_HEAD) and the Super Admin is told. The IT Admin does not decide it.',
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,

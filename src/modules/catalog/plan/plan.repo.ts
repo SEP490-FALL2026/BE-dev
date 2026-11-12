@@ -140,7 +140,7 @@ export class PlanRepo {
     const row = await (tx ?? this.prisma).plan.findUnique({
       where: { id },
       include: {
-        application: { select: { name: true, kind: true, catalogStatus: true, businessOwnerEmployeeId: true } },
+        application: { select: { name: true, kind: true, catalogStatus: true } },
       },
     });
 
@@ -155,7 +155,6 @@ export class PlanRepo {
           applicationName: row.application.name,
           applicationKind: row.application.kind,
           applicationStatus: row.application.catalogStatus,
-          businessOwnerEmployeeId: row.application.businessOwnerEmployeeId,
         }
       : null;
   }
@@ -166,7 +165,7 @@ export class PlanRepo {
     const rows = await (tx ?? this.prisma).plan.findMany({
       where: { id: { in: [...ids] } },
       include: {
-        application: { select: { name: true, kind: true, catalogStatus: true, businessOwnerEmployeeId: true } },
+        application: { select: { name: true, kind: true, catalogStatus: true } },
       },
     });
 
@@ -180,7 +179,6 @@ export class PlanRepo {
       applicationName: row.application.name,
       applicationKind: row.application.kind,
       applicationStatus: row.application.catalogStatus,
-      businessOwnerEmployeeId: row.application.businessOwnerEmployeeId,
     }));
   }
 
@@ -267,14 +265,14 @@ export class PlanRepo {
     return new Map(rows.map((row) => [row.id, row.application.vendorId]));
   }
 
-  /** The Business Owner the application of the plan has now; null when the plan does not exist. */
-  async findBusinessOwnerId(planId: string, tx?: DbTx): Promise<string | null> {
+  /** The IT Admin responsible for the application of the plan now (`QĐ-111g`); null when there is none or the plan does not exist. */
+  async findResponsibleItAdminId(planId: string, tx?: DbTx): Promise<string | null> {
     const row = await (tx ?? this.prisma).plan.findUnique({
       where: { id: planId },
-      select: { application: { select: { businessOwnerEmployeeId: true } } },
+      select: { application: { select: { responsibleItAdminEmployeeId: true } } },
     });
 
-    return row?.application.businessOwnerEmployeeId ?? null;
+    return row?.application.responsibleItAdminEmployeeId ?? null;
   }
 
   /** The same, locked `FOR SHARE` for the rest of the transaction so its kind cannot change under the caller. */

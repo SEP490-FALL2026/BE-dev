@@ -4,6 +4,10 @@ import { FlowWorld } from '../support/flows/flow-world';
  * MF-5, F5-02 (step 13 of Wave 1): the IT Admin proposes to reduce a subscription and names the seats to take back; the head of
  * the department that owns the subscription — not the spending approver — confirms it; the IT Admin records the outcome with the
  * vendor. Finance only reads and is told the result. Real sign-in, the seeded dataset, nothing mocked.
+ *
+ * Whose subscription it is: only a subscription that a department owns has a head who decides it. The subscriptions of the shared pool
+ * (`QĐ-103d`: every plan but the K1 ones in the dataset) have no owner department and are not proposed or decided here yet, so the
+ * scenarios run on ChatGPT Plus (K1, owned by Engineering), whose one seat the dataset granted to NV-DEV1 (R18).
  */
 describe('F5-02 IT đề xuất giảm, trưởng phòng sở hữu xác nhận, IT ghi kết quả @MF5 @D1', () => {
   let world: FlowWorld;
@@ -19,11 +23,11 @@ describe('F5-02 IT đề xuất giảm, trưởng phòng sở hữu xác nhận,
   beforeAll(async () => {
     world = await FlowWorld.open();
     const dev1 = await world.facts.employeeId('NV-DEV1');
-    const jira = await call().planId('Jira Standard');
+    const chatgpt = await call().planId('ChatGPT Plus');
     seatId = (
       await world.facts.one<{ id: string }>(
         `SELECT id FROM license_assignments WHERE employee_id = $1 AND plan_id = $2 AND kind = 'PERSONAL'`,
-        [dev1, jira],
+        [dev1, chatgpt],
       )
     ).id;
   }, 300000);
@@ -33,13 +37,13 @@ describe('F5-02 IT đề xuất giảm, trưởng phòng sở hữu xác nhận,
   });
 
   it('IT Admin đề xuất giảm về 0 kèm danh sách ghế thu hồi; trưởng phòng sở hữu thấy, Người duyệt chi không #9 @B5', async () => {
-    const subscriptionId = await call().subscriptionOf('Jira Standard', 'ENG');
+    const subscriptionId = await call().subscriptionOf('ChatGPT Plus');
     const proposed = await call().post('NV-ITA1', '/subscription-renewals', {
       subscriptionId,
       choice: 'REDUCE',
       proposedQuantity: 0,
       releasedAssignmentIds: [seatId],
-      businessOwnerOpinion: 'Nhóm đã chuyển sang công cụ khác',
+      note: 'Nhóm đã chuyển sang công cụ khác',
     });
     expect(proposed.status).toBe(201);
     renewalId = call().data<{ renewal: { id: string } }>(proposed).renewal.id;

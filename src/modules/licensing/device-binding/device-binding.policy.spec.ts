@@ -13,8 +13,9 @@ import type { DeviceLookup, KeyFacts } from './device-binding.types';
  * CONTRACT TEST WITH A MOCK, NOT INTEGRATION. The device register (`US-09-01`) belongs to the Owner and does not exist in this
  * code base; these tests run the rules of binding a K4 key against `DeviceRegistryContractDouble`, an in-memory stand-in written
  * from the port alone. They do not prove that K4 works with the real register: that needs the register, its adapter and
- * integration tests on PostgreSQL (items `a05-k4-key-grant-by-device`, `a05-k4-device-install-limit`,
- * `a05-k4-device-revocation`).
+ * integration tests on PostgreSQL (item `a05-k4-device-install-limit`; the unused `a05-k4-device-revocation` and
+ * `a05-k4-key-grant-by-device` designs were deleted 10/11/2026 and 11/11/2026, replaced by `qd103-k4-key-pool` — see git
+ * history).
  */
 
 const ORG = 'org-1';

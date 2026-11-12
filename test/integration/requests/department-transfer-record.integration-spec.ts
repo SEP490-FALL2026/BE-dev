@@ -16,7 +16,6 @@ const h = new TransferHarness();
 describe('recording a transfer of a person (integration, real PostgreSQL)', () => {
   let des: Department;
   let fin: Department;
-  const NO = { personToPersonMessaging: false, callsOrMeetings: false, mailbox: false };
 
   beforeAll(async () => {
     await h.start();
@@ -85,7 +84,6 @@ describe('recording a transfer of a person (integration, real PostgreSQL)', () =
       grounds: h.grounds,
       recordedByAppUserId: h.sa.appUserId,
       recordedByProcedure: false,
-      warnings: [],
     });
     expect(await h.placements(e1.employeeId)).toEqual([
       expect.objectContaining({ department_id: des.id, valid_from: '2026-01-05', valid_to: effectiveOn }),
@@ -275,30 +273,13 @@ describe('recording a transfer of a person (integration, real PostgreSQL)', () =
     ]);
   });
 
-  it('warns without stopping when the person is the Business Owner of an application (AC-13)', async () => {
+  it('QĐ-111g: answers no warning about applications, for a person who declared one too (AC-13 is gone)', async () => {
     const owner = await h.veteran(des, code('E'));
-    await request(h.server())
-      .post('/api/v1/applications')
-      .set(h.as(h.it1))
-      .send({
-        name: h.unique('Owned app'),
-        kind: 'INTERNAL',
-        dataSensitivity: 'LOW',
-        businessOwnerEmployeeId: owner.employeeId,
-        communication: NO,
-      })
-      .expect(201);
 
     const wire = await h.recorded(body(owner.employeeId));
 
     expect(wire.status).toBe('PENDING');
-    expect(wire.warnings).toEqual([
-      {
-        code: 'BUSINESS_OWNER_KEEP_OR_CHANGE',
-        applications: [expect.objectContaining({ name: expect.any(String) as unknown })],
-        totalApplications: 1,
-      },
-    ]);
+    expect(wire).not.toHaveProperty('warnings');
   });
 
   describe('who may record one, and who reads what (AC-14, F40, F12, F13)', () => {

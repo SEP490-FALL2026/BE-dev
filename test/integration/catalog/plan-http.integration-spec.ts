@@ -50,7 +50,6 @@ describe('plans and workspace profiles over HTTP (integration, real PostgreSQL)'
   let it2: ApiAccount;
   let finance: ApiAccount;
   let employee: ApiAccount;
-  let businessOwner: string;
   let counter = 0;
   const server = () => ctx.app.getHttpServer();
   const as = (account: ApiAccount) => ({ Authorization: `Bearer ${account.accessToken}` });
@@ -73,7 +72,7 @@ describe('plans and workspace profiles over HTTP (integration, real PostgreSQL)'
       role: 'EMPLOYEE',
       admin,
     });
-    businessOwner = (await insertEmployeeFixture(ctx.app, seed, { code: 'E-OWN', email: 'owner@acme.vn' })).employeeId;
+    await insertEmployeeFixture(ctx.app, seed, { code: 'E-OWN', email: 'owner@acme.vn' });
   }, 120000);
 
   afterAll(async () => {
@@ -101,7 +100,6 @@ describe('plans and workspace profiles over HTTP (integration, real PostgreSQL)'
           kind,
           ...(kind === 'INTERNAL' ? {} : { vendorName: unique('Vendor') }),
           dataSensitivity: 'LOW',
-          businessOwnerEmployeeId: businessOwner,
           communication: NO,
         })
         .expect(201),

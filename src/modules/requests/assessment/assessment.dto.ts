@@ -106,8 +106,8 @@ export const assessmentRejectionBodySchema = z
   .meta({ description: 'UNCONTROLLABLE requires alternativePlanId or alternativeNote.' });
 
 /**
- * Registering software the company built itself (`US-05-20`): its Business Owner, who must still work, and the name when it
- * is not the one proposed. A payment that the grant needs (`US-05-20` AC-10) comes with the quote that prices it.
+ * Registering software the company built itself (`US-05-20`): the name when it is not the one proposed; the IT Admin who registers it answers for
+ * it (`QĐ-111g`). A payment that the grant needs (`US-05-20` AC-10) comes with the quote that prices it.
  */
 export const internalRegistrationBodySchema = z.strictObject({
   softwareName: text(200).optional(),
@@ -157,7 +157,6 @@ const assessmentSchema = z.strictObject({
   opinion: z.strictObject({ status: z.enum(['OBTAINED', 'NOT_AVAILABLE']), note: z.string().nullable() }).nullable(),
   /** A tool already in the catalog that does the same work: a suggestion, never a gate (`US-05-06` AC-5). */
   equivalentTool: z.strictObject({ planId: z.uuid(), planName: z.string(), applicationName: z.string() }).nullable(),
-  proposedBusinessOwner: employeeRef.nullable(),
   controlLevel: z.enum(['FULL', 'PARTIAL', 'UNCONTROLLABLE']).nullable(),
   controlRiskNote: z.string().nullable(),
   quote: quoteView.nullable(),

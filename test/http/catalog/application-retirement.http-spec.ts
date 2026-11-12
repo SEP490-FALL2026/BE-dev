@@ -19,7 +19,6 @@ describe('application retirement routes (e2e, no database)', () => {
   });
 
   it.each([
-    ['post', `${BASE}/retirement-confirmations`],
     ['get', `${BASE}/retirement`],
     ['post', `${BASE}/retire`],
   ] as const)('answers 401 to %s %s without a token', async (method, path) => {
@@ -34,20 +33,14 @@ describe('application retirement routes (e2e, no database)', () => {
     ['an employee', ['EMPLOYEE'], []],
     ['a department head', ['MANAGER'], []],
     ['the spending approver, whose role is derived', [], ['SPENDING_APPROVER']],
-  ])('refuses %s the confirmation and the retirement with 403', async (_name, direct, derived) => {
+  ])('refuses %s the retirement with 403', async (_name, direct, derived) => {
     const server = app.getHttpServer();
 
-    const confirm = await request(server)
-      .post(`${BASE}/retirement-confirmations`)
-      .set('Authorization', bearer(principal([...direct, ...derived])))
-      .send({ businessOwnerEmployeeId: ID, note: 'x' })
-      .expect(403);
     const retire = await request(server)
       .post(`${BASE}/retire`)
       .set('Authorization', bearer(principal([...direct, ...derived])))
       .expect(403);
 
-    expect(bodyOf(confirm).error.code).toBe('AUTHORIZATION.FORBIDDEN');
     expect(bodyOf(retire).error.code).toBe('AUTHORIZATION.FORBIDDEN');
   });
 
@@ -68,25 +61,6 @@ describe('application retirement routes (e2e, no database)', () => {
   it.each([
     ['an id that is not a UUID', 'post', '/api/v1/applications/not-a-uuid/retire', undefined],
     ['an id that is not a UUID in the look', 'get', '/api/v1/applications/not-a-uuid/retirement', undefined],
-    ['a confirmation with no person', 'post', `${BASE}/retirement-confirmations`, { note: 'x' }],
-    [
-      'a confirmation of a person that is not a UUID',
-      'post',
-      `${BASE}/retirement-confirmations`,
-      { businessOwnerEmployeeId: 'x', note: 'y' },
-    ],
-    [
-      'a note over two thousand characters',
-      'post',
-      `${BASE}/retirement-confirmations`,
-      { businessOwnerEmployeeId: ID, note: 'x'.repeat(2001) },
-    ],
-    [
-      'a confirmation with an unknown field',
-      'post',
-      `${BASE}/retirement-confirmations`,
-      { businessOwnerEmployeeId: ID, note: 'x', force: true },
-    ],
   ] as const)('turns away %s with 422', async (_name, method, path, body) => {
     const req = request(app.getHttpServer())
       [method](path)
@@ -97,9 +71,14 @@ describe('application retirement routes (e2e, no database)', () => {
     expect(bodyOf(response).error.code).toBe('VALIDATION_ERROR');
   });
 
-  it('has no route that brings a retired application back or creates revocations for it', async () => {
+  it('has no route that confirms a retirement (`QĐ-111g`), brings a retired application back or creates revocations for it', async () => {
     const server = app.getHttpServer();
 
+    await request(server)
+      .post(`${BASE}/retirement-confirmations`)
+      .set('Authorization', bearer(principal(['IT_ADMIN'])))
+      .send({ businessOwnerEmployeeId: ID, note: 'x' })
+      .expect(404);
     await request(server)
       .post(`${BASE}/restore`)
       .set('Authorization', bearer(principal(['IT_ADMIN'])))
@@ -112,5 +91,16 @@ describe('application retirement routes (e2e, no database)', () => {
       .post(`${BASE}/revoke-all`)
       .set('Authorization', bearer(principal(['IT_ADMIN'])))
       .expect(404);
+  });
+
+  it('has no route of the Business Owner any more (`QĐ-111g`, BO-DEL-1): the warnings and the owners of an application answer 404', async () => {
+    const server = app.getHttpServer();
+
+    for (const path of ['/api/v1/business-owner-warnings', `/api/v1/applications/${ID}/business-owners`]) {
+      await request(server)
+        .get(path)
+        .set('Authorization', bearer(principal(['SUPER_ADMIN'])))
+        .expect(404);
+    }
   });
 });

@@ -135,6 +135,9 @@ model Application {
   functionalGroupId           String?         @map("functional_group_id") @db.Uuid
   // QĐ-104 removed the Business Owner: null for an application declared since; older rows keep the person they named.
   businessOwnerEmployeeId     String?         @map("business_owner_employee_id") @db.Uuid
+  // QĐ-111g: the IT Admin who answers for the application: the one who declared it, changed by a transfer of responsibility.
+  // Null for an application whose creator is no longer a usable IT Admin; `needsResponsible` is read from this column and the account.
+  responsibleItAdminEmployeeId String?        @map("responsible_it_admin_employee_id") @db.Uuid
   dataSensitivity             DataSensitivity @map("data_sensitivity")
   commPersonToPersonMessaging Boolean         @map("comm_person_to_person_messaging")
   commCallsOrMeetings         Boolean         @map("comm_calls_or_meetings")
@@ -154,7 +157,8 @@ model Application {
   vendor                    Vendor?                             @relation(fields: [vendorId], references: [id], onDelete: Restrict)
   dictionaryLine            VendorServiceLine?                  @relation(fields: [dictionaryLineId], references: [id], onDelete: Restrict)
   functionalGroup           FunctionalGroup?                    @relation(fields: [functionalGroupId], references: [id], onDelete: Restrict)
-  businessOwner             Employee?                           @relation(fields: [businessOwnerEmployeeId], references: [id], onDelete: Restrict)
+  businessOwner             Employee?                           @relation("ApplicationLegacyBusinessOwner", fields: [businessOwnerEmployeeId], references: [id], onDelete: Restrict)
+  responsibleItAdmin        Employee?                           @relation("ApplicationResponsibleItAdmin", fields: [responsibleItAdminEmployeeId], references: [id], onDelete: Restrict)
   proposals                 VendorDictionaryProposal[]
   plans                     Plan[]
   applicationBusinessOwners ApplicationBusinessOwner[]
@@ -163,6 +167,7 @@ model Application {
 
   @@unique([organizationId, dictionaryLineId])
   @@index([functionalGroupId])
+  @@index([responsibleItAdminEmployeeId])
   @@map("applications")
 }
 

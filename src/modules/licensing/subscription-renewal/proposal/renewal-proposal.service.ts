@@ -21,8 +21,6 @@ export interface ProposeRenewalInput {
   choice: RenewalChoice;
   proposedQuantity?: number;
   note?: string;
-  /** What the Business Owner said, as the IT Admin records it: an input for the decider, never a step (`US-11-05` AC-3). */
-  businessOwnerOpinion?: string;
   /** The seats in use to take back when reducing below them (`QĐ-66x`): exactly the excess, none for another choice. */
   releasedAssignmentIds?: string[];
 }
@@ -31,7 +29,7 @@ const textOf = (value: string | undefined): string | null => value?.trim() || nu
 
 /**
  * The proposal of the IT Admin for a subscription period (`US-11-05` AC-1, AC-3, AC-5, AC-6, AC-15): renew as it is, reduce to a
- * number of seats naming the seats to take back, or cancel, with the opinion of the Business Owner if there is one. One case per
+ * number of seats naming the seats to take back, or cancel, One case per
  * period; a period with no milestone waits for its contract data and a perpetual purchase or internal software has none. The
  * proposal is what puts the case in the queue of the head of the owner department, who confirms it and is told; nothing is decided
  * here (`SoD-3`). When the department has no head the case is made all the same and waits, and the Super Admin is told once.
@@ -78,7 +76,6 @@ export class RenewalProposalService {
         proposedChoice: input.choice,
         proposedQuantity: input.proposedQuantity ?? null,
         proposalNote: textOf(input.note),
-        businessOwnerOpinion: textOf(input.businessOwnerOpinion),
         proposedByEmployeeId: actor.employeeId,
         proposedByAppUserId: actor.appUserId,
       });
@@ -99,7 +96,6 @@ export class RenewalProposalService {
             quantity: created.proposedQuantity,
             noticeBasis: created.noticeBasis,
             noticeBaseDate: created.noticeBaseDate,
-            businessOwnerOpinionRecorded: created.businessOwnerOpinion !== null,
             releasedAssignmentIds: released.map((seat) => seat.assignmentId),
           },
         ),

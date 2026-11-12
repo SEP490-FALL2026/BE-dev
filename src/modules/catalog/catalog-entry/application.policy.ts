@@ -97,9 +97,9 @@ export function vendorSourceOf(input: {
 }
 
 /**
- * Whether the Business Owner has to be replaced: they have left (`US-04-06`, `FR-1.7`). Only the employee status counts, so
- * a move to another department, which leaves it `ACTIVE`, never raises it. Read when the application is read, not stored.
+ * Whether the application needs a responsible IT Admin (`QĐ-111g`, `US-04-06` AC-7, AC-8): nobody is named, or the person named is no longer
+ * a usable IT Admin (left, locked, lost the role). Read when the application is read, never stored; `usableAmong` holds the usable ones.
  */
-export function replacementRequired(ownerStatus: 'ACTIVE' | 'TERMINATED'): boolean {
-  return ownerStatus === 'TERMINATED';
+export function needsResponsible(responsible: string | null, usableAmong: ReadonlySet<string>): boolean {
+  return responsible === null || !usableAmong.has(responsible);
 }

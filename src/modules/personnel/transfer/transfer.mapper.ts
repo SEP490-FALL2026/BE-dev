@@ -1,7 +1,7 @@
 import type { DepartmentBrief, EmployeeRecord } from '../../organization/public/organization.types';
 import type { ReadAccess } from '../personnel-self-action.policy';
 import type { TransferChangeWire, TransferDetailWire, TransferRecordedWire, TransferSummaryWire } from './transfer.dto';
-import type { TransferChangeRecord, TransferRecord, TransferSummaryRecord, TransferWarning } from './transfer.types';
+import type { TransferChangeRecord, TransferRecord, TransferSummaryRecord } from './transfer.types';
 
 /** The names a row of the list or a detail shows, read for the whole page in one statement each. */
 export interface TransferNames {
@@ -76,11 +76,8 @@ export function toDetail(
   };
 }
 
-export const toRecorded = (
-  record: TransferRecord,
-  names: TransferNames,
-  warnings: TransferWarning[],
-): TransferRecordedWire => ({ ...toDetail(record, names), warnings });
+export const toRecorded = (record: TransferRecord, names: TransferNames): TransferRecordedWire =>
+  toDetail(record, names);
 
 export const toChange = (change: TransferChangeRecord): TransferChangeWire => ({
   id: change.id,

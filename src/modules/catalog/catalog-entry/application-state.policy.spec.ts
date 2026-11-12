@@ -11,7 +11,6 @@ const current = {
   name: 'Slack',
   domains: ['slack.com'],
   dataSensitivity: 'MEDIUM' as const,
-  businessOwnerEmployeeId: 'emp-1',
   functionalGroup: { id: 'grp-1' } as { id: string } | null,
   dictionaryServiceLineId: 'line-1' as string | null,
   communication,
@@ -25,7 +24,6 @@ describe('what an update of an application changes (US-04-01, US-04-02)', () => 
         current,
         {
           dataSensitivity: 'MEDIUM',
-          businessOwnerEmployeeId: 'emp-1',
           functionalGroupId: 'grp-1',
           dictionaryServiceLineId: 'line-1',
         },
@@ -40,7 +38,6 @@ describe('what an update of an application changes (US-04-01, US-04-02)', () => 
         current,
         {
           dataSensitivity: 'HIGH',
-          businessOwnerEmployeeId: 'emp-2',
           functionalGroupId: 'grp-2',
           dictionaryServiceLineId: 'line-2',
         },
@@ -50,7 +47,6 @@ describe('what an update of an application changes (US-04-01, US-04-02)', () => 
       name: 'Slack Pro',
       domains: ['slack.com', 'slack-edge.com'],
       dataSensitivity: 'HIGH',
-      businessOwnerEmployeeId: 'emp-2',
       functionalGroupId: 'grp-2',
       dictionaryServiceLineId: 'line-2',
     });

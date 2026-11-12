@@ -76,7 +76,6 @@ describe('the amount and the term of a request (integration, real PostgreSQL)', 
         kind: 'LICENSED',
         vendorName: h.unique('Vendor'),
         dataSensitivity: 'LOW',
-        businessOwnerEmployeeId: design.head.employeeId,
         communication: { personToPersonMessaging: false, callsOrMeetings: false, mailbox: false },
       });
       const key = await declarePlan(h.ctx, h.it1.accessToken, {

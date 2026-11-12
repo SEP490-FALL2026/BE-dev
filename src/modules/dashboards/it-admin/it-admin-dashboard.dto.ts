@@ -28,7 +28,7 @@ const itAdminDashboardSchema = z.strictObject({
     termsToReview: section('The plan terms that need a review.'),
     offboardingHandovers: section('The departures still handing over in the departments of the caller.'),
     unconfirmedDevices: section(
-      'The company machines without a confirmation of the monitoring policy; the device registry is not delivered yet.',
+      'The company machines whose holder has not yet acknowledged the monitoring notice: the same number the machine list (`deviceList`) answers for the awaiting-acknowledgement state.',
     ),
     saasIssues: section(
       'The SaaS error reports given to the caller that are not resolved, closed or marked duplicate.',

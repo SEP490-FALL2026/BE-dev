@@ -13,7 +13,7 @@ export type RenewalProblem =
   | 'QUANTITY_INVALID'
   /** The caller is not the person who decides this renewal now (`FR-3.13`, `SoD-3`). */
   | 'NOT_DECIDER'
-  /** The Business Owner's head proposes: the head confirms, so another IT Admin proposes (`SoD-3`). */
+  /** The head of the owner department proposes: the head confirms, so another IT Admin proposes (`SoD-3`). */
   | 'PROPOSER_IS_OWNER_HEAD'
   /** The case is not waiting for a decision (already decided). */
   | 'NOT_AWAITING_DECISION'

@@ -89,7 +89,6 @@ export function toRenewalDetail(
       choice: record.proposedChoice,
       quantity: record.proposedQuantity,
       note: record.proposalNote,
-      businessOwnerOpinion: record.businessOwnerOpinion,
       proposedByEmployeeId: record.proposedByEmployeeId,
       proposedAt: record.proposedAt.toISOString(),
       releasedSeatCount: released.length,

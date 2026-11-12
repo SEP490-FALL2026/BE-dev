@@ -39,7 +39,6 @@ describe('what keeps a department in use: its subscriptions and purchases (integ
           kind: 'LICENSED',
           vendorName: h.unique('Vendor'),
           dataSensitivity: 'LOW',
-          businessOwnerEmployeeId: h.businessOwner,
           communication: { personToPersonMessaging: false, callsOrMeetings: false, mailbox: false },
         })
         .expect(201),

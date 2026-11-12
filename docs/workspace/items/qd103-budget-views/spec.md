@@ -7,7 +7,7 @@
   `QĐ-103z`, `QĐ-104e`(2); `US-06-10` AC-7, `US-06-15` AC-7, AC-14, `US-06-18` AC-4, AC-9, `US-12-01` AC-11, AC-16), BE
   `d9c46552`. Ledger: L1-17, L1-18; luật R-I05 (trưởng phòng thấy Trần phòng), R-C02 (_chưa có ngân sách_), R-C06 (_điều
   chỉnh kỳ trước_).
-- Nhóm roadmap: không — bó finding `qd103-108-alignment` (xem tracker §5).
+- Nhóm roadmap: G5, G8 (từ re-pin scope map 11/11/2026) — bó finding `qd103-108-alignment` (xem tracker §5).
 - [Kế hoạch](plan.md).
 
 ## Business outcome
@@ -19,8 +19,8 @@ bản hiện hành, cột _điều chỉnh kỳ trước_, ô tổng có **Trầ
 
 ## Sizing decision
 
-- Container: bó finding `qd103-108-alignment` (đợt W2), ngoài nhóm G.
-- Mode: `technical-enabler`.
+- Container: G5, G8 (nhóm giao việc, không phải ranh giới hạng mục); bó finding `qd103-108-alignment` (đợt W2). Trước re-pin 11/11/2026 là ngoài nhóm.
+- Mode: `grouped-stories`.
 - Outcome and owner: `budgets/budget-view` (đọc); `requests` cung cấp số _Request đang chờ duyệt chi_ qua extension point của
   `budgets` (`requests → budgets` được, ngược lại không — `scripts/arch/tiers.cjs`).
 - Boundaries: chỉ đọc; 3 operation đổi response/quyền; 1 extension point mới; không migration.
@@ -28,13 +28,15 @@ bản hiện hành, cột _điều chỉnh kỳ trước_, ô tổng có **Trầ
   khi có số, tránh trả số sai).
 - Not smaller: ba view dùng chung một hàm tổng (`CommitmentRepo.totals` + phần chờ) để không lệch nhau và lệch kiểm tra ngân sách.
 - Siblings: `qd103-budget-cycle-ceilings`, `qd103-department-effective-year`.
-- Scope map: n/a
+- Scope map: [G5](../../../roadmap.md#work-item-decomposition-g5), [G8](../../../roadmap.md#work-item-decomposition-g8).
 
 ## Primary Story/AC
 
-| Story | AC           | Coverage | Phần còn lại thuộc                        |
-| ----- | ------------ | -------- | ----------------------------------------- |
-| —     | L1-17, L1-18 | n/a      | gỡ chặn `qd103-seat-month-cost-pool-line` |
+| Story    | AC           | Coverage | Phần còn lại thuộc                                                                                                                                                                           |
+| -------- | ------------ | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| US-06-10 | AC-7         | partial  | AC còn lại và vế chung theo scope map: `g5-budget-proposal-and-review`, `qd96-100-plan-line-removal-and-bm10-lines`, `qd103-budget-proposal-lines-cleanup`, `qd93-budget-record-attachments` |
+| US-06-15 | AC-7, AC-14  | partial  | AC còn lại và vế chung theo scope map: `qd103-budget-cycle-ceilings`, `qd103-calendar-fiscal-year`, `qd103-budget-baseline-annual-check`, `qd103-department-effective-year`                  |
+| US-12-01 | AC-11, AC-16 | partial  | AC còn lại và vế chung theo scope map: `finance-screens-api`, `qd103-budget-vs-actual-report`                                                                                                |
 
 ## Supporting references
 
@@ -42,6 +44,8 @@ bản hiện hành, cột _điều chỉnh kỳ trước_, ô tổng có **Trầ
 AC-14, `US-06-18` AC-4, AC-9, `US-12-01` AC-11, AC-16. `QĐ-82l`(1)/`QĐ-97c`: _còn lại = ngân sách − thực chi − cam kết đang
 giữ − Request đang chờ duyệt chi_. `QĐ-104e`(2): phần chênh của năm đã đóng hiện ở _điều chỉnh kỳ trước_. Spec cũ
 `qd96-100-budget-visibility-qd100p` chỉ đọc tham khảo.
+
+_Re-pin 11/11/2026 ([C3](../../../reviews/mf2-mf3-2026-11-10/C3-SCOPE-MAP-REPIN.md)):_ trước là `technical-enabler`, dòng `n/a` của bảng Primary: L1-17, L1-18 — gỡ chặn `qd103-seat-month-cost-pool-line`. Bảng Primary claim AC của tối đa ba Story chính lấy từ danh sách trên, chỉ AC đang dùng ở Docs `5bb2e6a` (số AC của EP-05/EP-06/EP-12 không đổi giữa `9c7f386` và `5bb2e6a`); khóa khác của danh sách trên giữ chủ hiện có hoặc là `deferred` tới hạng mục này trong scope map. Claim theo spec và commit đã merge (PR #36), chưa đối chiếu từng AC trên code.
 
 ## Explicit out of scope
 

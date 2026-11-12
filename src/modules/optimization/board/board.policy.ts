@@ -3,7 +3,7 @@ import type { GhostSeatEvidence } from '../ghost-seat/ghost-seat-evidence.json';
 import type { GhostSeatGroup, GhostSeatState } from '../ghost-seat/ghost-seat.types';
 import { isReclaimable } from '../ghost-seat/ghost-seat-state.policy';
 
-/** Whom the table is read for: the departments the IT Admin is in charge of (`MINE`) or the whole organization (`ALL`, `QĐ-58b`). */
+/** The scope a client asks the table for. Both read the scope of the IT Admin (`QĐ-111ax`); `ALL` stays on the wire and no longer widens it. */
 export type DepartmentScope = 'MINE' | 'ALL';
 
 /** The label of how sure a recommendation is: `G1` and `G2` come from the data of the system itself, with no level and no percentage (`QĐ-35b`). */
@@ -42,9 +42,18 @@ export function labelsOf(row: {
 /** The IT Admin may open a reclaim on a row that is an open `G2` (the button of the table). */
 export const canReclaim = (row: { group: GhostSeatGroup; state: GhostSeatState }): boolean => isReclaimable(row);
 
-/** The departments a read is limited to, or undefined for the whole organization. */
-export function departmentsOfScope(scope: DepartmentScope, inChargeOf: readonly string[]): string[] | undefined {
-  return scope === 'MINE' ? [...inChargeOf] : undefined;
+/**
+ * What a filter on one department makes of the scope of the reader (`QĐ-111aw`): no filter keeps the scope; a department inside it (or any, when the
+ * scope is the whole organization, undefined) is read exactly; a department outside it reads nothing, never an error.
+ */
+export function narrowToDepartment(
+  scope: readonly string[] | undefined,
+  departmentId: string | undefined,
+): { departmentIds?: string[]; departmentId?: string } | 'OUT_OF_SCOPE' {
+  if (departmentId === undefined) return scope ? { departmentIds: [...scope] } : {};
+  if (scope && !scope.includes(departmentId)) return 'OUT_OF_SCOPE';
+
+  return { departmentId };
 }
 
 /** The sentence the summary carries for internal software (`US-10-01` AC-8, `US-10-05` AC-7, `US-10-02` AC-9, `QĐ-62o`). */

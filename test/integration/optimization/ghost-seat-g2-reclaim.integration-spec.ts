@@ -165,7 +165,9 @@ describe('the board of wasted seats and the reclaim of a G2 (integration, real P
     await w.runRules();
     const [g1] = await w.g1Of(subscription);
 
-    const listed = dataOf(await get('/api/v1/ghost-seat-recommendations', w.it1, { pageSize: 100 }).expect(200)) as {
+    const listed = dataOf(
+      await get('/api/v1/ghost-seat-recommendations', w.worldItAdmin.account, { pageSize: 100 }).expect(200),
+    ) as {
       items: Record<string, unknown>[];
       pagination: { totalItems: number };
     };
@@ -201,6 +203,11 @@ describe('the board of wasted seats and the reclaim of a G2 (integration, real P
     ) as { items: { id: string }[] };
     expect(none.items.map((item) => item.id)).toContain(g1.id);
     expect(none.items.map((item) => item.id)).not.toContain(g2.id);
+    // QĐ-111ax: ALL no longer widens the scope of an IT Admin who is not in charge of the department.
+    const widened = dataOf(
+      await get('/api/v1/ghost-seat-recommendations', it2, { departmentScope: 'ALL', pageSize: 100 }).expect(200),
+    ) as { items: { id: string }[] };
+    expect(widened.items.map((item) => item.id)).not.toContain(g2.id);
     for (const account of [w.finance, w.employee]) {
       await get('/api/v1/ghost-seat-recommendations', account).expect(403);
       await get('/api/v1/ghost-seat-optimization-summary', account).expect(403);

@@ -106,7 +106,11 @@ describe('BR-MF1-09: a K4 key back to the store and withdrawn from it (integrati
     const usableBefore = (await listed(seat.subscriptionId)).summary.usableKeys;
 
     const done = await h
-      .revoked(seat.taskId, { completion: 'KEY_DEACTIVATED', evidence: 'Deactivated on the laptop' })
+      .revoked(seat.taskId, {
+        completion: 'KEY_DEACTIVATED',
+        evidence: 'Deactivated on the laptop',
+        keyDisposition: 'RETURN_TO_STORE',
+      })
       .expect(200);
 
     expect(h.dataOf<{ task: TaskWire }>(done).task).toMatchObject({ status: 'COMPLETED' });
@@ -160,12 +164,17 @@ describe('BR-MF1-09: a K4 key back to the store and withdrawn from it (integrati
       .revoked(seat.taskId, { completion: 'KEY_DEACTIVATED', evidence: 'x', keyDisposition: 'WITHDRAW' })
       .expect(422);
     const otherWay = await h.revoked(seat.taskId, { completion: 'ACCOUNT_REMOVED', evidence: 'x' }).expect(422);
-    const noEvidence = await h.revoked(seat.taskId, { completion: 'KEY_DEACTIVATED', evidence: ' ' }).expect(422);
+    const noEvidence = await h
+      .revoked(seat.taskId, { completion: 'KEY_DEACTIVATED', evidence: ' ', keyDisposition: 'RETURN_TO_STORE' })
+      .expect(422);
+    // QĐ-111p: a K4 completion must say where the key goes; it is no longer put back by default.
+    const noDisposition = await h.revoked(seat.taskId, { completion: 'KEY_DEACTIVATED', evidence: 'x' }).expect(422);
 
-    expect([noReason, otherWay, noEvidence].map((response) => h.codeOf(response))).toEqual([
+    expect([noReason, otherWay, noEvidence, noDisposition].map((response) => h.codeOf(response))).toEqual([
       'REVOCATION.WITHDRAWAL_REASON_REQUIRED',
       'REVOCATION.COMPLETION_NOT_ALLOWED',
       'PROVISIONING_TASK.EVIDENCE_REQUIRED',
+      'REVOCATION.KEY_DISPOSITION_REQUIRED',
     ]);
     expect((await keysOf(seat.subscriptionId)).find((key) => key.id === seat.keyId)).toMatchObject({
       status: 'ASSIGNED',
@@ -182,7 +191,7 @@ describe('BR-MF1-09: a K4 key back to the store and withdrawn from it (integrati
     expect(h.codeOf(misplaced)).toBe('REVOCATION.COMPLETION_NOT_ALLOWED');
   });
 
-  it('BR-MF1-09: a K4 seat granted before the key pool holds no key: the revocation ends it and moves no key', async () => {
+  it('BR-MF1-09: a K4 seat granted before the key pool holds no key: the revocation asks nothing about a key, ends it and records none (Owner 12/11/2026)', async () => {
     const subscriptionId = await h.subscription(3, 'K4');
     const assignmentId = await legacySeat(subscriptionId, `E-K4R-OLD-${(counter += 1)}`);
     const { taskId } = await h.open(assignmentId, 'RETURN');
@@ -190,10 +199,13 @@ describe('BR-MF1-09: a K4 key back to the store and withdrawn from it (integrati
 
     await h.revoked(taskId, { completion: 'KEY_DEACTIVATED', evidence: 'Deactivated' }).expect(200);
 
-    expect((await h.auditEvents('ProvisioningTask', taskId)).at(-1)).toMatchObject({
+    const completed = (await h.auditEvents('ProvisioningTask', taskId)).at(-1) as { action: string; after: object };
+    expect(completed).toMatchObject({
       action: 'PROVISIONING_TASK.REVOCATION_COMPLETED',
-      after: { completion: 'KEY_DEACTIVATED', licenseKeyId: null, keyDisposition: 'RETURN_TO_STORE' },
+      after: { completion: 'KEY_DEACTIVATED' },
     });
+    expect(completed.after).not.toHaveProperty('keyDisposition');
+    expect(completed.after).not.toHaveProperty('licenseKeyId');
   });
 
   it('BR-MF1-09 (Q-10 B): the IT Admin withdraws a free key with a reason; it is no longer usable, revealed or given out', async () => {

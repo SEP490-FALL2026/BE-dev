@@ -14,7 +14,6 @@ export type SectionState = (typeof SECTION_STATES)[number];
 export const MISSING_SOURCE_REASONS = [
   'FINANCE_FIGURES_NOT_DELIVERED',
   'USAGE_DATA_NOT_DELIVERED',
-  'DEVICE_REGISTRY_NOT_DELIVERED',
   'NO_DATA_SOURCE',
 ] as const;
 export type MissingSourceReason = (typeof MISSING_SOURCE_REASONS)[number];

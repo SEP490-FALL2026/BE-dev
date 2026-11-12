@@ -287,7 +287,9 @@ describe('role overviews (integration, real PostgreSQL)', () => {
       );
       expect(sections.offboardingHandovers.count).toBe(1);
       expect(sections.licenseKeys).toEqual(countedAs(2, 'licenseKeyList'));
-      expect(sections.unconfirmedDevices).toEqual(missing('DEVICE_REGISTRY_NOT_DELIVERED'));
+      expect(sections.unconfirmedDevices).toEqual(
+        countedAs(await h.totalOf('/api/v1/devices', it1, { state: 'AWAITING_ACKNOWLEDGEMENT' }), 'deviceList'),
+      );
       expect(sections.discrepancies).toEqual(countedAs(0, 'usageNoAssignmentFindingList'));
       expect(sections.cancellationDeadlines).toMatchObject({
         state: 'AT_SOURCE',

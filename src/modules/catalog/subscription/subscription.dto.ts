@@ -37,7 +37,10 @@ export const declareSubscriptionBodySchema = z.strictObject({
   autoRenew: z.boolean().optional(),
   allowsMidTermReduction: z.boolean().optional(),
   // The IT Admin who answers for the subscription (QĐ-103v(4)): needed once it is active.
-  responsibleItAdminEmployeeId: z.uuid().optional(),
+  responsibleItAdminEmployeeId: z.uuid().optional().meta({
+    description:
+      'The IT Admin who answers for the subscription. When it is not sent, the IT Admin responsible for the application of the plan is taken if they still work as an IT Admin; otherwise it stays empty and an active subscription refuses to be saved without one.',
+  }),
   vendorMinimumSeats: vendorMinimumSeats.optional(),
 });
 

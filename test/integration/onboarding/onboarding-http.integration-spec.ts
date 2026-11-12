@@ -247,8 +247,7 @@ describe('the onboarding checklist over HTTP (integration, real PostgreSQL)', ()
   });
 
   it('follows the data: an application, a plan and a subscription make steps 2 and 3 done and the seat step ready (AC-1)', async () => {
-    const owner = (await insertEmployeeFixture(ctx.app, seed, { code: 'E-OB-OWN', email: 'ob-owner@acme.vn' }))
-      .employeeId;
+    await insertEmployeeFixture(ctx.app, seed, { code: 'E-OB-OWN', email: 'ob-owner@acme.vn' });
     const application = await request(server())
       .post('/api/v1/applications')
       .set(as(it1))
@@ -257,7 +256,6 @@ describe('the onboarding checklist over HTTP (integration, real PostgreSQL)', ()
         kind: 'SAAS',
         vendorName: 'Figma Inc',
         dataSensitivity: 'LOW',
-        businessOwnerEmployeeId: owner,
         communication: { personToPersonMessaging: false, callsOrMeetings: false, mailbox: false },
       })
       .expect(201);

@@ -37,6 +37,8 @@ duy nhất được phép). Được dùng bởi: budgets, catalog, installation
   khôi phục và đổi người giữ vai Super Admin (ca có kế hoạch lẫn khẩn cấp), chỉ lệnh `pnpm ops:recover` (qua
   `identity-access-recovery-cli.module.ts`).
 - `IdentityAccessInspectionApi` — chỉ `pnpm ops:inspect`; `LocalDemoAccountApi` — chỉ `pnpm ops:seed` (qua `DemoAccountsApi` của installation).
+- `it-admin-directory/` — `GET /it-admins`: IT Admin đang làm việc (phân trang, `search`) để chọn người nhận ứng dụng (`QĐ-111g`);
+  `ItAdminQueryService` đọc `AccountRecordService` và `OrganizationReadApi`.
 - Type/lỗi: `identity-access.types.ts`, `identity-access.errors.ts`, `recovery.types.ts`, `recovery.errors.ts`.
 
 ## Bảng sở hữu

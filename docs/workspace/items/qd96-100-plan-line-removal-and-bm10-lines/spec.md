@@ -4,7 +4,7 @@
 - Thiết kế ban đầu bởi: AI theo quyết định Owner 05/11/2026 (phiên, chưa GVHD/mentor xác nhận) — `QĐ-101n`, thay toàn bộ
   `QĐ-101m`; thay hạng mục `qd96-100-plan-line-auto-match` (tạo cùng ngày, chưa ai implement — đã xóa).
 - Thiết kế: `ready`. Owner review: chưa review. Peer review: chưa có. **Đợt 1** — bước 12b của
-  [SPEC-PLAN-DOT-1](../../../reviews/qd96-100-alignment-2026-11-05/fe-batch/SPEC-PLAN-DOT-1.md).
+  SPEC-PLAN-DOT-1 (nhật ký review đã xóa 11/11/2026 — xem git history).
 - Nguồn: Docs `5dad7b6` + sửa chưa commit 05/11/2026 (`QĐ-101n`; BRD 4.3 `FR-3.3`, `FR-3.20`, `FR-3.21`, `FR-5.15`(1)(2)(5)(6), `BM-10`; US —
   `US-05-04` AC-12, AC-15; `US-06-10` AC-1, AC-2; `US-06-12` AC-10 bỏ; `US-06-14` AC-5; `US-16-02` AC-9 — tham chiếu), BE `808318a4`.
 - Nhóm roadmap: G5 — chỉ là planning container (xem `## Sizing decision`). [Kế hoạch](plan.md).
@@ -52,7 +52,7 @@ tả, số seat (tùy chọn), số tiền của năm, ghi chú. Kiểm bằng h
 ## Supporting references
 
 `US-16-02` AC-9 (mobile, cùng contract web — `a08-mobile-approver-flows` chỉ đổi test/tài liệu); `QĐ-101n`, `QĐ-82a`, `QĐ-82d`, `QĐ-82l(5)`, `QĐ-97c`, `QĐ-100p` (sửa tại chỗ bởi `QĐ-101n`); `QĐ-94g` B4 (không đổi); `US-06-09`
-Dữ liệu nghiệp vụ (dòng phiên bản cùng dạng); quyết định cũ [PLAN-LINE-DECISION](../../../reviews/qd96-100-alignment-2026-11-05/fe-batch/PLAN-LINE-DECISION.md).
+Dữ liệu nghiệp vụ (dòng phiên bản cùng dạng); quyết định cũ PLAN-LINE-DECISION (nhật ký review đã xóa 11/11/2026 — xem git history).
 
 ## Explicit out of scope
 

@@ -8,7 +8,7 @@
   sơ đồ `SBF-04a` v1.0 bước `a_up`→`d_match`, `a_notice`, `d_ok`; `QĐ-101h`, `QĐ-101b`, `QĐ-28a`, `QĐ-31b`, `QĐ-35c`, `QĐ-101i`, `QĐ-62o`),
   BE `46b6a94e` (đọc ở `712044f9`). Ledger: L4-01, L4-02, L4-03 (giữ). Luật R-J01 (tiền đề `G3`/`G4`). Theo nguồn: Q-85 (vế lần nhập đầu);
   theo phạm vi tracker: Q-84; kỹ thuật (chốt ở đây): Q-85 vế _người được cấp sau_, gắn danh tính lúc đọc, độ mới theo loại nguồn.
-- Nhóm roadmap: không — bó finding `qd103-108-alignment` (đợt W6).
+- Nhóm roadmap: G7 (từ re-pin scope map 11/11/2026) — bó finding `qd103-108-alignment` (đợt W6).
 - Kế hoạch: `plan.md` cùng thư mục.
 
 ## Business outcome
@@ -23,8 +23,8 @@ collector (`L4-03`, giữ nguyên) đọc qua **một** API bằng chứng cho r
 
 ## Sizing decision
 
-- Container: bó finding `qd103-108-alignment` (W6).
-- Mode: `technical-enabler`
+- Container: G7 (nhóm giao việc, không phải ranh giới hạng mục); bó finding `qd103-108-alignment` (W6). Trước re-pin 11/11/2026 là ngoài nhóm.
+- Mode: `grouped-stories`.
 - Outcome and owner: module `usage` (T6 — `scripts/arch/tiers.cjs:10`), capability mới `vendor-source/` (L3), `vendor-import/` (L3), `identity/` (L3),
   `usage-evidence/` (L0, không controller, chỉ facade dùng); facade mới `usage/public/usage-evidence.api.ts` (hiện `public/` trống).
 - Boundaries: 1 migration (enum mới bằng `CREATE TYPE` cùng bảng ⟹ không `*_values`); 15 operation mới; 1 đổi; 1 extension point
@@ -34,13 +34,15 @@ collector (`L4-03`, giữ nguyên) đọc qua **một** API bằng chứng cho r
 - Not smaller: khớp danh tính, cửa sổ bao phủ, thông báo theo dõi và xem trước phải ghi cùng lúc, nếu không dữ liệu nhập được mà không dùng được
   (TC-4) hoặc ghi trước khi báo (`US-08-05` AC-3).
 - Siblings: `qd103-ghost-seat-g3-g4` (đọc `UsageEvidenceApi`, bind `UsageImportListeners`).
-- Scope map: n/a
+- Scope map: [G7](../../../roadmap.md#work-item-decomposition-g7).
 
 ## Primary Story/AC
 
-| Story | AC                | Coverage | Phần còn lại thuộc                                                          |
-| ----- | ----------------- | -------- | --------------------------------------------------------------------------- |
-| —     | L4-01, L4-02 (đủ) | n/a      | dùng bằng chứng: `qd103-ghost-seat-g3-g4`; `SBF-08` sai lệch: NGOÀI-PHẠM-VI |
+| Story    | AC                     | Coverage | Phần còn lại thuộc                                                                                                                             |
+| -------- | ---------------------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| US-08-02 | AC-1, AC-3             | partial  | AC còn lại và vế chung theo scope map: `qd103-ghost-seat-g3-g4`; AC-2, AC-5→AC-7 `deferred` tới chính `qd103-vendor-usage-import` (chưa claim) |
+| US-08-04 | AC-1, AC-2, AC-4, AC-7 | partial  | AC-3, AC-5, AC-6 `deferred` tới chính `qd103-vendor-usage-import` (chưa claim)                                                                 |
+| US-08-05 | AC-1→AC-4              | partial  | AC-5, AC-6 `deferred` tới chính `qd103-vendor-usage-import` (chưa claim)                                                                       |
 
 ## Supporting references
 
@@ -49,6 +51,8 @@ collector (`L4-03`, giữ nguyên) đọc qua **một** API bằng chứng cho r
 `US-08-07` AC-3 (chồng lấn); `US-10-02` AC-3, AC-14, `US-10-03` AC-3, AC-4, AC-9, AC-10, `US-10-04` AC-4, `US-12-15` dòng 23. Spec cũ (§4 luật 9):
 `g7-vendor-usage-import-identity` — **còn dùng** tên bảng/enum, preview 24 h + `previewVersion`, thứ tự khớp, chunk ≤ 5 000, 50 000 dòng, schema
 `saas-sentry.vendor-usage-report/0.1-proposal`; **bỏ** _chỉ gửi qua hệ thống_, _từ chối `auth_only`_, `employee_id` gắn lúc ghi; CSV mẫu mới ở đây.
+
+_Re-pin 11/11/2026 ([C3](../../../reviews/mf2-mf3-2026-11-10/C3-SCOPE-MAP-REPIN.md)):_ trước là `technical-enabler`, dòng `n/a` của bảng Primary: L4-01, L4-02 (đủ) — dùng bằng chứng: `qd103-ghost-seat-g3-g4`; `SBF-08` sai lệch: NGOÀI-PHẠM-VI. Bảng Primary claim AC của tối đa ba Story chính lấy từ danh sách trên, chỉ AC đang dùng ở Docs `5bb2e6a` (số AC của EP-05/EP-06/EP-12 không đổi giữa `9c7f386` và `5bb2e6a`); khóa khác của danh sách trên giữ chủ hiện có hoặc là `deferred` tới hạng mục này trong scope map. Claim theo spec và commit đã merge (PR #36), chưa đối chiếu từng AC trên code.
 
 ## Explicit out of scope
 

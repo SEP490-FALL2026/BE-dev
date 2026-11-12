@@ -1,7 +1,7 @@
 # Spec: qd96-100-annual-budget-reserve-and-floor — dự phòng mặc định 10 % do Finance cấu hình, sàn cam kết chuyển tiếp
 
 - Phụ trách: AI theo giao việc Owner (05/11/2026); người nhận implement tiếp quản spec/plan và evidence.
-- Thiết kế ban đầu bởi: AI (agent C-SPEC-B) theo [tracker qd96-100](../../../reviews/qd96-100-alignment-2026-11-05/README.md),
+- Thiết kế ban đầu bởi: AI (agent C-SPEC-B) theo tracker qd96-100 (nhật ký review đã xóa 11/11/2026 — xem git history),
   `LEDGER.md` L-304, L-306, L-307, L-309, L-310, L-815 (vế _vai sở hữu tham số_); tự giải S-03.
 - Thiết kế: `draft`. Owner review: chưa review. Peer review: chưa có.
 - Nguồn: Docs `3d73a7f` (BRD 4.0 `FR-5.15`, `FR-5.8b`, `FR-8.2`, `FR-1.6`; US 05/11/2026 — `US-06-09` AC-30, AC-32, `US-06-11`

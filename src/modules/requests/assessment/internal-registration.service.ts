@@ -17,11 +17,11 @@ import { AssessmentPricingService } from './assessment-pricing.service';
 
 /**
  * Registering internal software for a proposal (`US-05-20` AC-3→AC-5, AC-8→AC-10): when the IT Admin has classified what
- * was proposed as software the company built itself, they register it in the catalog with a Business Owner who still works,
+ * was proposed as software the company built itself, they register it in the catalog, answering for it as the IT Admin responsible (`QĐ-111g`),
  * and the request goes the way that has no spend: the IT Admin grants it by hand (`US-05-20` AC-1). Nothing financial is
  * made for it — no vendor, contract, subscription, invoice, commitment or seat bought. When the grant itself needs a payment
  * the registration needs no spending approver, but the request keeps its spend step with the amount the quote gives
- * (`AC-10`). A Business Owner who is missing or has left refuses the registration and the request stays with the IT Admin
+ * (`AC-10`). A name already taken refuses the registration and the request stays with the IT Admin
  * (`AC-4`, `AC-9`): it is never rejected for that.
  */
 @Injectable()
@@ -61,8 +61,6 @@ export class InternalRegistrationService {
       });
       const registered = await this.catalog.registerInternalSoftware(tx, actor, {
         name: body.softwareName ?? proposal.softwareName,
-        // The legacy catalog column stays until its own removal; it is no longer a field the assessor chooses.
-        businessOwnerEmployeeId: request.requesterEmployeeId,
         dataSensitivity: basis.dataSensitivity,
       });
       if (registered.status === 'REFUSED') throw new InternalRegistrationRefusedError(registered.reason);

@@ -9,7 +9,7 @@
   `QĐ-49b`, `QĐ-58b`, `QĐ-77l`), BE `46b6a94e` (đọc ở `712044f9`). Ledger: L4-04, L4-09, L4-19 (hệ quả W4). Luật R-J01, R-J03 (vế `G2` thay thế),
   R-J05 (vế `G2` gửi thẳng IT), R-E02, R-H03. Câu tạm chọn (chờ Owner): Q-12 = A (QUESTIONS), Q-82, Q-83 (NOTES W6); kỹ thuật (chốt ở đây):
   mẫu số `KPI-5`, khóa listener.
-- Nhóm roadmap: không — bó finding `qd103-108-alignment` (đợt W6).
+- Nhóm roadmap: G7 (từ re-pin scope map 11/11/2026) — bó finding `qd103-108-alignment` (đợt W6).
 - Kế hoạch: `plan.md` cùng thư mục.
 
 ## Business outcome
@@ -23,8 +23,8 @@ qua `SBF-18`; không có gì tự thu hồi (`SoD-6`).
 
 ## Sizing decision
 
-- Container: bó finding `qd103-108-alignment` (W6).
-- Mode: `technical-enabler`
+- Container: G7 (nhóm giao việc, không phải ranh giới hạng mục); bó finding `qd103-108-alignment` (W6). Trước re-pin 11/11/2026 là ngoài nhóm.
+- Mode: `grouped-stories`.
 - Outcome and owner: **module mới `optimization`** — tầng mới **T7** (giữa T6 `usage`/`personnel` và `dashboards`, nay T8): rule đọc facade của
   `licensing`, `catalog` (T4), `organization` (T2), `operating-parameters` (T3), `personnel`, `usage` (T6) và bị `dashboards` đọc; đặt trong `usage` sẽ
   cần cạnh cùng tầng `usage → personnel`. Capability: `ghost-seat/` (L0 — bảng, trạng thái, bằng chứng, listener), `rule-run/` (L0), `internal-rules/`
@@ -34,13 +34,15 @@ qua `SBF-18`; không có gì tự thu hồi (`SoD-6`).
 - Not larger: `G3`/`G4` + cổng 2–7 ở `qd103-ghost-seat-g3-g4`; hàng đợi trưởng phòng, trạng thái định tuyến ở `qd103-ghost-seat-manager-decision`.
 - Not smaller: bảng khuyến nghị, lượt chạy, partial unique cổng 8 và luật thay thế phải có trước mọi nhóm khác.
 - Siblings: `qd103-ghost-seat-g3-g4`, `qd103-ghost-seat-manager-decision` (cùng module, thêm giá trị enum qua `*_values`, cột, capability).
-- Scope map: n/a
+- Scope map: [G7](../../../roadmap.md#work-item-decomposition-g7).
 
 ## Primary Story/AC
 
-| Story | AC                                                  | Coverage | Phần còn lại thuộc                                                                                        |
-| ----- | --------------------------------------------------- | -------- | --------------------------------------------------------------------------------------------------------- |
-| —     | L4-04 (a, b, c, d-khung, e), L4-09 (điều phối khóa) | n/a      | trạng thái `G3`/`G4` trên bảng: `qd103-ghost-seat-g3-g4`; quyết định: `qd103-ghost-seat-manager-decision` |
+| Story    | AC                           | Coverage | Phần còn lại thuộc                                                                                                                                    |
+| -------- | ---------------------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| US-10-01 | AC-1→AC-10                   | full     | —                                                                                                                                                     |
+| US-10-05 | AC-1, AC-2, AC-5, AC-7, AC-8 | partial  | AC còn lại và vế chung theo scope map: `qd103-ghost-seat-manager-decision`, `qd103-ghost-seat-g3-g4`                                                  |
+| US-10-07 | AC-4, AC-13, AC-18, AC-20    | partial  | AC còn lại và vế chung theo scope map: `qd103-ghost-seat-manager-decision`, `qd103-revocation-grace-notice`, `qd103-commitment-release-on-revocation` |
 
 ## Supporting references
 
@@ -49,6 +51,8 @@ AC-4, AC-13, AC-18 (vế `G2` không ân hạn), AC-20 (`K1`), `US-07-05` AC-12,
 tham khảo (§4 luật 9): **còn dùng** tên enum `GhostSeatGroup`, `GhostSeatTier`, partial unique cổng 8, claim lượt chạy `ON CONFLICT` + nhận lại sau
 2 h, `attempt < 3`, mỗi đối tượng một transaction, gắn `G2` vào tác vụ thu hồi đang sống (`US-07-05` AC-12 — `SBF-04` :43 _không sinh `G2` lần nữa_
 đọc là _không trùng_); **bỏ** `GhostSeatState` cũ, phòng của `G1` = phòng sở hữu thuê bao (trái R-E02).
+
+_Re-pin 11/11/2026 ([C3](../../../reviews/mf2-mf3-2026-11-10/C3-SCOPE-MAP-REPIN.md)):_ trước là `technical-enabler`, dòng `n/a` của bảng Primary: L4-04 (a, b, c, d-khung, e), L4-09 (điều phối khóa) — trạng thái `G3`/`G4` trên bảng: `qd103-ghost-seat-g3-g4`; quyết định: `qd103-ghost-seat-manager-decision`. Bảng Primary claim AC của tối đa ba Story chính lấy từ danh sách trên, chỉ AC đang dùng ở Docs `5bb2e6a` (số AC của EP-05/EP-06/EP-12 không đổi giữa `9c7f386` và `5bb2e6a`); khóa khác của danh sách trên giữ chủ hiện có hoặc là `deferred` tới hạng mục này trong scope map. Claim theo spec và commit đã merge (PR #36), chưa đối chiếu từng AC trên code.
 
 ## Explicit out of scope
 

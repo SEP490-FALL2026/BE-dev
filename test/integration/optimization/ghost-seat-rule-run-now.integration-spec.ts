@@ -88,7 +88,8 @@ describe('POST /ghost-seat-rule-runs: the rules run by hand (integration, real P
     expect(g1).toMatchObject({ state: 'OPEN', free_seats: 98, created_run_id: runs[0].id });
     const g3 = await recommendations('G3', 'employee_id', world.people[0]);
     expect(g3).toHaveLength(1);
-    expect(g3[0]).toMatchObject({ state: 'OPEN', created_run_id: runs[1].id });
+    // A run by hand routes what it made at once, not at the next hourly pass: the department of the world has no head, so G3 waits for one.
+    expect(g3[0]).toMatchObject({ state: 'WAITING_FOR_HEAD', created_run_id: runs[1].id });
     expect(await recommendations('G3', 'employee_id', world.people[1])).toEqual([]);
     // Each run is audited with the person who asked.
     const { rows: audits } = await h.ctx.sql.query<{ actor_kind: string; actor_roles: string[] }>(

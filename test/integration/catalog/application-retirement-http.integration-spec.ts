@@ -17,13 +17,7 @@ describe('the retirement of an application over HTTP (integration, real PostgreS
   let designer: string;
   let a1Employee: string;
   let people: string[];
-  let owner: string;
 
-  const confirm = (applicationId: string, body: object, account = h.it1) =>
-    request(h.server())
-      .post(`/api/v1/applications/${applicationId}/retirement-confirmations`)
-      .set(h.as(account))
-      .send(body);
   const retire = (applicationId: string, account = h.it1) =>
     request(h.server()).post(`/api/v1/applications/${applicationId}/retire`).set(h.as(account));
   const retirement = (applicationId: string, account = h.it1) =>
@@ -110,7 +104,6 @@ describe('the retirement of an application over HTTP (integration, real PostgreS
 
   beforeAll(async () => {
     await h.start();
-    owner = h.businessOwner;
     designer = await h.jobTitle('Designer');
     a1Employee = await h.person('E-A1');
     await h.account('E-A1', a1Employee, 'IT_ADMIN');
@@ -123,72 +116,47 @@ describe('the retirement of an application over HTTP (integration, real PostgreS
     await h.stop();
   });
 
-  it('US-04-01 AC-8: needs the confirmation of the Business Owner, which is recorded with its content, and then retires', async () => {
+  it('US-04-01 AC-9, QĐ-111g: nobody confirms, the IT Admin retires an application with nothing holding it, and the audit names them', async () => {
     const { applicationId } = await cleanApplication();
-    const before = await retirement(applicationId).expect(200);
+    const before = h.dataOf<{ retirement: Record<string, unknown> }>(
+      await retirement(applicationId).expect(200),
+    ).retirement;
 
-    expect(h.codeOf(await retire(applicationId).expect(422))).toBe('APPLICATION.RETIREMENT_NEEDS_CONFIRMATION');
-    expect(h.dataOf<{ retirement: { confirmed: boolean; canRetire: boolean } }>(before).retirement).toMatchObject({
-      confirmed: false,
-      canRetire: false,
-    });
-    for (const body of [{ businessOwnerEmployeeId: owner }, { businessOwnerEmployeeId: owner, note: '  ' }]) {
-      expect(h.codeOf(await confirm(applicationId, body).expect(422))).toBe('APPLICATION.RETIREMENT_NOTE_REQUIRED');
-    }
-    expect(
-      h.codeOf(await confirm(applicationId, { businessOwnerEmployeeId: people[0], note: 'tôi đồng ý' }).expect(422)),
-    ).toBe('APPLICATION.RETIREMENT_NOT_BUSINESS_OWNER');
+    expect(before).toMatchObject({ status: 'APPROVED', canRetire: true });
+    expect(before).not.toHaveProperty('confirmations');
+    expect(before).not.toHaveProperty('confirmationTotal');
+    expect(before).not.toHaveProperty('confirmed');
     expect(await statusOf(applicationId)).toBe('APPROVED');
 
-    const confirmation = h.dataOf<{
-      confirmation: { id: string; businessOwnerEmployeeId: string; note: string; recordedBy: string };
-    }>(
-      await confirm(applicationId, { businessOwnerEmployeeId: owner, note: '  đã dọn sạch, đồng ý ngừng  ' }).expect(
-        201,
-      ),
-    ).confirmation;
-    expect(confirmation).toMatchObject({
-      businessOwnerEmployeeId: owner,
-      note: 'đã dọn sạch, đồng ý ngừng',
-      recordedBy: h.it1.appUserId,
-    });
-    expect(
-      h.dataOf<{ retirement: { canRetire: boolean } }>(await retirement(applicationId).expect(200)).retirement
-        .canRetire,
-    ).toBe(true);
-
     expect(h.dataOf<{ status: string }>(await retire(applicationId).expect(200)).status).toBe('RETIRED');
+
     expect(await statusOf(applicationId)).toBe('RETIRED');
+    const row = (
+      await h.ctx.sql.query<{ retirement_confirmation_id: string | null; retired_by_app_user_id: string }>(
+        `SELECT retirement_confirmation_id, retired_by_app_user_id FROM applications WHERE id = $1`,
+        [applicationId],
+      )
+    ).rows[0];
+    expect(row).toEqual({ retirement_confirmation_id: null, retired_by_app_user_id: h.it1.appUserId });
     const events = (await h.auditEvents('Application', applicationId)).filter((event) =>
       /RETIREMENT_CONFIRMED|RETIRED/.test(event.action),
     );
-    expect(events.map((event) => event.action)).toEqual(['APPLICATION.RETIREMENT_CONFIRMED', 'APPLICATION.RETIRED']);
-    expect(events[0]).toMatchObject({
-      actor_app_user_id: h.it1.appUserId,
-      after: { businessOwnerEmployeeId: owner, note: 'đã dọn sạch, đồng ý ngừng', confirmationId: confirmation.id },
-    });
-    expect(events[1]).toMatchObject({
-      actor_app_user_id: h.it1.appUserId,
-      after: { status: 'RETIRED', confirmationId: confirmation.id, businessOwnerEmployeeId: owner },
-    });
+    expect(events.map((event) => event.action)).toEqual(['APPLICATION.RETIRED']);
+    expect(events[0]).toMatchObject({ actor_app_user_id: h.it1.appUserId, after: { status: 'RETIRED' } });
   });
 
-  it('QĐ-104: an application that names no Business Owner is retired by the IT Admin with no confirmation, still only when nothing holds it', async () => {
+  it('QĐ-111g: the route that recorded the confirmation of a Business Owner is gone (404), and a retirement is still only when nothing holds it', async () => {
     const { applicationId, planId, subscriptionId } = await cleanApplication();
-    await h.ctx.sql.query(`UPDATE applications SET business_owner_employee_id = NULL WHERE id = $1`, [applicationId]);
     const seat = await insertAssignment(people[1], planId, subscriptionId);
 
+    await request(h.server())
+      .post(`/api/v1/applications/${applicationId}/retirement-confirmations`)
+      .set(h.as(h.it1))
+      .send({ note: 'đồng ý' })
+      .expect(404);
     expect(
-      h.dataOf<{ retirement: { confirmed: boolean; canRetire: boolean } }>(await retirement(applicationId).expect(200))
-        .retirement,
-    ).toMatchObject({
-      confirmed: true,
-      canRetire: false,
-    });
-    // Nobody confirms in place of an owner that does not exist.
-    expect(h.codeOf(await confirm(applicationId, { businessOwnerEmployeeId: owner, note: 'đồng ý' }).expect(422))).toBe(
-      'APPLICATION.RETIREMENT_NOT_BUSINESS_OWNER',
-    );
+      h.dataOf<{ retirement: { canRetire: boolean } }>(await retirement(applicationId).expect(200)).retirement,
+    ).toMatchObject({ canRetire: false });
     expect(h.codeOf(await retire(applicationId).expect(409))).toBe('APPLICATION.RETIREMENT_BLOCKED');
 
     await h.ctx.sql.query(`UPDATE license_assignments SET valid_until = valid_from + 1 WHERE id = $1`, [seat]);
@@ -197,33 +165,10 @@ describe('the retirement of an application over HTTP (integration, real PostgreS
         .canRetire,
     ).toBe(true);
     expect(h.dataOf<{ status: string }>(await retire(applicationId).expect(200)).status).toBe('RETIRED');
-    const row = (
-      await h.ctx.sql.query<{
-        catalog_status: string;
-        retirement_confirmation_id: string | null;
-        retired_by_app_user_id: string;
-      }>(`SELECT catalog_status, retirement_confirmation_id, retired_by_app_user_id FROM applications WHERE id = $1`, [
-        applicationId,
-      ])
-    ).rows[0];
-    expect(row).toEqual({
-      catalog_status: 'RETIRED',
-      retirement_confirmation_id: null,
-      retired_by_app_user_id: h.it1.appUserId,
-    });
-    const retired = (await h.auditEvents('Application', applicationId)).filter(
-      (event) => event.action === 'APPLICATION.RETIRED',
-    );
-    expect(retired).toHaveLength(1);
-    expect(retired[0]).toMatchObject({
-      actor_app_user_id: h.it1.appUserId,
-      after: { status: 'RETIRED', confirmationId: null, businessOwnerEmployeeId: null, note: null },
-    });
   });
 
   it('DB-09: the last look at what holds the application is taken in the transaction that holds the locks', async () => {
     const { applicationId } = await cleanApplication();
-    await confirm(applicationId, { businessOwnerEmployeeId: owner, note: 'đồng ý' }).expect(201);
     const holdings = jest.spyOn(h.ctx.app.get(AssignmentRepo, { strict: false }), 'holdingOfPlans');
     const plans = jest.spyOn(h.ctx.app.get(PlanRepo, { strict: false }), 'findOfApplication');
     try {
@@ -241,27 +186,11 @@ describe('the retirement of an application over HTTP (integration, real PostgreS
     }
   });
 
-  it('does not count the confirmation of someone who is no longer the Business Owner', async () => {
-    const { applicationId } = await cleanApplication();
-    await confirm(applicationId, { businessOwnerEmployeeId: owner, note: 'đồng ý' }).expect(201);
-    await request(h.server())
-      .patch(`/api/v1/applications/${applicationId}`)
-      .set(h.as(h.it1))
-      .send({ businessOwnerEmployeeId: people[0] })
-      .expect(200);
-
-    expect(h.codeOf(await retire(applicationId).expect(422))).toBe('APPLICATION.RETIREMENT_NEEDS_CONFIRMATION');
-    await confirm(applicationId, { businessOwnerEmployeeId: owner, note: 'vẫn tôi' }).expect(422);
-    await confirm(applicationId, { businessOwnerEmployeeId: people[0], note: 'tôi là người mới' }).expect(201);
-    await retire(applicationId).expect(200);
-  });
-
   it('US-04-01 AC-9: is refused while assignments and a running subscription hold it, lists exactly them, and revokes nothing', async () => {
     const { applicationId, planId } = await cleanApplication();
     const running = await subscribe(planId, { endDate: '2027-12-31' });
     const first = await insertAssignment(people[0], planId, running);
     const second = await insertAssignment(people[1], planId, running);
-    await confirm(applicationId, { businessOwnerEmployeeId: owner, note: 'đồng ý' }).expect(201);
     const tasks = await taskCount();
 
     const refused = await retire(applicationId).expect(409);
@@ -289,7 +218,6 @@ describe('the retirement of an application over HTTP (integration, real PostgreS
     const planId = await h.plan('K5');
     const applicationId = await applicationOf(planId);
     const assignmentId = await insertAssignment(people[2], planId, null);
-    await confirm(applicationId, { businessOwnerEmployeeId: owner, note: 'đồng ý' }).expect(201);
 
     const refused = await retire(applicationId).expect(409);
 
@@ -309,7 +237,6 @@ describe('the retirement of an application over HTTP (integration, real PostgreS
           kind: 'LICENSED',
           vendorName: h.unique('Vendor'),
           dataSensitivity: 'LOW',
-          businessOwnerEmployeeId: owner,
           communication: { personToPersonMessaging: false, callsOrMeetings: false, mailbox: false },
         })
         .expect(201),
@@ -341,7 +268,6 @@ describe('the retirement of an application over HTTP (integration, real PostgreS
       })
       .expect(201);
     const assignmentId = await insertAssignment(people[3], planId, null, { from: '2026-04-01' });
-    await confirm(applicationId, { businessOwnerEmployeeId: owner, note: 'đồng ý ngừng Office 2021' }).expect(201);
 
     const refused = await retire(applicationId).expect(409);
     expect(h.codeOf(refused)).toBe('APPLICATION.RETIREMENT_BLOCKED');
@@ -359,7 +285,6 @@ describe('the retirement of an application over HTTP (integration, real PostgreS
     const { applicationId, planId, subscriptionId } = await cleanApplication();
     await insertAssignment(people[0], planId, subscriptionId, { failed: true });
     await insertAssignment(people[1], planId, subscriptionId, { from: '2025-02-01', until: '2025-03-01' });
-    await confirm(applicationId, { businessOwnerEmployeeId: owner, note: 'đồng ý' }).expect(201);
     const view = h.dataOf<{ retirement: { blockers: Blockers; canRetire: boolean } }>(
       await retirement(applicationId).expect(200),
     );
@@ -381,15 +306,11 @@ describe('the retirement of an application over HTTP (integration, real PostgreS
     ).toEqual([today, openEnded].sort());
   });
 
-  it('retires once and for good: a second retirement, a new confirmation and a way back are all refused', async () => {
+  it('retires once and for good: a second retirement and a way back are both refused', async () => {
     const { applicationId } = await cleanApplication();
-    await confirm(applicationId, { businessOwnerEmployeeId: owner, note: 'đồng ý' }).expect(201);
     await retire(applicationId).expect(200);
 
     expect(h.codeOf(await retire(applicationId).expect(409))).toBe('APPLICATION.ALREADY_RETIRED');
-    expect(h.codeOf(await confirm(applicationId, { businessOwnerEmployeeId: owner, note: 'lại' }).expect(409))).toBe(
-      'APPLICATION.ALREADY_RETIRED',
-    );
     await expect(
       h.ctx.sql.query(`UPDATE applications SET catalog_status = 'APPROVED', retired_at = NULL WHERE id = $1`, [
         applicationId,
@@ -400,7 +321,6 @@ describe('the retirement of an application over HTTP (integration, real PostgreS
   it('takes no seat under a retired application, from a request or from a baseline file', async () => {
     const planId = await h.plan('K5');
     const applicationId = await applicationOf(planId);
-    await confirm(applicationId, { businessOwnerEmployeeId: owner, note: 'đồng ý' }).expect(201);
     await retire(applicationId).expect(200);
 
     const grant = await h.grant({ requestId: h.gate.grantable(people[4], planId) }).expect(409);
@@ -418,7 +338,6 @@ describe('the retirement of an application over HTTP (integration, real PostgreS
     const preview = h.dataOf<{ id: string; previewVersion: number }>(
       await h.upload({ planId }, h.file([{ employee_code: 'E-R4', account_identifier: 'e-r4@acme.vn' }])).expect(201),
     );
-    await confirm(applicationId, { businessOwnerEmployeeId: owner, note: 'đồng ý' }).expect(201);
     await retire(applicationId).expect(200);
 
     const refused = await h.confirm(preview.id, preview.previewVersion).expect(409);
@@ -434,7 +353,6 @@ describe('the retirement of an application over HTTP (integration, real PostgreS
   it('a retirement waits for a grant that is being made, and then finds the seat it holds', async () => {
     const planId = await h.plan('K5');
     const applicationId = await applicationOf(planId);
-    await confirm(applicationId, { businessOwnerEmployeeId: owner, note: 'đồng ý' }).expect(201);
     const holder = new Client({ connectionString: h.ctx.database.url });
     await holder.connect();
     try {
@@ -459,7 +377,6 @@ describe('the retirement of an application over HTTP (integration, real PostgreS
 
   it('shows an application that is retired as retired, with the day, and nothing left to decide', async () => {
     const { applicationId } = await cleanApplication();
-    await confirm(applicationId, { businessOwnerEmployeeId: owner, note: 'đồng ý' }).expect(201);
     await retire(applicationId).expect(200);
 
     const { retirement: view } = h.dataOf<{
@@ -474,7 +391,6 @@ describe('the retirement of an application over HTTP (integration, real PostgreS
   it('a grant and a retirement at the same moment never leave a retired application with a seat held under it', async () => {
     const planId = await h.plan('K5');
     const applicationId = await applicationOf(planId);
-    await confirm(applicationId, { businessOwnerEmployeeId: owner, note: 'đồng ý' }).expect(201);
 
     const [granted, retired] = await Promise.all([
       h.grant({ requestId: h.gate.grantable(people[5], planId) }),
@@ -489,47 +405,11 @@ describe('the retirement of an application over HTTP (integration, real PostgreS
     expect([granted.status, retired.status]).not.toEqual([201, 200]);
   });
 
-  it('INV-06: a confirmation waits for a departure that is being recorded, and then finds the owner gone', async () => {
-    const { applicationId } = await cleanApplication();
-    const leaving = await h.person('E-OWNER-LEAVING');
-    await h.ctx.sql.query(`UPDATE applications SET business_owner_employee_id = $2 WHERE id = $1`, [
-      applicationId,
-      leaving,
-    ]);
-    const holder = new Client({ connectionString: h.ctx.database.url });
-    await holder.connect();
-    try {
-      await holder.query('BEGIN');
-      await holder.query(`UPDATE employees SET status = 'TERMINATED' WHERE id = $1`, [leaving]);
-
-      const pending = confirm(applicationId, { businessOwnerEmployeeId: leaving, note: 'đồng ý' }).then(
-        (response) => response,
-      );
-      await waitForLockWaiters(h.ctx.sql, 1);
-      await holder.query('COMMIT');
-      const refused = await pending;
-
-      expect(refused.status).toBe(422);
-      expect(h.codeOf(refused)).toBe('APPLICATION.RETIREMENT_NOT_BUSINESS_OWNER');
-      const kept = await h.ctx.sql.query(
-        `SELECT 1 FROM application_retirement_confirmations WHERE application_id = $1`,
-        [applicationId],
-      );
-      expect(kept.rowCount).toBe(0);
-    } finally {
-      await holder.query('ROLLBACK').catch(() => undefined);
-      await holder.end();
-    }
-  });
-
-  it('is for the IT Admin to record and retire; Finance only looks; an employee and the Super Admin do neither', async () => {
+  it('is for the IT Admin to retire; Finance only looks; an employee and the Super Admin do neither', async () => {
     const { applicationId } = await cleanApplication();
     const superAdmin = { ...h.it1, accessToken: h.admin };
 
     for (const account of [h.finance, h.employee, superAdmin]) {
-      expect(
-        h.codeOf(await confirm(applicationId, { businessOwnerEmployeeId: owner, note: 'x' }, account).expect(403)),
-      ).toBe('AUTHORIZATION.FORBIDDEN');
       expect(h.codeOf(await retire(applicationId, account).expect(403))).toBe('AUTHORIZATION.FORBIDDEN');
     }
     await retirement(applicationId, h.finance).expect(200);

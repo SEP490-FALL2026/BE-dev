@@ -278,11 +278,6 @@
       "count": 1
     }
   },
-  "src/modules/requests/assessment/assessment-view.service.ts": {
-    "max-lines-per-function": {
-      "count": 1
-    }
-  },
   "src/modules/requests/assessment/proposal.service.ts": {
     "max-lines-per-function": {
       "count": 2

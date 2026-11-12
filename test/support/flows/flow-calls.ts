@@ -74,13 +74,15 @@ export class FlowCalls {
     return found.id;
   }
 
-  /** The subscription a department owns of a plan (read from the database: the subscription list is for the IT Admin). */
-  async subscriptionOf(planName: string, departmentCode: string): Promise<string> {
+  /**
+   * The subscription of a plan: the one stock of the whole company (`QĐ-103d`) — the dataset holds exactly one subscription per plan, so a
+   * second one is a failure of the dataset, not a choice. Read from the database: the subscription list is for the IT Admin.
+   */
+  async subscriptionOf(planName: string): Promise<string> {
     return (
       await this.facts.one<{ id: string }>(
-        `SELECT s.id FROM subscriptions s JOIN plans p ON p.id = s.plan_id JOIN departments d ON d.id = s.owner_department_id
-          WHERE p.name = $1 AND d.code = $2`,
-        [planName, departmentCode],
+        `SELECT s.id FROM subscriptions s JOIN plans p ON p.id = s.plan_id WHERE p.name = $1`,
+        [planName],
       )
     ).id;
   }

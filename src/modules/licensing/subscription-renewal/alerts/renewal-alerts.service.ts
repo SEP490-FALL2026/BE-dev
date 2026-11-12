@@ -21,10 +21,9 @@ export interface AlertSubject {
 
 /**
  * The alerts of the milestones of a renewal (`US-11-01`): at each milestone counted back from the cancellation deadline (or the end
- * date), the IT Admin, Finance, the Business Owner who still works and the decider are told, the Super Admin too at the last one,
+ * date), the IT Admin, Finance and the decider are told, the Super Admin too at the last one,
  * which is left out when the decision and its outcome are both recorded. A period with no milestone gives the IT Admin a warning of
- * the quality of its contract data instead of a guessed date; a Business Owner who left is not told and the IT Admin is asked to
- * name another. Each person is told once for a milestone, however often the pass runs, and each notice has its audit event.
+ * the quality of its contract data instead of a guessed date. Each person is told once for a milestone, however often the pass runs, and each notice has its audit event.
  * Usage is only said to be available or not: no recommendation is invented here.
  */
 @Injectable()
@@ -50,17 +49,6 @@ export class RenewalAlertsService {
       for (const recipient of alertRecipients(people, milestone.final)) {
         told += await this.alert(tx, subject, recipient, { baseDate, days: milestone.days, decided });
       }
-      if (people.businessOwner === null && people.itAdmin !== null) {
-        await this.notifier.tell(tx, {
-          organizationId: subject.organizationId,
-          recipients: [people.itAdmin],
-          code: 'SUBSCRIPTION_BUSINESS_OWNER_LEFT',
-          subject: { type: 'SUBSCRIPTION', id: period.subscriptionId },
-          params: { subscriptionId: period.subscriptionId, applicationId: period.applicationId },
-          eventKey: `subscription-business-owner-left:${period.subscriptionId}:${baseDate}`,
-        });
-      }
-
       return told;
     });
   }

@@ -35,8 +35,6 @@ export interface DeclareApplicationInput {
   dictionaryServiceLineId?: string;
   domains?: string[];
   dataSensitivity: DataSensitivity;
-  /** QĐ-104 removed the Business Owner: optional; an application declared without one has none. */
-  businessOwnerEmployeeId?: string;
   communication: CommunicationAnswers & { note?: string | null };
   functionalGroupId?: string;
 }
@@ -45,7 +43,6 @@ export interface UpdateApplicationInput {
   name?: string;
   domains?: string[];
   dataSensitivity?: DataSensitivity;
-  businessOwnerEmployeeId?: string;
   communication?: Partial<CommunicationAnswers> & { note?: string | null };
   functionalGroupId?: string | null;
   dictionaryServiceLineId?: string | null;
@@ -53,8 +50,8 @@ export interface UpdateApplicationInput {
 
 /**
  * The application catalog the IT Admin keeps (`US-04-01`). Declaring or changing an application is one transaction:
- * the Business Owner is locked and checked, the vendor and the functional group are found or checked, the application
- * is written, a proposal to the dictionary is raised when the software is outside it, and the audit events are recorded.
+ * the vendor and the functional group are found or checked, the application is written with the IT Admin who declares it
+ * as the one responsible (`QĐ-111g`), a proposal to the dictionary is raised when the software is outside it, and the audit events are recorded.
  * A unique violation aborts the transaction, so it is caught outside it and mapped by the column it names.
  */
 @Injectable()
@@ -90,7 +87,7 @@ export class ApplicationService {
   }> {
     const record = await this.applications.find(id);
     if (!record) throw new ApplicationNotFoundError();
-    const [application] = await this.views.withOwners([record]);
+    const [application] = await this.views.withResponsible([record]);
     const similar = record.functionalGroup
       ? await this.applications.similarTo(record.functionalGroup.id, id, SIMILAR_APPLICATION_LIMIT)
       : { items: [], total: 0 };
@@ -105,7 +102,7 @@ export class ApplicationService {
 
   /**
    * Declares an application. Throws the vendor errors of `vendorSourceOf`, the
-   * name, domain and note errors of the policy, ApplicationBusinessOwnerInvalidError,
+   * name, domain and note errors of the policy,
    * ApplicationFunctionalGroupInvalidError, ApplicationDictionaryLineNotFoundError, ApplicationNameTakenError,
    * ApplicationDictionaryLineTakenError, ApplicationDictionaryLineMismatchError (a vendor of the group's name holds
    * another group) and ApplicationVendorGroupChangedError (a simultaneous change took the group first, `DB-03`).
@@ -115,7 +112,7 @@ export class ApplicationService {
     actor: AuthenticatedPrincipal,
     input: DeclareApplicationInput,
   ): Promise<{ application: ApplicationView; proposed: boolean }> {
-    const [application] = await this.views.withOwners([await this.declareRecord(actor, input)]);
+    const [application] = await this.views.withResponsible([await this.declareRecord(actor, input)]);
 
     return { application, proposed: vendorSourceOf(input).type === 'NAME' };
   }
@@ -139,7 +136,7 @@ export class ApplicationService {
     }
   }
 
-  /** The Business Owner and the functional group are checked, the vendor is found or made, the application is written, and the audit says so. */
+  /** The functional group is checked, the vendor is found or made, the application is written with the caller as the IT Admin responsible, and the audit says so. */
   private async writeDeclaration(
     tx: DbTx,
     actor: AuthenticatedPrincipal,
@@ -153,8 +150,6 @@ export class ApplicationService {
     },
   ): Promise<ApplicationRecord> {
     const { source, name, domains, note, organizationId } = prepared;
-    const owner = input.businessOwnerEmployeeId ?? null;
-    if (owner !== null) await this.guards.requireWorkingOwner(tx, owner);
     const group = input.functionalGroupId ? await this.guards.requireActiveGroup(tx, input.functionalGroupId) : null;
     const { ensured, dictionaryServiceLineId } = await this.ensureVendor(tx, organizationId, source);
 
@@ -165,7 +160,8 @@ export class ApplicationService {
       vendorId: ensured?.vendor.id ?? null,
       dictionaryServiceLineId,
       functionalGroupId: group?.id ?? null,
-      businessOwnerEmployeeId: owner,
+      // QĐ-111g: the IT Admin who declares the application answers for it; there is no field to choose another.
+      responsibleItAdminEmployeeId: actor.employeeId,
       dataSensitivity: input.dataSensitivity,
       communication: {
         personToPersonMessaging: input.communication.personToPersonMessaging,
@@ -176,13 +172,6 @@ export class ApplicationService {
       },
       domains,
     });
-    if (owner !== null) {
-      await this.applications.openOwnerPeriod(tx, {
-        applicationId: created.id,
-        employeeId: owner,
-        assignedByAppUserId: actor.appUserId,
-      });
-    }
     await this.auditCreated(tx, actor, created, { ensured, source, name, domains, organizationId });
 
     return created;
@@ -283,7 +272,7 @@ export class ApplicationService {
     try {
       const record = await this.runner.run((tx) => this.updateIn(tx, actor, id, input, { cleaned, organizationId }));
 
-      return (await this.views.withOwners([record]))[0];
+      return (await this.views.withResponsible([record]))[0];
     } catch (error) {
       throw this.guards.mapWriteError(error);
     }
@@ -301,10 +290,7 @@ export class ApplicationService {
     if (!current) throw new ApplicationNotFoundError();
     const changes = applicationChangesOf(current, input, ctx.cleaned);
 
-    // The references that changed are checked in this order: the Business Owner, the functional group, the dictionary line.
-    if (changes.businessOwnerEmployeeId !== undefined) {
-      await this.guards.requireWorkingOwner(tx, changes.businessOwnerEmployeeId);
-    }
+    // The references that changed are checked in this order: the functional group, the dictionary line.
     if (changes.functionalGroupId) await this.guards.requireActiveGroup(tx, changes.functionalGroupId);
     const adoptedGroup = changes.dictionaryServiceLineId
       ? await this.vendorLinks.requireLine(tx, organizationId, current, changes.dictionaryServiceLineId)
@@ -314,14 +300,6 @@ export class ApplicationService {
     const updated = await this.applications.update(tx, id, changes);
     if (adoptedGroup) {
       await this.vendorLinks.recordAdopted(tx, actor, organizationId, adoptedGroup.vendorId, adoptedGroup.groupId);
-    }
-    if (changes.businessOwnerEmployeeId !== undefined) {
-      await this.applications.closeOpenOwnerPeriod(tx, id);
-      await this.applications.openOwnerPeriod(tx, {
-        applicationId: id,
-        employeeId: changes.businessOwnerEmployeeId,
-        assignedByAppUserId: actor.appUserId,
-      });
     }
     await this.audit.record(
       tx,

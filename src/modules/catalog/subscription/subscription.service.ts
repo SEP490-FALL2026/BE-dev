@@ -160,7 +160,15 @@ export class SubscriptionService {
     if (plan.applicationStatus === 'RETIRED') throw new SubscriptionApplicationRetiredError();
     await this.poolRules.assertNoLiveDuplicate(tx, plan, null, organizationId);
     const ownerDepartmentId = await this.ownerOf(tx, plan.provisioningType, input.ownerDepartmentId);
-    const state = declaredStateOf(input);
+    const state = {
+      ...declaredStateOf(input),
+      // QĐ-111g: a declaration that names nobody takes the IT Admin responsible for the application, when they still work as one.
+      responsibleItAdminEmployeeId: await this.poolRules.responsibleOfDeclaration(
+        tx,
+        plan.applicationId,
+        input.responsibleItAdminEmployeeId,
+      ),
+    };
     this.assertShape(plan, input.kind, state);
 
     const priced = await this.pricing.priceToday(tx, money);
