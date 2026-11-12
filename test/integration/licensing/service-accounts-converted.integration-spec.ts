@@ -287,6 +287,43 @@ describe('the migration that takes service accounts out of the scope (integratio
       expect(told.find((line) => line.includes(withFile))).toContain('personnel file that is not closed');
     }, 240_000);
 
+    it('judges a duty of handover open as the application did (neither confirmed nor cancelled), whether or not it proceeded without confirmation', async () => {
+      const worker = await h.person(code());
+      /** A duty of handover as the earlier release wrote it: the columns of its state, each with the SQL value it is given. */
+      const duty = async (assignmentId: string, state: Record<string, string>): Promise<void> => {
+        const columns = Object.keys(state);
+        await h.ctx.sql.query(
+          `INSERT INTO handover_duties (id, organization_id, assignment_id, employee_id, source, leaver_is_head, confirmer_role,
+             data_loss, due_on, created_by_app_user_id${columns.map((column) => `, ${column}`).join('')})
+           SELECT gen_random_uuid(), a.organization_id, a.id, a.employee_id, 'DEPARTURE', false, 'IT_ADMIN', true, '2026-11-20', $2${columns
+             .map((column) => `, ${state[column]}`)
+             .join('')}
+             FROM license_assignments a WHERE a.id = $1`,
+          [assignmentId, randomUUID()],
+        );
+      };
+      const proceeded = await serviceAccount(subscriptions.seed, worker);
+      await duty(proceeded, { proceeded_unconfirmed_at: 'now()' });
+      const confirmed = await serviceAccount(subscriptions.seed, worker);
+      await duty(confirmed, {
+        confirmed_value: "'HANDED_OVER'",
+        confirmed_by_employee_id: `'${itOne}'`,
+        confirmed_role: "'IT_ADMIN'",
+        confirmed_at: 'now()',
+      });
+      const cancelled = await serviceAccount(subscriptions.seed, worker);
+      await duty(cancelled, { cancelled_at: 'now()', cancel_reason: "'RULE_CHANGED'" });
+
+      const told = await migrate();
+
+      // A duty that proceeded without confirmation is still open: the flag only marks it (`OPEN_DUTY`, the unique index of one open duty per seat).
+      expect(await successorOf(proceeded)).toBeNull();
+      expect(told.find((line) => line.includes(proceeded))).toContain('a duty of handover is still open');
+      // A duty that was confirmed or cancelled is history and keeps nothing.
+      expect(await successorOf(confirmed)).not.toBeNull();
+      expect(await successorOf(cancelled)).not.toBeNull();
+    }, 180_000);
+
     it('leaves one that has not started yet, and one for which no IT Admin can act', async () => {
       const worker = await h.person(code());
       const future = await serviceAccount(subscriptions.seed, worker, { validFrom: tomorrow() });

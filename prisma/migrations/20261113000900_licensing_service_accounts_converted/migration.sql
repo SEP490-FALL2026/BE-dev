@@ -18,7 +18,9 @@
 --
 -- What is not converted and is listed in a notice instead: a service account with a task of the grant or the revocation still alive, a duty of handover
 -- still open, a person who answers for it who has a personnel file (a transfer, a departure) that is not closed, one that has not started, one that ends
--- by itself the day it would be converted, and one for which no IT Admin can act.
+-- by itself the day it would be converted, and one for which no IT Admin can act. A duty of handover is open as the application judged it
+-- (`OPEN_DUTY`, the unique index of one open duty per seat and `20261113000500_handover_duties_cancel_open`): neither confirmed nor cancelled. The moment
+-- `proceeded_unconfirmed_at` only marks an open duty whose revocation went ahead without the confirmation, so it does not close it.
 
 CREATE OR REPLACE FUNCTION pg_temp.slm_usable_it_admin(candidate uuid) RETURNS boolean
 LANGUAGE sql STABLE AS $$
