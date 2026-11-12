@@ -151,6 +151,10 @@ export class EmployeeRecordService {
     return this.repo.searchActiveEmployees(search, onDate, limit, excludeEmployeeIds);
   }
 
+  pageAmong(employeeIds: readonly string[], search: string | undefined, skip: number, take: number) {
+    return this.repo.pageAmong(employeeIds, search, skip, take);
+  }
+
   profile(employeeId: string, onDate: Date): Promise<EmployeeProfile | null> {
     return this.repo.findProfile(employeeId, onDate);
   }

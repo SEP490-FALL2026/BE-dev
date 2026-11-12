@@ -48,6 +48,11 @@ export class LicenseKeyAssignmentService {
     );
   }
 
+  /** Whether the seat holds a key, its row locked until commit; a seat granted before the key pool holds none. */
+  async holdsKey(tx: DbTx, assignmentId: string): Promise<boolean> {
+    return (await this.repo.lockOfAssignment(tx, assignmentId)) !== null;
+  }
+
   /**
    * Takes the key back from the seat whose revocation is completed (`US-07-05` AC-6, AC-7): into the store as a free key, or into the store
    * and withdrawn at once with the reason the IT Admin gave, in one write so it is never free in between. The caller holds the subscription

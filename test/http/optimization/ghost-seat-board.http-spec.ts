@@ -235,7 +235,7 @@ describe('ghost seat board routes (no database)', () => {
     });
     expect(queries.listSeatStates).toHaveBeenCalledWith(
       expect.objectContaining({ roles: ['IT_ADMIN'] }),
-      expect.objectContaining({ applicationId: ID, status: 'NO_DATA', departmentScope: 'ALL' }),
+      expect.objectContaining({ applicationId: ID, status: 'NO_DATA', departmentScope: 'MINE' }),
     );
     expect(JSON.stringify(response.body)).not.toContain('fullName');
     await request(app.getHttpServer())

@@ -99,4 +99,5 @@ sang Docs (`HANDOFF-CHAT.md` §7 bước 5). DX-10 có thể cần bộ lọc au
 Owner chọn **B** — giữ cơ chế `QĐ-97d` (Request, duyệt, cam kết theo giá chưa thuế; thuế vào khi có hóa đơn; hóa đơn không bị chặn),
 chuẩn hóa định nghĩa _chi phí thực chịu_ = giá chưa VAT + VAT không được khấu trừ + thuế nhà thầu công ty chịu + phí thẻ/ngân hàng +
 chênh tỷ giá; **không** gồm VAT được khấu trừ. Code BE đã đúng (`budgets/budget/invoice.policy.ts`: `actualCostMinor = netMinor +
-nonDeductibleTaxMinor`), nên chỉ sửa chữ Docs (`QĐ-97d`, BRD, US) khi Owner nói "đồng bộ".
+nonDeductibleTaxMinor`) và Docs cũng đã đúng (`QĐ-60a`: giá + thuế không được khấu trừ + phí thẻ/chênh tỷ giá; GTGT khấu trừ cột
+riêng) ⟹ **không** cần sửa Docs hay code; chỉ dùng báo cáo để giải thích khi bảo vệ (ghi nhận ở `QĐ-112`).

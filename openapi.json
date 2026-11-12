@@ -83483,7 +83483,8 @@
             "name": "departmentScope",
             "required": false,
             "in": "query",
-            "schema": { "default": "ALL", "type": "string", "enum": ["MINE", "ALL"] }
+            "description": "Kept for compatibility: both values read only the departments the IT Admin is in charge of, and those with no IT Admin; ALL no longer reads the whole organization.",
+            "schema": { "default": "MINE", "type": "string", "enum": ["MINE", "ALL"] }
           },
           {
             "name": "departmentId",
@@ -83819,7 +83820,8 @@
             "name": "departmentScope",
             "required": false,
             "in": "query",
-            "schema": { "default": "ALL", "type": "string", "enum": ["MINE", "ALL"] }
+            "description": "Kept for compatibility: both values read only the departments the IT Admin is in charge of, and those with no IT Admin; ALL no longer reads the whole organization.",
+            "schema": { "default": "MINE", "type": "string", "enum": ["MINE", "ALL"] }
           },
           {
             "name": "departmentId",

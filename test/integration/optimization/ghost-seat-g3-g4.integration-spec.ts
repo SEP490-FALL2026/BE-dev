@@ -15,9 +15,11 @@ import { pretendBusinessToday } from '../../support/pretend-today';
 import { EVENT_SOURCE, UsageHarness } from '../../support/vendor-usage-harness';
 
 /** The whole organization is read (`ALL`), so only the role of the reader counts. */
-const IT_ADMIN_READER = { employeeId: 'not-used', roles: ['IT_ADMIN'] } as unknown as AuthenticatedPrincipal;
 
 const h = new UsageHarness();
+/** The IT Admin of the harness: the table reads only the departments in their scope (`QĐ-111ax`). */
+const itAdminReader = () =>
+  ({ employeeId: h.it1.employeeId, roles: ['IT_ADMIN'] }) as unknown as AuthenticatedPrincipal;
 let week = 0;
 let tag = 0;
 
@@ -685,8 +687,8 @@ describe('G3 / G4: the weekly pass, gates 2-7, the three states, days over the c
     });
     await service().run(new Date());
 
-    const states = await h.ctx.app.get(BoardQueryService).listSeatStates(IT_ADMIN_READER, {
-      departmentScope: 'ALL',
+    const states = await h.ctx.app.get(BoardQueryService).listSeatStates(itAdminReader(), {
+      departmentScope: 'MINE',
       applicationId: noData.applicationId,
       page: 1,
       pageSize: 10,
@@ -698,8 +700,8 @@ describe('G3 / G4: the weekly pass, gates 2-7, the three states, days over the c
       lastActiveDate: null,
       inactiveDays: null,
     });
-    const inactive = await h.ctx.app.get(BoardQueryService).listSeatStates(IT_ADMIN_READER, {
-      departmentScope: 'ALL',
+    const inactive = await h.ctx.app.get(BoardQueryService).listSeatStates(itAdminReader(), {
+      departmentScope: 'MINE',
       applicationId: active.applicationId,
       status: 'INACTIVE',
       page: 1,

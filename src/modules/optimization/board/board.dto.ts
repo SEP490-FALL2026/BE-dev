@@ -53,7 +53,10 @@ export const recommendationListQuerySchema = z.strictObject({
   tier: z.enum(GHOST_SEAT_TIERS).optional(),
   state: z.enum(GHOST_SEAT_STATES).optional(),
   applicationId: z.uuid().optional(),
-  departmentScope: z.enum(['MINE', 'ALL']).default('ALL'),
+  departmentScope: z.enum(['MINE', 'ALL']).default('MINE').meta({
+    description:
+      'Kept for compatibility: both values read only the departments the IT Admin is in charge of, and those with no IT Admin; ALL no longer reads the whole organization.',
+  }),
   departmentId: z
     .uuid()
     .optional()
@@ -65,7 +68,10 @@ export const recommendationListQuerySchema = z.strictObject({
 export const seatStateListQuerySchema = z.strictObject({
   applicationId: z.uuid().optional(),
   status: z.enum(SEAT_STATUSES).optional(),
-  departmentScope: z.enum(['MINE', 'ALL']).default('ALL'),
+  departmentScope: z.enum(['MINE', 'ALL']).default('MINE').meta({
+    description:
+      'Kept for compatibility: both values read only the departments the IT Admin is in charge of, and those with no IT Admin; ALL no longer reads the whole organization.',
+  }),
   departmentId: z
     .uuid()
     .optional()

@@ -485,6 +485,39 @@ export class EmployeeRepo {
     }));
   }
 
+  /**
+   * One page of the employees among `employeeIds`, by code, matched on code or name, and how many match (API-LIST-DETAIL.1): the page and
+   * the total share one snapshot (RepeatableRead). Literal match as in `searchActiveEmployees`; the ids travel as ONE uuid[] parameter.
+   */
+  async pageAmong(
+    employeeIds: readonly string[],
+    search: string | undefined,
+    skip: number,
+    take: number,
+  ): Promise<{ items: { id: string; employeeCode: string; fullName: string }[]; total: number }> {
+    const term = search?.trim();
+    const pattern = term ? `%${escapeLikePattern(term)}%` : null;
+    const ids = [...employeeIds];
+    const where = Prisma.sql`e.id = ANY(${ids}::uuid[])
+         AND (${pattern}::text IS NULL OR e.employee_code ILIKE ${pattern} OR e.full_name ILIKE ${pattern})`;
+
+    return this.prisma.$transaction(
+      async (tx) => {
+        const rows = await tx.$queryRaw<{ id: string; employee_code: string; full_name: string }[]>`
+          SELECT e.id, e.employee_code, e.full_name FROM employees e WHERE ${where}
+           ORDER BY e.employee_code, e.id OFFSET ${skip} LIMIT ${take}`;
+        const [{ total }] = await tx.$queryRaw<{ total: number }[]>`
+          SELECT count(*)::int AS total FROM employees e WHERE ${where}`;
+
+        return {
+          items: rows.map((row) => ({ id: row.id, employeeCode: row.employee_code, fullName: row.full_name })),
+          total,
+        };
+      },
+      { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead },
+    );
+  }
+
   /** Name, department and job title at `onDate` (a date-column value) for /me. */
   async findProfile(employeeId: string, onDate: Date): Promise<EmployeeProfile | null> {
     const employee = await this.prisma.employee.findUnique({

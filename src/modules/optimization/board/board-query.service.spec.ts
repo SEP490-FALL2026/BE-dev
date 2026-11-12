@@ -79,7 +79,7 @@ const page = { page: 1, pageSize: 20 };
 
 describe('QĐ-111aw: the table of wasted seats shows a holder by code, never by name', () => {
   it('has no fullName on any row of the recommendations or of the seat states', async () => {
-    const { service } = build({ members: {} });
+    const { service } = build({ members: { 'd-it': ['emp-1'] } });
 
     const recommendations = await service.list(itAdmin, { departmentScope: 'ALL', ...page });
     const states = await service.listSeatStates(itAdmin, { departmentScope: 'ALL', ...page });
@@ -108,13 +108,13 @@ describe('R-20, m-14: MINE is the scope of the reader', () => {
     expect(identity.findUsableItAdminEmployeeIds).toHaveBeenCalledWith(['it-1']);
   });
 
-  it('reads the whole organization for ALL and never asks which department anyone heads (the routes are for the IT Admin, CO-1)', async () => {
-    const { service, repo, organizationReads } = build();
+  it('reads the scope of the IT Admin for ALL too, never the whole organization, and never asks which department anyone heads (QĐ-111ax, CO-1)', async () => {
+    const { service, repo, organizationReads } = build({ itScope: ['d-it'] });
 
     await service.list(itAdmin, { departmentScope: 'ALL', ...page });
 
-    expect(repo.page.mock.calls[0]?.[1]).toEqual({});
-    expect(organizationReads.getItAdminScope).not.toHaveBeenCalled();
+    expect(repo.page.mock.calls[0]?.[1]).toEqual({ departmentIds: ['d-it'] });
+    expect(organizationReads.getItAdminScope).toHaveBeenCalledTimes(1);
     expect(organizationReads.getHeadedDepartment).not.toHaveBeenCalled();
   });
 });
@@ -166,14 +166,14 @@ describe('QĐ-111aw: a filter on a department or a holder stays inside the scope
     expect(otherHolder.items).toEqual([]);
   });
 
-  it('reads every seat state for ALL, and an empty page when the scope has nobody', async () => {
+  it('reads the holders of the scope for ALL as for MINE (QĐ-111ax), and an empty page when the scope has nobody', async () => {
     const { service, seatStates } = build({ itScope: ['d-it'], members: { 'd-it': [] } });
 
-    await service.listSeatStates(itAdmin, { departmentScope: 'ALL', ...page });
-    const none = await service.listSeatStates(itAdmin, { departmentScope: 'MINE', ...page });
+    const all = await service.listSeatStates(itAdmin, { departmentScope: 'ALL', ...page });
+    const mine = await service.listSeatStates(itAdmin, { departmentScope: 'MINE', ...page });
 
-    expect(seatStates.seatStatePage).toHaveBeenCalledTimes(1);
-    expect(seatStates.seatStatePage.mock.calls[0]?.[1]).not.toHaveProperty('employeeIds');
-    expect(none.items).toEqual([]);
+    expect(seatStates.seatStatePage).not.toHaveBeenCalled();
+    expect(all.items).toEqual([]);
+    expect(mine.items).toEqual([]);
   });
 });

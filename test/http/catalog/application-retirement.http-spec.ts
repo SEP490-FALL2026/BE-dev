@@ -92,4 +92,15 @@ describe('application retirement routes (e2e, no database)', () => {
       .set('Authorization', bearer(principal(['IT_ADMIN'])))
       .expect(404);
   });
+
+  it('has no route of the Business Owner any more (`QĐ-111g`, BO-DEL-1): the warnings and the owners of an application answer 404', async () => {
+    const server = app.getHttpServer();
+
+    for (const path of ['/api/v1/business-owner-warnings', `/api/v1/applications/${ID}/business-owners`]) {
+      await request(server)
+        .get(path)
+        .set('Authorization', bearer(principal(['SUPER_ADMIN'])))
+        .expect(404);
+    }
+  });
 });

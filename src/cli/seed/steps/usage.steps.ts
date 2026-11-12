@@ -124,6 +124,21 @@ async function oneImport(ctx: DemoRunContext, spec: DemoUsageSource): Promise<Re
   return { status: 'done', label };
 }
 
+/**
+ * Every recommendation raised, read as each IT Admin responsible for a subscription of the dataset: an IT Admin reads the table only for the
+ * departments in their scope (`QĐ-111ax`), so one reader no longer sees them all. Deduplicated by id.
+ */
+async function raisedForAll<T extends { id: string }>(ctx: DemoRunContext): Promise<T[]> {
+  const readers = [...new Set(ctx.fixture.subscriptions.map((subscription) => subscription.responsible))];
+  const byId = new Map<string, T>();
+  for (const reader of readers) {
+    for (const item of await listAll<T>(ctx, await as(ctx, reader), '/ghost-seat-recommendations'))
+      byId.set(item.id, item);
+  }
+
+  return [...byId.values()];
+}
+
 async function imports(ctx: DemoRunContext): Promise<StepOutcome> {
   const results: Result[] = [];
   for (const spec of ctx.fixture.usageSources) results.push(await oneImport(ctx, spec));
@@ -137,7 +152,7 @@ async function imports(ctx: DemoRunContext): Promise<StepOutcome> {
  */
 async function firstRun(ctx: DemoRunContext): Promise<StepOutcome> {
   const admin = await as(ctx, ctx.fixture.subscriptions[0].responsible);
-  const raised = await listAll<{ id: string }>(ctx, admin, '/ghost-seat-recommendations?departmentScope=ALL');
+  const raised = await raisedForAll<{ id: string }>(ctx);
   if (raised.length > 0) return { status: 'present', detail: `${raised.length} khuyến nghị đã có` };
   if (ctx.mode === 'plan') return { status: 'planned', detail: 'chạy luật G1–G4' };
   await ctx.api.call(admin, 'POST', '/ghost-seat-rule-runs', {});
@@ -171,10 +186,7 @@ async function standingOf(
   const waiting = (await listAll<QueueItem>(ctx, head, '/ghost-seat-queue')).find(
     (item) => wanted(item) && item.state === 'AWAITING_DECISION',
   );
-  const admin = await as(ctx, ctx.fixture.subscriptions[0].responsible);
-  const raised = (await listAll<QueueItem>(ctx, admin, '/ghost-seat-recommendations?departmentScope=ALL')).filter(
-    wanted,
-  );
+  const raised = (await raisedForAll<QueueItem>(ctx)).filter(wanted);
 
   return { waiting, others: raised };
 }

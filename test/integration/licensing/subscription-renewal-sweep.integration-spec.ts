@@ -291,6 +291,13 @@ describe('the pass over the milestones of the renewals (integration, real Postgr
       } finally {
         await h.ctx.sql.query(`UPDATE app_users SET status = 'ACTIVE' WHERE employee_id = $1`, [itSub.employeeId]);
       }
+      // Left, the account not locked yet: no longer usable either.
+      await h.ctx.sql.query(`UPDATE employees SET status = 'TERMINATED' WHERE id = $1`, [itSub.employeeId]);
+      try {
+        expect(await named(itSub.employeeId)).toEqual([h.it1.employeeId, ...others].sort());
+      } finally {
+        await h.ctx.sql.query(`UPDATE employees SET status = 'ACTIVE' WHERE id = $1`, [itSub.employeeId]);
+      }
     });
 
     it('QĐ-111g: tells no Business Owner and asks nothing about one: the IT Admin, Finance and the decider are the people told', async () => {

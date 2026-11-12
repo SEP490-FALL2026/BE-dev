@@ -47,7 +47,7 @@ bảy bước của `QĐ-111ap`, mỗi bước thuộc đúng một chính sách
 - **Phạm vi:** mọi tài khoản SaaS-Sentry; SaaS trả phí, phần mềm thương mại có bản quyền, phần mềm nội bộ do công ty cấp. Phần mềm miễn phí bên ngoài không phải đối tượng quản lý chi phí (`C-02`) nhưng vẫn chịu quy định 6.
 - **Vai trò:** người dùng — tuân thủ, hoàn trả quyền không còn cần; Trưởng phòng — giám sát việc dùng trong phòng; IT Admin — cấp, thu hồi, giữ cấu hình an toàn; Super Admin — ban hành bộ chính sách, ghi sự kiện nhân sự.
 - **Căn cứ:** Bộ luật Lao động 2019 (Điều 118 — nội quy lao động); Luật Bảo vệ dữ liệu cá nhân số 91/2025/QH15; nội bộ `C-01`, `C-02`, `C-05`, `C-15`, `C-19`, `FR-8.14`. Nhãn _(đề xuất)_ ở quy định 6 và 14 bỏ theo QĐ ban hành bộ chính sách (DX-05, DX-06),
-  chờ ghi sổ QĐ khi đồng bộ. **Tham chiếu:** QT A.2, A.3, A.5, A.7; `BM-01`, `BM-03`, `BM-06`; `SBF-05`, `SBF-09`, `SBF-10`.
+  đã ghi sổ `QĐ-112c` (Docs `Bộ chính sách khởi tạo.md` 1.0). **Tham chiếu:** QT A.2, A.3, A.5, A.7; `BM-01`, `BM-03`, `BM-06`; `SBF-05`, `SBF-09`, `SBF-10`.
 
 **Quy định**
 
@@ -290,8 +290,7 @@ dùng lại.
 - **Phạm vi:** đánh giá và đưa phần mềm mới vào danh mục (`SBF-15`), mua, hóa đơn, nguồn tiền (`SBF-19`), kho `K2`/`K4`, thuê bao, admin nhà cung cấp, điểm điều chỉnh (`SBF-20`).
 - **Vai trò:** IT Admin — đánh giá case B, tạo mục, phụ trách thuê bao, mua và nộp hóa đơn; Finance — đối chiếu, ký xác nhận xuất tiền hoặc trả lại; Super Admin — phân công IT Admin phụ trách phòng.
 - **Căn cứ:** Luật Thuế GTGT số 48/2024/QH15; Nghị định 181/2025/NĐ-CP (khấu trừ GTGT); Nghị định 320/2025/NĐ-CP (chi phí được trừ TNDN); Nghị định 123/2020/NĐ-CP sửa đổi bởi Nghị định 70/2025/NĐ-CP (hóa đơn, chứng từ). Nhãn
-  _(đề xuất)_ ở quy định 10 và 11 (trừ vế khoản lặp ưu tiên Thẻ công ty) bỏ theo QĐ ban hành bộ chính sách (DX-02, DX-03), chờ ghi sổ QĐ khi
-  đồng bộ. Nội bộ `QĐ-103l`, `QĐ-103w`, `QĐ-104d`, `QĐ-104k`, `QĐ-110k`, `QĐ-110l`, `QĐ-110u`, `QĐ-110v`, `QĐ-111b`→`QĐ-111g`, `QĐ-111r`, `QĐ-111t`→`QĐ-111y`, `FR-1.1`, `FR-1.9`, `FR-3.19`, `FR-5.3`, `FR-5.4`. **Tham chiếu:** QT `1.3`, C.1, C.2; `BM-02`, `BM-05`.
+  _(đề xuất)_ ở quy định 10 và 11 (trừ vế khoản lặp ưu tiên Thẻ công ty) bỏ theo QĐ ban hành bộ chính sách (DX-02, DX-03), đã ghi sổ `QĐ-112c` (Docs `Bộ chính sách khởi tạo.md` 1.0). Nội bộ `QĐ-103l`, `QĐ-103w`, `QĐ-104d`, `QĐ-104k`, `QĐ-110k`, `QĐ-110l`, `QĐ-110u`, `QĐ-110v`, `QĐ-111b`→`QĐ-111g`, `QĐ-111r`, `QĐ-111t`→`QĐ-111y`, `FR-1.1`, `FR-1.9`, `FR-3.19`, `FR-5.3`, `FR-5.4`. **Tham chiếu:** QT `1.3`, C.1, C.2; `BM-02`, `BM-05`.
 
 **Quy định**
 
@@ -333,7 +332,7 @@ dùng lại.
 2. Bước `1.3` đặt ở `POL-SAAS` (cùng nội dung `SBF-15`); bảng 4.8 của R10 đặt ở `POL-MF1`.
 3. `POL-GEN`, `POL-MF2`, `POL-MF3` không có bước checklist (chỉ xác nhận đã đọc). Câu _"mỗi chính sách gắn một bước quyết định có checklist"_ ở `FR-8.12`/A.7/R-42 cần sửa thành _"bộ chính sách gắn các bước có checklist"_.
 4. _"`K1` ưu tiên gói tháng"_ viết theo QT `C-11`/`QĐ-103d` là **chỉ** gói tháng, không mua gói năm cá nhân, cộng thêm hướng _nhu cầu dài hạn/nhiều người ⟹ ưu tiên `K2`_ (`POL-MF1` 6, mục 1.7-07). Nếu Owner chỉ muốn "ưu tiên" (cho phép gói năm `K1` khi có lý do) thì phải sửa `QĐ-103d`.
-5. Các mục _(đề xuất)_ chưa có QĐ và hệ thống **không** ép: hóa đơn đứng tên công ty, ngưỡng 5 triệu không dùng tiền mặt, hoàn tiền IT bằng chuyển khoản, khoản lặp ưu tiên Thẻ công ty, cấm đưa dữ liệu mật vào phần mềm ngoài danh mục, xử lý vi phạm theo nội quy. Số hiệu luật/nghị định lấy từ R12B và BRD, nên nhờ kế toán/pháp chế kiểm trước khi demo. **Sau DX 12/11:** chỉ còn vế _khoản lặp ưu tiên Thẻ công ty_ (`POL-SAAS` quy định 11) mang _(đề xuất)_; các mục còn lại bỏ nhãn theo QĐ ban hành bộ chính sách (DX-02, DX-03, DX-05, DX-06), chờ ghi sổ QĐ khi đồng bộ; căn cứ đã sửa đúng tên văn bản theo [R16](R16-POLICY-SOURCES.md).
+5. Các mục _(đề xuất)_ chưa có QĐ và hệ thống **không** ép: hóa đơn đứng tên công ty, ngưỡng 5 triệu không dùng tiền mặt, hoàn tiền IT bằng chuyển khoản, khoản lặp ưu tiên Thẻ công ty, cấm đưa dữ liệu mật vào phần mềm ngoài danh mục, xử lý vi phạm theo nội quy. Số hiệu luật/nghị định lấy từ R12B và BRD, nên nhờ kế toán/pháp chế kiểm trước khi demo. **Sau DX 12/11:** chỉ còn vế _khoản lặp ưu tiên Thẻ công ty_ (`POL-SAAS` quy định 11) mang _(đề xuất)_; các mục còn lại bỏ nhãn theo QĐ ban hành bộ chính sách (DX-02, DX-03, DX-05, DX-06), đã ghi sổ `QĐ-112c` (Docs `Bộ chính sách khởi tạo.md` 1.0); căn cứ đã sửa đúng tên văn bản theo [R16](R16-POLICY-SOURCES.md).
 6. **`change_note` bản 1:** demo dùng số QĐ giả định _01/2026/QĐ-GĐ_. Với cài đặt thật, đề xuất nạp bản 1 kèm _"Bộ mẫu SaaS-Sentry v1.9 — công ty xuất bản phiên bản 2 kèm quyết định của mình"_. Không nạp nháp, vì checklist (PL-2) cần bản hiện hành, thiếu thì mọi bước duyệt bị khóa.
 7. **Vai phải xác nhận:** `POL-GEN` thêm `SPENDING_APPROVER` (R10 không có); `POL-USAGE` = `IT_ADMIN`, `MANAGER`; Super Admin không phải xác nhận bản nào.
 8. **Mục ✅ `SYSTEM`** chỉ gắn khi QT ghi hệ thống chặn thật. Khi seed, `PL-2` cần đối chiếu từng mục `SYSTEM` với guard trong code. Mục nào không có guard thì đổi sang `PERSON`, để FE không tick sẵn một điều kiện mà hệ thống không kiểm.

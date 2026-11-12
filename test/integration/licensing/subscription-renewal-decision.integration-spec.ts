@@ -300,6 +300,24 @@ describe('the proposal and the confirmation of a renewal (integration, real Post
       expect(rows).toEqual([{ decider_role: 'OWNER_DEPARTMENT_HEAD' }]);
     });
 
+    it('QĐ-111g, CO-6: tells the IT Admin responsible for the subscription of the decision, not the one in charge of the department', async () => {
+      const itSub = await h.account('E-IT-DEC', await h.person('E-IT-DEC'), 'IT_ADMIN');
+      const { subscriptionId } = await h.termWithSeats({ ...unit, members: [] }, 15);
+      await h.ctx.sql.query(`UPDATE subscriptions SET responsible_it_admin_employee_id = $2 WHERE id = $1`, [
+        subscriptionId,
+        itSub.employeeId,
+      ]);
+      const id = await h.proposedRenewal({ subscriptionId, choice: 'RENEW' });
+
+      await h.confirmRenewal(id, unit.head.account, { reason: 'Still used by the team' }).expect(200);
+
+      const told = await h.notices('SUBSCRIPTION_RENEWAL_DECIDED', id);
+      // The IT Admin who proposed (it1, also in charge of the department) is told as the proposer; the responsible one as the IT Admin.
+      expect(told.map((row) => row.recipient_employee_id).sort()).toEqual(
+        [h.it1.employeeId, itSub.employeeId, h.finance.employeeId].sort(),
+      );
+    });
+
     it('opens the revocations of the seats the IT Admin proposed when it confirms a reduction (F26)', async () => {
       const reduceUnit = await h.unit(3);
       const { subscriptionId, seats } = await h.termWithSeats(reduceUnit, 16, { quantity: 5 });

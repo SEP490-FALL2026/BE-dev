@@ -191,20 +191,21 @@ describe('BR-MF1-09: a K4 key back to the store and withdrawn from it (integrati
     expect(h.codeOf(misplaced)).toBe('REVOCATION.COMPLETION_NOT_ALLOWED');
   });
 
-  it('BR-MF1-09: a K4 seat granted before the key pool holds no key: the revocation ends it and moves no key', async () => {
+  it('BR-MF1-09: a K4 seat granted before the key pool holds no key: the revocation asks nothing about a key, ends it and records none (Owner 12/11/2026)', async () => {
     const subscriptionId = await h.subscription(3, 'K4');
     const assignmentId = await legacySeat(subscriptionId, `E-K4R-OLD-${(counter += 1)}`);
     const { taskId } = await h.open(assignmentId, 'RETURN');
     await h.claim(taskId).expect(200);
 
-    await h
-      .revoked(taskId, { completion: 'KEY_DEACTIVATED', evidence: 'Deactivated', keyDisposition: 'RETURN_TO_STORE' })
-      .expect(200);
+    await h.revoked(taskId, { completion: 'KEY_DEACTIVATED', evidence: 'Deactivated' }).expect(200);
 
-    expect((await h.auditEvents('ProvisioningTask', taskId)).at(-1)).toMatchObject({
+    const completed = (await h.auditEvents('ProvisioningTask', taskId)).at(-1) as { action: string; after: object };
+    expect(completed).toMatchObject({
       action: 'PROVISIONING_TASK.REVOCATION_COMPLETED',
-      after: { completion: 'KEY_DEACTIVATED', licenseKeyId: null, keyDisposition: 'RETURN_TO_STORE' },
+      after: { completion: 'KEY_DEACTIVATED' },
     });
+    expect(completed.after).not.toHaveProperty('keyDisposition');
+    expect(completed.after).not.toHaveProperty('licenseKeyId');
   });
 
   it('BR-MF1-09 (Q-10 B): the IT Admin withdraws a free key with a reason; it is no longer usable, revealed or given out', async () => {

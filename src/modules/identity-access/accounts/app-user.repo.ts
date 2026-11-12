@@ -196,7 +196,10 @@ export class AppUserRepo {
     }));
   }
 
-  /** Among the employee ids given, those whose account is active and activated and holds an effective IT_ADMIN grant. */
+  /**
+   * Among the employee ids given, those who have not left and whose account is active and activated and holds an effective IT_ADMIN
+   * grant: the same test as the two below. A leaver's account stays active until someone locks it, and they must not count meanwhile.
+   */
   async findUsableItAdminEmployeeIds(employeeIds: readonly string[], tx?: DbTx): Promise<Set<string>> {
     if (employeeIds.length === 0) return new Set();
     const rows = await (tx ?? this.prisma).appUser.findMany({
@@ -204,6 +207,7 @@ export class AppUserRepo {
         employeeId: { in: [...employeeIds] },
         status: 'ACTIVE',
         activationState: 'ACTIVATED',
+        employee: { status: 'ACTIVE' },
         roleGrants: { some: { role: 'IT_ADMIN', revokedAt: null } },
       },
       select: { employeeId: true },

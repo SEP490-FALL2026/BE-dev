@@ -2,6 +2,8 @@ import { randomUUID } from 'node:crypto';
 import request from 'supertest';
 import { ApiAccount, adminToken, createActivatedAccount } from '../../support/api-accounts';
 import { HttpTestApp, SeededInstallation, createHttpTestApp, seedInstallation } from '../../support/http-test-app';
+import { PgRelay } from '../../support/pg-relay';
+import { QueryCounter, dataStatements } from '../../support/query-count';
 
 interface ApplicationWire {
   id: string;
@@ -31,6 +33,8 @@ describe('the responsible IT Admin of an application over HTTP (integration, rea
   let finance: ApiAccount;
   let employee: ApiAccount;
   let counter = 0;
+  let relay: PgRelay;
+  let statements: QueryCounter;
   const server = () => ctx.app.getHttpServer();
   const as = (account: ApiAccount) => ({ Authorization: `Bearer ${account.accessToken}` });
   const asSuperAdmin = () => ({ Authorization: `Bearer ${admin}` });
@@ -38,7 +42,16 @@ describe('the responsible IT Admin of an application over HTTP (integration, rea
   const codeOf = (response: request.Response): string => (response.body as { error: { code: string } }).error.code;
 
   beforeAll(async () => {
-    ctx = await createHttpTestApp();
+    ctx = await createHttpTestApp({
+      appDatabaseUrl: async (directUrl) => {
+        const url = new URL(directUrl);
+        relay = await PgRelay.start(url.hostname, Number(url.port || 5432));
+        url.port = String(relay.port);
+
+        return url.toString();
+      },
+    });
+    statements = QueryCounter.on(relay);
     seed = await seedInstallation(ctx.app);
     admin = await adminToken(ctx, seed);
     const account = (code: string, role: 'IT_ADMIN' | 'FINANCE' | 'EMPLOYEE') =>
@@ -52,6 +65,7 @@ describe('the responsible IT Admin of an application over HTTP (integration, rea
 
   afterAll(async () => {
     await ctx?.close();
+    await relay?.stop();
   });
 
   const declare = async (by: ApiAccount = it1): Promise<ApplicationWire> => {
@@ -167,6 +181,30 @@ describe('the responsible IT Admin of an application over HTTP (integration, rea
       }
     });
 
+    it('m-05: a responsible IT Admin who has left but whose account nobody locked yet is not a working IT Admin: the application needs one, another takes it, and nobody hands it to the leaver', async () => {
+      const created = await declare(it1);
+      const leave = (left: boolean) =>
+        ctx.sql.query(`UPDATE employees SET status = $2::"EmployeeStatus" WHERE id = $1`, [
+          it1.employeeId,
+          left ? 'TERMINATED' : 'ACTIVE',
+        ]);
+      await leave(true);
+      try {
+        expect(await readApplication(created.id)).toMatchObject({
+          responsibleItAdmin: { employeeId: it1.employeeId },
+          needsResponsible: true,
+        });
+        const taken = dataOf<TransferWire>(await transfer(created.id, it2.employeeId, as(it2)).expect(200));
+        expect(taken).toMatchObject({ responsibleItAdmin: { employeeId: it2.employeeId }, changed: true });
+        expect(codeOf(await transfer(created.id, it1.employeeId, asSuperAdmin()).expect(422))).toBe(
+          'APPLICATION.RESPONSIBLE_NOT_IT_ADMIN',
+        );
+        expect(await responsibleOf(created.id)).toBe(it2.employeeId);
+      } finally {
+        await leave(false);
+      }
+    });
+
     it('hands to the one already responsible without writing or auditing anything, and answers changed false', async () => {
       const created = await declare(it1);
 
@@ -248,6 +286,22 @@ describe('the responsible IT Admin of an application over HTTP (integration, rea
       expect(second.items.map((row) => row.employeeCode)).toEqual(['E-IT3']);
       expect(second.pagination).toEqual({ page: 2, pageSize: 2, totalItems: 3, totalPages: 2 });
       for (const account of [finance, employee]) await list({}, as(account)).expect(403);
+    });
+
+    it('finds by a part of the name, literally, and pages in SQL: as many statements for one IT Admin as for three (API-LIST-DETAIL.1)', async () => {
+      const { rows } = await ctx.sql.query<{ full_name: string }>(`SELECT full_name FROM employees WHERE id = $1`, [
+        it2.employeeId,
+      ]);
+      const byName = dataOf<{ items: { employeeCode: string }[] }>(
+        await list({ search: rows[0].full_name }).expect(200),
+      );
+      expect(byName.items.map((row) => row.employeeCode)).toEqual(['E-IT2']);
+      const wildcard = dataOf<{ items: unknown[] }>(await list({ search: '%' }).expect(200));
+      expect(wildcard.items).toEqual([]);
+
+      const many = await statements.run(() => list({ pageSize: 2 }).expect(200));
+      const one = await statements.run(() => list({ search: 'E-IT1' }).expect(200));
+      expect(dataStatements(many.statements)).toHaveLength(dataStatements(one.statements).length);
     });
   });
 });

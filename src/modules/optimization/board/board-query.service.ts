@@ -56,12 +56,11 @@ export class BoardQueryService {
   ) {}
 
   /**
-   * The departments `MINE` stands for, or undefined for the whole organization (`ALL`): the scope of `getItAdminScope` (the departments that
-   * name the IT Admin and, while a department has no usable IT Admin, that one too, R-20). The two table routes are the IT Admin's.
+   * The departments the IT Admin reads (`QĐ-111ax`, R-20): always the scope of `getItAdminScope` — the departments that name them and, while
+   * a department has no usable IT Admin, that one too. `departmentScope` no longer widens it: `ALL` reads the same as `MINE` (kept on the
+   * wire so a client that still sends it is not refused).
    */
-  private async scopeOf(actor: AuthenticatedPrincipal, scope: DepartmentScope): Promise<string[] | undefined> {
-    if (scope === 'ALL') return undefined;
-
+  private async scopeOf(actor: AuthenticatedPrincipal): Promise<string[]> {
     return this.organizationReads.getItAdminScope(actor.employeeId, (ids) =>
       this.identity.findUsableItAdminEmployeeIds(ids),
     );
@@ -70,7 +69,7 @@ export class BoardQueryService {
   async list(actor: AuthenticatedPrincipal, query: RecommendationQuery) {
     const organization = await this.organizationReads.getOrganization();
     if (!organization) return { items: [], pagination: pageOf(0, query.page, query.pageSize) };
-    const narrowed = narrowToDepartment(await this.scopeOf(actor, query.departmentScope), query.departmentId);
+    const narrowed = narrowToDepartment(await this.scopeOf(actor), query.departmentId);
     if (narrowed === 'OUT_OF_SCOPE') return { items: [], pagination: pageOf(0, query.page, query.pageSize) };
     const { items, total } = await this.repo.page(
       organization.id,
@@ -207,7 +206,7 @@ export class BoardQueryService {
 
   /** The employees a seat-state read is limited to, or undefined for no limit; an empty list reads nothing. */
   private async holdersInScope(actor: AuthenticatedPrincipal, query: SeatStateQuery): Promise<string[] | undefined> {
-    const narrowed = narrowToDepartment(await this.scopeOf(actor, query.departmentScope), query.departmentId);
+    const narrowed = narrowToDepartment(await this.scopeOf(actor), query.departmentId);
     if (narrowed === 'OUT_OF_SCOPE') return [];
     const departments = narrowed.departmentId ? [narrowed.departmentId] : narrowed.departmentIds;
     const members = departments
