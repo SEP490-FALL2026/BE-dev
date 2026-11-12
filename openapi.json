@@ -32753,7 +32753,7 @@
         },
         "responses": {
           "200": {
-            "description": "The only end of a revocation that gives the seat back. K2 is completed as ACCOUNT_REMOVED with evidence, or as ALREADY_GONE with a note when the person removed the account themselves; K5 as OFF_SYSTEM_REVOKED with evidence; K4 as KEY_DEACTIVATED with evidence, and its key goes back to the store (keyDisposition RETURN_TO_STORE, the default) or back and withdrawn from it at once (WITHDRAW, with a withdrawalReason: a key that may not move to another device), with LICENSE_KEY.RETURNED_TO_STORE (and LICENSE_KEY.WITHDRAWN) in the audit trail; K1 as RENEWAL_CANCELLED with evidence, the day the paid period ends (paidThroughOn) and what is known of the access: UNTIL_PAID_END, or CUT with the day (accessCutOn) and its evidence. The assignment ends the same day for K2, K4 and K5, and for K1 at the end of the paid period or the day the access was cut, whichever is earlier; a K1 seat whose access runs on is reported as terminating. The completion writes no saving, invoice, contract or budget.",
+            "description": "The only end of a revocation that gives the seat back. K2 is completed as ACCOUNT_REMOVED with evidence, or as ALREADY_GONE with a note when the person removed the account themselves; K5 as OFF_SYSTEM_REVOKED with evidence; K4 as KEY_DEACTIVATED with evidence, and the IT Admin must say where its key goes (keyDisposition, required for K4): back to the store (RETURN_TO_STORE) or back and withdrawn from it at once (WITHDRAW, with a withdrawalReason: a key that may not move to another device), with LICENSE_KEY.RETURNED_TO_STORE (and LICENSE_KEY.WITHDRAWN) in the audit trail; K1 as RENEWAL_CANCELLED with evidence, the day the paid period ends (paidThroughOn) and what is known of the access: UNTIL_PAID_END, or CUT with the day (accessCutOn) and its evidence. The assignment ends the same day for K2, K4 and K5, and for K1 at the end of the paid period or the day the access was cut, whichever is earlier; a K1 seat whose access runs on is reported as terminating. The completion writes no saving, invoice, contract or budget.",
             "content": {
               "application/json": {
                 "schema": {
@@ -32958,7 +32958,7 @@
             }
           },
           "422": {
-            "description": "The request is invalid (VALIDATION_ERROR), or the completion is refused and nothing is stored: REVOCATION.COMPLETION_NOT_ALLOWED (the way does not fit the kind of grant), NOTE_REQUIRED, PAID_THROUGH_REQUIRED, ACCESS_STATE_REQUIRED, ACCESS_STATE_INVALID, WITHDRAWAL_REASON_REQUIRED (a K4 key withdrawn with no reason; keyDisposition or withdrawalReason on another kind is COMPLETION_NOT_ALLOWED), or no evidence (PROVISIONING_TASK.EVIDENCE_REQUIRED).",
+            "description": "The request is invalid (VALIDATION_ERROR), or the completion is refused and nothing is stored: REVOCATION.COMPLETION_NOT_ALLOWED (the way does not fit the kind of grant), NOTE_REQUIRED, PAID_THROUGH_REQUIRED, ACCESS_STATE_REQUIRED, ACCESS_STATE_INVALID, KEY_DISPOSITION_REQUIRED (a K4 completion without keyDisposition), WITHDRAWAL_REASON_REQUIRED (a K4 key withdrawn with no reason; keyDisposition or withdrawalReason on another kind is COMPLETION_NOT_ALLOWED), or no evidence (PROVISIONING_TASK.EVIDENCE_REQUIRED).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -33026,6 +33026,17 @@
                       "error": {
                         "code": "REVOCATION.ACCESS_STATE_INVALID",
                         "message": "The completion of the revocation is not valid: ACCESS_STATE_INVALID.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "REVOCATION.KEY_DISPOSITION_REQUIRED": {
+                    "summary": "The completion of the revocation is not valid: KEY_DISPOSITION_REQUIRED.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "REVOCATION.KEY_DISPOSITION_REQUIRED",
+                        "message": "The completion of the revocation is not valid: KEY_DISPOSITION_REQUIRED.",
                         "requestId": "req_example"
                       }
                     }
@@ -84196,6 +84207,20 @@
             "schema": { "default": "ALL", "type": "string", "enum": ["MINE", "ALL"] }
           },
           {
+            "name": "departmentId",
+            "required": false,
+            "in": "query",
+            "description": "Only this department; a department outside the scope reads an empty page.",
+            "schema": { "format": "uuid", "type": "string" }
+          },
+          {
+            "name": "employeeId",
+            "required": false,
+            "in": "query",
+            "description": "Only this holder; one outside the scope reads an empty page.",
+            "schema": { "format": "uuid", "type": "string" }
+          },
+          {
             "name": "page",
             "required": false,
             "in": "query",
@@ -84216,7 +84241,7 @@
         ],
         "responses": {
           "200": {
-            "description": "One page of recommendations (G1, G2), newest first, filtered by group, tier, state, application and department scope.",
+            "description": "One page of recommendations (G1, G2), newest first, filtered by group, tier, state, application, department scope (MINE = the departments of the IT Admin, ALL = the organization), one department and one holder; a department or a holder outside the scope reads an empty page. A holder is shown by code, never by name.",
             "content": {
               "application/json": {
                 "schema": {
@@ -84510,6 +84535,26 @@
               "type": "string",
               "enum": ["ACTIVE", "INACTIVE", "NO_DATA", "UNMATCHED_IDENTITY", "INSUFFICIENT_EVIDENCE", "EXCLUDED"]
             }
+          },
+          {
+            "name": "departmentScope",
+            "required": false,
+            "in": "query",
+            "schema": { "default": "ALL", "type": "string", "enum": ["MINE", "ALL"] }
+          },
+          {
+            "name": "departmentId",
+            "required": false,
+            "in": "query",
+            "description": "Only the holders placed in this department; one outside the scope reads an empty page.",
+            "schema": { "format": "uuid", "type": "string" }
+          },
+          {
+            "name": "employeeId",
+            "required": false,
+            "in": "query",
+            "description": "Only this holder; one outside the scope reads an empty page.",
+            "schema": { "format": "uuid", "type": "string" }
           },
           {
             "name": "page",
@@ -114729,10 +114774,9 @@
                       "type": "object",
                       "properties": {
                         "employeeId": { "type": "string", "format": "uuid" },
-                        "employeeCode": { "type": "string" },
-                        "fullName": { "type": "string" }
+                        "employeeCode": { "type": "string" }
                       },
-                      "required": ["employeeId", "employeeCode", "fullName"],
+                      "required": ["employeeId", "employeeCode"],
                       "additionalProperties": false,
                       "nullable": true
                     },
@@ -115010,10 +115054,9 @@
                       "type": "object",
                       "properties": {
                         "employeeId": { "type": "string", "format": "uuid" },
-                        "employeeCode": { "type": "string" },
-                        "fullName": { "type": "string" }
+                        "employeeCode": { "type": "string" }
                       },
-                      "required": ["employeeId", "employeeCode", "fullName"],
+                      "required": ["employeeId", "employeeCode"],
                       "additionalProperties": false,
                       "nullable": true
                     },
@@ -115175,10 +115218,9 @@
                     "type": "object",
                     "properties": {
                       "employeeId": { "type": "string", "format": "uuid" },
-                      "employeeCode": { "type": "string" },
-                      "fullName": { "type": "string" }
+                      "employeeCode": { "type": "string" }
                     },
-                    "required": ["employeeId", "employeeCode", "fullName"],
+                    "required": ["employeeId", "employeeCode"],
                     "additionalProperties": false,
                     "nullable": true
                   },
@@ -115410,10 +115452,9 @@
                     "type": "object",
                     "properties": {
                       "employeeId": { "type": "string", "format": "uuid" },
-                      "employeeCode": { "type": "string" },
-                      "fullName": { "type": "string" }
+                      "employeeCode": { "type": "string" }
                     },
-                    "required": ["employeeId", "employeeCode", "fullName"],
+                    "required": ["employeeId", "employeeCode"],
                     "additionalProperties": false,
                     "nullable": true
                   },
@@ -116499,13 +116540,7 @@
                       },
                       "reason": {
                         "type": "string",
-                        "enum": [
-                          "FINANCE_FIGURES_NOT_DELIVERED",
-                          "USAGE_DATA_NOT_DELIVERED",
-                          "DEVICE_REGISTRY_NOT_DELIVERED",
-                          "NO_DATA_SOURCE",
-                          null
-                        ],
+                        "enum": ["FINANCE_FIGURES_NOT_DELIVERED", "USAGE_DATA_NOT_DELIVERED", "NO_DATA_SOURCE", null],
                         "description": "Set only when state is NOT_AVAILABLE: the source of the data that is not delivered yet.",
                         "nullable": true
                       }
@@ -116536,13 +116571,7 @@
                       },
                       "reason": {
                         "type": "string",
-                        "enum": [
-                          "FINANCE_FIGURES_NOT_DELIVERED",
-                          "USAGE_DATA_NOT_DELIVERED",
-                          "DEVICE_REGISTRY_NOT_DELIVERED",
-                          "NO_DATA_SOURCE",
-                          null
-                        ],
+                        "enum": ["FINANCE_FIGURES_NOT_DELIVERED", "USAGE_DATA_NOT_DELIVERED", "NO_DATA_SOURCE", null],
                         "description": "Set only when state is NOT_AVAILABLE: the source of the data that is not delivered yet.",
                         "nullable": true
                       }
@@ -116573,13 +116602,7 @@
                       },
                       "reason": {
                         "type": "string",
-                        "enum": [
-                          "FINANCE_FIGURES_NOT_DELIVERED",
-                          "USAGE_DATA_NOT_DELIVERED",
-                          "DEVICE_REGISTRY_NOT_DELIVERED",
-                          "NO_DATA_SOURCE",
-                          null
-                        ],
+                        "enum": ["FINANCE_FIGURES_NOT_DELIVERED", "USAGE_DATA_NOT_DELIVERED", "NO_DATA_SOURCE", null],
                         "description": "Set only when state is NOT_AVAILABLE: the source of the data that is not delivered yet.",
                         "nullable": true
                       }
@@ -116610,13 +116633,7 @@
                       },
                       "reason": {
                         "type": "string",
-                        "enum": [
-                          "FINANCE_FIGURES_NOT_DELIVERED",
-                          "USAGE_DATA_NOT_DELIVERED",
-                          "DEVICE_REGISTRY_NOT_DELIVERED",
-                          "NO_DATA_SOURCE",
-                          null
-                        ],
+                        "enum": ["FINANCE_FIGURES_NOT_DELIVERED", "USAGE_DATA_NOT_DELIVERED", "NO_DATA_SOURCE", null],
                         "description": "Set only when state is NOT_AVAILABLE: the source of the data that is not delivered yet.",
                         "nullable": true
                       }
@@ -116682,13 +116699,7 @@
                       },
                       "reason": {
                         "type": "string",
-                        "enum": [
-                          "FINANCE_FIGURES_NOT_DELIVERED",
-                          "USAGE_DATA_NOT_DELIVERED",
-                          "DEVICE_REGISTRY_NOT_DELIVERED",
-                          "NO_DATA_SOURCE",
-                          null
-                        ],
+                        "enum": ["FINANCE_FIGURES_NOT_DELIVERED", "USAGE_DATA_NOT_DELIVERED", "NO_DATA_SOURCE", null],
                         "description": "Set only when state is NOT_AVAILABLE: the source of the data that is not delivered yet.",
                         "nullable": true
                       }
@@ -116719,13 +116730,7 @@
                       },
                       "reason": {
                         "type": "string",
-                        "enum": [
-                          "FINANCE_FIGURES_NOT_DELIVERED",
-                          "USAGE_DATA_NOT_DELIVERED",
-                          "DEVICE_REGISTRY_NOT_DELIVERED",
-                          "NO_DATA_SOURCE",
-                          null
-                        ],
+                        "enum": ["FINANCE_FIGURES_NOT_DELIVERED", "USAGE_DATA_NOT_DELIVERED", "NO_DATA_SOURCE", null],
                         "description": "Set only when state is NOT_AVAILABLE: the source of the data that is not delivered yet.",
                         "nullable": true
                       }
@@ -116756,13 +116761,7 @@
                       },
                       "reason": {
                         "type": "string",
-                        "enum": [
-                          "FINANCE_FIGURES_NOT_DELIVERED",
-                          "USAGE_DATA_NOT_DELIVERED",
-                          "DEVICE_REGISTRY_NOT_DELIVERED",
-                          "NO_DATA_SOURCE",
-                          null
-                        ],
+                        "enum": ["FINANCE_FIGURES_NOT_DELIVERED", "USAGE_DATA_NOT_DELIVERED", "NO_DATA_SOURCE", null],
                         "description": "Set only when state is NOT_AVAILABLE: the source of the data that is not delivered yet.",
                         "nullable": true
                       }
@@ -116793,13 +116792,7 @@
                       },
                       "reason": {
                         "type": "string",
-                        "enum": [
-                          "FINANCE_FIGURES_NOT_DELIVERED",
-                          "USAGE_DATA_NOT_DELIVERED",
-                          "DEVICE_REGISTRY_NOT_DELIVERED",
-                          "NO_DATA_SOURCE",
-                          null
-                        ],
+                        "enum": ["FINANCE_FIGURES_NOT_DELIVERED", "USAGE_DATA_NOT_DELIVERED", "NO_DATA_SOURCE", null],
                         "description": "Set only when state is NOT_AVAILABLE: the source of the data that is not delivered yet.",
                         "nullable": true
                       }
@@ -116830,13 +116823,7 @@
                       },
                       "reason": {
                         "type": "string",
-                        "enum": [
-                          "FINANCE_FIGURES_NOT_DELIVERED",
-                          "USAGE_DATA_NOT_DELIVERED",
-                          "DEVICE_REGISTRY_NOT_DELIVERED",
-                          "NO_DATA_SOURCE",
-                          null
-                        ],
+                        "enum": ["FINANCE_FIGURES_NOT_DELIVERED", "USAGE_DATA_NOT_DELIVERED", "NO_DATA_SOURCE", null],
                         "description": "Set only when state is NOT_AVAILABLE: the source of the data that is not delivered yet.",
                         "nullable": true
                       }
@@ -116867,13 +116854,7 @@
                       },
                       "reason": {
                         "type": "string",
-                        "enum": [
-                          "FINANCE_FIGURES_NOT_DELIVERED",
-                          "USAGE_DATA_NOT_DELIVERED",
-                          "DEVICE_REGISTRY_NOT_DELIVERED",
-                          "NO_DATA_SOURCE",
-                          null
-                        ],
+                        "enum": ["FINANCE_FIGURES_NOT_DELIVERED", "USAGE_DATA_NOT_DELIVERED", "NO_DATA_SOURCE", null],
                         "description": "Set only when state is NOT_AVAILABLE: the source of the data that is not delivered yet.",
                         "nullable": true
                       }
@@ -116904,13 +116885,7 @@
                       },
                       "reason": {
                         "type": "string",
-                        "enum": [
-                          "FINANCE_FIGURES_NOT_DELIVERED",
-                          "USAGE_DATA_NOT_DELIVERED",
-                          "DEVICE_REGISTRY_NOT_DELIVERED",
-                          "NO_DATA_SOURCE",
-                          null
-                        ],
+                        "enum": ["FINANCE_FIGURES_NOT_DELIVERED", "USAGE_DATA_NOT_DELIVERED", "NO_DATA_SOURCE", null],
                         "description": "Set only when state is NOT_AVAILABLE: the source of the data that is not delivered yet.",
                         "nullable": true
                       }
@@ -116941,13 +116916,7 @@
                       },
                       "reason": {
                         "type": "string",
-                        "enum": [
-                          "FINANCE_FIGURES_NOT_DELIVERED",
-                          "USAGE_DATA_NOT_DELIVERED",
-                          "DEVICE_REGISTRY_NOT_DELIVERED",
-                          "NO_DATA_SOURCE",
-                          null
-                        ],
+                        "enum": ["FINANCE_FIGURES_NOT_DELIVERED", "USAGE_DATA_NOT_DELIVERED", "NO_DATA_SOURCE", null],
                         "description": "Set only when state is NOT_AVAILABLE: the source of the data that is not delivered yet.",
                         "nullable": true
                       }
@@ -117025,13 +116994,7 @@
                       },
                       "reason": {
                         "type": "string",
-                        "enum": [
-                          "FINANCE_FIGURES_NOT_DELIVERED",
-                          "USAGE_DATA_NOT_DELIVERED",
-                          "DEVICE_REGISTRY_NOT_DELIVERED",
-                          "NO_DATA_SOURCE",
-                          null
-                        ],
+                        "enum": ["FINANCE_FIGURES_NOT_DELIVERED", "USAGE_DATA_NOT_DELIVERED", "NO_DATA_SOURCE", null],
                         "description": "Set only when state is NOT_AVAILABLE: the source of the data that is not delivered yet.",
                         "nullable": true
                       }
@@ -117062,13 +117025,7 @@
                       },
                       "reason": {
                         "type": "string",
-                        "enum": [
-                          "FINANCE_FIGURES_NOT_DELIVERED",
-                          "USAGE_DATA_NOT_DELIVERED",
-                          "DEVICE_REGISTRY_NOT_DELIVERED",
-                          "NO_DATA_SOURCE",
-                          null
-                        ],
+                        "enum": ["FINANCE_FIGURES_NOT_DELIVERED", "USAGE_DATA_NOT_DELIVERED", "NO_DATA_SOURCE", null],
                         "description": "Set only when state is NOT_AVAILABLE: the source of the data that is not delivered yet.",
                         "nullable": true
                       }
@@ -117099,13 +117056,7 @@
                       },
                       "reason": {
                         "type": "string",
-                        "enum": [
-                          "FINANCE_FIGURES_NOT_DELIVERED",
-                          "USAGE_DATA_NOT_DELIVERED",
-                          "DEVICE_REGISTRY_NOT_DELIVERED",
-                          "NO_DATA_SOURCE",
-                          null
-                        ],
+                        "enum": ["FINANCE_FIGURES_NOT_DELIVERED", "USAGE_DATA_NOT_DELIVERED", "NO_DATA_SOURCE", null],
                         "description": "Set only when state is NOT_AVAILABLE: the source of the data that is not delivered yet.",
                         "nullable": true
                       }
@@ -117136,13 +117087,7 @@
                       },
                       "reason": {
                         "type": "string",
-                        "enum": [
-                          "FINANCE_FIGURES_NOT_DELIVERED",
-                          "USAGE_DATA_NOT_DELIVERED",
-                          "DEVICE_REGISTRY_NOT_DELIVERED",
-                          "NO_DATA_SOURCE",
-                          null
-                        ],
+                        "enum": ["FINANCE_FIGURES_NOT_DELIVERED", "USAGE_DATA_NOT_DELIVERED", "NO_DATA_SOURCE", null],
                         "description": "Set only when state is NOT_AVAILABLE: the source of the data that is not delivered yet.",
                         "nullable": true
                       }
@@ -117173,13 +117118,7 @@
                       },
                       "reason": {
                         "type": "string",
-                        "enum": [
-                          "FINANCE_FIGURES_NOT_DELIVERED",
-                          "USAGE_DATA_NOT_DELIVERED",
-                          "DEVICE_REGISTRY_NOT_DELIVERED",
-                          "NO_DATA_SOURCE",
-                          null
-                        ],
+                        "enum": ["FINANCE_FIGURES_NOT_DELIVERED", "USAGE_DATA_NOT_DELIVERED", "NO_DATA_SOURCE", null],
                         "description": "Set only when state is NOT_AVAILABLE: the source of the data that is not delivered yet.",
                         "nullable": true
                       }
@@ -117210,13 +117149,7 @@
                       },
                       "reason": {
                         "type": "string",
-                        "enum": [
-                          "FINANCE_FIGURES_NOT_DELIVERED",
-                          "USAGE_DATA_NOT_DELIVERED",
-                          "DEVICE_REGISTRY_NOT_DELIVERED",
-                          "NO_DATA_SOURCE",
-                          null
-                        ],
+                        "enum": ["FINANCE_FIGURES_NOT_DELIVERED", "USAGE_DATA_NOT_DELIVERED", "NO_DATA_SOURCE", null],
                         "description": "Set only when state is NOT_AVAILABLE: the source of the data that is not delivered yet.",
                         "nullable": true
                       }
@@ -117247,13 +117180,7 @@
                       },
                       "reason": {
                         "type": "string",
-                        "enum": [
-                          "FINANCE_FIGURES_NOT_DELIVERED",
-                          "USAGE_DATA_NOT_DELIVERED",
-                          "DEVICE_REGISTRY_NOT_DELIVERED",
-                          "NO_DATA_SOURCE",
-                          null
-                        ],
+                        "enum": ["FINANCE_FIGURES_NOT_DELIVERED", "USAGE_DATA_NOT_DELIVERED", "NO_DATA_SOURCE", null],
                         "description": "Set only when state is NOT_AVAILABLE: the source of the data that is not delivered yet.",
                         "nullable": true
                       }
@@ -117284,20 +117211,14 @@
                       },
                       "reason": {
                         "type": "string",
-                        "enum": [
-                          "FINANCE_FIGURES_NOT_DELIVERED",
-                          "USAGE_DATA_NOT_DELIVERED",
-                          "DEVICE_REGISTRY_NOT_DELIVERED",
-                          "NO_DATA_SOURCE",
-                          null
-                        ],
+                        "enum": ["FINANCE_FIGURES_NOT_DELIVERED", "USAGE_DATA_NOT_DELIVERED", "NO_DATA_SOURCE", null],
                         "description": "Set only when state is NOT_AVAILABLE: the source of the data that is not delivered yet.",
                         "nullable": true
                       }
                     },
                     "required": ["state", "count", "sourceOperationId", "reason"],
                     "additionalProperties": false,
-                    "description": "The company machines without a confirmation of the monitoring policy; the device registry is not delivered yet."
+                    "description": "The company machines whose holder has not yet acknowledged the monitoring notice (US-09-01 AC-2), counted as `deviceList` with state=AWAITING_ACKNOWLEDGEMENT lists them."
                   },
                   "saasIssues": {
                     "type": "object",
@@ -117321,13 +117242,7 @@
                       },
                       "reason": {
                         "type": "string",
-                        "enum": [
-                          "FINANCE_FIGURES_NOT_DELIVERED",
-                          "USAGE_DATA_NOT_DELIVERED",
-                          "DEVICE_REGISTRY_NOT_DELIVERED",
-                          "NO_DATA_SOURCE",
-                          null
-                        ],
+                        "enum": ["FINANCE_FIGURES_NOT_DELIVERED", "USAGE_DATA_NOT_DELIVERED", "NO_DATA_SOURCE", null],
                         "description": "Set only when state is NOT_AVAILABLE: the source of the data that is not delivered yet.",
                         "nullable": true
                       }
@@ -117358,13 +117273,7 @@
                       },
                       "reason": {
                         "type": "string",
-                        "enum": [
-                          "FINANCE_FIGURES_NOT_DELIVERED",
-                          "USAGE_DATA_NOT_DELIVERED",
-                          "DEVICE_REGISTRY_NOT_DELIVERED",
-                          "NO_DATA_SOURCE",
-                          null
-                        ],
+                        "enum": ["FINANCE_FIGURES_NOT_DELIVERED", "USAGE_DATA_NOT_DELIVERED", "NO_DATA_SOURCE", null],
                         "description": "Set only when state is NOT_AVAILABLE: the source of the data that is not delivered yet.",
                         "nullable": true
                       }
@@ -117431,13 +117340,7 @@
                       },
                       "reason": {
                         "type": "string",
-                        "enum": [
-                          "FINANCE_FIGURES_NOT_DELIVERED",
-                          "USAGE_DATA_NOT_DELIVERED",
-                          "DEVICE_REGISTRY_NOT_DELIVERED",
-                          "NO_DATA_SOURCE",
-                          null
-                        ],
+                        "enum": ["FINANCE_FIGURES_NOT_DELIVERED", "USAGE_DATA_NOT_DELIVERED", "NO_DATA_SOURCE", null],
                         "description": "Set only when state is NOT_AVAILABLE: the source of the data that is not delivered yet.",
                         "nullable": true
                       }
@@ -117468,13 +117371,7 @@
                       },
                       "reason": {
                         "type": "string",
-                        "enum": [
-                          "FINANCE_FIGURES_NOT_DELIVERED",
-                          "USAGE_DATA_NOT_DELIVERED",
-                          "DEVICE_REGISTRY_NOT_DELIVERED",
-                          "NO_DATA_SOURCE",
-                          null
-                        ],
+                        "enum": ["FINANCE_FIGURES_NOT_DELIVERED", "USAGE_DATA_NOT_DELIVERED", "NO_DATA_SOURCE", null],
                         "description": "Set only when state is NOT_AVAILABLE: the source of the data that is not delivered yet.",
                         "nullable": true
                       }
@@ -117505,13 +117402,7 @@
                       },
                       "reason": {
                         "type": "string",
-                        "enum": [
-                          "FINANCE_FIGURES_NOT_DELIVERED",
-                          "USAGE_DATA_NOT_DELIVERED",
-                          "DEVICE_REGISTRY_NOT_DELIVERED",
-                          "NO_DATA_SOURCE",
-                          null
-                        ],
+                        "enum": ["FINANCE_FIGURES_NOT_DELIVERED", "USAGE_DATA_NOT_DELIVERED", "NO_DATA_SOURCE", null],
                         "description": "Set only when state is NOT_AVAILABLE: the source of the data that is not delivered yet.",
                         "nullable": true
                       }
@@ -117542,13 +117433,7 @@
                       },
                       "reason": {
                         "type": "string",
-                        "enum": [
-                          "FINANCE_FIGURES_NOT_DELIVERED",
-                          "USAGE_DATA_NOT_DELIVERED",
-                          "DEVICE_REGISTRY_NOT_DELIVERED",
-                          "NO_DATA_SOURCE",
-                          null
-                        ],
+                        "enum": ["FINANCE_FIGURES_NOT_DELIVERED", "USAGE_DATA_NOT_DELIVERED", "NO_DATA_SOURCE", null],
                         "description": "Set only when state is NOT_AVAILABLE: the source of the data that is not delivered yet.",
                         "nullable": true
                       }
@@ -117579,13 +117464,7 @@
                       },
                       "reason": {
                         "type": "string",
-                        "enum": [
-                          "FINANCE_FIGURES_NOT_DELIVERED",
-                          "USAGE_DATA_NOT_DELIVERED",
-                          "DEVICE_REGISTRY_NOT_DELIVERED",
-                          "NO_DATA_SOURCE",
-                          null
-                        ],
+                        "enum": ["FINANCE_FIGURES_NOT_DELIVERED", "USAGE_DATA_NOT_DELIVERED", "NO_DATA_SOURCE", null],
                         "description": "Set only when state is NOT_AVAILABLE: the source of the data that is not delivered yet.",
                         "nullable": true
                       }
@@ -117616,13 +117495,7 @@
                       },
                       "reason": {
                         "type": "string",
-                        "enum": [
-                          "FINANCE_FIGURES_NOT_DELIVERED",
-                          "USAGE_DATA_NOT_DELIVERED",
-                          "DEVICE_REGISTRY_NOT_DELIVERED",
-                          "NO_DATA_SOURCE",
-                          null
-                        ],
+                        "enum": ["FINANCE_FIGURES_NOT_DELIVERED", "USAGE_DATA_NOT_DELIVERED", "NO_DATA_SOURCE", null],
                         "description": "Set only when state is NOT_AVAILABLE: the source of the data that is not delivered yet.",
                         "nullable": true
                       }
@@ -117653,13 +117526,7 @@
                       },
                       "reason": {
                         "type": "string",
-                        "enum": [
-                          "FINANCE_FIGURES_NOT_DELIVERED",
-                          "USAGE_DATA_NOT_DELIVERED",
-                          "DEVICE_REGISTRY_NOT_DELIVERED",
-                          "NO_DATA_SOURCE",
-                          null
-                        ],
+                        "enum": ["FINANCE_FIGURES_NOT_DELIVERED", "USAGE_DATA_NOT_DELIVERED", "NO_DATA_SOURCE", null],
                         "description": "Set only when state is NOT_AVAILABLE: the source of the data that is not delivered yet.",
                         "nullable": true
                       }
@@ -117690,13 +117557,7 @@
                       },
                       "reason": {
                         "type": "string",
-                        "enum": [
-                          "FINANCE_FIGURES_NOT_DELIVERED",
-                          "USAGE_DATA_NOT_DELIVERED",
-                          "DEVICE_REGISTRY_NOT_DELIVERED",
-                          "NO_DATA_SOURCE",
-                          null
-                        ],
+                        "enum": ["FINANCE_FIGURES_NOT_DELIVERED", "USAGE_DATA_NOT_DELIVERED", "NO_DATA_SOURCE", null],
                         "description": "Set only when state is NOT_AVAILABLE: the source of the data that is not delivered yet.",
                         "nullable": true
                       }
