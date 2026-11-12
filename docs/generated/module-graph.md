@@ -112,11 +112,11 @@ flowchart BT
   personnel -->|24| audit
   personnel -->|5| catalog
   personnel -->|2| devices
-  personnel -->|20| identity_access
+  personnel -->|19| identity_access
   personnel -->|24| licensing
   personnel -->|6| notifications
   personnel -->|6| operating_parameters
-  personnel -->|89| organization
+  personnel -->|88| organization
   personnel -->|7| requests
   requests -->|59| audit
   requests -->|23| budgets
