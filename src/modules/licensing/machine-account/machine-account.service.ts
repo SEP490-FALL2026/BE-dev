@@ -54,7 +54,8 @@ export class MachineAccountService {
       const current = await this.assignments.lock(tx, assignmentId);
       if (!current) throw new AssignmentNotFoundError();
       const holders = await this.identity.findUsableItAdminEmployeeIds([current.employeeId], tx);
-      const refusal = machineAccountRefusal(current, holders.has(current.employeeId), change);
+      const today = await this.organizationReads.businessToday(new Date(), tx);
+      const refusal = machineAccountRefusal(current, holders.has(current.employeeId), change, today);
       if (refusal) throw new MachineAccountRefusedError(refusal);
       const outcome = machineAccountOutcome(current, change);
       if (outcome === 'UNCHANGED') return toAssignmentView(current);

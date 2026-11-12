@@ -158,6 +158,32 @@ describe('the flag of a machine account over HTTP and PostgreSQL (integration)',
     expect(h.codeOf(legacy)).toBe('LICENSE_ASSIGNMENT.NOT_PERSONAL');
   }, 120_000);
 
+  it('flags a seat that is set to end on a later day, as the seat the conversion writes keeps the end of its service account, and refuses one that ends today', async () => {
+    const later = await itAdminSeat();
+    const endingToday = await itAdminSeat();
+    await h.ctx.sql.query(`UPDATE license_assignments SET valid_until = $2::date WHERE id = $1`, [
+      later.id,
+      h.inDays(30),
+    ]);
+    await h.ctx.sql.query(`UPDATE license_assignments SET valid_until = $2::date WHERE id = $1`, [
+      endingToday.id,
+      h.today(),
+    ]);
+
+    await flag(later.id, { isMachineAccount: true, note: NOTE }).expect(200);
+    const refused = await flag(endingToday.id, { isMachineAccount: true, note: NOTE }).expect(409);
+
+    expect(await seatOf(later.id)).toMatchObject({
+      isMachineAccount: true,
+      machineAccountNote: NOTE,
+      validUntil: h.inDays(30),
+    });
+    expect(h.codeOf(refused)).toBe('LICENSE_ASSIGNMENT.NOT_OPEN');
+    expect(await seatOf(endingToday.id)).toMatchObject({ isMachineAccount: false });
+    await flag(later.id, { isMachineAccount: false }).expect(200);
+    expect(await seatOf(later.id)).toMatchObject({ isMachineAccount: false, machineAccountNote: null });
+  }, 120_000);
+
   it('refuses turning the flag off while the IT Admin holds another personal seat of the subscription for an overlapping period (409)', async () => {
     const own = await itAdminSeat();
     const flagged = randomUUID();

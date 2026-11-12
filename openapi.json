@@ -27895,7 +27895,7 @@
             }
           },
           "409": {
-            "description": "The seat has ended, is set to end, failed or was cancelled (LICENSE_ASSIGNMENT.NOT_OPEN), or turning the flag off would leave the person with two personal seats of the subscription for an overlapping period (LICENSE_ASSIGNMENT.MACHINE_ACCOUNT_OVERLAP).",
+            "description": "The seat has ended (its end day is today or past), failed or was cancelled (LICENSE_ASSIGNMENT.NOT_OPEN; a seat set to end on a later day is still open), or turning the flag off would leave the person with two personal seats of the subscription for an overlapping period (LICENSE_ASSIGNMENT.MACHINE_ACCOUNT_OVERLAP).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
