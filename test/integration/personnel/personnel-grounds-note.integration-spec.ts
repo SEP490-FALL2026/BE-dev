@@ -132,4 +132,34 @@ describe('the basis in one box in the database (integration, real PostgreSQL)', 
     expect(await insertChange('RETURNED', none)).toBe('23514');
     expect(await insertChange('STARTED', { ...only, issuer: 'HR' })).toBe('23514');
   });
+
+  it('reads an event written with the four parts as one sentence, so the kind of document, who issued it and the day are not lost; one with the box as it was written', async () => {
+    const read = async () => h.dataOf<{ groundsNote: string }>(await h.readLeave(leaveId).expect(200)).groundsNote;
+    const changes = async () =>
+      h.dataOf<{ items: { kind: string; groundsNote: string | null }[] }>(await h.leaveChanges(leaveId).expect(200))
+        .items;
+    expect(await read()).toBe(h.approval);
+
+    await h.ctx.sql.query(
+      `UPDATE employee_leaves SET grounds_type = 'APPROVED_APPLICATION', grounds_reference = 'DN-06/2026',
+              grounds_issuer = 'HR', grounds_issued_on = DATE '2026-05-25' WHERE id = $1`,
+      [leaveId],
+    );
+    // The history is append-only: the change written before the box is a row of its own.
+    await h.ctx.sql.query(
+      `INSERT INTO employee_leave_changes (id, leave_id, kind, old_return_on, new_return_on, grounds_type, grounds_reference,
+                                           grounds_issuer, grounds_issued_on, recorded_by_app_user_id)
+       SELECT gen_random_uuid(), id, 'RETURN_DATE_CHANGED'::"EmployeeLeaveChangeKind", approved_return_on, approved_return_on + 3,
+              'APPROVED_APPLICATION', 'DN-06/2026', 'HR', DATE '2026-05-25', started_by_app_user_id
+         FROM employee_leaves WHERE id = $1`,
+      [leaveId],
+    );
+
+    expect(await read()).toBe('APPROVED_APPLICATION DN-06/2026 — HR, 2026-05-25');
+    const kept = await changes();
+    expect(kept.find((change) => change.kind === 'STARTED')?.groundsNote).toBe(h.approval);
+    expect(kept.find((change) => change.kind === 'RETURN_DATE_CHANGED')?.groundsNote).toBe(
+      'APPROVED_APPLICATION DN-06/2026 — HR, 2026-05-25',
+    );
+  });
 });

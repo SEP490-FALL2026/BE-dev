@@ -120,6 +120,17 @@ export function groundsNoteOfBasis(basis: GroundsInput | null | undefined): stri
   return note === '' ? undefined : note.slice(0, GROUNDS_NOTE_MAX_LENGTH);
 }
 
+/**
+ * The box a recorded basis is read as, for the wire (`R-32`): the reference as written for an event made with the box; for an event written
+ * before it, which kept four parts, the parts put back into one sentence (as `groundsNoteOfBasis` writes them) so that the kind of
+ * document, who issued it and the day are not lost from what the interface shows.
+ */
+export function groundsNoteOf(recorded: RecordedGrounds): string {
+  if (recorded.type === null) return recorded.reference;
+
+  return groundsNoteOfBasis(recorded) ?? recorded.reference;
+}
+
 /** The box as it is kept, trimmed, with the other three parts empty; call only after `groundsNoteRefusal` said it is fine. */
 export function normalizedGroundsNote(note: string): RecordedGrounds {
   return { type: null, reference: note.trim(), issuer: null, issuedOn: null };

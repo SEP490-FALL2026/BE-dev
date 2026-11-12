@@ -1,5 +1,6 @@
 import type { BusinessDate } from '../../../core/business-date';
 import type { EmployeeRecord } from '../../organization/public/organization.types';
+import { groundsNoteOf } from '../personnel-grounds.policy';
 import type { ReadAccess } from '../personnel-self-action.policy';
 import type { LeaveChangeWire, LeaveDetailWire, LeaveSummaryWire } from './leave.dto';
 import { isReturnOverdue } from './leave.policy';
@@ -38,7 +39,7 @@ export function toDetail(
 ): LeaveDetailWire {
   return {
     ...toSummary(record, employees, today),
-    groundsNote: access === 'FULL' ? record.grounds.reference : null,
+    groundsNote: access === 'FULL' ? groundsNoteOf(record.grounds) : null,
     endKind: record.endKind,
     resumesLeaveId: record.resumesLeaveId,
     startedByAppUserId: record.startedByAppUserId,
@@ -54,7 +55,7 @@ export const toChange = (change: LeaveChangeRecord): LeaveChangeWire => ({
   newReturnOn: change.newReturnOn,
   returnedOn: change.returnedOn,
   onSchedule: change.onSchedule,
-  groundsNote: change.grounds?.reference ?? null,
+  groundsNote: change.grounds ? groundsNoteOf(change.grounds) : null,
   recordedByAppUserId: change.recordedByAppUserId,
   recordedByProcedure: change.recordedByTicketId !== null,
   recordedAt: change.recordedAt.toISOString(),

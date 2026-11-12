@@ -1,4 +1,5 @@
 import type { DepartmentBrief, EmployeeRecord } from '../../organization/public/organization.types';
+import { groundsNoteOf } from '../personnel-grounds.policy';
 import type { ReadAccess } from '../personnel-self-action.policy';
 import type { TransferChangeWire, TransferDetailWire, TransferRecordedWire, TransferSummaryWire } from './transfer.dto';
 import type { TransferChangeRecord, TransferRecord, TransferSummaryRecord } from './transfer.types';
@@ -48,7 +49,7 @@ export function toDetail(
 
   return {
     ...toSummary(record, names),
-    groundsNote: full ? record.grounds.reference : null,
+    groundsNote: full ? groundsNoteOf(record.grounds) : null,
     headSuccessor:
       full && handover
         ? {
@@ -85,7 +86,7 @@ export const toChange = (change: TransferChangeRecord): TransferChangeWire => ({
   oldEffectiveOn: change.oldEffectiveOn,
   newEffectiveOn: change.newEffectiveOn,
   reason: change.reason,
-  groundsNote: change.grounds.reference,
+  groundsNote: groundsNoteOf(change.grounds),
   changedByAppUserId: change.changedByAppUserId,
   changedByProcedure: change.changedByTicketId !== null,
   changedAt: change.changedAt.toISOString(),

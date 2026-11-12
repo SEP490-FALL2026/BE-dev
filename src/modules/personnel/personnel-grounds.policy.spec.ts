@@ -1,5 +1,6 @@
 import {
   groundsNoteRefusal,
+  groundsNoteOf,
   groundsNoteOfBasis,
   groundsRefusal,
   groundsSnapshot,
@@ -107,5 +108,23 @@ describe('the box a four-part basis becomes (a notice of a head, the controlled 
         reference: 'BM09-2026-000123',
       }),
     ).toBe('BM09-2026-000123');
+  });
+});
+
+describe('the box a recorded basis is read as (R-32)', () => {
+  it('is the reference as it was written for an event made with the box', () => {
+    expect(groundsNoteOf(normalizedGroundsNote('QĐ nghỉ việc số 12/2026'))).toBe('QĐ nghỉ việc số 12/2026');
+  });
+
+  it('puts the four parts of an event written before the box back into one sentence, so they are not lost', () => {
+    expect(
+      groundsNoteOf({ type: 'HR_DECISION', reference: 'QD-12/2026', issuer: 'HR Department', issuedOn: '2026-06-20' }),
+    ).toBe('HR_DECISION QD-12/2026 — HR Department, 2026-06-20');
+  });
+
+  it('is cut to the size of the box', () => {
+    const note = groundsNoteOf({ type: 'T', reference: 'r'.repeat(600), issuer: 'I', issuedOn: '2026-06-20' });
+
+    expect(note).toHaveLength(500);
   });
 });

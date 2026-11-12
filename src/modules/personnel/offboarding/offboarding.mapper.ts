@@ -7,6 +7,7 @@ import type {
   OffboardingRightWire,
   OffboardingSummaryWire,
 } from './offboarding.dto';
+import { groundsNoteOf } from '../personnel-grounds.policy';
 import type { ReadAccess } from '../personnel-self-action.policy';
 import { ROLE_FLAGS, type RoleFlagMap } from '../public/personnel.types';
 import type { Checklist } from './offboarding.policy';
@@ -137,7 +138,7 @@ export function toDetail(
       : null,
     priorWorkState: record.priorWorkState,
     departureEffectiveOn: record.departureEffectiveOn,
-    groundsNote: full ? record.grounds.reference : null,
+    groundsNote: full ? groundsNoteOf(record.grounds) : null,
     headSuccessor:
       full && handover
         ? {
