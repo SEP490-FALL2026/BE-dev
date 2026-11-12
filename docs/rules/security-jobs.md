@@ -74,11 +74,6 @@
   (one line that names the kind of error, the code and whether it can be retried: the bullet after this one).
   A change written for today is told in the transaction that writes it. It runs in the API graph because that is where every
   listener (requests, personnel) is registered. Run one by hand with `OrganizationHistoryService.announceDueChanges(day)`.
-  The API also runs `HandoverDutySweeper` once an hour (the first pass five minutes after start, unreferenced timer): for each
-  handover duty whose deadline has passed unconfirmed it writes `overdue_noticed_at`, the audit event `HANDOVER_DUTY.OVERDUE` and an inbox
-  notice (`HANDOVER_CONFIRMATION_OVERDUE`) to the person who confirms today and the IT Admin in charge in one transaction, so a duty is told
-  once for a deadline however many instances run; a failed pass only logs. Run one by hand with
-  `HandoverOverdueService.noticeOverdue(now)`.
   The API also runs `TransferReviewSweeper` once an hour (the first pass five minutes after start, unreferenced timer): for each open
   transfer review past its deadline whose department has a head today it writes `overdue_noticed_at` and the audit event
   `TRANSFER_REVIEW.OVERDUE` in one transaction, so a review is told once however many instances run; a department without a head is

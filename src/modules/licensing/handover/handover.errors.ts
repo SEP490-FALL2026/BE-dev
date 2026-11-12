@@ -1,27 +1,3 @@
-import type { BusinessDate } from '../../../core/business-date';
-import { RevocationHookRefusedError } from '../public/licensing.errors';
-import type { HandoverRole, WaitingReason } from './handover-confirmer.policy';
-
-/**
- * The work on a seat is held until the person who confirms the handover has done it, or its deadline ends (`US-03-09` AC-3, AC-5,
- * `US-07-05` AC-13). Thrown from the hook of the revocation, so the route of the task answers it as a conflict with this code and
- * nothing is changed.
- */
-export class HandoverConfirmationPendingError extends RevocationHookRefusedError {
-  constructor(dutyId: string, dueOn: BusinessDate, role: HandoverRole, waiting: WaitingReason | null) {
-    super(
-      'HANDOVER.CONFIRMATION_PENDING',
-      'The handover of the data has to be confirmed before the seat is taken away.',
-      {
-        dutyId,
-        dueOn,
-        role,
-        waitingReason: waiting,
-      },
-    );
-  }
-}
-
 export type HandoverDutyProblem =
   /** The duty does not exist, or the caller has nothing to do with it. */
   | 'NOT_FOUND'

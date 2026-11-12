@@ -11,7 +11,7 @@ const M = 1_000_000;
  * US-03-05 AC-2, AC-3, AC-6 to AC-9, AC-11: the queue of the IT Admin for the rights that ended and the start of their revocation,
  * over HTTP on real PostgreSQL. A right is read into the queue from the day after its end, stays in force and is never revoked or
  * renewed by itself; a renewal sent in time keeps it waiting; the revocation goes through the one gate with the source of an expiry,
- * its handover falls to the IT Admin, and a failure never means the right was lost.
+ * no handover confirmation is asked (`QĐ-110g`), and a failure never means the right was lost.
  */
 describe('the rights that ended and the IT Admin queue (integration, real PostgreSQL)', () => {
   let relay: PgRelay;
@@ -290,60 +290,26 @@ describe('the rights that ended and the IT Admin queue (integration, real Postgr
       expect(await h.liveTaskOf(today.assignmentId)).toBeNull();
     });
 
-    it('asks the IT Admin, not the head, to confirm the handover, holds the work for it, and goes on flagged after the short deadline (AC-9)', async () => {
-      const { unit, assignmentId } = await right(2, lossy);
+    it('asks nobody to confirm a handover (QĐ-110g): a plan that loses data opens no duty, the IT Admin takes the work at once and completes it', async () => {
+      const { assignmentId } = await right(2, lossy);
       const { taskId } = await started(assignmentId);
 
-      const [duty] = await h.dutyRows(assignmentId);
-      expect(duty).toMatchObject({ source: 'TIME_LIMITED_EXPIRY', confirmer_role: 'IT_ADMIN', confirmed_value: null });
-      expect(duty.due_on >= h.today()).toBe(true);
-      expect((await h.queueRowOf(assignmentId))?.handover).toMatchObject({
-        dutyId: duty.id,
-        status: 'OPEN',
-        role: 'IT_ADMIN',
-        overdue: false,
-        flaggedUnconfirmed: false,
-      });
+      expect(await h.dutyRows(assignmentId)).toEqual([]);
+      expect((await h.queueRowOf(assignmentId))?.handover).toBeNull();
       expect((await h.queueRowOf(assignmentId))?.plan.dataLossOnRemoval).toBe(true);
-      // The head is not who confirms; the work is held until the IT Admin does.
-      expect(h.codeOf(await h.confirmDuty(duty.id, { value: 'HANDLED' }, unit.head.account).expect(403))).toBe(
-        'HANDOVER_DUTY.NOT_CONFIRMER',
-      );
-      expect(h.codeOf(await h.claim(taskId).expect(409))).toBe('HANDOVER.CONFIRMATION_PENDING');
 
-      await h.confirmDuty(duty.id, { value: 'HANDLED' }).expect(201);
       await h.claim(taskId).expect(200);
       await h.revoked(taskId, { completion: 'ACCOUNT_REMOVED', evidence: 'Removed from the workspace' }).expect(200);
 
-      expect((await h.dutyRows(assignmentId))[0]).toMatchObject({
-        confirmed_value: 'HANDLED',
-        proceeded_unconfirmed_at: null,
-      });
+      expect(await h.dutyRows(assignmentId)).toEqual([]);
       expect((await h.seatRow(assignmentId)).valid_until).toBe(h.today());
-
-      const late = await right(2, lossy);
-      const lateTask = (await started(late.assignmentId)).taskId;
-      await h.ctx.sql.query(`UPDATE handover_duties SET due_on = $2::date WHERE assignment_id = $1`, [
-        late.assignmentId,
-        h.inDays(-1),
-      ]);
-      expect((await h.queueRowOf(late.assignmentId))?.handover).toMatchObject({ overdue: true });
-      await h.claim(lateTask).expect(200);
-      await h.revoked(lateTask, { completion: 'ACCOUNT_REMOVED', evidence: 'Removed from the workspace' }).expect(200);
-
-      const [flagged] = await h.dutyRows(late.assignmentId);
-      expect(flagged.confirmed_value).toBeNull();
-      expect(flagged.proceeded_unconfirmed_at).not.toBeNull();
-      expect((await h.seatRow(late.assignmentId)).valid_until).toBe(h.today());
     });
   });
 
   describe('a revocation that fails never means the right was lost (AC-11)', () => {
-    it('keeps the right in force and in the queue with the failed task, and the confirmation as it was', async () => {
+    it('keeps the right in force and in the queue with the failed task', async () => {
       const { assignmentId } = await right(2, lossy);
       const { taskId } = await started(assignmentId);
-      const [duty] = await h.dutyRows(assignmentId);
-      await h.confirmDuty(duty.id, { value: 'HANDLED' }).expect(201);
       await h.claim(taskId).expect(200);
 
       await h.fail(taskId, { reason: 'The workspace admin cannot sign in' }).expect(200);
@@ -352,7 +318,7 @@ describe('the rights that ended and the IT Admin queue (integration, real Postgr
       expect(await h.queueRowOf(assignmentId)).toMatchObject({
         status: 'REVOCATION_OPEN',
         revocation: { taskId, status: 'FAILED' },
-        handover: { status: 'CONFIRMED' },
+        handover: null,
       });
       await h.retry(taskId).expect(200);
       expect((await h.queueRowOf(assignmentId))?.revocation).toMatchObject({ status: 'QUEUED' });
@@ -361,10 +327,9 @@ describe('the rights that ended and the IT Admin queue (integration, real Postgr
 
       await h.closeFailed(taskId, { reason: 'Handled outside the system later' }).expect(200);
 
-      // The right is still held and is back to waiting for the IT Admin; the confirmation that was written is not undone.
+      // The right is still held and is back to waiting for the IT Admin.
       expect(await h.seatRow(assignmentId)).toMatchObject({ valid_until: null });
       expect((await h.queueRowOf(assignmentId))?.status).toBe('READY_TO_REVOKE');
-      expect((await h.dutyRows(assignmentId))[0]).toMatchObject({ confirmed_value: 'HANDLED' });
       const again = await started(assignmentId);
       expect(again).toMatchObject({ created: true });
       expect(again.taskId).not.toBe(taskId);

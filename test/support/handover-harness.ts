@@ -2,7 +2,6 @@ import { randomUUID } from 'node:crypto';
 import request from 'supertest';
 import { TransactionRunner } from '../../src/infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../src/infrastructure/security/tokens/access-token-verifier.port';
-import { HandoverOverdueService } from '../../src/modules/licensing/handover/handover-overdue.service';
 import { LicensingApi } from '../../src/modules/licensing/public/licensing.api';
 import { LicensingHandoverApi } from '../../src/modules/licensing/public/licensing-handover.api';
 import type {
@@ -171,9 +170,6 @@ export class HandoverHarness extends TransferHarness {
       .run((tx) =>
         this.ctx.app.get(LicensingHandoverApi).cancelHandoverDuties(tx, this.actorOf(this.it1), { caseRefId, reason }),
       );
-
-  /** The reminder of the hour, run by hand. */
-  noticeOverdue = (now: Date = new Date()) => this.ctx.app.get(HandoverOverdueService).noticeOverdue(now);
 
   revoked = (id: string, body: object, account: ApiAccount = this.it1) =>
     request(this.server())

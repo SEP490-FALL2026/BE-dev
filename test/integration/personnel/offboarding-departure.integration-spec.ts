@@ -1,7 +1,6 @@
 import { randomUUID } from 'node:crypto';
 import request from 'supertest';
 import { OffboardingBlockerContributions } from '../../../src/modules/personnel/public/personnel.extension-points';
-import type { DutyWire } from '../../support/handover-harness';
 import { OffboardingHarness, type CaseWire, type RightWire } from '../../support/offboarding-harness';
 import type { Department, Person } from '../../support/request-harness';
 
@@ -48,12 +47,6 @@ describe('the departure of a person, the revocations and the closing (integratio
   const me = (person: Person) => request(h.server()).get('/api/v1/me').set(h.as(person.account));
   const rightsOf = async (id: string) =>
     h.dataOf<{ items: RightWire[] }>(await h.rightsOf(id, '?pageSize=100').expect(200)).items;
-  const confirmAll = async (person: Person) => {
-    const rows = h.dataOf<{ items: DutyWire[] }>(
-      await h.duties(`?pageSize=100&employeeId=${person.employeeId}`, h1.account).expect(200),
-    ).items;
-    for (const row of rows) await h.confirmDuty(row.id, { value: 'HANDED_OVER' }, h1.account).expect(201);
-  };
   const LOCK = { note: 'Đã khóa tài khoản công ty, phiên và token thiết bị' };
 
   describe('the person has left (AC-3, AC-9, AC-10)', () => {
@@ -218,7 +211,7 @@ describe('the departure of a person, the revocations and the closing (integratio
       expect([lockRoute.status, h.codeOf(lockRoute)]).toEqual([409, 'OFFBOARDING_CASE.ALREADY_RECORDED']);
     });
 
-    it('go through the handover, are completed by the IT Admin, and then the case closes with its steps done (AC-20, QĐ-62i)', async () => {
+    it('are completed by the IT Admin with no handover step, and then the case closes with its steps done (AC-20, QĐ-62i)', async () => {
       const { person } = await leaver();
       const wire = await h.recordedCase(person);
       await h.leaveOnLastDay(wire.id).expect(200);
@@ -239,10 +232,7 @@ describe('the departure of a person, the revocations and the closing (integratio
       expect(h.detailsOf(early).blockers).toEqual(
         expect.arrayContaining(['PERSONAL_RIGHTS_OPEN', 'SERVICE_ACCOUNTS_WITHOUT_ANSWERER']),
       );
-      // The tools are held until the head confirms them (AC-7 is the head's); then the IT Admin completes each task.
-      const held0 = await h.claim(held[0].revocation?.taskId ?? '');
-      expect([held0.status, h.codeOf(held0)]).toEqual([409, 'HANDOVER.CONFIRMATION_PENDING']);
-      await confirmAll(person);
+      // No tool is held for a handover (QĐ-110g): the IT Admin takes and completes each task at once.
       for (const right of held) {
         const taskId = right.revocation?.taskId ?? '';
         await h.claim(taskId).expect(200);
@@ -318,7 +308,6 @@ describe('the departure of a person, the revocations and the closing (integratio
       });
       await h.revokeRights(wire.id, {}).expect(200);
       expect(await h.taskCount()).toBe(tasks + 2);
-      await confirmAll(person);
       const after = await rightsOf(wire.id);
       const task = (assignmentId: string) =>
         after.find((right) => right.assignmentId === assignmentId)?.revocation?.taskId ?? '';
@@ -352,7 +341,7 @@ describe('the departure of a person, the revocations and the closing (integratio
   });
 
   describe('a departure nobody planned (AC-18)', () => {
-    it('lets the tool that loses no data go at once and holds the one that does until the head confirms it', async () => {
+    it('lets every tool go at once, the one that loses data too: no handover is asked (QĐ-110g)', async () => {
       const { person, seats } = await leaver([canva, chatgpt]);
       const wire = await h.recordedCase(person, { accessBlockMode: 'BLOCK_NOW', lastWorkingDay: h.today() });
 
@@ -365,9 +354,9 @@ describe('the departure of a person, the revocations and the closing (integratio
         rights.find((right) => right.assignmentId === assignmentId)?.revocation?.taskId ?? '';
       await h.claim(task(seats[0])).expect(200);
       await h.revoked(task(seats[0]), { completion: 'ACCOUNT_REMOVED', evidence: 'đã xóa' }).expect(200);
-      const held = await h.claim(task(seats[1]));
-      expect([held.status, h.codeOf(held)]).toEqual([409, 'HANDOVER.CONFIRMATION_PENDING']);
-      expect((await rightsOf(wire.id)).map((right) => right.assignmentId)).toEqual([seats[1]]);
+      await h.claim(task(seats[1])).expect(200);
+      await h.revoked(task(seats[1]), { completion: 'ACCOUNT_REMOVED', evidence: 'đã xóa' }).expect(200);
+      expect(await rightsOf(wire.id)).toEqual([]);
     });
   });
 });

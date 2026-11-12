@@ -3,8 +3,6 @@ import { addDays } from '../../../core/business-date';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../../audit/public/audit.api';
-import { CatalogApi } from '../../catalog/public/catalog.api';
-import { SeatTargetNotFoundError } from '../public/licensing.errors';
 import type {
   CancelHandoverInput,
   HandoverDutyBrief,
@@ -12,34 +10,18 @@ import type {
   OpenHandoverDutiesInput,
   ReconcileHandoverInput,
 } from '../public/licensing-handover.types';
-import {
-  NO_LONGER_APPLIES,
-  type RevocationContext,
-  type RevocationReasonFacts,
-  type RevocationTaskFacts,
-} from '../public/licensing.types';
-import { AssignmentEndService } from '../assignment/assignment-end.service';
 import { licensingAuditEvent } from '../licensing-audit-event.mapper';
 import { RevocationViewService } from '../provisioning/revocation-view.service';
-import { isOverdue, requirementOf, withdrawalReconsiders } from './handover-confirmer.policy';
+import { isOverdue } from './handover-confirmer.policy';
 import { HandoverConfirmerResolver } from './handover-confirmer.service';
 import { HandoverCaseFacts } from './handover-case-facts.service';
 import { HandoverIssueService } from './handover-issue.service';
 import { HandoverRepo } from './handover.repo';
 
-/** The sources a person who leaves opens: the one who leaves is not who confirms. */
-const DEPARTING: ReadonlySet<string> = new Set(['DEPARTURE', 'ABRUPT_DEPARTURE']);
 /**
- * The record of a return keeps its own light handover (`g5-return-and-renewal-requests`): the gate is not asked a second time for
- * a reason that comes from it.
- */
-const RETURN_RECORD = 'RETURN_REQUEST';
-
-/**
- * Opens, moves and cancels the duties of the handover (`US-03-09`, `US-07-09`). A planned departure opens them for every seat the
- * person holds as soon as it is recorded, before any task exists, with the deadline its source worked out; every other source
- * opens them through the hook when its revocation opens, with a short deadline counted here. A change or a cancellation of the
- * case moves or cancels the duties still waiting, and a confirmed duty stays as history.
+ * What is left of the duties of the handover after `QĐ-110g` (the confirmation is gone): a planned departure still opens them when it
+ * is recorded until the personnel side stops (X-H.2), and the reads show what stands. No revocation opens a duty any more. A change
+ * or a cancellation of the case moves or cancels the duties still waiting, and a confirmed duty stays as history.
  */
 @Injectable()
 export class HandoverService {
@@ -47,11 +29,9 @@ export class HandoverService {
     private readonly issue: HandoverIssueService,
     private readonly repo: HandoverRepo,
     private readonly view: RevocationViewService,
-    private readonly catalog: CatalogApi,
     private readonly facts: HandoverCaseFacts,
     private readonly audit: AuditApi,
     private readonly resolver: HandoverConfirmerResolver,
-    private readonly ending: AssignmentEndService,
   ) {}
 
   /** Where the handover confirmation of each seat stands, in one read of the duties and one of the organization. */
@@ -108,93 +88,6 @@ export class HandoverService {
     }
 
     return result;
-  }
-
-  /** The hook of the revocation: a task was opened or a reason added to it, so the seat may owe a confirmation. */
-  async openFromTask(
-    tx: DbTx,
-    actor: AuthenticatedPrincipal,
-    task: RevocationTaskFacts,
-    reasons: readonly RevocationReasonFacts[],
-    context: RevocationContext,
-    now: Date,
-  ): Promise<void> {
-    const asked = reasons
-      .filter((reason) => reason.referenceKind !== RETURN_RECORD)
-      .map((reason) => ({ source: reason.source, decidedByEmployeeId: reason.decidedByEmployeeId }));
-    const [plan] = await this.catalog.getPlanRevocationInfo([task.planId], tx);
-    if (!plan) throw new SeatTargetNotFoundError('PLAN');
-
-    const today = await this.facts.today(now, tx);
-    const departmentId = context.departmentId ?? (await this.facts.departmentOf(task.employeeId, today, tx));
-
-    const required = requirementOf(asked, plan.dataLossOnRemoval, { departmentId });
-    if (!required) return;
-    // The person who leaves heads the department: a successor is looked for from tomorrow, never the person themselves.
-    const leaverIsHead =
-      DEPARTING.has(required.source) &&
-      departmentId !== null &&
-      (await this.facts.heads(task.employeeId, departmentId, today, tx));
-
-    await this.issue.ensure(tx, actor, {
-      assignmentId: task.assignmentId,
-      employeeId: task.employeeId,
-      facts: asked,
-      dataLossOnRemoval: plan.dataLossOnRemoval,
-      noticeText: context.noticeText ?? plan.revocationNote,
-      caseRefId: null,
-      departmentId,
-      leaverIsHead,
-      resolveOn: leaverIsHead ? addDays(today, 1) : null,
-      dueOn: context.dueOn ?? (await this.facts.dueFor(required.source, today)),
-    });
-  }
-
-  /**
-   * The hook of the revocation: a source took one of its reasons back (`BR-MF5-04`, DA6-28). The duty waiting for the seat is looked at again
-   * from the reasons that still stand: it goes when none stands or when it was owed to a role only the withdrawn reason asked for (a ghost
-   * seat is confirmed by the head who decided it; the expiry that stays asks the IT Admin), and what the remaining reasons owe is opened as
-   * for any reason (a confirmation already written that answers it is relied on, `QĐ-64a`). A duty of a departure case, or one whose own
-   * source still stands, is never cancelled here (`FR-2.12`, `QĐ-66p`).
-   */
-  async reconcileWithdrawn(
-    tx: DbTx,
-    actor: AuthenticatedPrincipal,
-    task: RevocationTaskFacts,
-    remaining: readonly RevocationReasonFacts[],
-    cancelled: boolean,
-    now: Date,
-  ): Promise<void> {
-    // The seat before its duty, as every writer of a duty does (the task, the subscription, the assignment, the duty): never the other way.
-    await this.ending.lock(tx, task.assignmentId);
-    const open = await this.repo.lockOpenOf(tx, task.assignmentId);
-    const remainingSources = remaining.map((reason) => reason.source);
-    if (open && withdrawalReconsiders(open, remainingSources, cancelled)) {
-      const [plan] = await this.catalog.getPlanRevocationInfo([task.planId], tx);
-      if (!plan) throw new SeatTargetNotFoundError('PLAN');
-      const asked = remaining
-        .filter((reason) => reason.referenceKind !== RETURN_RECORD)
-        .map((reason) => ({ source: reason.source, decidedByEmployeeId: reason.decidedByEmployeeId }));
-      const required = cancelled
-        ? null
-        : requirementOf(asked, plan.dataLossOnRemoval, { departmentId: open.departmentId });
-      if (!required || required.role !== open.confirmerRole || required.fixedEmployeeId !== open.confirmerEmployeeId) {
-        await this.repo.cancel(tx, open.id, NO_LONGER_APPLIES, now);
-        await this.audit.record(
-          tx,
-          licensingAuditEvent(
-            actor,
-            open.organizationId,
-            'HANDOVER_DUTY.CANCELLED',
-            'HandoverDuty',
-            open.id,
-            { dueOn: open.dueOn },
-            { assignmentId: open.assignmentId, revocationTaskId: task.id, reason: NO_LONGER_APPLIES },
-          ),
-        );
-      }
-    }
-    if (!cancelled && remaining.length > 0) await this.openFromTask(tx, actor, task, remaining, {}, now);
   }
 
   /** The deadline of the case moved: the duties still waiting get the new one, and the reminder starts over (`US-03-04` AC-14). */

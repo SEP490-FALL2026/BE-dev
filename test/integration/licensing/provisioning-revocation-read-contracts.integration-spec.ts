@@ -277,7 +277,7 @@ describe('the reads and the hook of a revocation (integration, real PostgreSQL)'
     }, 600_000);
   });
 
-  describe('the hook the handover confirmation registers (US-07-05 AC-11, g6-handover-confirmation)', () => {
+  describe('the hook a module that extends a revocation registers (US-07-05 AC-11)', () => {
     const calls: string[] = [];
     const opened: {
       task: RevocationTaskFacts;
@@ -319,9 +319,8 @@ describe('the reads and the hook of a revocation (integration, real PostgreSQL)'
       listening = null;
     });
 
-    it('tells the handover confirmation before the return of a seat, so the first to refuse is the handover (the order the modules start in)', () => {
+    it('tells the modules that extend a revocation in the order they start in (QĐ-110g: no handover confirmation among them)', () => {
       expect(h.ctx.app.get(RevocationListeners).names()).toEqual([
-        'licensing.handover-confirmation',
         // G9-02 (RV-07): the money held for the seat goes back by the day when the revocation is completed.
         'requests.seat-release',
         'requests.return-request',

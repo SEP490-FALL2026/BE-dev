@@ -103,7 +103,7 @@ describe('deciding about the tools of a review after a transfer (integration, re
     expect(byProvisioning).toContainEqual(['K2', 'STILL_NEEDED', true]);
   });
 
-  it('US-03-07 AC-4, US-07-05 AC-9: until the head decides there is no revocation; "no longer needed" for a tool that loses data holds it for the head, not the IT Admin', async () => {
+  it('US-03-07 AC-4, US-07-05 AC-9: until the head decides there is no revocation; "no longer needed" for a tool that loses data opens the task for the IT Admin with no handover step (QĐ-110g)', async () => {
     const { seats, review } = await h.movedWith(des, fin, [{ subscriptionId: figma }]);
     const reviewId = review?.id ?? '';
     expect(await h.liveTaskOf(seats[0])).toBeNull();
@@ -124,26 +124,11 @@ describe('deciding about the tools of a review after a transfer (integration, re
         reference_id: reviewId,
       },
     ]);
-    const [duty] = await h.dutyRows(seats[0]);
-    expect(duty).toMatchObject({
-      source: 'TRANSFER_REVIEW',
-      confirmer_role: 'DEPARTMENT_HEAD',
-      department_id: fin.id,
-      notice_text: SAVE,
-    });
-    // The head of the new department confirms; the head before and the IT Admin do not.
-    expect(h.dataOf<{ canConfirm: boolean }>(await h.duty(duty.id, h2.account).expect(200)).canConfirm).toBe(true);
-    await h.duty(duty.id, h1.account).expect(404);
-    expect(h.codeOf(await h.claim(taskId ?? '').expect(409))).toBe('HANDOVER.CONFIRMATION_PENDING');
-    expect(h.codeOf(await h.confirmDuty(duty.id, { value: 'HANDLED' }, h.it1).expect(403))).toBe(
-      'HANDOVER_DUTY.NOT_CONFIRMER',
-    );
-
-    // Past the short deadline the removal goes on and is flagged; it is never held for ever.
-    await h.ctx.sql.query(`UPDATE handover_duties SET due_on = $2 WHERE id = $1`, [duty.id, h.day(-1)]);
+    // No handover is asked for a tool that loses data (QĐ-110g): the task goes to the IT Admin at once.
+    expect(await h.dutyRows(seats[0])).toEqual([]);
     await h.claim(taskId ?? '').expect(200);
     await h.revoked(taskId ?? '', { completion: 'ACCOUNT_REMOVED', evidence: 'đã xóa' }).expect(200);
-    expect((await h.dutyRows(seats[0]))[0].proceeded_unconfirmed_at).not.toBeNull();
+    expect(await h.dutyRows(seats[0])).toEqual([]);
     expect((await h.assignmentRow(seats[0])).valid_until).not.toBeNull();
   });
 

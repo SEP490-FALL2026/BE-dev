@@ -51,11 +51,8 @@ import { HandoverCaseFacts } from './handover/handover-case-facts.service';
 import { HandoverConfirmationService } from './handover/handover-confirmation.service';
 import { HandoverConfirmerResolver } from './handover/handover-confirmer.service';
 import { HandoverDutiesController } from './handover/handover-duties.controller';
-import { HandoverDutySweeper } from './handover/handover-duty.job';
 import { HandoverIssueService } from './handover/handover-issue.service';
 import { HandoverListRepo } from './handover/handover-list.repo';
-import { HandoverOverdueService } from './handover/handover-overdue.service';
-import { HandoverRevocationHook } from './handover/handover-revocation.listener';
 import { HandoverViewService } from './handover/handover-view.service';
 import { HandoverRepo } from './handover/handover.repo';
 import { HandoverService } from './handover/handover.service';
@@ -245,11 +242,8 @@ import { SubscriptionRenewalsController } from './subscription-renewal/subscript
     HandoverAlertService,
     HandoverIssueService,
     HandoverService,
-    HandoverRevocationHook,
     HandoverConfirmationService,
     HandoverViewService,
-    HandoverOverdueService,
-    HandoverDutySweeper,
     ExpiryReminderRepo,
     ExpiryReminderService,
     ExpiryReminderSweeper,
