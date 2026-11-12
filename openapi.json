@@ -5727,7 +5727,7 @@
         },
         "responses": {
           "201": {
-            "description": "The transfer was recorded: the placement the person has ends on the day and the new one begins on it, and the head of the department they leave is handed over or left empty as chosen. A day of today takes effect at once. The seats the person holds are not touched. A warning lists the applications the person is Business Owner of, which need another owner.",
+            "description": "The transfer was recorded: the placement the person has ends on the day and the new one begins on it, and the head of the department they leave is handed over or left empty as chosen. A day of today takes effect at once. The seats the person holds are not touched.",
             "content": {
               "application/json": {
                 "schema": {
@@ -18590,7 +18590,7 @@
             }
           },
           "422": {
-            "description": "The request is invalid (VALIDATION_ERROR) or a rule refuses it: NAME_INVALID, VENDOR_NAME_INVALID, DOMAIN_INVALID, TOO_MANY_DOMAINS, NOTE_INVALID, VENDOR_REQUIRED, VENDOR_SOURCE_AMBIGUOUS, INTERNAL_HAS_NO_VENDOR, BUSINESS_OWNER_INVALID, FUNCTIONAL_GROUP_INVALID, DICTIONARY_LINE_NOT_FOUND, DICTIONARY_LINE_MISMATCH or UPDATE_EMPTY.",
+            "description": "The request is invalid (VALIDATION_ERROR) or a rule refuses it: NAME_INVALID, VENDOR_NAME_INVALID, DOMAIN_INVALID, TOO_MANY_DOMAINS, NOTE_INVALID, VENDOR_REQUIRED, VENDOR_SOURCE_AMBIGUOUS, INTERNAL_HAS_NO_VENDOR, FUNCTIONAL_GROUP_INVALID, DICTIONARY_LINE_NOT_FOUND, DICTIONARY_LINE_MISMATCH or UPDATE_EMPTY.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -18659,17 +18659,6 @@
                       "error": {
                         "code": "APPLICATION.INTERNAL_HAS_NO_VENDOR",
                         "message": "An internal application has no vendor and no dictionary line.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "APPLICATION.BUSINESS_OWNER_INVALID": {
-                    "summary": "The Business Owner must be an employee who is still working.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "APPLICATION.BUSINESS_OWNER_INVALID",
-                        "message": "The Business Owner must be an employee who is still working.",
                         "requestId": "req_example"
                       }
                     }
@@ -19181,7 +19170,7 @@
             }
           },
           "422": {
-            "description": "The request is invalid (VALIDATION_ERROR) or a rule refuses it: NAME_INVALID, VENDOR_NAME_INVALID, DOMAIN_INVALID, TOO_MANY_DOMAINS, NOTE_INVALID, VENDOR_REQUIRED, VENDOR_SOURCE_AMBIGUOUS, INTERNAL_HAS_NO_VENDOR, BUSINESS_OWNER_INVALID, FUNCTIONAL_GROUP_INVALID, DICTIONARY_LINE_NOT_FOUND, DICTIONARY_LINE_MISMATCH or UPDATE_EMPTY.",
+            "description": "The request is invalid (VALIDATION_ERROR) or a rule refuses it: NAME_INVALID, VENDOR_NAME_INVALID, DOMAIN_INVALID, TOO_MANY_DOMAINS, NOTE_INVALID, VENDOR_REQUIRED, VENDOR_SOURCE_AMBIGUOUS, INTERNAL_HAS_NO_VENDOR, FUNCTIONAL_GROUP_INVALID, DICTIONARY_LINE_NOT_FOUND, DICTIONARY_LINE_MISMATCH or UPDATE_EMPTY.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -19250,17 +19239,6 @@
                       "error": {
                         "code": "APPLICATION.INTERNAL_HAS_NO_VENDOR",
                         "message": "An internal application has no vendor and no dictionary line.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "APPLICATION.BUSINESS_OWNER_INVALID": {
-                    "summary": "The Business Owner must be an employee who is still working.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "APPLICATION.BUSINESS_OWNER_INVALID",
-                        "message": "The Business Owner must be an employee who is still working.",
                         "requestId": "req_example"
                       }
                     }
@@ -21496,6 +21474,647 @@
         "security": [{ "bearer": [] }],
         "summary": "Record the workspace profile of a K2 plan",
         "tags": ["plans"]
+      }
+    },
+    "/api/v1/plans/{id}/terms": {
+      "get": {
+        "operationId": "planTermsGet",
+        "parameters": [
+          { "name": "id", "required": true, "in": "path", "schema": { "format": "uuid", "type": "string" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "The terms as IT recorded them, the sharing policy kept on the plan, and the review alerts open for the plan. A K5 plan answers applicable false.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/PlanTermsResponseDto" },
+                    { "properties": { "message": { "example": "PLAN_TERMS.FETCHED" } } }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHENTICATION_REQUIRED": {
+                    "summary": "A Bearer access token is required.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHENTICATION_REQUIRED",
+                        "message": "A Bearer access token is required.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "INVALID_ACCESS_TOKEN": {
+                    "summary": "The access token is invalid.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "INVALID_ACCESS_TOKEN",
+                        "message": "The access token is invalid.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only the IT Admin and Finance read the terms of a plan.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHORIZATION.FORBIDDEN": {
+                    "summary": "You do not have permission to perform this action.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHORIZATION.FORBIDDEN",
+                        "message": "You do not have permission to perform this action.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The plan does not exist (PLAN.NOT_FOUND).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "PLAN.NOT_FOUND": {
+                    "summary": "The plan does not exist.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "PLAN.NOT_FOUND",
+                        "message": "The plan does not exist.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The id is not a UUID (VALIDATION_ERROR).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "VALIDATION_ERROR": {
+                    "summary": "Request validation failed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "VALIDATION_ERROR",
+                        "message": "Request validation failed.",
+                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_TOO_MANY_REQUESTS": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_TOO_MANY_REQUESTS",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "TOKEN_VERIFICATION_UNAVAILABLE": {
+                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
+                        "message": "Authentication is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SERVICE_UNAVAILABLE": {
+                    "summary": "The service is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SERVICE_UNAVAILABLE",
+                        "message": "The service is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "bearer": [] }],
+        "summary": "Get the terms of a plan",
+        "tags": ["plan-terms"]
+      },
+      "put": {
+        "operationId": "planTermsSet",
+        "parameters": [
+          { "name": "id", "required": true, "in": "path", "schema": { "format": "uuid", "type": "string" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/PlanTermsBodyDto" } } }
+        },
+        "responses": {
+          "200": {
+            "description": "The terms replace the previous ones as a whole, exactly as given; changed says whether anything differed. The sharing policy is not set here but on the plan.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/PlanTermsSetResponseDto" },
+                    { "properties": { "message": { "example": "PLAN_TERMS.SET" } } }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_BAD_REQUEST": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_BAD_REQUEST",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHENTICATION_REQUIRED": {
+                    "summary": "A Bearer access token is required.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHENTICATION_REQUIRED",
+                        "message": "A Bearer access token is required.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "INVALID_ACCESS_TOKEN": {
+                    "summary": "The access token is invalid.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "INVALID_ACCESS_TOKEN",
+                        "message": "The access token is invalid.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only an IT Admin records the terms of a plan.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHORIZATION.FORBIDDEN": {
+                    "summary": "You do not have permission to perform this action.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHORIZATION.FORBIDDEN",
+                        "message": "You do not have permission to perform this action.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The plan does not exist (PLAN.NOT_FOUND).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "PLAN.NOT_FOUND": {
+                    "summary": "The plan does not exist.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "PLAN.NOT_FOUND",
+                        "message": "The plan does not exist.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_PAYLOAD_TOO_LARGE": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_PAYLOAD_TOO_LARGE",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_UNSUPPORTED_MEDIA_TYPE": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_UNSUPPORTED_MEDIA_TYPE",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The request is invalid (VALIDATION_ERROR) or a rule refuses it: PLAN_TERMS.NOT_APPLICABLE, URL_INVALID, TEXT_INVALID, REVIEW_DATE_IN_FUTURE or INSTALL_LIMIT_NUMERIC_ONLY_FOR_K4.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "VALIDATION_ERROR": {
+                    "summary": "Request validation failed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "VALIDATION_ERROR",
+                        "message": "Request validation failed.",
+                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "PLAN_TERMS.NOT_APPLICABLE": {
+                    "summary": "A K5 plan of an internal application has no terms.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "PLAN_TERMS.NOT_APPLICABLE",
+                        "message": "A K5 plan of an internal application has no terms.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "PLAN_TERMS.URL_INVALID": {
+                    "summary": "The terms link must be an http or https address of at most 2000 characters.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "PLAN_TERMS.URL_INVALID",
+                        "message": "The terms link must be an http or https address of at most 2000 characters.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "PLAN_TERMS.TEXT_INVALID": {
+                    "summary": "A text of the terms is at most 2000 characters.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "PLAN_TERMS.TEXT_INVALID",
+                        "message": "A text of the terms is at most 2000 characters.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "PLAN_TERMS.REVIEW_DATE_IN_FUTURE": {
+                    "summary": "The review date cannot be a day that has not come yet.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "PLAN_TERMS.REVIEW_DATE_IN_FUTURE",
+                        "message": "The review date cannot be a day that has not come yet.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "PLAN_TERMS.INSTALL_LIMIT_NUMERIC_ONLY_FOR_K4": {
+                    "summary": "Only a K4 plan keeps the install limit as a number.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "PLAN_TERMS.INSTALL_LIMIT_NUMERIC_ONLY_FOR_K4",
+                        "message": "Only a K4 plan keeps the install limit as a number.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_TOO_MANY_REQUESTS": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_TOO_MANY_REQUESTS",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "TOKEN_VERIFICATION_UNAVAILABLE": {
+                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
+                        "message": "Authentication is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SERVICE_UNAVAILABLE": {
+                    "summary": "The service is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SERVICE_UNAVAILABLE",
+                        "message": "The service is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "bearer": [] }],
+        "summary": "Record the terms of a plan",
+        "tags": ["plan-terms"]
+      }
+    },
+    "/api/v1/plan-warnings": {
+      "get": {
+        "operationId": "planWarningList",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maximum": 9007199254740991,
+              "exclusiveMinimum": true,
+              "default": 1,
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": { "maximum": 100, "exclusiveMinimum": true, "default": 20, "type": "integer", "minimum": 0 }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A page of the review alerts open today, the earliest milestone first: the plan, the deadline of the subscription (and where it comes from), and the date of the last review.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/PlanWarningPageResponseDto" },
+                    { "properties": { "message": { "example": "PLAN_WARNING.LISTED" } } }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHENTICATION_REQUIRED": {
+                    "summary": "A Bearer access token is required.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHENTICATION_REQUIRED",
+                        "message": "A Bearer access token is required.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "INVALID_ACCESS_TOKEN": {
+                    "summary": "The access token is invalid.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "INVALID_ACCESS_TOKEN",
+                        "message": "The access token is invalid.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only an IT Admin reads the review alerts.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHORIZATION.FORBIDDEN": {
+                    "summary": "You do not have permission to perform this action.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHORIZATION.FORBIDDEN",
+                        "message": "You do not have permission to perform this action.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The query is invalid (VALIDATION_ERROR).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "VALIDATION_ERROR": {
+                    "summary": "Request validation failed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "VALIDATION_ERROR",
+                        "message": "Request validation failed.",
+                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_TOO_MANY_REQUESTS": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_TOO_MANY_REQUESTS",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "TOKEN_VERIFICATION_UNAVAILABLE": {
+                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
+                        "message": "Authentication is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SERVICE_UNAVAILABLE": {
+                    "summary": "The service is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SERVICE_UNAVAILABLE",
+                        "message": "The service is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "bearer": [] }],
+        "summary": "List the terms that need a new review",
+        "tags": ["plan-terms"]
       }
     },
     "/api/v1/vendors": {
@@ -24104,1751 +24723,6 @@
         "tags": ["subscriptions"]
       }
     },
-    "/api/v1/plans/{id}/terms": {
-      "get": {
-        "operationId": "planTermsGet",
-        "parameters": [
-          { "name": "id", "required": true, "in": "path", "schema": { "format": "uuid", "type": "string" } }
-        ],
-        "responses": {
-          "200": {
-            "description": "The terms as IT recorded them, the sharing policy kept on the plan, the opinions on them, and the review alerts open for the plan. A K5 plan answers applicable false.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "allOf": [
-                    { "$ref": "#/components/schemas/PlanTermsResponseDto" },
-                    { "properties": { "message": { "example": "PLAN_TERMS.FETCHED" } } }
-                  ]
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Authentication is required or the token is no longer valid.",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "AUTHENTICATION_REQUIRED": {
-                    "summary": "A Bearer access token is required.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "AUTHENTICATION_REQUIRED",
-                        "message": "A Bearer access token is required.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "INVALID_ACCESS_TOKEN": {
-                    "summary": "The access token is invalid.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "INVALID_ACCESS_TOKEN",
-                        "message": "The access token is invalid.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Only the IT Admin and Finance read the terms of a plan.",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "AUTHORIZATION.FORBIDDEN": {
-                    "summary": "You do not have permission to perform this action.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "AUTHORIZATION.FORBIDDEN",
-                        "message": "You do not have permission to perform this action.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "The plan does not exist (PLAN.NOT_FOUND).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "PLAN.NOT_FOUND": {
-                    "summary": "The plan does not exist.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "PLAN.NOT_FOUND",
-                        "message": "The plan does not exist.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "The id is not a UUID (VALIDATION_ERROR).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "VALIDATION_ERROR": {
-                    "summary": "Request validation failed.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "VALIDATION_ERROR",
-                        "message": "Request validation failed.",
-                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "HTTP_TOO_MANY_REQUESTS": {
-                    "summary": "The request could not be processed.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "HTTP_TOO_MANY_REQUESTS",
-                        "message": "The request could not be processed.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "TOKEN_VERIFICATION_UNAVAILABLE": {
-                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
-                        "message": "Authentication is temporarily unavailable. Retry shortly.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "SERVICE_UNAVAILABLE": {
-                    "summary": "The service is temporarily unavailable. Retry shortly.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "SERVICE_UNAVAILABLE",
-                        "message": "The service is temporarily unavailable. Retry shortly.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        },
-        "security": [{ "bearer": [] }],
-        "summary": "Get the terms of a plan",
-        "tags": ["plan-terms"]
-      },
-      "put": {
-        "operationId": "planTermsSet",
-        "parameters": [
-          { "name": "id", "required": true, "in": "path", "schema": { "format": "uuid", "type": "string" } }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/PlanTermsBodyDto" } } }
-        },
-        "responses": {
-          "200": {
-            "description": "The terms replace the previous ones as a whole, exactly as given; changed says whether anything differed. The sharing policy is not set here but on the plan.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "allOf": [
-                    { "$ref": "#/components/schemas/PlanTermsSetResponseDto" },
-                    { "properties": { "message": { "example": "PLAN_TERMS.SET" } } }
-                  ]
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "HTTP_BAD_REQUEST": {
-                    "summary": "The request could not be processed.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "HTTP_BAD_REQUEST",
-                        "message": "The request could not be processed.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Authentication is required or the token is no longer valid.",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "AUTHENTICATION_REQUIRED": {
-                    "summary": "A Bearer access token is required.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "AUTHENTICATION_REQUIRED",
-                        "message": "A Bearer access token is required.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "INVALID_ACCESS_TOKEN": {
-                    "summary": "The access token is invalid.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "INVALID_ACCESS_TOKEN",
-                        "message": "The access token is invalid.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Only an IT Admin records the terms of a plan.",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "AUTHORIZATION.FORBIDDEN": {
-                    "summary": "You do not have permission to perform this action.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "AUTHORIZATION.FORBIDDEN",
-                        "message": "You do not have permission to perform this action.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "The plan does not exist (PLAN.NOT_FOUND).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "PLAN.NOT_FOUND": {
-                    "summary": "The plan does not exist.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "PLAN.NOT_FOUND",
-                        "message": "The plan does not exist.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "413": {
-            "description": "The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "HTTP_PAYLOAD_TOO_LARGE": {
-                    "summary": "The request could not be processed.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "HTTP_PAYLOAD_TOO_LARGE",
-                        "message": "The request could not be processed.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "415": {
-            "description": "The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "HTTP_UNSUPPORTED_MEDIA_TYPE": {
-                    "summary": "The request could not be processed.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "HTTP_UNSUPPORTED_MEDIA_TYPE",
-                        "message": "The request could not be processed.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "The request is invalid (VALIDATION_ERROR) or a rule refuses it: PLAN_TERMS.NOT_APPLICABLE, URL_INVALID, TEXT_INVALID, REVIEW_DATE_IN_FUTURE or INSTALL_LIMIT_NUMERIC_ONLY_FOR_K4.",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "VALIDATION_ERROR": {
-                    "summary": "Request validation failed.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "VALIDATION_ERROR",
-                        "message": "Request validation failed.",
-                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "PLAN_TERMS.NOT_APPLICABLE": {
-                    "summary": "A K5 plan of an internal application has no terms.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "PLAN_TERMS.NOT_APPLICABLE",
-                        "message": "A K5 plan of an internal application has no terms.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "PLAN_TERMS.URL_INVALID": {
-                    "summary": "The terms link must be an http or https address of at most 2000 characters.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "PLAN_TERMS.URL_INVALID",
-                        "message": "The terms link must be an http or https address of at most 2000 characters.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "PLAN_TERMS.TEXT_INVALID": {
-                    "summary": "A text of the terms is at most 2000 characters.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "PLAN_TERMS.TEXT_INVALID",
-                        "message": "A text of the terms is at most 2000 characters.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "PLAN_TERMS.REVIEW_DATE_IN_FUTURE": {
-                    "summary": "The review date cannot be a day that has not come yet.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "PLAN_TERMS.REVIEW_DATE_IN_FUTURE",
-                        "message": "The review date cannot be a day that has not come yet.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "PLAN_TERMS.INSTALL_LIMIT_NUMERIC_ONLY_FOR_K4": {
-                    "summary": "Only a K4 plan keeps the install limit as a number.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "PLAN_TERMS.INSTALL_LIMIT_NUMERIC_ONLY_FOR_K4",
-                        "message": "Only a K4 plan keeps the install limit as a number.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "HTTP_TOO_MANY_REQUESTS": {
-                    "summary": "The request could not be processed.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "HTTP_TOO_MANY_REQUESTS",
-                        "message": "The request could not be processed.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "TOKEN_VERIFICATION_UNAVAILABLE": {
-                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
-                        "message": "Authentication is temporarily unavailable. Retry shortly.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "SERVICE_UNAVAILABLE": {
-                    "summary": "The service is temporarily unavailable. Retry shortly.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "SERVICE_UNAVAILABLE",
-                        "message": "The service is temporarily unavailable. Retry shortly.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        },
-        "security": [{ "bearer": [] }],
-        "summary": "Record the terms of a plan",
-        "tags": ["plan-terms"]
-      }
-    },
-    "/api/v1/plans/{id}/term-opinions": {
-      "get": {
-        "operationId": "planTermOpinionList",
-        "parameters": [
-          { "name": "id", "required": true, "in": "path", "schema": { "format": "uuid", "type": "string" } },
-          {
-            "name": "page",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "maximum": 9007199254740991,
-              "exclusiveMinimum": true,
-              "default": 1,
-              "type": "integer",
-              "minimum": 0
-            }
-          },
-          {
-            "name": "pageSize",
-            "required": false,
-            "in": "query",
-            "schema": { "maximum": 100, "exclusiveMinimum": true, "default": 20, "type": "integer", "minimum": 0 }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "A page of the opinions of the Business Owner on the terms of the plan, the newest first.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "allOf": [
-                    { "$ref": "#/components/schemas/OpinionPageResponseDto" },
-                    { "properties": { "message": { "example": "PLAN_TERM_OPINION.LISTED" } } }
-                  ]
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Authentication is required or the token is no longer valid.",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "AUTHENTICATION_REQUIRED": {
-                    "summary": "A Bearer access token is required.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "AUTHENTICATION_REQUIRED",
-                        "message": "A Bearer access token is required.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "INVALID_ACCESS_TOKEN": {
-                    "summary": "The access token is invalid.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "INVALID_ACCESS_TOKEN",
-                        "message": "The access token is invalid.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Only the IT Admin and Finance read the opinions.",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "AUTHORIZATION.FORBIDDEN": {
-                    "summary": "You do not have permission to perform this action.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "AUTHORIZATION.FORBIDDEN",
-                        "message": "You do not have permission to perform this action.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "The plan does not exist (PLAN.NOT_FOUND).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "PLAN.NOT_FOUND": {
-                    "summary": "The plan does not exist.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "PLAN.NOT_FOUND",
-                        "message": "The plan does not exist.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "The id is not a UUID or the query is invalid (VALIDATION_ERROR).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "VALIDATION_ERROR": {
-                    "summary": "Request validation failed.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "VALIDATION_ERROR",
-                        "message": "Request validation failed.",
-                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "HTTP_TOO_MANY_REQUESTS": {
-                    "summary": "The request could not be processed.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "HTTP_TOO_MANY_REQUESTS",
-                        "message": "The request could not be processed.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "TOKEN_VERIFICATION_UNAVAILABLE": {
-                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
-                        "message": "Authentication is temporarily unavailable. Retry shortly.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "SERVICE_UNAVAILABLE": {
-                    "summary": "The service is temporarily unavailable. Retry shortly.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "SERVICE_UNAVAILABLE",
-                        "message": "The service is temporarily unavailable. Retry shortly.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        },
-        "security": [{ "bearer": [] }],
-        "summary": "List the opinions on the terms of a plan",
-        "tags": ["plan-terms"]
-      },
-      "post": {
-        "operationId": "planTermOpinionRecord",
-        "parameters": [
-          { "name": "id", "required": true, "in": "path", "schema": { "format": "uuid", "type": "string" } }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/OpinionBodyDto" } } }
-        },
-        "responses": {
-          "201": {
-            "description": "The opinion is kept with the Business Owner of the application, who recorded it and when. It adds no step, deadline or approver.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "allOf": [
-                    { "$ref": "#/components/schemas/OpinionResponseDto" },
-                    { "properties": { "message": { "example": "PLAN_TERM_OPINION.RECORDED" } } }
-                  ]
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "HTTP_BAD_REQUEST": {
-                    "summary": "The request could not be processed.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "HTTP_BAD_REQUEST",
-                        "message": "The request could not be processed.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Authentication is required or the token is no longer valid.",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "AUTHENTICATION_REQUIRED": {
-                    "summary": "A Bearer access token is required.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "AUTHENTICATION_REQUIRED",
-                        "message": "A Bearer access token is required.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "INVALID_ACCESS_TOKEN": {
-                    "summary": "The access token is invalid.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "INVALID_ACCESS_TOKEN",
-                        "message": "The access token is invalid.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Only an IT Admin records the terms of a plan.",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "AUTHORIZATION.FORBIDDEN": {
-                    "summary": "You do not have permission to perform this action.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "AUTHORIZATION.FORBIDDEN",
-                        "message": "You do not have permission to perform this action.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "The plan does not exist (PLAN.NOT_FOUND).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "PLAN.NOT_FOUND": {
-                    "summary": "The plan does not exist.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "PLAN.NOT_FOUND",
-                        "message": "The plan does not exist.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "413": {
-            "description": "The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "HTTP_PAYLOAD_TOO_LARGE": {
-                    "summary": "The request could not be processed.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "HTTP_PAYLOAD_TOO_LARGE",
-                        "message": "The request could not be processed.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "415": {
-            "description": "The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "HTTP_UNSUPPORTED_MEDIA_TYPE": {
-                    "summary": "The request could not be processed.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "HTTP_UNSUPPORTED_MEDIA_TYPE",
-                        "message": "The request could not be processed.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "The request is invalid (VALIDATION_ERROR), the opinion is empty or too long (PLAN_TERMS.TEXT_INVALID) or the plan has no terms or its application names no Business Owner (PLAN_TERMS.NOT_APPLICABLE).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "VALIDATION_ERROR": {
-                    "summary": "Request validation failed.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "VALIDATION_ERROR",
-                        "message": "Request validation failed.",
-                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "PLAN_TERMS.TEXT_INVALID": {
-                    "summary": "A text of the terms is at most 2000 characters.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "PLAN_TERMS.TEXT_INVALID",
-                        "message": "A text of the terms is at most 2000 characters.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "PLAN_TERMS.NOT_APPLICABLE": {
-                    "summary": "A K5 plan of an internal application has no terms.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "PLAN_TERMS.NOT_APPLICABLE",
-                        "message": "A K5 plan of an internal application has no terms.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "HTTP_TOO_MANY_REQUESTS": {
-                    "summary": "The request could not be processed.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "HTTP_TOO_MANY_REQUESTS",
-                        "message": "The request could not be processed.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "TOKEN_VERIFICATION_UNAVAILABLE": {
-                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
-                        "message": "Authentication is temporarily unavailable. Retry shortly.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "SERVICE_UNAVAILABLE": {
-                    "summary": "The service is temporarily unavailable. Retry shortly.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "SERVICE_UNAVAILABLE",
-                        "message": "The service is temporarily unavailable. Retry shortly.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        },
-        "security": [{ "bearer": [] }],
-        "summary": "Record an opinion of the Business Owner on the terms",
-        "tags": ["plan-terms"]
-      }
-    },
-    "/api/v1/plan-warnings": {
-      "get": {
-        "operationId": "planWarningList",
-        "parameters": [
-          {
-            "name": "page",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "maximum": 9007199254740991,
-              "exclusiveMinimum": true,
-              "default": 1,
-              "type": "integer",
-              "minimum": 0
-            }
-          },
-          {
-            "name": "pageSize",
-            "required": false,
-            "in": "query",
-            "schema": { "maximum": 100, "exclusiveMinimum": true, "default": 20, "type": "integer", "minimum": 0 }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "A page of the review alerts open today, the earliest milestone first: the plan, the deadline of the subscription (and where it comes from), and the date of the last review.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "allOf": [
-                    { "$ref": "#/components/schemas/PlanWarningPageResponseDto" },
-                    { "properties": { "message": { "example": "PLAN_WARNING.LISTED" } } }
-                  ]
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Authentication is required or the token is no longer valid.",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "AUTHENTICATION_REQUIRED": {
-                    "summary": "A Bearer access token is required.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "AUTHENTICATION_REQUIRED",
-                        "message": "A Bearer access token is required.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "INVALID_ACCESS_TOKEN": {
-                    "summary": "The access token is invalid.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "INVALID_ACCESS_TOKEN",
-                        "message": "The access token is invalid.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Only an IT Admin reads the review alerts.",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "AUTHORIZATION.FORBIDDEN": {
-                    "summary": "You do not have permission to perform this action.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "AUTHORIZATION.FORBIDDEN",
-                        "message": "You do not have permission to perform this action.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "The query is invalid (VALIDATION_ERROR).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "VALIDATION_ERROR": {
-                    "summary": "Request validation failed.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "VALIDATION_ERROR",
-                        "message": "Request validation failed.",
-                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "HTTP_TOO_MANY_REQUESTS": {
-                    "summary": "The request could not be processed.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "HTTP_TOO_MANY_REQUESTS",
-                        "message": "The request could not be processed.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "TOKEN_VERIFICATION_UNAVAILABLE": {
-                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
-                        "message": "Authentication is temporarily unavailable. Retry shortly.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "SERVICE_UNAVAILABLE": {
-                    "summary": "The service is temporarily unavailable. Retry shortly.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "SERVICE_UNAVAILABLE",
-                        "message": "The service is temporarily unavailable. Retry shortly.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        },
-        "security": [{ "bearer": [] }],
-        "summary": "List the terms that need a new review",
-        "tags": ["plan-terms"]
-      }
-    },
-    "/api/v1/business-owner-warnings": {
-      "get": {
-        "operationId": "businessOwnerWarningList",
-        "parameters": [
-          {
-            "name": "page",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "maximum": 9007199254740991,
-              "exclusiveMinimum": true,
-              "default": 1,
-              "type": "integer",
-              "minimum": 0
-            }
-          },
-          {
-            "name": "pageSize",
-            "required": false,
-            "in": "query",
-            "schema": { "maximum": 100, "exclusiveMinimum": true, "default": 20, "type": "integer", "minimum": 0 }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "A page of the applications, of every kind, whose Business Owner has left, by name. The application keeps that owner until a working one is named.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "allOf": [
-                    { "$ref": "#/components/schemas/OwnerWarningPageResponseDto" },
-                    { "properties": { "message": { "example": "BUSINESS_OWNER_WARNING.LISTED" } } }
-                  ]
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Authentication is required or the token is no longer valid.",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "AUTHENTICATION_REQUIRED": {
-                    "summary": "A Bearer access token is required.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "AUTHENTICATION_REQUIRED",
-                        "message": "A Bearer access token is required.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "INVALID_ACCESS_TOKEN": {
-                    "summary": "The access token is invalid.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "INVALID_ACCESS_TOKEN",
-                        "message": "The access token is invalid.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Only an IT Admin reads the alerts.",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "AUTHORIZATION.FORBIDDEN": {
-                    "summary": "You do not have permission to perform this action.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "AUTHORIZATION.FORBIDDEN",
-                        "message": "You do not have permission to perform this action.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "The query is invalid (VALIDATION_ERROR).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "VALIDATION_ERROR": {
-                    "summary": "Request validation failed.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "VALIDATION_ERROR",
-                        "message": "Request validation failed.",
-                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "HTTP_TOO_MANY_REQUESTS": {
-                    "summary": "The request could not be processed.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "HTTP_TOO_MANY_REQUESTS",
-                        "message": "The request could not be processed.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "TOKEN_VERIFICATION_UNAVAILABLE": {
-                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
-                        "message": "Authentication is temporarily unavailable. Retry shortly.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "SERVICE_UNAVAILABLE": {
-                    "summary": "The service is temporarily unavailable. Retry shortly.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "SERVICE_UNAVAILABLE",
-                        "message": "The service is temporarily unavailable. Retry shortly.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        },
-        "security": [{ "bearer": [] }],
-        "summary": "List the applications whose Business Owner has left",
-        "tags": ["applications"]
-      }
-    },
-    "/api/v1/applications/{id}/business-owners": {
-      "get": {
-        "operationId": "applicationBusinessOwnerHistory",
-        "parameters": [
-          { "name": "id", "required": true, "in": "path", "schema": { "format": "uuid", "type": "string" } },
-          {
-            "name": "page",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "maximum": 9007199254740991,
-              "exclusiveMinimum": true,
-              "default": 1,
-              "type": "integer",
-              "minimum": 0
-            }
-          },
-          {
-            "name": "pageSize",
-            "required": false,
-            "in": "query",
-            "schema": { "maximum": 100, "exclusiveMinimum": true, "default": 20, "type": "integer", "minimum": 0 }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "A page of the periods of the Business Owner, the latest first: the person, from when to when, and who made the change.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "allOf": [
-                    { "$ref": "#/components/schemas/OwnerHistoryResponseDto" },
-                    { "properties": { "message": { "example": "APPLICATION.BUSINESS_OWNERS_LISTED" } } }
-                  ]
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Authentication is required or the token is no longer valid.",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "AUTHENTICATION_REQUIRED": {
-                    "summary": "A Bearer access token is required.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "AUTHENTICATION_REQUIRED",
-                        "message": "A Bearer access token is required.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "INVALID_ACCESS_TOKEN": {
-                    "summary": "The access token is invalid.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "INVALID_ACCESS_TOKEN",
-                        "message": "The access token is invalid.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Only the IT Admin and Finance read the history.",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "AUTHORIZATION.FORBIDDEN": {
-                    "summary": "You do not have permission to perform this action.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "AUTHORIZATION.FORBIDDEN",
-                        "message": "You do not have permission to perform this action.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "The application does not exist (APPLICATION.NOT_FOUND).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "APPLICATION.NOT_FOUND": {
-                    "summary": "The application does not exist.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "APPLICATION.NOT_FOUND",
-                        "message": "The application does not exist.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "The id is not a UUID or the query is invalid (VALIDATION_ERROR).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "VALIDATION_ERROR": {
-                    "summary": "Request validation failed.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "VALIDATION_ERROR",
-                        "message": "Request validation failed.",
-                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "HTTP_TOO_MANY_REQUESTS": {
-                    "summary": "The request could not be processed.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "HTTP_TOO_MANY_REQUESTS",
-                        "message": "The request could not be processed.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "TOKEN_VERIFICATION_UNAVAILABLE": {
-                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
-                        "message": "Authentication is temporarily unavailable. Retry shortly.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "SERVICE_UNAVAILABLE": {
-                    "summary": "The service is temporarily unavailable. Retry shortly.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "SERVICE_UNAVAILABLE",
-                        "message": "The service is temporarily unavailable. Retry shortly.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        },
-        "security": [{ "bearer": [] }],
-        "summary": "List the Business Owners an application had",
-        "tags": ["applications"]
-      }
-    },
-    "/api/v1/applications/{id}/retirement-confirmations": {
-      "post": {
-        "operationId": "applicationRetirementConfirm",
-        "parameters": [
-          { "name": "id", "required": true, "in": "path", "schema": { "format": "uuid", "type": "string" } }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ConfirmRetirementBodyDto" } } }
-        },
-        "responses": {
-          "201": {
-            "description": "The confirmation of the Business Owner of today, with its content and who recorded it, kept for good. The audit trail names the person who recorded it, the Business Owner and the content.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "allOf": [
-                    { "$ref": "#/components/schemas/RetirementConfirmationResponseDto" },
-                    { "properties": { "message": { "example": "APPLICATION.RETIREMENT_CONFIRMED" } } }
-                  ]
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "HTTP_BAD_REQUEST": {
-                    "summary": "The request could not be processed.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "HTTP_BAD_REQUEST",
-                        "message": "The request could not be processed.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Authentication is required or the token is no longer valid.",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "AUTHENTICATION_REQUIRED": {
-                    "summary": "A Bearer access token is required.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "AUTHENTICATION_REQUIRED",
-                        "message": "A Bearer access token is required.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "INVALID_ACCESS_TOKEN": {
-                    "summary": "The access token is invalid.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "INVALID_ACCESS_TOKEN",
-                        "message": "The access token is invalid.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Only an IT Admin records the confirmation.",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "AUTHORIZATION.FORBIDDEN": {
-                    "summary": "You do not have permission to perform this action.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "AUTHORIZATION.FORBIDDEN",
-                        "message": "You do not have permission to perform this action.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "The application does not exist (APPLICATION.NOT_FOUND).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "APPLICATION.NOT_FOUND": {
-                    "summary": "The application does not exist.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "APPLICATION.NOT_FOUND",
-                        "message": "The application does not exist.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "The application is retired already (APPLICATION.ALREADY_RETIRED).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "APPLICATION.ALREADY_RETIRED": {
-                    "summary": "The application is retired already.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "APPLICATION.ALREADY_RETIRED",
-                        "message": "The application is retired already.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "413": {
-            "description": "The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "HTTP_PAYLOAD_TOO_LARGE": {
-                    "summary": "The request could not be processed.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "HTTP_PAYLOAD_TOO_LARGE",
-                        "message": "The request could not be processed.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "415": {
-            "description": "The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "HTTP_UNSUPPORTED_MEDIA_TYPE": {
-                    "summary": "The request could not be processed.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "HTTP_UNSUPPORTED_MEDIA_TYPE",
-                        "message": "The request could not be processed.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "The request is invalid (VALIDATION_ERROR), the person is not the Business Owner of today or has left (APPLICATION.RETIREMENT_NOT_BUSINESS_OWNER), or the note is blank (APPLICATION.RETIREMENT_NOTE_REQUIRED).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "VALIDATION_ERROR": {
-                    "summary": "Request validation failed.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "VALIDATION_ERROR",
-                        "message": "Request validation failed.",
-                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "APPLICATION.RETIREMENT_NOT_BUSINESS_OWNER": {
-                    "summary": "Only the Business Owner of the application, still working, confirms its retirement.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "APPLICATION.RETIREMENT_NOT_BUSINESS_OWNER",
-                        "message": "Only the Business Owner of the application, still working, confirms its retirement.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "APPLICATION.RETIREMENT_NOTE_REQUIRED": {
-                    "summary": "The confirmation of the Business Owner needs its content.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "APPLICATION.RETIREMENT_NOTE_REQUIRED",
-                        "message": "The confirmation of the Business Owner needs its content.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "HTTP_TOO_MANY_REQUESTS": {
-                    "summary": "The request could not be processed.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "HTTP_TOO_MANY_REQUESTS",
-                        "message": "The request could not be processed.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "TOKEN_VERIFICATION_UNAVAILABLE": {
-                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
-                        "message": "Authentication is temporarily unavailable. Retry shortly.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "SERVICE_UNAVAILABLE": {
-                    "summary": "The service is temporarily unavailable. Retry shortly.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "SERVICE_UNAVAILABLE",
-                        "message": "The service is temporarily unavailable. Retry shortly.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        },
-        "security": [{ "bearer": [] }],
-        "summary": "Record the confirmation of the Business Owner to retire an application",
-        "tags": ["applications"]
-      }
-    },
     "/api/v1/applications/{id}/retirement": {
       "get": {
         "operationId": "applicationRetirementGet",
@@ -25857,7 +24731,7 @@
         ],
         "responses": {
           "200": {
-            "description": "The newest 50 confirmations recorded and how many there are, whether the Business Owner of today has confirmed (true when the application names no Business Owner: nothing to confirm), the first 50 assignments and running term subscriptions that would stop the retirement with their totals and the number of assignments per plan, and whether it would go through now.",
+            "description": "The first 50 assignments and running term subscriptions that would stop the retirement with their totals and the number of assignments per plan, and whether it would go through now.",
             "content": {
               "application/json": {
                 "schema": {
@@ -26032,7 +24906,7 @@
         ],
         "responses": {
           "200": {
-            "description": "The application is retired for good, on the confirmation of its Business Owner. Nothing is revoked or cancelled for it: an application that something still holds is refused instead.",
+            "description": "The application is retired for good, with no confirmation to wait for. Nothing is revoked or cancelled for it: an application that something still holds is refused instead.",
             "content": {
               "application/json": {
                 "schema": {
@@ -26174,7 +25048,7 @@
             }
           },
           "422": {
-            "description": "The id is invalid (VALIDATION_ERROR), or the Business Owner of today has not confirmed (APPLICATION.RETIREMENT_NEEDS_CONFIRMATION); an application that names no Business Owner needs no confirmation.",
+            "description": "The id is invalid (VALIDATION_ERROR)",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -26187,17 +25061,6 @@
                         "code": "VALIDATION_ERROR",
                         "message": "Request validation failed.",
                         "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "APPLICATION.RETIREMENT_NEEDS_CONFIRMATION": {
-                    "summary": "The Business Owner has to confirm before the application is retired.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "APPLICATION.RETIREMENT_NEEDS_CONFIRMATION",
-                        "message": "The Business Owner has to confirm before the application is retired.",
                         "requestId": "req_example"
                       }
                     }
@@ -26262,6 +25125,272 @@
         },
         "security": [{ "bearer": [] }],
         "summary": "Retire an application",
+        "tags": ["applications"]
+      }
+    },
+    "/api/v1/applications/{id}/responsibility-transfer": {
+      "post": {
+        "operationId": "applicationResponsibilityTransfer",
+        "parameters": [
+          { "name": "id", "required": true, "in": "path", "schema": { "format": "uuid", "type": "string" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/ResponsibilityTransferBodyDto" } }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "The application now has the IT Admin named as the one responsible; changed is false when it already had them and nothing was written. The audit trail names who handed it to whom.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/ResponsibilityTransferResponseDto" },
+                    { "properties": { "message": { "example": "APPLICATION.RESPONSIBILITY_TRANSFERRED" } } }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_BAD_REQUEST": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_BAD_REQUEST",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHENTICATION_REQUIRED": {
+                    "summary": "A Bearer access token is required.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHENTICATION_REQUIRED",
+                        "message": "A Bearer access token is required.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "INVALID_ACCESS_TOKEN": {
+                    "summary": "The access token is invalid.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "INVALID_ACCESS_TOKEN",
+                        "message": "The access token is invalid.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only an IT Admin or the Super Admin hands an application over, and an IT Admin only while they are the one responsible, or while the application needs a responsible IT Admin and they take it for themselves (APPLICATION.RESPONSIBILITY_NOT_YOURS). The one who loses the race to take an application that needs one meets this too.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHORIZATION.FORBIDDEN": {
+                    "summary": "You do not have permission to perform this action.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHORIZATION.FORBIDDEN",
+                        "message": "You do not have permission to perform this action.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "APPLICATION.RESPONSIBILITY_NOT_YOURS": {
+                    "summary": "Only the IT Admin responsible for the application hands it over; any IT Admin takes it while it needs one.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "APPLICATION.RESPONSIBILITY_NOT_YOURS",
+                        "message": "Only the IT Admin responsible for the application hands it over; any IT Admin takes it while it needs one.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The application does not exist (APPLICATION.NOT_FOUND).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "APPLICATION.NOT_FOUND": {
+                    "summary": "The application does not exist.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "APPLICATION.NOT_FOUND",
+                        "message": "The application does not exist.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_PAYLOAD_TOO_LARGE": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_PAYLOAD_TOO_LARGE",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_UNSUPPORTED_MEDIA_TYPE": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_UNSUPPORTED_MEDIA_TYPE",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The request is invalid (VALIDATION_ERROR), or the person named is not an IT Admin who works now (APPLICATION.RESPONSIBLE_NOT_IT_ADMIN): nothing changes.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "VALIDATION_ERROR": {
+                    "summary": "Request validation failed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "VALIDATION_ERROR",
+                        "message": "Request validation failed.",
+                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "APPLICATION.RESPONSIBLE_NOT_IT_ADMIN": {
+                    "summary": "The IT Admin responsible for an application must be an IT Admin who is working now.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "APPLICATION.RESPONSIBLE_NOT_IT_ADMIN",
+                        "message": "The IT Admin responsible for an application must be an IT Admin who is working now.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_TOO_MANY_REQUESTS": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_TOO_MANY_REQUESTS",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "TOKEN_VERIFICATION_UNAVAILABLE": {
+                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
+                        "message": "Authentication is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SERVICE_UNAVAILABLE": {
+                    "summary": "The service is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SERVICE_UNAVAILABLE",
+                        "message": "The service is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "bearer": [] }],
+        "summary": "Hand an application to another IT Admin",
         "tags": ["applications"]
       }
     },
@@ -38013,7 +37142,7 @@
         },
         "responses": {
           "201": {
-            "description": "The IT Admin proposes to renew the period as it is, to reduce it to a number of seats (naming exactly the seats in use above that number to take back), or to cancel it, with the opinion of the Business Owner if they gave one (an input, never a step). The point where the decision is carried out is worked out by the system, not sent. One proposal per period. It puts the case in the queue of the head of the department that owns the subscription, who is told; when the department has no head the case waits (waitingReason NO_HEAD) and the Super Admin is told. The IT Admin does not decide it.",
+            "description": "The IT Admin proposes to renew the period as it is, to reduce it to a number of seats (naming exactly the seats in use above that number to take back), or to cancel it. The point where the decision is carried out is worked out by the system, not sent. One proposal per period. It puts the case in the queue of the head of the department that owns the subscription, who is told; when the department has no head the case waits (waitingReason NO_HEAD) and the Super Admin is told. The IT Admin does not decide it.",
             "content": {
               "application/json": {
                 "schema": {
@@ -38328,7 +37457,7 @@
         ],
         "responses": {
           "200": {
-            "description": "The case with its period (seats bought and in use, dates, automatic renewal, reduction mid-term), whether evidence of use is available (without it the usage cannot be judged, never 0), the proposal with the opinion of the Business Owner the IT Admin recorded and how many seats it proposes to take back, the decision with the seats chosen to take back and the snapshot frozen when it was taken (null for the IT Admin), the late flag, and the outcome with the new period and the savings at renewal when the new period costs less. A decision never holds a budget commitment.",
+            "description": "The case with its period (seats bought and in use, dates, automatic renewal, reduction mid-term), whether evidence of use is available (without it the usage cannot be judged, never 0), the proposal the IT Admin recorded and how many seats it proposes to take back, the decision with the seats chosen to take back and the snapshot frozen when it was taken (null for the IT Admin), the late flag, and the outcome with the new period and the savings at renewal when the new period costs less. A decision never holds a budget commitment.",
             "content": {
               "application/json": {
                 "schema": {
@@ -43797,12 +42926,12 @@
                     }
                   },
                   "ASSESSMENT.INTERNAL_COMPLETES_BY_REGISTRATION": {
-                    "summary": "Internal software is completed by registering it in the catalog with its Business Owner.",
+                    "summary": "Internal software is completed by registering it in the catalog.",
                     "value": {
                       "success": false,
                       "error": {
                         "code": "ASSESSMENT.INTERNAL_COMPLETES_BY_REGISTRATION",
-                        "message": "Internal software is completed by registering it in the catalog with its Business Owner.",
+                        "message": "Internal software is completed by registering it in the catalog.",
                         "requestId": "req_example"
                       }
                     }
@@ -44237,7 +43366,7 @@
         },
         "responses": {
           "200": {
-            "description": "The software the company built itself is registered in the catalog with its Business Owner and one plan granted by hand, and the request goes the way that has no spend: the IT Admin grants it. No vendor, contract, subscription, invoice, commitment or seat bought is made. With a payment (a quote in the body) the request keeps its spend step and waits for the head to send it on.",
+            "description": "The software the company built itself is registered in the catalog, answered for by the IT Admin who registers it, with one plan granted by hand, and the request goes the way that has no spend: the IT Admin grants it. No vendor, contract, subscription, invoice, commitment or seat bought is made. With a payment (a quote in the body) the request keeps its spend step and waits for the head to send it on.",
             "content": {
               "application/json": {
                 "schema": {
@@ -44441,7 +43570,7 @@
             }
           },
           "422": {
-            "description": "The Business Owner is missing or has left (APPLICATION.BUSINESS_OWNER_INVALID), the data sensitivity is not known (ASSESSMENT.INCOMPLETE), the quote cannot price the request (ASSESSMENT.QUOTE_NOT_IN_FORCE and the others), or the body is invalid (VALIDATION_ERROR). Nothing is registered and the request stays with the IT Admin.",
+            "description": "The data sensitivity is not known (ASSESSMENT.INCOMPLETE), the quote cannot price the request (ASSESSMENT.QUOTE_NOT_IN_FORCE and the others), or the body is invalid (VALIDATION_ERROR). Nothing is registered and the request stays with the IT Admin.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -44454,17 +43583,6 @@
                         "code": "VALIDATION_ERROR",
                         "message": "Request validation failed.",
                         "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "APPLICATION.BUSINESS_OWNER_INVALID": {
-                    "summary": "The internal software cannot be registered: BUSINESS_OWNER_INVALID.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "APPLICATION.BUSINESS_OWNER_INVALID",
-                        "message": "The internal software cannot be registered: BUSINESS_OWNER_INVALID.",
                         "requestId": "req_example"
                       }
                     }
@@ -44624,7 +43742,7 @@
         },
         "responses": {
           "200": {
-            "description": "After the spending approver has decided the request, the IT Admin links it to the plan registered in the catalog, whose application must have a Business Owner who still works. The grant is possible only after this.",
+            "description": "After the spending approver has decided the request, the IT Admin links it to the plan registered in the catalog. The grant is possible only after this.",
             "content": {
               "application/json": {
                 "schema": {
@@ -44743,7 +43861,7 @@
             }
           },
           "409": {
-            "description": "The request is not waiting for its grant or is already linked (ACCESS_REQUEST.CATALOG_LINK_NOT_ALLOWED), the application is retired (ACCESS_REQUEST.APPLICATION_RETIRED), or it has no Business Owner who works (ACCESS_REQUEST.BUSINESS_OWNER_REQUIRED).",
+            "description": "The request is not waiting for its grant or is already linked (ACCESS_REQUEST.CATALOG_LINK_NOT_ALLOWED) or the application is retired (ACCESS_REQUEST.APPLICATION_RETIRED).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -44766,17 +43884,6 @@
                       "error": {
                         "code": "ACCESS_REQUEST.APPLICATION_RETIRED",
                         "message": "The application of the plan is retired: no access is asked for it.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "ACCESS_REQUEST.BUSINESS_OWNER_REQUIRED": {
-                    "summary": "The request cannot be linked to the plan: BUSINESS_OWNER_REQUIRED.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "ACCESS_REQUEST.BUSINESS_OWNER_REQUIRED",
-                        "message": "The request cannot be linked to the plan: BUSINESS_OWNER_REQUIRED.",
                         "requestId": "req_example"
                       }
                     }
@@ -84161,6 +83268,178 @@
         "tags": ["app-users"]
       }
     },
+    "/api/v1/it-admins": {
+      "get": {
+        "operationId": "itAdminList",
+        "parameters": [
+          { "name": "search", "required": false, "in": "query", "schema": { "maxLength": 100, "type": "string" } },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maximum": 9007199254740991,
+              "exclusiveMinimum": true,
+              "default": 1,
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": { "maximum": 100, "exclusiveMinimum": true, "default": 20, "type": "integer", "minimum": 0 }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "One page of the employees who hold the IT Admin role on an account that can act, by employee code, optionally searched by code or name.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/ItAdminPageResponseDto" },
+                    { "properties": { "message": { "example": "IT_ADMIN.LISTED" } } }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHENTICATION_REQUIRED": {
+                    "summary": "A Bearer access token is required.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHENTICATION_REQUIRED",
+                        "message": "A Bearer access token is required.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "INVALID_ACCESS_TOKEN": {
+                    "summary": "The access token is invalid.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "INVALID_ACCESS_TOKEN",
+                        "message": "The access token is invalid.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only an IT Admin or the Super Admin reads the list.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHORIZATION.FORBIDDEN": {
+                    "summary": "You do not have permission to perform this action.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHORIZATION.FORBIDDEN",
+                        "message": "You do not have permission to perform this action.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The query is invalid (VALIDATION_ERROR).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "VALIDATION_ERROR": {
+                    "summary": "Request validation failed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "VALIDATION_ERROR",
+                        "message": "Request validation failed.",
+                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_TOO_MANY_REQUESTS": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_TOO_MANY_REQUESTS",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "TOKEN_VERIFICATION_UNAVAILABLE": {
+                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
+                        "message": "Authentication is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SERVICE_UNAVAILABLE": {
+                    "summary": "The service is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SERVICE_UNAVAILABLE",
+                        "message": "The service is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "bearer": [] }],
+        "summary": "List the IT Admins who work now",
+        "tags": ["it-admins"]
+      }
+    },
     "/api/v1/ghost-seat-recommendations": {
       "get": {
         "operationId": "ghostSeatRecommendationList",
@@ -89378,34 +88657,6 @@
                 "required": ["closedAt", "closedByAppUserId"],
                 "additionalProperties": false,
                 "nullable": true
-              },
-              "warnings": {
-                "maxItems": 1,
-                "type": "array",
-                "items": {
-                  "type": "object",
-                  "properties": {
-                    "code": { "type": "string", "enum": ["BUSINESS_OWNER_KEEP_OR_CHANGE"] },
-                    "applications": {
-                      "maxItems": 20,
-                      "type": "array",
-                      "items": {
-                        "type": "object",
-                        "properties": { "id": { "type": "string", "format": "uuid" }, "name": { "type": "string" } },
-                        "required": ["id", "name"],
-                        "additionalProperties": false
-                      }
-                    },
-                    "totalApplications": {
-                      "type": "integer",
-                      "exclusiveMinimum": true,
-                      "maximum": 9007199254740991,
-                      "minimum": 0
-                    }
-                  },
-                  "required": ["code", "applications", "totalApplications"],
-                  "additionalProperties": false
-                }
               }
             },
             "required": [
@@ -89422,8 +88673,7 @@
               "recordedAt",
               "effectiveAt",
               "cancellation",
-              "closure",
-              "warnings"
+              "closure"
             ],
             "additionalProperties": false,
             "nullable": true
@@ -90759,7 +90009,6 @@
                 "type": "object",
                 "properties": {
                   "departmentWithoutHeadFrom": { "type": "string", "nullable": true },
-                  "businessOwnerApplications": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
                   "accountLockNotRecorded": { "type": "boolean" },
                   "workspaces": { "type": "object", "additionalProperties": { "type": "string" } },
                   "registered": {
@@ -90767,13 +90016,7 @@
                     "additionalProperties": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
                   }
                 },
-                "required": [
-                  "departmentWithoutHeadFrom",
-                  "businessOwnerApplications",
-                  "accountLockNotRecorded",
-                  "workspaces",
-                  "registered"
-                ],
+                "required": ["departmentWithoutHeadFrom", "accountLockNotRecorded", "workspaces", "registered"],
                 "additionalProperties": false
               }
             },
@@ -91427,7 +90670,6 @@
                 "type": "object",
                 "properties": {
                   "departmentWithoutHeadFrom": { "type": "string", "nullable": true },
-                  "businessOwnerApplications": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
                   "accountLockNotRecorded": { "type": "boolean" },
                   "workspaces": { "type": "object", "additionalProperties": { "type": "string" } },
                   "registered": {
@@ -91435,13 +90677,7 @@
                     "additionalProperties": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
                   }
                 },
-                "required": [
-                  "departmentWithoutHeadFrom",
-                  "businessOwnerApplications",
-                  "accountLockNotRecorded",
-                  "workspaces",
-                  "registered"
-                ],
+                "required": ["departmentWithoutHeadFrom", "accountLockNotRecorded", "workspaces", "registered"],
                 "additionalProperties": false
               },
               "revocations": {
@@ -92510,20 +91746,22 @@
                     },
                     "dataSensitivity": { "type": "string", "enum": ["LOW", "MEDIUM", "HIGH"] },
                     "isCommunicationService": { "type": "boolean" },
-                    "businessOwner": {
+                    "responsibleItAdmin": {
                       "type": "object",
                       "properties": {
                         "employeeId": { "type": "string", "format": "uuid" },
                         "employeeCode": { "type": "string" },
-                        "fullName": { "type": "string" },
-                        "status": { "type": "string", "enum": ["ACTIVE", "TERMINATED"] }
+                        "fullName": { "type": "string" }
                       },
-                      "required": ["employeeId", "employeeCode", "fullName", "status"],
+                      "required": ["employeeId", "employeeCode", "fullName"],
                       "additionalProperties": false,
-                      "description": "Null for an application declared without one: the Business Owner is no longer required.",
+                      "description": "The IT Admin who answers for the application (the one who declared it, or who took it over); null when nobody does.",
                       "nullable": true
                     },
-                    "businessOwnerReplacementRequired": { "type": "boolean" },
+                    "needsResponsible": {
+                      "type": "boolean",
+                      "description": "True when nobody is responsible, or the one named is no longer a working IT Admin: any IT Admin may take it over with the responsibility transfer."
+                    },
                     "usageCollectionDefault": { "type": "string", "nullable": true, "enum": ["NOT_COLLECTED", null] },
                     "functionalGroup": {
                       "type": "object",
@@ -92542,8 +91780,8 @@
                     "vendor",
                     "dataSensitivity",
                     "isCommunicationService",
-                    "businessOwner",
-                    "businessOwnerReplacementRequired",
+                    "responsibleItAdmin",
+                    "needsResponsible",
                     "usageCollectionDefault",
                     "functionalGroup",
                     "status",
@@ -92604,7 +91842,6 @@
           "dictionaryServiceLineId": { "type": "string", "format": "uuid" },
           "domains": { "maxItems": 100, "type": "array", "items": { "type": "string", "maxLength": 1000 } },
           "dataSensitivity": { "type": "string", "enum": ["LOW", "MEDIUM", "HIGH"] },
-          "businessOwnerEmployeeId": { "type": "string", "format": "uuid" },
           "communication": {
             "type": "object",
             "properties": {
@@ -92641,20 +91878,22 @@
               },
               "dataSensitivity": { "type": "string", "enum": ["LOW", "MEDIUM", "HIGH"] },
               "isCommunicationService": { "type": "boolean" },
-              "businessOwner": {
+              "responsibleItAdmin": {
                 "type": "object",
                 "properties": {
                   "employeeId": { "type": "string", "format": "uuid" },
                   "employeeCode": { "type": "string" },
-                  "fullName": { "type": "string" },
-                  "status": { "type": "string", "enum": ["ACTIVE", "TERMINATED"] }
+                  "fullName": { "type": "string" }
                 },
-                "required": ["employeeId", "employeeCode", "fullName", "status"],
+                "required": ["employeeId", "employeeCode", "fullName"],
                 "additionalProperties": false,
-                "description": "Null for an application declared without one: the Business Owner is no longer required.",
+                "description": "The IT Admin who answers for the application (the one who declared it, or who took it over); null when nobody does.",
                 "nullable": true
               },
-              "businessOwnerReplacementRequired": { "type": "boolean" },
+              "needsResponsible": {
+                "type": "boolean",
+                "description": "True when nobody is responsible, or the one named is no longer a working IT Admin: any IT Admin may take it over with the responsibility transfer."
+              },
               "usageCollectionDefault": { "type": "string", "nullable": true, "enum": ["NOT_COLLECTED", null] },
               "functionalGroup": {
                 "type": "object",
@@ -92689,8 +91928,8 @@
               "vendor",
               "dataSensitivity",
               "isCommunicationService",
-              "businessOwner",
-              "businessOwnerReplacementRequired",
+              "responsibleItAdmin",
+              "needsResponsible",
               "usageCollectionDefault",
               "functionalGroup",
               "status",
@@ -92728,20 +91967,22 @@
               },
               "dataSensitivity": { "type": "string", "enum": ["LOW", "MEDIUM", "HIGH"] },
               "isCommunicationService": { "type": "boolean" },
-              "businessOwner": {
+              "responsibleItAdmin": {
                 "type": "object",
                 "properties": {
                   "employeeId": { "type": "string", "format": "uuid" },
                   "employeeCode": { "type": "string" },
-                  "fullName": { "type": "string" },
-                  "status": { "type": "string", "enum": ["ACTIVE", "TERMINATED"] }
+                  "fullName": { "type": "string" }
                 },
-                "required": ["employeeId", "employeeCode", "fullName", "status"],
+                "required": ["employeeId", "employeeCode", "fullName"],
                 "additionalProperties": false,
-                "description": "Null for an application declared without one: the Business Owner is no longer required.",
+                "description": "The IT Admin who answers for the application (the one who declared it, or who took it over); null when nobody does.",
                 "nullable": true
               },
-              "businessOwnerReplacementRequired": { "type": "boolean" },
+              "needsResponsible": {
+                "type": "boolean",
+                "description": "True when nobody is responsible, or the one named is no longer a working IT Admin: any IT Admin may take it over with the responsibility transfer."
+              },
               "usageCollectionDefault": { "type": "string", "nullable": true, "enum": ["NOT_COLLECTED", null] },
               "functionalGroup": {
                 "type": "object",
@@ -92804,8 +92045,8 @@
               "vendor",
               "dataSensitivity",
               "isCommunicationService",
-              "businessOwner",
-              "businessOwnerReplacementRequired",
+              "responsibleItAdmin",
+              "needsResponsible",
               "usageCollectionDefault",
               "functionalGroup",
               "status",
@@ -92831,7 +92072,6 @@
           "name": { "type": "string", "maxLength": 1000 },
           "domains": { "maxItems": 100, "type": "array", "items": { "type": "string", "maxLength": 1000 } },
           "dataSensitivity": { "type": "string", "enum": ["LOW", "MEDIUM", "HIGH"] },
-          "businessOwnerEmployeeId": { "type": "string", "format": "uuid" },
           "communication": {
             "type": "object",
             "properties": {
@@ -92867,20 +92107,22 @@
               },
               "dataSensitivity": { "type": "string", "enum": ["LOW", "MEDIUM", "HIGH"] },
               "isCommunicationService": { "type": "boolean" },
-              "businessOwner": {
+              "responsibleItAdmin": {
                 "type": "object",
                 "properties": {
                   "employeeId": { "type": "string", "format": "uuid" },
                   "employeeCode": { "type": "string" },
-                  "fullName": { "type": "string" },
-                  "status": { "type": "string", "enum": ["ACTIVE", "TERMINATED"] }
+                  "fullName": { "type": "string" }
                 },
-                "required": ["employeeId", "employeeCode", "fullName", "status"],
+                "required": ["employeeId", "employeeCode", "fullName"],
                 "additionalProperties": false,
-                "description": "Null for an application declared without one: the Business Owner is no longer required.",
+                "description": "The IT Admin who answers for the application (the one who declared it, or who took it over); null when nobody does.",
                 "nullable": true
               },
-              "businessOwnerReplacementRequired": { "type": "boolean" },
+              "needsResponsible": {
+                "type": "boolean",
+                "description": "True when nobody is responsible, or the one named is no longer a working IT Admin: any IT Admin may take it over with the responsibility transfer."
+              },
               "usageCollectionDefault": { "type": "string", "nullable": true, "enum": ["NOT_COLLECTED", null] },
               "functionalGroup": {
                 "type": "object",
@@ -92914,8 +92156,8 @@
               "vendor",
               "dataSensitivity",
               "isCommunicationService",
-              "businessOwner",
-              "businessOwnerReplacementRequired",
+              "responsibleItAdmin",
+              "needsResponsible",
               "usageCollectionDefault",
               "functionalGroup",
               "status",
@@ -93425,6 +92667,259 @@
               "emergencyAccount",
               "updatedAt"
             ],
+            "additionalProperties": false,
+            "nullable": true
+          }
+        },
+        "required": ["success", "message", "data"],
+        "additionalProperties": false
+      },
+      "PlanTermsResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "enum": [true] },
+          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "planId": { "type": "string", "format": "uuid" },
+              "applicable": { "type": "boolean" },
+              "sharingPolicy": { "type": "string", "enum": ["ALLOWED", "NOT_ALLOWED", null], "nullable": true },
+              "terms": {
+                "type": "object",
+                "properties": {
+                  "termsUrl": { "type": "string", "nullable": true },
+                  "lastReviewedOn": { "type": "string", "nullable": true },
+                  "aiTraining": { "type": "string", "nullable": true },
+                  "dataLocation": { "type": "string", "nullable": true },
+                  "installLimit": {
+                    "type": "object",
+                    "properties": {
+                      "maxDevicesPerKey": {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991,
+                        "nullable": true
+                      },
+                      "note": { "type": "string", "nullable": true }
+                    },
+                    "required": ["maxDevicesPerKey", "note"],
+                    "additionalProperties": false
+                  },
+                  "commercialUse": { "type": "string", "nullable": true },
+                  "cancellationRefund": { "type": "string", "nullable": true },
+                  "updatedAt": { "type": "string", "format": "date-time" }
+                },
+                "required": [
+                  "termsUrl",
+                  "lastReviewedOn",
+                  "aiTraining",
+                  "dataLocation",
+                  "installLimit",
+                  "commercialUse",
+                  "cancellationRefund",
+                  "updatedAt"
+                ],
+                "additionalProperties": false,
+                "nullable": true
+              },
+              "warnings": {
+                "maxItems": 50,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "code": { "type": "string", "enum": ["TERMS_REVIEW_DUE"] },
+                    "planId": { "type": "string", "format": "uuid" },
+                    "planName": { "type": "string" },
+                    "applicationId": { "type": "string", "format": "uuid" },
+                    "applicationName": { "type": "string" },
+                    "subscriptionId": { "type": "string", "format": "uuid" },
+                    "noticeDeadline": {
+                      "type": "object",
+                      "properties": {
+                        "value": { "type": "string", "nullable": true },
+                        "source": { "type": "string", "enum": ["DECLARED", "INFERRED_UNCONFIRMED", "BY_END_DATE"] }
+                      },
+                      "required": ["value", "source"],
+                      "additionalProperties": false
+                    },
+                    "baseDate": { "type": "string" },
+                    "reviewFrom": { "type": "string" },
+                    "lastReviewedOn": { "type": "string", "nullable": true }
+                  },
+                  "required": [
+                    "code",
+                    "planId",
+                    "planName",
+                    "applicationId",
+                    "applicationName",
+                    "subscriptionId",
+                    "noticeDeadline",
+                    "baseDate",
+                    "reviewFrom",
+                    "lastReviewedOn"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "warningTotal": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+            },
+            "required": ["planId", "applicable", "sharingPolicy", "terms", "warnings", "warningTotal"],
+            "additionalProperties": false,
+            "nullable": true
+          }
+        },
+        "required": ["success", "message", "data"],
+        "additionalProperties": false
+      },
+      "PlanTermsBodyDto": {
+        "type": "object",
+        "properties": {
+          "termsUrl": { "type": "string", "maxLength": 10000, "nullable": true },
+          "lastReviewedOn": {
+            "type": "string",
+            "format": "date",
+            "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused).",
+            "nullable": true
+          },
+          "aiTraining": { "type": "string", "maxLength": 10000, "nullable": true },
+          "dataLocation": { "type": "string", "maxLength": 10000, "nullable": true },
+          "installLimit": {
+            "type": "object",
+            "properties": {
+              "maxDevicesPerKey": { "type": "integer", "minimum": 1, "maximum": 1000000, "nullable": true },
+              "note": { "type": "string", "maxLength": 10000, "nullable": true }
+            },
+            "additionalProperties": false,
+            "nullable": true
+          },
+          "commercialUse": { "type": "string", "maxLength": 10000, "nullable": true },
+          "cancellationRefund": { "type": "string", "maxLength": 10000, "nullable": true }
+        },
+        "additionalProperties": false
+      },
+      "PlanTermsSetResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "enum": [true] },
+          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "terms": {
+                "type": "object",
+                "properties": {
+                  "termsUrl": { "type": "string", "nullable": true },
+                  "lastReviewedOn": { "type": "string", "nullable": true },
+                  "aiTraining": { "type": "string", "nullable": true },
+                  "dataLocation": { "type": "string", "nullable": true },
+                  "installLimit": {
+                    "type": "object",
+                    "properties": {
+                      "maxDevicesPerKey": {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991,
+                        "nullable": true
+                      },
+                      "note": { "type": "string", "nullable": true }
+                    },
+                    "required": ["maxDevicesPerKey", "note"],
+                    "additionalProperties": false
+                  },
+                  "commercialUse": { "type": "string", "nullable": true },
+                  "cancellationRefund": { "type": "string", "nullable": true },
+                  "updatedAt": { "type": "string", "format": "date-time" }
+                },
+                "required": [
+                  "termsUrl",
+                  "lastReviewedOn",
+                  "aiTraining",
+                  "dataLocation",
+                  "installLimit",
+                  "commercialUse",
+                  "cancellationRefund",
+                  "updatedAt"
+                ],
+                "additionalProperties": false
+              },
+              "changed": { "type": "boolean" }
+            },
+            "required": ["terms", "changed"],
+            "additionalProperties": false,
+            "nullable": true
+          }
+        },
+        "required": ["success", "message", "data"],
+        "additionalProperties": false
+      },
+      "PlanWarningPageResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "enum": [true] },
+          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "items": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "code": { "type": "string", "enum": ["TERMS_REVIEW_DUE"] },
+                    "planId": { "type": "string", "format": "uuid" },
+                    "planName": { "type": "string" },
+                    "applicationId": { "type": "string", "format": "uuid" },
+                    "applicationName": { "type": "string" },
+                    "subscriptionId": { "type": "string", "format": "uuid" },
+                    "noticeDeadline": {
+                      "type": "object",
+                      "properties": {
+                        "value": { "type": "string", "nullable": true },
+                        "source": { "type": "string", "enum": ["DECLARED", "INFERRED_UNCONFIRMED", "BY_END_DATE"] }
+                      },
+                      "required": ["value", "source"],
+                      "additionalProperties": false
+                    },
+                    "baseDate": { "type": "string" },
+                    "reviewFrom": { "type": "string" },
+                    "lastReviewedOn": { "type": "string", "nullable": true }
+                  },
+                  "required": [
+                    "code",
+                    "planId",
+                    "planName",
+                    "applicationId",
+                    "applicationName",
+                    "subscriptionId",
+                    "noticeDeadline",
+                    "baseDate",
+                    "reviewFrom",
+                    "lastReviewedOn"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "pagination": {
+                "type": "object",
+                "properties": {
+                  "page": { "type": "integer", "exclusiveMinimum": true, "maximum": 9007199254740991, "minimum": 0 },
+                  "pageSize": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "maximum": 9007199254740991,
+                    "minimum": 0
+                  },
+                  "totalItems": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                  "totalPages": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+                },
+                "required": ["page", "pageSize", "totalItems", "totalPages"],
+                "additionalProperties": false
+              },
+              "asOf": { "type": "string" }
+            },
+            "required": ["items", "pagination", "asOf"],
             "additionalProperties": false,
             "nullable": true
           }
@@ -94284,541 +93779,6 @@
         },
         "additionalProperties": false
       },
-      "PlanTermsResponseDto": {
-        "type": "object",
-        "properties": {
-          "success": { "type": "boolean", "enum": [true] },
-          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
-          "data": {
-            "type": "object",
-            "properties": {
-              "planId": { "type": "string", "format": "uuid" },
-              "applicable": { "type": "boolean" },
-              "sharingPolicy": { "type": "string", "enum": ["ALLOWED", "NOT_ALLOWED", null], "nullable": true },
-              "terms": {
-                "type": "object",
-                "properties": {
-                  "termsUrl": { "type": "string", "nullable": true },
-                  "lastReviewedOn": { "type": "string", "nullable": true },
-                  "aiTraining": { "type": "string", "nullable": true },
-                  "dataLocation": { "type": "string", "nullable": true },
-                  "installLimit": {
-                    "type": "object",
-                    "properties": {
-                      "maxDevicesPerKey": {
-                        "type": "integer",
-                        "minimum": -9007199254740991,
-                        "maximum": 9007199254740991,
-                        "nullable": true
-                      },
-                      "note": { "type": "string", "nullable": true }
-                    },
-                    "required": ["maxDevicesPerKey", "note"],
-                    "additionalProperties": false
-                  },
-                  "commercialUse": { "type": "string", "nullable": true },
-                  "cancellationRefund": { "type": "string", "nullable": true },
-                  "updatedAt": { "type": "string", "format": "date-time" }
-                },
-                "required": [
-                  "termsUrl",
-                  "lastReviewedOn",
-                  "aiTraining",
-                  "dataLocation",
-                  "installLimit",
-                  "commercialUse",
-                  "cancellationRefund",
-                  "updatedAt"
-                ],
-                "additionalProperties": false,
-                "nullable": true
-              },
-              "opinions": {
-                "maxItems": 50,
-                "type": "array",
-                "items": {
-                  "type": "object",
-                  "properties": {
-                    "id": { "type": "string", "format": "uuid" },
-                    "businessOwner": {
-                      "type": "object",
-                      "properties": {
-                        "employeeId": { "type": "string", "format": "uuid" },
-                        "employeeCode": { "type": "string" },
-                        "fullName": { "type": "string" }
-                      },
-                      "required": ["employeeId", "employeeCode", "fullName"],
-                      "additionalProperties": false
-                    },
-                    "opinion": { "type": "string" },
-                    "recordedBy": { "type": "string", "format": "uuid" },
-                    "recordedAt": { "type": "string", "format": "date-time" }
-                  },
-                  "required": ["id", "businessOwner", "opinion", "recordedBy", "recordedAt"],
-                  "additionalProperties": false
-                }
-              },
-              "opinionTotal": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
-              "warnings": {
-                "maxItems": 50,
-                "type": "array",
-                "items": {
-                  "type": "object",
-                  "properties": {
-                    "code": { "type": "string", "enum": ["TERMS_REVIEW_DUE"] },
-                    "planId": { "type": "string", "format": "uuid" },
-                    "planName": { "type": "string" },
-                    "applicationId": { "type": "string", "format": "uuid" },
-                    "applicationName": { "type": "string" },
-                    "subscriptionId": { "type": "string", "format": "uuid" },
-                    "noticeDeadline": {
-                      "type": "object",
-                      "properties": {
-                        "value": { "type": "string", "nullable": true },
-                        "source": { "type": "string", "enum": ["DECLARED", "INFERRED_UNCONFIRMED", "BY_END_DATE"] }
-                      },
-                      "required": ["value", "source"],
-                      "additionalProperties": false
-                    },
-                    "baseDate": { "type": "string" },
-                    "reviewFrom": { "type": "string" },
-                    "lastReviewedOn": { "type": "string", "nullable": true }
-                  },
-                  "required": [
-                    "code",
-                    "planId",
-                    "planName",
-                    "applicationId",
-                    "applicationName",
-                    "subscriptionId",
-                    "noticeDeadline",
-                    "baseDate",
-                    "reviewFrom",
-                    "lastReviewedOn"
-                  ],
-                  "additionalProperties": false
-                }
-              },
-              "warningTotal": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
-            },
-            "required": [
-              "planId",
-              "applicable",
-              "sharingPolicy",
-              "terms",
-              "opinions",
-              "opinionTotal",
-              "warnings",
-              "warningTotal"
-            ],
-            "additionalProperties": false,
-            "nullable": true
-          }
-        },
-        "required": ["success", "message", "data"],
-        "additionalProperties": false
-      },
-      "PlanTermsBodyDto": {
-        "type": "object",
-        "properties": {
-          "termsUrl": { "type": "string", "maxLength": 10000, "nullable": true },
-          "lastReviewedOn": {
-            "type": "string",
-            "format": "date",
-            "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused).",
-            "nullable": true
-          },
-          "aiTraining": { "type": "string", "maxLength": 10000, "nullable": true },
-          "dataLocation": { "type": "string", "maxLength": 10000, "nullable": true },
-          "installLimit": {
-            "type": "object",
-            "properties": {
-              "maxDevicesPerKey": { "type": "integer", "minimum": 1, "maximum": 1000000, "nullable": true },
-              "note": { "type": "string", "maxLength": 10000, "nullable": true }
-            },
-            "additionalProperties": false,
-            "nullable": true
-          },
-          "commercialUse": { "type": "string", "maxLength": 10000, "nullable": true },
-          "cancellationRefund": { "type": "string", "maxLength": 10000, "nullable": true }
-        },
-        "additionalProperties": false
-      },
-      "PlanTermsSetResponseDto": {
-        "type": "object",
-        "properties": {
-          "success": { "type": "boolean", "enum": [true] },
-          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
-          "data": {
-            "type": "object",
-            "properties": {
-              "terms": {
-                "type": "object",
-                "properties": {
-                  "termsUrl": { "type": "string", "nullable": true },
-                  "lastReviewedOn": { "type": "string", "nullable": true },
-                  "aiTraining": { "type": "string", "nullable": true },
-                  "dataLocation": { "type": "string", "nullable": true },
-                  "installLimit": {
-                    "type": "object",
-                    "properties": {
-                      "maxDevicesPerKey": {
-                        "type": "integer",
-                        "minimum": -9007199254740991,
-                        "maximum": 9007199254740991,
-                        "nullable": true
-                      },
-                      "note": { "type": "string", "nullable": true }
-                    },
-                    "required": ["maxDevicesPerKey", "note"],
-                    "additionalProperties": false
-                  },
-                  "commercialUse": { "type": "string", "nullable": true },
-                  "cancellationRefund": { "type": "string", "nullable": true },
-                  "updatedAt": { "type": "string", "format": "date-time" }
-                },
-                "required": [
-                  "termsUrl",
-                  "lastReviewedOn",
-                  "aiTraining",
-                  "dataLocation",
-                  "installLimit",
-                  "commercialUse",
-                  "cancellationRefund",
-                  "updatedAt"
-                ],
-                "additionalProperties": false
-              },
-              "changed": { "type": "boolean" }
-            },
-            "required": ["terms", "changed"],
-            "additionalProperties": false,
-            "nullable": true
-          }
-        },
-        "required": ["success", "message", "data"],
-        "additionalProperties": false
-      },
-      "OpinionPageResponseDto": {
-        "type": "object",
-        "properties": {
-          "success": { "type": "boolean", "enum": [true] },
-          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
-          "data": {
-            "type": "object",
-            "properties": {
-              "items": {
-                "type": "array",
-                "items": {
-                  "type": "object",
-                  "properties": {
-                    "id": { "type": "string", "format": "uuid" },
-                    "businessOwner": {
-                      "type": "object",
-                      "properties": {
-                        "employeeId": { "type": "string", "format": "uuid" },
-                        "employeeCode": { "type": "string" },
-                        "fullName": { "type": "string" }
-                      },
-                      "required": ["employeeId", "employeeCode", "fullName"],
-                      "additionalProperties": false
-                    },
-                    "opinion": { "type": "string" },
-                    "recordedBy": { "type": "string", "format": "uuid" },
-                    "recordedAt": { "type": "string", "format": "date-time" }
-                  },
-                  "required": ["id", "businessOwner", "opinion", "recordedBy", "recordedAt"],
-                  "additionalProperties": false
-                }
-              },
-              "pagination": {
-                "type": "object",
-                "properties": {
-                  "page": { "type": "integer", "exclusiveMinimum": true, "maximum": 9007199254740991, "minimum": 0 },
-                  "pageSize": {
-                    "type": "integer",
-                    "exclusiveMinimum": true,
-                    "maximum": 9007199254740991,
-                    "minimum": 0
-                  },
-                  "totalItems": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
-                  "totalPages": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
-                },
-                "required": ["page", "pageSize", "totalItems", "totalPages"],
-                "additionalProperties": false
-              }
-            },
-            "required": ["items", "pagination"],
-            "additionalProperties": false,
-            "nullable": true
-          }
-        },
-        "required": ["success", "message", "data"],
-        "additionalProperties": false
-      },
-      "OpinionBodyDto": {
-        "type": "object",
-        "properties": { "opinion": { "type": "string", "maxLength": 10000 } },
-        "required": ["opinion"],
-        "additionalProperties": false
-      },
-      "OpinionResponseDto": {
-        "type": "object",
-        "properties": {
-          "success": { "type": "boolean", "enum": [true] },
-          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
-          "data": {
-            "type": "object",
-            "properties": {
-              "id": { "type": "string", "format": "uuid" },
-              "businessOwner": {
-                "type": "object",
-                "properties": {
-                  "employeeId": { "type": "string", "format": "uuid" },
-                  "employeeCode": { "type": "string" },
-                  "fullName": { "type": "string" }
-                },
-                "required": ["employeeId", "employeeCode", "fullName"],
-                "additionalProperties": false
-              },
-              "opinion": { "type": "string" },
-              "recordedBy": { "type": "string", "format": "uuid" },
-              "recordedAt": { "type": "string", "format": "date-time" }
-            },
-            "required": ["id", "businessOwner", "opinion", "recordedBy", "recordedAt"],
-            "additionalProperties": false,
-            "nullable": true
-          }
-        },
-        "required": ["success", "message", "data"],
-        "additionalProperties": false
-      },
-      "PlanWarningPageResponseDto": {
-        "type": "object",
-        "properties": {
-          "success": { "type": "boolean", "enum": [true] },
-          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
-          "data": {
-            "type": "object",
-            "properties": {
-              "items": {
-                "type": "array",
-                "items": {
-                  "type": "object",
-                  "properties": {
-                    "code": { "type": "string", "enum": ["TERMS_REVIEW_DUE"] },
-                    "planId": { "type": "string", "format": "uuid" },
-                    "planName": { "type": "string" },
-                    "applicationId": { "type": "string", "format": "uuid" },
-                    "applicationName": { "type": "string" },
-                    "subscriptionId": { "type": "string", "format": "uuid" },
-                    "noticeDeadline": {
-                      "type": "object",
-                      "properties": {
-                        "value": { "type": "string", "nullable": true },
-                        "source": { "type": "string", "enum": ["DECLARED", "INFERRED_UNCONFIRMED", "BY_END_DATE"] }
-                      },
-                      "required": ["value", "source"],
-                      "additionalProperties": false
-                    },
-                    "baseDate": { "type": "string" },
-                    "reviewFrom": { "type": "string" },
-                    "lastReviewedOn": { "type": "string", "nullable": true }
-                  },
-                  "required": [
-                    "code",
-                    "planId",
-                    "planName",
-                    "applicationId",
-                    "applicationName",
-                    "subscriptionId",
-                    "noticeDeadline",
-                    "baseDate",
-                    "reviewFrom",
-                    "lastReviewedOn"
-                  ],
-                  "additionalProperties": false
-                }
-              },
-              "pagination": {
-                "type": "object",
-                "properties": {
-                  "page": { "type": "integer", "exclusiveMinimum": true, "maximum": 9007199254740991, "minimum": 0 },
-                  "pageSize": {
-                    "type": "integer",
-                    "exclusiveMinimum": true,
-                    "maximum": 9007199254740991,
-                    "minimum": 0
-                  },
-                  "totalItems": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
-                  "totalPages": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
-                },
-                "required": ["page", "pageSize", "totalItems", "totalPages"],
-                "additionalProperties": false
-              },
-              "asOf": { "type": "string" }
-            },
-            "required": ["items", "pagination", "asOf"],
-            "additionalProperties": false,
-            "nullable": true
-          }
-        },
-        "required": ["success", "message", "data"],
-        "additionalProperties": false
-      },
-      "OwnerWarningPageResponseDto": {
-        "type": "object",
-        "properties": {
-          "success": { "type": "boolean", "enum": [true] },
-          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
-          "data": {
-            "type": "object",
-            "properties": {
-              "items": {
-                "type": "array",
-                "items": {
-                  "type": "object",
-                  "properties": {
-                    "applicationId": { "type": "string", "format": "uuid" },
-                    "applicationName": { "type": "string" },
-                    "kind": { "type": "string", "enum": ["SAAS", "LICENSED", "INTERNAL"] },
-                    "businessOwner": {
-                      "type": "object",
-                      "properties": {
-                        "employeeId": { "type": "string", "format": "uuid" },
-                        "employeeCode": { "type": "string" },
-                        "fullName": { "type": "string" },
-                        "status": { "type": "string", "enum": ["ACTIVE", "TERMINATED"] }
-                      },
-                      "required": ["employeeId", "employeeCode", "fullName", "status"],
-                      "additionalProperties": false
-                    }
-                  },
-                  "required": ["applicationId", "applicationName", "kind", "businessOwner"],
-                  "additionalProperties": false
-                }
-              },
-              "pagination": {
-                "type": "object",
-                "properties": {
-                  "page": { "type": "integer", "exclusiveMinimum": true, "maximum": 9007199254740991, "minimum": 0 },
-                  "pageSize": {
-                    "type": "integer",
-                    "exclusiveMinimum": true,
-                    "maximum": 9007199254740991,
-                    "minimum": 0
-                  },
-                  "totalItems": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
-                  "totalPages": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
-                },
-                "required": ["page", "pageSize", "totalItems", "totalPages"],
-                "additionalProperties": false
-              }
-            },
-            "required": ["items", "pagination"],
-            "additionalProperties": false,
-            "nullable": true
-          }
-        },
-        "required": ["success", "message", "data"],
-        "additionalProperties": false
-      },
-      "OwnerHistoryResponseDto": {
-        "type": "object",
-        "properties": {
-          "success": { "type": "boolean", "enum": [true] },
-          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
-          "data": {
-            "type": "object",
-            "properties": {
-              "items": {
-                "type": "array",
-                "items": {
-                  "type": "object",
-                  "properties": {
-                    "employee": {
-                      "type": "object",
-                      "properties": {
-                        "employeeId": { "type": "string", "format": "uuid" },
-                        "employeeCode": { "type": "string" },
-                        "fullName": { "type": "string" },
-                        "status": { "type": "string", "enum": ["ACTIVE", "TERMINATED"] }
-                      },
-                      "required": ["employeeId", "employeeCode", "fullName", "status"],
-                      "additionalProperties": false
-                    },
-                    "assignedAt": { "type": "string", "format": "date-time" },
-                    "assignedBy": { "type": "string", "format": "uuid", "nullable": true },
-                    "endedAt": { "type": "string", "format": "date-time", "nullable": true }
-                  },
-                  "required": ["employee", "assignedAt", "assignedBy", "endedAt"],
-                  "additionalProperties": false
-                }
-              },
-              "pagination": {
-                "type": "object",
-                "properties": {
-                  "page": { "type": "integer", "exclusiveMinimum": true, "maximum": 9007199254740991, "minimum": 0 },
-                  "pageSize": {
-                    "type": "integer",
-                    "exclusiveMinimum": true,
-                    "maximum": 9007199254740991,
-                    "minimum": 0
-                  },
-                  "totalItems": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
-                  "totalPages": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
-                },
-                "required": ["page", "pageSize", "totalItems", "totalPages"],
-                "additionalProperties": false
-              }
-            },
-            "required": ["items", "pagination"],
-            "additionalProperties": false,
-            "nullable": true
-          }
-        },
-        "required": ["success", "message", "data"],
-        "additionalProperties": false
-      },
-      "ConfirmRetirementBodyDto": {
-        "type": "object",
-        "properties": {
-          "businessOwnerEmployeeId": { "type": "string", "format": "uuid" },
-          "note": { "default": "", "type": "string", "maxLength": 2000 }
-        },
-        "required": ["businessOwnerEmployeeId"],
-        "additionalProperties": false
-      },
-      "RetirementConfirmationResponseDto": {
-        "type": "object",
-        "properties": {
-          "success": { "type": "boolean", "enum": [true] },
-          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
-          "data": {
-            "type": "object",
-            "properties": {
-              "confirmation": {
-                "type": "object",
-                "properties": {
-                  "id": { "type": "string", "format": "uuid" },
-                  "applicationId": { "type": "string", "format": "uuid" },
-                  "businessOwnerEmployeeId": { "type": "string", "format": "uuid" },
-                  "note": { "type": "string" },
-                  "recordedBy": { "type": "string", "format": "uuid" },
-                  "recordedAt": { "type": "string", "format": "date-time" }
-                },
-                "required": ["id", "applicationId", "businessOwnerEmployeeId", "note", "recordedBy", "recordedAt"],
-                "additionalProperties": false
-              }
-            },
-            "required": ["confirmation"],
-            "additionalProperties": false,
-            "nullable": true
-          }
-        },
-        "required": ["success", "message", "data"],
-        "additionalProperties": false
-      },
       "RetirementResponseDto": {
         "type": "object",
         "properties": {
@@ -94832,32 +93792,6 @@
                 "properties": {
                   "status": { "type": "string", "enum": ["APPROVED", "RETIRED"] },
                   "retiredAt": { "type": "string", "format": "date-time", "nullable": true },
-                  "confirmations": {
-                    "maxItems": 50,
-                    "type": "array",
-                    "items": {
-                      "type": "object",
-                      "properties": {
-                        "id": { "type": "string", "format": "uuid" },
-                        "applicationId": { "type": "string", "format": "uuid" },
-                        "businessOwnerEmployeeId": { "type": "string", "format": "uuid" },
-                        "note": { "type": "string" },
-                        "recordedBy": { "type": "string", "format": "uuid" },
-                        "recordedAt": { "type": "string", "format": "date-time" }
-                      },
-                      "required": [
-                        "id",
-                        "applicationId",
-                        "businessOwnerEmployeeId",
-                        "note",
-                        "recordedBy",
-                        "recordedAt"
-                      ],
-                      "additionalProperties": false
-                    }
-                  },
-                  "confirmationTotal": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
-                  "confirmed": { "type": "boolean" },
                   "blockers": {
                     "type": "object",
                     "properties": {
@@ -94935,15 +93869,7 @@
                   },
                   "canRetire": { "type": "boolean" }
                 },
-                "required": [
-                  "status",
-                  "retiredAt",
-                  "confirmations",
-                  "confirmationTotal",
-                  "confirmed",
-                  "blockers",
-                  "canRetire"
-                ],
+                "required": ["status", "retiredAt", "blockers", "canRetire"],
                 "additionalProperties": false
               }
             },
@@ -94967,6 +93893,44 @@
               "status": { "type": "string", "enum": ["RETIRED"] }
             },
             "required": ["id", "status"],
+            "additionalProperties": false,
+            "nullable": true
+          }
+        },
+        "required": ["success", "message", "data"],
+        "additionalProperties": false
+      },
+      "ResponsibilityTransferBodyDto": {
+        "type": "object",
+        "properties": { "toItAdminEmployeeId": { "type": "string", "format": "uuid" } },
+        "required": ["toItAdminEmployeeId"],
+        "additionalProperties": false
+      },
+      "ResponsibilityTransferResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "enum": [true] },
+          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "applicationId": { "type": "string", "format": "uuid" },
+              "responsibleItAdmin": {
+                "type": "object",
+                "properties": {
+                  "employeeId": { "type": "string", "format": "uuid" },
+                  "employeeCode": { "type": "string" },
+                  "fullName": { "type": "string" }
+                },
+                "required": ["employeeId", "employeeCode", "fullName"],
+                "additionalProperties": false
+              },
+              "changed": {
+                "type": "boolean",
+                "description": "False when the application was handed to the one already responsible: nothing was written."
+              }
+            },
+            "required": ["applicationId", "responsibleItAdmin", "changed"],
             "additionalProperties": false,
             "nullable": true
           }
@@ -98404,7 +97368,6 @@
                         "nullable": true
                       },
                       "note": { "type": "string", "nullable": true },
-                      "businessOwnerOpinion": { "type": "string", "nullable": true },
                       "proposedByEmployeeId": { "type": "string", "format": "uuid" },
                       "proposedAt": { "type": "string", "format": "date-time" },
                       "releasedSeatCount": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
@@ -98413,7 +97376,6 @@
                       "choice",
                       "quantity",
                       "note",
-                      "businessOwnerOpinion",
                       "proposedByEmployeeId",
                       "proposedAt",
                       "releasedSeatCount"
@@ -98676,7 +97638,6 @@
           "choice": { "type": "string", "enum": ["RENEW", "REDUCE", "CANCEL"] },
           "proposedQuantity": { "type": "integer", "minimum": 0, "maximum": 1000000000 },
           "note": { "type": "string", "minLength": 1, "maxLength": 2000 },
-          "businessOwnerOpinion": { "type": "string", "minLength": 1, "maxLength": 2000 },
           "releasedAssignmentIds": {
             "maxItems": 10000,
             "type": "array",
@@ -101101,17 +100062,6 @@
                     "additionalProperties": false,
                     "nullable": true
                   },
-                  "proposedBusinessOwner": {
-                    "type": "object",
-                    "properties": {
-                      "employeeId": { "type": "string", "format": "uuid" },
-                      "employeeCode": { "type": "string" },
-                      "fullName": { "type": "string" }
-                    },
-                    "required": ["employeeId", "employeeCode", "fullName"],
-                    "additionalProperties": false,
-                    "nullable": true
-                  },
                   "controlLevel": {
                     "type": "string",
                     "enum": ["FULL", "PARTIAL", "UNCONTROLLABLE", null],
@@ -101322,7 +100272,6 @@
                   "dataSensitivity",
                   "opinion",
                   "equivalentTool",
-                  "proposedBusinessOwner",
                   "controlLevel",
                   "controlRiskNote",
                   "quote",
@@ -114700,6 +113649,52 @@
         "required": ["role"],
         "additionalProperties": false
       },
+      "ItAdminPageResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "enum": [true] },
+          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "items": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "employeeId": { "type": "string", "format": "uuid" },
+                    "employeeCode": { "type": "string" },
+                    "fullName": { "type": "string" }
+                  },
+                  "required": ["employeeId", "employeeCode", "fullName"],
+                  "additionalProperties": false
+                }
+              },
+              "pagination": {
+                "type": "object",
+                "properties": {
+                  "page": { "type": "integer", "exclusiveMinimum": true, "maximum": 9007199254740991, "minimum": 0 },
+                  "pageSize": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "maximum": 9007199254740991,
+                    "minimum": 0
+                  },
+                  "totalItems": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                  "totalPages": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+                },
+                "required": ["page", "pageSize", "totalItems", "totalPages"],
+                "additionalProperties": false
+              }
+            },
+            "required": ["items", "pagination"],
+            "additionalProperties": false,
+            "nullable": true
+          }
+        },
+        "required": ["success", "message", "data"],
+        "additionalProperties": false
+      },
       "RecommendationPageResponseDto": {
         "type": "object",
         "properties": {
@@ -117218,7 +116213,7 @@
                     },
                     "required": ["state", "count", "sourceOperationId", "reason"],
                     "additionalProperties": false,
-                    "description": "The company machines whose holder has not yet acknowledged the monitoring notice (US-09-01 AC-2), counted as `deviceList` with state=AWAITING_ACKNOWLEDGEMENT lists them."
+                    "description": "The company machines whose holder has not yet acknowledged the monitoring notice: the same number the machine list (`deviceList`) answers for the awaiting-acknowledgement state."
                   },
                   "saasIssues": {
                     "type": "object",
