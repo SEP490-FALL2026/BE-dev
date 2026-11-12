@@ -158,6 +158,26 @@ export const PARAM_KEYS_BY_CODE: Readonly<Record<InAppNotificationCode, readonly
   USAGE_TRACKING_NOTICE: ['applicationId', 'activityDefinition', 'dataKinds', 'purpose', 'retentionMonths', 'viewPath'],
   // The application by id (the interface turns it into a name: no key may be a name), the source by its label, the last day the source covers and how old it is: words and days, no person.
   USAGE_SOURCE_STALE: ['applicationId', 'source', 'coverageTo', 'freshnessDays'],
+  // MF-2 (`QĐ-110b`–`QĐ-110e`): the people and the days of a departure, how many rights wait; `audience` says who is told (the Super Admin
+  // that the person is marked as gone, the IT Admin to block the company account and open the revocation).
+  REVOCATION_OVERDUE: ['caseId', 'employeeId', 'dueOn', 'rightCount'],
+  DEPARTURE_ACCESS_BLOCKED: ['caseId', 'employeeId', 'departmentId', 'blockedOn', 'revocationDueOn', 'audience'],
+  ACCOUNT_LOCK_OVERDUE: ['caseId', 'employeeId', 'blockedOn'],
+  // MF-3 (`QĐ-110p`): the grace of a transfer; `audience` is the mover, a head or an IT Admin of one of the two departments.
+  TRANSFER_GRACE_STARTED: ['transferId', 'employeeId', 'fromDepartmentId', 'toDepartmentId', 'graceEndsOn', 'audience'],
+  TRANSFER_GRACE_ENDING: ['transferId', 'employeeId', 'graceEndsOn'],
+  TRANSFER_RIGHTS_REVOKING: ['transferId', 'employeeId', 'toDepartmentId', 'rightCount'],
+  // A request closed because its beneficiary left or moved (`QĐ-110d`, `QĐ-110o`): `reasonKind` is DEPARTURE or TRANSFER.
+  REQUEST_CANCELLED_BENEFICIARY_GONE: ['requestId', 'beneficiaryEmployeeId', 'reasonKind'],
+  // The list of software of a department (`QĐ-110s`, `QĐ-110t`).
+  DEPARTMENT_SOFTWARE_PROPOSED: ['proposalId', 'departmentId', 'applicationId', 'planId'],
+  DEPARTMENT_SOFTWARE_PROPOSAL_DECIDED: ['proposalId', 'departmentId', 'applicationId', 'planId', 'decision', 'reason'],
+  // The admins a plan keeps at the vendor (`QĐ-110k`): how many are left; and a subscription that gained seats (`QĐ-110v`).
+  VENDOR_ADMINS_BELOW_MINIMUM: ['planId', 'applicationId', 'adminCount'],
+  DEPARTMENT_WITHOUT_HEAD: ['departmentId', 'waitingCount'],
+  SUBSCRIPTION_SEATS_INCREASED: ['subscriptionId', 'fromQuantity', 'toQuantity', 'requestId', 'changedByEmployeeId'],
+  // What an IT Admin who leaves still answers for, once the day has come and the handover is not done (`QĐ-110j`, `R-26`).
+  IT_ADMIN_HANDOVER_PENDING: ['sourceKind', 'sourceId', 'employeeId', 'dueOn'],
 };
 
 /** Whether the code is one of the closed table. */

@@ -152,6 +152,23 @@ export const IN_APP_NOTIFICATION_CODES = [
   'USAGE_TRACKING_NOTICE',
   // Every vendor report of an application is older than a week, so no seat of it can be judged unused (`qd103-ghost-seat-g3-g4`, `Q-91`): told once to the IT Admin.
   'USAGE_SOURCE_STALE',
+  // MF-2 and MF-3 and what goes with them (`QĐ-110`, `QĐ-111`): a revocation past its day, a person blocked and the account not locked in
+  // time, the grace of a transfer (begun, ending, the rights being taken back), a request cancelled because its beneficiary is gone, the
+  // list of software of a department, the vendor admins of a plan below the minimum, a department nobody heads, seats added to a pool
+  // subscription, and the handover of an IT Admin's responsibilities that waits. Ids, days and counts only.
+  'REVOCATION_OVERDUE',
+  'DEPARTURE_ACCESS_BLOCKED',
+  'ACCOUNT_LOCK_OVERDUE',
+  'TRANSFER_GRACE_STARTED',
+  'TRANSFER_GRACE_ENDING',
+  'TRANSFER_RIGHTS_REVOKING',
+  'REQUEST_CANCELLED_BENEFICIARY_GONE',
+  'DEPARTMENT_SOFTWARE_PROPOSED',
+  'DEPARTMENT_SOFTWARE_PROPOSAL_DECIDED',
+  'VENDOR_ADMINS_BELOW_MINIMUM',
+  'DEPARTMENT_WITHOUT_HEAD',
+  'SUBSCRIPTION_SEATS_INCREASED',
+  'IT_ADMIN_HANDOVER_PENDING',
 ] as const;
 
 export type InAppNotificationCode = (typeof IN_APP_NOTIFICATION_CODES)[number];
