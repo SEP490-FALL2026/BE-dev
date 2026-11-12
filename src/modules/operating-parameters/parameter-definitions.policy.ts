@@ -241,6 +241,42 @@ export const PARAMETER_DEFINITIONS: readonly ParameterDefinition[] = [
     source: 'FR-2.12, QĐ-63b, OQ-A-05',
   },
   {
+    key: 'DEPARTURE_REVOCATION_WORKING_DAYS',
+    label: 'Hạn thu hồi quyền sau khi chặn người nghỉ việc',
+    group: 'PERSONNEL',
+    shape: { kind: 'int', min: 1, max: 10 },
+    default: 1,
+    unit: 'working days',
+    unitLabel: 'ngày làm việc',
+    description:
+      'How many working days the IT Admin has to take back every right of a person who has been blocked, counted from the working day after the block (the first of them being day 1).',
+    source: 'QĐ-110c, QĐ-77i',
+  },
+  {
+    key: 'TRANSFER_GRACE_WORKING_DAYS',
+    label: 'Thời gian ân hạn quyền cũ sau điều chuyển',
+    group: 'PERSONNEL',
+    shape: { kind: 'int', min: 1, max: 30 },
+    default: 5,
+    unit: 'working days',
+    unitLabel: 'ngày làm việc',
+    description:
+      'How long a transferred person keeps the rights of the old department before the system takes them all back, counted in working days with the day the transfer takes effect as day 1.',
+    source: 'QĐ-110p, QĐ-110r',
+  },
+  {
+    key: 'TRANSFER_GRACE_REMINDER_WORKING_DAYS',
+    label: 'Nhắc người chuyển trước khi hết ân hạn',
+    group: 'PERSONNEL',
+    shape: { kind: 'int', min: 1, max: 10 },
+    default: 2,
+    unit: 'working days',
+    unitLabel: 'ngày làm việc',
+    description:
+      'How many working days before the grace ends the transferred person is told once more that the rights of the old department are about to be taken back.',
+    source: 'QĐ-110p',
+  },
+  {
     key: 'PROVISIONING_RETRY_COUNT',
     label: 'Số lần thử lại cấp/thu hồi',
     group: 'PROVISIONING',

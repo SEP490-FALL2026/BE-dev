@@ -20,6 +20,9 @@ describe('operating parameter definitions (US-01-04)', () => {
     expect(defaults.SAAS_ISSUE_RESPONSE_WORKING_DAYS).toBe(1);
     expect(defaults.SAAS_ISSUE_REOPEN_WORKING_DAYS).toBe(5);
     expect(defaults.ABRUPT_DEPARTURE_HOLD_WORKING_DAYS).toBe(1);
+    expect(defaults.DEPARTURE_REVOCATION_WORKING_DAYS).toBe(1);
+    expect(defaults.TRANSFER_GRACE_WORKING_DAYS).toBe(5);
+    expect(defaults.TRANSFER_GRACE_REMINDER_WORKING_DAYS).toBe(2);
     expect(defaults.BACKLOG_ALERT_THRESHOLD).toBe(10);
     expect(defaults.DETECTION_THRESHOLD_DAYS).toEqual([30, 60, 90]);
     expect(defaults.RENEWAL_ALERT_DAYS_BEFORE_DEADLINE).toEqual([15, 7]);
@@ -124,6 +127,9 @@ const EXPECTED_KEYS = [
   'PERSONNEL_NOTICE_REVIEW_WORKING_DAYS',
   'ABRUPT_DEPARTURE_HOLD_WORKING_DAYS',
   'HANDOVER_SHORT_DEADLINE_WORKING_DAYS',
+  'DEPARTURE_REVOCATION_WORKING_DAYS',
+  'TRANSFER_GRACE_WORKING_DAYS',
+  'TRANSFER_GRACE_REMINDER_WORKING_DAYS',
   'PROVISIONING_RETRY_COUNT',
   'SAAS_ISSUE_RESPONSE_WORKING_DAYS',
   'SAAS_ISSUE_REOPEN_WORKING_DAYS',
@@ -143,7 +149,7 @@ const EXPECTED_KEYS = [
 ];
 
 describe('operating parameter labels and groups (QĐ93-PARAM-LABEL)', () => {
-  it('pins the twenty-six keys, ordered by group and, inside a group, as the spec table lists them', () => {
+  it('pins the twenty-nine keys, ordered by group and, inside a group, as the spec table lists them', () => {
     expect(PARAMETER_DEFINITIONS.map((definition) => definition.key)).toEqual(EXPECTED_KEYS);
   });
 
@@ -246,6 +252,27 @@ describe('operating parameter labels and groups (QĐ93-PARAM-LABEL)', () => {
       [
         'HANDOVER_SHORT_DEADLINE_WORKING_DAYS',
         'Hạn ngắn xác nhận bàn giao dữ liệu',
+        'PERSONNEL',
+        'working days',
+        'ngày làm việc',
+      ],
+      [
+        'DEPARTURE_REVOCATION_WORKING_DAYS',
+        'Hạn thu hồi quyền sau khi chặn người nghỉ việc',
+        'PERSONNEL',
+        'working days',
+        'ngày làm việc',
+      ],
+      [
+        'TRANSFER_GRACE_WORKING_DAYS',
+        'Thời gian ân hạn quyền cũ sau điều chuyển',
+        'PERSONNEL',
+        'working days',
+        'ngày làm việc',
+      ],
+      [
+        'TRANSFER_GRACE_REMINDER_WORKING_DAYS',
+        'Nhắc người chuyển trước khi hết ân hạn',
         'PERSONNEL',
         'working days',
         'ngày làm việc',
