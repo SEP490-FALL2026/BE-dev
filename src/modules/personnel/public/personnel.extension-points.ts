@@ -3,7 +3,6 @@ import type { BusinessDate } from '../../../core/business-date';
 import { Contributions } from '../../../core/extension/contributions';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { NoticeEventInput, NoticeEventKind, NoticeEventRef, NoticeRecord } from '../personnel-notice.types';
-import type { Grounds } from '../personnel-grounds.policy';
 import type { PersonnelActor } from './personnel.types';
 
 /** A file of the personnel context (a transfer now, the leaving of a person later) and the day its effect is due. */
@@ -72,11 +71,14 @@ export class OffboardingWarningContributions extends Contributions<OffboardingSo
   }
 }
 
-/** What a recorder is given to write the official event a notice announces. The basis is whole; the notice only names itself. */
+/**
+ * What a recorder is given to write the official event a notice announces. The basis is the sentence the four parts the Super Admin gave
+ * make (`QĐ-110a`: an event keeps its basis in one box); the notice only names itself.
+ */
 export interface NoticeEventRequest {
   actor: PersonnelActor;
   notice: NoticeRecord;
-  grounds: Grounds;
+  groundsNote: string;
   event: NoticeEventInput;
 }
 

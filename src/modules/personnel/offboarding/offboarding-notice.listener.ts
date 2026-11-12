@@ -10,7 +10,6 @@ import {
 import { OffboardingRefusedError } from './offboarding.errors';
 import { toOffboardingApiException } from './offboarding.http-errors';
 import { OffboardingFrame } from './offboarding-frame.service';
-import { groundsNoteOfBasis } from '../personnel-grounds.policy';
 import { OffboardingRepo } from './offboarding.repo';
 import { OffboardingService } from './offboarding.service';
 
@@ -47,7 +46,7 @@ export class OffboardingNoticeRecorder implements OnModuleInit, NoticeEventRecor
           employeeId: notice.employeeId,
           lastWorkingDay: event.lastWorkingDay,
           accessBlockMode: this.modeOf(event),
-          groundsNote: groundsNoteOfBasis(request.grounds),
+          groundsNote: request.groundsNote,
           successor: event.successor,
           cancelPendingTransfer: event.cancelPendingTransfer,
           noticeId: notice.id,
