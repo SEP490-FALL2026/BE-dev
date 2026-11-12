@@ -258,6 +258,14 @@
 - **Đổi sang A:** sửa kỳ vọng `provisioning-grant-http` AC-4 và bỏ dòng thêm vào migration; FE đọc `IDENTIFIER_IN_USE` thay `OVERLAP` ở cấp lần hai (cần changelog tài liệu API FE).
 - **Chạm:** `prisma/migrations/20261113000600_licensing_machine_account_flag/migration.sql`, `test/integration/licensing/license-assignment-constraints.integration-spec.ts`, `src/modules/licensing/README.md`. Chạy: `test/integration/licensing` 50 file / 530 xanh, `test/http/licensing` 10 file / 249 xanh, `test:gates` 331/331.
 
+### D-36 · MF2-B review (ghi chú) · Đề xuất sửa SPEC §4 P1/P23 cho khớp D-31/D-32, và giới hạn đã biết của `commitmentToRelease`
+
+Không sửa code; SPEC không bị sửa trong lượt này (spec là của Owner/điều phối). Đề xuất để lần sửa SPEC kế tiếp áp dụng:
+
+- **SPEC §4 P1 (`SPEC.md:125`):** body ghi `{ employeeId, lastWorkingDay?, blockNow, groundsNote, successor? }`. Thực tế (D-31) wire giữ `accessBlockMode: 'WITH_LAST_DAY' | 'BLOCK_NOW'` (bắt buộc, không mặc định), `lastWorkingDay` tùy chọn: bắt buộc với `WITH_LAST_DAY`, bỏ trống hoặc hôm nay với `BLOCK_NOW` (ngày khác ⟹ 422 `LAST_WORKING_DAY_INVALID`, `details.reason BLOCK_NOW_DAY_IS_TODAY`). Đề xuất sửa chữ SPEC: `blockNow` ⟹ `accessBlockMode = BLOCK_NOW`; thêm `cancelPendingTransfer?` (đã có từ X0.6b, SPEC không nhắc); thêm `409 BLOCK_NOW_LAST_DAY_FIXED` cho P2 `last-day-changes` thay chữ "409" chung.
+- **SPEC §4 P23 (`SPEC.md:147`):** `commitmentToRelease` viết số ít. Thực tế (D-32) là **mảng** `[{ currency, amountMinor: string }]` theo tiền tệ; `openRequestsToCancel[]` và `provisioningInFlight[]` có `{ requestId, type, state, line }`; `responsibilities` là `{ subscriptions: number | null, applications: number | null }` (`null` = chưa có nguồn, chờ X-IT); `rightsToRevoke[]` có thêm `revocable`, `dataLossOnRemoval`, `revocationNote`, `revocationUnderWay`. Đề xuất sửa SPEC P23 theo đúng hình `DepartureImpact` (`personnel/departure-deadline/departure-impact.types.ts`) để RD.3 chỉ gắn route.
+- **Giới hạn đã biết của `commitmentToRelease` (D-32):** chỉ cộng phần còn giữ (`amount − released − applied`) của cam kết `HELD` thuộc các Request bị hủy **nguyên cái**. Request nhóm (`GROUP_GRANT`) chỉ hủy dòng của người nghỉ, phần tiền chia cho dòng đó **không** vào con số, nên con số có thể thấp hơn số thực được giải phóng khi người nghỉ có dòng nhóm đang giữ tiền (`openRequestsToCancel[].line = true` cho FE biết có dòng nhóm). Cách bù nếu Owner muốn: đọc phần tiền của dòng qua facade nhóm (`GroupGrantService`) trong `previewBeneficiaryGone`.
+
 ## Bị chặn
 
 (chưa có)
