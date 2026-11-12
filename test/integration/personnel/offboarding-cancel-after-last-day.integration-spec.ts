@@ -295,6 +295,28 @@ describe('cancelling a handover after its last working day (integration, real Po
       expect(line.detail.count).toBe(1);
     }, 240_000);
 
+    it('leaves a task alone when the only reason it has is another source, here a return: the departure never asked for it', async () => {
+      const code = `E-CL-${(counter += 1)}`;
+      const person = await h.worker(des, code);
+      const seat = await h.seatOf(person, { subscriptionId: subscriptions[2] }, code);
+      const wire = await h.recordedCase(person);
+      const returned = await h.open(seat, 'RETURN');
+      await pastLastDay(wire, person);
+
+      const cancelled = await h.cancelCase(wire.id, { reason: 'Ở lại sau ngày cuối' }).expect(200);
+
+      expect(h.dataOf<{ revocationsWithdrawn: object }>(cancelled).revocationsWithdrawn).toEqual({
+        cancelled: 0,
+        itAdminToClose: 0,
+        continues: 0,
+        alreadyDone: 0,
+      });
+      expect(await taskOf(returned.taskId)).toMatchObject({ status: 'QUEUED' });
+      expect(await reasonsOf(returned.taskId)).toEqual([{ source: 'RETURN', withdrawn: false }]);
+      expect((await h.auditEventsOf('PROVISIONING_TASK.REASON_WITHDRAWN', returned.taskId)).length).toBe(0);
+      expect(await h.changeKinds(wire.id)).not.toContain('REVOCATIONS_WITHDRAWN');
+    }, 180_000);
+
     it('tells an IT Admin who can act, never the person who left, when that person was the IT Admin in charge', async () => {
       const itDepartment = await h.departmentWithUnit('P-CL2');
       const code = `E-CL-${(counter += 1)}`;
