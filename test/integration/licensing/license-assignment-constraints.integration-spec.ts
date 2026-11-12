@@ -8,6 +8,9 @@ import {
 } from '../../support/disposable-database';
 import { waitForLockWaiters } from '../../support/lock-wait';
 
+/** The constraint the database named the last time it refused a statement: when a row breaks two exclusions, the first created answers. */
+let lastViolatedConstraint: string | null = null;
+
 /** The SQLSTATE a rejected statement carries: the constraint, not the application, said no. */
 async function sqlState(sql: Client, text: string, values: unknown[] = []): Promise<string | null> {
   try {
@@ -15,6 +18,8 @@ async function sqlState(sql: Client, text: string, values: unknown[] = []): Prom
 
     return null;
   } catch (error) {
+    lastViolatedConstraint = (error as { constraint?: string }).constraint ?? null;
+
     return (error as { code?: string }).code ?? 'unknown';
   }
 }
@@ -330,6 +335,17 @@ describe('license assignments (integration, PostgreSQL constraints)', () => {
       expect(await personal(subscriptionId, { employeeId: staff, validFrom: '2026-05-31' })).toBe('23P01');
       expect(await personal(subscriptionId, { employeeId: staff, validFrom: '2026-06-01' })).toBeNull();
       expect(await personal(subscriptionId, { employeeId: staff, validFrom: '2026-12-01' })).toBe('23P01');
+    });
+
+    it('names the rule of the person, not the one of the account, when the same person is given the same account twice (OVERLAP, not IDENTIFIER_IN_USE)', async () => {
+      const subscriptionId = await fresh(10);
+
+      expect(await personal(subscriptionId, { employeeId: staff, identifier: 'twice@congty.vn' })).toBeNull();
+      expect(await personal(subscriptionId, { employeeId: staff, identifier: 'twice@congty.vn' })).toBe('23P01');
+
+      // Both exclusions are broken and the database names the first one created: the rule of the person must be created before the one of the
+      // identifier, or the second grant of a seat to the same person answers that the account is in use instead of that the person has a seat.
+      expect(lastViolatedConstraint).toBe('license_assignments_personal_no_overlap');
     });
 
     it('refuses the same person twice on an internal plan, which has no subscription', async () => {

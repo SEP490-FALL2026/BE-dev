@@ -40,6 +40,19 @@ ALTER TABLE "license_assignments"
         daterange("valid_from", "valid_until", '[)') WITH &&
     ) WHERE ("kind" = 'PERSONAL' AND NOT "is_machine_account");
 
+-- The database names the first exclusion constraint a row breaks, in the order they were created. Giving the same person the same account twice breaks
+-- this one and the one on the identifier; the answer of the route is that the person already holds a seat (OVERLAP), and not that the account is in
+-- use (IDENTIFIER_IN_USE), as it was while this constraint was the older of the two. Dropping and adding it above made it the younger, so the
+-- constraint on the identifier is created again after it, as it was created (20261020190100). Same definition, same rows.
+ALTER TABLE "license_assignments" DROP CONSTRAINT "license_assignments_identifier_no_overlap";
+ALTER TABLE "license_assignments"
+    ADD CONSTRAINT "license_assignments_identifier_no_overlap"
+    EXCLUDE USING gist (
+        (COALESCE("subscription_id", "plan_id")) WITH =,
+        "normalized_account_identifier" WITH =,
+        daterange("valid_from", "valid_until", '[)') WITH &&
+    );
+
 -- 3. A converted seat names the service account seat it continues, like a handover or a renewal carry. The rest of the rule is the latest
 -- definition (20261101000200).
 ALTER TABLE "license_assignments" DROP CONSTRAINT "license_assignments_handover_names_predecessor";

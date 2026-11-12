@@ -169,6 +169,7 @@ dịch vụ nào đọc cả ghế lẫn thu hồi thì đứng trên cả hai (
   sửa — đổi là gia hạn, bản ghi mới (trigger `license_assignment_reject_change`). Một người không giữ hai ghế cá nhân
   chồng thời gian trên cùng subscription/plan (`license_assignments_personal_no_overlap`, INV-02), trừ seat có cờ _tài khoản máy_
   (`is_machine_account`, R-9: `WHERE kind = 'PERSONAL' AND NOT is_machine_account`; cờ ⇔ `machine_account_note`).
+  Cùng người, cùng định danh trên cùng subscription vi phạm cả hai ràng buộc loại trừ (`…personal_no_overlap`, `…identifier_no_overlap`); DB báo ràng buộc **tạo trước**, nên `personal_no_overlap` phải cũ hơn `identifier_no_overlap` (mã `OVERLAP`, không phải `IDENTIFIER_IN_USE`): drop/add một ràng buộc thì drop/add lại ràng buộc kia sau nó (migration `20261113000600`; test `license-assignment-constraints` ghim thứ tự).
 - Thu hồi chỉ mở qua `openRevocation`, trong transaction của nguồn; ghế được trả khi task hoàn tất; gọi lại cùng nguồn
   và reference không đổi gì.
 - Mốc thu hồi (`BR-MF5-04`): mỗi lý do giữ `due_on`/`not_before` của nơi gọi; tác vụ giữ mốc suy ra từ các lý do còn hiệu
