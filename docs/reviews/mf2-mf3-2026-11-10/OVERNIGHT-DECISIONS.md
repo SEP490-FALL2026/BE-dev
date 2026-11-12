@@ -72,6 +72,12 @@
 ### D-13 · X-H.3 · `test/support/handover-harness.ts` còn dùng cho 5 harness khác: xóa hay đổi tên?
 - **ĐÃ CHỌN: bỏ phần duty, đổi tên thành `seat-revocation-harness.ts` (`SeatRevocationHarness`)**. Lý do: phần còn lại (`seatOf`, `describePlan`, `open`, `revoked`…) là của thu hồi ghế, không còn dính bàn giao. Test cần nói "không duty" đếm `handover_duties` qua `h.count(...)`. Cũng hạ trần `test/gates/lint-debt.gate-spec.ts` (complexity 49→48, max-lines 44→41, complexityAndLines 93→89) vì ESLint pruning bỏ 4 suppression của file đã xóa/gọn.
 
+### D-14 · X-H.4 · Hủy duty đang mở bằng migration: lý do viết thế nào, có ghi Audit Trail không?
+- **A:** `UPDATE … cancel_reason = 'RULE_CHANGED'` thuần SQL, không ghi `audit_events`. Ưu: đúng chữ SPEC §6, một câu lệnh, chạy lại an toàn (chỉ đụng dòng còn mở). Nhược: dòng hủy không có sự kiện `HANDOVER_DUTY.CANCELLED` kèm.
+- **B:** thêm audit event mỗi dòng. Nhược: migration không có người/phiên để nêu làm tác nhân, cột `created_by_app_user_id` đã là NOT NULL của dòng cũ; lịch sử `HANDOVER_DUTY.*` cũ vẫn còn đủ.
+- **ĐÃ CHỌN: A.** Lý do: đơn giản, đúng SPEC; `cancel_reason` là TEXT tự do (không enum nên không cần migration `_values`). Có khối `DO $$ … RAISE` đếm mở trước/hủy/mở sau và dừng nếu còn dòng mở. Chạm: `prisma/migrations/20261113000500_handover_duties_cancel_open/migration.sql`, test `licensing/handover-removed.integration-spec.ts`. Owner đếm lại `SELECT count(*) FROM handover_duties WHERE confirmed_at IS NULL AND cancelled_at IS NULL` trước deploy (cần 0 sau migration).
+- **Đổi sang B:** thêm vào migration một `INSERT INTO audit_events` cho từng dòng với `actor_kind = 'SYSTEM'`.
+
 ## Bị chặn
 
 (chưa có)
