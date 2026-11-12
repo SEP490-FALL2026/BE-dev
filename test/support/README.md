@@ -185,14 +185,6 @@ fixture SQL không chứng minh workflow tạo tài khoản. Dùng `bodyOf(respo
   role) on the offboarding harness; the Super Admin of the harness leaves in the last case of the file, after which no account can be made or
   given a role in that database, so keep a case that needs the Super Admin before it. `test/http/personnel/role-duties.http-spec.ts` is the two routes without
   a database.
-- `support/service-account-handover-harness.ts`: the offboarding harness with what the handover of service accounts needs: `botOf` (a
-  service account written through the baseline import), the routes (`changeResponsibleOf`, `proposeMove`, `confirmMove`, `cancelMove`,
-  `listMoves`, `listServiceDuties`, `closeTransfer`), `chainOf` (the chain of an assignment as the database keeps it), `seatsTaken(day)`,
-  `unitOf`, `moveRow`, `noticeCount`, `sweepOverdue(now)` (the hourly reminder by hand) and `pretendToday(day)` (the organization says
-  it is another day). The duties, the change of the person responsible, the departure and the reminder are in
-  `service-account-duty.integration-spec.ts`, the move and its confirmation in `service-account-move.integration-spec.ts`, what the
-  database refuses in `service-account-integrity.integration-spec.ts`, and the routes without a database in
-  `test/http/licensing/service-account-handover.http-spec.ts`.
 - `support/expiry-harness.ts`: the return harness with what the rights that end on a day need: the three routes (`queue`,
   `startRevocation`, `reminders`), `noticeDue(now)` (the hourly reminder by hand), `queueRows`, `reminderRows`, `giveEndDate` (the database refuses to change an end date that was set) and `waitingRenewals(map)` (a stand-in for the
   renewals that wait, which returns the real reader when called back). The reminders and what the database refuses are in

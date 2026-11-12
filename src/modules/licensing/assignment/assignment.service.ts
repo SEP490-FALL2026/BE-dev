@@ -35,7 +35,7 @@ interface EndWithoutSeatInput {
 /**
  * The assignments of seats (`US-02-05`, `US-07-01` AC-14). Assignments reach this service by the baseline import and by
  * a request; both are written under the lock of the subscription, with an audit event for each, and the database holds the
- * invariants whoever writes. A change of the person responsible for a service account is `AssignmentResponsibleService`. The
+ * invariants whoever writes. There is no service account any more (`QĐ-110m`). The
  * account identifier never enters an audit event.
  */
 @Injectable()

@@ -89,7 +89,7 @@ const PUBLIC_CONTRACT_EXPORTS: ReadonlySet<string> = new Set([
   // D-S21 (qd93-remove-fallback-substitute-approvers): who can never ask for or be given access through a Request, one facade for every route that makes one.
   'IdentityAccessFacadeModule: RequestPartyEligibilityApi',
   // The licensing facades, one per topic of its type files (R4): the revocation of seats and the grant of a request, the renewal, the
-  // open grant tasks of a person, the service account duties, and (G4, ADR-0013) the seat baseline the import reads and writes through.
+  // open grant tasks of a person, and (G4, ADR-0013) the seat baseline the import reads and writes through.
   'LicensingModule: LicensingApi',
   'LicensingModule: LicensingRenewalApi',
   'LicensingModule: LicensingGhostSeatApi',
@@ -100,7 +100,6 @@ const PUBLIC_CONTRACT_EXPORTS: ReadonlySet<string> = new Set([
   'UsageModule: UsageImportListeners',
   'LicensingModule: LicensingOpenGrantsApi',
   'OptimizationModule: OptimizationApi',
-  'LicensingModule: LicensingServiceAccountApi',
   'LicensingModule: LicensingSeatBaselineApi',
   // G8 (US-12-15): the counts of licensing the role overviews read.
   'LicensingModule: LicensingDashboardApi',
@@ -112,7 +111,6 @@ const PUBLIC_CONTRACT_EXPORTS: ReadonlySet<string> = new Set([
   'LicensingModule: RenewalHoldHook',
   'LicensingModule: RenewalFinancialContributions',
   'LicensingModule: RenewalUsageContributions',
-  'LicensingModule: ResponsibleDeadlineHook',
   'LicensingModule: SeatBaselineClosedListeners',
   // H5.5 (identity-access Wave B): the account contracts the API and the recovery command reach the account persistence
   // through; the persistence itself is declared once, here, because every graph needs it.

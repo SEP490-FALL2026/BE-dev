@@ -419,11 +419,11 @@ describe('the layers of requests, as the command prints them and as the module c
     return rows;
   };
 
-  // 39 until 09/11/2026; then request-limits (GH-1/2/3), renewal-apply and request-history (P1-09/P1-10) made 42.
-  test('prints one line with a layer for each of the 42 capabilities, every one in exactly one layer', () => {
+  // 39 until 09/11/2026; then request-limits (GH-1/2/3), renewal-apply and request-history (P1-09/P1-10) made 42; service-account-request left (QĐ-110m): 41.
+  test('prints one line with a layer for each of the 41 capabilities, every one in exactly one layer', () => {
     assert.equal(printed.status, 0);
-    assert.equal(lines.length, 42);
-    assert.equal(new Set(lines.map(([, , name]) => name)).size, 42);
+    assert.equal(lines.length, 41);
+    assert.equal(new Set(lines.map(([, , name]) => name)).size, 41);
   });
 
   test('marks as isolated, and only as such, the capability that imports nothing and that nothing imports', () => {
@@ -443,14 +443,8 @@ describe('the layers of requests, as the command prints them and as the module c
 
   test('has no capability below L3 that imports a capability with a controller, and names the importers of each L3 that is imported', () => {
     const imported = lines.filter(([, layer, , , by]) => layer === 'L3' && Number(by) > 0);
-    // the five exceptions of the card (the list itself is in the gate capability-graph)
-    assert.deepEqual(imported.map(([, , name]) => name).sort(), [
-      'draft',
-      'group-request-submission',
-      'line-closure',
-      'service-account-request',
-      'sla',
-    ]);
+    // the four exceptions of the card (the list itself is in the gate capability-graph)
+    assert.deepEqual(imported.map(([, , name]) => name).sort(), ['draft', 'group-request-submission', 'line-closure', 'sla']);
     for (const [, , name, , , importers] of imported) assert.ok(importers, name);
     const graph = capabilityGraph(join(projectRoot, 'src')).get('requests');
     const l3 = new Set(printedLayers.L3);
