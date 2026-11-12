@@ -75,11 +75,10 @@ anh em) → `role-duties`, `transfer`, `transfer-review` → `notice` → `leave
 - `offboarding/` — nghỉ việc: ghi, đổi ngày làm cuối, hủy, đã nghỉ, khóa tài khoản, mở thu hồi, đóng (US-03-04);
   `offboarding.controller.ts`, `offboarding-steps.controller.ts`; `OffboardingService` điều phối ba bước ghi nghỉ việc:
   `OffboardingPreconditions` (đọc, khóa, kiểm lại sau khóa), `OffboardingEndings` (hủy điều chuyển đang chờ, kết thúc nghỉ dài
-  hạn, kỳ trưởng phòng và placement), `OffboardingCaseWriter` (ca, thay đổi đầu tiên, audit, hook, bàn giao, thông báo);
+  hạn, kỳ trưởng phòng và placement), `OffboardingCaseWriter` (ca, thay đổi đầu tiên, audit, hook, chặn đăng nhập, thông báo);
   `OffboardingRevocationService`.
   Luồng rút gọn cho người chưa xếp phòng (`US-03-04` AC-30, `QĐ-93g`(5), `D-S14`, `D-S17`, `D-S18`, `D-S28`):
-  `offboarding_cases.department_id` có thể null; không placement để kết thúc, không bàn giao trưởng phòng, không nghĩa vụ xác
-  nhận bàn giao của `licensing`; một lần xếp phòng lần đầu chưa hiệu lực mà ngày làm việc cuối đứng trước `validFrom` bị hủy cùng
+  `offboarding_cases.department_id` có thể null; không placement để kết thúc, không bàn giao trưởng phòng; một lần xếp phòng lần đầu chưa hiệu lực mà ngày làm việc cuối đứng trước `validFrom` bị hủy cùng
   hồ sơ (cột `cancelled_placement_*`, khôi phục khi hủy hồ sơ nếu phòng còn hoạt động); ngày cuối từ `validFrom` ⟹ 409
   `PLACEMENT_OVERLAP` `FIRST_PLACEMENT_PENDING`. Hồ sơ không phòng hiện cho Super Admin và mọi IT Admin dùng được.
   Con `open-requests/` (`open-requests.controller.ts`), `detail/` (`OffboardingDetailService` dựng chi tiết một ca cho

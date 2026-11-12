@@ -46,16 +46,6 @@ import { ExpiryRenewalWindowSweeper } from './expiry/expiry-renewal-window.job';
 import { ExpiryRenewalWindowRepo } from './expiry/expiry-renewal-window.repo';
 import { ExpiryRenewalWindowService } from './expiry/expiry-renewal-window.service';
 import { ProvisioningExtensionService } from './provisioning/tasks/provisioning-extension.service';
-import { HandoverAlertService } from './handover/handover-alert.service';
-import { HandoverCaseFacts } from './handover/handover-case-facts.service';
-import { HandoverConfirmationService } from './handover/handover-confirmation.service';
-import { HandoverConfirmerResolver } from './handover/handover-confirmer.service';
-import { HandoverDutiesController } from './handover/handover-duties.controller';
-import { HandoverIssueService } from './handover/handover-issue.service';
-import { HandoverListRepo } from './handover/handover-list.repo';
-import { HandoverViewService } from './handover/handover-view.service';
-import { HandoverRepo } from './handover/handover.repo';
-import { HandoverService } from './handover/handover.service';
 import { LicensingAlerts } from './licensing-alerts.service';
 import { LicenseKeyCipher, parsePreviousVaultKeys } from './license-key/license-key-cipher.service';
 import { LicenseKeyRepo } from './license-key/license-key.repo';
@@ -77,7 +67,6 @@ import {
 } from './public/licensing.extension-points';
 import { LicensingApi } from './public/licensing.api';
 import { LicensingDashboardApi } from './public/licensing-dashboard.api';
-import { LicensingHandoverApi } from './public/licensing-handover.api';
 import { LicensingGhostSeatApi } from './public/licensing-ghost-seat.api';
 import { LicensingUsageApi } from './public/licensing-usage.api';
 import { LicensingOpenGrantsApi } from './public/licensing-open-grants.api';
@@ -173,7 +162,6 @@ import { SubscriptionRenewalsController } from './subscription-renewal/subscript
     ProvisioningTasksController,
     RevocationTasksController,
     LicenseKeysController,
-    HandoverDutiesController,
     ExpiryController,
     SaasIssuesController,
     MySoftwareController,
@@ -235,15 +223,6 @@ import { SubscriptionRenewalsController } from './subscription-renewal/subscript
     RevocationViewService,
     OpenGrantTaskRepo,
     OpenGrantTaskService,
-    HandoverRepo,
-    HandoverListRepo,
-    HandoverConfirmerResolver,
-    HandoverCaseFacts,
-    HandoverAlertService,
-    HandoverIssueService,
-    HandoverService,
-    HandoverConfirmationService,
-    HandoverViewService,
     ExpiryReminderRepo,
     ExpiryReminderService,
     ExpiryReminderSweeper,
@@ -305,7 +284,6 @@ import { SubscriptionRenewalsController } from './subscription-renewal/subscript
     GrantRequestGateHook,
     LicensingApi,
     LicensingDashboardApi,
-    LicensingHandoverApi,
     LicensingGhostSeatApi,
     LicensingUsageApi,
     UsageFactsRepo,
@@ -322,7 +300,6 @@ import { SubscriptionRenewalsController } from './subscription-renewal/subscript
   exports: [
     LicensingApi,
     LicensingDashboardApi,
-    LicensingHandoverApi,
     LicensingGhostSeatApi,
     LicensingUsageApi,
     LicensingOpenGrantsApi,

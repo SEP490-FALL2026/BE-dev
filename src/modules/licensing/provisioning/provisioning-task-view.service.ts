@@ -69,6 +69,8 @@ export interface TaskSummaryView {
     applicationId: string;
     applicationName: string;
     provisioningType: ProvisioningKind;
+    /** What the plan says to do before the seat is taken away, on a revocation; null on a grant and when the plan has none. */
+    preRevocationNote: string | null;
   } | null;
   subscriptionId: string | null;
   accountIdentifier: string;
@@ -122,11 +124,27 @@ export type TaskView = Omit<TaskSummaryView, 'revocation'> & TaskDetailFields;
 interface ViewContext {
   employees: Map<string, { id: string; employeeCode: string; fullName: string; status: string }>;
   plans: Map<string, SeatTarget>;
+  /** The note of each plan of a revocation about what to do before the seat is taken away (`QĐ-110g`: read only, nobody confirms it). */
+  notes: Map<string, string | null>;
   /** The reasons of the revocations among the tasks: all of them for a detail, only how many for a row of the list. */
   reasons: Map<string, ReasonRecord[]>;
   reasonCounts: Map<string, number>;
   today: BusinessDate;
   now: number;
+}
+
+/** The plan on a card: its names and kind of provisioning, and, on a revocation, what the plan says to do before the seat goes. */
+function planCardOf(plan: SeatTarget | undefined, note: string | null | undefined): TaskSummaryView['plan'] {
+  return plan
+    ? {
+        planId: plan.planId,
+        planName: plan.planName,
+        applicationId: plan.applicationId,
+        applicationName: plan.applicationName,
+        provisioningType: plan.provisioningType,
+        preRevocationNote: note ?? null,
+      }
+    : null;
 }
 
 /**
@@ -222,7 +240,15 @@ export class ProvisioningTaskViewService {
     );
     const planIds = [...new Set(records.map((task) => task.assignment.planId))];
     const plans = new Map((await this.catalog.findPlanSeatTargets(planIds)).map((plan) => [plan.planId, plan]));
-    const revocationIds = records.filter((task) => task.kind === 'REVOKE').map((task) => task.id);
+    const revocations = records.filter((task) => task.kind === 'REVOKE');
+    const revocationIds = revocations.map((task) => task.id);
+    const noted = [...new Set(revocations.map((task) => task.assignment.planId))];
+    const notes = new Map(
+      (noted.length > 0 ? await this.catalog.getPlanRevocationInfo(noted) : []).map((info) => [
+        info.planId,
+        info.revocationNote,
+      ]),
+    );
     const reasons = new Map<string, ReasonRecord[]>();
     if (withReasons) {
       for (const reason of await this.reasons.listAllOf(revocationIds)) {
@@ -236,12 +262,12 @@ export class ProvisioningTaskViewService {
       : await this.reasons.countOf(revocationIds);
     const today = revocationIds.length > 0 ? await this.organizationReads.businessToday() : '';
 
-    return { employees, plans, reasons, reasonCounts, today, now: Date.now() };
+    return { employees, plans, notes, reasons, reasonCounts, today, now: Date.now() };
   }
 
   private summaryOf(
     task: ProvisioningTaskRecord,
-    { employees, plans, reasonCounts, today, now }: ViewContext,
+    { employees, plans, notes, reasonCounts, today, now }: ViewContext,
   ): TaskSummaryView {
     const beneficiary = employees.get(task.assignment.employeeId);
     const plan = plans.get(task.assignment.planId);
@@ -260,15 +286,7 @@ export class ProvisioningTaskViewService {
       beneficiary: beneficiary
         ? { employeeId: beneficiary.id, employeeCode: beneficiary.employeeCode, fullName: beneficiary.fullName }
         : null,
-      plan: plan
-        ? {
-            planId: plan.planId,
-            planName: plan.planName,
-            applicationId: plan.applicationId,
-            applicationName: plan.applicationName,
-            provisioningType: plan.provisioningType,
-          }
-        : null,
+      plan: planCardOf(plan, task.kind === 'REVOKE' ? notes.get(task.assignment.planId) : undefined),
       subscriptionId: task.assignment.subscriptionId,
       accountIdentifier: task.assignment.accountIdentifier,
       defaultResponsibleEmployeeId: task.defaultResponsibleEmployeeId,

@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { TransactionRunner, type DbTx } from '../../../infrastructure/database/transaction-runner';
 import { AuditApi } from '../../audit/public/audit.api';
-import type { OperatorAuditActor } from '../../licensing/public/licensing-handover.types';
+import type { OperatorAuditActor } from '../../licensing/public/licensing.types';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { ControlledWaitAlertService } from './controlled-wait-alert.service';
 import {

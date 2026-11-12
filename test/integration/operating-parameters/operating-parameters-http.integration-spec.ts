@@ -114,7 +114,10 @@ describe('the operating parameters and the non-working dates over HTTP (integrat
       expect(parameters.get('PERSONNEL_NOTICE_REVIEW_WORKING_DAYS')?.value).toBe(2);
       expect(parameters.get('SAAS_ISSUE_RESPONSE_WORKING_DAYS')?.value).toBe(1);
       expect(parameters.get('SAAS_ISSUE_REOPEN_WORKING_DAYS')?.value).toBe(5);
-      expect(parameters.get('ABRUPT_DEPARTURE_HOLD_WORKING_DAYS')?.value).toBe(1);
+      expect(parameters.get('DEPARTURE_REVOCATION_WORKING_DAYS')?.value).toBe(1);
+      // The two parameters of the handover are gone with the handover (QĐ-110g).
+      expect(parameters.has('ABRUPT_DEPARTURE_HOLD_WORKING_DAYS')).toBe(false);
+      expect(parameters.has('HANDOVER_SHORT_DEADLINE_WORKING_DAYS')).toBe(false);
       expect(parameters.get('DETECTION_THRESHOLD_DAYS')?.value).toEqual([30, 60, 90]);
       expect(parameters.get('RENEWAL_ALERT_DAYS_BEFORE_DEADLINE')?.value).toEqual([15, 7]);
       expect(parameters.get('RULE_SCHEDULE_G1_G2')?.value).toBe('DAILY');
@@ -142,8 +145,6 @@ describe('the operating parameters and the non-working dates over HTTP (integrat
         'BUDGET_ZBB_PRICE_INCREASE_PERCENT',
         'TRANSFER_REVIEW_WORKING_DAYS',
         'PERSONNEL_NOTICE_REVIEW_WORKING_DAYS',
-        'ABRUPT_DEPARTURE_HOLD_WORKING_DAYS',
-        'HANDOVER_SHORT_DEADLINE_WORKING_DAYS',
         'DEPARTURE_REVOCATION_WORKING_DAYS',
         'TRANSFER_GRACE_WORKING_DAYS',
         'TRANSFER_GRACE_REMINDER_WORKING_DAYS',
@@ -250,11 +251,11 @@ describe('the operating parameters and the non-working dates over HTTP (integrat
     });
 
     it('keeps the history, newest first, and closes the value it replaces', async () => {
-      await setParameter('ABRUPT_DEPARTURE_HOLD_WORKING_DAYS', 2).expect(200);
-      await setParameter('ABRUPT_DEPARTURE_HOLD_WORKING_DAYS', 4).expect(200);
+      await setParameter('TRANSFER_GRACE_WORKING_DAYS', 2).expect(200);
+      await setParameter('TRANSFER_GRACE_WORKING_DAYS', 4).expect(200);
 
       const history = await request(server())
-        .get('/api/v1/operating-parameters/ABRUPT_DEPARTURE_HOLD_WORKING_DAYS/history')
+        .get('/api/v1/operating-parameters/TRANSFER_GRACE_WORKING_DAYS/history')
         .set(asAdmin())
         .expect(200);
 
@@ -267,7 +268,7 @@ describe('the operating parameters and the non-working dates over HTTP (integrat
         [4, true],
         [2, false],
       ]);
-      expect((await rows('ABRUPT_DEPARTURE_HOLD_WORKING_DAYS')).filter((row) => row.valid_to === null)).toHaveLength(1);
+      expect((await rows('TRANSFER_GRACE_WORKING_DAYS')).filter((row) => row.valid_to === null)).toHaveLength(1);
     });
 
     it('answers the same value with the parameter and records nothing', async () => {
@@ -306,9 +307,8 @@ describe('the operating parameters and the non-working dates over HTTP (integrat
       expect((await list()).get(key)).toEqual(before);
     });
 
-    it('sets the retry count, the reminder and the withdrawal, and the short deadline, and refuses a withdrawal before the reminder (AC-13)', async () => {
+    it('sets the retry count, the reminder and the withdrawal, and refuses a withdrawal before the reminder (AC-13)', async () => {
       await setParameter('PROVISIONING_RETRY_COUNT', 5).expect(200);
-      await setParameter('HANDOVER_SHORT_DEADLINE_WORKING_DAYS', 2).expect(200);
       await setParameter('INVITATION_REMINDER_DAYS', 4).expect(200);
       await setParameter('INVITATION_WITHDRAW_DAYS', 20).expect(200);
 
@@ -319,7 +319,6 @@ describe('the operating parameters and the non-working dates over HTTP (integrat
       expect(errorOf(refusedReminder).details).toMatchObject({ problem: 'INCONSISTENT' });
       const parameters = await list();
       expect(parameters.get('PROVISIONING_RETRY_COUNT')?.value).toBe(5);
-      expect(parameters.get('HANDOVER_SHORT_DEADLINE_WORKING_DAYS')?.value).toBe(2);
       expect(parameters.get('INVITATION_REMINDER_DAYS')?.value).toBe(4);
       expect(parameters.get('INVITATION_WITHDRAW_DAYS')?.value).toBe(20);
       expect((await auditFor('PROVISIONING_RETRY_COUNT'))[0]).toMatchObject({
@@ -424,8 +423,9 @@ describe('the operating parameters and the non-working dates over HTTP (integrat
 
       expect(parameters.has('BUDGET_PERIOD_KIND')).toBe(false);
       // 27 before GH-1/2/3 and the renewal window (REQUEST_OPEN_NEW_LIMIT, PAID_SOFTWARE_FLAG_THRESHOLD, RENEWAL_WINDOW_DAYS), then the
-      // three of MF-2 and MF-3 (DEPARTURE_REVOCATION_WORKING_DAYS, TRANSFER_GRACE_WORKING_DAYS, TRANSFER_GRACE_REMINDER_WORKING_DAYS).
-      expect(parameters.size).toBe(33);
+      // three of MF-2 and MF-3 (DEPARTURE_REVOCATION_WORKING_DAYS, TRANSFER_GRACE_WORKING_DAYS, TRANSFER_GRACE_REMINDER_WORKING_DAYS), less the
+      // two of the handover that went (ABRUPT_DEPARTURE_HOLD_WORKING_DAYS, HANDOVER_SHORT_DEADLINE_WORKING_DAYS, QĐ-110g).
+      expect(parameters.size).toBe(31);
     });
 
     it('is 404 for a parameter that does not exist, the time zone included (AC-11)', async () => {

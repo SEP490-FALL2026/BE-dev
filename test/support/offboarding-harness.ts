@@ -1,7 +1,7 @@
 import request from 'supertest';
 import { subtractWorkingDays } from '../../src/core/working-days';
 import type { ApiAccount } from './api-accounts';
-import { HandoverHarness } from './handover-harness';
+import { SeatRevocationHarness } from './seat-revocation-harness';
 import type { Department, Person } from './request-harness';
 
 export interface CaseWire {
@@ -82,10 +82,10 @@ export interface CaseRow {
 }
 
 /**
- * The handover harness with what the tests of the record of a departure need: the calls of its eleven routes, the people it leaves
+ * The seat and revocation harness with what the tests of the record of a departure need: the calls of its eleven routes, the people it leaves
  * and what it writes in the database. No assertion lives here.
  */
-export class OffboardingHarness extends HandoverHarness {
+export class OffboardingHarness extends SeatRevocationHarness {
   /** The working day before `day`, with no day off in the calendar of a test installation. */
   dueBefore = (day: string): string => subtractWorkingDays(day, 1, new Set());
 

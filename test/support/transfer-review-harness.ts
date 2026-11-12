@@ -1,7 +1,7 @@
 import request from 'supertest';
 import { TransferReviewOverdueService } from '../../src/modules/personnel/transfer-review/transfer-review-overdue.service';
 import type { ApiAccount } from './api-accounts';
-import { HandoverHarness } from './handover-harness';
+import { SeatRevocationHarness } from './seat-revocation-harness';
 import type { Department, Person } from './request-harness';
 
 export interface ReviewWire {
@@ -69,10 +69,10 @@ export interface ReviewItemRow {
 }
 
 /**
- * The handover harness with what the tests of the review after a transfer need: the people and the toolset, the calls of its four
+ * The seat and revocation harness with what the tests of the review after a transfer need: the people and the toolset, the calls of its four
  * routes and what the reviews look like in the database. No assertion lives here.
  */
-export class TransferReviewHarness extends HandoverHarness {
+export class TransferReviewHarness extends SeatRevocationHarness {
   reviews = (query = '', account: ApiAccount = this.it1) =>
     request(this.server()).get(`/api/v1/transfer-reviews${query}`).set(this.as(account));
   review = (id: string, account: ApiAccount = this.it1) =>

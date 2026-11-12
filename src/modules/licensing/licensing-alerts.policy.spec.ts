@@ -1,6 +1,5 @@
 import {
   expiryReminderAlert,
-  handoverAlert,
   leaverAccessAlert,
   leaverKeepsAccess,
   recipientsOf,
@@ -16,14 +15,6 @@ const P = '00000000-0000-4000-8000-00000000000b';
 const D = '00000000-0000-4000-8000-00000000000d';
 const T = '00000000-0000-4000-8000-00000000000c';
 const F = '00000000-0000-4000-8000-00000000000f';
-
-const duty = (dueOn = '2026-09-29') => ({
-  id: D,
-  assignmentId: A,
-  employeeId: E,
-  confirmerRole: 'DEPARTMENT_HEAD',
-  dueOn,
-});
 
 describe('who an alert of a right goes to (US-12-15)', () => {
   it('tells each person once and nobody in the place of a role nobody holds', () => {
@@ -67,22 +58,6 @@ describe('what each alert says and its key (FR-5.14 lines 3, 12, 13, 38)', () =>
     expect(
       expiryReminderAlert({ ...holder.params, expectedEndDate: '2026-12-31', audience: 'EMPLOYEE' } as never).eventKey,
     ).not.toBe(holder.eventKey);
-  });
-
-  it('tells a handover that waits once for the duty, and its overdue once for each deadline (line 12)', () => {
-    const due = handoverAlert('DUE', duty());
-    const overdue = handoverAlert('OVERDUE', duty());
-
-    expect(due).toMatchObject({
-      code: 'HANDOVER_CONFIRMATION_DUE',
-      subject: { type: 'HandoverDuty', id: D },
-      params: { dutyId: D, assignmentId: A, employeeId: E, role: 'DEPARTMENT_HEAD', dueOn: '2026-09-29' },
-      eventKey: `HANDOVER_CONFIRMATION_DUE:${D}`,
-    });
-    expect(handoverAlert('DUE', duty('2026-10-05')).eventKey).toBe(due.eventKey);
-    expect(overdue.code).toBe('HANDOVER_CONFIRMATION_OVERDUE');
-    expect(overdue.eventKey).toBe(`HANDOVER_CONFIRMATION_OVERDUE:${D}:2026-09-29`);
-    expect(handoverAlert('OVERDUE', duty('2026-10-05')).eventKey).not.toBe(overdue.eventKey);
   });
 
   it('reminds of a service account before the day once for the file and day, and alerts after it once for the account and day (line 13)', () => {
@@ -141,8 +116,6 @@ describe('what each alert says and its key (FR-5.14 lines 3, 12, 13, 38)', () =>
         expectedEndDate: '2026-09-30',
         audience: 'IT_ADMIN',
       }),
-      handoverAlert('DUE', duty()),
-      handoverAlert('OVERDUE', duty()),
       serviceAccountDueAlert(file, 1),
       serviceAccountOverdueAlert({ assignmentId: A, owningDepartmentId: null, ...file }),
       leaverAccessAlert({ taskId: T, assignmentId: A, employeeId: E, planId: P, accessUntil: '2026-11-30' }),

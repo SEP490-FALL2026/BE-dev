@@ -1,8 +1,6 @@
 import {
   checkReturnable,
   checkSender,
-  handoverConfirmRefusal,
-  handoverOnTime,
   mayReadReturn,
   originMatches,
   returnSubmittedDetail,
@@ -132,43 +130,7 @@ describe('who reads a return (US-05-13 AC-3)', () => {
   });
 });
 
-describe('who confirms the handover of a return, and what the return says when it is sent (US-05-13 AC-6, QĐ-62f)', () => {
-  const found = {
-    requestedByEmployeeId: 'sender',
-    state: 'AWAITING_REVOCATION' as const,
-    handoverRequired: true,
-    handoverConfirmedAt: null as Date | null,
-  };
-
-  it('lets the person who sent the return confirm a handover that is required and not yet confirmed', () => {
-    expect(handoverConfirmRefusal('sender', found)).toBeNull();
-  });
-
-  it.each([
-    ['somebody else', 'other', found, 'NOT_REQUESTER'],
-    [
-      'a return the revocation of which is not waited for any more',
-      'sender',
-      { ...found, state: 'COMPLETED' as const },
-      'NOT_AWAITING',
-    ],
-    ['a plan that loses no data', 'sender', { ...found, handoverRequired: false }, 'HANDOVER_NOT_REQUIRED'],
-    [
-      'a handover that was confirmed',
-      'sender',
-      { ...found, handoverConfirmedAt: new Date() },
-      'HANDOVER_ALREADY_CONFIRMED',
-    ],
-  ])('refuses %s, in the order a caller should learn it', (_label, actor, facts, code) => {
-    expect(handoverConfirmRefusal(actor, facts)).toBe(code);
-  });
-
-  it('is on time when there is no deadline, or today is not after it', () => {
-    expect(handoverOnTime(null, '2026-11-10')).toBe(true);
-    expect(handoverOnTime('2026-11-10', '2026-11-10')).toBe(true);
-    expect(handoverOnTime('2026-11-10', '2026-11-11')).toBe(false);
-  });
-
+describe('what the return says when it is sent (US-05-13, QĐ-110g)', () => {
   it('says in the audit entry who sent it, which seat and which task, and never the reason; it asks nothing of a handover (QĐ-110g)', () => {
     expect(
       returnSubmittedDetail({

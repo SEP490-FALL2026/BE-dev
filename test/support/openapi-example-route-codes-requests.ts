@@ -203,15 +203,6 @@ export const ROUTE_ERROR_CODES_REQUESTS: Readonly<
   returnRequestGet: {
     '404': ['RETURN_REQUEST.NOT_FOUND'],
   },
-  returnRequestHandoverConfirm: {
-    '403': ['RETURN_REQUEST.NOT_REQUESTER'],
-    '404': ['RETURN_REQUEST.NOT_FOUND'],
-    '409': [
-      'RETURN_REQUEST.HANDOVER_ALREADY_CONFIRMED',
-      'RETURN_REQUEST.HANDOVER_NOT_REQUIRED',
-      'RETURN_REQUEST.NOT_AWAITING',
-    ],
-  },
   returnRequestSubmit: {
     '403': [
       'ACCESS_REQUEST.SUPER_ADMIN_CANNOT_REQUEST',

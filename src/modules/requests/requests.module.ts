@@ -157,7 +157,6 @@ import { RenewalRequestService } from './renewal-request/renewal-request.service
 import { RenewalRequestsController } from './renewal-request/renewal-requests.controller';
 import { ReturnRequestQueryService } from './return-request/return-request-query.service';
 import { ReturnRequestRepo } from './return-request/return-request.repo';
-import { ReturnHandoverService } from './return-request/return-handover.service';
 import { ReturnSeatGate } from './return-request/return-seat-gate.service';
 import { ReturnRequestService } from './return-request/return-request.service';
 import { ReturnRequestsController } from './return-request/return-requests.controller';
@@ -333,7 +332,6 @@ import { MyRequestsService } from './my-requests/my-requests.service';
     ServiceAccountBoundaryService,
     ReturnRequestRepo,
     ReturnSeatGate,
-    ReturnHandoverService,
     ReturnRequestService,
     ReturnRequestQueryService,
     ReturnRevocationHook,

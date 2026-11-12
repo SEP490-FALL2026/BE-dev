@@ -37,6 +37,41 @@
 - **ĐÃ CHỌN: giữ bốn cờ**, đổi thành một câu khi ghi sự kiện (`groundsNoteOfBasis`). Lý do: `--from-notice` cần bốn phần cho chính thông báo (thông báo giữ form cũ, `QĐ-110`); đổi một cờ buộc bỏ `--from-notice` hoặc đổi form thông báo (trái QĐ). Chạm: không có file (hiện trạng).
 - **Đổi nếu Owner muốn một cờ:** thêm `--basis <text>` cho mọi mode trừ `--from-notice`, cập nhật `record-super-admin-event.arguments.ts` + spec.
 
+### D-6 · X-H.1/X-H.3 · `RevocationContext.dueOn` / `noticeText` không còn ai đọc: bỏ hay giữ?
+- **A:** bỏ hai trường (và cả `context` nếu chỉ còn `departmentId`) khỏi `OpenRevocationInput` và 3 nơi gọi (`offboarding-revocation`, `transfer-review-*`). Ưu: không còn mã chết. Nhược: đổi chữ ký facade, đụng code `transfer-review` sắp bị xóa ở MF3-A.1 và test pin `context` (`provisioning-revocation-read-contracts`).
+- **B:** giữ nguyên hình. Ưu: không đổi facade, R2 C23 xếp việc này vào pha B.
+- **ĐÃ CHỌN: B.** Lý do: dễ đổi lại, ít chạm, `transfer-review` còn tới MF3-A.1. Căn cứ: R2 C23 (pha B), SPEC §5 X-H ("bảng/cột giữ"). Chạm: không có file (chỉ HANDOFF X-H.1).
+- **Đổi sang A:** sửa `licensing.types.ts` (`RevocationContext`), `revocation-recorder.service.ts`, 3 nơi gọi và test hook.
+
+### D-7 · X-H.2 · `offboarding_cases.handover_due_on`: còn ghi cho hồ sơ có ngày cuối không?
+- **A:** ngừng ghi (NULL). Nhược: CHECK `offboarding_cases_due_for_planned_only_check` + guard còn đòi cột này cho hồ sơ `WITH_LAST_DAY`; phải viết migration thay CHECK/guard (R4 trong R2).
+- **B:** vẫn ghi `plannedDueOn` (ngày cuối trừ 1 ngày làm việc), bỏ khỏi API ở pha B.
+- **ĐÃ CHỌN: B.** Lý do: không migration cấu trúc, không rủi ro trigger; R2 Q4 khuyến nghị "giữ cột chết". Căn cứ: R2 §4.2 A2/C21, SPEC §6 ("không drop ở đợt này"). Chạm: `personnel/offboarding/offboarding-handover.service.ts` (`plannedDueOn`), commit 8e6bc748. API `handoverDueOn` giữ.
+- **Đổi sang A:** migration thay CHECK + guard `offboarding_cases`, bỏ `plannedDueOn`, bỏ khóa `handoverDueOn` ở DTO list/detail.
+
+### D-8 · X-H.3 · Các khóa của bàn giao ở API đọc (`rights[].handover`, `assignment-expiry-queue[].handover`, `checklist.dataHandover`, `return-requests[].handover*`): bỏ khóa hay giữ giá trị cố định?
+- **A:** bỏ khóa ngay. Ưu: gọn. Nhược: FE đang đóng hồ sơ cần checklist "đúng 4 bước" đều `DONE` (R2 K5-iv) và đọc `handover` ⟹ hỏng nếu bỏ trước FE.
+- **B:** giữ khóa với giá trị cố định: `handover: null`, `dataHandover: { state: 'DONE', pendingDuties: 0 }`, phiếu trả mới `handover.required=false`; phiếu cũ vẫn hiện dữ liệu cột. Bỏ khóa ở pha B sau khi FE phát hành.
+- **ĐÃ CHỌN: B.** Lý do: SPEC P3 ("khóa `handover` trả `null`, giữ hình"), R2 pha A/B và `QĐ-110g` không đòi bỏ khóa. Chạm: `offboarding.mapper.ts`, `expiry-queue.service.ts`, `offboarding.policy.ts`, DTO (chỉ đổi mô tả). Tài liệu API FE ghi "luôn null/DONE".
+- **Đổi sang A:** xóa khóa ở 3 DTO + `toRight` + queue + policy; ghi changelog FE.
+
+### D-9 · X-H.3 · Hai tham số `ABRUPT_DEPARTURE_HOLD_WORKING_DAYS`, `HANDOVER_SHORT_DEADLINE_WORKING_DAYS`: bỏ định nghĩa không, và dòng `parameter_values` cũ thì sao?
+- **ĐÃ CHỌN: bỏ cả hai khỏi `PARAMETER_DEFINITIONS`** (grep: không còn mã đọc, chỉ còn `HandoverCaseFacts` đã xóa); số tham số 33 → 31 ở test đếm; **không xóa** dòng `parameter_values` cũ: `list()` đi theo danh sách định nghĩa và `effectiveValues` bỏ qua khóa lạ nên dòng mồ côi vô hại, còn xóa dữ liệu là không hoàn tác. Căn cứ: PROMPT X-H, R2 C18. Chạm: `parameter-definitions.policy.ts` (+spec), `operating-parameters-http.integration-spec.ts`.
+- **Đổi nếu Owner muốn dọn dòng cũ:** thêm migration `DELETE FROM parameter_values WHERE key IN (…)` ở pha B.
+
+### D-10 · X-H.3 · Thẻ tác vụ thu hồi: thêm `plan.preRevocationNote` thôi, hay thêm cả `dataLossOnRemoval` như R2 A4?
+- **ĐÃ CHỌN: chỉ `plan.preRevocationNote`** (chỉ đọc; `null` ở tác vụ cấp và gói không có lưu ý). Lý do: SPEC P14 (thắng báo cáo R2). `dataLossOnRemoval` đã có ở `/rights`, hàng đợi hết hạn; thêm cờ lên thẻ là một khóa thêm FE chưa yêu cầu. Chạm: `provisioning.dto.ts`, `provisioning-task-view.service.ts`. Một lần đọc `getPlanRevocationInfo` cho cả trang (số câu lệnh không đổi theo số tác vụ).
+- **Thêm sau nếu FE cần:** thêm `dataLossOnRemoval: boolean` vào cùng object `plan`.
+
+### D-11 · X-H.3 · `OperatorAuditActor` dời đi đâu ("types dùng chung")?
+- **ĐÃ CHỌN: `licensing/public/licensing.types.ts`** (cạnh `SystemActor`), không tạo file mới. Lý do: `licensing/public/` đang 25 file, xóa 2 file `licensing-handover.*` còn 23; ba nơi dùng (`licensing-audit-event.mapper.ts`, 2 file `requests/reassignment/`) vốn đã import facade licensing. Chạm: commit X-H.3.
+
+### D-12 · X-H.1…3 · Mã thông báo `HANDOVER_CONFIRMATION_*`, hành động audit `HANDOVER_DUTY.*` và `RETURN_REQUEST.HANDOVER_CONFIRMED` còn trong bảng đọc của inbox/audit?
+- **ĐÃ CHỌN: giữ** ở `notifications.types.ts`, `inbox.policy.ts`, `status-rules-related.policy.ts` (đọc dòng cũ); chỉ bỏ nơi sinh (`handoverAlert` xóa). Lý do: dòng cũ trong DB vẫn phải hiển thị được, R2 C7 xếp bỏ mã vào pha B. Chạm: `licensing-alerts.policy.ts` (+spec).
+
+### D-13 · X-H.3 · `test/support/handover-harness.ts` còn dùng cho 5 harness khác: xóa hay đổi tên?
+- **ĐÃ CHỌN: bỏ phần duty, đổi tên thành `seat-revocation-harness.ts` (`SeatRevocationHarness`)**. Lý do: phần còn lại (`seatOf`, `describePlan`, `open`, `revoked`…) là của thu hồi ghế, không còn dính bàn giao. Test cần nói "không duty" đếm `handover_duties` qua `h.count(...)`. Cũng hạ trần `test/gates/lint-debt.gate-spec.ts` (complexity 49→48, max-lines 44→41, complexityAndLines 93→89) vì ESLint pruning bỏ 4 suppression của file đã xóa/gọn.
+
 ## Bị chặn
 
 (chưa có)

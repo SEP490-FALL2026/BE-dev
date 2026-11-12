@@ -9934,7 +9934,7 @@
         },
         "responses": {
           "201": {
-            "description": "The handover was recorded with the last working day and the basis, or, blocked now, the departure was recorded with the access of the person refused from the next request (a last working day that is today or past leaves the person at once). The placement of the person ends the day after the last working day, the head of the department they leave is handed over or left empty as chosen (a warning says from when), a long leave ends, a transfer that would take effect later is cancelled with the reason given, and the head of the department is asked to confirm the handover of every tool. No seat is taken away and no task is made. A person with no placement in force (department null) is recorded the same way with no placement to end and no head handover; a first placement not yet in force that starts after the last working day is cancelled with the record, and put back if the case is cancelled.",
+            "description": "The handover was recorded with the last working day and the basis, or, blocked now, the departure was recorded with the access of the person refused from the next request (a last working day that is today or past leaves the person at once). The placement of the person ends the day after the last working day, the head of the department they leave is handed over or left empty as chosen (a warning says from when), a long leave ends, a transfer that would take effect later is cancelled with the reason given. No seat is taken away and no task is made. A person with no placement in force (department null) is recorded the same way with no placement to end and no head handover; a first placement not yet in force that starts after the last working day is cancelled with the record, and put back if the case is cancelled.",
             "content": {
               "application/json": {
                 "schema": {
@@ -10706,7 +10706,7 @@
         ],
         "responses": {
           "200": {
-            "description": "A page of the personal seats the person holds, oldest first: the tool and plan, the way it is taken away and what to do first, whether it loses data, the confirmation of the handover of the tool and the task that takes it away. Service accounts are not among them.",
+            "description": "A page of the personal seats the person holds, oldest first: the tool and plan, the way it is taken away and what to do first, whether it loses data and the task that takes it away. Service accounts are not among them.",
             "content": {
               "application/json": {
                 "schema": {
@@ -11078,7 +11078,7 @@
         },
         "responses": {
           "200": {
-            "description": "The last working day moved: the placement of the person and the handover of the head move with it, the day the confirmation is due is counted again, and the reason and the basis are kept. Only a handover under way before its last working day can move.",
+            "description": "The last working day moved: the placement of the person and the handover of the head move with it, and the reason and the basis are kept. Only a handover under way before its last working day can move.",
             "content": {
               "application/json": {
                 "schema": {
@@ -11444,7 +11444,7 @@
         },
         "responses": {
           "200": {
-            "description": "The handover was cancelled: the person keeps the department and, if they headed it, the head, the confirmations that waited are cancelled, and they are back to what they were doing (a long leave still ahead included). A first placement the case had cancelled is put back when its department is still active, and firstPlacementRestored says whether it was. No task is made or taken away.",
+            "description": "The handover was cancelled: the person keeps the department and, if they headed it, the head, and they are back to what they were doing (a long leave still ahead included). A first placement the case had cancelled is put back when its department is still active, and firstPlacementRestored says whether it was. No task is made or taken away.",
             "content": {
               "application/json": {
                 "schema": {
@@ -33394,635 +33394,6 @@
         "tags": ["license-keys"]
       }
     },
-    "/api/v1/handover-duties": {
-      "get": {
-        "operationId": "handoverDutyList",
-        "parameters": [
-          {
-            "name": "scope",
-            "required": false,
-            "in": "query",
-            "schema": { "default": "mine", "type": "string", "enum": ["mine", "all"] }
-          },
-          {
-            "name": "status",
-            "required": false,
-            "in": "query",
-            "schema": { "type": "string", "enum": ["OPEN", "CONFIRMED", "CANCELLED"] }
-          },
-          { "name": "employeeId", "required": false, "in": "query", "schema": { "format": "uuid", "type": "string" } },
-          {
-            "name": "overdue",
-            "required": false,
-            "in": "query",
-            "schema": { "type": "string", "enum": ["true", "false"] }
-          },
-          {
-            "name": "page",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "maximum": 9007199254740991,
-              "exclusiveMinimum": true,
-              "default": 1,
-              "type": "integer",
-              "minimum": 0
-            }
-          },
-          {
-            "name": "pageSize",
-            "required": false,
-            "in": "query",
-            "schema": { "maximum": 100, "exclusiveMinimum": true, "default": 20, "type": "integer", "minimum": 0 }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "A page of handover duties, the earliest deadline first. By default (scope mine) the duties that fall to the caller: those fixed to them, those of the people in the department they head, and those of a head who leaves when the caller is the one designated to follow. With scope all an IT Admin reads every duty without confirming them. A row names the tool, the plan and the person, says who confirms, the deadline, whether it passed, whether the revocation went on without the confirmation, and why nobody is named yet while nobody is. The notice of the plan and the confirmation are in the detail.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "allOf": [
-                    { "$ref": "#/components/schemas/HandoverDutyPageResponseDto" },
-                    { "properties": { "message": { "example": "HANDOVER_DUTY.LISTED" } } }
-                  ]
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Authentication is required or the token is no longer valid.",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "AUTHENTICATION_REQUIRED": {
-                    "summary": "A Bearer access token is required.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "AUTHENTICATION_REQUIRED",
-                        "message": "A Bearer access token is required.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "INVALID_ACCESS_TOKEN": {
-                    "summary": "The access token is invalid.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "INVALID_ACCESS_TOKEN",
-                        "message": "The access token is invalid.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Only an IT Admin asks for scope all (HANDOVER_DUTY.SCOPE_FORBIDDEN).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "HANDOVER_DUTY.SCOPE_FORBIDDEN": {
-                    "summary": "Only an IT Admin reads the handover duties of everyone.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "HANDOVER_DUTY.SCOPE_FORBIDDEN",
-                        "message": "Only an IT Admin reads the handover duties of everyone.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "A filter is invalid (VALIDATION_ERROR).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "VALIDATION_ERROR": {
-                    "summary": "Request validation failed.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "VALIDATION_ERROR",
-                        "message": "Request validation failed.",
-                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "HTTP_TOO_MANY_REQUESTS": {
-                    "summary": "The request could not be processed.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "HTTP_TOO_MANY_REQUESTS",
-                        "message": "The request could not be processed.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "TOKEN_VERIFICATION_UNAVAILABLE": {
-                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
-                        "message": "Authentication is temporarily unavailable. Retry shortly.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "SERVICE_UNAVAILABLE": {
-                    "summary": "The service is temporarily unavailable. Retry shortly.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "SERVICE_UNAVAILABLE",
-                        "message": "The service is temporarily unavailable. Retry shortly.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        },
-        "security": [{ "bearer": [] }],
-        "summary": "List the handover duties of the caller",
-        "tags": ["handover-duties"]
-      }
-    },
-    "/api/v1/handover-duties/{id}": {
-      "get": {
-        "operationId": "handoverDutyGet",
-        "parameters": [
-          { "name": "id", "required": true, "in": "path", "schema": { "format": "uuid", "type": "string" } }
-        ],
-        "responses": {
-          "200": {
-            "description": "The duty with the notice of the plan as it was when the duty was opened, the person it falls to now, and the confirmation (the value, the role the person confirmed in, the moment and whether it came after the deadline) or the cancellation.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "allOf": [
-                    { "$ref": "#/components/schemas/HandoverDutyDetailResponseDto" },
-                    { "properties": { "message": { "example": "HANDOVER_DUTY.RETRIEVED" } } }
-                  ]
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Authentication is required or the token is no longer valid.",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "AUTHENTICATION_REQUIRED": {
-                    "summary": "A Bearer access token is required.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "AUTHENTICATION_REQUIRED",
-                        "message": "A Bearer access token is required.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "INVALID_ACCESS_TOKEN": {
-                    "summary": "The access token is invalid.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "INVALID_ACCESS_TOKEN",
-                        "message": "The access token is invalid.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "The duty does not exist, or has nothing to do with the caller (HANDOVER_DUTY.NOT_FOUND).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "HANDOVER_DUTY.NOT_FOUND": {
-                    "summary": "The handover duty does not exist.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "HANDOVER_DUTY.NOT_FOUND",
-                        "message": "The handover duty does not exist.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "The id is not valid (VALIDATION_ERROR).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "VALIDATION_ERROR": {
-                    "summary": "Request validation failed.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "VALIDATION_ERROR",
-                        "message": "Request validation failed.",
-                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "HTTP_TOO_MANY_REQUESTS": {
-                    "summary": "The request could not be processed.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "HTTP_TOO_MANY_REQUESTS",
-                        "message": "The request could not be processed.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "TOKEN_VERIFICATION_UNAVAILABLE": {
-                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
-                        "message": "Authentication is temporarily unavailable. Retry shortly.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "SERVICE_UNAVAILABLE": {
-                    "summary": "The service is temporarily unavailable. Retry shortly.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "SERVICE_UNAVAILABLE",
-                        "message": "The service is temporarily unavailable. Retry shortly.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        },
-        "security": [{ "bearer": [] }],
-        "summary": "Read a handover duty in full",
-        "tags": ["handover-duties"]
-      }
-    },
-    "/api/v1/handover-duties/{id}/confirmations": {
-      "post": {
-        "operationId": "handoverDutyConfirm",
-        "parameters": [
-          { "name": "id", "required": true, "in": "path", "schema": { "format": "uuid", "type": "string" } }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ConfirmHandoverBodyDto" } } }
-        },
-        "responses": {
-          "201": {
-            "description": "Records, once, who confirmed, in which role, when, and whether it came after the deadline. A person who leaves says HANDED_OVER or NOT_NEEDED; every other case says HANDLED. The confirmation is not the result of the revocation: it neither starts nor ends it, and one that comes after the revocation went on is only recorded. The content of the data is not recorded.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "allOf": [
-                    { "$ref": "#/components/schemas/HandoverDutyDetailResponseDto" },
-                    { "properties": { "message": { "example": "HANDOVER_DUTY.CONFIRMED" } } }
-                  ]
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "HTTP_BAD_REQUEST": {
-                    "summary": "The request could not be processed.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "HTTP_BAD_REQUEST",
-                        "message": "The request could not be processed.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Authentication is required or the token is no longer valid.",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "AUTHENTICATION_REQUIRED": {
-                    "summary": "A Bearer access token is required.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "AUTHENTICATION_REQUIRED",
-                        "message": "A Bearer access token is required.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "INVALID_ACCESS_TOKEN": {
-                    "summary": "The access token is invalid.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "INVALID_ACCESS_TOKEN",
-                        "message": "The access token is invalid.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "The caller is not the person the duty falls to: another head, the head before a transfer, an IT Admin for the duty of a head, a stand-in approver, Finance, a spending approver or the Super Admin (HANDOVER_DUTY.NOT_CONFIRMER). Nothing is written.",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "HANDOVER_DUTY.NOT_CONFIRMER": {
-                    "summary": "Only the person the handover falls to confirms it.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "HANDOVER_DUTY.NOT_CONFIRMER",
-                        "message": "Only the person the handover falls to confirms it.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "The duty does not exist, or has nothing to do with the caller (HANDOVER_DUTY.NOT_FOUND).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "HANDOVER_DUTY.NOT_FOUND": {
-                    "summary": "The handover duty does not exist.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "HANDOVER_DUTY.NOT_FOUND",
-                        "message": "The handover duty does not exist.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "The duty was confirmed already (HANDOVER_DUTY.ALREADY_CONFIRMED) or was cancelled with the case it belonged to (HANDOVER_DUTY.CANCELLED): nothing changes.",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "HANDOVER_DUTY.ALREADY_CONFIRMED": {
-                    "summary": "The handover was confirmed already.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "HANDOVER_DUTY.ALREADY_CONFIRMED",
-                        "message": "The handover was confirmed already.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "HANDOVER_DUTY.CANCELLED": {
-                    "summary": "The handover was cancelled.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "HANDOVER_DUTY.CANCELLED",
-                        "message": "The handover was cancelled.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "413": {
-            "description": "The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "HTTP_PAYLOAD_TOO_LARGE": {
-                    "summary": "The request could not be processed.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "HTTP_PAYLOAD_TOO_LARGE",
-                        "message": "The request could not be processed.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "415": {
-            "description": "The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "HTTP_UNSUPPORTED_MEDIA_TYPE": {
-                    "summary": "The request could not be processed.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "HTTP_UNSUPPORTED_MEDIA_TYPE",
-                        "message": "The request could not be processed.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "The request is invalid (VALIDATION_ERROR), or the value is not one this duty allows (HANDOVER_DUTY.VALUE_NOT_ALLOWED).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "VALIDATION_ERROR": {
-                    "summary": "Request validation failed.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "VALIDATION_ERROR",
-                        "message": "Request validation failed.",
-                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "HANDOVER_DUTY.VALUE_NOT_ALLOWED": {
-                    "summary": "The value is not one this handover allows.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "HANDOVER_DUTY.VALUE_NOT_ALLOWED",
-                        "message": "The value is not one this handover allows.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "HTTP_TOO_MANY_REQUESTS": {
-                    "summary": "The request could not be processed.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "HTTP_TOO_MANY_REQUESTS",
-                        "message": "The request could not be processed.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "TOKEN_VERIFICATION_UNAVAILABLE": {
-                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
-                        "message": "Authentication is temporarily unavailable. Retry shortly.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "SERVICE_UNAVAILABLE": {
-                    "summary": "The service is temporarily unavailable. Retry shortly.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "SERVICE_UNAVAILABLE",
-                        "message": "The service is temporarily unavailable. Retry shortly.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        },
-        "security": [{ "bearer": [] }],
-        "summary": "Confirm that the data of a tool was handed over",
-        "tags": ["handover-duties"]
-      }
-    },
     "/api/v1/assignment-expiry-queue": {
       "get": {
         "operationId": "assignmentExpiryQueueList",
@@ -34066,7 +33437,7 @@
         ],
         "responses": {
           "200": {
-            "description": "A page of the open personal rights whose end day has passed, the earliest end first. A right is still in force while it is here: nothing revokes or renews it by itself. A row names the person, their department, the tool and the plan, the end day, the days past it and a debt flag set after seven days. Its status is WAITING_RENEWAL_DECISION while a renewal sent in time is not decided (the right stays as it is), READY_TO_REVOKE otherwise, and REVOCATION_OPEN once a revocation is under way, with that revocation and the confirmation of the handover of its data. Filter by status, by debt or by department. A renewal that was approved ends the old record and the right leaves the queue.",
+            "description": "A page of the open personal rights whose end day has passed, the earliest end first. A right is still in force while it is here: nothing revokes or renews it by itself. A row names the person, their department, the tool and the plan, the end day, the days past it and a debt flag set after seven days. Its status is WAITING_RENEWAL_DECISION while a renewal sent in time is not decided (the right stays as it is), READY_TO_REVOKE otherwise, and REVOCATION_OPEN once a revocation is under way, with that revocation. Filter by status, by debt or by department. A renewal that was approved ends the old record and the right leaves the queue.",
             "content": {
               "application/json": {
                 "schema": {
@@ -34220,7 +33591,7 @@
         ],
         "responses": {
           "201": {
-            "description": "Opens the revocation of the right with the source of an expired right, through the same gate every other source uses: a task of the provisioning queue, or the reason added to the one the right already has. Asking again changes nothing. The right stays in force until the task is completed with its evidence; a task that fails leaves the right held and in the queue with that task. For a plan whose removal loses data the confirmation of the handover falls to the IT Admin, with a short deadline after which the work goes on and the right carries the flag of an unconfirmed handover.",
+            "description": "Opens the revocation of the right with the source of an expired right, through the same gate every other source uses: a task of the provisioning queue, or the reason added to the one the right already has. Asking again changes nothing. The right stays in force until the task is completed with its evidence; a task that fails leaves the right held and in the queue with that task.",
             "content": {
               "application/json": {
                 "schema": {
@@ -48007,7 +47378,7 @@
         },
         "responses": {
           "201": {
-            "description": "Names exactly one seat. The holder returns their own seat, whether or not their department has a head; the head of the department of the holder confirms that the seat is no longer needed. There is no approval step: the revocation of the seat is queued for the IT Admin in the same moment, and the seat is given back only when the IT Admin has taken the access away. A plan whose removal loses data asks the person who sent the return to confirm that the handover is done, by a short deadline; a plan that loses nothing only shows its note. No saving is recorded for a return. A request whose withdrawal was refused because its grant was done is named by fromRequestId.",
+            "description": "Names exactly one seat. The holder returns their own seat, whether or not their department has a head; the head of the department of the holder confirms that the seat is no longer needed. There is no approval step: the revocation of the seat is queued for the IT Admin in the same moment, and the seat is given back only when the IT Admin has taken the access away. The note of the plan about what to do before the seat is taken away is shown to the IT Admin; no confirmation of a handover is asked of anyone. No saving is recorded for a return. A request whose withdrawal was refused because its grant was done is named by fromRequestId.",
             "content": {
               "application/json": {
                 "schema": {
@@ -48371,7 +47742,7 @@
         ],
         "responses": {
           "200": {
-            "description": "The newest first. The IT Admin sees every return; anyone else sees the returns of the seats they hold, the returns they sent and, as the head of a department, those of the people of the department. Each row carries the plan, the source, the state of the revocation and what the handover asks, and none of the long texts.",
+            "description": "The newest first. The IT Admin sees every return; anyone else sees the returns of the seats they hold, the returns they sent and, as the head of a department, those of the people of the department. Each row carries the plan, the source, the state of the revocation, and none of the long texts.",
             "content": {
               "application/json": {
                 "schema": {
@@ -48504,7 +47875,7 @@
         ],
         "responses": {
           "200": {
-            "description": "The return with its reason, the note of the plan, the handover and how the revocation ended. Only the holder, the person who sent it, the head of the department of the holder and the IT Admin read it.",
+            "description": "The return with its reason, the note of the plan and how the revocation ended. Only the holder, the person who sent it, the head of the department of the holder and the IT Admin read it.",
             "content": {
               "application/json": {
                 "schema": {
@@ -48647,224 +48018,6 @@
         },
         "security": [{ "bearer": [] }],
         "summary": "Read one return of a seat",
-        "tags": ["return-requests"]
-      }
-    },
-    "/api/v1/return-requests/{id}/handover-confirmation": {
-      "post": {
-        "operationId": "returnRequestHandoverConfirm",
-        "parameters": [
-          { "name": "id", "required": true, "in": "path", "schema": { "format": "uuid", "type": "string" } }
-        ],
-        "responses": {
-          "200": {
-            "description": "The person who sent the return, the holder returning their seat or the head confirming it, says that the handover of the data is done. The IT Admin may complete the revocation of a plan that loses data only after this, or after the deadline has passed: a revocation completed after the deadline without it is flagged as completed without the confirmation. The confirmation is written once.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "allOf": [
-                    { "$ref": "#/components/schemas/ReturnResponseDto" },
-                    { "properties": { "message": { "example": "RETURN_REQUEST.HANDOVER_CONFIRMED" } } }
-                  ]
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Authentication is required or the token is no longer valid.",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "AUTHENTICATION_REQUIRED": {
-                    "summary": "A Bearer access token is required.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "AUTHENTICATION_REQUIRED",
-                        "message": "A Bearer access token is required.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "INVALID_ACCESS_TOKEN": {
-                    "summary": "The access token is invalid.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "INVALID_ACCESS_TOKEN",
-                        "message": "The access token is invalid.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "The caller did not send the return (RETURN_REQUEST.NOT_REQUESTER).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "RETURN_REQUEST.NOT_REQUESTER": {
-                    "summary": "The return of the seat is refused: NOT_REQUESTER.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "RETURN_REQUEST.NOT_REQUESTER",
-                        "message": "The return of the seat is refused: NOT_REQUESTER.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "The return does not exist, or the caller has no part in it (RETURN_REQUEST.NOT_FOUND).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "RETURN_REQUEST.NOT_FOUND": {
-                    "summary": "The return of the seat is refused: NOT_FOUND.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "RETURN_REQUEST.NOT_FOUND",
-                        "message": "The return of the seat is refused: NOT_FOUND.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "The plan asks for no handover (RETURN_REQUEST.HANDOVER_NOT_REQUIRED), it is confirmed already (RETURN_REQUEST.HANDOVER_ALREADY_CONFIRMED) or the return has ended (RETURN_REQUEST.NOT_AWAITING). Nothing changes.",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "RETURN_REQUEST.HANDOVER_NOT_REQUIRED": {
-                    "summary": "The return of the seat is refused: HANDOVER_NOT_REQUIRED.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "RETURN_REQUEST.HANDOVER_NOT_REQUIRED",
-                        "message": "The return of the seat is refused: HANDOVER_NOT_REQUIRED.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "RETURN_REQUEST.HANDOVER_ALREADY_CONFIRMED": {
-                    "summary": "The return of the seat is refused: HANDOVER_ALREADY_CONFIRMED.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "RETURN_REQUEST.HANDOVER_ALREADY_CONFIRMED",
-                        "message": "The return of the seat is refused: HANDOVER_ALREADY_CONFIRMED.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "RETURN_REQUEST.NOT_AWAITING": {
-                    "summary": "The return of the seat is refused: NOT_AWAITING.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "RETURN_REQUEST.NOT_AWAITING",
-                        "message": "The return of the seat is refused: NOT_AWAITING.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "The id is invalid (VALIDATION_ERROR).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "VALIDATION_ERROR": {
-                    "summary": "Request validation failed.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "VALIDATION_ERROR",
-                        "message": "Request validation failed.",
-                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "HTTP_TOO_MANY_REQUESTS": {
-                    "summary": "The request could not be processed.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "HTTP_TOO_MANY_REQUESTS",
-                        "message": "The request could not be processed.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "TOKEN_VERIFICATION_UNAVAILABLE": {
-                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
-                        "message": "Authentication is temporarily unavailable. Retry shortly.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "SERVICE_UNAVAILABLE": {
-                    "summary": "The service is temporarily unavailable. Retry shortly.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "SERVICE_UNAVAILABLE",
-                        "message": "The service is temporarily unavailable. Retry shortly.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        },
-        "security": [{ "bearer": [] }],
-        "summary": "Confirm that the handover of the data is done",
         "tags": ["return-requests"]
       }
     },
@@ -94713,9 +93866,17 @@
                       "planName": { "type": "string" },
                       "applicationId": { "type": "string", "format": "uuid" },
                       "applicationName": { "type": "string" },
-                      "provisioningType": { "type": "string", "enum": ["K1", "K2", "K3", "K4", "K5"] }
+                      "provisioningType": { "type": "string", "enum": ["K1", "K2", "K3", "K4", "K5"] },
+                      "preRevocationNote": { "type": "string", "nullable": true }
                     },
-                    "required": ["planId", "planName", "applicationId", "applicationName", "provisioningType"],
+                    "required": [
+                      "planId",
+                      "planName",
+                      "applicationId",
+                      "applicationName",
+                      "provisioningType",
+                      "preRevocationNote"
+                    ],
                     "additionalProperties": false,
                     "nullable": true
                   },
@@ -95026,9 +94187,17 @@
                         "planName": { "type": "string" },
                         "applicationId": { "type": "string", "format": "uuid" },
                         "applicationName": { "type": "string" },
-                        "provisioningType": { "type": "string", "enum": ["K1", "K2", "K3", "K4", "K5"] }
+                        "provisioningType": { "type": "string", "enum": ["K1", "K2", "K3", "K4", "K5"] },
+                        "preRevocationNote": { "type": "string", "nullable": true }
                       },
-                      "required": ["planId", "planName", "applicationId", "applicationName", "provisioningType"],
+                      "required": [
+                        "planId",
+                        "planName",
+                        "applicationId",
+                        "applicationName",
+                        "provisioningType",
+                        "preRevocationNote"
+                      ],
                       "additionalProperties": false,
                       "nullable": true
                     },
@@ -95252,9 +94421,17 @@
                       "planName": { "type": "string" },
                       "applicationId": { "type": "string", "format": "uuid" },
                       "applicationName": { "type": "string" },
-                      "provisioningType": { "type": "string", "enum": ["K1", "K2", "K3", "K4", "K5"] }
+                      "provisioningType": { "type": "string", "enum": ["K1", "K2", "K3", "K4", "K5"] },
+                      "preRevocationNote": { "type": "string", "nullable": true }
                     },
-                    "required": ["planId", "planName", "applicationId", "applicationName", "provisioningType"],
+                    "required": [
+                      "planId",
+                      "planName",
+                      "applicationId",
+                      "applicationName",
+                      "provisioningType",
+                      "preRevocationNote"
+                    ],
                     "additionalProperties": false,
                     "nullable": true
                   },
@@ -95765,257 +94942,6 @@
           }
         },
         "required": ["success", "message", "data"],
-        "additionalProperties": false
-      },
-      "HandoverDutyPageResponseDto": {
-        "type": "object",
-        "properties": {
-          "success": { "type": "boolean", "enum": [true] },
-          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
-          "data": {
-            "type": "object",
-            "properties": {
-              "items": {
-                "type": "array",
-                "items": {
-                  "type": "object",
-                  "properties": {
-                    "id": { "type": "string", "format": "uuid" },
-                    "assignmentId": { "type": "string", "format": "uuid" },
-                    "application": {
-                      "type": "object",
-                      "properties": { "id": { "type": "string", "format": "uuid" }, "name": { "type": "string" } },
-                      "required": ["id", "name"],
-                      "additionalProperties": false
-                    },
-                    "plan": {
-                      "type": "object",
-                      "properties": { "id": { "type": "string", "format": "uuid" }, "name": { "type": "string" } },
-                      "required": ["id", "name"],
-                      "additionalProperties": false
-                    },
-                    "employee": {
-                      "type": "object",
-                      "properties": {
-                        "id": { "type": "string", "format": "uuid" },
-                        "employeeCode": { "type": "string" },
-                        "fullName": { "type": "string" }
-                      },
-                      "required": ["id", "employeeCode", "fullName"],
-                      "additionalProperties": false
-                    },
-                    "source": {
-                      "type": "string",
-                      "enum": [
-                        "RETURN",
-                        "MANAGER_NOT_NEEDED",
-                        "TRANSFER_REVIEW",
-                        "GHOST_SEAT",
-                        "DEPARTURE",
-                        "ABRUPT_DEPARTURE",
-                        "TIME_LIMITED_EXPIRY",
-                        "SUBSCRIPTION_REDUCTION",
-                        "SUBSCRIPTION_CANCELLATION",
-                        "SUBSCRIPTION_EXPIRED",
-                        "NOT_LEGALIZED",
-                        "RE_EXECUTION",
-                        "POST_SETUP_REVIEW",
-                        "TRANSFER"
-                      ]
-                    },
-                    "role": { "type": "string", "enum": ["DEPARTMENT_HEAD", "REQUESTER", "IT_ADMIN"] },
-                    "status": { "type": "string", "enum": ["OPEN", "CONFIRMED", "CANCELLED"] },
-                    "dataLoss": { "type": "boolean" },
-                    "dueOn": { "type": "string" },
-                    "overdue": { "type": "boolean" },
-                    "flaggedUnconfirmed": { "type": "boolean" },
-                    "waitingReason": { "type": "string", "enum": ["NO_HEAD", "NO_SUCCESSOR", null], "nullable": true },
-                    "canConfirm": { "type": "boolean" }
-                  },
-                  "required": [
-                    "id",
-                    "assignmentId",
-                    "application",
-                    "plan",
-                    "employee",
-                    "source",
-                    "role",
-                    "status",
-                    "dataLoss",
-                    "dueOn",
-                    "overdue",
-                    "flaggedUnconfirmed",
-                    "waitingReason",
-                    "canConfirm"
-                  ],
-                  "additionalProperties": false
-                }
-              },
-              "pagination": {
-                "type": "object",
-                "properties": {
-                  "page": { "type": "integer", "exclusiveMinimum": true, "maximum": 9007199254740991, "minimum": 0 },
-                  "pageSize": {
-                    "type": "integer",
-                    "exclusiveMinimum": true,
-                    "maximum": 9007199254740991,
-                    "minimum": 0
-                  },
-                  "totalItems": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
-                  "totalPages": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
-                },
-                "required": ["page", "pageSize", "totalItems", "totalPages"],
-                "additionalProperties": false
-              }
-            },
-            "required": ["items", "pagination"],
-            "additionalProperties": false,
-            "nullable": true
-          }
-        },
-        "required": ["success", "message", "data"],
-        "additionalProperties": false
-      },
-      "HandoverDutyDetailResponseDto": {
-        "type": "object",
-        "properties": {
-          "success": { "type": "boolean", "enum": [true] },
-          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
-          "data": {
-            "type": "object",
-            "properties": {
-              "id": { "type": "string", "format": "uuid" },
-              "assignmentId": { "type": "string", "format": "uuid" },
-              "application": {
-                "type": "object",
-                "properties": { "id": { "type": "string", "format": "uuid" }, "name": { "type": "string" } },
-                "required": ["id", "name"],
-                "additionalProperties": false
-              },
-              "plan": {
-                "type": "object",
-                "properties": { "id": { "type": "string", "format": "uuid" }, "name": { "type": "string" } },
-                "required": ["id", "name"],
-                "additionalProperties": false
-              },
-              "employee": {
-                "type": "object",
-                "properties": {
-                  "id": { "type": "string", "format": "uuid" },
-                  "employeeCode": { "type": "string" },
-                  "fullName": { "type": "string" }
-                },
-                "required": ["id", "employeeCode", "fullName"],
-                "additionalProperties": false
-              },
-              "source": {
-                "type": "string",
-                "enum": [
-                  "RETURN",
-                  "MANAGER_NOT_NEEDED",
-                  "TRANSFER_REVIEW",
-                  "GHOST_SEAT",
-                  "DEPARTURE",
-                  "ABRUPT_DEPARTURE",
-                  "TIME_LIMITED_EXPIRY",
-                  "SUBSCRIPTION_REDUCTION",
-                  "SUBSCRIPTION_CANCELLATION",
-                  "SUBSCRIPTION_EXPIRED",
-                  "NOT_LEGALIZED",
-                  "RE_EXECUTION",
-                  "POST_SETUP_REVIEW",
-                  "TRANSFER"
-                ]
-              },
-              "role": { "type": "string", "enum": ["DEPARTMENT_HEAD", "REQUESTER", "IT_ADMIN"] },
-              "status": { "type": "string", "enum": ["OPEN", "CONFIRMED", "CANCELLED"] },
-              "dataLoss": { "type": "boolean" },
-              "dueOn": { "type": "string" },
-              "overdue": { "type": "boolean" },
-              "flaggedUnconfirmed": { "type": "boolean" },
-              "waitingReason": { "type": "string", "enum": ["NO_HEAD", "NO_SUCCESSOR", null], "nullable": true },
-              "canConfirm": { "type": "boolean" },
-              "noticeText": { "type": "string", "nullable": true },
-              "confirmer": {
-                "type": "object",
-                "properties": {
-                  "id": { "type": "string", "format": "uuid" },
-                  "employeeCode": { "type": "string" },
-                  "fullName": { "type": "string" }
-                },
-                "required": ["id", "employeeCode", "fullName"],
-                "additionalProperties": false,
-                "nullable": true
-              },
-              "confirmation": {
-                "type": "object",
-                "properties": {
-                  "value": { "type": "string", "enum": ["HANDED_OVER", "NOT_NEEDED", "HANDLED"] },
-                  "role": {
-                    "type": "string",
-                    "enum": ["DEPARTMENT_HEAD", "DESIGNATED_SUCCESSOR", "REQUESTER", "IT_ADMIN"]
-                  },
-                  "confirmedBy": {
-                    "type": "object",
-                    "properties": {
-                      "id": { "type": "string", "format": "uuid" },
-                      "employeeCode": { "type": "string" },
-                      "fullName": { "type": "string" }
-                    },
-                    "required": ["id", "employeeCode", "fullName"],
-                    "additionalProperties": false
-                  },
-                  "confirmedAt": { "type": "string", "format": "date-time" },
-                  "late": { "type": "boolean" }
-                },
-                "required": ["value", "role", "confirmedBy", "confirmedAt", "late"],
-                "additionalProperties": false,
-                "nullable": true
-              },
-              "cancellation": {
-                "type": "object",
-                "properties": {
-                  "cancelledAt": { "type": "string", "format": "date-time" },
-                  "reason": { "type": "string" }
-                },
-                "required": ["cancelledAt", "reason"],
-                "additionalProperties": false,
-                "nullable": true
-              },
-              "createdAt": { "type": "string", "format": "date-time" }
-            },
-            "required": [
-              "id",
-              "assignmentId",
-              "application",
-              "plan",
-              "employee",
-              "source",
-              "role",
-              "status",
-              "dataLoss",
-              "dueOn",
-              "overdue",
-              "flaggedUnconfirmed",
-              "waitingReason",
-              "canConfirm",
-              "noticeText",
-              "confirmer",
-              "confirmation",
-              "cancellation",
-              "createdAt"
-            ],
-            "additionalProperties": false,
-            "nullable": true
-          }
-        },
-        "required": ["success", "message", "data"],
-        "additionalProperties": false
-      },
-      "ConfirmHandoverBodyDto": {
-        "type": "object",
-        "properties": { "value": { "type": "string", "enum": ["HANDED_OVER", "NOT_NEEDED", "HANDLED"] } },
-        "required": ["value"],
         "additionalProperties": false
       },
       "ExpiryQueuePageResponseDto": {

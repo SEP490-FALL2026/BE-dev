@@ -88,11 +88,10 @@ const PUBLIC_CONTRACT_EXPORTS: ReadonlySet<string> = new Set([
   'IdentityAccessFacadeModule: IdentityAccessApi',
   // D-S21 (qd93-remove-fallback-substitute-approvers): who can never ask for or be given access through a Request, one facade for every route that makes one.
   'IdentityAccessFacadeModule: RequestPartyEligibilityApi',
-  // The licensing facades, one per topic of its type files (R4): the revocation of seats and the grant of a request, the renewal, the handover
-  // duties of a departure, the open grant tasks of a person, the service account duties, and (G4, ADR-0013) the seat baseline the import reads and writes through.
+  // The licensing facades, one per topic of its type files (R4): the revocation of seats and the grant of a request, the renewal, the
+  // open grant tasks of a person, the service account duties, and (G4, ADR-0013) the seat baseline the import reads and writes through.
   'LicensingModule: LicensingApi',
   'LicensingModule: LicensingRenewalApi',
-  'LicensingModule: LicensingHandoverApi',
   'LicensingModule: LicensingGhostSeatApi',
   // qd103-vendor-usage-import: the seats and holders the usage import matches identities against, and the one door to the usage evidence the rules of wasted seats read.
   'LicensingModule: LicensingUsageApi',

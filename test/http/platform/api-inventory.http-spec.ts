@@ -115,4 +115,21 @@ describe('API inventory (e2e): the operations, their access and the routes that 
     }
     await request(app.getHttpServer()).post('/api/v1/catalog-applications').send({}).expect(404);
   });
+
+  it('the four routes of the handover (QĐ-110g) are gone: no operation, and the path answers 404, not 410 or 401', async () => {
+    const id = '4f24d10d-63ad-49b1-a7a1-c988765990ae';
+    const gone = [
+      'GET /api/v1/handover-duties',
+      'GET /api/v1/handover-duties/{id}',
+      'POST /api/v1/handover-duties/{id}/confirmations',
+      'POST /api/v1/return-requests/{id}/handover-confirmation',
+    ];
+
+    expect(operations.map((operation) => operation.key).filter((key) => gone.includes(key))).toEqual([]);
+    const server = app.getHttpServer();
+    await request(server).get('/api/v1/handover-duties').expect(404);
+    await request(server).get(`/api/v1/handover-duties/${id}`).expect(404);
+    await request(server).post(`/api/v1/handover-duties/${id}/confirmations`).send({ value: 'HANDLED' }).expect(404);
+    await request(server).post(`/api/v1/return-requests/${id}/handover-confirmation`).send({}).expect(404);
+  });
 });

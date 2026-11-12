@@ -294,14 +294,14 @@ describe('the rights that ended and the IT Admin queue (integration, real Postgr
       const { assignmentId } = await right(2, lossy);
       const { taskId } = await started(assignmentId);
 
-      expect(await h.dutyRows(assignmentId)).toEqual([]);
+      expect(await h.count('handover_duties')).toBe(0);
       expect((await h.queueRowOf(assignmentId))?.handover).toBeNull();
       expect((await h.queueRowOf(assignmentId))?.plan.dataLossOnRemoval).toBe(true);
 
       await h.claim(taskId).expect(200);
       await h.revoked(taskId, { completion: 'ACCOUNT_REMOVED', evidence: 'Removed from the workspace' }).expect(200);
 
-      expect(await h.dutyRows(assignmentId)).toEqual([]);
+      expect(await h.count('handover_duties')).toBe(0);
       expect((await h.seatRow(assignmentId)).valid_until).toBe(h.today());
     });
   });

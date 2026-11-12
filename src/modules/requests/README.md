@@ -174,7 +174,7 @@ cùng cần; phần ghi nằm ở `assessment/assessment.repo.ts`.
   - `group-request-submission/` — kiểm tra, gửi, ứng viên; `group-requests.controller.ts`; `GroupRequestWriter` ghi request và dòng,
     `group-need-routing.policy.ts` chọn người xét nhu cầu; `line-closure/` — đóng dòng của người đã nghỉ (`GroupLineCloser`).
 - **Trả ghế, gia hạn, service account**
-  - `return-request/` (US-05-13; mọi vai trừ Super Admin, `ACCESS_REQUEST.SUPER_ADMIN_CANNOT_REQUEST`; `ReturnSeatGate` xét ghế trả, `ReturnHandoverService` mở bàn giao; `return-request.policy.ts`),
+  - `return-request/` (US-05-13; mọi vai trừ Super Admin, `ACCESS_REQUEST.SUPER_ADMIN_CANNOT_REQUEST`; `ReturnSeatGate` xét ghế trả, không đòi xác nhận bàn giao (`QĐ-110g`); `return-request.policy.ts`),
     `renewal-request/` (US-05-14; `renewal-requests.controller.ts`; `RenewalRequestWriter` ghi, `renewal-request-submission.mapper.ts`
     dựng dòng và audit) với `renewal-apply/`
     (`renewal-apply.service.ts`, `renewal-request.repo.ts`: duyệt ⟹ mở tác vụ IT `EXTEND` (`requestExtension`), IT hoàn tất ⟹

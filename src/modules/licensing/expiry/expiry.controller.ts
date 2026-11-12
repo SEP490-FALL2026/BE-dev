@@ -43,7 +43,7 @@ export class ExpiryController {
   @ApiSuccessResponse(ExpiryQueuePageResponseDto, {
     message: 'ASSIGNMENT_EXPIRY_QUEUE.LISTED',
     description:
-      'A page of the open personal rights whose end day has passed, the earliest end first. A right is still in force while it is here: nothing revokes or renews it by itself. A row names the person, their department, the tool and the plan, the end day, the days past it and a debt flag set after seven days. Its status is WAITING_RENEWAL_DECISION while a renewal sent in time is not decided (the right stays as it is), READY_TO_REVOKE otherwise, and REVOCATION_OPEN once a revocation is under way, with that revocation and the confirmation of the handover of its data. Filter by status, by debt or by department. A renewal that was approved ends the old record and the right leaves the queue.',
+      'A page of the open personal rights whose end day has passed, the earliest end first. A right is still in force while it is here: nothing revokes or renews it by itself. A row names the person, their department, the tool and the plan, the end day, the days past it and a debt flag set after seven days. Its status is WAITING_RENEWAL_DECISION while a renewal sent in time is not decided (the right stays as it is), READY_TO_REVOKE otherwise, and REVOCATION_OPEN once a revocation is under way, with that revocation. Filter by status, by debt or by department. A renewal that was approved ends the old record and the right leaves the queue.',
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,
@@ -76,7 +76,7 @@ export class ExpiryController {
     status: HttpStatus.CREATED,
     message: 'ASSIGNMENT_EXPIRY.REVOCATION_STARTED',
     description:
-      'Opens the revocation of the right with the source of an expired right, through the same gate every other source uses: a task of the provisioning queue, or the reason added to the one the right already has. Asking again changes nothing. The right stays in force until the task is completed with its evidence; a task that fails leaves the right held and in the queue with that task. For a plan whose removal loses data the confirmation of the handover falls to the IT Admin, with a short deadline after which the work goes on and the right carries the flag of an unconfirmed handover.',
+      'Opens the revocation of the right with the source of an expired right, through the same gate every other source uses: a task of the provisioning queue, or the reason added to the one the right already has. Asking again changes nothing. The right stays in force until the task is completed with its evidence; a task that fails leaves the right held and in the queue with that task.',
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,

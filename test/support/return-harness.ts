@@ -61,8 +61,6 @@ export class ReturnHarness extends ServiceAccountHarness {
     request(this.server()).get('/api/v1/return-requests').query(query).set(this.as(account));
   returnGet = (id: string, account: ApiAccount) =>
     request(this.server()).get(`/api/v1/return-requests/${id}`).set(this.as(account));
-  confirmHandover = (id: string, account: ApiAccount) =>
-    request(this.server()).post(`/api/v1/return-requests/${id}/handover-confirmation`).set(this.as(account));
   renew = (body: object, account: ApiAccount) =>
     request(this.server()).post('/api/v1/access-requests/renewals').set(this.as(account)).send(body);
   revoked = (id: string, body: object, account: ApiAccount = this.it1) =>

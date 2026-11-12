@@ -54,7 +54,7 @@ export const expiredRightSchema = z.strictObject({
   pendingRenewal: z.strictObject({ requestId: z.uuid(), state: z.string() }).nullable(),
   /** The revocation that is under way, while one is. */
   revocation: z.strictObject({ taskId: z.uuid(), status: z.string() }).nullable(),
-  /** The confirmation of the handover of the data of the tool: who it falls to, until when, whether the work went on without it. */
+  /** Always null since `QĐ-110g` (no handover is confirmed): the key stays until the clients stop reading it, then goes. */
   handover: z
     .strictObject({
       dutyId: z.uuid(),

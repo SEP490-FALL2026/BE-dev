@@ -107,7 +107,7 @@ describe('deciding about the tools of a review after a transfer (integration, re
     const { seats, review } = await h.movedWith(des, fin, [{ subscriptionId: figma }]);
     const reviewId = review?.id ?? '';
     expect(await h.liveTaskOf(seats[0])).toBeNull();
-    expect(await h.dutyRows(seats[0])).toEqual([]);
+    expect(await h.count('handover_duties')).toBe(0);
 
     const answer = h.dataOf<{ item: ReviewItemWire }>(await say(reviewId, seats[0], 'NOT_NEEDED').expect(201));
 
@@ -125,10 +125,10 @@ describe('deciding about the tools of a review after a transfer (integration, re
       },
     ]);
     // No handover is asked for a tool that loses data (QĐ-110g): the task goes to the IT Admin at once.
-    expect(await h.dutyRows(seats[0])).toEqual([]);
+    expect(await h.count('handover_duties')).toBe(0);
     await h.claim(taskId ?? '').expect(200);
     await h.revoked(taskId ?? '', { completion: 'ACCOUNT_REMOVED', evidence: 'đã xóa' }).expect(200);
-    expect(await h.dutyRows(seats[0])).toEqual([]);
+    expect(await h.count('handover_duties')).toBe(0);
     expect((await h.assignmentRow(seats[0])).valid_until).not.toBeNull();
   });
 
@@ -138,7 +138,7 @@ describe('deciding about the tools of a review after a transfer (integration, re
     await say(review?.id ?? '', seats[0], 'NOT_NEEDED').expect(201);
 
     const taskId = await h.liveTaskOf(seats[0]);
-    expect(await h.dutyRows(seats[0])).toEqual([]);
+    expect(await h.count('handover_duties')).toBe(0);
     await h.claim(taskId ?? '').expect(200);
     expect(await h.revocationSourcesOf(seats[0])).toEqual(['TRANSFER_REVIEW']);
   });

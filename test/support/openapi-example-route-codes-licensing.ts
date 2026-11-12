@@ -20,18 +20,6 @@ export const ROUTE_ERROR_CODES_LICENSING: Readonly<
       'REVOCATION.TYPE_NOT_SUPPORTED',
     ],
   },
-  handoverDutyConfirm: {
-    '403': ['HANDOVER_DUTY.NOT_CONFIRMER'],
-    '404': ['HANDOVER_DUTY.NOT_FOUND'],
-    '409': ['HANDOVER_DUTY.ALREADY_CONFIRMED', 'HANDOVER_DUTY.CANCELLED'],
-    '422': ['HANDOVER_DUTY.VALUE_NOT_ALLOWED'],
-  },
-  handoverDutyGet: {
-    '404': ['HANDOVER_DUTY.NOT_FOUND'],
-  },
-  handoverDutyList: {
-    '403': ['HANDOVER_DUTY.SCOPE_FORBIDDEN'],
-  },
   notificationMarkRead: {
     '404': ['NOTIFICATION.NOT_FOUND'],
   },

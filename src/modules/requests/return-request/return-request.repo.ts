@@ -208,13 +208,6 @@ export class ReturnRequestRepo {
     return found.length === 0 ? null : this.findById(found[0].id, tx);
   }
 
-  async confirmHandover(tx: DbTx, id: string, employeeId: string, at: Date): Promise<void> {
-    await tx.returnRequest.update({
-      where: { id },
-      data: { handoverConfirmedAt: at, handoverConfirmedByEmployeeId: employeeId },
-    });
-  }
-
   async markCompleted(tx: DbTx, id: string, at: Date): Promise<void> {
     await tx.returnRequest.update({ where: { id }, data: { state: 'COMPLETED', completedAt: at } });
   }

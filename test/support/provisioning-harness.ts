@@ -101,7 +101,7 @@ export interface TaskWire {
   requestId: string;
   assignmentId: string;
   beneficiary: { employeeId: string; employeeCode: string; fullName: string } | null;
-  plan: { planId: string; planName: string; provisioningType: string } | null;
+  plan: { planId: string; planName: string; provisioningType: string; preRevocationNote?: string | null } | null;
   subscriptionId: string | null;
   accountIdentifier: string;
   steps: { code: string; accountIdentifier?: string; adminIdentity?: string }[];

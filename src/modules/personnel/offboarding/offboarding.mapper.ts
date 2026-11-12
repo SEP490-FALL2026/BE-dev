@@ -1,6 +1,5 @@
 import type { EmployeeRecord, DepartmentBrief } from '../../organization/public/organization.types';
 import type { PersonalSeat } from '../../licensing/public/licensing.types';
-import type { HandoverDutyBrief } from '../../licensing/public/licensing-handover.types';
 import type {
   OffboardingChangeWire,
   OffboardingDetailWire,
@@ -183,16 +182,7 @@ export function toDetail(
   };
 }
 
-export function toRight(
-  seat: PersonalSeat,
-  facts: {
-    duty: HandoverDutyBrief | undefined;
-    accessRunsOnUntil: string | undefined;
-    employees: ReadonlyMap<string, EmployeeRecord>;
-  },
-): OffboardingRightWire {
-  const duty = facts.duty;
-
+export function toRight(seat: PersonalSeat, facts: { accessRunsOnUntil: string | undefined }): OffboardingRightWire {
   return {
     assignmentId: seat.assignmentId,
     application: { id: seat.applicationId, name: seat.applicationName },
@@ -210,18 +200,8 @@ export function toRight(
       source: seat.revocation.source,
     },
     accessRunsOnUntil: facts.accessRunsOnUntil ?? null,
-    handover: duty
-      ? {
-          dutyId: duty.dutyId,
-          status: duty.status,
-          role: duty.role,
-          confirmer: duty.confirmerEmployeeId ? brief(facts.employees, duty.confirmerEmployeeId) : null,
-          waitingReason: duty.waitingReason,
-          dueOn: duty.dueOn,
-          overdue: duty.overdue,
-          flaggedUnconfirmed: duty.flaggedUnconfirmed,
-        }
-      : null,
+    // No confirmation of a handover is asked (`QĐ-110g`): the key stays, always null, until the clients stop reading it.
+    handover: null,
   };
 }
 

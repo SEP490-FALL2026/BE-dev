@@ -176,7 +176,7 @@ export class OffboardingController {
   @ApiSuccessResponse(OffboardingRightPageResponseDto, {
     message: 'OFFBOARDING_CASE.RIGHTS_LISTED',
     description:
-      'A page of the personal seats the person holds, oldest first: the tool and plan, the way it is taken away and what to do first, whether it loses data, the confirmation of the handover of the tool and the task that takes it away. Service accounts are not among them.',
+      'A page of the personal seats the person holds, oldest first: the tool and plan, the way it is taken away and what to do first, whether it loses data and the task that takes it away. Service accounts are not among them.',
   })
   @ApiErrorResponses(...COMMON, NOT_FOUND, PAGE_INVALID)
   async rights(

@@ -74,32 +74,6 @@ export function renewalWindowOpenedAlert(input: {
   };
 }
 
-export type HandoverStage = 'DUE' | 'OVERDUE';
-
-/**
- * Line 12: a handover waits for its confirmation. `DUE` is told once for the duty when it opens or falls to someone new; `OVERDUE`
- * once for each deadline that passed, so a deadline that moved and passed again is told again.
- */
-export function handoverAlert(
-  stage: HandoverStage,
-  duty: { id: string; assignmentId: string; employeeId: string; confirmerRole: string; dueOn: BusinessDate },
-): LicensingAlert {
-  const code = stage === 'DUE' ? 'HANDOVER_CONFIRMATION_DUE' : 'HANDOVER_CONFIRMATION_OVERDUE';
-
-  return {
-    code,
-    subject: { type: 'HandoverDuty', id: duty.id },
-    params: {
-      dutyId: duty.id,
-      assignmentId: duty.assignmentId,
-      employeeId: duty.employeeId,
-      role: duty.confirmerRole,
-      dueOn: duty.dueOn,
-    },
-    eventKey: stage === 'DUE' ? `${code}:${duty.id}` : `${code}:${duty.id}:${duty.dueOn}`,
-  };
-}
-
 /** Line 13, the reminder: the person who answers for service accounts has a file that takes effect on a day; once for the file and day. */
 export function serviceAccountDueAlert(
   file: { employeeId: string; fileKind: string; fileId: string; dueOn: BusinessDate },

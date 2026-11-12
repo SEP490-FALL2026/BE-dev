@@ -1,7 +1,6 @@
 import type { AuthenticatedPrincipal } from '../../infrastructure/security/tokens/access-token-verifier.port';
 import type { AuditEventInput, AuditValue } from '../audit/public/audit.types';
-import type { OperatorAuditActor } from './public/licensing-handover.types';
-import { isSystemActor, type SystemActor } from './public/licensing.types';
+import { isSystemActor, type OperatorAuditActor, type SystemActor } from './public/licensing.types';
 
 /**
  * The audit event for a change made by `actor` (a user acting as themselves), correlated by their session. With `operator` (the

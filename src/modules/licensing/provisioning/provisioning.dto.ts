@@ -154,6 +154,8 @@ const taskSummarySchema = z.strictObject({
       applicationId: z.uuid(),
       applicationName: z.string(),
       provisioningType: z.enum(['K1', 'K2', 'K3', 'K4', 'K5']),
+      /** On the card of a revocation: what the plan says to do before the seat is taken away, read only; null on a grant and when the plan has none. */
+      preRevocationNote: z.string().nullable(),
     })
     .nullable(),
   subscriptionId: z.uuid().nullable(),

@@ -193,6 +193,7 @@ const rightSchema = z.strictObject({
     .nullable(),
   /** The day the access ends when the renewal is cancelled and the access runs on to the end of the paid period. */
   accessRunsOnUntil: z.string().nullable(),
+  /** Always null since `QĐ-110g` (no handover is confirmed): the key stays until the clients stop reading it, then goes. */
   handover: z
     .strictObject({
       dutyId: z.uuid(),

@@ -1,5 +1,6 @@
 import type { BusinessDate } from '../../../core/business-date';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
+import type { AuditValue } from '../../audit/public/audit.types';
 import type { SeatTarget } from '../../catalog/public/catalog.types';
 
 export type AssignmentKind = 'PERSONAL' | 'SERVICE';
@@ -305,6 +306,18 @@ export interface OpenRevocationInput {
   /** `{ holder: true }`: the person who holds the seat is told once that its revocation is coming. Nothing given: nobody is told. */
   notice?: { holder: true };
   now?: Date;
+}
+
+/**
+ * Who the Audit Trail names for an event when the caller is the controlled procedure `ops:record-super-admin-event` or the conversion
+ * command: an operator working a ticket, never an account. The `actor` a facade is given then only fills the columns that still
+ * demand an account; the events say `OPERATOR`, no account, the ticket as the reference and as the correlation. `context` is what
+ * the command adds to the `after` of every event it writes (references only).
+ */
+export interface OperatorAuditActor {
+  ticketId: string;
+  ticketRef: string;
+  context?: { readonly [key: string]: AuditValue };
 }
 
 /**

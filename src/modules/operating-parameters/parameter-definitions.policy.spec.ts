@@ -19,7 +19,6 @@ describe('operating parameter definitions (US-01-04)', () => {
     expect(defaults.PERSONNEL_NOTICE_REVIEW_WORKING_DAYS).toBe(2);
     expect(defaults.SAAS_ISSUE_RESPONSE_WORKING_DAYS).toBe(1);
     expect(defaults.SAAS_ISSUE_REOPEN_WORKING_DAYS).toBe(5);
-    expect(defaults.ABRUPT_DEPARTURE_HOLD_WORKING_DAYS).toBe(1);
     expect(defaults.DEPARTURE_REVOCATION_WORKING_DAYS).toBe(1);
     expect(defaults.TRANSFER_GRACE_WORKING_DAYS).toBe(5);
     expect(defaults.TRANSFER_GRACE_REMINDER_WORKING_DAYS).toBe(2);
@@ -125,8 +124,6 @@ const EXPECTED_KEYS = [
   'BUDGET_ZBB_PRICE_INCREASE_PERCENT',
   'TRANSFER_REVIEW_WORKING_DAYS',
   'PERSONNEL_NOTICE_REVIEW_WORKING_DAYS',
-  'ABRUPT_DEPARTURE_HOLD_WORKING_DAYS',
-  'HANDOVER_SHORT_DEADLINE_WORKING_DAYS',
   'DEPARTURE_REVOCATION_WORKING_DAYS',
   'TRANSFER_GRACE_WORKING_DAYS',
   'TRANSFER_GRACE_REMINDER_WORKING_DAYS',
@@ -238,20 +235,6 @@ describe('operating parameter labels and groups (QĐ93-PARAM-LABEL)', () => {
       [
         'PERSONNEL_NOTICE_REVIEW_WORKING_DAYS',
         'Hạn xử lý thông báo biến động nhân sự',
-        'PERSONNEL',
-        'working days',
-        'ngày làm việc',
-      ],
-      [
-        'ABRUPT_DEPARTURE_HOLD_WORKING_DAYS',
-        'Thời gian giữ công cụ khi nghỉ đột xuất',
-        'PERSONNEL',
-        'working days',
-        'ngày làm việc',
-      ],
-      [
-        'HANDOVER_SHORT_DEADLINE_WORKING_DAYS',
-        'Hạn ngắn xác nhận bàn giao dữ liệu',
         'PERSONNEL',
         'working days',
         'ngày làm việc',

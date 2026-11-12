@@ -14,14 +14,9 @@ export type ReturnRefusal =
   /** The request the return says it follows is not the one that made the seat, or the person has no part in it. */
   | 'ORIGIN_MISMATCH'
   /** The return does not exist, or the person has no part in it: the two answer alike so a return cannot be probed. */
-  | 'NOT_FOUND'
-  | 'NOT_REQUESTER'
-  | 'HANDOVER_NOT_REQUIRED'
-  | 'HANDOVER_ALREADY_CONFIRMED'
-  /** The return has ended: its revocation is completed or failed. */
-  | 'NOT_AWAITING';
+  | 'NOT_FOUND';
 
-/** The return of a seat cannot be sent or confirmed as asked: the reason says why (`US-05-13`). */
+/** The return of a seat cannot be sent as asked: the reason says why (`US-05-13`). */
 export class ReturnRequestRefusedError extends Error {
   constructor(
     readonly reason: ReturnRefusal,

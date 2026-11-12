@@ -261,6 +261,26 @@ describe('the reads and the hook of a revocation (integration, real PostgreSQL)'
       expect(items.filter((item) => item.kind === 'REVOKE').every((item) => item.requestId === null)).toBe(true);
     });
 
+    it('shows the note of the plan about what to do before the seat is taken away on the card of a revocation, in the row and the detail, and null on a grant and when the plan has none (QĐ-110g, P14)', async () => {
+      const subscriptionId = await h.subscription(2, 'K2');
+      const planId = await h.planOf(subscriptionId);
+      await h.ctx.sql.query(`UPDATE plans SET revocation_note = $2 WHERE id = $1`, [planId, 'Xuất bảng trước khi gỡ']);
+      const noted = (await h.open(await h.seat({ subscriptionId }, code()), 'RETURN')).taskId;
+      const plain = (await h.open(await h.seat({ subscriptionId: await h.subscription(2, 'K2') }, code()), 'RETURN'))
+        .taskId;
+      const grant = await h.granted(await h.person(code()), planId, { subscriptionId });
+
+      const { result } = await listAll();
+      const items = h.dataOf<{ items: RevocationTaskWire[] }>(result).items;
+
+      expect(items.find((item) => item.id === noted)?.plan).toMatchObject({
+        preRevocationNote: 'Xuất bảng trước khi gỡ',
+      });
+      expect((await h.revocationOf(noted)).plan).toMatchObject({ preRevocationNote: 'Xuất bảng trước khi gỡ' });
+      expect(items.find((item) => item.id === plain)?.plan).toMatchObject({ preRevocationNote: null });
+      expect(items.find((item) => item.id === grant.id)?.plan).toMatchObject({ preRevocationNote: null });
+    }, 120_000);
+
     it('reads no long text of any task and takes the same number of statements for 3 revocations as for 12', async () => {
       await makeTasks(2);
       const few = await listAll();
