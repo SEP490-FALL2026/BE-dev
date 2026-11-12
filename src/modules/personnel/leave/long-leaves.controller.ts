@@ -224,7 +224,7 @@ export class LongLeavesController {
   @ApiSuccessResponse(LeaveDetailResponseDto, {
     message: 'LONG_LEAVE.RETURNED',
     description:
-      'The person works again from the day, and is in the evaluation of the recommendations again. On the approved day of return no new document is needed: the Super Admin confirms and the Audit Trail keeps who and when. On any other day, earlier or later, a new authoritative basis is required.',
+      'The person works again from the day, and is in the evaluation of the recommendations again. The basis (groundsNote) is required on any day, the approved one too: the interface fills it from the leave, the Super Admin may edit it, and what is sent is kept on the change RETURNED beside who and when.',
   })
   @ApiErrorResponses(
     ...WRITE_COMMON,
@@ -236,7 +236,7 @@ export class LongLeavesController {
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
-      description: `The body is invalid (VALIDATION_ERROR), the day is before the leave began or in the future (LONG_LEAVE.RETURN_DATE_INVALID), or, on a day other than the approved one, ${GROUNDS_REFUSALS}: nothing is saved and the person stays on long leave.`,
+      description: `The body is invalid (VALIDATION_ERROR), the day is before the leave began or in the future (LONG_LEAVE.RETURN_DATE_INVALID), or ${GROUNDS_REFUSALS}: nothing is saved and the person stays on long leave.`,
       examples: [VALIDATION_EXAMPLE, EXAMPLES.RETURN_DATE_IN_FUTURE, ...GROUNDS_EXAMPLES],
     },
   )

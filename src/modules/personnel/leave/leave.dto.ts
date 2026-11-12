@@ -21,8 +21,8 @@ const changeReturnDateBodySchema = z.strictObject({
 
 const confirmReturnBodySchema = z.strictObject({
   returnedOn: businessDay,
-  // Needed only when the person returns on another day than the approved one (`leave.policy.ts`), so it is optional but typed.
-  groundsNote: groundsNoteBodySchema.optional(),
+  // Always needed, on the approved day too (R-32): the interface fills it from `GET /long-leaves/{id}`, the Super Admin may edit it.
+  groundsNote: groundsNoteBodySchema,
 });
 
 const listQuerySchema = z.strictObject({

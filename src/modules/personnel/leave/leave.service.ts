@@ -167,7 +167,7 @@ export class LeaveService {
     });
   }
 
-  /** The person is back from `returnedOn`; on the approved day no document is needed, on any other day a new basis is. */
+  /** The person is back from `returnedOn`, with the basis in its box whatever the day (R-32); it is kept on the change `RETURNED`. */
   confirmReturn(actor: PersonnelActor, leaveId: string, input: ConfirmReturnInput, outer?: DbTx): Promise<LeaveRecord> {
     return this.inTransaction(actor, leaveId, outer, async (tx, { organizationId, leave, employeeCode, today }) => {
       refuse(
@@ -181,7 +181,7 @@ export class LeaveService {
         }),
       );
       const onSchedule = isOnSchedule(input.returnedOn, leave.approvedReturnOn);
-      const grounds = onSchedule ? undefined : normalizedGroundsNote(input.groundsNote ?? '');
+      const grounds = normalizedGroundsNote(input.groundsNote ?? '');
       const by = actorColumns(actor);
       const ended = await this.leaves.end(tx, leave.id, input.returnedOn, 'RETURNED');
       await this.history.setEmployeeWorkState(tx, leave.employeeId, 'WORKING');
@@ -207,7 +207,7 @@ export class LeaveService {
             workState: 'WORKING',
             returnedOn: input.returnedOn,
             onSchedule,
-            grounds: grounds ? groundsSnapshot(grounds) : null,
+            grounds: groundsSnapshot(grounds),
           },
         ),
       );

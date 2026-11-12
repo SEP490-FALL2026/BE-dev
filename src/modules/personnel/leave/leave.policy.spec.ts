@@ -106,14 +106,22 @@ const back = (over: Partial<ConfirmReturnFacts> = {}): ConfirmReturnFacts => ({
   ...over,
 });
 
-describe('the return of a person (US-03-03 AC-7, AC-8)', () => {
-  it('needs no document on the approved day', () => {
-    expect(confirmReturnRefusal(back())).toBeNull();
+describe('the return of a person (US-03-03 AC-7, AC-8, R-32)', () => {
+  it('needs the basis on the approved day too: the box is prefilled from the leave, may be edited, and is kept (P26)', () => {
     expect(isOnSchedule('2026-09-01', '2026-09-01')).toBe(true);
+    expect(confirmReturnRefusal(back())?.code).toBe('GROUNDS_REQUIRED');
+    expect(confirmReturnRefusal(back({ groundsNote: '   ' }))?.code).toBe('GROUNDS_REQUIRED');
+    expect(confirmReturnRefusal(back({ groundsNote: NOTE }))).toBeNull();
   });
 
-  it('judges neither a missing nor a wrong basis on the approved day', () => {
-    expect(confirmReturnRefusal(back({ groundsNote: 'BM09-2026-000001' }))).toBeNull();
+  it('judges a wrong basis on the approved day as on any other: too long, or the code of a notice', () => {
+    expect(confirmReturnRefusal(back({ groundsNote: 'BM09-2026-000001' }))?.code).toBe('GROUNDS_IS_NOTICE');
+    expect(confirmReturnRefusal(back({ groundsNote: 'x'.repeat(501) }))?.code).toBe('GROUNDS_TOO_LONG');
+  });
+
+  it('judges the day before the basis: a leave that ended or a day that cannot be is refused whatever the basis', () => {
+    expect(confirmReturnRefusal(back({ status: 'ENDED' }))?.code).toBe('NOT_ACTIVE');
+    expect(confirmReturnRefusal(back({ returnedOn: '2026-09-02' }))?.code).toBe('RETURN_DATE_INVALID');
   });
 
   it.each([

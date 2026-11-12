@@ -36,43 +36,48 @@ describe('the return from a long leave (integration, real PostgreSQL)', () => {
     await h.stop();
   });
 
-  describe('a return on the approved day (AC-7)', () => {
-    it('needs no new document: the person works again, and the Audit Trail keeps who confirmed and when', async () => {
+  describe('a return on the approved day (AC-7, R-32)', () => {
+    it('keeps the basis the interface filled from the leave: the person works again, and the Audit Trail keeps who confirmed and when', async () => {
       const { person, leave } = await onLeave(h.day(-90), h.today());
+      const prefilled = h.dataOf<LeaveWire>(await h.readLeave(leave.id)).groundsNote;
 
-      const response = await h.confirmReturn(leave.id, { returnedOn: h.today() });
+      const response = await h.confirmReturn(leave.id, { returnedOn: h.today(), groundsNote: prefilled });
 
       expect(response.status).toBe(200);
       expect(h.dataOf<LeaveWire>(response)).toMatchObject({ status: 'ENDED', endKind: 'RETURNED', endedOn: h.today() });
       expect(await h.workState(person.employeeId)).toBe('WORKING');
       const [event] = await h.auditEventsOf('LONG_LEAVE.RETURNED', leave.id);
-      expect(event).toMatchObject({
-        actor_kind: 'USER',
-        after: { onSchedule: true, workState: 'WORKING', grounds: null },
-      });
+      expect(event).toMatchObject({ actor_kind: 'USER', after: { onSchedule: true, workState: 'WORKING' } });
+      expect(event.after?.grounds).not.toBeNull();
       expect(event.actor_app_user_id).toBe(h.sa.appUserId);
       const log = h.dataOf<{ items: LeaveChangeWire[] }>(await h.leaveChanges(leave.id)).items;
       expect(log.map((change) => [change.kind, change.onSchedule, change.groundsNote])).toEqual([
         ['STARTED', null, h.approval],
-        ['RETURNED', true, null],
+        ['RETURNED', true, h.approval],
       ]);
     });
 
-    it('ignores a basis given on the day, wrong or not, and refuses one that is malformed', async () => {
+    it('keeps what was edited, not what was prefilled', async () => {
       const { leave } = await onLeave(h.day(-90), h.today());
 
-      const malformed = await h.confirmReturn(leave.id, {
-        returnedOn: h.today(),
-        groundsNote: ['x'],
-      });
-      const response = await h.confirmReturn(leave.id, {
-        returnedOn: h.today(),
-        groundsNote: 'BM09-2026-000001',
-      });
+      await h.confirmReturn(leave.id, { returnedOn: h.today(), groundsNote: h.extension }).expect(200);
 
+      const log = h.dataOf<{ items: LeaveChangeWire[] }>(await h.leaveChanges(leave.id)).items;
+      expect(log[1]).toMatchObject({ kind: 'RETURNED', onSchedule: true, groundsNote: h.extension });
+    });
+
+    it('refuses a return with no basis, a blank one or the code of a notice, and one that is malformed; the person stays on leave', async () => {
+      const { person, leave } = await onLeave(h.day(-90), h.today());
+
+      const missing = await h.confirmReturn(leave.id, { returnedOn: h.today() });
+      const notice = await h.confirmReturn(leave.id, { returnedOn: h.today(), groundsNote: 'BM09-2026-000001' });
+      const malformed = await h.confirmReturn(leave.id, { returnedOn: h.today(), groundsNote: ['x'] });
+
+      expect([missing.status, h.codeOf(missing)]).toEqual([422, 'VALIDATION_ERROR']);
+      expect([notice.status, h.codeOf(notice)]).toEqual([422, 'LONG_LEAVE.GROUNDS_IS_NOTICE']);
       expect([malformed.status, h.codeOf(malformed)]).toEqual([422, 'VALIDATION_ERROR']);
-      expect(response.status).toBe(200);
-      expect(h.dataOf<LeaveWire>(response).status).toBe('ENDED');
+      expect(await h.workState(person.employeeId)).toBe('ON_LONG_LEAVE');
+      expect(h.dataOf<LeaveWire>(await h.readLeave(leave.id)).status).toBe('ACTIVE');
     });
   });
 
@@ -90,7 +95,7 @@ describe('the return from a long leave (integration, real PostgreSQL)', () => {
         groundsNote: 'BM09-2026-000777',
       });
 
-      expect([refused.status, h.codeOf(refused)]).toEqual([422, 'LONG_LEAVE.GROUNDS_REQUIRED']);
+      expect([refused.status, h.codeOf(refused)]).toEqual([422, 'VALIDATION_ERROR']);
       expect([notice.status, h.codeOf(notice)]).toEqual([422, 'LONG_LEAVE.GROUNDS_IS_NOTICE']);
       expect(await h.workState(person.employeeId)).toBe('ON_LONG_LEAVE');
       expect(h.dataOf<LeaveWire>(await h.readLeave(leave.id)).status).toBe('ACTIVE');
@@ -120,7 +125,7 @@ describe('the return from a long leave (integration, real PostgreSQL)', () => {
 
     it('lets a person who came back go on leave again', async () => {
       const { person, leave } = await onLeave(h.day(-30), h.today());
-      await h.confirmReturn(leave.id, { returnedOn: h.today() }).expect(200);
+      await h.confirmReturn(leave.id, { returnedOn: h.today(), groundsNote: h.approval }).expect(200);
 
       const second = await h.started({
         employeeId: person.employeeId,

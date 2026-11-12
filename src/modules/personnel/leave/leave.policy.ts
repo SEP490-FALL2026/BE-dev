@@ -76,20 +76,21 @@ export interface ConfirmReturnFacts extends LeaveFacts {
   groundsNote: string | undefined;
 }
 
-/** Whether the return was on the day that was approved, which needs no new document (`US-03-03` AC-7). */
+/** Whether the return was on the day that was approved (`US-03-03` AC-7): it only tells the history whether the person came back as planned. */
 export const isOnSchedule = (returnedOn: BusinessDate, approvedReturnOn: BusinessDate): boolean =>
   returnedOn === approvedReturnOn;
 
 /**
- * Whether the person may be recorded back (`US-03-03` AC-7, AC-8): from the day the leave began to today. On the approved day no
- * document is needed; on any other day, earlier or later, a new basis is.
+ * Whether the person may be recorded back (`US-03-03` AC-7, AC-8): from the day the leave began to today, with the basis in its box
+ * (`QĐ-111bd`, R-32): on the approved day too, since the box is filled from what the leave already says and the Super Admin may edit it, and
+ * what is sent is what is kept. Whether the day is the approved one only decides the `onSchedule` the history shows.
  */
 export function confirmReturnRefusal(facts: ConfirmReturnFacts): LeaveRefusal | null {
   if (facts.status !== 'ACTIVE') return { code: 'NOT_ACTIVE' };
   if (facts.returnedOn < facts.startedOn) return { code: 'RETURN_DATE_INVALID', details: { reason: 'BEFORE_START' } };
   if (facts.returnedOn > facts.today) return { code: 'RETURN_DATE_INVALID', details: { reason: 'IN_FUTURE' } };
 
-  return isOnSchedule(facts.returnedOn, facts.approvedReturnOn) ? null : leaveGroundsRefusal(facts.groundsNote);
+  return leaveGroundsRefusal(facts.groundsNote);
 }
 
 /** A leave past the day it was due back is only to be reminded about; the state of the person never moves by the calendar (`AC-4`). */

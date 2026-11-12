@@ -136,6 +136,10 @@ describe('long leave routes (e2e, no database)', () => {
             .send({ newApprovedReturnOn: '2026-10-01' }),
       ],
       [
+        'a return without the basis, on the approved day too (R-32)',
+        (server: App) => request(server).post(`/api/v1/long-leaves/${ID}/returns`).send({ returnedOn: '2026-09-01' }),
+      ],
+      [
         'a return with a basis that is not a sentence',
         (server: App) =>
           request(server)
