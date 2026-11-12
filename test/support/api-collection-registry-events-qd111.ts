@@ -11,7 +11,7 @@ export const QD111_REGISTRY_EVENTS: readonly RegistryEvent[] = [
     change: 'closed',
     from: 'unbounded',
     finding: 'LD-06',
-    item: 'g0-g6-final-business-baseline-remediation',
+    item: 'be-bugfix-2026-11-12',
     date: '2026-11-12',
     reason: 'The opinions of the Business Owner on plan terms were removed (QĐ-111g): the terms no longer embed them.',
   },
@@ -21,7 +21,7 @@ export const QD111_REGISTRY_EVENTS: readonly RegistryEvent[] = [
     change: 'closed',
     from: 'unbounded',
     finding: 'LD-06',
-    item: 'g0-g6-final-business-baseline-remediation',
+    item: 'be-bugfix-2026-11-12',
     date: '2026-11-12',
     reason:
       'The confirmation of a retirement by a Business Owner was removed (QĐ-111g): the retirement view carries none.',
