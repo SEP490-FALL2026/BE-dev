@@ -31,7 +31,12 @@ describe('long leave data, list and contracts for the leaving flow (integration,
     approvedReturnOn: string,
   ): Promise<{ person: Person; leave: LeaveWire }> => {
     const person = await h.worker(des, code('E'));
-    const leave = await h.started({ employeeId: person.employeeId, startedOn, approvedReturnOn, grounds: h.approval });
+    const leave = await h.started({
+      employeeId: person.employeeId,
+      startedOn,
+      approvedReturnOn,
+      groundsNote: h.approval,
+    });
 
     return { person, leave };
   };
@@ -106,7 +111,7 @@ describe('long leave data, list and contracts for the leaving flow (integration,
     it('never changes who is on leave or since when, never deletes, and never changes a leave that has ended', async () => {
       const { person, leave } = await onLeave(h.day(-10), h.day(10));
       const ended = await onLeave(h.day(-10), h.day(10));
-      await h.confirmReturn(ended.leave.id, { returnedOn: h.today(), grounds: h.extension }).expect(200);
+      await h.confirmReturn(ended.leave.id, { returnedOn: h.today(), groundsNote: h.extension }).expect(200);
 
       expect(
         await sqlState(`UPDATE employee_leaves SET employee_id = $2 WHERE id = $1`, [
@@ -208,13 +213,13 @@ describe('long leave data, list and contracts for the leaving flow (integration,
       );
       expect(items.map((item) => item.id)).toEqual(ordered.map((item) => item.id));
       expect(items.length).toBeGreaterThanOrEqual(12);
-      expect(items[0]).not.toHaveProperty('grounds');
+      expect(items[0]).not.toHaveProperty('groundsNote');
     });
 
     it('filters by state and person, and the list of late returns holds exactly the active leaves past their day', async () => {
       const late = await onLeave(h.day(-50), h.day(-1));
       const back = await onLeave(h.day(-50), h.day(-1));
-      await h.confirmReturn(back.leave.id, { returnedOn: h.today(), grounds: h.extension }).expect(200);
+      await h.confirmReturn(back.leave.id, { returnedOn: h.today(), groundsNote: h.extension }).expect(200);
 
       const byPerson = h.dataOf<{ items: LeaveWire[] }>(
         await h.listLeaves(`?employeeId=${back.person.employeeId}&status=ENDED`),
@@ -311,7 +316,7 @@ describe('long leave data, list and contracts for the leaving flow (integration,
   describe('the days of leave a rule of the recommendations reads', () => {
     it('gives the leaves of many people that touch the span in one statement', async () => {
       const a = await onLeave(h.day(-100), h.day(-60));
-      await h.confirmReturn(a.leave.id, { returnedOn: h.day(-60), grounds: h.extension }).expect(200);
+      await h.confirmReturn(a.leave.id, { returnedOn: h.day(-60), groundsNote: h.extension }).expect(200);
       const b = await onLeave(h.day(-40), h.day(40));
       const none = await h.worker(des, code('W'));
       const ids = [a.person.employeeId, b.person.employeeId, none.employeeId];

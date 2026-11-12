@@ -60,24 +60,6 @@ describe('the day a basis was issued (integration, real PostgreSQL)', () => {
       (day) => ({ reason: 'x', grounds: grounds(day) }),
     ],
     [
-      'longLeaveStart',
-      'post',
-      '/long-leaves',
-      (day) => ({ employeeId: id, startedOn: h.today(), approvedReturnOn: h.day(30), grounds: grounds(day) }),
-    ],
-    [
-      'longLeaveChangeReturnDate',
-      'post',
-      `/long-leaves/${id}/return-date-changes`,
-      (day) => ({ newApprovedReturnOn: h.day(40), grounds: grounds(day) }),
-    ],
-    [
-      'longLeaveConfirmReturn',
-      'post',
-      `/long-leaves/${id}/returns`,
-      (day) => ({ returnedOn: h.today(), grounds: grounds(day) }),
-    ],
-    [
       'personnelNoticeRecord',
       'post',
       `/personnel-notices/${id}/recording`,

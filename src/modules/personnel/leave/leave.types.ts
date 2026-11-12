@@ -1,5 +1,5 @@
 import type { BusinessDate } from '../../../core/business-date';
-import type { GroundsInput, RecordedGrounds } from '../personnel-grounds.policy';
+import type { RecordedGrounds } from '../personnel-grounds.policy';
 
 export type LeaveStatus = 'ACTIVE' | 'ENDED';
 export type LeaveEndKind = 'RETURNED' | 'DEPARTURE_STARTED';
@@ -62,17 +62,20 @@ export interface StartLeaveInput {
   employeeId: string;
   startedOn: BusinessDate;
   approvedReturnOn: BusinessDate;
-  grounds?: GroundsInput;
+  /** The basis in one box (`QĐ-110a`); the policy refuses it when it is missing, blank, too long or the code of a notice. */
+  groundsNote?: string | undefined;
   /** The notice of a head this leave is recorded from (`US-03-11`); a leave recorded straight from a document has none. */
   noticeId?: string;
 }
 
 export interface ChangeReturnDateInput {
   newApprovedReturnOn: BusinessDate;
-  grounds?: GroundsInput;
+  /** The basis in one box (`QĐ-110a`); the policy refuses it when it is missing, blank, too long or the code of a notice. */
+  groundsNote?: string | undefined;
 }
 
 export interface ConfirmReturnInput {
   returnedOn: BusinessDate;
-  grounds?: GroundsInput;
+  /** The basis in one box (`QĐ-110a`); the policy refuses it when it is missing, blank, too long or the code of a notice. */
+  groundsNote?: string | undefined;
 }

@@ -15,6 +15,11 @@ function grounds(ctx: DemoRunContext, code: string) {
   };
 }
 
+/** The same basis in one box, as the routes that take it ask for it (`QĐ-110a`). */
+function groundsNote(ctx: DemoRunContext, code: string): string {
+  return `${ctx.fixture.marker}-QD-${code}: quyết định của phòng Nhân sự (nguồn ban hành ngoài hệ thống)`;
+}
+
 /** The event of the person in any state counts as the dataset's: a run never records a second one. */
 async function exists(ctx: DemoRunContext, path: string, employeeId: string): Promise<boolean> {
   const rows = await ctx.api.call<{ items: unknown[] }>(
@@ -40,7 +45,7 @@ async function record(ctx: DemoRunContext, event: DemoPersonnelEvent): Promise<R
             employeeId,
             startedOn: ctx.today,
             approvedReturnOn: dayOffset(ctx.today, event.returnInDays),
-            grounds: grounds(ctx, event.employee),
+            groundsNote: groundsNote(ctx, event.employee),
           },
         };
       case 'OFFBOARDING':

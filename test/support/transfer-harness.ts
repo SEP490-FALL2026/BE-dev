@@ -52,6 +52,8 @@ export class TransferHarness extends ReassignmentHarness {
     };
   }
 
+  /** The basis in one box (QĐ-110a): what every personnel event of the Super Admin is written on. */
+  readonly groundsNote = 'Quyết định số QD-12/2026 của phòng Nhân sự';
   readonly grounds = { type: 'HR_DECISION', reference: 'QD-12/2026', issuer: 'HR Department', issuedOn: '2026-10-01' };
 
   /**

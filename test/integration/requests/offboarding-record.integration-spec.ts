@@ -369,12 +369,7 @@ describe('recording a departure (integration, real PostgreSQL)', () => {
           employeeId: person.employeeId,
           startedOn: h.day(-30),
           approvedReturnOn: h.day(60),
-          grounds: {
-            type: 'APPROVED_APPLICATION',
-            reference: 'DN-05/2026',
-            issuer: 'HR Department',
-            issuedOn: '2026-05-25',
-          },
+          groundsNote: 'Đơn xin nghỉ dài hạn số DN-05/2026',
         })
         .expect(201);
       expect(await h.workState(person.employeeId)).toBe('ACTIVE/ON_LONG_LEAVE');

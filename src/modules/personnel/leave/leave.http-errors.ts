@@ -17,7 +17,7 @@ const STATUS: Readonly<Record<string, HttpStatus>> = {
   RETURN_DATE_INVALID: HttpStatus.UNPROCESSABLE_ENTITY,
   RETURN_DATE_IN_PAST: HttpStatus.UNPROCESSABLE_ENTITY,
   GROUNDS_REQUIRED: HttpStatus.UNPROCESSABLE_ENTITY,
-  GROUNDS_INCOMPLETE: HttpStatus.UNPROCESSABLE_ENTITY,
+  GROUNDS_TOO_LONG: HttpStatus.UNPROCESSABLE_ENTITY,
   GROUNDS_IS_NOTICE: HttpStatus.UNPROCESSABLE_ENTITY,
 };
 
@@ -32,7 +32,7 @@ const MESSAGES: Readonly<Record<string, string>> = {
   RETURN_DATE_INVALID: 'The day is not valid for this leave.',
   RETURN_DATE_IN_PAST: 'The new day of return is today or later.',
   GROUNDS_REQUIRED: 'The basis of the day is required.',
-  GROUNDS_INCOMPLETE: 'The basis lacks a part: its type, number, issuer or day of issue.',
+  GROUNDS_TOO_LONG: 'The basis is longer than 500 characters.',
   GROUNDS_IS_NOTICE: 'The code of a notice is not the document the day rests on.',
 };
 
@@ -69,6 +69,6 @@ export const LEAVE_ERROR_EXAMPLES = {
   RETURN_DATE_IN_FUTURE: example(new LeaveRefusedError('RETURN_DATE_INVALID', { reason: 'IN_FUTURE' })),
   RETURN_DATE_IN_PAST: example(new LeaveRefusedError('RETURN_DATE_IN_PAST')),
   GROUNDS_REQUIRED: example(new LeaveRefusedError('GROUNDS_REQUIRED')),
-  GROUNDS_INCOMPLETE: example(new LeaveRefusedError('GROUNDS_INCOMPLETE', { missing: ['issuer'] })),
+  GROUNDS_TOO_LONG: example(new LeaveRefusedError('GROUNDS_TOO_LONG')),
   GROUNDS_IS_NOTICE: example(new LeaveRefusedError('GROUNDS_IS_NOTICE')),
 } as const;

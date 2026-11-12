@@ -97,12 +97,7 @@ describe('the notices of the personnel context (integration, real PostgreSQL)', 
         employeeId: who.employeeId,
         startedOn: h.day(-1),
         approvedReturnOn: h.day(40),
-        grounds: {
-          type: 'APPROVED_APPLICATION',
-          reference: 'DN-05/2026',
-          issuer: 'HR Department',
-          issuedOn: '2026-05-25',
-        },
+        groundsNote: 'Đơn xin nghỉ dài hạn số DN-05/2026',
       });
 
       expect(leave.status).toBe(201);

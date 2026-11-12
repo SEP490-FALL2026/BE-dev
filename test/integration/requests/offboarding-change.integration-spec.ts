@@ -229,12 +229,7 @@ describe('moving and cancelling a handover (integration, real PostgreSQL)', () =
           employeeId: person.employeeId,
           startedOn: h.day(-30),
           approvedReturnOn: returnOn,
-          grounds: {
-            type: 'APPROVED_APPLICATION',
-            reference: 'DN-05/2026',
-            issuer: 'HR Department',
-            issuedOn: '2026-05-25',
-          },
+          groundsNote: 'Đơn xin nghỉ dài hạn số DN-05/2026',
         })
         .expect(201);
 

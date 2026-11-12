@@ -1,5 +1,6 @@
 import {
   groundsNoteRefusal,
+  groundsNoteOfBasis,
   groundsRefusal,
   groundsSnapshot,
   normalizedGrounds,
@@ -84,5 +85,27 @@ describe('the basis in one box (QĐ-110a, QĐ-111bd, R-32)', () => {
       issuer: null,
       issuedOn: null,
     });
+  });
+});
+
+describe('the box a four-part basis becomes (a notice of a head, the controlled procedure)', () => {
+  it('writes the parts that are given, in the order a person reads a document, and nothing for a basis with none', () => {
+    expect(groundsNoteOfBasis(WHOLE)).toBe('DECISION QD-12/2026 — HR Department, 2026-06-20');
+    expect(groundsNoteOfBasis({ reference: ' QD-12/2026 ' })).toBe('QD-12/2026');
+    expect(groundsNoteOfBasis({})).toBeUndefined();
+    expect(groundsNoteOfBasis(null)).toBeUndefined();
+    expect(groundsNoteOfBasis({ type: ' ', reference: '', issuer: null })).toBeUndefined();
+  });
+
+  it('keeps the code of a notice as it is, so the box refuses it as it refuses it in one piece', () => {
+    expect(
+      groundsNoteOfBasis({
+        ...WHOLE,
+        type: undefined,
+        issuer: undefined,
+        issuedOn: undefined,
+        reference: 'BM09-2026-000123',
+      }),
+    ).toBe('BM09-2026-000123');
   });
 });

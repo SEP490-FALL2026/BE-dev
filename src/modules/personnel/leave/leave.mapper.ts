@@ -38,7 +38,7 @@ export function toDetail(
 ): LeaveDetailWire {
   return {
     ...toSummary(record, employees, today),
-    grounds: access === 'FULL' ? { ...record.grounds } : null,
+    groundsNote: access === 'FULL' ? record.grounds.reference : null,
     endKind: record.endKind,
     resumesLeaveId: record.resumesLeaveId,
     startedByAppUserId: record.startedByAppUserId,
@@ -54,7 +54,7 @@ export const toChange = (change: LeaveChangeRecord): LeaveChangeWire => ({
   newReturnOn: change.newReturnOn,
   returnedOn: change.returnedOn,
   onSchedule: change.onSchedule,
-  grounds: change.grounds && { ...change.grounds },
+  groundsNote: change.grounds?.reference ?? null,
   recordedByAppUserId: change.recordedByAppUserId,
   recordedByProcedure: change.recordedByTicketId !== null,
   recordedAt: change.recordedAt.toISOString(),

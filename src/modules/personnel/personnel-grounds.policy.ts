@@ -105,6 +105,21 @@ export function groundsNoteRefusal(note: string | null | undefined): GroundsNote
   return null;
 }
 
+/**
+ * The box a four-part basis becomes where that form is still the input (the notice of a head that is turned into an event, the
+ * controlled procedure): the parts given, in the order a document is read ("DECISION QD-12/2026 — HR Department, 2026-06-20"), cut to
+ * the size of the box. Undefined when no part is given, so the box refuses it as missing.
+ */
+export function groundsNoteOfBasis(basis: GroundsInput | null | undefined): string | undefined {
+  if (!basis) return undefined;
+  const part = (value: string | null | undefined): string => (filled(value) ? value.trim() : '');
+  const document = [part(basis.type), part(basis.reference)].filter(Boolean).join(' ');
+  const source = [part(basis.issuer), part(basis.issuedOn)].filter(Boolean).join(', ');
+  const note = [document, source].filter(Boolean).join(' — ');
+
+  return note === '' ? undefined : note.slice(0, GROUNDS_NOTE_MAX_LENGTH);
+}
+
 /** The box as it is kept, trimmed, with the other three parts empty; call only after `groundsNoteRefusal` said it is fine. */
 export function normalizedGroundsNote(note: string): RecordedGrounds {
   return { type: null, reference: note.trim(), issuer: null, issuedOn: null };

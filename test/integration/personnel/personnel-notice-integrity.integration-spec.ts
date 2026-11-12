@@ -153,7 +153,7 @@ describe('what the database refuses about the notices of the heads (integration,
         employeeId: other.employeeId,
         startedOn: h.day(-1),
         approvedReturnOn: h.day(20),
-        grounds: h.grounds,
+        groundsNote: h.groundsNote,
       })
       .expect(201);
     const second = await h.runningLeaveOf(other.employeeId);

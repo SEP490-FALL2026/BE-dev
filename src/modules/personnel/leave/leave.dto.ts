@@ -2,7 +2,7 @@ import { createZodDto } from '../../../infrastructure/http/dto/zod-dto';
 import { z } from 'zod';
 import { successEnvelopeSchema } from '../../../infrastructure/http/dto/success-envelope.dto';
 import { businessDay } from '../../../infrastructure/http/dto/business-date.dto';
-import { groundsBodySchema, optionalGroundsBodySchema } from '../personnel-grounds.dto';
+import { groundsNoteBodySchema } from '../personnel-grounds.dto';
 
 const flag = z.enum(['true', 'false']).transform((value) => value === 'true');
 
@@ -11,18 +11,18 @@ const startBodySchema = z.strictObject({
   employeeId: z.uuid(),
   startedOn: businessDay,
   approvedReturnOn: businessDay,
-  grounds: groundsBodySchema,
+  groundsNote: groundsNoteBodySchema,
 });
 
 const changeReturnDateBodySchema = z.strictObject({
   newApprovedReturnOn: businessDay,
-  grounds: groundsBodySchema,
+  groundsNote: groundsNoteBodySchema,
 });
 
 const confirmReturnBodySchema = z.strictObject({
   returnedOn: businessDay,
   // Needed only when the person returns on another day than the approved one (`leave.policy.ts`), so it is optional but typed.
-  grounds: optionalGroundsBodySchema,
+  groundsNote: groundsNoteBodySchema.optional(),
 });
 
 const listQuerySchema = z.strictObject({
@@ -48,14 +48,6 @@ const pagination = z.strictObject({
 });
 
 const employeeBrief = z.strictObject({ id: z.uuid(), employeeCode: z.string(), fullName: z.string() });
-/** The basis as it was kept: the box in `reference`; the other three parts are present only for an event written before the box. */
-const groundsSchema = z.strictObject({
-  type: z.string().nullable(),
-  reference: z.string(),
-  issuer: z.string().nullable(),
-  issuedOn: z.string().nullable(),
-});
-
 /** The row of the list: who, since when, due back when, and whether the day has passed without the person back. */
 export const leaveSummarySchema = z.strictObject({
   id: z.uuid(),
@@ -68,8 +60,8 @@ export const leaveSummarySchema = z.strictObject({
 });
 
 export const leaveDetailSchema = leaveSummarySchema.extend({
-  /** The basis of the approved day of return in force. Null in the minimal projection an IT Admin reads. */
-  grounds: groundsSchema.nullable(),
+  /** The basis of the approved day of return in force, as the one box it was written in: what a form fills in again. Null in the minimal projection an IT Admin reads. */
+  groundsNote: z.string().nullable(),
   endKind: z.enum(['RETURNED', 'DEPARTURE_STARTED']).nullable(),
   resumesLeaveId: z.uuid().nullable(),
   /** The account that started it; null when the controlled procedure did (`startedByProcedure`). */
@@ -86,7 +78,8 @@ const changeSchema = z.strictObject({
   newReturnOn: z.string().nullable(),
   returnedOn: z.string().nullable(),
   onSchedule: z.boolean().nullable(),
-  grounds: groundsSchema.nullable(),
+  /** The basis the change was written on, in one box; null for a return on the approved day, which needs none. */
+  groundsNote: z.string().nullable(),
   /** The account that recorded it; null when the controlled procedure did (`recordedByProcedure`). */
   recordedByAppUserId: z.uuid().nullable(),
   recordedByProcedure: z.boolean(),

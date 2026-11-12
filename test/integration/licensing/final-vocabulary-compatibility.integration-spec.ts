@@ -279,7 +279,7 @@ describe('the vocabulary and the unnamed actors of the next release, read by the
             employeeId: e1.employeeId,
             startedOn: h.day(-1),
             approvedReturnOn: h.day(40),
-            grounds: approval,
+            groundsNote: 'Đơn xin nghỉ dài hạn số DN-05/2026',
           })
           .expect(201),
       );

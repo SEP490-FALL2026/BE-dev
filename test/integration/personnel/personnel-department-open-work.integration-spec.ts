@@ -168,12 +168,7 @@ describe('what the personnel context keeps a department in use for (integration,
           employeeId: member.employeeId,
           startedOn: h.day(-1),
           approvedReturnOn: h.day(40),
-          grounds: {
-            type: 'APPROVED_APPLICATION',
-            reference: 'DN-05/2026',
-            issuer: 'HR Department',
-            issuedOn: '2026-05-25',
-          },
+          groundsNote: 'Đơn xin nghỉ dài hạn số DN-05/2026',
         })
         .expect(201);
 

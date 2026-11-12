@@ -8,6 +8,7 @@ import {
   type NoticeEventRequest,
 } from '../public/personnel.extension-points';
 import { LeaveRefusedError } from './leave.errors';
+import { groundsNoteOfBasis } from '../personnel-grounds.policy';
 import { toLeaveApiException } from './leave.http-errors';
 import { LeaveRepo } from './leave.repo';
 import { LeaveService } from './leave.service';
@@ -43,7 +44,7 @@ export class LeaveNoticeRecorder implements OnModuleInit, NoticeEventRecorder {
         employeeId: notice.employeeId,
         startedOn: event.startedOn,
         approvedReturnOn: event.approvedReturnOn,
-        grounds: request.grounds,
+        groundsNote: groundsNoteOfBasis(request.grounds),
         noticeId: notice.id,
       });
 

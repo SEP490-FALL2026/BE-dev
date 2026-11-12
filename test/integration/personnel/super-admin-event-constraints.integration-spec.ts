@@ -211,12 +211,7 @@ describe('the approval tickets of Super Admin events (integration, PostgreSQL)',
           employeeId: away.employeeId,
           startedOn: h.day(-1),
           approvedReturnOn: h.day(40),
-          grounds: {
-            type: 'APPROVED_APPLICATION',
-            reference: 'DN-07/2026',
-            issuer: 'HR Department',
-            issuedOn: '2026-05-25',
-          },
+          groundsNote: 'Đơn xin nghỉ dài hạn số DN-07/2026',
         })
         .expect(201);
       leaveChange = await idOf('employee_leave_changes', `recorded_by_app_user_id IS NOT NULL`);
