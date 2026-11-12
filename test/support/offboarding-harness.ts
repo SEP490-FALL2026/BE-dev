@@ -9,7 +9,6 @@ export interface CaseWire {
   employee: { id: string; employeeCode: string; fullName: string };
   state: 'HANDING_OVER' | 'LEFT' | 'CANCELLED';
   accessBlockMode: 'WITH_LAST_DAY' | 'BLOCK_NOW';
-  abrupt: boolean;
   lastWorkingDay: string;
   /** Always null on the wire since `QĐ-110g`. */
   handoverDueOn: null;
