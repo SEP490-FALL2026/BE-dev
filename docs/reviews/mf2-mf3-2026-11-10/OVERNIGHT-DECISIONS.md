@@ -198,6 +198,13 @@
 - **Business Owner:** `git grep -i -E "business.?owner" -- src` không còn định danh, trường, route hay luật sống nào; còn lại là ghi chú gỡ bỏ (`catalog/README.md`, `notifications/README.md`, comment `transfer.dto.ts`, tên spec `renewal-alerts`/`inbox` nói _không còn_ Business Owner, `QĐ-111g`) và tên bảng `application_business_owners` ở README. Sửa một tên test lỗi thời: `assessment.policy.spec.ts` (ý kiến của ô `opinion` do IT Admin ghi, không còn gắn vai Business Owner). Mô hình Prisma `ApplicationLegacyBusinessOwner`/`ApplicationBusinessOwner` giữ cho đợt dọn bảng (AUDIT gói bug-fix).
 - **Đổi lại nếu Owner muốn khác:** khôi phục thư mục từ `git show <commit>^:src/modules/licensing/device-binding`; drop cột `self_executed` làm cùng pass contract của D-27.
 
+### D-29 · MF2-A review (Optional) · Roadmap còn ghi `a05-k4-device-registry-contract` (dòng 223) là enabler đã giao, dù `licensing/device-binding` đã gỡ ở MF2-A
+
+- **A:** sửa ngay dòng 223 (thêm "đã gỡ ở MF2-A"). Ưu: roadmap không nói sai. Nhược: cùng contract còn nằm ở `g7-device-registry-acknowledgement` (dòng 351 và các dòng ma trận AC 635, 1056–1081 trỏ port/sổ thiết bị) và `qd103-k4-key-pool` ⟹ sửa một dòng lẻ làm roadmap lệch nội bộ; roadmap của X-H (`g6-handover-confirmation`) và X-SA đã được hoãn cho gói Z.
+- **B:** hoãn cho gói Z, ghi một dòng vào HANDOFF để Z không sót.
+- **ĐÃ CHỌN: B.** Lý do: roadmap sync là việc của gói Z (PLAN §2 #19) và một lượt sửa thống nhất cho `a05-k4-device-registry-contract`, `g7-device-registry-acknowledgement` (dòng 351 và ma trận AC liên quan), `g6-handover-confirmation`, X-SA. Căn cứ: HANDOFF X-H-G, X-SA-G ("Roadmap để gói Z"). Chạm: không có file.
+- **Đổi sang A:** thêm câu "capability `licensing/device-binding` đã gỡ ở MF2-A (`QĐ-110`), contract thiết kế lại khi làm K4 theo thiết bị" vào cột mô tả dòng 223 rồi `pnpm rules:format`.
+
 ## Bị chặn
 
 (chưa có)
