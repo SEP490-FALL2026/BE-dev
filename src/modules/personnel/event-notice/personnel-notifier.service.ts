@@ -169,15 +169,50 @@ export class PersonnelNotifier {
       params: { caseId: input.caseId, employeeId: input.employeeId, dueOn: input.dueOn, rightCount: input.rightCount },
       eventKey: `offboarding:${input.caseId}:${input.today}`,
     };
-    const itAdmin = await this.itAdminOfDeparture(tx, input);
-    const superAdmin = (await this.identity.getSuperAdminHolder(tx))?.employeeId ?? null;
-    const recipients = new Set([itAdmin, superAdmin].filter((id): id is string => id !== null));
-    let written = false;
-    for (const recipient of recipients) {
-      written = (await this.tell(tx, input.organizationId, recipient, 'REVOCATION_OVERDUE', notice)) || written;
-    }
 
-    return written;
+    return this.toItAdminAndSuperAdmin(tx, input, 'REVOCATION_OVERDUE', notice);
+  }
+
+  /**
+   * The access of a person who is leaving is blocked from today (`QĐ-110b`, `QĐ-110d`, R-1): the system has ended the machines and closed the
+   * open requests. The Super Admin is asked to mark the person as left (only while `markLeft`, a person already marked has nothing to mark),
+   * and the IT Admin to **block** the company account (item 1a of `BM-08`: reset the password of the mailbox and sign out every session; the
+   * mailbox itself is not locked yet) and to open the revocation by `revocationDueOn`. One notice for each audience, once for the case.
+   */
+  async departureAccessBlocked(
+    tx: DbTx,
+    input: Common & { caseId: string; blockedOn: BusinessDate; revocationDueOn: BusinessDate; markLeft: boolean },
+  ): Promise<void> {
+    const notice = (audience: 'SUPER_ADMIN' | 'IT_ADMIN'): NoticeParts => ({
+      subject: { type: 'OFFBOARDING_CASE', id: input.caseId },
+      params: {
+        caseId: input.caseId,
+        employeeId: input.employeeId,
+        departmentId: input.departmentId,
+        blockedOn: input.blockedOn,
+        revocationDueOn: input.revocationDueOn,
+        audience,
+      },
+      eventKey: `DEPARTURE_ACCESS_BLOCKED:${input.caseId}:${audience}`,
+    });
+    if (input.markLeft)
+      await this.toSuperAdmin(tx, input.organizationId, 'DEPARTURE_ACCESS_BLOCKED', notice('SUPER_ADMIN'));
+    const itAdmin = await this.itAdminOfDeparture(tx, input);
+    if (itAdmin) await this.tell(tx, input.organizationId, itAdmin, 'DEPARTURE_ACCESS_BLOCKED', notice('IT_ADMIN'));
+  }
+
+  /**
+   * A departure blocked now still has no lock of the company account at the end of the day it was blocked (`QĐ-94m`(12), R-1): the IT Admin
+   * and the Super Admin are told once for the case. Returns whether a notice was written.
+   */
+  async accountLockOverdue(tx: DbTx, input: Common & { caseId: string; blockedOn: BusinessDate }): Promise<boolean> {
+    const notice: NoticeParts = {
+      subject: { type: 'OFFBOARDING_CASE', id: input.caseId },
+      params: { caseId: input.caseId, employeeId: input.employeeId, blockedOn: input.blockedOn },
+      eventKey: `ACCOUNT_LOCK_OVERDUE:${input.caseId}`,
+    };
+
+    return this.toItAdminAndSuperAdmin(tx, input, 'ACCOUNT_LOCK_OVERDUE', notice);
   }
 
   /** A person who holds a role that needs someone to take over is leaving: the Super Admin is told, once for each role. */
@@ -223,6 +258,24 @@ export class PersonnelNotifier {
         ...parameters,
       });
     }
+  }
+
+  /** The IT Admin of the departure and the Super Admin, a person who is both once; true when a notice was written. */
+  private async toItAdminAndSuperAdmin(
+    tx: DbTx,
+    input: Common,
+    code: InAppNotificationCode,
+    notice: NoticeParts,
+  ): Promise<boolean> {
+    const itAdmin = await this.itAdminOfDeparture(tx, input);
+    const superAdmin = (await this.identity.getSuperAdminHolder(tx))?.employeeId ?? null;
+    const recipients = new Set([itAdmin, superAdmin].filter((id): id is string => id !== null));
+    let written = false;
+    for (const recipient of recipients) {
+      written = (await this.tell(tx, input.organizationId, recipient, code, notice)) || written;
+    }
+
+    return written;
   }
 
   private async toSuperAdmin(

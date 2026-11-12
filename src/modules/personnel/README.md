@@ -97,7 +97,13 @@ anh em `event-notice` để báo, nên `event-notice` không được import l�
   `LicensingApi.countPersonalSeatsWithoutCompletedTaskOf`); `RevocationOverdueSweeper` (mỗi giờ, API) → `RevocationOverdueService.noticeOverdue(now)` báo
   `REVOCATION_OVERDUE` tới IT phụ trách (không phải chính người nghỉ) và Super Admin, mỗi ngày làm việc một lần mỗi hồ sơ (`eventKey`
   `offboarding:<caseId>:<ngày>`), kèm audit `OFFBOARDING_CASE.REVOCATION_OVERDUE` (SYSTEM); `overdueCases` dùng chung với bộ lọc `revocationOverdue` của
-  danh sách hồ sơ. Capability này không import `offboarding/`.
+  danh sách hồ sơ. **Mốc chặn** (`QĐ-110b`, `QĐ-110d`, MF2-E): `BlockMomentSweeper` (mỗi giờ, API) → `BlockAnnouncementService.announce(now)` thông báo **một lần mỗi hồ sơ**
+  (cột `offboarding_cases.block_announced_at`, đặt trong giao dịch của hồ sơ dưới khóa nhân viên rồi hồ sơ) khi người đó bị từ chối từ hôm nay trở về trước
+  (`firstDayRefused` ở `block-moment.policy.ts`): `BlockMomentEffects` kết thúc đăng ký thiết bị (`DEPARTURE_BLOCKED`), gọi
+  `RequestsApi.cancelForBeneficiaryGone` phạm vi `ALL_OPEN`, ghi audit `OFFBOARDING_CASE.ACCESS_BLOCKED` (SYSTEM) và dòng nhật ký `ACCESS_BLOCKED` (không tài
+  khoản, không ticket), báo Super Admin (chỉ khi chưa `LEFT`) và IT (`DEPARTURE_ACCESS_BLOCKED`, audience `SUPER_ADMIN`/`IT_ADMIN`); hạn thu hồi đã có trên
+  hồ sơ **không đổi**, chỉ ghi khi còn NULL. `AccountLockOverdueService.notice(now)` (cùng job) báo IT + Super Admin `ACCOUNT_LOCK_OVERDUE` một lần mỗi hồ sơ khi
+  hồ sơ chặn ngay chưa ghi `account-lock` tới hết ngày ghi. Hồ sơ hủy trước mốc không bao giờ được báo. Capability này không import `offboarding/`.
 - `department-member/` — trưởng phòng đọc một người đang ở phòng mình hôm nay (`QĐ-41c`(2)); `department-member.controller.ts`
   (`GET /departments/{id}/employees/{employeeId}` + `…/software-rights` + `…/open-requests`, `@RequireRoles('MANAGER')`),
   `DepartmentMemberQueryService` (hồ sơ không email/hợp đồng + hai số đếm; hai danh sách phân trang ≤ 100),

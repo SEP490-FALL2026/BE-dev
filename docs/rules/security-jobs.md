@@ -106,6 +106,20 @@
   `offboarding:<case>:<day>` is unique for a recipient, so a case is told once for each working day however many instances or passes run; no
   notice on a Saturday, a Sunday or a non-working date; a failed pass only logs. It only tells: no task is opened, no seat taken away, the case is
   never changed. Run one by hand with `RevocationOverdueService.noticeOverdue(now)`.
+  The API also runs `BlockMomentSweeper` once an hour (the first pass five minutes after start, unreferenced timer): for each departure that is
+  not cancelled or closed, has `block_announced_at IS NULL` and whose person is refused from today or earlier (the block of the case, or the
+  day they left) it announces the block once (`QĐ-110b`, `QĐ-110d`). Each case has a transaction of its own that locks the employee, then the case
+  `FOR UPDATE`, reads the case and the block again and sets `block_announced_at` before anything else, so a pass on another instance, a pass
+  run again or a cancellation at the same time never both act; a case that fails is logged and tried again at the next pass without
+  stopping the others. In that transaction the system ends the registrations of the machines of the person (cause `DEPARTURE_BLOCKED`), closes
+  every open request of the person through `RequestsApi.cancelForBeneficiaryGone` with the scope `ALL_OPEN` (the ones whose grant is being
+  carried out stay and the IT Admin is told), writes the audit event `OFFBOARDING_CASE.ACCESS_BLOCKED` (actor `SYSTEM`) and the line
+  `ACCESS_BLOCKED` of the log of the case (no account and no ticket wrote it), and tells the Super Admin (only while the person is not yet
+  marked as left) and the IT Admin (`DEPARTURE_ACCESS_BLOCKED`, one key per audience). A deadline of revocation already on the case is never
+  changed; it is written only when the case has none. The same pass then tells the IT Admin and the Super Admin (`ACCOUNT_LOCK_OVERDUE`, key
+  `ACCOUNT_LOCK_OVERDUE:<case>`, once for the case, with the audit event `OFFBOARDING_CASE.ACCOUNT_LOCK_OVERDUE`) when a departure blocked now
+  has no lock of the company account from the day after it was recorded. It revokes nothing and opens no task. Run one by hand with
+  `BlockAnnouncementService.announce(now)` and `AccountLockOverdueService.notice(now)`.
   The API also runs `SaasIssueSweeper` once an hour (the first pass five minutes after start, unreferenced timer): it closes each resolved
   report of an error in a SaaS right whose last day to reopen (`saas_issues.reopen_until`, fixed when it was resolved from
   `SAAS_ISSUE_REOPEN_WORKING_DAYS`) has passed (state `CLOSED`, a `SYSTEM` entry and the audit event `SAAS_ISSUE.CLOSED`, under the row lock),

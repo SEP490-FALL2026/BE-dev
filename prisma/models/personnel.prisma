@@ -307,6 +307,8 @@ model OffboardingCase {
   handoverDueOn          DateTime?             @map("handover_due_on") @db.Date
   // The day the IT Admin has until to take every right of the person away (QĐ-110c, M-09): null for a case that was closed or cancelled before the rule.
   revocationDueOn        DateTime?             @map("revocation_due_on") @db.Date
+  // The moment the system announced that the access of the person is blocked (QĐ-110b, QĐ-110d): set once by the sweeper of the block moment, which is what keeps it from telling twice.
+  blockAnnouncedAt       DateTime?             @map("block_announced_at") @db.Timestamptz(3)
   groundsType            String?                @map("grounds_type")
   groundsReference       String                @map("grounds_reference")
   groundsIssuer          String?                @map("grounds_issuer")

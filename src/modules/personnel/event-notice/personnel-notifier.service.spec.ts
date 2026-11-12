@@ -267,4 +267,93 @@ describe('who is told of an event of the personnel context (F17, spec B)', () =>
       expect(recipients(unplaced.told, 'REVOCATION_OVERDUE')).toEqual(['it-a', 'sa']);
     });
   });
+  describe('the block moment of a departure (QĐ-110b, QĐ-110d, R-1)', () => {
+    const facts = {
+      organizationId: ORGANIZATION,
+      employeeId: 'leaver',
+      departmentId: 'd1',
+      caseId: 'c1',
+      blockedOn: '2026-10-01',
+      revocationDueOn: '2026-10-02',
+      markLeft: true,
+    };
+    const audiences = (told: InAppNotificationInput[]) =>
+      told.map((notice) => [notice.recipientEmployeeId, notice.params.audience, notice.eventKey]);
+
+    it('tells the Super Admin to mark the person as left and the IT Admin to block the company account and open the revocation, once each, with ids and days only', async () => {
+      const { notifier, told } = notifierOf({ superAdmin: 'sa', itAdminOfDepartment: 'it1' });
+
+      await notifier.departureAccessBlocked(TX, facts);
+
+      expect(audiences(told)).toEqual([
+        ['sa', 'SUPER_ADMIN', 'DEPARTURE_ACCESS_BLOCKED:c1:SUPER_ADMIN'],
+        ['it1', 'IT_ADMIN', 'DEPARTURE_ACCESS_BLOCKED:c1:IT_ADMIN'],
+      ]);
+      expect(told[0]).toMatchObject({
+        code: 'DEPARTURE_ACCESS_BLOCKED',
+        subject: { type: 'OFFBOARDING_CASE', id: 'c1' },
+        params: {
+          caseId: 'c1',
+          employeeId: 'leaver',
+          departmentId: 'd1',
+          blockedOn: '2026-10-01',
+          revocationDueOn: '2026-10-02',
+        },
+      });
+      expect(Object.keys(told[0].params).sort()).toEqual([
+        'audience',
+        'blockedOn',
+        'caseId',
+        'departmentId',
+        'employeeId',
+        'revocationDueOn',
+      ]);
+    });
+
+    it('does not ask the Super Admin to mark a person who is already marked as left, and tells the IT Admin who can act when the department names none', async () => {
+      const { notifier, told } = notifierOf({ superAdmin: 'sa', usableItAdmins: ['it-a'] });
+
+      await notifier.departureAccessBlocked(TX, { ...facts, markLeft: false });
+
+      expect(audiences(told)).toEqual([['it-a', 'IT_ADMIN', 'DEPARTURE_ACCESS_BLOCKED:c1:IT_ADMIN']]);
+    });
+
+    it('tells only the Super Admin when no IT Admin can act, and never the person who left', async () => {
+      const { notifier, told } = notifierOf({
+        superAdmin: 'sa',
+        itAdminOfDepartment: 'leaver',
+        usableItAdmins: ['leaver'],
+      });
+
+      await notifier.departureAccessBlocked(TX, facts);
+
+      expect(audiences(told)).toEqual([['sa', 'SUPER_ADMIN', 'DEPARTURE_ACCESS_BLOCKED:c1:SUPER_ADMIN']]);
+    });
+  });
+
+  describe('the lock of the company account that was not written by the end of the day (QĐ-94m, R-1)', () => {
+    const facts = {
+      organizationId: ORGANIZATION,
+      employeeId: 'leaver',
+      departmentId: 'd1',
+      caseId: 'c1',
+      blockedOn: '2026-11-12',
+    };
+
+    it('tells the IT Admin and the Super Admin once for the case, and says whether anything was written', async () => {
+      const first = notifierOf({ superAdmin: 'sa', itAdminOfDepartment: 'it1' });
+      const again = notifierOf({ superAdmin: 'sa', itAdminOfDepartment: 'it1', alreadyTold: true });
+
+      expect(await first.notifier.accountLockOverdue(TX, facts)).toBe(true);
+      expect(await again.notifier.accountLockOverdue(TX, facts)).toBe(false);
+
+      expect(recipients(first.told, 'ACCOUNT_LOCK_OVERDUE')).toEqual(['it1', 'sa']);
+      expect(first.told[0]).toMatchObject({
+        subject: { type: 'OFFBOARDING_CASE', id: 'c1' },
+        params: { caseId: 'c1', employeeId: 'leaver', blockedOn: '2026-11-12' },
+        eventKey: 'ACCOUNT_LOCK_OVERDUE:c1',
+      });
+      expect(Object.keys(first.told[0].params).sort()).toEqual(['blockedOn', 'caseId', 'employeeId']);
+    });
+  });
 });

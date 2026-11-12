@@ -1,5 +1,6 @@
 import { addDays, type BusinessDate } from '../../../core/business-date';
 import { addWorkingDays, type NonWorkingDates } from '../../../core/working-days';
+import { firstDayRefused } from '../departure-deadline/block-moment.policy';
 import { groundsNoteRefusal } from '../personnel-grounds.policy';
 import type { AccessBlockMode, OffboardingState } from './offboarding.types';
 
@@ -285,12 +286,7 @@ export function accessBlockedFrom(
   facts: { state: OffboardingState; leftOn: BusinessDate | null },
   block: DepartureBlock | null,
 ): BusinessDate | null {
-  if (facts.state === 'CANCELLED') return null;
-  const days = [block?.blockedFrom, facts.state === 'LEFT' ? facts.leftOn : null].filter(
-    (day): day is BusinessDate => typeof day === 'string',
-  );
-
-  return days.length === 0 ? null : days.reduce((first, day) => (day < first ? day : first));
+  return firstDayRefused(facts, block);
 }
 
 /** Whether the lock of the account may be written (`US-03-04` AC-20, `QĐ-77i`): the person is blocked and it was not written yet. */
