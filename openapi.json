@@ -93867,7 +93867,11 @@
                       "applicationId": { "type": "string", "format": "uuid" },
                       "applicationName": { "type": "string" },
                       "provisioningType": { "type": "string", "enum": ["K1", "K2", "K3", "K4", "K5"] },
-                      "preRevocationNote": { "type": "string", "nullable": true }
+                      "preRevocationNote": {
+                        "description": "The note the plan carries now about what to do before the seat is taken away, read when the card is read, not a copy kept when the task was opened. Read only: nobody confirms it. Null on a grant and when the plan has no note.",
+                        "type": "string",
+                        "nullable": true
+                      }
                     },
                     "required": [
                       "planId",
@@ -94188,7 +94192,11 @@
                         "applicationId": { "type": "string", "format": "uuid" },
                         "applicationName": { "type": "string" },
                         "provisioningType": { "type": "string", "enum": ["K1", "K2", "K3", "K4", "K5"] },
-                        "preRevocationNote": { "type": "string", "nullable": true }
+                        "preRevocationNote": {
+                          "description": "The note the plan carries now about what to do before the seat is taken away, read when the card is read, not a copy kept when the task was opened. Read only: nobody confirms it. Null on a grant and when the plan has no note.",
+                          "type": "string",
+                          "nullable": true
+                        }
                       },
                       "required": [
                         "planId",
@@ -94422,7 +94430,11 @@
                       "applicationId": { "type": "string", "format": "uuid" },
                       "applicationName": { "type": "string" },
                       "provisioningType": { "type": "string", "enum": ["K1", "K2", "K3", "K4", "K5"] },
-                      "preRevocationNote": { "type": "string", "nullable": true }
+                      "preRevocationNote": {
+                        "description": "The note the plan carries now about what to do before the seat is taken away, read when the card is read, not a copy kept when the task was opened. Read only: nobody confirms it. Null on a grant and when the plan has no note.",
+                        "type": "string",
+                        "nullable": true
+                      }
                     },
                     "required": [
                       "planId",

@@ -154,8 +154,13 @@ const taskSummarySchema = z.strictObject({
       applicationId: z.uuid(),
       applicationName: z.string(),
       provisioningType: z.enum(['K1', 'K2', 'K3', 'K4', 'K5']),
-      /** On the card of a revocation: what the plan says to do before the seat is taken away, read only; null on a grant and when the plan has none. */
-      preRevocationNote: z.string().nullable(),
+      /** On the card of a revocation: what the plan says now to do before the seat is taken away, read only; null on a grant and when the plan has none. */
+      preRevocationNote: z
+        .string()
+        .nullable()
+        .describe(
+          'The note the plan carries now about what to do before the seat is taken away, read when the card is read, not a copy kept when the task was opened. Read only: nobody confirms it. Null on a grant and when the plan has no note.',
+        ),
     })
     .nullable(),
   subscriptionId: z.uuid().nullable(),
