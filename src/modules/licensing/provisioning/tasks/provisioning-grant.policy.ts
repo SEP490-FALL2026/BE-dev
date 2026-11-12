@@ -21,6 +21,20 @@ export function grantPurchaseOf(
   return { kind: decision.kind, reason: decision.reason, purchasedAt: now };
 }
 
+/**
+ * Why the grant of a seat cannot begin for the beneficiary (`QĐ-77f`, `QĐ-110d`): they have left, or a departure blocks their access
+ * today although they are not marked left yet. A task already being worked is not judged here: it is the IT Admin's to check with the
+ * vendor and close. Null when the grant may begin.
+ */
+export function beneficiaryGrantRefusal(facts: {
+  status: string;
+  accessBlocked: boolean;
+}): 'LEFT' | 'ACCESS_BLOCKED' | null {
+  if (facts.status !== 'ACTIVE') return 'LEFT';
+
+  return facts.accessBlocked ? 'ACCESS_BLOCKED' : null;
+}
+
 /** Whether the request claimed in the transaction of the grant is still the one that was read before it: the same person, plan and kind of seat. */
 export const claimMatchesAnswer = (
   claimed: { employeeId: string; planId: string; seat: string },

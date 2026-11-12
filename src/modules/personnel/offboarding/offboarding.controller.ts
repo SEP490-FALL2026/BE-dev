@@ -102,7 +102,7 @@ export class OffboardingController {
     status: HttpStatus.CREATED,
     message: 'OFFBOARDING_CASE.RECORDED',
     description:
-      'The handover was recorded with the last working day and the basis, or, blocked now, the departure was recorded with the access of the person refused from the next request (a last working day that is today or past leaves the person at once). The placement of the person ends the day after the last working day, the head of the department they leave is handed over or left empty as chosen (a warning says from when), a long leave ends, a transfer that would take effect later is cancelled with the reason given. No seat is taken away and no task is made. A person with no placement in force (department null) is recorded the same way with no placement to end and no head handover; a first placement not yet in force that starts after the last working day is cancelled with the record, and put back if the case is cancelled.',
+      'The handover was recorded with the last working day and the basis, or, blocked now, the departure was recorded with the access of the person refused from the next request: its last working day is the day it is recorded (left out, or today), the person leaves at once, and the successor of the head takes the department the day after. The placement of the person ends the day after the last working day, the head of the department they leave is handed over or left empty as chosen (a warning says from when), a long leave ends, a transfer that would take effect later is cancelled with the reason given. No seat is taken away and no task is made. A person with no placement in force (department null) is recorded the same way with no placement to end and no head handover; a first placement not yet in force that starts after the last working day is cancelled with the record, and put back if the case is cancelled.',
   })
   @ApiErrorResponses(
     ...WRITE_COMMON,
@@ -118,7 +118,7 @@ export class OffboardingController {
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
-      description: `The body is invalid (VALIDATION_ERROR), there is no last working day or it is not allowed (OFFBOARDING_CASE.LAST_WORKING_DAY_REQUIRED, LAST_WORKING_DAY_INVALID), ${GROUNDS_REFUSALS}, a transfer that waits would be cancelled by the departure and the confirmation is missing (TRANSFER_CANCELLATION_REQUIRED), the person heads the department they leave and names nobody to follow them or gives "nobody" (PERSONNEL.SUCCESSOR_REQUIRED, details.departmentId), or the person chosen to follow the head cannot take the department that day (OFFBOARDING_CASE.SUCCESSOR_NOT_A_MEMBER_ON_DATE): nothing is saved.`,
+      description: `The body is invalid (VALIDATION_ERROR), there is no last working day for a planned handover or the day is not allowed (OFFBOARDING_CASE.LAST_WORKING_DAY_REQUIRED, LAST_WORKING_DAY_INVALID; for a departure blocked now details.reason BLOCK_NOW_DAY_IS_TODAY says the day must be today), ${GROUNDS_REFUSALS}, a transfer that waits would be cancelled by the departure and the confirmation is missing (TRANSFER_CANCELLATION_REQUIRED), the person heads the department they leave and names nobody to follow them or gives "nobody" (PERSONNEL.SUCCESSOR_REQUIRED, details.departmentId), or the person chosen to follow the head cannot take the department that day (OFFBOARDING_CASE.SUCCESSOR_NOT_A_MEMBER_ON_DATE): nothing is saved.`,
       examples: [
         VALIDATION_EXAMPLE,
         E.LAST_WORKING_DAY_REQUIRED,
@@ -229,8 +229,14 @@ export class OffboardingController {
     NOT_FOUND,
     {
       status: HttpStatus.CONFLICT,
-      description: `The person has left (OFFBOARDING_CASE.CASE_LEFT), the handover is not under way (NOT_HANDING_OVER), the last working day has passed (LAST_DAY_ALREADY_PASSED), the case cancelled a first placement and the new day is on or after the day it would take effect (PLACEMENT_OVERLAP, details.reason FIRST_PLACEMENT_PENDING with validFrom), or ${CONCURRENT}.`,
-      examples: [...NOT_UNDER_WAY, E.LAST_DAY_ALREADY_PASSED, E.PLACEMENT_OVERLAP, ...CONCURRENT_EXAMPLES],
+      description: `The person has left (OFFBOARDING_CASE.CASE_LEFT), the handover is not under way (NOT_HANDING_OVER), the case was blocked now and its last working day, the day it was recorded, does not move (BLOCK_NOW_LAST_DAY_FIXED), the last working day has passed (LAST_DAY_ALREADY_PASSED), the case cancelled a first placement and the new day is on or after the day it would take effect (PLACEMENT_OVERLAP, details.reason FIRST_PLACEMENT_PENDING with validFrom), or ${CONCURRENT}.`,
+      examples: [
+        ...NOT_UNDER_WAY,
+        E.BLOCK_NOW_LAST_DAY_FIXED,
+        E.LAST_DAY_ALREADY_PASSED,
+        E.PLACEMENT_OVERLAP,
+        ...CONCURRENT_EXAMPLES,
+      ],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,

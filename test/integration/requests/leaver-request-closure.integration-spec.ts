@@ -502,6 +502,38 @@ describe('the requests and grants of a person who left (integration, real Postgr
     });
   });
 
+  describe('a grant is not started from the day a departure blocks the person (QĐ-110d)', () => {
+    it('refuses to grant and to claim a queued task once the block is in force, before the person is marked left, and leaves the task being worked as it is', async () => {
+      const u = await example();
+      const working = await approvedFor(u, u.leaver, 5 * M);
+      const workingTask = await granted(working);
+      await h.claim(workingTask).expect(200);
+      const queued = await approvedFor(u, u.leaver, 5 * M, 1);
+      const queuedTask = await granted(queued, 1);
+      const fresh = await approvedFor(u, u.leaver, 5 * M, 2);
+      const departure = await h.recordedCase(u.leaver);
+      // Before the day of the block the grant goes on as it did: the person is still at work.
+      expect(departure.state).toBe('HANDING_OVER');
+      expect(departure.accessBlocked).toBe(false);
+      await h.ctx.sql.query(`UPDATE employee_access_blocks SET blocked_from = $2::date WHERE employee_id = $1`, [
+        u.leaver.employeeId,
+        h.today(),
+      ]);
+
+      const refusedGrant = await h.grant({ requestId: fresh, subscriptionId: plans[2].subscriptionId }).expect(409);
+      const refusedClaim = await h.claim(queuedTask).expect(409);
+
+      expect(h.codeOf(refusedGrant)).toBe('PROVISIONING.BENEFICIARY_DEPARTED');
+      expect(h.detailsOf(refusedGrant)).toMatchObject({ requestId: fresh, cause: 'ACCESS_BLOCKED' });
+      expect(h.codeOf(refusedClaim)).toBe('PROVISIONING.BENEFICIARY_DEPARTED');
+      expect(h.detailsOf(refusedClaim)).toMatchObject({ cause: 'ACCESS_BLOCKED' });
+      expect((await taskOf(queued)).status).toBe('QUEUED');
+      expect(await taskOf(fresh)).toBeUndefined();
+      // The task already being worked is not touched: it is the IT Admin's to check with the vendor and close (QĐ-110d).
+      expect((await taskOf(working)).status).toBe('IN_PROGRESS');
+    });
+  });
+
   describe('what the database refuses', () => {
     it('keeps the cancellation columns and the state together, and lets a task being worked end as cancelled only for this reason', async () => {
       const u = await example();

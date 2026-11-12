@@ -14,6 +14,7 @@ const STATUS: Readonly<Record<string, HttpStatus>> = {
   LAST_WORKING_DAY_REQUIRED: HttpStatus.UNPROCESSABLE_ENTITY,
   LAST_WORKING_DAY_INVALID: HttpStatus.UNPROCESSABLE_ENTITY,
   LAST_DAY_ALREADY_PASSED: HttpStatus.CONFLICT,
+  BLOCK_NOW_LAST_DAY_FIXED: HttpStatus.CONFLICT,
   NO_CHANGE: HttpStatus.UNPROCESSABLE_ENTITY,
   CASE_LEFT: HttpStatus.CONFLICT,
   CASE_NOT_LEFT: HttpStatus.CONFLICT,
@@ -46,6 +47,8 @@ const MESSAGES: Readonly<Record<string, string>> = {
   LAST_WORKING_DAY_REQUIRED: 'The last working day is required.',
   LAST_WORKING_DAY_INVALID: 'The last working day cannot be that day.',
   LAST_DAY_ALREADY_PASSED: 'The last working day has passed: cancel the handover or record that the employee has left.',
+  BLOCK_NOW_LAST_DAY_FIXED:
+    'The access of the person was blocked at once: their last working day is the day it was recorded and does not move.',
   NO_CHANGE: 'The last working day is the same.',
   CASE_LEFT: 'The employee has already left; the handover cannot change.',
   CASE_NOT_LEFT: 'The employee has not left yet.',
@@ -111,6 +114,7 @@ export const OFFBOARDING_ERROR_EXAMPLES = {
   LAST_DAY_ALREADY_PASSED: example(
     new OffboardingRefusedError('LAST_DAY_ALREADY_PASSED', { lastWorkingDay: '2026-01-01' }),
   ),
+  BLOCK_NOW_LAST_DAY_FIXED: example(new OffboardingRefusedError('BLOCK_NOW_LAST_DAY_FIXED')),
   NO_CHANGE: example(new OffboardingRefusedError('NO_CHANGE')),
   CASE_LEFT: example(new OffboardingRefusedError('CASE_LEFT')),
   CASE_NOT_LEFT: example(new OffboardingRefusedError('CASE_NOT_LEFT')),

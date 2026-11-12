@@ -138,7 +138,6 @@ describe('offboarding case routes (e2e, no database)', () => {
       ],
       ['the retired reason to cancel the transfer', { ...RECORD, pendingTransferCancellation: { reason: 'x' } }],
       ['a confirmation to cancel the transfer that is not true', { ...RECORD, cancelPendingTransfer: false }],
-      ['no last day', { employeeId: ID, accessBlockMode: 'BLOCK_NOW', groundsNote: NOTE }],
       ['the retired flag', { ...RECORD, abrupt: true }],
       ['a mode that is not known', { ...RECORD, accessBlockMode: 'LATER' }],
       ['an employee that is not an id', { ...RECORD, employeeId: 'E1' }],

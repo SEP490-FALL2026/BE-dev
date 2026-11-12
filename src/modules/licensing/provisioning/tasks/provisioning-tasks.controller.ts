@@ -92,7 +92,7 @@ export class ProvisioningTasksController {
     {
       status: HttpStatus.CONFLICT,
       description:
-        'PROVISIONING.REQUEST_NOT_APPROVED, REQUEST_ENDED, REQUEST_NOT_IN_CATALOG (the software is not registered in the catalog yet), REQUEST_BOUNDARY_NOT_CHECKED (a service account whose boundary the IT Admin has not accepted), RESPONSIBLE_NOT_IN_DEPARTMENT (the person who answers for a service account left its department or the company: name another), TYPE_NOT_SUPPORTED (K3), BENEFICIARY_DEPARTED (details.nextStep CANCEL_REQUEST), BENEFICIARY_NOT_STARTED (details.startsOn: the person joins later), PURCHASE_NOT_ALLOWED (a `purchase` was sent while the pool of the plan still has a free seat: details.freeSeats and details.subscriptionIds), SEAT_TARGET.APPLICATION_RETIRED, or LICENSE_ASSIGNMENT.SEAT_CAPACITY (the subscription has no free seat and no `purchase` was sent: details.freeSeatsInPool is how many seats the other subscriptions of the plan hold free). A refused purchase is kept in the audit trail with the free seats (PROVISIONING_TASK.PURCHASE_REFUSED).',
+        'PROVISIONING.REQUEST_NOT_APPROVED, REQUEST_ENDED, REQUEST_NOT_IN_CATALOG (the software is not registered in the catalog yet), REQUEST_BOUNDARY_NOT_CHECKED (a service account whose boundary the IT Admin has not accepted), RESPONSIBLE_NOT_IN_DEPARTMENT (the person who answers for a service account left its department or the company: name another), TYPE_NOT_SUPPORTED (K3), BENEFICIARY_DEPARTED (the person has left, or a departure has blocked their access from today though they are not marked left yet: details.cause LEFT or ACCESS_BLOCKED, details.nextStep CANCEL_REQUEST), BENEFICIARY_NOT_STARTED (details.startsOn: the person joins later), PURCHASE_NOT_ALLOWED (a `purchase` was sent while the pool of the plan still has a free seat: details.freeSeats and details.subscriptionIds), SEAT_TARGET.APPLICATION_RETIRED, or LICENSE_ASSIGNMENT.SEAT_CAPACITY (the subscription has no free seat and no `purchase` was sent: details.freeSeatsInPool is how many seats the other subscriptions of the plan hold free). A refused purchase is kept in the audit trail with the free seats (PROVISIONING_TASK.PURCHASE_REFUSED).',
       examples: PROVISIONING_GRANT_EXAMPLES.CONFLICT,
     },
     {
@@ -170,7 +170,7 @@ export class ProvisioningTasksController {
     {
       status: HttpStatus.CONFLICT,
       description:
-        'PROVISIONING_TASK.NOT_MANUAL, NOT_CLAIMABLE (done or failed), NOT_BEFORE (a revocation still in its grace: details.notBefore is the first day it can be taken) or PROVISIONING.BENEFICIARY_DEPARTED (close the request as cancelled).',
+        'PROVISIONING_TASK.NOT_MANUAL, NOT_CLAIMABLE (done or failed), NOT_BEFORE (a revocation still in its grace: details.notBefore is the first day it can be taken) or PROVISIONING.BENEFICIARY_DEPARTED (the person has left or is blocked by a departure, details.cause says which: close the request as cancelled; a task already being worked is not refused).',
       examples: [
         PROVISIONING_ERROR_EXAMPLES.NOT_CLAIMABLE,
         PROVISIONING_ERROR_EXAMPLES.NOT_BEFORE,

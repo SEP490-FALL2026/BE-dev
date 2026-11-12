@@ -9934,7 +9934,7 @@
         },
         "responses": {
           "201": {
-            "description": "The handover was recorded with the last working day and the basis, or, blocked now, the departure was recorded with the access of the person refused from the next request (a last working day that is today or past leaves the person at once). The placement of the person ends the day after the last working day, the head of the department they leave is handed over or left empty as chosen (a warning says from when), a long leave ends, a transfer that would take effect later is cancelled with the reason given. No seat is taken away and no task is made. A person with no placement in force (department null) is recorded the same way with no placement to end and no head handover; a first placement not yet in force that starts after the last working day is cancelled with the record, and put back if the case is cancelled.",
+            "description": "The handover was recorded with the last working day and the basis, or, blocked now, the departure was recorded with the access of the person refused from the next request: its last working day is the day it is recorded (left out, or today), the person leaves at once, and the successor of the head takes the department the day after. The placement of the person ends the day after the last working day, the head of the department they leave is handed over or left empty as chosen (a warning says from when), a long leave ends, a transfer that would take effect later is cancelled with the reason given. No seat is taken away and no task is made. A person with no placement in force (department null) is recorded the same way with no placement to end and no head handover; a first placement not yet in force that starts after the last working day is cancelled with the record, and put back if the case is cancelled.",
             "content": {
               "application/json": {
                 "schema": {
@@ -10162,7 +10162,7 @@
             }
           },
           "422": {
-            "description": "The body is invalid (VALIDATION_ERROR), there is no last working day or it is not allowed (OFFBOARDING_CASE.LAST_WORKING_DAY_REQUIRED, LAST_WORKING_DAY_INVALID), the basis (groundsNote) is only the code of a notice and not a document (OFFBOARDING_CASE.GROUNDS_IS_NOTICE); a basis that is missing, blank or over 500 characters is a VALIDATION_ERROR, a transfer that waits would be cancelled by the departure and the confirmation is missing (TRANSFER_CANCELLATION_REQUIRED), the person heads the department they leave and names nobody to follow them or gives \"nobody\" (PERSONNEL.SUCCESSOR_REQUIRED, details.departmentId), or the person chosen to follow the head cannot take the department that day (OFFBOARDING_CASE.SUCCESSOR_NOT_A_MEMBER_ON_DATE): nothing is saved.",
+            "description": "The body is invalid (VALIDATION_ERROR), there is no last working day for a planned handover or the day is not allowed (OFFBOARDING_CASE.LAST_WORKING_DAY_REQUIRED, LAST_WORKING_DAY_INVALID; for a departure blocked now details.reason BLOCK_NOW_DAY_IS_TODAY says the day must be today), the basis (groundsNote) is only the code of a notice and not a document (OFFBOARDING_CASE.GROUNDS_IS_NOTICE); a basis that is missing, blank or over 500 characters is a VALIDATION_ERROR, a transfer that waits would be cancelled by the departure and the confirmation is missing (TRANSFER_CANCELLATION_REQUIRED), the person heads the department they leave and names nobody to follow them or gives \"nobody\" (PERSONNEL.SUCCESSOR_REQUIRED, details.departmentId), or the person chosen to follow the head cannot take the department that day (OFFBOARDING_CASE.SUCCESSOR_NOT_A_MEMBER_ON_DATE): nothing is saved.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -11207,7 +11207,7 @@
             }
           },
           "409": {
-            "description": "The person has left (OFFBOARDING_CASE.CASE_LEFT), the handover is not under way (NOT_HANDING_OVER), the last working day has passed (LAST_DAY_ALREADY_PASSED), the case cancelled a first placement and the new day is on or after the day it would take effect (PLACEMENT_OVERLAP, details.reason FIRST_PLACEMENT_PENDING with validFrom), or the person or the case was changed meanwhile (CONCURRENT_CHANGE).",
+            "description": "The person has left (OFFBOARDING_CASE.CASE_LEFT), the handover is not under way (NOT_HANDING_OVER), the case was blocked now and its last working day, the day it was recorded, does not move (BLOCK_NOW_LAST_DAY_FIXED), the last working day has passed (LAST_DAY_ALREADY_PASSED), the case cancelled a first placement and the new day is on or after the day it would take effect (PLACEMENT_OVERLAP, details.reason FIRST_PLACEMENT_PENDING with validFrom), or the person or the case was changed meanwhile (CONCURRENT_CHANGE).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -11230,6 +11230,17 @@
                       "error": {
                         "code": "OFFBOARDING_CASE.NOT_HANDING_OVER",
                         "message": "The case is not a handover under way.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "OFFBOARDING_CASE.BLOCK_NOW_LAST_DAY_FIXED": {
+                    "summary": "The access of the person was blocked at once: their last working day is the day it was recorded and does not move.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "OFFBOARDING_CASE.BLOCK_NOW_LAST_DAY_FIXED",
+                        "message": "The access of the person was blocked at once: their last working day is the day it was recorded and does not move.",
                         "requestId": "req_example"
                       }
                     }
@@ -28872,7 +28883,7 @@
             }
           },
           "409": {
-            "description": "PROVISIONING.REQUEST_NOT_APPROVED, REQUEST_ENDED, REQUEST_NOT_IN_CATALOG (the software is not registered in the catalog yet), REQUEST_BOUNDARY_NOT_CHECKED (a service account whose boundary the IT Admin has not accepted), RESPONSIBLE_NOT_IN_DEPARTMENT (the person who answers for a service account left its department or the company: name another), TYPE_NOT_SUPPORTED (K3), BENEFICIARY_DEPARTED (details.nextStep CANCEL_REQUEST), BENEFICIARY_NOT_STARTED (details.startsOn: the person joins later), PURCHASE_NOT_ALLOWED (a `purchase` was sent while the pool of the plan still has a free seat: details.freeSeats and details.subscriptionIds), SEAT_TARGET.APPLICATION_RETIRED, or LICENSE_ASSIGNMENT.SEAT_CAPACITY (the subscription has no free seat and no `purchase` was sent: details.freeSeatsInPool is how many seats the other subscriptions of the plan hold free). A refused purchase is kept in the audit trail with the free seats (PROVISIONING_TASK.PURCHASE_REFUSED).",
+            "description": "PROVISIONING.REQUEST_NOT_APPROVED, REQUEST_ENDED, REQUEST_NOT_IN_CATALOG (the software is not registered in the catalog yet), REQUEST_BOUNDARY_NOT_CHECKED (a service account whose boundary the IT Admin has not accepted), RESPONSIBLE_NOT_IN_DEPARTMENT (the person who answers for a service account left its department or the company: name another), TYPE_NOT_SUPPORTED (K3), BENEFICIARY_DEPARTED (the person has left, or a departure has blocked their access from today though they are not marked left yet: details.cause LEFT or ACCESS_BLOCKED, details.nextStep CANCEL_REQUEST), BENEFICIARY_NOT_STARTED (details.startsOn: the person joins later), PURCHASE_NOT_ALLOWED (a `purchase` was sent while the pool of the plan still has a free seat: details.freeSeats and details.subscriptionIds), SEAT_TARGET.APPLICATION_RETIRED, or LICENSE_ASSIGNMENT.SEAT_CAPACITY (the subscription has no free seat and no `purchase` was sent: details.freeSeatsInPool is how many seats the other subscriptions of the plan hold free). A refused purchase is kept in the audit trail with the free seats (PROVISIONING_TASK.PURCHASE_REFUSED).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -28951,7 +28962,7 @@
                       "error": {
                         "code": "PROVISIONING.BENEFICIARY_DEPARTED",
                         "message": "The beneficiary has left the company.",
-                        "details": { "requestId": "<request-id>", "nextStep": "CANCEL_REQUEST" },
+                        "details": { "requestId": "<request-id>", "cause": "LEFT", "nextStep": "CANCEL_REQUEST" },
                         "requestId": "req_example"
                       }
                     }
@@ -29779,7 +29790,7 @@
             }
           },
           "409": {
-            "description": "PROVISIONING_TASK.NOT_MANUAL, NOT_CLAIMABLE (done or failed), NOT_BEFORE (a revocation still in its grace: details.notBefore is the first day it can be taken) or PROVISIONING.BENEFICIARY_DEPARTED (close the request as cancelled).",
+            "description": "PROVISIONING_TASK.NOT_MANUAL, NOT_CLAIMABLE (done or failed), NOT_BEFORE (a revocation still in its grace: details.notBefore is the first day it can be taken) or PROVISIONING.BENEFICIARY_DEPARTED (the person has left or is blocked by a departure, details.cause says which: close the request as cancelled; a task already being worked is not refused).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -29814,7 +29825,7 @@
                       "error": {
                         "code": "PROVISIONING.BENEFICIARY_DEPARTED",
                         "message": "The beneficiary has left the company.",
-                        "details": { "requestId": "<request-id>", "nextStep": "CANCEL_REQUEST" },
+                        "details": { "requestId": "<request-id>", "cause": "LEFT", "nextStep": "CANCEL_REQUEST" },
                         "requestId": "req_example"
                       }
                     }
@@ -87906,7 +87917,7 @@
           },
           "cancelPendingTransfer": { "type": "boolean", "enum": [true] }
         },
-        "required": ["employeeId", "lastWorkingDay", "accessBlockMode", "groundsNote"],
+        "required": ["employeeId", "accessBlockMode", "groundsNote"],
         "additionalProperties": false
       },
       "OffboardingDetailResponseDto": {

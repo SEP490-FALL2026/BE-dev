@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { Page, pageOf } from '../../../../core/application/pagination';
 import type { AuthenticatedPrincipal } from '../../../../infrastructure/security/tokens/access-token-verifier.port';
 import { OrganizationReadApi } from '../../../organization/public/organization-read.api';
-import { ProvisioningBeneficiaryDepartedError, ProvisioningTaskNotFoundError } from '../../public/licensing.errors';
+import { ProvisioningTaskNotFoundError } from '../../public/licensing.errors';
 import { RevocationListeners } from '../../public/licensing.extension-points';
 import type { ProvisioningChannel, ProvisioningTaskStatus } from '../../public/licensing.types';
 import { cleanEvidence, cleanFailureReason, nextStatus } from '../provisioning.policy';
@@ -12,6 +12,7 @@ import { toRevocationFacts } from '../provisioning-task.types';
 import { ProvisioningTaskRepo } from '../provisioning-task.repo';
 import { ProvisioningTaskViewService, type TaskSummaryView, type TaskView } from '../provisioning-task-view.service';
 import { ProvisioningGrantCompletion } from './provisioning-grant-completion.service';
+import { ProvisioningHolderService } from './provisioning-holder.service';
 
 export type TaskScope = 'ALL' | 'MINE' | 'GENERAL';
 
@@ -29,6 +30,7 @@ export class ProvisioningService {
     private readonly organizationReads: OrganizationReadApi,
     private readonly revocation: RevocationListeners,
     private readonly completion: ProvisioningGrantCompletion,
+    private readonly holders: ProvisioningHolderService,
   ) {}
 
   /** The queue, the oldest first: `MINE` the tasks this IT Admin is in charge of, `GENERAL` those nobody works by default. */
@@ -83,9 +85,7 @@ export class ProvisioningService {
           await this.revocation.emit(tx, { moment: 'BEFORE_WORK', task: toRevocationFacts(locked), now });
         } else {
           const beneficiary = await this.organizationReads.getEmployee(locked.assignment.employeeId, tx);
-          if (beneficiary && beneficiary.status !== 'ACTIVE') {
-            throw new ProvisioningBeneficiaryDepartedError(locked.requestId ?? '');
-          }
+          if (beneficiary) await this.holders.requireCanBegin(tx, locked.requestId ?? '', beneficiary);
         }
         await this.repo.markClaimed(tx, locked.id, actor.appUserId, now);
         if (locked.kind === 'REVOKE') {

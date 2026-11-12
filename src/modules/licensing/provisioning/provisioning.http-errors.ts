@@ -103,6 +103,7 @@ export function toProvisioningApiException(error: unknown): unknown {
   if (error instanceof ProvisioningBeneficiaryDepartedError) {
     return refuse(CONFLICT, 'PROVISIONING.BENEFICIARY_DEPARTED', error.message, {
       requestId: error.requestId,
+      cause: error.cause,
       nextStep: 'CANCEL_REQUEST',
     });
   }

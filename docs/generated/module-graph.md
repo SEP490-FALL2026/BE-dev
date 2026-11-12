@@ -86,7 +86,7 @@ flowchart BT
   licensing -->|28| audit
   licensing -->|48| catalog
   licensing -->|2| finance
-  licensing -->|8| identity_access
+  licensing -->|9| identity_access
   licensing -->|7| notifications
   licensing -->|7| operating_parameters
   licensing -->|47| organization

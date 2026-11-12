@@ -4,7 +4,7 @@ describe('what moving the last working day of a handover is judged on (US-03-04 
   it('judges the new day against the day it is, the day the person came, the day the placement began and the day it was', () => {
     expect(
       changeFactsOf(
-        { state: 'HANDING_OVER', lastWorkingDay: '2026-11-10' },
+        { state: 'HANDING_OVER', accessBlockMode: 'WITH_LAST_DAY', lastWorkingDay: '2026-11-10' },
         {
           today: '2026-11-03',
           hireDate: '2026-01-05',
@@ -15,6 +15,7 @@ describe('what moving the last working day of a handover is judged on (US-03-04 
       ),
     ).toEqual({
       state: 'HANDING_OVER',
+      accessBlockMode: 'WITH_LAST_DAY',
       today: '2026-11-03',
       hireDate: '2026-01-05',
       placementFrom: '2026-02-01',

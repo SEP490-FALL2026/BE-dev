@@ -54,11 +54,31 @@ function plannedDayRefusal(day: BusinessDate | undefined, facts: LastDayFacts): 
   return null;
 }
 
-/** A departure blocked now: its last working day may be past, today or ahead (`Q-04` B), but not before the person came. */
+/**
+ * The last working day a departure is judged on (`QĐ-110b`): one blocked now works to the end of the day it is recorded, so it is today
+ * when none is given; a planned handover has no day to guess, and what was given is judged as it is (a day that is not today is refused
+ * for the departure blocked now by {@link recordRefusal}, not corrected here).
+ */
+export function lastWorkingDayOf(
+  accessBlockMode: AccessBlockMode,
+  given: BusinessDate | undefined,
+  today: BusinessDate,
+): BusinessDate | undefined {
+  if (accessBlockMode === 'WITH_LAST_DAY') return given;
+
+  return given === undefined || given.trim() === '' ? today : given;
+}
+
+/**
+ * A departure blocked now: its last working day is the day it is recorded (`QĐ-110b`, S2), not before the person came or the placement
+ * began. A day left out is today; any other day is refused with the reason `BLOCK_NOW_DAY_IS_TODAY`.
+ */
 function blockNowDayRefusal(day: BusinessDate | undefined, facts: LastDayFacts): OffboardingRefusal | null {
-  if (day === undefined || day.trim() === '') return { code: 'LAST_WORKING_DAY_REQUIRED' };
-  if (day < facts.hireDate) return { code: 'LAST_WORKING_DAY_INVALID', details: { reason: 'BEFORE_HIRE_DATE' } };
-  if (facts.placementFrom !== null && day < facts.placementFrom)
+  const chosen = day === undefined || day.trim() === '' ? facts.today : day;
+  if (chosen !== facts.today)
+    return { code: 'LAST_WORKING_DAY_INVALID', details: { reason: 'BLOCK_NOW_DAY_IS_TODAY', today: facts.today } };
+  if (chosen < facts.hireDate) return { code: 'LAST_WORKING_DAY_INVALID', details: { reason: 'BEFORE_HIRE_DATE' } };
+  if (facts.placementFrom !== null && chosen < facts.placementFrom)
     return {
       code: 'LAST_WORKING_DAY_INVALID',
       details: { reason: 'BEFORE_PLACEMENT_START', placementFrom: facts.placementFrom },
@@ -101,7 +121,7 @@ export function recordRefusal(facts: RecordFacts): OffboardingRefusal | null {
 
   const transfer = pendingTransferRefusal(
     facts.pendingTransfer,
-    facts.lastWorkingDay as BusinessDate,
+    lastWorkingDayOf(facts.accessBlockMode, facts.lastWorkingDay, facts.today) as BusinessDate,
     facts.cancelPendingTransfer,
   );
   if (transfer) return transfer;
@@ -135,6 +155,7 @@ function groundsFault(groundsNote: string | undefined | null): OffboardingRefusa
 
 export interface ChangeLastDayFacts extends LastDayFacts {
   state: OffboardingState;
+  accessBlockMode: AccessBlockMode;
   groundsNote?: string | undefined;
   currentLastWorkingDay: BusinessDate;
   newLastWorkingDay: BusinessDate;
@@ -151,11 +172,14 @@ export function notHandingOverRefusal(state: OffboardingState): OffboardingRefus
 }
 
 /**
- * Whether the last working day of a handover under way may move (`US-03-04` AC-14, AC-22, AC-29): not once today is past the old
- * one (only a cancellation or the departure itself is left), with a reason, to a day that is today or later and not before the person
- * came, and the head of the department is judged again on the new day.
+ * Whether the last working day of a handover under way may move (`US-03-04` AC-14, AC-22, AC-29): not for a case blocked now, whose
+ * last working day is the day it was recorded (`QĐ-110b`, 409 `BLOCK_NOW_LAST_DAY_FIXED`, also once it has left), not once today is past
+ * the old one (only a cancellation or the departure itself is left), with a reason, to a day that is today or later and not before the
+ * person came, and the head of the department is judged again on the new day. A cancelled case is not a handover under way, whatever its mode.
  */
 export function changeLastDayRefusal(facts: ChangeLastDayFacts): OffboardingRefusal | null {
+  if (facts.state === 'CANCELLED') return notHandingOverRefusal(facts.state);
+  if (facts.accessBlockMode === 'BLOCK_NOW') return { code: 'BLOCK_NOW_LAST_DAY_FIXED' };
   const state = notHandingOverRefusal(facts.state);
   if (state) return state;
   if (facts.today > facts.currentLastWorkingDay)

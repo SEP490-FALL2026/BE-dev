@@ -98,16 +98,11 @@ describe('recording a departure (integration, real PostgreSQL)', () => {
     expect(detail.checklist?.accountLock).toEqual({ state: 'PENDING', urgent: false });
   });
 
-  it('refuses a record without the last working day or without the mode, and one with `abrupt`, and writes nothing (AC-2, Q-04 B)', async () => {
+  it('refuses a record without the mode and one with `abrupt`, a planned handover without a last working day or in the past, and writes nothing (AC-2, QĐ-110b)', async () => {
     const { person } = await leaver();
     const before = await nothingWritten(person);
     const tasks = await h.taskCount();
 
-    const withoutDay = await h.recordCase({
-      employeeId: person.employeeId,
-      accessBlockMode: 'WITH_LAST_DAY',
-      groundsNote: h.groundsNote,
-    });
     const withoutMode = await h.recordCase({
       employeeId: person.employeeId,
       lastWorkingDay: h.day(10),
@@ -115,9 +110,15 @@ describe('recording a departure (integration, real PostgreSQL)', () => {
       groundsNote: h.groundsNote,
     });
     const retired = await h.recordCase(h.body(person, { abrupt: true }));
-    for (const response of [withoutDay, withoutMode, retired])
+    for (const response of [withoutMode, retired])
       expect([response.status, h.codeOf(response)]).toEqual([422, 'VALIDATION_ERROR']);
-    // A planned handover cannot start in the past; a departure blocked now can have a last working day that has gone by.
+    // A planned handover needs its day and cannot start in the past; a departure blocked now takes today when none is given.
+    const withoutDay = await h.recordCase({
+      employeeId: person.employeeId,
+      accessBlockMode: 'WITH_LAST_DAY',
+      groundsNote: h.groundsNote,
+    });
+    expect([withoutDay.status, h.codeOf(withoutDay)]).toEqual([422, 'OFFBOARDING_CASE.LAST_WORKING_DAY_REQUIRED']);
     const past = await h.recordCase(h.body(person, { lastWorkingDay: h.day(-1) }));
     expect([past.status, h.codeOf(past)]).toEqual([422, 'OFFBOARDING_CASE.LAST_WORKING_DAY_INVALID']);
 

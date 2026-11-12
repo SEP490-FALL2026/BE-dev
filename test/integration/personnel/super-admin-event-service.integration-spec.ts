@@ -601,8 +601,8 @@ describe('the controlled procedure for an event about the Super Admin (integrati
   // Last in the file: once the Super Admin has left, the application refuses their token (401) and a correction of their record
   // tells them nothing, so nothing that needs a working Super Admin can follow it.
   describe('an abrupt departure of the Super Admin', () => {
-    it('an abrupt departure already over is recorded the same way, as the last write about the person', async () => {
-      const abrupt = await run({ mode: 'abrupt-departure-record', lastWorkingDay: h.day(-2) });
+    it('an abrupt departure is recorded the same way, as the last write about the person, with the day it is recorded as its last working day', async () => {
+      const abrupt = await run({ mode: 'abrupt-departure-record', lastWorkingDay: h.today() });
 
       expect(abrupt.outcome).toBe('RECORDED');
       const { rows } = await h.ctx.sql.query<{ by_user: string | null; by_ticket: string | null; mode: string }>(

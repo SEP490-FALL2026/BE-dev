@@ -7,6 +7,7 @@ import { OffboardingCaseWriter } from './offboarding-case-writer.service';
 import { OffboardingEndings } from './offboarding-endings.service';
 import { OffboardingFrame } from './offboarding-frame.service';
 import { OffboardingPreconditions } from './offboarding-preconditions.service';
+import { lastWorkingDayOf } from './offboarding.policy';
 import type { OffboardingRecord, RecordOffboardingInput } from './offboarding.types';
 
 /**
@@ -37,10 +38,12 @@ export class OffboardingService {
   }
 
   /** The same in the transaction of the caller (the write that starts from a notice of the head, or from the controlled procedure). */
-  async recordInTx(tx: DbTx, actor: PersonnelActor, input: RecordOffboardingInput): Promise<OffboardingRecord> {
-    this.guard.requireWriter(actor, input.employeeId);
+  async recordInTx(tx: DbTx, actor: PersonnelActor, given: RecordOffboardingInput): Promise<OffboardingRecord> {
+    this.guard.requireWriter(actor, given.employeeId);
     const organization = await this.guard.requireOrganization();
     const today = await this.organizationReads.businessToday(new Date(), tx);
+    // A departure blocked now works to the end of the day it is recorded: a last working day left out is today (`QĐ-110b`).
+    const input = { ...given, lastWorkingDay: lastWorkingDayOf(given.accessBlockMode, given.lastWorkingDay, today) };
 
     const { seen, held } = await this.preconditions.require(tx, actor, input, today);
     const scheduled = await this.endings.end(tx, actor, input, { seen, held, organizationId: organization.id, today });

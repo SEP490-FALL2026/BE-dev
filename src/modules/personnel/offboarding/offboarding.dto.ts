@@ -17,8 +17,9 @@ const accountLockBodySchema = z.strictObject({ note: z.string().trim().min(1).ma
 
 const recordBodySchema = z.strictObject({
   employeeId: z.uuid(),
-  // The last working day and the mode are always given: the Super Admin chooses both on purpose, there is no default (`QĐ-96c`).
-  lastWorkingDay: businessDay,
+  // The mode is always given: the Super Admin chooses it on purpose, there is no default (`QĐ-96c`). The last working day is required
+  // for a planned handover; a departure blocked now works to the end of the day it is recorded, so it is left out or is today (`QĐ-110b`).
+  lastWorkingDay: businessDay.optional(),
   accessBlockMode: z.enum(['WITH_LAST_DAY', 'BLOCK_NOW']),
   groundsNote: groundsNoteBodySchema,
   successor: successorBodySchema.optional(),

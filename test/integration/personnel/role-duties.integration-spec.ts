@@ -504,7 +504,7 @@ describe('the roles of a person who leaves and the duties of a workspace (integr
       });
       const abrupt = await recordAsSuperAdmin(h.ctx.app, subjectCode, 'R-RD-003', {
         mode: 'abrupt-departure-record',
-        lastWorkingDay: h.day(-2),
+        lastWorkingDay: h.today(),
       });
 
       expect(await watched()).toMatchObject({

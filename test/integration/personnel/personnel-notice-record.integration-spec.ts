@@ -274,22 +274,24 @@ describe('verifying and recording the notices of the heads (integration, real Po
       expect(await stillWaiting(e1)).toBe(true);
     });
 
-    it('lets a departure notice block now with a last working day ahead: the person is refused at once and still handing over', async () => {
+    it('refuses a departure notice that blocks now with a last working day ahead: the last day is the day it is recorded, the person stays and the notice waits (QĐ-110b)', async () => {
       const e1 = await h.worker(des, code());
       const wire = h.dataOf<NoticeWire>(await notice(e1, 'DEPARTURE', { proposedOn: h.day(20) }));
       await me(e1).expect(200);
 
-      await h
-        .recordNotice(wire.id, h.recording({ lastWorkingDay: h.day(20), accessBlockMode: 'BLOCK_NOW' }))
-        .expect(201);
+      const refused = await h.recordNotice(
+        wire.id,
+        h.recording({ lastWorkingDay: h.day(20), accessBlockMode: 'BLOCK_NOW' }),
+      );
 
-      await me(e1).expect(401);
-      const [row] = await h.noticeRows(e1.employeeId);
-      expect(await h.caseRow(row.recorded_event_id as string)).toMatchObject({
-        state: 'HANDING_OVER',
-        access_block_mode: 'BLOCK_NOW',
-      });
-      expect(await h.workState(e1.employeeId)).toBe('ACTIVE/HANDING_OVER');
+      expect([refused.status, h.codeOf(refused), h.detailsOf(refused)]).toEqual([
+        422,
+        'OFFBOARDING_CASE.LAST_WORKING_DAY_INVALID',
+        { reason: 'BLOCK_NOW_DAY_IS_TODAY', today: h.today() },
+      ]);
+      await me(e1).expect(200);
+      expect(await stillWaiting(e1)).toBe(true);
+      expect(await h.workState(e1.employeeId)).toBe('ACTIVE/WORKING');
     });
   });
 

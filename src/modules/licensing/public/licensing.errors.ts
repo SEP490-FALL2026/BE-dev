@@ -156,10 +156,20 @@ export class ProvisioningResponsibleInvalidError extends Error {
   }
 }
 
-/** The beneficiary has left: no task to grant starts for them (`QĐ-77f`). */
+/**
+ * The beneficiary has left, or a departure blocks their access from today: no task to grant starts for them (`QĐ-77f`, `QĐ-110d`). The
+ * cause says which, for a client that tells a person at work from one who is gone.
+ */
 export class ProvisioningBeneficiaryDepartedError extends Error {
-  constructor(readonly requestId: string) {
-    super('The beneficiary has left the company.');
+  constructor(
+    readonly requestId: string,
+    readonly cause: 'LEFT' | 'ACCESS_BLOCKED' = 'LEFT',
+  ) {
+    super(
+      cause === 'LEFT'
+        ? 'The beneficiary has left the company.'
+        : 'The access of the beneficiary is blocked by their departure.',
+    );
     this.name = 'ProvisioningBeneficiaryDepartedError';
   }
 }

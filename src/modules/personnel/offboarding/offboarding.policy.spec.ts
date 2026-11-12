@@ -88,11 +88,6 @@ describe('whether a departure may be recorded', () => {
       'ALREADY_HANDING_OVER',
     ],
     ['no last working day, planned', { lastWorkingDay: undefined }, 'LAST_WORKING_DAY_REQUIRED'],
-    [
-      'no last working day, blocked now',
-      { lastWorkingDay: undefined, accessBlockMode: 'BLOCK_NOW' },
-      'LAST_WORKING_DAY_REQUIRED',
-    ],
     ['a planned day in the past', { lastWorkingDay: '2026-10-23' }, 'LAST_WORKING_DAY_INVALID'],
     ['a day before the person came', { hireDate: '2026-11-10' }, 'LAST_WORKING_DAY_INVALID'],
     ['a day before the placement began', { placementFrom: '2026-11-10' }, 'LAST_WORKING_DAY_INVALID'],
@@ -130,6 +125,7 @@ describe('whether a departure may be recorded', () => {
 describe('moving, cancelling and leaving', () => {
   const change = (extra: object = {}) => ({
     state: 'HANDING_OVER' as const,
+    accessBlockMode: 'WITH_LAST_DAY' as const,
     today: '2026-10-24',
     hireDate: '2020-01-01',
     placementFrom: '2026-01-05',

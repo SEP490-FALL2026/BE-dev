@@ -209,86 +209,86 @@ describe('the block of the access from the day after the last working day (integ
     });
   });
 
-  describe('a departure blocked now (departure-block-now-mode, AC-32, Q-04 B)', () => {
+  describe('a departure blocked now (departure-block-now-mode, AC-32, QĐ-110b)', () => {
     const blockNow = async (person: Person, extra: object = {}) =>
-      h.recordedCase(person, { accessBlockMode: 'BLOCK_NOW', lastWorkingDay: h.day(30), ...extra });
+      h.recordedCase(person, { accessBlockMode: 'BLOCK_NOW', lastWorkingDay: undefined, ...extra });
 
-    it('keeps the case a handover under way with the last day ahead, and refuses the person from the next request', async () => {
+    it('has the day it is recorded as its last working day, leaves the person at once, and refuses them from the next request', async () => {
       const person = await leaver();
       await me(person.account.accessToken).expect(200);
 
       const wire = await blockNow(person);
 
       expect(wire).toMatchObject({
-        state: 'HANDING_OVER',
+        state: 'LEFT',
         accessBlockMode: 'BLOCK_NOW',
-        lastWorkingDay: h.day(30),
+        lastWorkingDay: h.today(),
         handoverDueOn: null,
         accessBlocked: true,
-        accessBlockedFrom: h.today(),
       });
-      expect(await blockOf(person.employeeId)).toMatchObject({ cause: 'DEPARTURE_BLOCK_NOW', blocked_from: h.today() });
+      expect((await h.caseRow(wire.id)).left_on).toBe(h.today());
+      expect(await h.employeeLeftOn(person.employeeId)).toBe(h.today());
       await me(person.account.accessToken).expect(401);
       await login(person).expect(401);
-      // The IT Admin locks the company account and opens the revocations at once, the person not being marked left.
+      // The IT Admin locks the company account and opens the revocations at once; a person with no seat has nothing to take away.
       await h.lockAccount(wire.id, LOCK).expect(200);
       const empty = await h.revokeRights(wire.id, {});
       expect([empty.status, h.codeOf(empty)]).toEqual([409, 'OFFBOARDING_CASE.NOTHING_TO_REVOKE']);
-      expect((await h.caseRow(wire.id)).state).toBe('HANDING_OVER');
     });
 
-    it('does not open the access again when the last working day moves: only the block that follows the last day moves (R-11)', async () => {
+    it('takes today when it is given as the last working day, the same as when it is left out', async () => {
+      const person = await leaver();
+
+      const wire = await blockNow(person, { lastWorkingDay: h.today() });
+
+      expect(wire).toMatchObject({ state: 'LEFT', lastWorkingDay: h.today() });
+    });
+
+    it('does not let the last working day move: 409 BLOCK_NOW_LAST_DAY_FIXED, and nothing changes', async () => {
       const person = await leaver();
       const wire = await blockNow(person);
 
       const moved = await h.changeLastDay(wire.id, { lastWorkingDay: h.day(45), reason: 'Dời ngày cuối' });
-      expect([moved.status, moved.status === 200 ? null : h.codeOf(moved)]).toEqual([200, null]);
 
-      expect(await blockOf(person.employeeId)).toMatchObject({ cause: 'DEPARTURE_BLOCK_NOW', blocked_from: h.today() });
-      const read = h.dataOf<CaseWire>(await h.readCase(wire.id).expect(200));
-      expect([read.lastWorkingDay, read.accessBlockedFrom]).toEqual([h.day(45), h.today()]);
-      await login(person).expect(401);
+      expect([moved.status, h.codeOf(moved)]).toEqual([409, 'OFFBOARDING_CASE.BLOCK_NOW_LAST_DAY_FIXED']);
+      expect((await h.caseRow(wire.id)).last_working_day).toBe(h.today());
+      expect(await h.changeKinds(wire.id)).not.toContain('LAST_DAY_CHANGED');
     });
 
-    it('lets the person leave only from the last working day, and the day they left is that day', async () => {
-      const person = await leaver();
-      const wire = await blockNow(person);
+    it.each([
+      ['yesterday', -1],
+      ['a day ahead', 1],
+      ['thirty days ahead', 30],
+      ['a day before the person came', -2000],
+    ])(
+      'refuses %s as the last working day: 422, it must be today, and nothing is written (QĐ-110b)',
+      async (_name, offset) => {
+        const person = await leaver();
+        const before = await h.caseCount(person.employeeId);
 
-      const early = await h.markLeft(wire.id);
-      expect([early.status, h.codeOf(early)]).toEqual([409, 'OFFBOARDING_CASE.LAST_WORKING_DAY_AHEAD']);
-      expect(h.detailsOf(early)).toEqual({ lastWorkingDay: h.day(30) });
-      expect((await h.caseRow(wire.id)).state).toBe('HANDING_OVER');
+        const refused = await h.recordCase(
+          h.body(person, { accessBlockMode: 'BLOCK_NOW', lastWorkingDay: h.day(offset) }),
+        );
 
-      await h.ctx.sql.query(`UPDATE offboarding_cases SET last_working_day = $2::date WHERE id = $1`, [
-        wire.id,
-        h.day(-2),
-      ]);
-      const left = h.dataOf<CaseWire>(await h.markLeft(wire.id).expect(200));
+        expect([refused.status, h.codeOf(refused), h.detailsOf(refused)]).toEqual([
+          422,
+          'OFFBOARDING_CASE.LAST_WORKING_DAY_INVALID',
+          { reason: 'BLOCK_NOW_DAY_IS_TODAY', today: h.today() },
+        ]);
+        expect(await h.caseCount(person.employeeId)).toBe(before);
+        await me(person.account.accessToken).expect(200);
+      },
+    );
 
-      expect(left).toMatchObject({ state: 'LEFT', left: { leftOn: h.day(-2) } });
-      expect(await h.employeeLeftOn(person.employeeId)).toBe(h.day(-2));
-    });
-
-    it('leaves the person at once when the last working day is yesterday, with the day of leaving as that day (AC-18)', async () => {
-      const person = await leaver();
-
-      const wire = await blockNow(person, { lastWorkingDay: h.day(-1) });
-
-      expect(wire).toMatchObject({ state: 'LEFT', accessBlockMode: 'BLOCK_NOW', accessBlocked: true });
-      expect((await h.caseRow(wire.id)).left_on).toBe(h.day(-1));
-      expect(await h.employeeLeftOn(person.employeeId)).toBe(h.day(-1));
-      await me(person.account.accessToken).expect(401);
-    });
-
-    it('refuses a last working day before the person came, and a planned handover in the past', async () => {
+    it('still asks a planned handover for its last working day, and refuses one in the past', async () => {
       const person = await leaver();
       const before = await h.caseCount(person.employeeId);
 
-      const early = await h.recordCase(h.body(person, { accessBlockMode: 'BLOCK_NOW', lastWorkingDay: '2019-01-01' }));
-      const planned = await h.recordCase(h.body(person, { lastWorkingDay: h.day(-1) }));
+      const missing = await h.recordCase(h.body(person, { lastWorkingDay: undefined }));
+      const past = await h.recordCase(h.body(person, { lastWorkingDay: h.day(-1) }));
 
-      expect([early, planned].map((response) => [response.status, h.codeOf(response)])).toEqual([
-        [422, 'OFFBOARDING_CASE.LAST_WORKING_DAY_INVALID'],
+      expect([missing, past].map((response) => [response.status, h.codeOf(response)])).toEqual([
+        [422, 'OFFBOARDING_CASE.LAST_WORKING_DAY_REQUIRED'],
         [422, 'OFFBOARDING_CASE.LAST_WORKING_DAY_INVALID'],
       ]);
       expect(await h.caseCount(person.employeeId)).toBe(before);
@@ -367,7 +367,7 @@ describe('the block of the access from the day after the last working day (integ
 
   // Last in the file: the procedure blocks the Super Admin, whose token the rest of the file would need.
   describe('the controlled procedure (departure-block-now-mode, Task 4)', () => {
-    it('maps abrupt-departure-record to a departure blocked now: a last working day ahead keeps the Super Admin handing over, but refused', async () => {
+    it('maps abrupt-departure-record to a departure blocked now: the day it is recorded is the last working day, and the Super Admin is refused from the next request', async () => {
       const subject = h.seed.superAdmin;
       await h.ctx.sql.query(`UPDATE employees SET hire_date = '2020-01-01' WHERE id = $1`, [subject.employeeId]);
       const subjectCode = (
@@ -376,18 +376,30 @@ describe('the block of the access from the day after the last working day (integ
         ])
       ).rows[0].employee_code;
 
+      await expect(
+        recordAsSuperAdmin(h.ctx.app, subjectCode, 'R-AB-000', {
+          mode: 'abrupt-departure-record',
+          lastWorkingDay: h.day(5),
+        }),
+      ).rejects.toMatchObject({
+        problem: 'OFFBOARDING_CASE.LAST_WORKING_DAY_INVALID',
+        reason: 'BLOCK_NOW_DAY_IS_TODAY',
+      });
+      expect(await h.caseCount(subject.employeeId)).toBe(0);
+
       const recorded = await recordAsSuperAdmin(h.ctx.app, subjectCode, 'R-AB-001', {
         mode: 'abrupt-departure-record',
-        lastWorkingDay: h.day(5),
+        lastWorkingDay: h.today(),
       });
 
       expect(recorded.outcome).toBe('RECORDED');
       const row = await h.caseRow(recorded.recordId);
-      expect([row.state, row.access_block_mode, row.handover_due_on]).toEqual(['HANDING_OVER', 'BLOCK_NOW', null]);
-      expect(await blockOf(subject.employeeId)).toMatchObject({
-        cause: 'DEPARTURE_BLOCK_NOW',
-        blocked_from: h.today(),
-      });
+      expect([row.state, row.access_block_mode, row.last_working_day, row.handover_due_on]).toEqual([
+        'LEFT',
+        'BLOCK_NOW',
+        h.today(),
+        null,
+      ]);
       await me(h.sa.accessToken).expect(401);
     });
   });
