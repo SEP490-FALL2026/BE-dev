@@ -204,7 +204,8 @@ describe('the roles of a person who leaves and the duties of a workspace (integr
         expect(await flaggedEvents(wire.id)).toHaveLength(atRecord.length);
         expect(await stored(wire.id)).toEqual(['SPENDING_APPROVER']);
         const read = h.dataOf<FlaggedCase>(await h.readCase(wire.id).expect(200));
-        expect(Object.keys(read.roleFlags)).not.toEqual(expect.arrayContaining(['FALLBACK_APPROVER']));
+        expect(Object.keys(read.roleFlags)).not.toContain('FALLBACK_APPROVER');
+        expect(Object.keys(read.roleFlags)).not.toContain('SUBSTITUTE_APPROVER');
         expect(read).not.toHaveProperty('abrupt');
       } finally {
         await h.setRole('SPENDING_APPROVER', h.boss);
