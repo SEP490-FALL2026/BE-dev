@@ -5955,7 +5955,7 @@
             }
           },
           "422": {
-            "description": "The body is invalid (VALIDATION_ERROR), the day is in the past or not after the first day of the current placement (DEPARTMENT_TRANSFER.EFFECTIVE_DATE_IN_PAST, EFFECTIVE_DATE_NOT_AFTER_CURRENT_PERIOD), the department does not change (NO_CHANGE), the department is unknown (DEPARTMENT_NOT_FOUND), the destination takes effect later than the day (DEPARTMENT_NOT_YET_EFFECTIVE), the basis is the code of a notice and not a document (DEPARTMENT_TRANSFER.GROUNDS_IS_NOTICE), it is issued after today (PERSONNEL.GROUNDS_ISSUED_ON_FUTURE); a basis that is missing or lacks a part is a VALIDATION_ERROR, or the head of the department they leave is not provided for (HEAD_SUCCESSOR_REQUIRED, SUCCESSOR_NOT_A_MEMBER_ON_DATE).",
+            "description": "The body is invalid (VALIDATION_ERROR), the day is in the past or not after the first day of the current placement (DEPARTMENT_TRANSFER.EFFECTIVE_DATE_IN_PAST, EFFECTIVE_DATE_NOT_AFTER_CURRENT_PERIOD), the department does not change (NO_CHANGE), the department is unknown (DEPARTMENT_NOT_FOUND), the destination takes effect later than the day (DEPARTMENT_NOT_YET_EFFECTIVE), the basis (groundsNote) is only the code of a notice and not a document (DEPARTMENT_TRANSFER.GROUNDS_IS_NOTICE); a basis that is missing, blank or over 500 characters is a VALIDATION_ERROR, or the head of the department they leave is not provided for (HEAD_SUCCESSOR_REQUIRED, SUCCESSOR_NOT_A_MEMBER_ON_DATE).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -6038,18 +6038,6 @@
                       "error": {
                         "code": "DEPARTMENT_TRANSFER.GROUNDS_IS_NOTICE",
                         "message": "The code of a notice is not the document the change rests on.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "PERSONNEL.GROUNDS_ISSUED_ON_FUTURE": {
-                    "summary": "The basis cannot be issued after today.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "PERSONNEL.GROUNDS_ISSUED_ON_FUTURE",
-                        "message": "The basis cannot be issued after today.",
-                        "details": { "today": "2026-01-01" },
                         "requestId": "req_example"
                       }
                     }
@@ -6927,7 +6915,7 @@
             }
           },
           "422": {
-            "description": "The body is invalid, such as one without a reason or a basis (VALIDATION_ERROR), the basis is the code of a notice and not a document (DEPARTMENT_TRANSFER.GROUNDS_IS_NOTICE), it is issued after today (PERSONNEL.GROUNDS_ISSUED_ON_FUTURE); a basis that is missing or lacks a part is a VALIDATION_ERROR, the day is the same, in the past or not after the current placement (NO_CHANGE, EFFECTIVE_DATE_IN_PAST, EFFECTIVE_DATE_NOT_AFTER_CURRENT_PERIOD), or the head of the department cannot be handed over on the new day (HEAD_SUCCESSOR_REQUIRED, SUCCESSOR_NOT_A_MEMBER_ON_DATE): nothing is saved.",
+            "description": "The body is invalid, such as one without a reason or a basis (VALIDATION_ERROR), the basis (groundsNote) is only the code of a notice and not a document (DEPARTMENT_TRANSFER.GROUNDS_IS_NOTICE); a basis that is missing, blank or over 500 characters is a VALIDATION_ERROR, the day is the same, in the past or not after the current placement (NO_CHANGE, EFFECTIVE_DATE_IN_PAST, EFFECTIVE_DATE_NOT_AFTER_CURRENT_PERIOD), or the head of the department cannot be handed over on the new day (HEAD_SUCCESSOR_REQUIRED, SUCCESSOR_NOT_A_MEMBER_ON_DATE): nothing is saved.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -6951,18 +6939,6 @@
                       "error": {
                         "code": "DEPARTMENT_TRANSFER.GROUNDS_IS_NOTICE",
                         "message": "The code of a notice is not the document the change rests on.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "PERSONNEL.GROUNDS_ISSUED_ON_FUTURE": {
-                    "summary": "The basis cannot be issued after today.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "PERSONNEL.GROUNDS_ISSUED_ON_FUTURE",
-                        "message": "The basis cannot be issued after today.",
-                        "details": { "today": "2026-01-01" },
                         "requestId": "req_example"
                       }
                     }
@@ -7293,7 +7269,7 @@
             }
           },
           "422": {
-            "description": "The body is invalid, such as one without a reason or a basis (VALIDATION_ERROR), or the basis is the code of a notice and not a document (DEPARTMENT_TRANSFER.GROUNDS_IS_NOTICE), it is issued after today (PERSONNEL.GROUNDS_ISSUED_ON_FUTURE); a basis that is missing or lacks a part is a VALIDATION_ERROR.",
+            "description": "The body is invalid, such as one without a reason or a basis (VALIDATION_ERROR), or the basis (groundsNote) is only the code of a notice and not a document (DEPARTMENT_TRANSFER.GROUNDS_IS_NOTICE); a basis that is missing, blank or over 500 characters is a VALIDATION_ERROR.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -7317,18 +7293,6 @@
                       "error": {
                         "code": "DEPARTMENT_TRANSFER.GROUNDS_IS_NOTICE",
                         "message": "The code of a notice is not the document the change rests on.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "PERSONNEL.GROUNDS_ISSUED_ON_FUTURE": {
-                    "summary": "The basis cannot be issued after today.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "PERSONNEL.GROUNDS_ISSUED_ON_FUTURE",
-                        "message": "The basis cannot be issued after today.",
-                        "details": { "today": "2026-01-01" },
                         "requestId": "req_example"
                       }
                     }
@@ -8624,7 +8588,7 @@
             }
           },
           "422": {
-            "description": "The body is invalid or names a field the route does not know (VALIDATION_ERROR), the start is in the future or before the employee joined (LONG_LEAVE.START_DATE_INVALID), the day of return is not after the start (RETURN_DATE_INVALID), or the basis is empty or lacks a part (LONG_LEAVE.GROUNDS_REQUIRED, GROUNDS_INCOMPLETE) or is the code of a notice and not a document (GROUNDS_IS_NOTICE), or is issued after today (PERSONNEL.GROUNDS_ISSUED_ON_FUTURE): nothing is saved.",
+            "description": "The body is invalid or names a field the route does not know (VALIDATION_ERROR), the start is in the future or before the employee joined (LONG_LEAVE.START_DATE_INVALID), the day of return is not after the start (RETURN_DATE_INVALID), or the basis (groundsNote) is empty (LONG_LEAVE.GROUNDS_REQUIRED), longer than 500 characters (GROUNDS_TOO_LONG) or is only the code of a notice and not a document (GROUNDS_IS_NOTICE): nothing is saved.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -8676,14 +8640,13 @@
                       }
                     }
                   },
-                  "LONG_LEAVE.GROUNDS_INCOMPLETE": {
-                    "summary": "The basis lacks a part: its type, number, issuer or day of issue.",
+                  "LONG_LEAVE.GROUNDS_TOO_LONG": {
+                    "summary": "The basis is longer than 500 characters.",
                     "value": {
                       "success": false,
                       "error": {
-                        "code": "LONG_LEAVE.GROUNDS_INCOMPLETE",
-                        "message": "The basis lacks a part: its type, number, issuer or day of issue.",
-                        "details": { "missing": ["issuer"] },
+                        "code": "LONG_LEAVE.GROUNDS_TOO_LONG",
+                        "message": "The basis is longer than 500 characters.",
                         "requestId": "req_example"
                       }
                     }
@@ -8695,18 +8658,6 @@
                       "error": {
                         "code": "LONG_LEAVE.GROUNDS_IS_NOTICE",
                         "message": "The code of a notice is not the document the day rests on.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "PERSONNEL.GROUNDS_ISSUED_ON_FUTURE": {
-                    "summary": "The basis cannot be issued after today.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "PERSONNEL.GROUNDS_ISSUED_ON_FUTURE",
-                        "message": "The basis cannot be issued after today.",
-                        "details": { "today": "2026-01-01" },
                         "requestId": "req_example"
                       }
                     }
@@ -9518,7 +9469,7 @@
             }
           },
           "422": {
-            "description": "The body is invalid (VALIDATION_ERROR), the day is the same, not after the start (LONG_LEAVE.RETURN_DATE_INVALID) or before today (RETURN_DATE_IN_PAST), or the basis is empty or lacks a part (LONG_LEAVE.GROUNDS_REQUIRED, GROUNDS_INCOMPLETE) or is the code of a notice and not a document (GROUNDS_IS_NOTICE), or is issued after today (PERSONNEL.GROUNDS_ISSUED_ON_FUTURE): nothing is saved and the person stays on long leave.",
+            "description": "The body is invalid (VALIDATION_ERROR), the day is the same, not after the start (LONG_LEAVE.RETURN_DATE_INVALID) or before today (RETURN_DATE_IN_PAST), or the basis (groundsNote) is empty (LONG_LEAVE.GROUNDS_REQUIRED), longer than 500 characters (GROUNDS_TOO_LONG) or is only the code of a notice and not a document (GROUNDS_IS_NOTICE): nothing is saved and the person stays on long leave.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -9569,14 +9520,13 @@
                       }
                     }
                   },
-                  "LONG_LEAVE.GROUNDS_INCOMPLETE": {
-                    "summary": "The basis lacks a part: its type, number, issuer or day of issue.",
+                  "LONG_LEAVE.GROUNDS_TOO_LONG": {
+                    "summary": "The basis is longer than 500 characters.",
                     "value": {
                       "success": false,
                       "error": {
-                        "code": "LONG_LEAVE.GROUNDS_INCOMPLETE",
-                        "message": "The basis lacks a part: its type, number, issuer or day of issue.",
-                        "details": { "missing": ["issuer"] },
+                        "code": "LONG_LEAVE.GROUNDS_TOO_LONG",
+                        "message": "The basis is longer than 500 characters.",
                         "requestId": "req_example"
                       }
                     }
@@ -9588,18 +9538,6 @@
                       "error": {
                         "code": "LONG_LEAVE.GROUNDS_IS_NOTICE",
                         "message": "The code of a notice is not the document the day rests on.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "PERSONNEL.GROUNDS_ISSUED_ON_FUTURE": {
-                    "summary": "The basis cannot be issued after today.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "PERSONNEL.GROUNDS_ISSUED_ON_FUTURE",
-                        "message": "The basis cannot be issued after today.",
-                        "details": { "today": "2026-01-01" },
                         "requestId": "req_example"
                       }
                     }
@@ -9861,7 +9799,7 @@
             }
           },
           "422": {
-            "description": "The body is invalid (VALIDATION_ERROR), the day is before the leave began or in the future (LONG_LEAVE.RETURN_DATE_INVALID), or, on a day other than the approved one, the basis is empty or lacks a part (LONG_LEAVE.GROUNDS_REQUIRED, GROUNDS_INCOMPLETE) or is the code of a notice and not a document (GROUNDS_IS_NOTICE), or is issued after today (PERSONNEL.GROUNDS_ISSUED_ON_FUTURE): nothing is saved and the person stays on long leave.",
+            "description": "The body is invalid (VALIDATION_ERROR), the day is before the leave began or in the future (LONG_LEAVE.RETURN_DATE_INVALID), or, on a day other than the approved one, the basis (groundsNote) is empty (LONG_LEAVE.GROUNDS_REQUIRED), longer than 500 characters (GROUNDS_TOO_LONG) or is only the code of a notice and not a document (GROUNDS_IS_NOTICE): nothing is saved and the person stays on long leave.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -9901,14 +9839,13 @@
                       }
                     }
                   },
-                  "LONG_LEAVE.GROUNDS_INCOMPLETE": {
-                    "summary": "The basis lacks a part: its type, number, issuer or day of issue.",
+                  "LONG_LEAVE.GROUNDS_TOO_LONG": {
+                    "summary": "The basis is longer than 500 characters.",
                     "value": {
                       "success": false,
                       "error": {
-                        "code": "LONG_LEAVE.GROUNDS_INCOMPLETE",
-                        "message": "The basis lacks a part: its type, number, issuer or day of issue.",
-                        "details": { "missing": ["issuer"] },
+                        "code": "LONG_LEAVE.GROUNDS_TOO_LONG",
+                        "message": "The basis is longer than 500 characters.",
                         "requestId": "req_example"
                       }
                     }
@@ -9920,18 +9857,6 @@
                       "error": {
                         "code": "LONG_LEAVE.GROUNDS_IS_NOTICE",
                         "message": "The code of a notice is not the document the day rests on.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "PERSONNEL.GROUNDS_ISSUED_ON_FUTURE": {
-                    "summary": "The basis cannot be issued after today.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "PERSONNEL.GROUNDS_ISSUED_ON_FUTURE",
-                        "message": "The basis cannot be issued after today.",
-                        "details": { "today": "2026-01-01" },
                         "requestId": "req_example"
                       }
                     }
@@ -10237,7 +10162,7 @@
             }
           },
           "422": {
-            "description": "The body is invalid (VALIDATION_ERROR), there is no last working day or it is not allowed (OFFBOARDING_CASE.LAST_WORKING_DAY_REQUIRED, LAST_WORKING_DAY_INVALID), the basis is the code of a notice and not a document (OFFBOARDING_CASE.GROUNDS_IS_NOTICE), it is issued after today (PERSONNEL.GROUNDS_ISSUED_ON_FUTURE); a basis that is missing or lacks a part is a VALIDATION_ERROR, a transfer that waits would be cancelled by the departure and the confirmation is missing (TRANSFER_CANCELLATION_REQUIRED), or the person chosen to follow the head cannot take the department that day (SUCCESSOR_NOT_A_MEMBER_ON_DATE): nothing is saved.",
+            "description": "The body is invalid (VALIDATION_ERROR), there is no last working day or it is not allowed (OFFBOARDING_CASE.LAST_WORKING_DAY_REQUIRED, LAST_WORKING_DAY_INVALID), the basis (groundsNote) is only the code of a notice and not a document (OFFBOARDING_CASE.GROUNDS_IS_NOTICE); a basis that is missing, blank or over 500 characters is a VALIDATION_ERROR, a transfer that waits would be cancelled by the departure and the confirmation is missing (TRANSFER_CANCELLATION_REQUIRED), or the person chosen to follow the head cannot take the department that day (SUCCESSOR_NOT_A_MEMBER_ON_DATE): nothing is saved.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -10296,18 +10221,6 @@
                       "error": {
                         "code": "OFFBOARDING_CASE.GROUNDS_IS_NOTICE",
                         "message": "The code of a notice is not the document the departure rests on.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "PERSONNEL.GROUNDS_ISSUED_ON_FUTURE": {
-                    "summary": "The basis cannot be issued after today.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "PERSONNEL.GROUNDS_ISSUED_ON_FUTURE",
-                        "message": "The basis cannot be issued after today.",
-                        "details": { "today": "2026-01-01" },
                         "requestId": "req_example"
                       }
                     }
@@ -11393,7 +11306,7 @@
             }
           },
           "422": {
-            "description": "The body is invalid, such as one without a reason or a basis (VALIDATION_ERROR), the basis is the code of a notice and not a document (OFFBOARDING_CASE.GROUNDS_IS_NOTICE), it is issued after today (PERSONNEL.GROUNDS_ISSUED_ON_FUTURE); a basis that is missing or lacks a part is a VALIDATION_ERROR, the day is the same or not allowed (NO_CHANGE, LAST_WORKING_DAY_INVALID), or the head of the department cannot be handed over on the new day (SUCCESSOR_NOT_A_MEMBER_ON_DATE): nothing is saved, and the old day and the old choice stay.",
+            "description": "The body is invalid, such as one without a reason or a basis (VALIDATION_ERROR), the basis (groundsNote) is only the code of a notice and not a document (OFFBOARDING_CASE.GROUNDS_IS_NOTICE); a basis that is missing, blank or over 500 characters is a VALIDATION_ERROR, the day is the same or not allowed (NO_CHANGE, LAST_WORKING_DAY_INVALID), or the head of the department cannot be handed over on the new day (SUCCESSOR_NOT_A_MEMBER_ON_DATE): nothing is saved, and the old day and the old choice stay.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -11417,18 +11330,6 @@
                       "error": {
                         "code": "OFFBOARDING_CASE.GROUNDS_IS_NOTICE",
                         "message": "The code of a notice is not the document the departure rests on.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "PERSONNEL.GROUNDS_ISSUED_ON_FUTURE": {
-                    "summary": "The basis cannot be issued after today.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "PERSONNEL.GROUNDS_ISSUED_ON_FUTURE",
-                        "message": "The basis cannot be issued after today.",
-                        "details": { "today": "2026-01-01" },
                         "requestId": "req_example"
                       }
                     }
@@ -11747,7 +11648,7 @@
             }
           },
           "422": {
-            "description": "The body is invalid, such as one without a reason or a basis (VALIDATION_ERROR), or the basis is the code of a notice and not a document (OFFBOARDING_CASE.GROUNDS_IS_NOTICE), it is issued after today (PERSONNEL.GROUNDS_ISSUED_ON_FUTURE); a basis that is missing or lacks a part is a VALIDATION_ERROR.",
+            "description": "The body is invalid, such as one without a reason or a basis (VALIDATION_ERROR), or the basis (groundsNote) is only the code of a notice and not a document (OFFBOARDING_CASE.GROUNDS_IS_NOTICE); a basis that is missing, blank or over 500 characters is a VALIDATION_ERROR.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -11771,18 +11672,6 @@
                       "error": {
                         "code": "OFFBOARDING_CASE.GROUNDS_IS_NOTICE",
                         "message": "The code of a notice is not the document the departure rests on.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "PERSONNEL.GROUNDS_ISSUED_ON_FUTURE": {
-                    "summary": "The basis cannot be issued after today.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "PERSONNEL.GROUNDS_ISSUED_ON_FUTURE",
-                        "message": "The basis cannot be issued after today.",
-                        "details": { "today": "2026-01-01" },
                         "requestId": "req_example"
                       }
                     }
@@ -88509,21 +88398,7 @@
             "format": "date",
             "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."
           },
-          "grounds": {
-            "type": "object",
-            "properties": {
-              "type": { "type": "string", "enum": ["HR_DECISION", "APPROVED_APPLICATION", "WRITTEN_DIRECTIVE"] },
-              "reference": { "type": "string", "minLength": 1, "maxLength": 200 },
-              "issuer": { "type": "string", "minLength": 1, "maxLength": 200 },
-              "issuedOn": {
-                "type": "string",
-                "format": "date",
-                "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."
-              }
-            },
-            "required": ["type", "reference", "issuer", "issuedOn"],
-            "additionalProperties": false
-          },
+          "groundsNote": { "type": "string", "minLength": 1, "maxLength": 500 },
           "successor": {
             "oneOf": [
               {
@@ -88544,7 +88419,7 @@
             ]
           }
         },
-        "required": ["employeeId", "toDepartmentId", "effectiveOn", "grounds"],
+        "required": ["employeeId", "toDepartmentId", "effectiveOn", "groundsNote"],
         "additionalProperties": false
       },
       "TransferRecordedResponseDto": {
@@ -88602,18 +88477,7 @@
               },
               "effectiveOn": { "type": "string" },
               "status": { "type": "string", "enum": ["PENDING", "EFFECTIVE", "CANCELLED"] },
-              "grounds": {
-                "type": "object",
-                "properties": {
-                  "type": { "type": "string" },
-                  "reference": { "type": "string" },
-                  "issuer": { "type": "string" },
-                  "issuedOn": { "type": "string" }
-                },
-                "required": ["type", "reference", "issuer", "issuedOn"],
-                "additionalProperties": false,
-                "nullable": true
-              },
+              "groundsNote": { "type": "string", "nullable": true },
               "headSuccessor": {
                 "type": "object",
                 "properties": {
@@ -88668,7 +88532,7 @@
               "to",
               "effectiveOn",
               "status",
-              "grounds",
+              "groundsNote",
               "headSuccessor",
               "recordedByAppUserId",
               "recordedByProcedure",
@@ -88829,18 +88693,7 @@
               },
               "effectiveOn": { "type": "string" },
               "status": { "type": "string", "enum": ["PENDING", "EFFECTIVE", "CANCELLED"] },
-              "grounds": {
-                "type": "object",
-                "properties": {
-                  "type": { "type": "string" },
-                  "reference": { "type": "string" },
-                  "issuer": { "type": "string" },
-                  "issuedOn": { "type": "string" }
-                },
-                "required": ["type", "reference", "issuer", "issuedOn"],
-                "additionalProperties": false,
-                "nullable": true
-              },
+              "groundsNote": { "type": "string", "nullable": true },
               "headSuccessor": {
                 "type": "object",
                 "properties": {
@@ -88895,7 +88748,7 @@
               "to",
               "effectiveOn",
               "status",
-              "grounds",
+              "groundsNote",
               "headSuccessor",
               "recordedByAppUserId",
               "recordedByProcedure",
@@ -88929,17 +88782,7 @@
                     "oldEffectiveOn": { "type": "string" },
                     "newEffectiveOn": { "type": "string", "nullable": true },
                     "reason": { "type": "string" },
-                    "grounds": {
-                      "type": "object",
-                      "properties": {
-                        "type": { "type": "string" },
-                        "reference": { "type": "string" },
-                        "issuer": { "type": "string" },
-                        "issuedOn": { "type": "string" }
-                      },
-                      "required": ["type", "reference", "issuer", "issuedOn"],
-                      "additionalProperties": false
-                    },
+                    "groundsNote": { "type": "string" },
                     "changedByAppUserId": { "type": "string", "format": "uuid", "nullable": true },
                     "changedByProcedure": { "type": "boolean" },
                     "changedAt": { "type": "string", "format": "date-time" }
@@ -88950,7 +88793,7 @@
                     "oldEffectiveOn",
                     "newEffectiveOn",
                     "reason",
-                    "grounds",
+                    "groundsNote",
                     "changedByAppUserId",
                     "changedByProcedure",
                     "changedAt"
@@ -88992,21 +88835,7 @@
             "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."
           },
           "reason": { "type": "string", "minLength": 1, "maxLength": 1000 },
-          "grounds": {
-            "type": "object",
-            "properties": {
-              "type": { "type": "string", "enum": ["HR_DECISION", "APPROVED_APPLICATION", "WRITTEN_DIRECTIVE"] },
-              "reference": { "type": "string", "minLength": 1, "maxLength": 200 },
-              "issuer": { "type": "string", "minLength": 1, "maxLength": 200 },
-              "issuedOn": {
-                "type": "string",
-                "format": "date",
-                "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."
-              }
-            },
-            "required": ["type", "reference", "issuer", "issuedOn"],
-            "additionalProperties": false
-          },
+          "groundsNote": { "type": "string", "minLength": 1, "maxLength": 500 },
           "successor": {
             "oneOf": [
               {
@@ -89027,30 +88856,16 @@
             ]
           }
         },
-        "required": ["newEffectiveOn", "reason", "grounds"],
+        "required": ["newEffectiveOn", "reason", "groundsNote"],
         "additionalProperties": false
       },
       "CancelTransferBodyDto": {
         "type": "object",
         "properties": {
           "reason": { "type": "string", "minLength": 1, "maxLength": 1000 },
-          "grounds": {
-            "type": "object",
-            "properties": {
-              "type": { "type": "string", "enum": ["HR_DECISION", "APPROVED_APPLICATION", "WRITTEN_DIRECTIVE"] },
-              "reference": { "type": "string", "minLength": 1, "maxLength": 200 },
-              "issuer": { "type": "string", "minLength": 1, "maxLength": 200 },
-              "issuedOn": {
-                "type": "string",
-                "format": "date",
-                "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."
-              }
-            },
-            "required": ["type", "reference", "issuer", "issuedOn"],
-            "additionalProperties": false
-          }
+          "groundsNote": { "type": "string", "minLength": 1, "maxLength": 500 }
         },
-        "required": ["reason", "grounds"],
+        "required": ["reason", "groundsNote"],
         "additionalProperties": false
       },
       "TransferReviewPageResponseDto": {
@@ -89495,23 +89310,9 @@
             "format": "date",
             "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."
           },
-          "grounds": {
-            "type": "object",
-            "properties": {
-              "type": { "type": "string", "enum": ["HR_DECISION", "APPROVED_APPLICATION", "WRITTEN_DIRECTIVE"] },
-              "reference": { "type": "string", "minLength": 1, "maxLength": 200 },
-              "issuer": { "type": "string", "minLength": 1, "maxLength": 200 },
-              "issuedOn": {
-                "type": "string",
-                "format": "date",
-                "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."
-              }
-            },
-            "required": ["type", "reference", "issuer", "issuedOn"],
-            "additionalProperties": false
-          }
+          "groundsNote": { "type": "string", "minLength": 1, "maxLength": 500 }
         },
-        "required": ["employeeId", "startedOn", "approvedReturnOn", "grounds"],
+        "required": ["employeeId", "startedOn", "approvedReturnOn", "groundsNote"],
         "additionalProperties": false
       },
       "LeaveDetailResponseDto": {
@@ -89538,18 +89339,7 @@
               "approvedReturnOn": { "type": "string" },
               "endedOn": { "type": "string", "nullable": true },
               "overdueReturn": { "type": "boolean" },
-              "grounds": {
-                "type": "object",
-                "properties": {
-                  "type": { "type": "string" },
-                  "reference": { "type": "string" },
-                  "issuer": { "type": "string" },
-                  "issuedOn": { "type": "string" }
-                },
-                "required": ["type", "reference", "issuer", "issuedOn"],
-                "additionalProperties": false,
-                "nullable": true
-              },
+              "groundsNote": { "type": "string", "nullable": true },
               "endKind": { "type": "string", "enum": ["RETURNED", "DEPARTURE_STARTED", null], "nullable": true },
               "resumesLeaveId": { "type": "string", "format": "uuid", "nullable": true },
               "startedByAppUserId": { "type": "string", "format": "uuid", "nullable": true },
@@ -89564,7 +89354,7 @@
               "approvedReturnOn",
               "endedOn",
               "overdueReturn",
-              "grounds",
+              "groundsNote",
               "endKind",
               "resumesLeaveId",
               "startedByAppUserId",
@@ -89659,18 +89449,7 @@
                     "newReturnOn": { "type": "string", "nullable": true },
                     "returnedOn": { "type": "string", "nullable": true },
                     "onSchedule": { "type": "boolean", "nullable": true },
-                    "grounds": {
-                      "type": "object",
-                      "properties": {
-                        "type": { "type": "string" },
-                        "reference": { "type": "string" },
-                        "issuer": { "type": "string" },
-                        "issuedOn": { "type": "string" }
-                      },
-                      "required": ["type", "reference", "issuer", "issuedOn"],
-                      "additionalProperties": false,
-                      "nullable": true
-                    },
+                    "groundsNote": { "type": "string", "nullable": true },
                     "recordedByAppUserId": { "type": "string", "format": "uuid", "nullable": true },
                     "recordedByProcedure": { "type": "boolean" },
                     "recordedAt": { "type": "string", "format": "date-time" }
@@ -89682,7 +89461,7 @@
                     "newReturnOn",
                     "returnedOn",
                     "onSchedule",
-                    "grounds",
+                    "groundsNote",
                     "recordedByAppUserId",
                     "recordedByProcedure",
                     "recordedAt"
@@ -89723,23 +89502,9 @@
             "format": "date",
             "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."
           },
-          "grounds": {
-            "type": "object",
-            "properties": {
-              "type": { "type": "string", "enum": ["HR_DECISION", "APPROVED_APPLICATION", "WRITTEN_DIRECTIVE"] },
-              "reference": { "type": "string", "minLength": 1, "maxLength": 200 },
-              "issuer": { "type": "string", "minLength": 1, "maxLength": 200 },
-              "issuedOn": {
-                "type": "string",
-                "format": "date",
-                "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."
-              }
-            },
-            "required": ["type", "reference", "issuer", "issuedOn"],
-            "additionalProperties": false
-          }
+          "groundsNote": { "type": "string", "minLength": 1, "maxLength": 500 }
         },
-        "required": ["newApprovedReturnOn", "grounds"],
+        "required": ["newApprovedReturnOn", "groundsNote"],
         "additionalProperties": false
       },
       "ConfirmReturnBodyDto": {
@@ -89750,21 +89515,7 @@
             "format": "date",
             "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."
           },
-          "grounds": {
-            "type": "object",
-            "properties": {
-              "type": { "type": "string", "enum": ["HR_DECISION", "APPROVED_APPLICATION", "WRITTEN_DIRECTIVE"] },
-              "reference": { "type": "string", "minLength": 1, "maxLength": 200 },
-              "issuer": { "type": "string", "minLength": 1, "maxLength": 200 },
-              "issuedOn": {
-                "type": "string",
-                "format": "date",
-                "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."
-              }
-            },
-            "required": ["type", "reference", "issuer", "issuedOn"],
-            "additionalProperties": false
-          }
+          "groundsNote": { "type": "string", "minLength": 1, "maxLength": 500 }
         },
         "required": ["returnedOn"],
         "additionalProperties": false
@@ -89779,21 +89530,7 @@
             "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."
           },
           "accessBlockMode": { "type": "string", "enum": ["WITH_LAST_DAY", "BLOCK_NOW"] },
-          "grounds": {
-            "type": "object",
-            "properties": {
-              "type": { "type": "string", "enum": ["HR_DECISION", "APPROVED_APPLICATION", "WRITTEN_DIRECTIVE"] },
-              "reference": { "type": "string", "minLength": 1, "maxLength": 200 },
-              "issuer": { "type": "string", "minLength": 1, "maxLength": 200 },
-              "issuedOn": {
-                "type": "string",
-                "format": "date",
-                "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."
-              }
-            },
-            "required": ["type", "reference", "issuer", "issuedOn"],
-            "additionalProperties": false
-          },
+          "groundsNote": { "type": "string", "minLength": 1, "maxLength": 500 },
           "successor": {
             "oneOf": [
               {
@@ -89815,7 +89552,7 @@
           },
           "cancelPendingTransfer": { "type": "boolean", "enum": [true] }
         },
-        "required": ["employeeId", "lastWorkingDay", "accessBlockMode", "grounds"],
+        "required": ["employeeId", "lastWorkingDay", "accessBlockMode", "groundsNote"],
         "additionalProperties": false
       },
       "OffboardingDetailResponseDto": {
@@ -89876,18 +89613,7 @@
               "firstPlacementRestored": { "type": "boolean" },
               "priorWorkState": { "type": "string", "enum": ["WORKING", "ON_LONG_LEAVE"] },
               "departureEffectiveOn": { "type": "string" },
-              "grounds": {
-                "type": "object",
-                "properties": {
-                  "type": { "type": "string" },
-                  "reference": { "type": "string" },
-                  "issuer": { "type": "string" },
-                  "issuedOn": { "type": "string" }
-                },
-                "required": ["type", "reference", "issuer", "issuedOn"],
-                "additionalProperties": false,
-                "nullable": true
-              },
+              "groundsNote": { "type": "string", "nullable": true },
               "headSuccessor": {
                 "type": "object",
                 "properties": {
@@ -90040,7 +89766,7 @@
               "department",
               "priorWorkState",
               "departureEffectiveOn",
-              "grounds",
+              "groundsNote",
               "headSuccessor",
               "recordedByAppUserId",
               "recordedByProcedure",
@@ -90218,7 +89944,8 @@
                             "SUBSCRIPTION_EXPIRED",
                             "NOT_LEGALIZED",
                             "RE_EXECUTION",
-                            "POST_SETUP_REVIEW"
+                            "POST_SETUP_REVIEW",
+                            "TRANSFER"
                           ]
                         }
                       },
@@ -90333,7 +90060,12 @@
                         "MARKED_LEFT",
                         "ACCOUNT_LOCK_RECORDED",
                         "REVOCATIONS_OPENED",
-                        "CLOSED"
+                        "CLOSED",
+                        "ACCESS_BLOCKED",
+                        "REVOCATIONS_WITHDRAWN",
+                        "IT_ADMIN_HANDED_OVER",
+                        "CLOSED_BY_SYSTEM",
+                        "MAILBOX_LOCKED"
                       ]
                     },
                     "oldLastWorkingDay": { "type": "string", "nullable": true },
@@ -90392,21 +90124,7 @@
             "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."
           },
           "reason": { "type": "string", "minLength": 1, "maxLength": 1000 },
-          "grounds": {
-            "type": "object",
-            "properties": {
-              "type": { "type": "string", "enum": ["HR_DECISION", "APPROVED_APPLICATION", "WRITTEN_DIRECTIVE"] },
-              "reference": { "type": "string", "minLength": 1, "maxLength": 200 },
-              "issuer": { "type": "string", "minLength": 1, "maxLength": 200 },
-              "issuedOn": {
-                "type": "string",
-                "format": "date",
-                "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."
-              }
-            },
-            "required": ["type", "reference", "issuer", "issuedOn"],
-            "additionalProperties": false
-          },
+          "groundsNote": { "type": "string", "minLength": 1, "maxLength": 500 },
           "successor": {
             "oneOf": [
               {
@@ -90427,30 +90145,16 @@
             ]
           }
         },
-        "required": ["lastWorkingDay", "reason", "grounds"],
+        "required": ["lastWorkingDay", "reason", "groundsNote"],
         "additionalProperties": false
       },
       "CancelOffboardingBodyDto": {
         "type": "object",
         "properties": {
           "reason": { "type": "string", "minLength": 1, "maxLength": 1000 },
-          "grounds": {
-            "type": "object",
-            "properties": {
-              "type": { "type": "string", "enum": ["HR_DECISION", "APPROVED_APPLICATION", "WRITTEN_DIRECTIVE"] },
-              "reference": { "type": "string", "minLength": 1, "maxLength": 200 },
-              "issuer": { "type": "string", "minLength": 1, "maxLength": 200 },
-              "issuedOn": {
-                "type": "string",
-                "format": "date",
-                "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."
-              }
-            },
-            "required": ["type", "reference", "issuer", "issuedOn"],
-            "additionalProperties": false
-          }
+          "groundsNote": { "type": "string", "minLength": 1, "maxLength": 500 }
         },
-        "required": ["reason", "grounds"],
+        "required": ["reason", "groundsNote"],
         "additionalProperties": false
       },
       "MarkLeftBodyDto": { "type": "object", "properties": {}, "additionalProperties": false },
@@ -90537,18 +90241,7 @@
               "firstPlacementRestored": { "type": "boolean" },
               "priorWorkState": { "type": "string", "enum": ["WORKING", "ON_LONG_LEAVE"] },
               "departureEffectiveOn": { "type": "string" },
-              "grounds": {
-                "type": "object",
-                "properties": {
-                  "type": { "type": "string" },
-                  "reference": { "type": "string" },
-                  "issuer": { "type": "string" },
-                  "issuedOn": { "type": "string" }
-                },
-                "required": ["type", "reference", "issuer", "issuedOn"],
-                "additionalProperties": false,
-                "nullable": true
-              },
+              "groundsNote": { "type": "string", "nullable": true },
               "headSuccessor": {
                 "type": "object",
                 "properties": {
@@ -90710,7 +90403,7 @@
               "department",
               "priorWorkState",
               "departureEffectiveOn",
-              "grounds",
+              "groundsNote",
               "headSuccessor",
               "recordedByAppUserId",
               "recordedByProcedure",
@@ -95084,7 +94777,8 @@
                           "SUBSCRIPTION_EXPIRED",
                           "NOT_LEGALIZED",
                           "RE_EXECUTION",
-                          "POST_SETUP_REVIEW"
+                          "POST_SETUP_REVIEW",
+                          "TRANSFER"
                         ]
                       },
                       "reasonCount": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
@@ -95396,7 +95090,8 @@
                             "SUBSCRIPTION_EXPIRED",
                             "NOT_LEGALIZED",
                             "RE_EXECUTION",
-                            "POST_SETUP_REVIEW"
+                            "POST_SETUP_REVIEW",
+                            "TRANSFER"
                           ]
                         },
                         "reasonCount": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
@@ -95621,7 +95316,8 @@
                           "SUBSCRIPTION_EXPIRED",
                           "NOT_LEGALIZED",
                           "RE_EXECUTION",
-                          "POST_SETUP_REVIEW"
+                          "POST_SETUP_REVIEW",
+                          "TRANSFER"
                         ]
                       },
                       "reasonCount": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
@@ -96123,7 +95819,8 @@
                         "SUBSCRIPTION_EXPIRED",
                         "NOT_LEGALIZED",
                         "RE_EXECUTION",
-                        "POST_SETUP_REVIEW"
+                        "POST_SETUP_REVIEW",
+                        "TRANSFER"
                       ]
                     },
                     "role": { "type": "string", "enum": ["DEPARTMENT_HEAD", "REQUESTER", "IT_ADMIN"] },
@@ -96226,7 +95923,8 @@
                   "SUBSCRIPTION_EXPIRED",
                   "NOT_LEGALIZED",
                   "RE_EXECUTION",
-                  "POST_SETUP_REVIEW"
+                  "POST_SETUP_REVIEW",
+                  "TRANSFER"
                 ]
               },
               "role": { "type": "string", "enum": ["DEPARTMENT_HEAD", "REQUESTER", "IT_ADMIN"] },
@@ -98398,7 +98096,13 @@
                       "cancelledAt": { "type": "string", "format": "date-time" },
                       "cause": {
                         "type": "string",
-                        "enum": ["BENEFICIARY_LEFT", "BENEFICIARY_TRANSFERRED", "SPENDING_APPROVER_PARTY"]
+                        "enum": [
+                          "BENEFICIARY_LEFT",
+                          "BENEFICIARY_TRANSFERRED",
+                          "SYSTEM_BENEFICIARY_LEFT",
+                          "SYSTEM_BENEFICIARY_TRANSFERRED",
+                          "SPENDING_APPROVER_PARTY"
+                        ]
                       },
                       "note": { "type": "string", "nullable": true }
                     },
@@ -98919,7 +98623,13 @@
                       "cancelledAt": { "type": "string", "format": "date-time" },
                       "cause": {
                         "type": "string",
-                        "enum": ["BENEFICIARY_LEFT", "BENEFICIARY_TRANSFERRED", "SPENDING_APPROVER_PARTY"]
+                        "enum": [
+                          "BENEFICIARY_LEFT",
+                          "BENEFICIARY_TRANSFERRED",
+                          "SYSTEM_BENEFICIARY_LEFT",
+                          "SYSTEM_BENEFICIARY_TRANSFERRED",
+                          "SPENDING_APPROVER_PARTY"
+                        ]
                       },
                       "note": { "type": "string", "nullable": true }
                     },
@@ -99781,7 +99491,13 @@
                           "cancelledAt": { "type": "string", "format": "date-time" },
                           "cause": {
                             "type": "string",
-                            "enum": ["BENEFICIARY_LEFT", "BENEFICIARY_TRANSFERRED", "SPENDING_APPROVER_PARTY"]
+                            "enum": [
+                              "BENEFICIARY_LEFT",
+                              "BENEFICIARY_TRANSFERRED",
+                              "SYSTEM_BENEFICIARY_LEFT",
+                              "SYSTEM_BENEFICIARY_TRANSFERRED",
+                              "SPENDING_APPROVER_PARTY"
+                            ]
                           },
                           "note": { "type": "string", "nullable": true }
                         },
@@ -103151,7 +102867,13 @@
                       "cancelledAt": { "type": "string", "format": "date-time" },
                       "cause": {
                         "type": "string",
-                        "enum": ["BENEFICIARY_LEFT", "BENEFICIARY_TRANSFERRED", "SPENDING_APPROVER_PARTY"]
+                        "enum": [
+                          "BENEFICIARY_LEFT",
+                          "BENEFICIARY_TRANSFERRED",
+                          "SYSTEM_BENEFICIARY_LEFT",
+                          "SYSTEM_BENEFICIARY_TRANSFERRED",
+                          "SPENDING_APPROVER_PARTY"
+                        ]
                       },
                       "note": { "type": "string", "nullable": true }
                     },
@@ -104292,7 +104014,13 @@
                       "cancelledAt": { "type": "string", "format": "date-time" },
                       "cause": {
                         "type": "string",
-                        "enum": ["BENEFICIARY_LEFT", "BENEFICIARY_TRANSFERRED", "SPENDING_APPROVER_PARTY"]
+                        "enum": [
+                          "BENEFICIARY_LEFT",
+                          "BENEFICIARY_TRANSFERRED",
+                          "SYSTEM_BENEFICIARY_LEFT",
+                          "SYSTEM_BENEFICIARY_TRANSFERRED",
+                          "SPENDING_APPROVER_PARTY"
+                        ]
                       },
                       "note": { "type": "string", "nullable": true }
                     },
@@ -104530,7 +104258,14 @@
                     "endReason": { "type": "string", "nullable": true },
                     "cancelCause": {
                       "type": "string",
-                      "enum": ["BENEFICIARY_LEFT", "BENEFICIARY_TRANSFERRED", "SPENDING_APPROVER_PARTY", null],
+                      "enum": [
+                        "BENEFICIARY_LEFT",
+                        "BENEFICIARY_TRANSFERRED",
+                        "SYSTEM_BENEFICIARY_LEFT",
+                        "SYSTEM_BENEFICIARY_TRANSFERRED",
+                        "SPENDING_APPROVER_PARTY",
+                        null
+                      ],
                       "nullable": true
                     }
                   },
@@ -107619,7 +107354,8 @@
                         "REMAINDER",
                         "REVOKED",
                         "LATE_GRANT",
-                        "GRANTED_FROM_POOL"
+                        "GRANTED_FROM_POOL",
+                        "TRANSFER_EFFECTIVE"
                       ]
                     },
                     "reasonText": { "type": "string", "nullable": true },
