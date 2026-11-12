@@ -12087,7 +12087,7 @@
         },
         "responses": {
           "200": {
-            "description": "Who locked the company account, the sessions and the device credentials of the person, outside the system, when, and what was done, written once. The revocations of the rights need it first or with them.",
+            "description": "Item (1a) of BM-08, written once: who blocked the company account of the person outside the system (reset the password of the mailbox and sign out every session), when, and what was done. The mailbox is not locked here: locking it for good is the later item (1b). The system itself refuses the sign-in from the block moment; this records that the account at the company is blocked too. The revocations of the rights need it first or with them.",
             "content": {
               "application/json": {
                 "schema": {
@@ -12345,7 +12345,7 @@
           }
         },
         "security": [{ "bearer": [] }],
-        "summary": "Record the lock of the company account",
+        "summary": "Record the block of the company account (item 1a)",
         "tags": ["offboarding-cases"]
       }
     },

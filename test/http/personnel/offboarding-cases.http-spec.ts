@@ -314,4 +314,24 @@ describe('offboarding case routes (e2e, no database)', () => {
     },
     OPENAPI_DOCUMENT_BUDGET_MS,
   );
+
+  it(
+    'R-1: documents the record of the lock of the company account as item (1a) of BM-08, the block, with the mailbox not locked yet',
+    () => {
+      const document = createOpenApiDocument(app);
+      const operation = (
+        document.paths['/api/v1/offboarding-cases/{id}/account-lock'] as {
+          post: { summary: string; responses: Record<string, { description?: string }> };
+        }
+      ).post;
+      const text = `${operation.summary} ${operation.responses['200']?.description ?? ''}`;
+
+      expect(operation.summary).toMatch(/block/i);
+      expect(text).toContain('(1a)');
+      expect(text).toMatch(/reset the password of the mailbox/i);
+      expect(text).toMatch(/sign(ed)? out every session/i);
+      expect(text).toMatch(/mailbox is not locked/i);
+    },
+    OPENAPI_DOCUMENT_BUDGET_MS,
+  );
 });

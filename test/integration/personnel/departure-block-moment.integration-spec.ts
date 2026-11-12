@@ -392,4 +392,28 @@ describe('the block moment of a departure (integration, real PostgreSQL)', () =>
       expect(await noticesOf(planned.id, 'ACCOUNT_LOCK_OVERDUE')).toEqual([]);
     }, 240_000);
   });
+
+  describe('the IT Admin in charge is told when a departure is recorded, moved or cancelled (SPEC MF2-E)', () => {
+    it('writes one event notice for them for each of the three, with the kind and the day only, beside the one the person who left gets', async () => {
+      const u = await example();
+      const wire = await h.recordedCase(u.leaver);
+      await h.changeLastDay(wire.id, { lastWorkingDay: h.day(12), reason: 'Kéo dài thời gian bàn giao' }).expect(200);
+      await h.cancelCase(wire.id, { reason: 'Người ở lại làm việc' }).expect(200);
+
+      const told = await noticesOf(wire.id, 'PERSONNEL_EVENT_RECORDED');
+
+      const kinds = (recipient: string) =>
+        told
+          .filter((notice) => notice.recipient === recipient)
+          .map((notice) => notice.params.eventKind)
+          .sort();
+      expect(kinds(h.it1.employeeId)).toEqual([
+        'DEPARTURE_CANCELLED',
+        'DEPARTURE_LAST_DAY_CHANGED',
+        'DEPARTURE_RECORDED',
+      ]);
+      expect(kinds(u.leaver.employeeId)).toEqual(kinds(h.it1.employeeId));
+      expect(Object.keys(told[0].params).sort()).toEqual(['departmentId', 'effectiveOn', 'employeeId', 'eventKind']);
+    }, 240_000);
+  });
 });

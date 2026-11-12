@@ -46,7 +46,7 @@ const CONCURRENT = 'the person or the case was changed meanwhile (CONCURRENT_CHA
 const LOCK_REFUSALS = [E.ACCOUNT_LOCK_NOT_RECORDED, E.ALREADY_RECORDED] as const;
 
 /**
- * The technical steps that follow the departure of a person, which are the IT Admin's (`QĐ-87a`): the lock of the company account, the
+ * The technical steps that follow the departure of a person, which are the IT Admin's (`QĐ-87a`): the block of the company account (item 1a of `BM-08`), the
  * revocations of the rights and the closing of the case. The role is judged again by the service, so this guard is only the outer
  * layer. The events of the departure (the record, the last working day, the cancellation, the departure) are the Super Admin's and are
  * in `OffboardingController`. Nothing is revoked by itself.
@@ -62,11 +62,14 @@ export class OffboardingStepsController {
 
   @Post(':id/account-lock')
   @RequireRoles('IT_ADMIN')
-  @ApiOperation({ operationId: 'offboardingCaseRecordAccountLock', summary: 'Record the lock of the company account' })
+  @ApiOperation({
+    operationId: 'offboardingCaseRecordAccountLock',
+    summary: 'Record the block of the company account (item 1a)',
+  })
   @ApiSuccessResponse(OffboardingDetailResponseDto, {
     message: 'OFFBOARDING_CASE.ACCOUNT_LOCK_RECORDED',
     description:
-      'Who locked the company account, the sessions and the device credentials of the person, outside the system, when, and what was done, written once. The revocations of the rights need it first or with them.',
+      'Item (1a) of BM-08, written once: who blocked the company account of the person outside the system (reset the password of the mailbox and sign out every session), when, and what was done. The mailbox is not locked here: locking it for good is the later item (1b). The system itself refuses the sign-in from the block moment; this records that the account at the company is blocked too. The revocations of the rights need it first or with them.',
   })
   @ApiErrorResponses(
     ...COMMON,

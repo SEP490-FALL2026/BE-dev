@@ -158,8 +158,10 @@ export const PARAM_KEYS_BY_CODE: Readonly<Record<InAppNotificationCode, readonly
   USAGE_TRACKING_NOTICE: ['applicationId', 'activityDefinition', 'dataKinds', 'purpose', 'retentionMonths', 'viewPath'],
   // The application by id (the interface turns it into a name: no key may be a name), the source by its label, the last day the source covers and how old it is: words and days, no person.
   USAGE_SOURCE_STALE: ['applicationId', 'source', 'coverageTo', 'freshnessDays'],
-  // MF-2 (`QĐ-110b`–`QĐ-110e`): the people and the days of a departure, how many rights wait; `audience` says who is told (the Super Admin
-  // that the person is marked as gone, the IT Admin to block the company account and open the revocation).
+  // MF-2 (`QĐ-110b`–`QĐ-110e`): the people and the days of a departure, how many rights wait. `DEPARTURE_ACCESS_BLOCKED` is told at the block moment, once for
+  // each `audience`: `SUPER_ADMIN` to mark the person as left; `IT_ADMIN` to **block** the company account (item 1a of `BM-08`: reset the password of the
+  // mailbox and sign out every session; the mailbox is not locked yet, that is item 1b) and to open the revocation by `revocationDueOn`. `blockedOn` is the
+  // first day the person is refused. `ACCOUNT_LOCK_OVERDUE` says item 1a of a departure blocked now was still not recorded at the end of the day `blockedOn`.
   REVOCATION_OVERDUE: ['caseId', 'employeeId', 'dueOn', 'rightCount'],
   DEPARTURE_ACCESS_BLOCKED: ['caseId', 'employeeId', 'departmentId', 'blockedOn', 'revocationDueOn', 'audience'],
   ACCOUNT_LOCK_OVERDUE: ['caseId', 'employeeId', 'blockedOn'],

@@ -20,6 +20,13 @@ export type PersonnelEventKind =
   | 'DEPARTURE_CANCELLED'
   | 'DEPARTURE_MARKED_LEFT';
 
+/** The events of a departure that the IT Admin in charge is told as well as the person and the heads: the block and the revocations follow them. */
+const IT_ADMIN_TOLD_OF: ReadonlySet<PersonnelEventKind> = new Set([
+  'DEPARTURE_RECORDED',
+  'DEPARTURE_LAST_DAY_CHANGED',
+  'DEPARTURE_CANCELLED',
+]);
+
 interface Common {
   organizationId: string;
   employeeId: string;
@@ -60,6 +67,11 @@ export class PersonnelNotifier {
     ];
     const heads = await this.organizationReads.getDepartmentHeads(departments, today, tx);
     const recipients = new Set<string>([input.employeeId, ...[...heads.values()].map((head) => head.employeeId)]);
+    // The IT Admin who answers for the department is told a departure was recorded, moved or cancelled, since the block and the revocations follow it.
+    if (IT_ADMIN_TOLD_OF.has(input.eventKind)) {
+      const itAdmin = await this.itAdminOfDeparture(tx, input);
+      if (itAdmin) recipients.add(itAdmin);
+    }
     const occurrence = randomUUID();
     for (const recipient of recipients) {
       await this.tell(tx, input.organizationId, recipient, 'PERSONNEL_EVENT_RECORDED', {
