@@ -338,6 +338,10 @@ Không sửa code; SPEC không bị sửa trong lượt này (spec là của Own
 - **Chạm:** `change/offboarding-cancel-takeback.service.ts`; test integration cùng file với D-44 (IT phụ trách chính là người nghỉ ⟹ thông báo tới `it1`; đã kiểm đỏ khi bỏ loại trừ).
 - **Đổi sang B:** thêm API đọc người giữ tác vụ vào `LicensingApi` và gửi theo người giữ.
 
+### D-46 · MF2-C review (d) · Đề xuất sửa SPEC/PLAN: mã lỗi hủy hồ sơ đã `LEFT`
+
+- SPEC §4 P2 và dòng `MF2-C.1` của PLAN ghi `OFFBOARDING.ALREADY_LEFT`; code giữ `OFFBOARDING_CASE.CASE_LEFT` (D-37, đã có từ trước, FE đã biết). **Đề xuất sửa SPEC/PLAN:** thay `OFFBOARDING.ALREADY_LEFT` bằng `OFFBOARDING_CASE.CASE_LEFT` ở hai chỗ đó. Không sửa SPEC trong gói này.
+
 ## Bị chặn
 
 (chưa có)
