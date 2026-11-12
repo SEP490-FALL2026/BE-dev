@@ -152,6 +152,8 @@ export class AssignmentService {
           expectedEndDate: row.expectedEndDate,
           predecessorId: null,
           baselineImportId: input.importId,
+          isMachineAccount: false,
+          machineAccountNote: null,
           createdByAppUserId: actor.appUserId,
         });
       } catch (error) {
@@ -219,6 +221,9 @@ export class AssignmentService {
         expectedEndDate: input.expectedEndDate,
         predecessorId: null,
         baselineImportId: null,
+        // A new grant is a plain seat: the flag is put on it afterwards, by the IT Admin (`QĐ-110m`).
+        isMachineAccount: false,
+        machineAccountNote: null,
         createdByAppUserId: actor.appUserId,
       });
     } catch (error) {

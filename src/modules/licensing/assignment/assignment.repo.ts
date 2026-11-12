@@ -84,6 +84,9 @@ export interface NewAssignment {
   expectedEndDate: BusinessDate | null;
   predecessorId: string | null;
   baselineImportId: string | null;
+  /** A record that follows a flagged seat keeps its flag and its reason (`R-9`); every other record is written plain. */
+  isMachineAccount: boolean;
+  machineAccountNote: string | null;
   createdByAppUserId: string;
 }
 
@@ -114,6 +117,8 @@ export class AssignmentRepo {
         expectedEndDate: input.expectedEndDate ? toDateColumn(input.expectedEndDate) : null,
         predecessorId: input.predecessorId,
         baselineImportId: input.baselineImportId,
+        isMachineAccount: input.isMachineAccount,
+        machineAccountNote: input.machineAccountNote,
         createdByAppUserId: input.createdByAppUserId,
       },
     });

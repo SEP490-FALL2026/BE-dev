@@ -80,6 +80,9 @@ export class AssignmentRenewalService {
         expectedEndDate: input.newExpectedEndDate,
         predecessorId: current.id,
         baselineImportId: null,
+        // The record that follows a flagged seat is the same machine account: its flag and its reason go on (`R-9`).
+        isMachineAccount: current.isMachineAccount,
+        machineAccountNote: current.machineAccountNote,
         createdByAppUserId: actor.appUserId,
       });
     } catch (error) {
