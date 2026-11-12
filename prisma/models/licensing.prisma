@@ -51,6 +51,10 @@ model LicenseAssignment {
   cancelledAt                 DateTime?           @map("cancelled_at") @db.Timestamptz(3)
   predecessorId               String?             @map("predecessor_id") @db.Uuid
   baselineImportId            String?             @map("baseline_import_id") @db.Uuid
+  // A personal seat of an IT Admin that is used for a machine account (QĐ-110m, R-9): INV-02 leaves it out, so the IT Admin keeps their own
+  // personal seat of the same subscription as well. `machineAccountNote` is the reason and is present exactly when the flag is on.
+  isMachineAccount            Boolean             @default(false) @map("is_machine_account")
+  machineAccountNote          String?             @map("machine_account_note")
   // A value, not a foreign key: the history outlives the account (as the audit trail does).
   createdByAppUserId          String              @map("created_by_app_user_id") @db.Uuid
   createdAt                   DateTime            @default(now()) @map("created_at") @db.Timestamptz(3)

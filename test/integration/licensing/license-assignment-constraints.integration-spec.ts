@@ -21,7 +21,7 @@ async function sqlState(sql: Client, text: string, values: unknown[] = []): Prom
 
 interface AssignmentInput {
   kind?: 'PERSONAL' | 'SERVICE';
-  source?: 'BASELINE' | 'HANDOVER' | 'REQUEST';
+  source?: 'BASELINE' | 'HANDOVER' | 'REQUEST' | 'MACHINE_ACCOUNT_CONVERSION';
   planId?: string;
   subscriptionId?: string | null;
   employeeId?: string;
@@ -36,6 +36,10 @@ interface AssignmentInput {
   expectedEnd?: string | null;
   predecessorId?: string | null;
   importId?: string | null;
+  /** A personal seat of an IT Admin flagged as a machine account carries the reason (QĐ-110m); left out, the seat is not flagged. */
+  machineNote?: string | null;
+  /** The flag with no note, for the check that asks for the note. */
+  machineFlag?: boolean;
   id?: string;
 }
 
@@ -129,9 +133,10 @@ describe('license assignments (integration, PostgreSQL constraints)', () => {
       client,
       `INSERT INTO license_assignments (id, organization_id, kind, source, plan_id, subscription_id, employee_id,
          account_identifier, normalized_account_identifier, reason, cost_center_id, owning_department_id, valid_from,
-         valid_from_basis, valid_until, expected_end_date, predecessor_id, baseline_import_id, created_by_app_user_id)
+         valid_from_basis, valid_until, expected_end_date, predecessor_id, baseline_import_id, created_by_app_user_id,
+         is_machine_account, machine_account_note)
        VALUES ($1, $2, $3::"AssignmentKind", $4::"AssignmentSource", $5, $6, $7, $8, $9, $10, $11, $12, $13,
-         $14::"AssignmentDateBasis", $15, $16, $17, $18, $19)`,
+         $14::"AssignmentDateBasis", $15, $16, $17, $18, $19, $20, $21)`,
       [
         input.id ?? randomUUID(),
         organizationId,
@@ -156,6 +161,8 @@ describe('license assignments (integration, PostgreSQL constraints)', () => {
         input.predecessorId === undefined ? null : input.predecessorId,
         input.importId !== undefined ? input.importId : (input.source ?? 'BASELINE') === 'BASELINE' ? importId : null,
         randomUUID(),
+        input.machineFlag ?? (input.machineNote !== undefined && input.machineNote !== null),
+        input.machineNote === undefined ? null : input.machineNote,
       ],
     );
   const personal = (subscriptionId: string, extra: AssignmentInput = {}) =>
@@ -363,6 +370,124 @@ describe('license assignments (integration, PostgreSQL constraints)', () => {
 
       expect(await personal(first, { employeeId: staff })).toBeNull();
       expect(await personal(second, { employeeId: staff })).toBeNull();
+    });
+  });
+
+  describe('QĐ-110m, R-9: a personal seat flagged as a machine account', () => {
+    const machine = { machineNote: 'Release pipeline of the build farm' } as const;
+
+    it('lets one IT Admin hold their own personal seat and a flagged one on the same subscription, and several flagged ones', async () => {
+      const subscriptionId = await fresh(10);
+
+      expect(await personal(subscriptionId, { employeeId: staff, identifier: 'it.admin@congty.vn' })).toBeNull();
+      expect(await personal(subscriptionId, { employeeId: staff, identifier: 'ci-bot', ...machine })).toBeNull();
+      expect(await personal(subscriptionId, { employeeId: staff, identifier: 'release-bot', ...machine })).toBeNull();
+    });
+
+    it('still refuses a second personal seat that is not flagged, whatever the flagged seats beside it', async () => {
+      const subscriptionId = await fresh(10);
+
+      expect(await personal(subscriptionId, { employeeId: staff, identifier: 'it.admin@congty.vn' })).toBeNull();
+      expect(await personal(subscriptionId, { employeeId: staff, identifier: 'ci-bot', ...machine })).toBeNull();
+      expect(await personal(subscriptionId, { employeeId: staff, identifier: 'second@congty.vn' })).toBe('23P01');
+    });
+
+    it('asks for the reason exactly when the flag is on, and only a personal seat takes the flag', async () => {
+      const subscriptionId = await fresh(10);
+
+      expect(await personal(subscriptionId, { employeeId: other, identifier: 'a-bot', machineFlag: true })).toBe(
+        '23514',
+      );
+      expect(
+        await personal(subscriptionId, {
+          employeeId: other,
+          identifier: 'b-bot',
+          machineFlag: true,
+          machineNote: '  ',
+        }),
+      ).toBe('23514');
+      expect(
+        await personal(subscriptionId, {
+          employeeId: other,
+          identifier: 'c-bot',
+          machineFlag: false,
+          machineNote: 'x',
+        }),
+      ).toBe('23514');
+      expect(
+        await personal(subscriptionId, {
+          kind: 'SERVICE',
+          employeeId: other,
+          identifier: 'd-bot',
+          reason: 'CI',
+          costCenterId: unitCenter,
+          ...machine,
+        }),
+      ).toBe('23514');
+    });
+
+    it('judges a seat again when its flag is turned off: refused (23P01) while the person holds another personal seat of the period', async () => {
+      const subscriptionId = await fresh(10);
+      const flagged = randomUUID();
+      expect(await personal(subscriptionId, { employeeId: staff, identifier: 'it.admin@congty.vn' })).toBeNull();
+      expect(
+        await personal(subscriptionId, { id: flagged, employeeId: staff, identifier: 'ci-bot', ...machine }),
+      ).toBeNull();
+      const unflag = `UPDATE license_assignments SET is_machine_account = false, machine_account_note = NULL WHERE id = $1`;
+
+      expect(await sqlState(sql, unflag, [flagged])).toBe('23P01');
+
+      // The other personal seat ends: the flagged one may become an ordinary seat from then on, and the flag may be turned back on.
+      const alone = await fresh(10);
+      const lone = randomUUID();
+      expect(await personal(alone, { id: lone, employeeId: staff, identifier: 'lone-bot', ...machine })).toBeNull();
+      expect(await sqlState(sql, unflag, [lone])).toBeNull();
+      expect(
+        await sqlState(
+          sql,
+          `UPDATE license_assignments SET is_machine_account = true, machine_account_note = 'Again' WHERE id = $1`,
+          [lone],
+        ),
+      ).toBeNull();
+    });
+
+    it('takes the seat a service account was converted into only when it names that service account', async () => {
+      const subscriptionId = await fresh(10);
+      const service = randomUUID();
+      expect(
+        await personal(subscriptionId, {
+          id: service,
+          kind: 'SERVICE',
+          employeeId: other,
+          identifier: 'old-bot',
+          reason: 'CI',
+          costCenterId: unitCenter,
+          validFrom: '2026-10-01',
+          validUntil: '2026-11-13',
+        }),
+      ).toBeNull();
+
+      expect(
+        await personal(subscriptionId, {
+          employeeId: staff,
+          identifier: 'old-bot',
+          source: 'MACHINE_ACCOUNT_CONVERSION',
+          importId: null,
+          validFrom: '2026-11-13',
+          ...machine,
+        }),
+      ).toBe('23514');
+      expect(
+        await personal(subscriptionId, {
+          employeeId: staff,
+          identifier: 'old-bot',
+          source: 'MACHINE_ACCOUNT_CONVERSION',
+          importId: null,
+          predecessorId: service,
+          validFrom: '2026-11-13',
+          ...machine,
+        }),
+      ).toBeNull();
     });
   });
 
