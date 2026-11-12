@@ -294,6 +294,36 @@ describe('cancelling a handover after its last working day (integration, real Po
       ).rows;
       expect(line.detail.count).toBe(1);
     }, 240_000);
+
+    it('tells an IT Admin who can act, never the person who left, when that person was the IT Admin in charge', async () => {
+      const itDepartment = await h.departmentWithUnit('P-CL2');
+      const code = `E-CL-${(counter += 1)}`;
+      const person = await h.worker(itDepartment, code, ['IT_ADMIN']);
+      await h.setItAdminInCharge(itDepartment, person);
+      const seat = await h.seatOf(person, { subscriptionId: subscriptions[2] }, code);
+      const wire = await h.recordedCase(person);
+      await pastLastDay(wire, person);
+      await h.lockAccount(wire.id, LOCK).expect(200);
+      await h.revokeRights(wire.id, {}).expect(200);
+      await h.claim((await h.liveTaskOf(seat)) as string).expect(200);
+
+      const cancelled = await h.cancelCase(wire.id, { reason: 'Ở lại sau ngày cuối' }).expect(200);
+
+      expect(
+        h.dataOf<{ revocationsWithdrawn: { itAdminToClose: number } }>(cancelled).revocationsWithdrawn,
+      ).toMatchObject({
+        itAdminToClose: 1,
+      });
+      const recipients = (
+        await h.ctx.sql.query<{ recipient_employee_id: string }>(
+          `SELECT recipient_employee_id FROM in_app_notifications WHERE code = 'DEPARTURE_REVOCATION_IT_CLOSE' AND subject_id = $1`,
+          [wire.id],
+        )
+      ).rows.map((row) => row.recipient_employee_id);
+      expect(recipients).toHaveLength(1);
+      expect(recipients[0]).not.toBe(person.employeeId);
+      expect(recipients).toEqual([h.it1.employeeId]);
+    }, 240_000);
   });
 
   describe('a handover whose last working day is not past', () => {

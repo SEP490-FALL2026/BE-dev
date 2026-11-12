@@ -1,12 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import type { BusinessDate } from '../../../../core/business-date';
 import type { DbTx } from '../../../../infrastructure/database/transaction-runner';
-import { IdentityAccessApi } from '../../../identity-access/public/identity-access.api';
 import type { PendingBlockOutcome } from '../../../identity-access/public/identity-access.types';
 import { LicensingApi } from '../../../licensing/public/licensing.api';
 import type { WithdrawnRevocation } from '../../../licensing/public/licensing.types';
 import { NotificationsApi } from '../../../notifications/public/notifications.api';
-import { OrganizationReadApi } from '../../../organization/public/organization-read.api';
+import { PersonnelNotifier } from '../../event-notice/personnel-notifier.service';
 import type { PersonnelActor } from '../../public/personnel.types';
 import { TransferGuardService } from '../../transfer/transfer-guard.service';
 import { OffboardingHandoverService } from '../offboarding-handover.service';
@@ -38,8 +37,7 @@ export class OffboardingCancelTakeBack {
     private readonly licensing: LicensingApi,
     private readonly guard: TransferGuardService,
     private readonly notifications: NotificationsApi,
-    private readonly organizationReads: OrganizationReadApi,
-    private readonly identity: IdentityAccessApi,
+    private readonly notifier: PersonnelNotifier,
     private readonly handovers: OffboardingHandoverService,
   ) {}
 
@@ -85,15 +83,17 @@ export class OffboardingCancelTakeBack {
       outcomes.push(withdrawn.outcome);
     }
     const tally = revocationsWithdrawnOf(outcomes);
-    if (tally.itAdminToClose > 0) await this.tellItAdmin(tx, held, today, tally.itAdminToClose);
+    if (tally.itAdminToClose > 0) await this.tellItAdmin(tx, held, tally.itAdminToClose);
 
     return tally;
   }
 
-  /** The IT Admin in charge of the department of the person, or the first one who can act, is told once for the case (`eventKey`). */
-  private async tellItAdmin(tx: DbTx, held: OffboardingRecord, today: BusinessDate, taskCount: number): Promise<void> {
-    const inCharge = await this.organizationReads.getItAdminInCharge(held.employeeId, today, tx);
-    const recipient = inCharge?.itAdminEmployeeId ?? (await this.identity.findFirstUsableItAdminEmployeeId(tx));
+  /**
+   * The IT Admin in charge of the department of the case, or the first one who can act, is told once for the case (`eventKey`): never the person
+   * who left, whose account is blocked and who would read nothing (`PersonnelNotifier.itAdminOfDeparture`).
+   */
+  private async tellItAdmin(tx: DbTx, held: OffboardingRecord, taskCount: number): Promise<void> {
+    const recipient = await this.notifier.itAdminOfDeparture(tx, held);
     if (recipient === null) return;
 
     await this.notifications.notifyInApp(tx, {

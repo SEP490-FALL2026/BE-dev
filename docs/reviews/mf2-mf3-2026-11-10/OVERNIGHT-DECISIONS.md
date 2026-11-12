@@ -331,6 +331,13 @@ Không sửa code; SPEC không bị sửa trong lượt này (spec là của Own
 - **Chạm:** `change/offboarding-change.policy.ts` (+spec), `change/offboarding-cancel-takeback.service.ts` (giá trị mặc định), `change/offboarding-cancel-writer.service.ts`, `offboarding.dto.ts`, `openapi.json`; test `offboarding-cancel-after-last-day.integration-spec.ts` (ca K1 `UNTIL_PAID_END` + ghế K2 đã xong + ghế đang chờ).
 - **Đổi lại:** bỏ khóa khỏi `RevocationsWithdrawn`/DTO và ghi chú vào mô tả OpenAPI (phương án A).
 
+### D-45 · MF2-C review (a) · Thông báo `DEPARTURE_REVOCATION_IT_CLOSE` không tới tài khoản của chính người nghỉ
+
+- **A:** loại `held.employeeId` khỏi người nhận, dùng IT phụ trách của phòng ghi trên hồ sơ (như job quá hạn D-42). **B:** gửi cho IT đang giữ tác vụ `IT_ADMIN_TO_CLOSE` (người nhận tác vụ). Ưu B: đúng người đang làm. Nhược B: cần đọc người giữ từng tác vụ qua facade `licensing` (thêm API) và vẫn phải xử lý trường hợp người đó cũng đã nghỉ; số tác vụ nhiều IT khác nhau ⟹ nhiều thông báo cho một hồ sơ.
+- **ĐÃ CHỌN: A.** `PersonnelNotifier.itAdminOfDeparture` (cùng hàm với D-42): IT phụ trách phòng của hồ sơ nếu khác người nghỉ, nếu không thì IT dùng được đầu tiên khác người nghỉ; không ai ⟹ không gửi. Đổi luôn chỗ tra cứu từ "phòng của người nghỉ hôm nay" (null sau ngày cuối vì vị trí đã kết thúc, nên trước đây gần như luôn rơi xuống IT đầu tiên) sang phòng ghi trên hồ sơ. Khóa sự kiện `DEPARTURE_REVOCATION_IT_CLOSE:<caseId>` giữ nguyên. `OffboardingCancelTakeBack` bỏ hai phụ thuộc (`OrganizationReadApi`, `IdentityAccessApi`), thêm `PersonnelNotifier`.
+- **Chạm:** `change/offboarding-cancel-takeback.service.ts`; test integration cùng file với D-44 (IT phụ trách chính là người nghỉ ⟹ thông báo tới `it1`; đã kiểm đỏ khi bỏ loại trừ).
+- **Đổi sang B:** thêm API đọc người giữ tác vụ vào `LicensingApi` và gửi theo người giữ.
+
 ## Bị chặn
 
 (chưa có)
