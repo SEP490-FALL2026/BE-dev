@@ -295,7 +295,7 @@ export interface OpenRevocationInput {
   /** Checked against `REVOCATION_SOURCES`: a missing or unknown source is refused. */
   source: string | undefined;
   decision: RevocationDecision;
-  /** Handed to the listeners as it is and kept nowhere here: the department, the short deadline, the notice of the handover step. */
+  /** Handed to the listeners as it is and kept nowhere here: the department, and a deadline and a notice that no listener reads since `QĐ-110g` (the handover is gone; the type goes in a later clean-up). */
   context?: RevocationContext;
   /**
    * The timing the source asks for (BR-MF5-04): `notBefore` is the first day the IT Admin may take or complete the work, `dueOn` the day it

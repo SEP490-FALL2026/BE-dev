@@ -21,8 +21,8 @@ import { ReturnSeatGate } from './return-seat-gate.service';
  * Sending the return of a seat (`US-05-13`, `US-01-12` AC-3). The return is a record of its own, not a
  * request that goes through steps: it names exactly one seat, and the person who is its holder returns it, or the head of the
  * department of the holder confirms it is no longer needed. It opens the revocation of the seat in the same transaction, through
- * the one gate of licensing (the seat is given back only when that task is completed), and snapshots what the plan asks of the
- * handover. A seat that is already being revoked takes the return as one more reason of its task. A refused return leaves
+ * the one gate of licensing (the seat is given back only when that task is completed), and keeps the note of the plan for the IT Admin;
+ * no confirmation of a handover is asked (`QĐ-110g`). A seat that is already being revoked takes the return as one more reason of its task. A refused return leaves
  * nothing behind. Neither the reason nor the identifier of the account enters an audit event.
  */
 @Injectable()

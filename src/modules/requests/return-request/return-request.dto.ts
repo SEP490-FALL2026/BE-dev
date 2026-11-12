@@ -30,7 +30,7 @@ export const returnListQuerySchema = z.strictObject({
 
 export const returnIdParamSchema = z.strictObject({ id: z.uuid() });
 
-/** One row of the list: who, which seat, where the revocation stands and what the handover asks; none of the long texts. */
+/** One row of the list: who, which seat, where the revocation stands; none of the long texts. */
 export const returnSummarySchema = z.strictObject({
   id: z.uuid(),
   state: z.enum(['AWAITING_REVOCATION', 'COMPLETED', 'FAILED']),

@@ -395,8 +395,8 @@ export class AssignmentRenewalRefusedError extends Error {
 
 /**
  * A module that extends a revocation (a listener of `RevocationListeners`) refuses the step: the code is its own and stable, and the
- * refusal is answered as a conflict. Throw it at `BEFORE_WORK` to stop the task being completed (the handover of a return, the
- * confirmation of a departure) so the caller sees a code and not a failure of the server.
+ * refusal is answered as a conflict. Throw it at `BEFORE_WORK` to stop the task being taken or completed so the caller sees a code and not a failure of the
+ * server. No listener does so today: the confirmation of a handover that did is gone (`QĐ-110g`).
  */
 export class RevocationHookRefusedError extends Error {
   constructor(

@@ -74,8 +74,8 @@ export class GrantRequestGateHook extends Hook<GrantRequestGate> {
 }
 
 /**
- * What a revocation tells the modules that extend it (`g6-handover-confirmation`, and the return of a seat of
- * `g5-return-and-renewal-requests`), in the transaction of each moment: they open their step when it opens (`OPENED`), may refuse
+ * What a revocation tells the modules that extend it (the return of a seat of `g5-return-and-renewal-requests`, the release of
+ * the money held for the seat, the ghost seat rule), in the transaction of each moment: they open their step when it opens (`OPENED`), may refuse
  * to let the work start or end by throwing at `BEFORE_WORK`, learn how the work ended (`AFTER_WORK`), and are told when the task
  * is closed as failed (`CLOSED_FAILED`) or a source takes back one of its reasons (`REASON_WITHDRAWN`). The status of the task says which moment of the work it is: before the task is taken it is
  * `QUEUED` or `RETRY_SCHEDULED`, before it is completed `IN_PROGRESS`; after it is `IN_PROGRESS` or `COMPLETED`.
@@ -118,8 +118,9 @@ export type RevocationEvent =
     };
 
 /**
- * The modules that extend a revocation, told in the order they were added and stopped at the first that throws. The handover
- * confirmation of licensing is added before the return of requests (licensing starts first); a test pins that order.
+ * The modules that extend a revocation, told in the order they were added and stopped at the first that throws. A test pins the
+ * order (`provisioning-revocation-read-contracts.integration-spec.ts`). No handover is confirmed any more (`QĐ-110g`), so no listener
+ * holds the work for it.
  */
 @Injectable()
 export class RevocationListeners extends Listeners<RevocationEvent, DbTx> {

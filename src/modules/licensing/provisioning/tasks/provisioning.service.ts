@@ -68,7 +68,7 @@ export class ProvisioningService {
 
   /**
    * Takes the task (or takes it over from another IT Admin). A revocation is taken whoever its beneficiary is, a person who
-   * left included; the hook of the handover may refuse it. Throws ProvisioningTaskNotFoundError,
+   * left included; a listener of the revocation may refuse it by throwing at `BEFORE_WORK` (none does today). Throws ProvisioningTaskNotFoundError,
    * ProvisioningTaskNotManualError, ProvisioningTaskStateError, ProvisioningBeneficiaryDepartedError and
    * ProvisioningAnotherItAdminNeededError.
    */

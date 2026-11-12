@@ -7,7 +7,7 @@ import type { ReturnSource } from './return-request.policy';
 
 export type ReturnRequestState = 'AWAITING_REVOCATION' | 'COMPLETED' | 'FAILED';
 
-/** A return as it is kept (`BM-03`): one seat, who sent it and why, what the plan asked of the handover, and how it ended. */
+/** A return as it is kept (`BM-03`): one seat, who sent it and why, what an older release asked of the handover (no longer asked, `QĐ-110g`), and how it ended. */
 export interface ReturnRequestRecord {
   id: string;
   organizationId: string;
