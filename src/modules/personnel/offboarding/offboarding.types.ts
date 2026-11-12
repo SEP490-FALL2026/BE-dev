@@ -1,5 +1,5 @@
 import type { BusinessDate } from '../../../core/business-date';
-import type { Grounds, GroundsInput } from '../personnel-grounds.policy';
+import type { GroundsInput, RecordedGrounds } from '../personnel-grounds.policy';
 import type { RoleFlag } from '../public/personnel.types';
 
 /** How the access of the person is blocked: from the day after the last working day, or from the day the departure is recorded (QĐ-96c). */
@@ -45,7 +45,7 @@ export interface OffboardingRecord {
   lastWorkingDay: BusinessDate;
   departureEffectiveOn: BusinessDate;
   handoverDueOn: BusinessDate | null;
-  grounds: Grounds;
+  grounds: RecordedGrounds;
   headHandover: HeadHandoverFacts | null;
   placementClosedId: string | null;
   cancelledPlacementId: string | null;

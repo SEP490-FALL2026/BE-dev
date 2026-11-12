@@ -269,7 +269,7 @@ export class TransferChangeWriter {
     held: TransferRecord,
     snapshots: {
       before: { [key: string]: string | null };
-      after: { [key: string]: string | null | { [key: string]: string } };
+      after: { [key: string]: string | null | { [key: string]: string | null } };
     },
   ): Promise<void> {
     await this.audit.record(

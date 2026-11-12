@@ -4,7 +4,7 @@ import { BusinessDate, fromDateColumn, toDateColumn } from '../../../core/busine
 import { Prisma } from '../../../generated/prisma/client';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
-import type { Grounds } from '../personnel-grounds.policy';
+import { recordedGroundsOf, type RecordedGrounds } from '../personnel-grounds.policy';
 import { transferHeadHandoverJson } from '../personnel-head-handover.json';
 import type {
   HeadHandoverFacts,
@@ -37,12 +37,7 @@ function toRecord(row: TransferRow): TransferRecord {
     closesPlacementId: row.closesPlacementId,
     opensPlacementId: row.opensPlacementId,
     headHandover: transferHeadHandoverJson.decode(row.headHandover),
-    grounds: {
-      type: row.groundsType,
-      reference: row.groundsReference,
-      issuer: row.groundsIssuer,
-      issuedOn: fromDateColumn(row.groundsIssuedOn),
-    },
+    grounds: recordedGroundsOf(row),
     recordedByAppUserId: row.recordedByAppUserId,
     recordedByTicketId: row.recordedByTicketId,
     recordedAt: row.recordedAt,
@@ -95,11 +90,11 @@ const FACT_COLUMNS = {
   closedAt: true,
 } as const;
 
-const groundsColumns = (grounds: Grounds) => ({
+const groundsColumns = (grounds: RecordedGrounds) => ({
   groundsType: grounds.type,
   groundsReference: grounds.reference,
   groundsIssuer: grounds.issuer,
-  groundsIssuedOn: toDateColumn(grounds.issuedOn),
+  groundsIssuedOn: grounds.issuedOn ? toDateColumn(grounds.issuedOn) : null,
 });
 
 /**
@@ -287,7 +282,7 @@ export class TransferRepo {
       oldEffectiveOn: BusinessDate;
       newEffectiveOn: BusinessDate | null;
       reason: string;
-      grounds: Grounds;
+      grounds: RecordedGrounds;
       changedByAppUserId: string | null;
       changedByTicketId: string | null;
     },
@@ -373,12 +368,7 @@ export class TransferRepo {
             oldEffectiveOn: fromDateColumn(row.oldEffectiveOn),
             newEffectiveOn: row.newEffectiveOn ? fromDateColumn(row.newEffectiveOn) : null,
             reason: row.reason,
-            grounds: {
-              type: row.groundsType,
-              reference: row.groundsReference,
-              issuer: row.groundsIssuer,
-              issuedOn: fromDateColumn(row.groundsIssuedOn),
-            },
+            grounds: recordedGroundsOf(row),
             changedByAppUserId: row.changedByAppUserId,
             changedByTicketId: row.changedByTicketId,
             changedAt: row.changedAt,

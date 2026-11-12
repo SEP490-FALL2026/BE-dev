@@ -74,11 +74,12 @@ const pagination = z.strictObject({
 
 const employeeBrief = z.strictObject({ id: z.uuid(), employeeCode: z.string(), fullName: z.string() });
 const stateSchema = z.enum(['HANDING_OVER', 'LEFT', 'CANCELLED']);
+/** The basis as it was kept: the box in `reference`; the other three parts are present only for an event written before the box. */
 const groundsSchema = z.strictObject({
-  type: z.string(),
+  type: z.string().nullable(),
   reference: z.string(),
-  issuer: z.string(),
-  issuedOn: z.string(),
+  issuer: z.string().nullable(),
+  issuedOn: z.string().nullable(),
 });
 const stepState = z.enum(['PENDING', 'IN_PROGRESS', 'DONE']);
 

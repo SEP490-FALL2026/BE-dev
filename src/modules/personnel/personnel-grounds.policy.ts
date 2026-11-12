@@ -1,4 +1,4 @@
-import { type BusinessDate, isBusinessDate } from '../../core/business-date';
+import { type BusinessDate, fromDateColumn, isBusinessDate } from '../../core/business-date';
 
 /**
  * The authoritative basis a change of the place of a person rests on (`US-03-01` AC-18): the kind of document, its number or a
@@ -10,6 +10,35 @@ export interface Grounds {
   reference: string;
   issuer: string;
   issuedOn: BusinessDate;
+}
+
+/**
+ * The basis as a personnel event keeps it (`QĐ-110a`, `QĐ-111bd`): one box of words, in `reference`, and the other three parts all
+ * present (an event written before the box) or all absent. Only the box is asked of a new event.
+ */
+export interface RecordedGrounds {
+  type: string | null;
+  reference: string;
+  issuer: string | null;
+  issuedOn: BusinessDate | null;
+}
+
+/** The columns of a basis as a table of events holds them. */
+export interface GroundsColumns {
+  groundsType: string | null;
+  groundsReference: string;
+  groundsIssuer: string | null;
+  groundsIssuedOn: Date | null;
+}
+
+/** The basis a row keeps, in the form the records of events share. */
+export function recordedGroundsOf(row: GroundsColumns): RecordedGrounds {
+  return {
+    type: row.groundsType,
+    reference: row.groundsReference,
+    issuer: row.groundsIssuer,
+    issuedOn: row.groundsIssuedOn ? fromDateColumn(row.groundsIssuedOn) : null,
+  };
 }
 
 /** What a caller sent for the basis: every part may be missing, and the policy says which. */
@@ -53,6 +82,30 @@ export function normalizedGrounds(input: GroundsInput): Grounds {
 }
 
 /** The basis as the Audit Trail keeps it: the four parts and nothing else. */
-export function groundsSnapshot(grounds: Grounds): { [part: string]: string } {
+export function groundsSnapshot(grounds: RecordedGrounds): { [part: string]: string | null } {
   return { type: grounds.type, reference: grounds.reference, issuer: grounds.issuer, issuedOn: grounds.issuedOn };
+}
+
+/** The most characters of the box that holds the basis of an event. */
+export const GROUNDS_NOTE_MAX_LENGTH = 500;
+
+export type GroundsNoteRefusal =
+  { reason: 'GROUNDS_REQUIRED' } | { reason: 'GROUNDS_TOO_LONG' } | { reason: 'GROUNDS_IS_NOTICE' };
+
+/**
+ * Null when the box is filled, is no longer than 500 characters once trimmed, and is not only the code of a notice (a notice starts a
+ * process, it is not the document that ends it, as for the four-part basis); otherwise what is wrong with it.
+ */
+export function groundsNoteRefusal(note: string | null | undefined): GroundsNoteRefusal | null {
+  const text = (note ?? '').trim();
+  if (text === '') return { reason: 'GROUNDS_REQUIRED' };
+  if (text.length > GROUNDS_NOTE_MAX_LENGTH) return { reason: 'GROUNDS_TOO_LONG' };
+  if (NOTICE_CODE.test(text)) return { reason: 'GROUNDS_IS_NOTICE' };
+
+  return null;
+}
+
+/** The box as it is kept, trimmed, with the other three parts empty; call only after `groundsNoteRefusal` said it is fine. */
+export function normalizedGroundsNote(note: string): RecordedGrounds {
+  return { type: null, reference: note.trim(), issuer: null, issuedOn: null };
 }

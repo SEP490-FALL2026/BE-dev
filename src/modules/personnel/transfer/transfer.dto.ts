@@ -56,11 +56,12 @@ const pagination = z.strictObject({
 const employeeBrief = z.strictObject({ id: z.uuid(), employeeCode: z.string(), fullName: z.string() });
 const departmentBrief = z.strictObject({ id: z.uuid(), code: z.string(), name: z.string() });
 const place = z.strictObject({ department: departmentBrief });
+/** The basis as it was kept: the box in `reference`; the other three parts are present only for an event written before the box. */
 const groundsSchema = z.strictObject({
-  type: z.string(),
+  type: z.string().nullable(),
   reference: z.string(),
-  issuer: z.string(),
-  issuedOn: z.string(),
+  issuer: z.string().nullable(),
+  issuedOn: z.string().nullable(),
 });
 
 /** The row of the list: who, from where to where, when, and where it stands. */

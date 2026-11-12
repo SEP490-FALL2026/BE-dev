@@ -1,5 +1,5 @@
 import type { BusinessDate } from '../../../core/business-date';
-import type { Grounds, GroundsInput } from '../personnel-grounds.policy';
+import type { GroundsInput, RecordedGrounds } from '../personnel-grounds.policy';
 
 export type LeaveStatus = 'ACTIVE' | 'ENDED';
 export type LeaveEndKind = 'RETURNED' | 'DEPARTURE_STARTED';
@@ -15,7 +15,7 @@ export interface LeaveRecord {
   endedOn: BusinessDate | null;
   endKind: LeaveEndKind | null;
   resumesLeaveId: string | null;
-  grounds: Grounds;
+  grounds: RecordedGrounds;
   /** Who started it: an account, or the ticket of the controlled procedure: exactly one of the two is set. */
   startedByAppUserId: string | null;
   startedByTicketId: string | null;
@@ -40,7 +40,7 @@ export interface LeaveChangeRecord {
   newReturnOn: BusinessDate | null;
   returnedOn: BusinessDate | null;
   onSchedule: boolean | null;
-  grounds: Grounds | null;
+  grounds: RecordedGrounds | null;
   /** The account, or the ticket of the controlled procedure. */
   recordedByAppUserId: string | null;
   recordedByTicketId: string | null;

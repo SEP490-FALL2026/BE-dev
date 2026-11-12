@@ -29,10 +29,10 @@ model DepartmentTransfer {
   closesPlacementId    String                   @map("closes_placement_id") @db.Uuid
   opensPlacementId     String                   @map("opens_placement_id") @db.Uuid
   headHandover         Json?                    @map("head_handover")
-  groundsType          String                   @map("grounds_type")
+  groundsType          String?                   @map("grounds_type")
   groundsReference     String                   @map("grounds_reference")
-  groundsIssuer        String                   @map("grounds_issuer")
-  groundsIssuedOn      DateTime                 @map("grounds_issued_on") @db.Date
+  groundsIssuer        String?                   @map("grounds_issuer")
+  groundsIssuedOn      DateTime?                 @map("grounds_issued_on") @db.Date
   selfExecuted         Boolean                  @default(false) @map("self_executed") @ignore
   // Who recorded and who cancelled: an application account OR the ticket of the controlled procedure (spec L.2).
   recordedByAppUserId  String?                  @map("recorded_by_app_user_id") @db.Uuid
@@ -73,10 +73,10 @@ model DepartmentTransferChange {
   oldEffectiveOn     DateTime                     @map("old_effective_on") @db.Date
   newEffectiveOn     DateTime?                    @map("new_effective_on") @db.Date
   reason             String
-  groundsType        String                       @map("grounds_type")
+  groundsType        String?                       @map("grounds_type")
   groundsReference   String                       @map("grounds_reference")
-  groundsIssuer      String                       @map("grounds_issuer")
-  groundsIssuedOn    DateTime                     @map("grounds_issued_on") @db.Date
+  groundsIssuer      String?                       @map("grounds_issuer")
+  groundsIssuedOn    DateTime?                     @map("grounds_issued_on") @db.Date
   changedByAppUserId String?                      @map("changed_by_app_user_id") @db.Uuid
   changedByTicketId  String?                      @map("changed_by_ticket_id") @db.Uuid
   changedAt          DateTime                     @default(now()) @map("changed_at") @db.Timestamptz(3)
@@ -192,10 +192,10 @@ model EmployeeLeave {
   endedOn                 DateTime?             @map("ended_on") @db.Date
   endKind                 EmployeeLeaveEndKind? @map("end_kind")
   resumesLeaveId          String?               @map("resumes_leave_id") @db.Uuid
-  groundsType             String                @map("grounds_type")
+  groundsType             String?                @map("grounds_type")
   groundsReference        String                @map("grounds_reference")
-  groundsIssuer           String                @map("grounds_issuer")
-  groundsIssuedOn         DateTime              @map("grounds_issued_on") @db.Date
+  groundsIssuer           String?                @map("grounds_issuer")
+  groundsIssuedOn         DateTime?              @map("grounds_issued_on") @db.Date
   startedByAppUserId      String?               @map("started_by_app_user_id") @db.Uuid
   startedByTicketId       String?               @map("started_by_ticket_id") @db.Uuid
   startedAt               DateTime              @default(now()) @map("started_at") @db.Timestamptz(3)
@@ -305,10 +305,10 @@ model OffboardingCase {
   lastWorkingDay         DateTime              @map("last_working_day") @db.Date
   departureEffectiveOn   DateTime              @map("departure_effective_on") @db.Date
   handoverDueOn          DateTime?             @map("handover_due_on") @db.Date
-  groundsType            String                @map("grounds_type")
+  groundsType            String?                @map("grounds_type")
   groundsReference       String                @map("grounds_reference")
-  groundsIssuer          String                @map("grounds_issuer")
-  groundsIssuedOn        DateTime              @map("grounds_issued_on") @db.Date
+  groundsIssuer          String?                @map("grounds_issuer")
+  groundsIssuedOn        DateTime?              @map("grounds_issued_on") @db.Date
   headHandover           Json?                 @map("head_handover")
   placementClosedId      String?               @map("placement_closed_id") @db.Uuid
   leftOn                 DateTime?             @map("left_on") @db.Date

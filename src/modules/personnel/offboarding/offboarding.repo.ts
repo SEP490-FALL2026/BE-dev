@@ -5,7 +5,7 @@ import { Prisma } from '../../../generated/prisma/client';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { offboardingChangeDetailJson, type ChangeDetail } from '../personnel-change-detail.json';
-import type { Grounds } from '../personnel-grounds.policy';
+import { recordedGroundsOf, type RecordedGrounds } from '../personnel-grounds.policy';
 import { offboardingHeadHandoverJson } from '../personnel-head-handover.json';
 import type {
   AccessBlockMode,
@@ -32,12 +32,7 @@ export function toRecord(row: CaseRow): OffboardingRecord {
     lastWorkingDay: fromDateColumn(row.lastWorkingDay),
     departureEffectiveOn: fromDateColumn(row.departureEffectiveOn),
     handoverDueOn: date(row.handoverDueOn),
-    grounds: {
-      type: row.groundsType,
-      reference: row.groundsReference,
-      issuer: row.groundsIssuer,
-      issuedOn: fromDateColumn(row.groundsIssuedOn),
-    },
+    grounds: recordedGroundsOf(row),
     headHandover: offboardingHeadHandoverJson.decode(row.headHandover),
     placementClosedId: row.placementClosedId,
     cancelledPlacementId: row.cancelledPlacementId,
@@ -70,7 +65,7 @@ export interface NewOffboarding {
   lastWorkingDay: BusinessDate;
   departureEffectiveOn: BusinessDate;
   handoverDueOn: BusinessDate | null;
-  grounds: Grounds;
+  grounds: RecordedGrounds;
   headHandover: HeadHandoverFacts | null;
   placementClosedId: string | null;
   cancelledPlacementId?: string | null;
@@ -112,7 +107,7 @@ export class OffboardingRepo {
         groundsType: input.grounds.type,
         groundsReference: input.grounds.reference,
         groundsIssuer: input.grounds.issuer,
-        groundsIssuedOn: toDateColumn(input.grounds.issuedOn),
+        groundsIssuedOn: input.grounds.issuedOn ? toDateColumn(input.grounds.issuedOn) : null,
         headHandover: offboardingHeadHandoverJson.encode(input.headHandover),
         placementClosedId: input.placementClosedId ?? null,
         cancelledPlacementId: input.cancelledPlacementId ?? null,
