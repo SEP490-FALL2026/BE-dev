@@ -354,6 +354,8 @@ export interface WithdrawRevocationInput {
   cause: 'NO_LONGER_APPLIES';
   /** The account that works the task now: a task in progress with no reason left is cancelled only when this account took it. */
   cancelInProgressClaimedBy?: string;
+  /** The controlled procedure acting under a ticket: the Audit Trail then says `OPERATOR` and the `actor` only fills the columns that need an account. */
+  operator?: OperatorAuditActor;
 }
 
 /**

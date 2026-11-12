@@ -20,6 +20,7 @@ dashboards; gốc `src/app/app.module.ts`.
     - `withdrawRevocationReason` — nguồn gỡ lý do của chính mình: còn lý do khác ⟹ `CONTINUES`; hết lý do ⟹ tác vụ
       `CANCELLED` (`NO_LONGER_APPLIES`, ghế không đổi), riêng tác vụ `IN_PROGRESS` chỉ hủy khi
       `cancelInProgressClaimedBy` đúng người nhận, ngược lại `IT_ADMIN_TO_CLOSE`; gọi lại ⟹ `NOT_FOUND`/`ALREADY_ENDED`.
+      Tham số tùy chọn `operator` (thủ tục có kiểm soát): audit ghi `OPERATOR` thay vì tài khoản đứng thế.
     - `lockGrantOfRequest`, `completedGrantOfRequest`, `cancelGrantOfRequest` — task grant của một request;
       `recordProvisioningFailure` — ghi lần thử connector lỗi (US-07-04).
     - `listPersonalSeatsOf`, `countPersonalSeatsOf`, `getSeatsHeldInPlans`, `listTerminatingAccess`,

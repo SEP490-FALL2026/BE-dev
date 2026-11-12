@@ -12,6 +12,11 @@ export interface PersonnelFileEvent {
   employeeId: string;
   /** The day the file takes effect: the day of a transfer, the last day of a person who leaves. */
   dueOn: BusinessDate;
+  /**
+   * Only on the cancellation of a departure (`onCancelled`): true when the block on the access of the person had taken effect, so the
+   * last working day was past and what the block did (the machines of the person) is taken back with the cancellation (`QĐ-100z`).
+   */
+  accessBlockInForce?: boolean;
 }
 
 /**

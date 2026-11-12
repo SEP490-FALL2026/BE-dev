@@ -81,8 +81,11 @@ anh em) → `role-duties`, `transfer`, `transfer-review` → `notice` → `leave
   `PLACEMENT_OVERLAP` `FIRST_PLACEMENT_PENDING`. Hồ sơ không phòng hiện cho Super Admin và mọi IT Admin dùng được.
   Con `open-requests/` (`open-requests.controller.ts`), `detail/` (`OffboardingDetailService` dựng chi tiết một ca cho
   controller và `OffboardingViewService`; `offboarding-detail.policy.ts`), `change/` (đổi ngày làm cuối, hủy:
-  `OffboardingChangeService` điều phối `OffboardingChangeJudge` (xét) và `OffboardingChangeWriter` (ghi);
-  `offboarding-change.policy.ts`).
+  `OffboardingChangeService` điều phối `OffboardingChangeJudge` (xét), `OffboardingChangeWriter` (ghi đổi ngày) và
+  `OffboardingCancelWriter` (ghi hủy); `OffboardingCancelTakeBack` xử lý dòng chặn khi hủy: chặn chưa hiệu lực bị bỏ, chặn đã hiệu lực (sau ngày cuối)
+  giữ nguyên nhưng rút lý do nghỉ việc khỏi tác vụ thu hồi qua `LicensingApi.withdrawRevocationReason` (đếm `revocationsWithdrawn`, báo IT phụ trách
+  `DEPARTURE_REVOCATION_IT_CLOSE` khi còn tác vụ đang làm) và, qua hook `onCancelled` (`accessBlockInForce`), kết thúc đăng ký thiết bị;
+  `offboarding-change.policy.ts`). Hồ sơ đã `LEFT` không hủy được (409 `CASE_LEFT`, R-41).
 - `departure-deadline/` — hạn thu hồi và tác động của nghỉ việc (MF2-B.3, MF2-D…): `DepartureImpactService.impactOf(tx, …)` **chỉ đọc** (quyền sẽ thu hồi qua
   `LicensingApi.listPersonalSeatsOf`, Request sẽ hủy / tác vụ cấp đang chạy / cam kết sẽ giải phóng qua `RequestsApi.previewBeneficiaryGone`, hạn thu hồi =
   `revocationDueOn` theo `DEPARTURE_REVOCATION_WORKING_DAYS`; `responsibilities` null và `vendorAdminRoles` rỗng tới X-IT). `OffboardingService` đọc nó trước khi

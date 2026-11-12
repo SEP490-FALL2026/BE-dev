@@ -6,6 +6,7 @@ import { cancelRefusal } from '../offboarding.policy';
 import { OffboardingFrame } from '../offboarding-frame.service';
 import type { ChangeLastDayInput, OffboardingRecord } from '../offboarding.types';
 import { OffboardingChangeJudge } from './offboarding-change-judge.service';
+import { OffboardingCancelWriter, type CancelledOffboarding } from './offboarding-cancel-writer.service';
 import { OffboardingChangeWriter } from './offboarding-change-writer.service';
 
 /**
@@ -13,7 +14,9 @@ import { OffboardingChangeWriter } from './offboarding-change-writer.service';
  * reason and only a handover that is still under way, and both put the periods the record wrote back exactly (the placement is open
  * again, the head of the department is back) before they write again. A move is judged on the new day like a record: when the head
  * cannot be handed over there, the whole command is refused and nothing is saved. A cancellation takes no task away because none
- * was made, and the person is back to what they were doing, a long leave included when its day is still ahead.
+ * was made before the last working day, and the person is back to what they were doing, a long leave included when its day is still
+ * ahead; after the last working day the reasons the departure gave to the tasks of revocation are withdrawn and the machines of the person end
+ * their registration (`QĐ-110c`), and a person who has left cannot be cancelled (R-41).
  */
 @Injectable()
 export class OffboardingChangeService {
@@ -21,6 +24,7 @@ export class OffboardingChangeService {
     private readonly frame: OffboardingFrame,
     private readonly judge: OffboardingChangeJudge,
     private readonly writer: OffboardingChangeWriter,
+    private readonly canceller: OffboardingCancelWriter,
   ) {}
 
   /**
@@ -53,12 +57,12 @@ export class OffboardingChangeService {
     id: string,
     input: { reason: string; groundsNote?: string | undefined },
     outer?: DbTx,
-  ): Promise<OffboardingRecord & { firstPlacementRestored?: boolean }> {
+  ): Promise<CancelledOffboarding> {
     return this.frame.runEvent(actor, id, { lockDepartment: true, outer }, async (tx, { held, today }) => {
       const refusal = cancelRefusal({ state: held.state, reason: input.reason, groundsNote: input.groundsNote });
       if (refusal) throw new OffboardingRefusedError(refusal.code, refusal.details);
 
-      return this.writer.cancel(tx, actor, held, {
+      return this.canceller.cancel(tx, actor, held, {
         reason: input.reason.trim(),
         today,
         ...(input.groundsNote ? { groundsNote: input.groundsNote } : {}),

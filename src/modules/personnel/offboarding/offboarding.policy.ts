@@ -300,6 +300,11 @@ export function accountLockRefusal(facts: { blocked: boolean; locked: boolean })
   return facts.locked ? { code: 'ALREADY_RECORDED' } : null;
 }
 
+/** The source a departure gives to the revocations it asks for (and takes back when it is cancelled): the mode of the case names it. */
+export function departureRevocationSource(mode: AccessBlockMode): 'DEPARTURE' | 'ABRUPT_DEPARTURE' {
+  return mode === 'BLOCK_NOW' ? 'ABRUPT_DEPARTURE' : 'DEPARTURE';
+}
+
 /** What a revocation of the rights is taken from: the seats the person holds, and which of them can be taken away by a task. */
 export interface RightFacts {
   assignmentId: string;

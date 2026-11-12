@@ -6,6 +6,7 @@ import {
   closeRefusal,
   departmentWithoutHeadFrom,
   departureEffectiveOn,
+  departureRevocationSource,
   handoverDueOn,
   isPastLastDay,
   namedRightsRefusal,
@@ -165,6 +166,11 @@ describe('moving, cancelling and leaving', () => {
 });
 
 describe('the revocations of the rights', () => {
+  it('gives the revocations of a departure the source its mode names (departureRevocationSource)', () => {
+    expect(departureRevocationSource('WITH_LAST_DAY')).toBe('DEPARTURE');
+    expect(departureRevocationSource('BLOCK_NOW')).toBe('ABRUPT_DEPARTURE');
+  });
+
   const right = (id: string, extra: Partial<RightFacts> = {}): RightFacts => ({
     assignmentId: id,
     hasTask: false,

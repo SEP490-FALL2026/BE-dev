@@ -128,6 +128,20 @@ export const offboardingDetailSchema = offboardingSummarySchema.extend({
   department: z.strictObject({ id: z.uuid(), code: z.string(), name: z.string() }).nullable(),
   /** Only on the answer to the cancellation of a case that had cancelled a first placement: whether it was put back. */
   firstPlacementRestored: z.boolean().optional(),
+  /**
+   * Only on the answer to the cancellation: what taking back the reasons of the departure did to the tasks of revocation (`QĐ-110c`).
+   * All zero when the last working day had not passed, when nothing was opened, or when no task carried a reason of this departure.
+   */
+  revocationsWithdrawn: z
+    .strictObject({
+      /** Tasks that waited, cancelled as no longer applying; the seat stays as it was. */
+      cancelled: z.number().int().nonnegative(),
+      /** Tasks in progress, left to the IT Admin who works them to close by what happened at the provider. */
+      itAdminToClose: z.number().int().nonnegative(),
+      /** Tasks that go on because another source still asks for the revocation of the seat. */
+      continues: z.number().int().nonnegative(),
+    })
+    .optional(),
   priorWorkState: z.enum(['WORKING', 'ON_LONG_LEAVE']),
   departureEffectiveOn: z.string(),
   /** The basis of the departure in one box, what a form fills in again. Null in the minimal projection an IT Admin reads. */

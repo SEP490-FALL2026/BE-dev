@@ -264,14 +264,14 @@ export class OffboardingController {
   @ApiSuccessResponse(OffboardingDetailResponseDto, {
     message: 'OFFBOARDING_CASE.CANCELLED',
     description:
-      'The handover was cancelled: the person keeps the department and, if they headed it, the head, and they are back to what they were doing (a long leave still ahead included). A first placement the case had cancelled is put back when its department is still active, and firstPlacementRestored says whether it was. No task is made or taken away.',
+      'The handover was cancelled: the person keeps the department and, if they headed it, the head, and they are back to what they were doing (a long leave still ahead included). A first placement the case had cancelled is put back when its department is still active, and firstPlacementRestored says whether it was. Before the last working day no task is made or taken away. After it (the block took effect) the block stays for the Super Admin to lift with an unlock and a reason, but what it did is taken back: the reason of the departure is withdrawn from every task of revocation (a task that waits is cancelled and the seat stays, a task another source asks for goes on, a task in progress is left to the IT Admin who works it to close by what happened at the provider and the IT Admin in charge is told), counted in revocationsWithdrawn, and every registration of a company machine of the person ends (cause DEPARTURE_BLOCKED), so the unlock revives no credential.',
   })
   @ApiErrorResponses(
     ...WRITE_COMMON,
     NOT_FOUND,
     {
       status: HttpStatus.CONFLICT,
-      description: `The person has left (OFFBOARDING_CASE.CASE_LEFT), the handover is not under way (NOT_HANDING_OVER), or ${CONCURRENT}.`,
+      description: `The person has left (OFFBOARDING_CASE.CASE_LEFT: a departure that happened is not cancelled), the handover is not under way (NOT_HANDING_OVER), or ${CONCURRENT}.`,
       examples: [...NOT_UNDER_WAY, ...CONCURRENT_EXAMPLES],
     },
     {
@@ -288,9 +288,14 @@ export class OffboardingController {
     try {
       const record = await this.changes.cancel(userActor(actor), params.id, body);
       const detail = await this.detail.detailOf(record);
-      return record.firstPlacementRestored !== undefined
-        ? { ...detail, firstPlacementRestored: record.firstPlacementRestored }
-        : detail;
+
+      return {
+        ...detail,
+        ...(record.firstPlacementRestored !== undefined
+          ? { firstPlacementRestored: record.firstPlacementRestored }
+          : {}),
+        revocationsWithdrawn: record.revocationsWithdrawn,
+      };
     } catch (error) {
       throw toOffboardingApiException(error);
     }

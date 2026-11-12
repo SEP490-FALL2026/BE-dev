@@ -10,7 +10,14 @@ import { OffboardingFrame } from './offboarding-frame.service';
 import { OffboardingLeftService } from './offboarding-left.service';
 import { OffboardingRefusedError } from './offboarding.errors';
 import { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
-import { closeRefusal, isBlocked, ownBlock, revocationSelection, type RightFacts } from './offboarding.policy';
+import {
+  closeRefusal,
+  departureRevocationSource,
+  isBlocked,
+  ownBlock,
+  revocationSelection,
+  type RightFacts,
+} from './offboarding.policy';
 import { isRevocableType } from '../departure-deadline/departure-impact.policy';
 import { OffboardingRepo } from './offboarding.repo';
 import type { OffboardingRecord, OpenRevocationsInput } from './offboarding.types';
@@ -136,7 +143,7 @@ export class OffboardingRevocationService {
   }
 
   private sourceOf(held: OffboardingRecord): 'DEPARTURE' | 'ABRUPT_DEPARTURE' {
-    return held.accessBlockMode === 'BLOCK_NOW' ? 'ABRUPT_DEPARTURE' : 'DEPARTURE';
+    return departureRevocationSource(held.accessBlockMode);
   }
 
   private async openOne(

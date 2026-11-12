@@ -65,6 +65,7 @@ describe('the notices of MF-2 and MF-3 and of what goes with them (QĐ-110, QĐ-
       'IT_ADMIN_HANDOVER_PENDING',
       { sourceKind: 'OFFBOARDING_CASE', sourceId: ID, employeeId: OTHER, dueOn: '2026-11-12' },
     ],
+    ['DEPARTURE_REVOCATION_IT_CLOSE', { caseId: ID, employeeId: OTHER, taskCount: 2 }],
   ];
 
   it.each(cases)('accepts %s with the keys of its code', (code, params) => {

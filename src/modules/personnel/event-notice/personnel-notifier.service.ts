@@ -75,6 +75,24 @@ export class PersonnelNotifier {
     }
   }
 
+  /** The person and the head of their department are told a departure under way moved or was cancelled (the case is the subject). */
+  departureChanged(
+    tx: DbTx,
+    record: { id: string; organizationId: string; employeeId: string; departmentId: string | null },
+    eventKind: 'DEPARTURE_LAST_DAY_CHANGED' | 'DEPARTURE_CANCELLED',
+    effectiveOn: BusinessDate,
+  ): Promise<void> {
+    return this.eventRecorded(tx, {
+      organizationId: record.organizationId,
+      employeeId: record.employeeId,
+      departmentId: record.departmentId,
+      eventKind,
+      eventId: record.id,
+      subjectType: 'OFFBOARDING_CASE',
+      effectiveOn,
+    });
+  }
+
   /** The Super Admin is told a notice of a head (`BM-09`) arrived, so it is not left waiting in a queue nobody reads. */
   async noticeReceived(tx: DbTx, notice: Common & { noticeId: string; kind: string }): Promise<void> {
     await this.toSuperAdmin(tx, notice.organizationId, 'PERSONNEL_NOTICE_RECEIVED', {

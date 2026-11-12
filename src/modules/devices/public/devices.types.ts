@@ -1,7 +1,13 @@
 import type { CollectionState } from '../devices-collection-state.policy';
 
 /** Why a registration of a machine to one person ended. */
-export type DeviceRegistrationEndCause = 'HOLDER_CHANGED' | 'DEVICE_RETIRED' | 'DEPARTURE' | 'EMPLOYEE_LEFT';
+export type DeviceRegistrationEndCause =
+  | 'HOLDER_CHANGED'
+  | 'DEVICE_RETIRED'
+  | 'DEPARTURE'
+  | 'EMPLOYEE_LEFT'
+  /** The block of a departure took effect (the last working day is past) and the handover was cancelled: the unlock never revives it (`QĐ-100z`). */
+  | 'DEPARTURE_BLOCKED';
 
 /** Ends every open registration of a person (a machine is never held by two people, a person may hold many machines). */
 export interface EndRegistrationsOfHolderInput {

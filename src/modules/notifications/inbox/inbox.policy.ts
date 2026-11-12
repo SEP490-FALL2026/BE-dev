@@ -180,6 +180,8 @@ export const PARAM_KEYS_BY_CODE: Readonly<Record<InAppNotificationCode, readonly
   SUBSCRIPTION_SEATS_INCREASED: ['subscriptionId', 'fromQuantity', 'toQuantity', 'requestId', 'changedByEmployeeId'],
   // What an IT Admin who leaves still answers for, once the day has come and the handover is not done (`QĐ-110j`, `R-26`).
   IT_ADMIN_HANDOVER_PENDING: ['sourceKind', 'sourceId', 'employeeId', 'dueOn'],
+  // A departure cancelled after the last working day: how many revocation tasks in progress the IT Admin closes by hand (`QĐ-110c`).
+  DEPARTURE_REVOCATION_IT_CLOSE: ['caseId', 'employeeId', 'taskCount'],
 };
 
 /** Whether the code is one of the closed table. */

@@ -32,6 +32,8 @@ import { NoticeRepo } from './notice/notice.repo';
 import { NoticeService } from './notice/notice.service';
 import { OffboardingAuditService } from './offboarding/offboarding-audit.service';
 import { OffboardingCaseWriter } from './offboarding/offboarding-case-writer.service';
+import { OffboardingCancelTakeBack } from './offboarding/change/offboarding-cancel-takeback.service';
+import { OffboardingCancelWriter } from './offboarding/change/offboarding-cancel-writer.service';
 import { OffboardingChangeJudge } from './offboarding/change/offboarding-change-judge.service';
 import { OffboardingChangeWriter } from './offboarding/change/offboarding-change-writer.service';
 import { OffboardingChangeService } from './offboarding/change/offboarding-change.service';
@@ -202,6 +204,8 @@ import { TransferReviewsController } from './transfer-review/transfer-reviews.co
     OffboardingCaseWriter,
     OffboardingService,
     OffboardingChangeJudge,
+    OffboardingCancelTakeBack,
+    OffboardingCancelWriter,
     OffboardingChangeWriter,
     OffboardingChangeService,
     OffboardingRevocationService,

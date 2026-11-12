@@ -11477,7 +11477,7 @@
         },
         "responses": {
           "200": {
-            "description": "The handover was cancelled: the person keeps the department and, if they headed it, the head, and they are back to what they were doing (a long leave still ahead included). A first placement the case had cancelled is put back when its department is still active, and firstPlacementRestored says whether it was. No task is made or taken away.",
+            "description": "The handover was cancelled: the person keeps the department and, if they headed it, the head, and they are back to what they were doing (a long leave still ahead included). A first placement the case had cancelled is put back when its department is still active, and firstPlacementRestored says whether it was. Before the last working day no task is made or taken away. After it (the block took effect) the block stays for the Super Admin to lift with an unlock and a reason, but what it did is taken back: the reason of the departure is withdrawn from every task of revocation (a task that waits is cancelled and the seat stays, a task another source asks for goes on, a task in progress is left to the IT Admin who works it to close by what happened at the provider and the IT Admin in charge is told), counted in revocationsWithdrawn, and every registration of a company machine of the person ends (cause DEPARTURE_BLOCKED), so the unlock revives no credential.",
             "content": {
               "application/json": {
                 "schema": {
@@ -11596,7 +11596,7 @@
             }
           },
           "409": {
-            "description": "The person has left (OFFBOARDING_CASE.CASE_LEFT), the handover is not under way (NOT_HANDING_OVER), or the person or the case was changed meanwhile (CONCURRENT_CHANGE).",
+            "description": "The person has left (OFFBOARDING_CASE.CASE_LEFT: a departure that happened is not cancelled), the handover is not under way (NOT_HANDING_OVER), or the person or the case was changed meanwhile (CONCURRENT_CHANGE).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -87973,6 +87973,16 @@
                 "nullable": true
               },
               "firstPlacementRestored": { "type": "boolean" },
+              "revocationsWithdrawn": {
+                "type": "object",
+                "properties": {
+                  "cancelled": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                  "itAdminToClose": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                  "continues": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+                },
+                "required": ["cancelled", "itAdminToClose", "continues"],
+                "additionalProperties": false
+              },
               "priorWorkState": { "type": "string", "enum": ["WORKING", "ON_LONG_LEAVE"] },
               "departureEffectiveOn": { "type": "string" },
               "groundsNote": { "type": "string", "nullable": true },
@@ -88593,6 +88603,16 @@
                 "nullable": true
               },
               "firstPlacementRestored": { "type": "boolean" },
+              "revocationsWithdrawn": {
+                "type": "object",
+                "properties": {
+                  "cancelled": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                  "itAdminToClose": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                  "continues": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+                },
+                "required": ["cancelled", "itAdminToClose", "continues"],
+                "additionalProperties": false
+              },
               "priorWorkState": { "type": "string", "enum": ["WORKING", "ON_LONG_LEAVE"] },
               "departureEffectiveOn": { "type": "string" },
               "groundsNote": { "type": "string", "nullable": true },
@@ -107112,7 +107132,7 @@
                   "endedAt": { "type": "string", "format": "date-time" },
                   "endCause": {
                     "type": "string",
-                    "enum": ["HOLDER_CHANGED", "DEVICE_RETIRED", "DEPARTURE", "EMPLOYEE_LEFT"]
+                    "enum": ["HOLDER_CHANGED", "DEVICE_RETIRED", "DEPARTURE", "EMPLOYEE_LEFT", "DEPARTURE_BLOCKED"]
                   }
                 },
                 "required": ["holder", "validUntil", "endedAt", "endCause"],

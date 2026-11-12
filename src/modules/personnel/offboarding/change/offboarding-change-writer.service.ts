@@ -1,7 +1,5 @@
 import { Injectable } from '@nestjs/common';
 import type { DbTx } from '../../../../infrastructure/database/transaction-runner';
-import { OrganizationHistoryApi } from '../../../organization/public/organization-history.api';
-import { LeaveDepartureService } from '../../leave/leave-departure.service';
 import { PersonnelNotifier } from '../../event-notice/personnel-notifier.service';
 import { PersonnelFileHooks } from '../../event-notice/personnel-file-hooks.service';
 import { groundsSnapshot, normalizedGroundsNote } from '../../personnel-grounds.policy';
@@ -15,18 +13,16 @@ import type { ChangeLastDayInput, OffboardingRecord } from '../offboarding.types
 import type { JudgedMove } from './offboarding-change-judge.service';
 
 /**
- * Writes the move of the last working day of a handover, or its cancellation, once it was judged (`US-03-04` AC-14, AC-15, AC-22, AC-26):
- * the periods of the record put back and written again for the move, the record, its change and the audit entry, the refusal of the person
- * moved with the day (or dropped), the hook of the file, and the notice, in the transaction of the event.
+ * Writes the move of the last working day of a handover once it was judged (`US-03-04` AC-14, AC-22): the periods of the record put back and
+ * written again for the move, the record, its change and the audit entry, the refusal of the person moved with the day, the hook of the
+ * file, and the notice, in the transaction of the event. The cancellation is written by `OffboardingCancelWriter`.
  */
 @Injectable()
 export class OffboardingChangeWriter {
   constructor(
     private readonly repo: OffboardingRepo,
-    private readonly history: OrganizationHistoryApi,
     private readonly periods: OffboardingPeriodsService,
     private readonly handovers: OffboardingHandoverService,
-    private readonly leaves: LeaveDepartureService,
     private readonly audit: OffboardingAuditService,
     private readonly hooks: PersonnelFileHooks,
     private readonly notifier: PersonnelNotifier,
@@ -68,7 +64,7 @@ export class OffboardingChangeWriter {
       dueOn: moved.departureEffectiveOn,
       previousDueOn: held.departureEffectiveOn,
     });
-    await this.tell(tx, moved, 'DEPARTURE_LAST_DAY_CHANGED', moved.departureEffectiveOn);
+    await this.notifier.departureChanged(tx, moved, 'DEPARTURE_LAST_DAY_CHANGED', moved.departureEffectiveOn);
 
     return moved;
   }
@@ -112,83 +108,5 @@ export class OffboardingChangeWriter {
         headSuccessor: headSuccessorLabel(moved.headHandover),
       },
     );
-  }
-
-  /** Puts the periods back, drops the block that has not taken effect, and brings the person back to what they were doing (`AC-26`). */
-  async cancel(
-    tx: DbTx,
-    actor: PersonnelActor,
-    held: OffboardingRecord,
-    why: { reason: string; today: string; groundsNote?: string },
-  ): Promise<OffboardingRecord & { firstPlacementRestored?: boolean }> {
-    const { reason } = why;
-    if (held.departmentId !== null) {
-      await this.periods.undo(tx, held);
-    }
-    const firstPlacementRestored = await this.periods.restoreFirstPlacement(tx, held);
-    // A block that has not taken effect goes with the handover; one that has stays until the Super Admin lifts it with a reason (QĐ-100q).
-    const block = await this.handovers.releaseAccessBlock(tx, held.employeeId, why.today);
-    // The person is back to what they were doing: a leave ended for the handover is taken up again when its day is still ahead (`AC-26`).
-    const resumed =
-      held.priorWorkState === 'ON_LONG_LEAVE'
-        ? await this.leaves.resumeAfterCancelledDeparture(tx, actor, held.employeeId, why.today)
-        : 'WORKING';
-    await this.history.setEmployeeWorkState(tx, held.employeeId, resumed);
-    const by = actorColumns(actor);
-    const cancelled = await this.repo.cancel(tx, held.id, { appUserId: by.appUserId, ticketId: by.ticketId, reason });
-    await this.repo.insertChange(tx, {
-      caseId: held.id,
-      kind: 'CANCELLED',
-      oldLastWorkingDay: held.lastWorkingDay,
-      reason,
-      detail: {
-        workState: resumed,
-        grounds: why.groundsNote ? groundsSnapshot(normalizedGroundsNote(why.groundsNote)) : null,
-        ...(firstPlacementRestored !== undefined ? { firstPlacementRestored } : {}),
-      },
-      changedByAppUserId: by.appUserId,
-      changedByTicketId: by.ticketId,
-    });
-    await this.audit.changed(
-      tx,
-      actor,
-      held,
-      'OFFBOARDING_CASE.CANCELLED',
-      { state: 'HANDING_OVER', lastWorkingDay: held.lastWorkingDay },
-      {
-        state: 'CANCELLED',
-        reason,
-        grounds: why.groundsNote ? groundsSnapshot(normalizedGroundsNote(why.groundsNote)) : null,
-        workState: resumed,
-        accessBlock: block,
-      },
-    );
-    await this.hooks.onCancelled(tx, {
-      fileKind: 'OFFBOARDING',
-      fileId: held.id,
-      employeeId: held.employeeId,
-      dueOn: held.departureEffectiveOn,
-    });
-    await this.tell(tx, cancelled, 'DEPARTURE_CANCELLED', held.departureEffectiveOn);
-
-    return { ...cancelled, ...(firstPlacementRestored !== undefined ? { firstPlacementRestored } : {}) };
-  }
-
-  /** The person and the head of their department are told the departure moved or was cancelled, in the same transaction. */
-  private tell(
-    tx: DbTx,
-    record: OffboardingRecord,
-    eventKind: 'DEPARTURE_LAST_DAY_CHANGED' | 'DEPARTURE_CANCELLED',
-    effectiveOn: string,
-  ): Promise<void> {
-    return this.notifier.eventRecorded(tx, {
-      organizationId: record.organizationId,
-      employeeId: record.employeeId,
-      departmentId: record.departmentId,
-      eventKind,
-      eventId: record.id,
-      subjectType: 'OFFBOARDING_CASE',
-      effectiveOn,
-    });
   }
 }
