@@ -50,6 +50,11 @@ Modes (the options of a mode are the fields of the body of the write it stands f
                            the account, its roles and the login email are never changed here. What is typed is personal data: it is
                            written to the record and to the Audit Trail only, and never printed back.
 
+  --successor-employee-id / --successor-none name who follows the head of the department the person leaves. For a departure (departure-record,
+  departure-change, abrupt-departure-record) a head of a department MUST give --successor-employee-id, a member of it who holds MANAGER:
+  --successor-none, or none at all, is refused with PERSONNEL.SUCCESSOR_REQUIRED (QĐ-110h); for a person who heads no department it is ignored.
+  A transfer still accepts --successor-none. abrupt-departure-record blocks now: its --last-working-day must be today (BLOCK_NOW_DAY_IS_TODAY otherwise).
+
   --from-notice (the four recording modes) records the event from a notice of a head (BM-09) about the person: the notice becomes RECORDED
   with the record of how it was checked, as the application writes it. --verification-method ATTACHED_DOCUMENT|EMAIL_FROM_ISSUER|
   DIRECT_CONTACT (default ATTACHED_DOCUMENT) and --verification-reference <text> (default the reference of the basis) go with it.
