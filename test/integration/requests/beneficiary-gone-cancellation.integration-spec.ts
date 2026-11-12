@@ -216,6 +216,29 @@ describe('the system closes the open requests of a person who is gone (integrati
       });
     });
 
+    it('does not close a request withdrawn while its grant had failed, whose task waits for the IT Admin to close it, and tells the IT Admin', async () => {
+      const u = await unit();
+      const person = await h.colleague(u);
+      const failing = await approvedFor(u, person, 1);
+      const task = await granted(failing, 1);
+      await h.claim(task).expect(200);
+      await h.fail(task, { reason: 'The invitation bounced' }).expect(200);
+      await h.withdrawRequest(failing, { reason: 'Not needed' }, person.account).expect(200);
+      expect(await stateOf(failing)).toBe('AWAITING_IT_CLOSE');
+      const held = await commitmentOf(failing);
+
+      const result = await run(leftBy(person));
+      await run(leftBy(person));
+
+      expect(result).toEqual({ cancelled: [], needsItCheck: [{ requestId: failing, line: false }] });
+      expect(await stateOf(failing)).toBe('AWAITING_IT_CLOSE');
+      expect(await commitmentOf(failing)).toEqual(held);
+      const told = (await h.noticesAbout(failing)).filter(
+        (notice) => notice.code === 'REQUEST_BENEFICIARY_GONE_IT_CHECK',
+      );
+      expect(told.map((notice) => notice.recipient_employee_id)).toEqual([h.it1.employeeId]);
+    });
+
     it('closes nothing of another person, nothing that is over, and does not fail for a person with nothing open', async () => {
       const u = await unit();
       const [gone, other] = await h.colleagues(u, 2);
@@ -278,6 +301,32 @@ describe('the system closes the open requests of a person who is gone (integrati
 
       expect(result).toEqual({ cancelled: [], needsItCheck: [{ requestId: id, line: true }] });
       expect(await h.lineStates(id)).toEqual(['APPROVED', 'EXECUTING']);
+      expect(
+        (await h.noticesAbout(id)).filter((notice) => notice.code === 'REQUEST_BENEFICIARY_GONE_IT_CHECK'),
+      ).toHaveLength(1);
+    });
+
+    it('does not end the line of a person withdrawn while their grant had failed: the IT Admin closes the task, and is told', async () => {
+      const u = await unit();
+      const [e1, e2] = await h.colleagues(u, 2);
+      const id = await h.groupApproved(u, plans[0].plan, [e1, e2]);
+      const task = h.dataOf<{ task: { id: string } }>(
+        await h
+          .grantLine(
+            { requestId: id, beneficiaryEmployeeId: e2.employeeId, subscriptionId: plans[0].subscriptionId },
+            h.it1,
+          )
+          .expect(201),
+      ).task.id;
+      await h.claim(task).expect(200);
+      await h.fail(task, { reason: 'The invitation bounced' }).expect(200);
+      await h.withdrawLine(id, e2.employeeId, { reason: 'Not needed' }, u.head.account).expect(200);
+      expect(await h.lineStates(id)).toEqual(['APPROVED', 'AWAITING_IT_CLOSE']);
+
+      const result = await run(leftBy(e2));
+
+      expect(result).toEqual({ cancelled: [], needsItCheck: [{ requestId: id, line: true }] });
+      expect(await h.lineStates(id)).toEqual(['APPROVED', 'AWAITING_IT_CLOSE']);
       expect(
         (await h.noticesAbout(id)).filter((notice) => notice.code === 'REQUEST_BENEFICIARY_GONE_IT_CHECK'),
       ).toHaveLength(1);

@@ -50,17 +50,16 @@ describe('what the system does to the request of a person who is gone', () => {
       expect(verdictOf(ALL, { ...paid('AWAITING_SPEND_DECISION'), type: 'RENEWAL' }, null)).toBe('CANCEL');
     });
 
-    it.each<AccessRequestState>([
-      'REJECTED',
-      'IT_REJECTED',
-      'COMPLETED',
-      'FAILED',
-      'WITHDRAWN',
-      'CANCELLED',
-      'AWAITING_IT_CLOSE',
-      'DRAFT',
-    ])('leaves a request that is over, waits for the IT Admin to close a withdrawal, or is a draft (%s)', (state) => {
-      expect(verdictOf(ALL, paid(state), null)).toBe('SKIP');
+    it.each<AccessRequestState>(['REJECTED', 'IT_REJECTED', 'COMPLETED', 'FAILED', 'WITHDRAWN', 'CANCELLED', 'DRAFT'])(
+      'leaves a request that is over or is a draft (%s)',
+      (state) => {
+        expect(verdictOf(ALL, paid(state), null)).toBe('SKIP');
+      },
+    );
+
+    it('asks the IT Admin to check a request withdrawn while its grant had failed: its task waits for them to close it (SPEC §8: nothing waits)', () => {
+      expect(verdictOf(ALL, paid('AWAITING_IT_CLOSE'), null)).toBe('NEEDS_IT_CHECK');
+      expect(verdictOf(ALL, free('AWAITING_IT_CLOSE'), null)).toBe('NEEDS_IT_CHECK');
     });
   });
 
@@ -88,9 +87,10 @@ describe('what the system does to the request of a person who is gone', () => {
       expect(verdictOf(OLD_DEPARTMENT, { ...paid('PENDING'), type: 'SERVICE_ACCOUNT' }, null)).toBe('SKIP');
     });
 
-    it('leaves a request that is over', () => {
+    it('leaves a request that is over, and asks the IT Admin to close a withdrawal that waits for them', () => {
       expect(verdictOf(OLD_DEPARTMENT, paid('COMPLETED'), null)).toBe('SKIP');
-      expect(verdictOf(OLD_DEPARTMENT, paid('AWAITING_IT_CLOSE'), null)).toBe('SKIP');
+      expect(verdictOf(OLD_DEPARTMENT, paid('AWAITING_IT_CLOSE'), null)).toBe('NEEDS_IT_CHECK');
+      expect(verdictOf(OLD_DEPARTMENT, paid('AWAITING_IT_CLOSE', NEW), null)).toBe('SKIP');
     });
   });
 
@@ -103,9 +103,11 @@ describe('what the system does to the request of a person who is gone', () => {
       },
     );
 
-    it('asks the IT Admin to check when the grant of the person is being carried out', () => {
+    it('asks the IT Admin to check when the grant of the person is being carried out, or they were withdrawn while it had failed', () => {
       expect(verdictOf(ALL, group(), 'EXECUTING')).toBe('NEEDS_IT_CHECK');
       expect(verdictOf(OLD_DEPARTMENT, group(), 'EXECUTING')).toBe('NEEDS_IT_CHECK');
+      expect(verdictOf(ALL, group(), 'AWAITING_IT_CLOSE')).toBe('NEEDS_IT_CHECK');
+      expect(verdictOf(OLD_DEPARTMENT, group(), 'AWAITING_IT_CLOSE')).toBe('NEEDS_IT_CHECK');
     });
 
     it('is judged by the line, not by the state of the request: the other people carry on', () => {
@@ -113,12 +115,13 @@ describe('what the system does to the request of a person who is gone', () => {
       expect(verdictOf(ALL, { ...group(), state: 'AWAITING_EXECUTION' }, 'EXECUTING')).toBe('NEEDS_IT_CHECK');
     });
 
-    it.each(LINE_STATES.filter((line) => !['AWAITING_NEED', 'NEED_CONFIRMED', 'APPROVED', 'EXECUTING'].includes(line)))(
-      'leaves a line that has ended or waits for the IT Admin (%s)',
-      (line) => {
-        expect(verdictOf(ALL, group(), line)).toBe('SKIP');
-      },
-    );
+    it.each(
+      LINE_STATES.filter(
+        (line) => !['AWAITING_NEED', 'NEED_CONFIRMED', 'APPROVED', 'EXECUTING', 'AWAITING_IT_CLOSE'].includes(line),
+      ),
+    )('leaves a line that has ended (%s)', (line) => {
+      expect(verdictOf(ALL, group(), line)).toBe('SKIP');
+    });
 
     it('leaves a group of the new department when only the old one is closed', () => {
       expect(verdictOf(OLD_DEPARTMENT, group(NEW), 'APPROVED')).toBe('SKIP');

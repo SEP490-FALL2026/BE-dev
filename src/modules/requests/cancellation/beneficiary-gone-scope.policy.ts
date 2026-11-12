@@ -1,9 +1,5 @@
 import type { AccessRequestBranchCode } from '../access-request/access-request.policy';
-import {
-  NOT_OPEN_FOR_LEAVER,
-  type AccessRequestKind,
-  type AccessRequestState,
-} from '../access-request/access-request.types';
+import { ENDED_STATES, type AccessRequestKind, type AccessRequestState } from '../access-request/access-request.types';
 import { OPEN_LINE_STATES, type LineState, type SystemCancelCause } from '../access-request/group-request.types';
 import type { BeneficiaryGoneScope } from '../public/requests.types';
 
@@ -34,7 +30,10 @@ export interface GoneRequestFacts {
  * - `NEEDS_IT_CHECK`: a task of the grant is alive on the request (see `hasLiveTask`), so nothing is cancelled: the vendor may already have
  *   sent the invitation, and a task that stays alive under a cancelled request would be completed with nothing held for it. The IT Admin
  *   checks it and closes the request by hand, which cancels the task with the request;
- * - `SKIP`: outside the scope, or not open (over, a draft, a withdrawal waiting for the IT Admin, no line of the person).
+ * - `SKIP`: outside the scope, or not open (over, a draft, no line of the person).
+ *
+ * A request withdrawn while its grant had failed (`AWAITING_IT_CLOSE`, a line likewise) is also `NEEDS_IT_CHECK`: its task of the grant waits
+ * for the IT Admin to close it as cancelled, which only they can do, and it is not left waiting unseen for a person who is gone.
  */
 export type GoneVerdict = 'CANCEL' | 'NEEDS_IT_CHECK' | 'SKIP';
 
@@ -65,16 +64,16 @@ function hasLiveTask(request: GoneRequestFacts): boolean {
  */
 export function verdictOf(scope: GoneScope, request: GoneRequestFacts, line: LineState | null): GoneVerdict {
   if (!inScope(scope, request)) return 'SKIP';
-  if (request.type === 'GROUP_GRANT') return line === null ? 'SKIP' : byState(OPEN_LINE_STATES, line);
-  if (request.state === 'DRAFT' || NOT_OPEN_FOR_LEAVER.includes(request.state)) return 'SKIP';
+  if (request.type === 'GROUP_GRANT') return line === null ? 'SKIP' : byLine(line);
+  if (request.state === 'DRAFT' || ENDED_STATES.includes(request.state)) return 'SKIP';
 
-  return hasLiveTask(request) ? 'NEEDS_IT_CHECK' : 'CANCEL';
+  return hasLiveTask(request) || request.state === 'AWAITING_IT_CLOSE' ? 'NEEDS_IT_CHECK' : 'CANCEL';
 }
 
-function byState(open: readonly LineState[], line: LineState): GoneVerdict {
-  if (!open.includes(line)) return 'SKIP';
+function byLine(line: LineState): GoneVerdict {
+  if (line === 'EXECUTING' || line === 'AWAITING_IT_CLOSE') return 'NEEDS_IT_CHECK';
 
-  return line === 'EXECUTING' ? 'NEEDS_IT_CHECK' : 'CANCEL';
+  return (OPEN_LINE_STATES as readonly LineState[]).includes(line) ? 'CANCEL' : 'SKIP';
 }
 
 /** Why the request ends: the departure for the person who left, the transfer for the one who was moved. */

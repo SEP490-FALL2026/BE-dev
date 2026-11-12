@@ -3,9 +3,9 @@ import { Prisma } from '../../../../generated/prisma/client';
 import { PrismaService } from '../../../../infrastructure/database/prisma.service';
 import type { DbTx } from '../../../../infrastructure/database/transaction-runner';
 import type { AccessRequestKind, AccessRequestState } from '../access-request.types';
-import { NOT_OPEN_FOR_LEAVER } from '../access-request.types';
+import { ENDED_STATES, NOT_OPEN_FOR_LEAVER } from '../access-request.types';
 import { currentStateOf } from '../access-request.policy';
-import { OPEN_LINE_STATES } from '../group-request.types';
+import { OPEN_LINE_STATES, type LineState } from '../group-request.types';
 
 export interface OpenRequestRow {
   id: string;
@@ -25,28 +25,37 @@ export interface OpenRequestRow {
 export class OpenRequestRepo {
   constructor(private readonly prisma: PrismaService) {}
 
-  /** What makes a request open for the person (see the class): shared by the page and by the ids. */
-  private openOf(employeeId: string, filter: { departmentId?: string } = {}) {
+  /**
+   * What makes a request open for the person (see the class): shared by the page and by the ids. `withWithdrawalWaiting` also takes in
+   * the request, or the line, withdrawn while its grant had failed, whose task waits for the IT Admin to close it (`AWAITING_IT_CLOSE`):
+   * the page for the IT Admin leaves it out, the system that closes the requests of a person who is gone does not.
+   */
+  private openOf(employeeId: string, filter: { departmentId?: string } = {}, withWithdrawalWaiting = false) {
+    const endedStates = withWithdrawalWaiting ? ENDED_STATES : NOT_OPEN_FOR_LEAVER;
+    const lineStates: readonly LineState[] = withWithdrawalWaiting
+      ? [...OPEN_LINE_STATES, 'AWAITING_IT_CLOSE']
+      : OPEN_LINE_STATES;
+
     return {
       beneficiaries: { some: { employeeId } },
       ...(filter.departmentId === undefined ? {} : { departmentId: filter.departmentId }),
       // A request being drafted is written by the release after this one and is not read here.
       state: { not: 'DRAFT' as const },
       OR: [
-        { type: { not: 'GROUP_GRANT' as const }, state: { notIn: [...NOT_OPEN_FOR_LEAVER] } },
-        { type: 'GROUP_GRANT' as const, lines: { some: { employeeId, state: { in: [...OPEN_LINE_STATES] } } } },
+        { type: { not: 'GROUP_GRANT' as const }, state: { notIn: [...endedStates] } },
+        { type: 'GROUP_GRANT' as const, lines: { some: { employeeId, state: { in: [...lineStates] } } } },
       ],
     };
   }
 
   /**
-   * The ids of every request the person is a beneficiary of that is open, oldest first, in the caller's transaction: what the system
-   * closes when the person is gone (`BeneficiaryGoneCancellation`). A person has few open requests (the limits of `MF-1` bound them),
+   * The ids of every request the person is a beneficiary of that is open, oldest first, in the caller's transaction, those with a
+   * withdrawal waiting for the IT Admin among them: what the system deals with when the person is gone (`BeneficiaryGoneCancellation`). A person has few open requests (the limits of `MF-1` bound them),
    * so there is no page; the order is fixed so two passes lock them in the same order.
    */
   async idsOf(tx: DbTx, employeeId: string): Promise<string[]> {
     const rows = await tx.accessRequest.findMany({
-      where: this.openOf(employeeId),
+      where: this.openOf(employeeId, {}, true),
       select: { id: true },
       orderBy: [{ submittedAt: 'asc' }, { id: 'asc' }],
     });
