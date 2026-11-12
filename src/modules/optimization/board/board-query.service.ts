@@ -56,19 +56,15 @@ export class BoardQueryService {
   ) {}
 
   /**
-   * The departments `MINE` stands for, or undefined for the whole organization (`ALL`): for an IT Admin the scope of `getItAdminScope` (the departments
-   * that name them and, while a department has no usable IT Admin, that one too, R-20); for a head the department they head today.
+   * The departments `MINE` stands for, or undefined for the whole organization (`ALL`): the scope of `getItAdminScope` (the departments that
+   * name the IT Admin and, while a department has no usable IT Admin, that one too, R-20). The two table routes are the IT Admin's.
    */
   private async scopeOf(actor: AuthenticatedPrincipal, scope: DepartmentScope): Promise<string[] | undefined> {
     if (scope === 'ALL') return undefined;
-    if (actor.roles.includes('IT_ADMIN')) {
-      return this.organizationReads.getItAdminScope(actor.employeeId, (ids) =>
-        this.identity.findUsableItAdminEmployeeIds(ids),
-      );
-    }
-    const headed = await this.organizationReads.getHeadedDepartment(actor.employeeId);
 
-    return headed ? [headed.departmentId] : [];
+    return this.organizationReads.getItAdminScope(actor.employeeId, (ids) =>
+      this.identity.findUsableItAdminEmployeeIds(ids),
+    );
   }
 
   async list(actor: AuthenticatedPrincipal, query: RecommendationQuery) {

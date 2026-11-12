@@ -3,7 +3,6 @@ import { BoardQueryService } from './board-query.service';
 
 const ORG = { id: 'org-1' };
 const itAdmin = { employeeId: 'it-1', roles: ['IT_ADMIN'] } as unknown as AuthenticatedPrincipal;
-const head = { employeeId: 'head-1', roles: ['MANAGER'] } as unknown as AuthenticatedPrincipal;
 
 const RECORD = {
   id: 'rec-1',
@@ -38,7 +37,7 @@ const SEAT_STATE = {
   assessedOn: '2026-11-02',
 };
 
-function build(overrides: { itScope?: string[]; headed?: string | null; members?: Record<string, string[]> } = {}) {
+function build(overrides: { itScope?: string[]; members?: Record<string, string[]> } = {}) {
   const repo = {
     page: jest
       .fn<Promise<unknown>, [string, Record<string, unknown>, unknown]>()
@@ -54,9 +53,7 @@ function build(overrides: { itScope?: string[]; headed?: string | null; members?
     getItAdminScope: jest
       .fn<Promise<string[]>, [string, (ids: string[]) => Promise<Set<string>>]>()
       .mockResolvedValue(overrides.itScope ?? ['d-it']),
-    getHeadedDepartment: jest
-      .fn()
-      .mockResolvedValue(overrides.headed === null ? null : { departmentId: overrides.headed ?? 'd-head' }),
+    getHeadedDepartment: jest.fn().mockResolvedValue(null),
     getDepartmentMemberIds: jest.fn((id: string) => Promise.resolve((overrides.members ?? {})[id] ?? [])),
     getEmployees: jest.fn().mockResolvedValue([{ id: 'emp-1', employeeCode: 'E1', fullName: 'Nguyen Van A' }]),
     getDepartmentIdsInChargeOf: jest.fn().mockResolvedValue(['must-not-be-used']),
@@ -111,27 +108,14 @@ describe('R-20, m-14: MINE is the scope of the reader', () => {
     expect(identity.findUsableItAdminEmployeeIds).toHaveBeenCalledWith(['it-1']);
   });
 
-  it('is, for a head, only the department they head', async () => {
-    const { service, repo, organizationReads } = build({ headed: 'd-head' });
+  it('reads the whole organization for ALL and never asks which department anyone heads (the routes are for the IT Admin, CO-1)', async () => {
+    const { service, repo, organizationReads } = build();
 
-    await service.list(head, { departmentScope: 'MINE', ...page });
+    await service.list(itAdmin, { departmentScope: 'ALL', ...page });
 
-    expect(repo.page).toHaveBeenCalledWith(
-      ORG.id,
-      expect.objectContaining({ departmentIds: ['d-head'] }),
-      expect.anything(),
-    );
+    expect(repo.page.mock.calls[0]?.[1]).toEqual({});
     expect(organizationReads.getItAdminScope).not.toHaveBeenCalled();
-  });
-
-  it('is nothing for a person who heads no department, and the whole organization is read for ALL', async () => {
-    const { service, repo } = build({ headed: null });
-
-    await service.list(head, { departmentScope: 'MINE', ...page });
-    await service.list(head, { departmentScope: 'ALL', ...page });
-
-    expect(repo.page.mock.calls[0]?.[1]).toEqual({ departmentIds: [] });
-    expect(repo.page.mock.calls[1]?.[1]).toEqual({});
+    expect(organizationReads.getHeadedDepartment).not.toHaveBeenCalled();
   });
 });
 

@@ -3,7 +3,7 @@ import type { GhostSeatEvidence } from '../ghost-seat/ghost-seat-evidence.json';
 import type { GhostSeatGroup, GhostSeatState } from '../ghost-seat/ghost-seat.types';
 import { isReclaimable } from '../ghost-seat/ghost-seat-state.policy';
 
-/** Whom the table is read for: the departments of the reader (`MINE`: the IT Admin's scope, a head's own department) or the whole organization (`ALL`, `QĐ-58b`). */
+/** Whom the table is read for: the departments of the reader (`MINE`: the scope of the IT Admin) or the whole organization (`ALL`, `QĐ-58b`). */
 export type DepartmentScope = 'MINE' | 'ALL';
 
 /** The label of how sure a recommendation is: `G1` and `G2` come from the data of the system itself, with no level and no percentage (`QĐ-35b`). */
