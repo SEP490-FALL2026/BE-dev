@@ -265,6 +265,34 @@ describe('the pass over the milestones of the renewals (integration, real Postgr
       ).rejects.toMatchObject({ constraint: 'subscription_deadline_events_immutable' });
     });
 
+    it('QĐ-111g, BB-9: tells the IT Admin responsible for the subscription instead of the one in charge of the department, and the department one when the responsible one is NULL or no longer usable', async () => {
+      const itSub = await h.account('E-IT-SUB', await h.person('E-IT-SUB'), 'IT_ADMIN');
+      const named = async (responsible: string | null): Promise<string[]> => {
+        const subscriptionId = await h.term({
+          ownerDepartmentId: unit.department.id,
+          noticeDeadline: h.inDays(40),
+          endDate: h.inDays(70),
+        });
+        await h.ctx.sql.query(`UPDATE subscriptions SET responsible_it_admin_employee_id = $2 WHERE id = $1`, [
+          subscriptionId,
+          responsible,
+        ]);
+        await h.sweepOn(h.inDays(25));
+
+        return (await alerts(subscriptionId)).map((row) => row.recipient_employee_id).sort();
+      };
+      const others = [h.finance.employeeId, h.boss.employeeId];
+
+      expect(await named(itSub.employeeId)).toEqual([itSub.employeeId, ...others].sort());
+      expect(await named(null)).toEqual([h.it1.employeeId, ...others].sort());
+      await h.ctx.sql.query(`UPDATE app_users SET status = 'LOCKED' WHERE employee_id = $1`, [itSub.employeeId]);
+      try {
+        expect(await named(itSub.employeeId)).toEqual([h.it1.employeeId, ...others].sort());
+      } finally {
+        await h.ctx.sql.query(`UPDATE app_users SET status = 'ACTIVE' WHERE employee_id = $1`, [itSub.employeeId]);
+      }
+    });
+
     it('QĐ-111g: tells no Business Owner and asks nothing about one: the IT Admin, Finance and the decider are the people told', async () => {
       const subscriptionId = await h.term({
         ownerDepartmentId: unit.department.id,
