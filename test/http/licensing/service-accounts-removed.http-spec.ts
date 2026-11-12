@@ -9,8 +9,27 @@ const OTHER = '3f0c7d54-9e1b-4f6a-8d2c-5b7a1e9c0d22';
 
 type Call = (server: App) => request.Test;
 
-/** The routes only the IT Admin may call (US-03-08 AC-9): anyone else, a department head included, is refused. */
+/** The routes only the IT Admin may call: anyone else, a department head included, is refused. */
 const IT_ADMIN_ONLY: Array<[string, Call]> = [
+  ['POST /department-transfers/{id}/closure', (s) => request(s).post(`/api/v1/department-transfers/${ID}/closure`)],
+];
+
+/**
+ * The routes of the service accounts are gone, with no answer of their own: they answer 404 like any route that does not exist
+ * (`QĐ-110m`, `QĐ-89c`). A pipeline or a bot is the flag of a machine account on the seat of an IT Admin (`POST /license-assignments/{id}/machine-account`).
+ */
+const REMOVED: Array<[string, Call]> = [
+  [
+    'POST /access-requests/service-accounts',
+    (s) =>
+      request(s)
+        .post('/api/v1/access-requests/service-accounts')
+        .send({ planId: ID, businessReason: 'Work', purpose: 'Build', expectedIdentifier: 'ci-bot' }),
+  ],
+  [
+    'POST /access-requests/{id}/service-account-review',
+    (s) => request(s).post(`/api/v1/access-requests/${ID}/service-account-review`).send({ decision: 'ACCEPT' }),
+  ],
   [
     'POST /license-assignments/{id}/responsible-changes',
     (s) =>
@@ -19,11 +38,6 @@ const IT_ADMIN_ONLY: Array<[string, Call]> = [
         .send({ employeeId: OTHER, effectiveFrom: '2026-10-15' }),
   ],
   ['GET /service-account-duties', (s) => request(s).get('/api/v1/service-account-duties')],
-  ['POST /department-transfers/{id}/closure', (s) => request(s).post(`/api/v1/department-transfers/${ID}/closure`)],
-];
-
-/** The routes of the move of a service account to another department are gone (`QĐ-89c`): they answer 404 like any route that does not exist. */
-const REMOVED: Array<[string, Call]> = [
   [
     'POST /license-assignments/{id}/department-moves',
     (s) => request(s).post(`/api/v1/license-assignments/${ID}/department-moves`).send({}),
@@ -39,7 +53,7 @@ const REMOVED: Array<[string, Call]> = [
   ],
 ];
 
-describe('service account handover routes (e2e, no database)', () => {
+describe('the routes of the service accounts (HTTP contract, no database)', () => {
   let app: INestApplication<App>;
 
   beforeAll(async () => {
@@ -51,11 +65,11 @@ describe('service account handover routes (e2e, no database)', () => {
   });
 
   it.each(REMOVED)('%s answers 404: the route does not exist any more', async (_name, call) => {
-    const response = await call(app.getHttpServer())
-      .set('Authorization', bearer(principal(['IT_ADMIN'])))
-      .expect(404);
-
-    expect(response.status).toBe(404);
+    for (const roles of [['IT_ADMIN'], ['EMPLOYEE'], ['SUPER_ADMIN']]) {
+      await call(app.getHttpServer())
+        .set('Authorization', bearer(principal(roles)))
+        .expect(404);
+    }
   });
 
   it.each(IT_ADMIN_ONLY)('%s without a token is 401', async (_name, call) => {
@@ -71,7 +85,7 @@ describe('service account handover routes (e2e, no database)', () => {
     ['an account with no role', [], []],
     ['a department head, whose role is derived', [], ['MANAGER']],
     ['the spending approver, whose role is derived', [], ['SPENDING_APPROVER']],
-  ])('refuses %s on every route only the IT Admin may call with 403 (AC-9)', async (_name, direct, derived) => {
+  ])('refuses %s on every route only the IT Admin may call with 403', async (_name, direct, derived) => {
     for (const [route, call] of IT_ADMIN_ONLY) {
       const response = await call(app.getHttpServer())
         .set('Authorization', bearer(principal([...direct, ...derived])))
@@ -80,26 +94,13 @@ describe('service account handover routes (e2e, no database)', () => {
     }
   });
 
-  describe('validation', () => {
-    const asIt = { Authorization: bearer(principal(['IT_ADMIN'])) };
-    it.each([
-      ['a duty list with a person that is not a UUID', '/api/v1/service-account-duties?employeeId=x'],
-      ['a duty list with an overdue flag that is not one', '/api/v1/service-account-duties?overdue=maybe'],
-      ['a duty list with a page size of 101', '/api/v1/service-account-duties?pageSize=101'],
-      ['a duty list with an unknown parameter', '/api/v1/service-account-duties?x=1'],
-    ])('turns away %s, 422', async (_name, path) => {
-      const response = await request(app.getHttpServer()).get(path).set(asIt).expect(422);
+  it('turns away a closure of an id that is not a UUID, 422', async () => {
+    const response = await request(app.getHttpServer())
+      .post('/api/v1/department-transfers/not-a-uuid/closure')
+      .set('Authorization', bearer(principal(['IT_ADMIN'])))
+      .send({})
+      .expect(422);
 
-      expect(bodyOf(response).error.code).toBe('VALIDATION_ERROR');
-    });
-
-    it.each([['a closure of an id that is not a UUID', '/api/v1/department-transfers/not-a-uuid/closure', {}]])(
-      'turns away %s, 422',
-      async (_name, path, body) => {
-        const response = await request(app.getHttpServer()).post(path).set(asIt).send(body).expect(422);
-
-        expect(bodyOf(response).error.code).toBe('VALIDATION_ERROR');
-      },
-    );
+    expect(bodyOf(response).error.code).toBe('VALIDATION_ERROR');
   });
 });

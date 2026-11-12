@@ -32,12 +32,6 @@ export interface LeaveInterval {
   endedOn: BusinessDate | null;
 }
 
-/**
- * The code the wire names for the service accounts that still have nobody to answer for them: the blocker of closing a departure and
- * of closing a transfer (`US-03-08`).
- */
-export const SERVICE_ACCOUNT_UNASSIGNED = 'SERVICE_ACCOUNT_UNASSIGNED';
-
 /** The code the wire names for the review of the tools the new head has not finished: it keeps the record of a transfer from being closed. */
 export const TRANSFER_REVIEW_OPEN = 'TRANSFER_REVIEW_OPEN';
 

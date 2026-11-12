@@ -39,9 +39,6 @@ dashboards; gốc `src/app/app.module.ts`.
     `listOpenGrantTasksOfBeneficiary`, `listHeldSeatsOfRequests` (seat của Request còn giữ ngày `on`, đi theo chuỗi `predecessor_id` — `HANDOVER`,
     gia hạn quyền, `RENEWAL_CARRY` — tới bản ghi đang chạy, từ grant của Request hoặc bản ghi Request nêu; trả phòng sở hữu hiện tại và các bản
     ghi sau gốc; là thứ khoản 01/01 đếm, `BR-MF1-09e`).
-  - `LicensingServiceAccountApi` ([public/licensing-service-account.api.ts](public/licensing-service-account.api.ts)) —
-    `listServiceAccountDuties`, `remindServiceAccountDuties` (nhắc IT Admin phụ trách phòng sở hữu vào hộp thông báo, gọi từ
-    hook hồ sơ của personnel).
   - `LicensingDashboardApi` ([public/licensing-dashboard.api.ts](public/licensing-dashboard.api.ts)) — số đếm cho trang tổng
     quan theo vai (dashboards): `employeeFacts`, `departmentFacts`, `itAdminFacts`; type ở `licensing-dashboard.types.ts`.
   - `LicensingSeatBaselineApi` ([public/licensing-seat-baseline.api.ts](public/licensing-seat-baseline.api.ts)) — seat
@@ -56,7 +53,7 @@ dashboards; gốc `src/app/app.module.ts`.
 ## Bảng sở hữu
 
 - `license_assignments`, `seat_baseline_states`, `provisioning_tasks`, `provisioning_task_reasons`, `handover_duties` (không còn ghi từ `QĐ-110g`; bảng giữ tới đợt dọn),
-  `service_account_duty_notices`, `assignment_expiry_reminders`, `assignment_renewal_windows`, `license_keys`, `license_key_reveal_windows`,
+  `service_account_duty_notices` (không còn ghi từ `QĐ-110m`; bảng giữ tới đợt dọn), `assignment_expiry_reminders`, `assignment_renewal_windows`, `license_keys`, `license_key_reveal_windows`,
   `saas_issues`, `saas_issue_entries`, `saas_issue_counters`, `subscription_renewals`,
   `subscription_renewal_released_seats`, `subscription_deadline_events` (`prisma/models/licensing.prisma`).
 
@@ -68,8 +65,6 @@ dashboards; gốc `src/app/app.module.ts`.
   (và các listener khác của requests/optimization bind). Moment: `OPENED`, `BEFORE_WORK`, `AFTER_WORK`, `CLOSED_FAILED`,
   `REASON_WITHDRAWN { task, withdrawn, remaining, cancelled }` (return bỏ qua). Không còn listener bàn giao (`QĐ-110g`).
 - Mở `RenewalHoldHook` (`licensing.renewal-hold`, Hook) — requests `renewal-request/renewal-hold.listener.ts`.
-- Mở `ResponsibleDeadlineHook` (`licensing.responsible-deadline`, Hook) — personnel
-  `service-account/personnel-file-deadlines.listener.ts`.
 - Bind `SeatBaselinePhaseHook` (catalog, `catalog.seat-baseline-phase`) — `seat-baseline/seat-baseline-phase.listener.ts`.
 - Mở `SeatBaselineClosedListeners` (`licensing.seat-baseline-closed`, Listeners) — personnel
   `transfer-review/post-setup-review.listener.ts`.
@@ -94,9 +89,12 @@ dịch vụ nào đọc cả ghế lẫn thu hồi thì đứng trên cả hai (
 
 ## Capability → file chính
 
-- `assignment/` — assignment ghế, đổi người phụ trách service account, ghế của subscription;
-  `assignments.controller.ts`, `subscription-seats.controller.ts`; `AssignmentService`, `AssignmentResponsibleService`.
-  Con: `service-account-duty/` (US-03-08), `renewal/` (US-05-14).
+- `assignment/` — assignment ghế (đọc danh sách) và ghế của subscription; `assignments.controller.ts`,
+  `subscription-seats.controller.ts`; `AssignmentService`. Con: `renewal/` (US-05-14). Không còn tài khoản dịch vụ (`QĐ-110m`): các dòng
+  `kind = 'SERVICE'` cũ chỉ còn là lịch sử (hoặc đợi chuyển, xem `…_licensing_service_accounts_converted`).
+- `machine-account/` — cờ _dùng cho tài khoản máy_ trên seat cá nhân của IT Admin (`QĐ-110m`, R-9): `POST /license-assignments/{id}/machine-account`;
+  `machine-account.controller.ts`, `MachineAccountService`, `machine-account.policy.ts` (thuần: loại seat, đang mở, người giữ là IT Admin dùng
+  được). Seat có cờ không tính vào INV-02; bật cờ cần lý do; tắt cờ khi trùng seat cá nhân cùng thuê bao ⟹ 409 `MACHINE_ACCOUNT_OVERLAP`.
 - `department-tools/` — công cụ phòng ban đang dùng (US-03-06); `department-tools.controller.ts`; `DepartmentToolsService`.
   Đọc ghế của `assignment/` và việc thu hồi của `provisioning/` nên đứng trên cả hai.
 - `seat-baseline/` — xem/đóng baseline ghế (US-02-05 AC-6); `seat-baseline.controller.ts`; `SeatBaselineService`.
@@ -135,9 +133,8 @@ dịch vụ nào đọc cả ghế lẫn thu hồi thì đứng trên cả hai (
   của một quyết định ghi ở `decision/renewal-decision-trail.service.ts`.
 - Gốc module (dùng chung nhiều capability): `licensing-audit-event.mapper.ts`, `licensing.http-errors.ts`;
   `licensing-alerts.policy.ts` + `licensing-alerts.service.ts` (`LicensingAlerts`) — cảnh báo license `FR-5.14` vào hộp thông báo
-  (dòng 3 T−7 ở `expiry/`, dòng 12 bàn giao đã bỏ theo `QĐ-110g`, dòng 13 tài khoản dịch vụ ở
-  `assignment/service-account-duty/`, dòng 38 `K1` của người nghỉ ở `provisioning/revocation-completion/`; hạng mục
-  `a03-license-inbox-alerts`).
+  (dòng 3 T−7 ở `expiry/`, dòng 12 bàn giao đã bỏ theo `QĐ-110g`, dòng 13 tài khoản dịch vụ đã bỏ theo `QĐ-110m`, dòng 38 `K1` của
+  người nghỉ ở `provisioning/revocation-completion/`; hạng mục `a03-license-inbox-alerts`).
 
 ## Kho dùng chung (`shared-pool/`, L0)
 
@@ -173,7 +170,8 @@ dịch vụ nào đọc cả ghế lẫn thu hồi thì đứng trên cả hai (
 
 - Assignment không bao giờ bị xóa; chỉ đổi khi kết thúc, failed hoặc cancelled, ngày dự kiến kết thúc đã đặt thì không
   sửa — đổi là gia hạn, bản ghi mới (trigger `license_assignment_reject_change`). Một người không giữ hai ghế cá nhân
-  chồng thời gian trên cùng subscription/plan (`license_assignments_personal_no_overlap`, INV-02).
+  chồng thời gian trên cùng subscription/plan (`license_assignments_personal_no_overlap`, INV-02), trừ seat có cờ _tài khoản máy_
+  (`is_machine_account`, R-9: `WHERE kind = 'PERSONAL' AND NOT is_machine_account`; cờ ⇔ `machine_account_note`).
 - Thu hồi chỉ mở qua `openRevocation`, trong transaction của nguồn; ghế được trả khi task hoàn tất; gọi lại cùng nguồn
   và reference không đổi gì.
 - Mốc thu hồi (`BR-MF5-04`): mỗi lý do giữ `due_on`/`not_before` của nơi gọi; tác vụ giữ mốc suy ra từ các lý do còn hiệu

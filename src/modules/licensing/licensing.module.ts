@@ -12,12 +12,6 @@ import { OrganizationModule } from '../organization/organization.module';
 import { AssignmentEndService } from './assignment/assignment-end.service';
 import { AssignmentFactsRepo } from './assignment/renewal/assignment-facts.repo';
 import { AssignmentRenewalService } from './assignment/renewal/assignment-renewal.service';
-import { AssignmentResponsibleService } from './assignment/assignment-responsible.service';
-import { ServiceAccountDutiesController } from './assignment/service-account-duty/service-account-duties.controller';
-import { ServiceAccountDutyRepo } from './assignment/service-account-duty/service-account-duty.repo';
-import { ServiceAccountDutyService } from './assignment/service-account-duty/service-account-duty.service';
-import { ServiceAccountDutySweeper } from './assignment/service-account-duty/service-account-duty.job';
-import { ServiceAccountSpendingApproverGrantCheck } from './assignment/service-account-duty/spending-approver-grant.listener';
 import { AssignmentDepartmentRepo } from './assignment/assignment-department.repo';
 import { RevocationCompletedFactsReader } from './provisioning/revocation-completion/revocation-completed-facts.service';
 import { AssignmentChainRepo } from './assignment/assignment-chain.repo';
@@ -63,7 +57,6 @@ import {
   RenewalFinancialContributions,
   RenewalHoldHook,
   RenewalUsageContributions,
-  ResponsibleDeadlineHook,
   RevocationListeners,
   SeatBaselineClosedListeners,
 } from './public/licensing.extension-points';
@@ -75,7 +68,6 @@ import { LicensingOpenGrantsApi } from './public/licensing-open-grants.api';
 import { LicensingPoolStockApi } from './public/licensing-pool-stock.api';
 import { LicensingRenewalApi } from './public/licensing-renewal.api';
 import { LicensingSeatBaselineApi } from './public/licensing-seat-baseline.api';
-import { LicensingServiceAccountApi } from './public/licensing-service-account.api';
 import { ProvisioningCancellationService } from './provisioning/grant-cancellation/provisioning-cancellation.service';
 import { ProvisioningDecisionService } from './provisioning/tasks/provisioning-decision.service';
 import { ProvisioningFailureService } from './provisioning/provisioning-failure.service';
@@ -160,7 +152,6 @@ import { SubscriptionRenewalsController } from './subscription-renewal/subscript
     MachineAccountController,
     SubscriptionSeatsController,
     DepartmentToolsController,
-    ServiceAccountDutiesController,
     SeatBaselineController,
     ProvisioningTasksController,
     RevocationTasksController,
@@ -185,13 +176,7 @@ import { SubscriptionRenewalsController } from './subscription-renewal/subscript
     AssignmentFactsRepo,
     AssignmentRenewalService,
     RenewalHoldHook,
-    ResponsibleDeadlineHook,
-    AssignmentResponsibleService,
     MachineAccountService,
-    ServiceAccountDutyRepo,
-    ServiceAccountDutyService,
-    ServiceAccountDutySweeper,
-    ServiceAccountSpendingApproverGrantCheck,
     AssignmentListService,
     DepartmentToolsService,
     SeatBaselineRepo,
@@ -298,7 +283,6 @@ import { SubscriptionRenewalsController } from './subscription-renewal/subscript
     LicensingPoolStockApi,
     LicensingRenewalApi,
     LicensingSeatBaselineApi,
-    LicensingServiceAccountApi,
   ],
   // Other modules read through the facade and bind the extension points; the capability services and the repos stay private.
   exports: [
@@ -310,11 +294,9 @@ import { SubscriptionRenewalsController } from './subscription-renewal/subscript
     LicensingPoolStockApi,
     LicensingRenewalApi,
     LicensingSeatBaselineApi,
-    LicensingServiceAccountApi,
     GrantRequestGateHook,
     RevocationListeners,
     RenewalHoldHook,
-    ResponsibleDeadlineHook,
     SeatBaselineClosedListeners,
     RenewalFinancialContributions,
     RenewalUsageContributions,

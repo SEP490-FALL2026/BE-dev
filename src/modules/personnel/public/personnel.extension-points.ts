@@ -16,7 +16,7 @@ export interface PersonnelFileEvent {
 
 /**
  * What a flow that hangs on a personnel file does when the file is recorded, when its day moves and when it is cancelled
- * (`g6-service-account-handover` asks for a person to answer for the service accounts of the one who goes). Called in the
+ * (the role duties of the one who goes). Called in the
  * transaction of the write, after it, as a part of it: a hook that throws — a bug, a failing statement, a refusal it
  * raises — rolls the whole write back and its error is the error of the write, as a refusing entry of `Listeners` does. A hook that
  * is allowed to fail without the write failing catches the error inside itself. What a hook writes belongs to the transaction too, so
@@ -45,8 +45,7 @@ export class PersonnelFileHookContributions extends Contributions<PersonnelFileH
 
 /**
  * What a flow that comes after the record of a departure tells it: how many things of its own still wait on a person who has left.
- * A blocker keeps the case from closing (the service accounts nobody answers for yet, the workspaces whose owner has not been
- * changed); a warning only shows beside the case and never stops anything (the roles the person holds that someone must take over).
+ * A blocker keeps the case from closing (the workspaces whose owner has not been changed); a warning only shows beside the case and never stops anything (the roles the person holds that someone must take over).
  * The count is read when the case is shown or closed, in the caller's transaction when there is one.
  */
 export interface OffboardingSource {

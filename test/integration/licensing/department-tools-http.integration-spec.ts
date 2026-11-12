@@ -282,42 +282,6 @@ describe('the tools a department uses (US-03-06 AC-13, AC-17, F22, integration, 
       expect(renewed).toMatchObject({ employeeCode: 'TR-RNW', terminating: false, terminatingUntil: null });
       expect(await terminatingCodes()).toEqual(['TR-CNL']);
     });
-
-    it('does not tell a service account whose person responsible changes on a later day', async () => {
-      const first = await enter(trm.code, 'TR-BOT1');
-      const next = await enter(trm.code, 'TR-BOT2');
-      await h.written({ subscriptionId: trmSubscription }, [
-        {
-          employee_code: 'TR-BOT1',
-          account_identifier: 'ci-trm',
-          kind: 'service',
-          reason: 'CI',
-          granted_on: '2026-01-05',
-        },
-      ]);
-      const bot = (await h.assignmentsOf({ subscriptionId: trmSubscription, kind: 'SERVICE' })).find(
-        (assignment) => assignment.employeeId === first,
-      );
-      if (!bot) throw new Error('no service account of TR-BOT1');
-
-      await request(h.server())
-        .post(`/api/v1/license-assignments/${bot.id}/responsible-changes`)
-        .set(h.as(h.it1))
-        .send({ employeeId: next, effectiveFrom: h.inDays(7) })
-        .expect(200);
-
-      expect(await validUntilOf(bot.id)).toBe(h.inDays(7));
-      const items = await itemsOfTrm();
-      expect(items.find((item) => item.assignmentId === bot.id)).toMatchObject({
-        kind: 'SERVICE',
-        employeeCode: 'TR-BOT1',
-        terminating: false,
-        terminatingUntil: null,
-      });
-      // The next record begins in a week: it holds nothing today and is not listed.
-      expect(items.map((item) => item.employeeCode)).not.toContain('TR-BOT2');
-      expect(await terminatingCodes()).toEqual(['TR-CNL']);
-    });
   });
 
   it('shows a start that is only the day of recording with its label, never as a grant date', async () => {

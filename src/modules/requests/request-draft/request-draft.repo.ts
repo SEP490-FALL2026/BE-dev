@@ -158,7 +158,6 @@ export class RequestDraftRepo {
 
   /** Deletes the draft with every row that hangs from it, in one go. The caller holds its lock and has judged that it is a draft. */
   async delete(tx: DbTx, id: string): Promise<void> {
-    await tx.accessRequestServiceAccount.deleteMany({ where: { requestId: id } });
     await tx.accessRequestBeneficiary.deleteMany({ where: { requestId: id } });
     await tx.accessRequest.delete({ where: { id, state: 'DRAFT' } });
   }

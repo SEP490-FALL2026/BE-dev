@@ -84,14 +84,6 @@
   `LONG_LEAVE.RETURN_OVERDUE` in one transaction, so a day is told once however many instances run, and told again when the day moves
   and passes; a failed pass only logs. It only tells: the work state of a person never changes by the calendar. Run one by hand with
   `LeaveOverdueService.noticeOverdue(now)`.
-  The API also runs `ServiceAccountDutySweeper` once an hour (the first pass five minutes after start, unreferenced timer): for each open
-  service account whose responsible person has a transfer or a departure that is not closed and whose day has passed it writes a row of
-  `service_account_duty_notices` (unique for the account and the day), the audit event `SERVICE_ACCOUNT_DUTY.OVERDUE` and an inbox notice
-  (`SERVICE_ACCOUNT_RESPONSIBLE_OVERDUE`) to the IT Admin in charge of the owning department in one transaction, so a day is told once however
-  many instances run; a failed pass only logs. It only tells: the transfer or the departure still takes
-  effect, the account keeps its person and nothing is revoked. It reads which people have a file that waits through the provider that the
-  personnel module registers, so it finds nothing in a process that does not load it. Run one by hand with
-  `ServiceAccountDutyService.noticeOverdue(now)`.
   The API also runs `ExpiryReminderSweeper` once an hour (the first pass five minutes after start, unreferenced timer): for each open
   personal right whose end date falls between today and seven days ahead it writes, in one transaction, at most three rows of
   `assignment_expiry_reminders` (unique for the right, the end date and the audience: the holder, the head of their department today, the

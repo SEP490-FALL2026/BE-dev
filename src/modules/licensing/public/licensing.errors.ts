@@ -65,42 +65,8 @@ export class AssignmentNotFoundError extends Error {
 
 export class AssignmentNotOpenError extends Error {
   constructor() {
-    super('The assignment has ended or is set to end: only an open one changes hands.');
+    super('The assignment has ended or is set to end: only an open one changes.');
     this.name = 'AssignmentNotOpenError';
-  }
-}
-
-export class AssignmentNotServiceAccountError extends Error {
-  constructor() {
-    super('Only the person responsible for a service account changes by this route.');
-    this.name = 'AssignmentNotServiceAccountError';
-  }
-}
-
-export type ResponsibleProblem =
-  'NOT_FOUND' | 'NOT_ACTIVE' | 'HANDING_OVER' | 'SAME_PERSON' | 'OUTSIDE_OWNING_DEPARTMENT';
-
-export class AssignmentResponsibleInvalidError extends Error {
-  constructor(readonly problem: ResponsibleProblem) {
-    super(`The person named cannot take over the service account: ${problem}.`);
-    this.name = 'AssignmentResponsibleInvalidError';
-  }
-}
-
-export type EffectiveDateProblem = 'NOT_AFTER_START' | 'IN_THE_PAST' | 'EXPECTED_END_BEFORE_START';
-
-export class AssignmentEffectiveDateInvalidError extends Error {
-  constructor(readonly problem: EffectiveDateProblem) {
-    super(`The date the change takes effect is not valid: ${problem}.`);
-    this.name = 'AssignmentEffectiveDateInvalidError';
-  }
-}
-
-/** A contractor, freelancer or intern holds the seat without an expected end date (`INV-07`). */
-export class AssignmentExpectedEndRequiredError extends Error {
-  constructor() {
-    super('A contractor, freelancer or intern needs an expected end date.');
-    this.name = 'AssignmentExpectedEndRequiredError';
   }
 }
 

@@ -32,8 +32,6 @@ describe('license assignments over HTTP (integration, real PostgreSQL)', () => {
     reason: 'CI pipeline',
     ...extra,
   });
-  const change = (id: string, body: object, account = h.it1) =>
-    request(h.server()).post(`/api/v1/license-assignments/${id}/responsible-changes`).set(h.as(account)).send(body);
 
   describe('AC-5: where an assignment came from', () => {
     it('tells a baseline assignment from one that came from a request or from a handover, and filters by source', async () => {
@@ -131,165 +129,6 @@ describe('license assignments over HTTP (integration, real PostgreSQL)', () => {
     });
   });
 
-  describe('AC-10: a change of the person responsible for a service account', () => {
-    it('ends the old assignment the day the new one begins, chains them, and keeps the seats taken at eight on every day', async () => {
-      today('2026-10-01');
-      const subscriptionId = await h.subscription(10);
-      const unit = await h.ownUnit();
-      await h.crowd('GIT', 7);
-      const e2 = await h.person('GHE2');
-      const e5 = await h.person('GHE5');
-      await h.written({ subscriptionId }, [
-        ...Array.from({ length: 7 }, (_, index) => row(`GIT${index}`)),
-        bot('GHE2', 'ci-bot'),
-      ]);
-      const original = (await h.assignmentsOf({ subscriptionId, kind: 'SERVICE' }))[0];
-      expect(original.employeeId).toBe(e2);
-      today('2026-10-10');
-
-      const response = await change(original.id, { employeeId: e5, effectiveFrom: '2026-10-15' }).expect(200);
-      const { ended, created } = h.dataOf<{ ended: AssignmentWire; created: AssignmentWire }>(response);
-
-      expect(ended).toMatchObject({ id: original.id, employeeId: e2, validUntil: '2026-10-15' });
-      expect(created).toMatchObject({
-        source: 'HANDOVER',
-        kind: 'SERVICE',
-        employeeId: e5,
-        accountIdentifier: 'ci-bot',
-        reason: 'CI pipeline',
-        costCenterId: unit.id,
-        owningDepartmentId: unit.departmentId,
-        effectiveFrom: '2026-10-15',
-        effectiveFromBasis: 'ACTUAL',
-        grantedOn: '2026-10-15',
-        validUntil: null,
-        predecessorId: original.id,
-      });
-      for (const day of ['2026-10-10', '2026-10-14', '2026-10-15', '2026-10-20']) {
-        today(day);
-        expect(h.dataOf<{ occupied: number }>(await h.seatUsage(subscriptionId).expect(200)).occupied).toBe(8);
-      }
-
-      const events = await h.ctx.sql.query<{
-        action: string;
-        resource_id: string;
-        before: unknown;
-        after: Record<string, unknown>;
-      }>(
-        `SELECT action, resource_id, before, after FROM audit_events
-          WHERE resource_id = ANY($1) AND action IN ('LICENSE_ASSIGNMENT.ENDED', 'LICENSE_ASSIGNMENT.CREATED') ORDER BY occurred_at, id`,
-        [[original.id, created.id]],
-      );
-      // Events written in one transaction share a millisecond more often than not, and `ORDER BY occurred_at, id` then
-      // follows the random id, not the order of writing (P28-02): each event is picked by what it is
-      // and what it is about.
-      expect(events.rows.map((event) => `${event.action} ${event.resource_id}`).sort()).toEqual(
-        [
-          `LICENSE_ASSIGNMENT.CREATED ${original.id}`,
-          `LICENSE_ASSIGNMENT.ENDED ${original.id}`,
-          `LICENSE_ASSIGNMENT.CREATED ${created.id}`,
-        ].sort(),
-      );
-      const endedEvent = events.rows.find(
-        (event) => event.action === 'LICENSE_ASSIGNMENT.ENDED' && event.resource_id === original.id,
-      );
-      expect(endedEvent).toMatchObject({
-        before: { validUntil: null },
-        after: { validUntil: '2026-10-15', successorId: created.id },
-      });
-      const successor = events.rows.find(
-        (event) => event.action === 'LICENSE_ASSIGNMENT.CREATED' && event.resource_id === created.id,
-      );
-      expect(successor?.after).toMatchObject({ source: 'HANDOVER', predecessorId: original.id });
-      expect(JSON.stringify(events.rows)).not.toContain('ci-bot');
-    });
-
-    it('works when every seat is taken, because the count does not change on any day', async () => {
-      today('2026-10-01');
-      const subscriptionId = await h.subscription(1);
-      await h.person('FUL1');
-      const next = await h.person('FUL2');
-      await h.written({ subscriptionId }, [bot('FUL1', 'only-bot')]);
-      const original = (await h.assignmentsOf({ subscriptionId }))[0];
-
-      const response = await change(original.id, { employeeId: next, effectiveFrom: '2026-10-08' }).expect(200);
-
-      expect(h.dataOf<{ created: AssignmentWire }>(response).created.employeeId).toBe(next);
-      today('2026-10-08');
-      expect(h.dataOf<{ occupied: number; free: number }>(await h.seatUsage(subscriptionId).expect(200))).toMatchObject(
-        { occupied: 1, free: 0 },
-      );
-    });
-
-    it('refuses a personal seat, an assignment that has ended, a day that is not after the start or is in the past', async () => {
-      today('2026-10-01');
-      const subscriptionId = await h.subscription(10);
-      await h.person('REF1');
-      await h.person('REF2');
-      const next = await h.person('REF3');
-      await h.written({ subscriptionId }, [row('REF1'), bot('REF2', 'ref-bot')]);
-      const [personal, service] = [
-        (await h.assignmentsOf({ subscriptionId, kind: 'PERSONAL' }))[0],
-        (await h.assignmentsOf({ subscriptionId, kind: 'SERVICE' }))[0],
-      ];
-      today('2026-10-10');
-
-      expect(h.codeOf(await change(personal.id, { employeeId: next, effectiveFrom: '2026-10-15' }).expect(422))).toBe(
-        'LICENSE_ASSIGNMENT.NOT_SERVICE_ACCOUNT',
-      );
-      expect(
-        h.detailsOf(await change(service.id, { employeeId: next, effectiveFrom: '2026-10-01' }).expect(422)),
-      ).toEqual({ problem: 'NOT_AFTER_START' });
-      expect(
-        h.detailsOf(await change(service.id, { employeeId: next, effectiveFrom: '2026-10-05' }).expect(422)),
-      ).toEqual({ problem: 'IN_THE_PAST' });
-      await change(service.id, { employeeId: next, effectiveFrom: '2026-10-15' }).expect(200);
-      expect(h.codeOf(await change(service.id, { employeeId: next, effectiveFrom: '2026-10-20' }).expect(409))).toBe(
-        'LICENSE_ASSIGNMENT.NOT_OPEN',
-      );
-      expect(h.codeOf(await change(randomUUID(), { employeeId: next, effectiveFrom: '2026-10-20' }).expect(404))).toBe(
-        'LICENSE_ASSIGNMENT.NOT_FOUND',
-      );
-    });
-
-    it('refuses a person who has left, one who does not exist, the person already responsible, and an intern without an end date', async () => {
-      today('2026-10-01');
-      const subscriptionId = await h.subscription(10);
-      const holder = await h.person('REG1');
-      const left = await h.person('REG2');
-      const intern = await h.person('REG3', 'INTERN');
-      await h.ctx.sql.query(`UPDATE employees SET status = 'TERMINATED' WHERE id = $1`, [left]);
-      await h.written({ subscriptionId }, [bot('REG1', 'reg-bot')]);
-      const service = (await h.assignmentsOf({ subscriptionId }))[0];
-      const body = (employeeId: string, extra: object = {}) => ({ employeeId, effectiveFrom: '2026-10-15', ...extra });
-
-      expect(h.detailsOf(await change(service.id, body(left)).expect(422))).toEqual({ problem: 'NOT_ACTIVE' });
-      expect(h.detailsOf(await change(service.id, body(randomUUID())).expect(422))).toEqual({ problem: 'NOT_FOUND' });
-      expect(h.detailsOf(await change(service.id, body(holder)).expect(422))).toEqual({ problem: 'SAME_PERSON' });
-      expect(h.codeOf(await change(service.id, body(intern)).expect(422))).toBe(
-        'LICENSE_ASSIGNMENT.EXPECTED_END_REQUIRED',
-      );
-      expect((await change(service.id, body(intern, { expectedEndDate: '2027-03-31' })).expect(200)).status).toBe(200);
-      expect(h.codeOf(await change(service.id, { employeeId: intern, effectiveFrom: 'soon' }).expect(422))).toBe(
-        'VALIDATION_ERROR',
-      );
-    });
-
-    it('leaves everything as it was when the change is refused', async () => {
-      today('2026-10-01');
-      const subscriptionId = await h.subscription(10);
-      await h.person('NOC1');
-      await h.written({ subscriptionId }, [bot('NOC1', 'noc-bot')]);
-      const service = (await h.assignmentsOf({ subscriptionId }))[0];
-      const before = await h.count('license_assignments');
-
-      await change(service.id, { employeeId: randomUUID(), effectiveFrom: '2026-10-15' }).expect(422);
-
-      expect(await h.count('license_assignments')).toBe(before);
-      expect((await h.assignmentsOf({ subscriptionId }))[0].validUntil).toBeNull();
-    });
-  });
-
   describe('the seats of a subscription', () => {
     it('says the seats bought, taken and free, and null while the quantity is not known', async () => {
       today('2026-10-01');
@@ -338,10 +177,10 @@ describe('license assignments over HTTP (integration, real PostgreSQL)', () => {
         { name: 'state', method: 'get', path: '/api/v1/seat-baseline' },
         { name: 'close', method: 'post', path: '/api/v1/seat-baseline/close' },
         {
-          name: 'change',
+          name: 'machine account',
           method: 'post',
-          path: `/api/v1/license-assignments/${randomUUID()}/responsible-changes`,
-          body: { employeeId: randomUUID(), effectiveFrom: '2026-10-15' },
+          path: `/api/v1/license-assignments/${randomUUID()}/machine-account`,
+          body: { isMachineAccount: false },
         },
       ] as const;
 

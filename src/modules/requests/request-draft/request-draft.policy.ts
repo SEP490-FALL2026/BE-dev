@@ -4,13 +4,12 @@
  * (the department has no Cost Center), and it is the sender's alone.
  */
 
-export type DraftKind = 'INDIVIDUAL' | 'GROUP' | 'SERVICE_ACCOUNT';
+export type DraftKind = 'INDIVIDUAL' | 'GROUP';
 
 /** The type of request each kind of draft becomes when it is sent. A renewal is never kept as a draft. */
 export const REQUEST_TYPE_OF_KIND = {
   INDIVIDUAL: 'GRANT',
   GROUP: 'GROUP_GRANT',
-  SERVICE_ACCOUNT: 'SERVICE_ACCOUNT',
 } as const satisfies Record<DraftKind, string>;
 
 /** The kind of draft a request of this type is, or null for a type that is never kept as a draft. */

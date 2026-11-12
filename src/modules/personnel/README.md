@@ -40,24 +40,22 @@ và lệnh `src/cli/record-super-admin-event/`.
 Bốn point mở, cả bốn đều do listener trong chính module đăng ký:
 
 - `PersonnelFileHookContributions` (`personnel.file-hook`) — `offboarding/open-requests/open-requests.listener.ts`,
-  `service-account/service-account-duty.listener.ts`, `role-duties/role-duties.listener.ts`.
-- `OffboardingBlockerContributions` (`personnel.offboarding-blocker`) — `service-account-blocker.listener.ts`,
-  `workspace-blocker.listener.ts`; `OffboardingWarningContributions` (`personnel.offboarding-warning`) —
+  `role-duties/role-duties.listener.ts`.
+- `OffboardingBlockerContributions` (`personnel.offboarding-blocker`) — `workspace-blocker.listener.ts`; `OffboardingWarningContributions` (`personnel.offboarding-warning`) —
   `open-requests.listener.ts`, `role-warning.listener.ts`.
 - `NoticeRecorderContributions` (`personnel.notice-recorder`) — `notice/transfer-notice.listener.ts`,
   `leave/leave-notice.listener.ts`, `offboarding/offboarding-notice.listener.ts`.
 
 Đăng ký vào: `organization.change-listeners` — `transfer/transfer-effective.listener.ts`,
 `transfer-review/transfer-review.listener.ts`; `organization.department-use-readers` —
-`event-notice/department-open-work.listener.ts`; `licensing.responsible-deadline` —
-`service-account/personnel-file-deadlines.listener.ts`; `licensing.seat-baseline-closed` —
+`event-notice/department-open-work.listener.ts`; `licensing.seat-baseline-closed` —
 `transfer-review/post-setup-review.listener.ts`; `requests.outcome` —
 `transfer-review/transfer-review-outcome.listener.ts`.
 
 ## Hướng phụ thuộc giữa capability (R6)
 
 Không vòng (`pnpm arch:capabilities --module personnel`, gate `capability-graph`). Từ thấp lên cao: `event-notice`,
-`service-account`, `department-member` (chỉ gọi facade của `organization`, `licensing`, `requests`; không import capability
+`department-member` (chỉ gọi facade của `organization`, `licensing`, `requests`; không import capability
 anh em) → `role-duties`, `transfer`, `transfer-review` → `notice` → `leave` → `offboarding` →
 `super-admin-event`. Recorder điều chuyển nằm ở `notice/` (đứng trên `transfer/`); recorder nghỉ dài hạn và thôi việc nằm ở
 `leave/`, `offboarding/` (đứng trên `notice/`).
@@ -97,7 +95,6 @@ anh em) → `role-duties`, `transfer`, `transfer-review` → `notice` → `leave
   thôi việc nằm ở `leave/`, `offboarding/` vì hai capability đó đứng trên `notice/`).
 - `role-duties/` — vai trò người sắp nghỉ đang giữ, vai trò Super Admin còn dùng được không;
   `me-departure-notice.controller.ts`, `super-admin-watch.controller.ts`; `RoleDutiesService`.
-- `service-account/` — chỉ gồm listener về người phụ trách service account (US-03-08).
 - `dashboard-facts/` — số đếm cho trang tổng quan theo vai: review sau điều chuyển đang mở của một phòng, ca nghỉ việc đang
   bàn giao của các phòng, thông báo của trưởng phòng chờ xử lý; cùng điều kiện với danh sách tương ứng. Không import capability nào.
 - `event-notice/` — `personnel-file-hooks.service.ts` (chạy file hook), `personnel-notifier.service.ts` (inbox, F17).

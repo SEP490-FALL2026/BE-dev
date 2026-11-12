@@ -190,28 +190,6 @@ describe('my requests: whose they are and what a row says (integration, real Pos
       }
     });
 
-    it('lists the request for a service account to the one who sent it', async () => {
-      const person = await employee();
-      // A request for a service account is sent once the seat baseline of the installation is closed.
-      await h.closeBaseline().expect(200);
-      const response = await request(h.server())
-        .post('/api/v1/access-requests/service-accounts')
-        .set(h.as(person.account))
-        .send({
-          planId: internal,
-          purpose: 'Build bot of the CI pipeline',
-          expectedIdentifier: 'ci-bot-2',
-          businessReason: 'Run the builds of the product',
-        })
-        .expect(201);
-      const sent = h.dataOf<{ request: { id: string } }>(response).request;
-
-      const rows = (await page(person.account)).items;
-
-      expect(rows.map((item) => [item.id, item.type])).toEqual([[sent.id, 'SERVICE_ACCOUNT']]);
-      expect(await idsOf(e1.account)).not.toContain(sent.id);
-    });
-
     it('does not list a draft, which is read with the drafts of the caller, and lists the request once it is sent', async () => {
       const person = await employee();
       const draft = h.dataOf<{ draft: { id: string } }>(

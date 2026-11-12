@@ -164,10 +164,6 @@ import { ReturnRevocationHook } from './return-request/return-revocation.listene
 import { RequestTimingRepo } from './timing/request-timing.repo';
 import { RequestTimingService } from './timing/request-timing.service';
 import { RequestTimingsController } from './timing/request-timings.controller';
-import { ServiceAccountBoundaryService } from './service-account-request/service-account-boundary.service';
-import { ServiceAccountRequestRepo } from './service-account-request/service-account-request.repo';
-import { ServiceAccountRequestService } from './service-account-request/service-account-request.service';
-import { ServiceAccountRequestsController } from './service-account-request/service-account-requests.controller';
 import { MyRequestsController } from './request-history/request-history-mine.controller';
 import { AccessRequestEventsController } from './request-history/access-request-events.controller';
 import { RequestAuditFlagsController } from './request-history/request-audit-flags.controller';
@@ -223,7 +219,6 @@ import { MyRequestsService } from './my-requests/my-requests.service';
     NeedDecisionQueueController,
     GrantQueueController,
     AssessmentQueueController,
-    ServiceAccountRequestsController,
     ReturnRequestsController,
     RenewalRequestsController,
     ControlledWaitController,
@@ -327,9 +322,6 @@ import { MyRequestsService } from './my-requests/my-requests.service';
     GrantQueueService,
     AssessmentQueueRepo,
     AssessmentQueueService,
-    ServiceAccountRequestRepo,
-    ServiceAccountRequestService,
-    ServiceAccountBoundaryService,
     ReturnRequestRepo,
     ReturnSeatGate,
     ReturnRequestService,

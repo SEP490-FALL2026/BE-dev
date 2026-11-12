@@ -133,14 +133,6 @@ const DROPPED: Call[] = [
     field: 'termMonths',
   },
   {
-    name: 'accessRequestServiceAccountSubmit: termMonths (QĐ-104a: an end date, not months)',
-    method: 'post',
-    path: '/api/v1/access-requests/service-accounts',
-    role: 'EMPLOYEE',
-    body: { planId: ID, businessReason: 'Work', purpose: 'Build', expectedIdentifier: 'ci-bot' },
-    dropped: { termMonths: 12 },
-  },
-  {
     name: 'groupRequestSubmit: termMonths (QĐ-104a: an end date, not months)',
     method: 'post',
     path: '/api/v1/group-requests',
@@ -178,11 +170,6 @@ const DROPPED: Call[] = [
   ...[
     ['accessRequestSubmit', '/api/v1/access-requests', { planId: ID, businessReason: 'Work' }],
     ['accessRequestPreview', '/api/v1/access-requests/preview', { planId: ID }],
-    [
-      'accessRequestServiceAccountSubmit',
-      '/api/v1/access-requests/service-accounts',
-      { planId: ID, businessReason: 'Work', purpose: 'Build', expectedIdentifier: 'ci-bot' },
-    ],
     [
       'accessRequestPropose',
       '/api/v1/access-requests/proposals',

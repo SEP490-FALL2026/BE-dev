@@ -1,7 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { GroupRequestService } from '../group-request-submission/group-request.service';
-import { ServiceAccountRequestService } from '../service-account-request/service-account-request.service';
 import {
   AccessRequestNotDraftError,
   AccessRequestNotFoundError,
@@ -28,7 +27,6 @@ export class RequestDraftSubmitService {
     private readonly drafts: RequestDraftRepo,
     private readonly requests: AccessRequestService,
     private readonly groups: GroupRequestService,
-    private readonly accounts: ServiceAccountRequestService,
   ) {}
 
   /**
@@ -50,8 +48,6 @@ export class RequestDraftSubmitService {
         return { kind: content.kind, record: await this.requests.submit(actor, content.body, draft) };
       case 'GROUP':
         return { kind: content.kind, record: await this.groups.submit(actor, content.body, draft) };
-      case 'SERVICE_ACCOUNT':
-        return { kind: content.kind, record: await this.accounts.submit(actor, content.body, draft) };
     }
   }
 }

@@ -2,12 +2,11 @@ import { Injectable } from '@nestjs/common';
 import { TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../../audit/public/audit.api';
-import { LicensingServiceAccountApi } from '../../licensing/public/licensing-service-account.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { personnelAuditEvent } from '../personnel-audit-event.mapper';
 import { PersonnelAccessRefusedError } from '../public/personnel.errors';
 import { technicalStepRefusal } from '../personnel-self-action.policy';
-import { SERVICE_ACCOUNT_UNASSIGNED, TRANSFER_REVIEW_OPEN, userActor } from '../public/personnel.types';
+import { TRANSFER_REVIEW_OPEN, userActor } from '../public/personnel.types';
 import { TransferGuardService } from './transfer-guard.service';
 import { TransferRefusedError } from './transfer.errors';
 import { TransferRepo } from './transfer.repo';
@@ -15,9 +14,9 @@ import { TransferSettlementService } from './transfer-settlement.service';
 import type { TransferRecord } from './transfer.types';
 
 /**
- * Closes a transfer that has taken effect (`US-03-08` AC-5, `BM-04`): only once the people who answer for the service accounts of the
- * person are named, never before it takes effect, and never twice. A transfer that is not closed still took effect on its day: closing
- * only says the loose ends of the person are tied. Throws TransferRefusedError.
+ * Closes a transfer that has taken effect (`BM-04`): never before it takes effect, never twice, and not while the review of the tools the
+ * new head has not finished is open. A transfer that is not closed still took effect on its day: closing only says the loose ends of the
+ * person are tied. There is no service account to wait for any more (`QĐ-110m`). Throws TransferRefusedError.
  */
 @Injectable()
 export class TransferClosureService {
@@ -26,15 +25,11 @@ export class TransferClosureService {
     private readonly transfers: TransferRepo,
     private readonly settlement: TransferSettlementService,
     private readonly organizationReads: OrganizationReadApi,
-    private readonly licensingServiceAccounts: LicensingServiceAccountApi,
     private readonly audit: AuditApi,
     private readonly guard: TransferGuardService,
   ) {}
 
-  /**
-   * Closing is a technical step that follows the event (the people who answer for the service accounts are named): the IT Admin's,
-   * judged here and not only by the guard of the route.
-   */
+  /** Closing is a technical step that follows the event: the IT Admin's, judged here and not only by the guard of the route. */
   close(actor: AuthenticatedPrincipal, id: string): Promise<TransferRecord> {
     const refused = technicalStepRefusal(actor);
     if (refused) throw new PersonnelAccessRefusedError(refused);
@@ -55,19 +50,11 @@ export class TransferClosureService {
       if (held.closedAt !== null) throw new TransferRefusedError('ALREADY_CLOSED');
       if (held.status !== 'EFFECTIVE') throw new TransferRefusedError('NOT_CLOSEABLE', { blockers: ['NOT_EFFECTIVE'] });
 
-      // The parts of the record that are still open keep it open: a service account with nobody to answer for it, and the review of
-      // the tools the new head has not finished (`US-03-08` AC-5, `US-03-07`). Each is told by its code with how many there are.
-      const open = await this.licensingServiceAccounts.listServiceAccountDuties([held.employeeId], tx);
+      // The review of the tools the new head has not finished keeps the record open (`US-03-08` AC-5, `US-03-07`), told by its code with
+      // how many there are.
       const reviews = await this.transfers.countOpenReviews(tx, held.id);
-      if (open.length > 0 || reviews > 0) {
-        throw new TransferRefusedError('NOT_CLOSEABLE', {
-          blockers: [
-            ...(open.length > 0 ? [SERVICE_ACCOUNT_UNASSIGNED] : []),
-            ...(reviews > 0 ? [TRANSFER_REVIEW_OPEN] : []),
-          ],
-          ...(open.length > 0 ? { serviceAccounts: open.length } : {}),
-          ...(reviews > 0 ? { openReviews: reviews } : {}),
-        });
+      if (reviews > 0) {
+        throw new TransferRefusedError('NOT_CLOSEABLE', { blockers: [TRANSFER_REVIEW_OPEN], openReviews: reviews });
       }
       const closed = await this.transfers.close(tx, id, actor.appUserId);
       await this.audit.record(

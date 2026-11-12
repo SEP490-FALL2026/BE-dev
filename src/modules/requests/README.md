@@ -1,7 +1,7 @@
 # requests
 
 Mục đích: request xin quyền dùng phần mềm và các bước quyết định nó — nhu cầu, thẩm định phần mềm mới, chi tiêu
-(Finance, spending approver, batch), grant; cùng request nhóm, trả ghế, gia hạn, service account, trạng thái, SLA và
+(Finance, spending approver, batch), grant; cùng request nhóm, trả ghế, gia hạn, trạng thái, SLA và
 chuyển bước khi tổ chức đổi (ADR-0015). Story chính: US-05-01 → US-05-04, US-05-06, US-05-08 → US-05-15, US-05-17,
 US-05-18, US-05-20, US-05-21, US-06-01 → US-06-03, US-06-12 → US-06-14; US-03-02 (gửi thay), US-03-04 (nghỉ việc).
 Tầng: T5 (`scripts/arch/tiers.cjs`). Phụ thuộc: budgets, licensing, catalog, organization, identity-access, finance,
@@ -34,7 +34,7 @@ controller) và `requests-work-facade.module.ts` (phần worker chạy, API dùn
 ## Bảng sở hữu
 
 - Request: `access_requests`, `access_request_beneficiaries`, `access_request_steps`, `approval_records`,
-  `access_request_proposals`, `access_request_assessments`, `access_request_service_accounts`,
+  `access_request_proposals`, `access_request_assessments`, `access_request_service_accounts` (không còn ghi từ `QĐ-110m`; bảng giữ tới đợt dọn),
   `access_request_renewals`, `return_requests`. Nhóm: `access_request_lines`, `access_request_line_decisions`,
   `access_request_line_amounts`.
 - Chi tiêu: `request_budget_checks`, `request_budget_check_years`, `request_finance_reviews`, `spend_batches`,
@@ -91,8 +91,7 @@ file; capability có controller không bị import trừ danh sách ngoại lệ
 
 - `draft`: hub `request-submission/access-requests.controller.ts` đọc bản nháp của người gọi theo id (`request-draft.service`,
   `request-draft.dto`); `reassignment` xử lý bản nháp khi người rời tổ chức (`request-draft-departure.service`): cả hai là use case của draft.
-- `group-request-submission`, `service-account-request`: nộp một bản nháp chạy use case của hai capability này từ
-  `draft/request-draft-submit.service.ts`.
+- `group-request-submission`: nộp một bản nháp nhóm chạy use case của capability này từ `draft/request-draft-submit.service.ts`.
 - `line-closure`: `cancellation/departure-cancellation.service.ts` đóng các dòng nhóm của người đã nghỉ bằng service và policy của nó.
 - `sla`: hàng đợi chi hiện tuổi của việc đang chờ qua `sla-queue-age.service`, service này đọc repo nhắc và policy SLA của `sla`.
 
@@ -173,12 +172,12 @@ cùng cần; phần ghi nằm ở `assessment/assessment.repo.ts`.
     `group-resolution.policy.ts`.
   - `group-request-submission/` — kiểm tra, gửi, ứng viên; `group-requests.controller.ts`; `GroupRequestWriter` ghi request và dòng,
     `group-need-routing.policy.ts` chọn người xét nhu cầu; `line-closure/` — đóng dòng của người đã nghỉ (`GroupLineCloser`).
-- **Trả ghế, gia hạn, service account**
+- **Trả ghế, gia hạn**
   - `return-request/` (US-05-13; mọi vai trừ Super Admin, `ACCESS_REQUEST.SUPER_ADMIN_CANNOT_REQUEST`; `ReturnSeatGate` xét ghế trả, không đòi xác nhận bàn giao (`QĐ-110g`); `return-request.policy.ts`),
     `renewal-request/` (US-05-14; `renewal-requests.controller.ts`; `RenewalRequestWriter` ghi, `renewal-request-submission.mapper.ts`
     dựng dòng và audit) với `renewal-apply/`
     (`renewal-apply.service.ts`, `renewal-request.repo.ts`: duyệt ⟹ mở tác vụ IT `EXTEND` (`requestExtension`), IT hoàn tất ⟹
-    `AccessRequestGrantGate.reportExtended` ⟹ `apply` ghi Assignment kế tiếp, BR-MF1-08d), `service-account-request/` (US-05-21).
+    `AccessRequestGrantGate.reportExtended` ⟹ `apply` ghi Assignment kế tiếp, BR-MF1-08d). Không còn Request tài khoản dịch vụ (`QĐ-110m`): loại `SERVICE_ACCOUNT` chỉ còn để đọc lịch sử, Request còn mở lúc bỏ đã bị hệ thống hủy với nguyên nhân `SYSTEM_SCOPE_REMOVED`.
     Request tiếp tục chỉ gửi trong cửa sổ `RENEWAL_WINDOW_DAYS` ngày trước ngày kết thúc (409 `RENEWAL_REQUEST.WINDOW_NOT_OPEN`;
     cửa sổ đã ghi giữ số ngày lúc mở, QĐ-108b), body `newEndDate` ≤ ngày kết thúc + 12 tháng (422 `RENEWAL_REQUEST.END_DATE_OUT_OF_RANGE`).
 - **Trạng thái, SLA, chuyển bước**

@@ -59,10 +59,7 @@ export class RequestDraftService {
 
       const saved = await this.drafts.insert(tx, {
         organizationId: employee.organizationId,
-        // A request of the type SERVICE_ACCOUNT must have its detail row when the transaction commits (`access_requests_service_account_detail`)
-        // and the detail is never deleted, while a draft has none: it is saved as the plain request it is until it is sent, and the
-        // kind it will be is kept with its content (`policy.draft.kind`); sending it gives the row its type with the detail.
-        type: body.kind === 'SERVICE_ACCOUNT' ? 'GRANT' : REQUEST_TYPE_OF_KIND[body.kind],
+        type: REQUEST_TYPE_OF_KIND[body.kind],
         // The branch the plan leads to; the policy is fixed, with the SLA of the day, only when the draft is sent.
         branch: policyFor(target.applicationKind, 1).branch,
         planId: body.planId,

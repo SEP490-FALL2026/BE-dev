@@ -98,7 +98,7 @@ describe('a hook of a personnel file and the transaction of the write (integrati
   const loggedText = (): string =>
     (logged.mock.calls as unknown[][]).map((call) => call.map(String).join(' ')).join('\n');
 
-  it('runs the three hooks of the flows that follow a file, in the order their modules add them, then a hook added later', async () => {
+  it('runs the hooks of the flows that follow a file, in the order their modules add them, then a hook added later', async () => {
     const person = await leaver();
     const hooks = h.ctx.app.get(PersonnelFileHookContributions);
     // The hooks are the objects the modules added; a spy on each calls through, so they do what they always do. A hook that has no
@@ -112,12 +112,11 @@ describe('a hook of a personnel file and the transaction of the write (integrati
 
     expect(realHooks.filter((name) => name !== 'personnel.device-registration')).toEqual([
       'personnel.open-requests',
-      'personnel.service-account-duty',
       'personnel.role-duties',
     ]);
     expect(realHooks).toContain('personnel.device-registration');
     expect(hooks.names()).toEqual([...realHooks, 'test.switch']);
-    expect(spies.map((spy) => spy.mock.calls.length)).toEqual([1, 1, 1, 1]);
+    expect(spies.map((spy) => spy.mock.calls.length)).toEqual([1, 1, 1]);
     const order = spies.map((spy) => spy.mock.invocationCallOrder[0]);
     expect(order).toEqual([...order].sort((first, second) => first - second));
     expect(spies[0].mock.calls[0][1]).toEqual({

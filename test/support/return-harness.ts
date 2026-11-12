@@ -2,7 +2,7 @@ import request from 'supertest';
 import type { ApiAccount } from './api-accounts';
 import { assignmentIdOf, importSeats } from './builders/seat.builder';
 import type { AccessRequestWire, Person } from './request-harness';
-import { ServiceAccountHarness } from './service-account-harness';
+import { SpendHarness } from './spend-harness';
 
 /** A return as the wire carries it, in a list and in its detail. */
 export interface ReturnWire {
@@ -54,7 +54,7 @@ export interface SeatRow {
  * (so that giving one back is seen on the seats free today), the calls of the routes of returns and renewals and of the queue
  * that takes a seat away. No assertion lives here.
  */
-export class ReturnHarness extends ServiceAccountHarness {
+export class ReturnHarness extends SpendHarness {
   returnSeat = (body: object, account: ApiAccount) =>
     request(this.server()).post('/api/v1/return-requests').set(this.as(account)).send(body);
   returnList = (account: ApiAccount, query: Record<string, string | number> = {}) =>

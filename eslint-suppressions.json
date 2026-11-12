@@ -100,11 +100,6 @@
       "count": 1
     }
   },
-  "src/modules/licensing/assignment/assignment.policy.ts": {
-    "complexity": {
-      "count": 1
-    }
-  },
   "src/modules/licensing/assignment/renewal/assignment-renewal.service.ts": {
     "max-lines-per-function": {
       "count": 1
@@ -332,14 +327,6 @@
   "src/modules/requests/request-view/access-request.mapper.ts": {
     "complexity": {
       "count": 1
-    }
-  },
-  "src/modules/requests/service-account-request/service-account-request.service.ts": {
-    "complexity": {
-      "count": 1
-    },
-    "max-lines-per-function": {
-      "count": 2
     }
   },
   "src/modules/requests/sla/backlog-alert.service.ts": {

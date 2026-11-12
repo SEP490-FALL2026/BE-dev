@@ -8,7 +8,6 @@ import type { AuthenticatedPrincipal } from '../../../infrastructure/security/to
 import type { PendingRenewal } from './licensing-renewal.types';
 import type { RenewalFinancialReader, RenewalUsageReader } from './licensing-subscription-renewal.types';
 import type { SeatBaselineClosedHolder } from './licensing.types';
-import type { PendingFileQuery, PendingPersonnelFile } from './licensing-service-account.types';
 import type {
   GrantOutcome,
   GrantRequestAnswer,
@@ -147,22 +146,6 @@ export interface RenewalHold {
 export class RenewalHoldHook extends Hook<RenewalHold> {
   constructor() {
     super('licensing.renewal-hold');
-  }
-}
-
-/**
- * The people who have a transfer that is not closed or a departure that is not closed, with the day each takes effect, earliest day
- * first (`US-03-08`): the day a person answering for a service account has to be replaced by. Implemented by the module of personnel.
- */
-export interface ResponsibleDeadlineProvider {
-  listPending(query: PendingFileQuery, tx?: DbTx): Promise<PendingPersonnelFile[]>;
-}
-
-/** The personnel files that bind the change of the person responsible for a service account (bound by personnel). */
-@Injectable()
-export class ResponsibleDeadlineHook extends Hook<ResponsibleDeadlineProvider> {
-  constructor() {
-    super('licensing.responsible-deadline');
   }
 }
 

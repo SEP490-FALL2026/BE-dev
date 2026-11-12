@@ -69,7 +69,7 @@ const GROUNDS_REFUSALS =
 /**
  * Transfers of a person to another department with the day they take effect and the basis they rest on. The Super Admin records,
  * moves and cancels them (`QĐ-87a`); the IT Admin reads a minimal projection of the departments in their charge and closes the
- * record once the service accounts have a person to answer for them. Finance, a department head and an employee are refused. The role
+ * record once it has taken effect and the review of the tools of the new head is done. Finance, a department head and an employee are refused. The role
  * is judged again by the service, so this guard is only the outer layer.
  */
 @ApiTags('department-transfers')
@@ -279,7 +279,7 @@ export class TransfersController {
   @ApiSuccessResponse(TransferDetailResponseDto, {
     message: 'DEPARTMENT_TRANSFER.CLOSED',
     description:
-      'The transfer is closed: the people who answer for the service accounts of the person are named, so none of them waits on the person any more. Recording a transfer and its taking effect never wait for this; only the closing does.',
+      'The transfer is closed: it has taken effect and the review of the tools of the new head is done. Recording a transfer and its taking effect never wait for this; only the closing does.',
   })
   @ApiErrorResponses(
     ...COMMON,
@@ -287,7 +287,7 @@ export class TransfersController {
     {
       status: HttpStatus.CONFLICT,
       description:
-        'The transfer cannot be closed yet (DEPARTMENT_TRANSFER.NOT_CLOSEABLE: details.blockers lists NOT_EFFECTIVE while it waits, or SERVICE_ACCOUNT_UNASSIGNED while a service account still has the person responsible), or it was closed already (ALREADY_CLOSED) or cancelled (ALREADY_CANCELLED). Nothing changes.',
+        'The transfer cannot be closed yet (DEPARTMENT_TRANSFER.NOT_CLOSEABLE: details.blockers lists NOT_EFFECTIVE while it waits, or TRANSFER_REVIEW_OPEN while the review of the tools of the new head is open), or it was closed already (ALREADY_CLOSED) or cancelled (ALREADY_CANCELLED). Nothing changes.',
       examples: [EXAMPLES.NOT_CLOSEABLE, EXAMPLES.ALREADY_CLOSED, EXAMPLES.ALREADY_CANCELLED],
     },
     {

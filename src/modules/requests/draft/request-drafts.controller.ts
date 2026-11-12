@@ -14,7 +14,6 @@ import { AuthenticatedOnly } from '../../../infrastructure/security/decorators/a
 import { CurrentPrincipal } from '../../../infrastructure/security/models/current-principal';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { GROUP_REQUEST_ERROR_EXAMPLES, toGroupRequestApiException } from '../group-request/group-request.http-errors';
-import { toServiceAccountApiException } from '../service-account-request/service-account-request.http-errors';
 import {
   ACCESS_REQUEST_ERROR_EXAMPLES as EXAMPLES,
   toAccessRequestApiException,
@@ -56,7 +55,6 @@ const NOT_DRAFT = {
 const SUBMITTED_MESSAGE: Readonly<Record<DraftKind, string>> = {
   INDIVIDUAL: 'ACCESS_REQUEST.SUBMITTED',
   GROUP: 'GROUP_REQUEST.SUBMITTED',
-  SERVICE_ACCOUNT: 'ACCESS_REQUEST.SERVICE_ACCOUNT_SUBMITTED',
 };
 
 /** GH-1 and GH-2 of the person a draft is sent for (`BR-MF1-01`). */
@@ -144,7 +142,7 @@ export class RequestDraftsController {
     status: HttpStatus.CREATED,
     message: 'ACCESS_REQUEST.SUBMITTED',
     description:
-      'Sends the draft by the operation that sends that kind of request, with every gate it has (the finance setup of the department of the sender on the day first), on what was saved: the draft becomes the request, sent now. It answers as that operation does, with its message (GROUP_REQUEST.SUBMITTED for a group, ACCESS_REQUEST.SERVICE_ACCOUNT_SUBMITTED for a service account). When a gate refuses, the answer is that operation’s own and the draft stays as it was.',
+      'Sends the draft by the operation that sends that kind of request, with every gate it has (the finance setup of the department of the sender on the day first), on what was saved: the draft becomes the request, sent now. It answers as that operation does, with its message (GROUP_REQUEST.SUBMITTED for a group). When a gate refuses, the answer is that operation’s own and the draft stays as it was.',
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,
@@ -158,7 +156,7 @@ export class RequestDraftsController {
     {
       status: HttpStatus.CONFLICT,
       description:
-        'The request was sent already (ACCESS_REQUEST.NOT_DRAFT), the department has no Cost Center in use yet (FINANCE.SETUP_INCOMPLETE), the application of the plan is retired (ACCESS_REQUEST.APPLICATION_RETIRED), the sender belongs to no department (ACCESS_REQUEST.NO_DEPARTMENT) or already holds a seat of the plan (ACCESS_REQUEST.ALREADY_HOLDS_ACCESS). A request for new access is refused when the person already has one of the plan open (ACCESS_REQUEST.OPEN_REQUEST_EXISTS, details.requestId) or already has as many open as they may (ACCESS_REQUEST.OPEN_LIMIT_REACHED, details.limit and details.openRequestIds; GH-1/GH-2, BR-MF1-01). The refusals particular to a group or a service account are those of their own operations.',
+        'The request was sent already (ACCESS_REQUEST.NOT_DRAFT), the department has no Cost Center in use yet (FINANCE.SETUP_INCOMPLETE), the application of the plan is retired (ACCESS_REQUEST.APPLICATION_RETIRED), the sender belongs to no department (ACCESS_REQUEST.NO_DEPARTMENT) or already holds a seat of the plan (ACCESS_REQUEST.ALREADY_HOLDS_ACCESS). A request for new access is refused when the person already has one of the plan open (ACCESS_REQUEST.OPEN_REQUEST_EXISTS, details.requestId) or already has as many open as they may (ACCESS_REQUEST.OPEN_LIMIT_REACHED, details.limit and details.openRequestIds; GH-1/GH-2, BR-MF1-01). The refusals particular to a group are those of its own operation.',
       examples: [
         EXAMPLES.NOT_DRAFT,
         EXAMPLES.FINANCE_SETUP_INCOMPLETE,
@@ -195,9 +193,9 @@ export class RequestDraftsController {
 
       return { request: toWire(await this.queries.view(sent.record)) };
     } catch (error) {
-      // The answer is the one of the operation that sends this kind of request: its own refusals (a group, a service account) keep
-      // their own codes, and every other error is mapped as the request routes map it.
-      throw toServiceAccountApiException(toGroupRequestApiException(error));
+      // The answer is the one of the operation that sends this kind of request: its own refusals (a group) keep their own codes, and
+      // every other error is mapped as the request routes map it.
+      throw toGroupRequestApiException(error);
     }
   }
 

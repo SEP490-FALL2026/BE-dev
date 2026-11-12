@@ -9,7 +9,7 @@ import {
   provisionDisposableDatabase,
 } from '../../support/disposable-database';
 import { pretendBusinessToday } from '../../support/pretend-today';
-import { AssignmentWire, SeatHarness } from '../../support/seat-baseline-harness';
+import { SeatHarness } from '../../support/seat-baseline-harness';
 
 const MIGRATIONS = join(process.cwd(), 'prisma', 'migrations');
 const UNIT_ONLY = '_cost_centers_unit_only';
@@ -221,38 +221,10 @@ describe('cost attribution to Units only (integration, BBI-D04 → BBI-D08, BBI-
       kind: 'service',
       reason: 'CI pipeline',
     });
-    const change = (id: string, body: object) =>
-      request(h.server()).post(`/api/v1/license-assignments/${id}/responsible-changes`).set(h.as(h.it1)).send(body);
     const deactivate = (id: string) =>
       request(h.server())
         .post(`/api/v1/departments/${id}/deactivate`)
         .set({ Authorization: `Bearer ${h.admin}` });
-
-    it('keeps a service account in the department that owns it: the person who takes over must be in that department', async () => {
-      today('2026-12-01');
-      const ops = await department('P-UO1');
-      const subscriptionId = await h.subscription(10, 'K2', ops.id);
-      const other = await department('P-UO2');
-      const owner = await enter(ops.code, 'UO-OWN');
-      const colleague = await enter(ops.code, 'UO-COL');
-      const stranger = await enter(other.code, 'UO-STR');
-      await h.written({ subscriptionId }, [bot('UO-OWN', 'uo-bot')]);
-      const original = (await h.assignmentsOf({ subscriptionId, kind: 'SERVICE' }))[0];
-      expect(original).toMatchObject({ employeeId: owner, owningDepartmentId: ops.id });
-      today('2026-12-10');
-
-      const refused = await change(original.id, { employeeId: stranger, effectiveFrom: '2026-12-15' }).expect(422);
-      const accepted = await change(original.id, { employeeId: colleague, effectiveFrom: '2026-12-15' }).expect(200);
-
-      expect(h.codeOf(refused)).toBe('LICENSE_ASSIGNMENT.RESPONSIBLE_INVALID');
-      expect(h.detailsOf(refused)).toEqual({ problem: 'OUTSIDE_OWNING_DEPARTMENT' });
-      const { created: next } = h.dataOf<{ created: AssignmentWire }>(accepted);
-      expect(next).toMatchObject({
-        employeeId: colleague,
-        owningDepartmentId: ops.id,
-        costCenterId: original.costCenterId,
-      });
-    });
 
     it('refuses to retire a department while it owns an open service account, naming it, and retires it once the account has ended', async () => {
       today('2026-12-01');

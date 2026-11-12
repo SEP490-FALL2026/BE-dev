@@ -41,16 +41,6 @@ describe('the Super Admin sends no request (integration, real PostgreSQL)', () =
         }),
     ],
     [
-      'accessRequestServiceAccountSubmit',
-      () =>
-        post('/access-requests/service-accounts', {
-          planId: plan,
-          purpose: 'Build bot of the CI pipeline',
-          expectedIdentifier: 'ci-bot-admin',
-          businessReason: 'Run the builds of the product',
-        }),
-    ],
-    [
       'accessRequestRenewalSubmit',
       () =>
         post('/access-requests/renewals', {
@@ -74,17 +64,6 @@ describe('the Super Admin sends no request (integration, real PostgreSQL)', () =
           planId: plan,
           lines: [{ employeeId: randomUUID() }],
           businessReason: 'The new brand needs the shared workspace',
-        }),
-    ],
-    [
-      'accessRequestDraftSave (service account)',
-      () =>
-        post('/access-requests/drafts', {
-          kind: 'SERVICE_ACCOUNT',
-          planId: plan,
-          purpose: 'Build bot of the CI pipeline',
-          expectedIdentifier: 'ci-bot-admin',
-          businessReason: 'Run the builds of the product',
         }),
     ],
     ['accessRequestDraftList', () => request(h.server()).get('/api/v1/access-requests/drafts').set(admin())],

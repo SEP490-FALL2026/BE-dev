@@ -28,7 +28,7 @@ export class ApprovalRoleChangeListeners extends Listeners<ApprovalRoleChange, D
 }
 
 /** What kind of open work stands in the way of the grant of SPENDING_APPROVER (`QĐ-93d`(3)). */
-export type SpendingApproverBlockerKind = 'REQUEST' | 'RETURN_REQUEST' | 'BUDGET_PROPOSAL' | 'SERVICE_ACCOUNT';
+export type SpendingApproverBlockerKind = 'REQUEST' | 'RETURN_REQUEST' | 'BUDGET_PROPOSAL';
 
 /** One piece of open work the person is a party of: what the refusal shows the Super Admin so they can finish or hand it on. */
 export interface SpendingApproverBlocker {
@@ -54,8 +54,8 @@ export interface SpendingApproverGrantCheck {
 }
 
 /**
- * Who tells the grant of SPENDING_APPROVER of the work that is still open (`QĐ-93d`(3), `US-01-03` AC-12, AC-13): the Request, the budget
- * proposal and the service account sit in modules above identity-access, which add one check each from a `*.listener.ts`. Held by the
+ * Who tells the grant of SPENDING_APPROVER of the work that is still open (`QĐ-93d`(3), `US-01-03` AC-12, AC-13): the Request and the budget
+ * proposal sit in modules above identity-access, which add one check each from a `*.listener.ts`. Held by the
  * facade module, one per application; with nobody added a grant finds no work.
  */
 @Injectable()

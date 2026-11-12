@@ -70,13 +70,9 @@ import { RoleDutiesViewService } from './role-duties/role-duties-view.service';
 import { RoleWarningSource } from './role-duties/role-warning.listener';
 import { SuperAdminWatchController } from './role-duties/super-admin-watch.controller';
 import { WorkspaceBlockerSource } from './role-duties/workspace-blocker.listener';
-import { PersonnelFileDeadlinesRepo } from './service-account/personnel-file-deadlines.repo';
-import { PersonnelFileDeadlines } from './service-account/personnel-file-deadlines.listener';
 import { PersonnelApi } from './public/personnel.api';
 import { PersonnelDashboardApi } from './public/personnel-dashboard.api';
 import { PersonnelDashboardFactsRepo } from './dashboard-facts/dashboard-facts.repo';
-import { ServiceAccountBlockerSource } from './service-account/service-account-blocker.listener';
-import { ServiceAccountDutyHook } from './service-account/service-account-duty.listener';
 import { TransferChangeWriter } from './transfer/transfer-change-writer.service';
 import { TransferChangeService } from './transfer/transfer-change.service';
 import { TransferClosureService } from './transfer/transfer-closure.service';
@@ -212,10 +208,6 @@ import { TransferReviewsController } from './transfer-review/transfer-reviews.co
     OpenRequestsService,
     OpenRequestsSource,
     DepartmentMemberQueryService,
-    PersonnelFileDeadlinesRepo,
-    PersonnelFileDeadlines,
-    ServiceAccountDutyHook,
-    ServiceAccountBlockerSource,
     RoleDutiesRepo,
     RoleDutiesService,
     RoleDutiesViewService,
