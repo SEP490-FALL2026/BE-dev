@@ -26,6 +26,9 @@ export interface AssignmentRecord {
   validUntil: BusinessDate | null;
   expectedEndDate: BusinessDate | null;
   predecessorId: string | null;
+  /** A personal seat of an IT Admin used for a machine account (`QĐ-110m`, `R-9`): INV-02 leaves it out; `machineAccountNote` says why. */
+  isMachineAccount: boolean;
+  machineAccountNote: string | null;
   /** Set when the grant it was made for was closed as failed: the period is then empty and no seat is taken. */
   failedAt: Date | null;
   /** Set when the grant it was made for was cancelled because the request was withdrawn: the period is empty as well. */

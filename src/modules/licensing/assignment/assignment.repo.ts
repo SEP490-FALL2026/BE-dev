@@ -29,6 +29,8 @@ const RECORD_SELECT = {
   validUntil: true,
   expectedEndDate: true,
   predecessorId: true,
+  isMachineAccount: true,
+  machineAccountNote: true,
   failedAt: true,
   cancelledAt: true,
   createdAt: true,
@@ -58,6 +60,8 @@ export const toRecord = (row: Row): AssignmentRecord => ({
   validUntil: row.validUntil ? fromDateColumn(row.validUntil) : null,
   expectedEndDate: row.expectedEndDate ? fromDateColumn(row.expectedEndDate) : null,
   predecessorId: row.predecessorId,
+  isMachineAccount: row.isMachineAccount,
+  machineAccountNote: row.machineAccountNote,
   failedAt: row.failedAt,
   cancelledAt: row.cancelledAt,
   createdAt: row.createdAt,
@@ -84,8 +88,8 @@ export interface NewAssignment {
 }
 
 /**
- * The one writer of `license_assignments`. Rows are never deleted and only `valid_until` and `expected_end_date` ever
- * change (the database refuses the rest), so there is no update of anything else here.
+ * The one writer of `license_assignments`. Rows are never deleted and only `valid_until`, `expected_end_date` and the flag of a machine
+ * account with its note ever change (the database refuses the rest), so there is no update of anything else here.
  */
 @Injectable()
 export class AssignmentRepo {
@@ -156,6 +160,24 @@ export class AssignmentRepo {
         expectedEndDate: input.expectedEndDate ? toDateColumn(input.expectedEndDate) : null,
       },
     });
+  }
+
+  /**
+   * Turns the flag of a machine account on (with its note) or off (the note goes with it): the one edit of a seat that is not about its end
+   * (`QĐ-110m`). The database judges INV-02 again for the seat, so an update that leaves two personal seats of one person overlapping
+   * is refused with 23P01 and nothing changes.
+   */
+  async setMachineAccount(
+    tx: DbTx,
+    id: string,
+    input: { on: boolean; note: string | null },
+  ): Promise<AssignmentRecord> {
+    const row = await tx.licenseAssignment.update({
+      where: { id },
+      data: { isMachineAccount: input.on, machineAccountNote: input.on ? input.note : null },
+    });
+
+    return toRecord(row);
   }
 
   /** Ends the assignment the day `until` (that day no longer counts). */

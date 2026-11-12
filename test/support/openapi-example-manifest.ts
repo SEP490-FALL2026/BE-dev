@@ -211,6 +211,7 @@ export const SUCCESS_MESSAGES: Readonly<Record<string, string>> = {
   itAdminList: 'IT_ADMIN.LISTED',
   licenseAssignmentChangeResponsible: 'LICENSE_ASSIGNMENT.RESPONSIBLE_CHANGED',
   licenseAssignmentList: 'LICENSE_ASSIGNMENT.LISTED',
+  licenseAssignmentSetMachineAccount: 'LICENSE_ASSIGNMENT.MACHINE_ACCOUNT_CHANGED',
   licenseKeyImport: 'LICENSE_KEY.IMPORTED',
   licenseKeyList: 'LICENSE_KEY.LISTED',
   licenseKeyReveal: 'LICENSE_KEY.REVEALED',

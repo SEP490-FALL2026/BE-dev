@@ -36,6 +36,8 @@ import { DashboardFactsService } from './dashboard-facts/dashboard-facts.service
 import { DepartmentToolsController } from './department-tools/department-tools.controller';
 import { DepartmentToolsService } from './department-tools/department-tools.service';
 import { SubscriptionSeatsController } from './assignment/subscription-seats.controller';
+import { MachineAccountController } from './machine-account/machine-account.controller';
+import { MachineAccountService } from './machine-account/machine-account.service';
 import { ExpiryController } from './expiry/expiry.controller';
 import { ExpiryQueueRepo } from './expiry/expiry-queue.repo';
 import { ExpiryQueueService } from './expiry/expiry-queue.service';
@@ -155,6 +157,7 @@ import { SubscriptionRenewalsController } from './subscription-renewal/subscript
   ],
   controllers: [
     AssignmentsController,
+    MachineAccountController,
     SubscriptionSeatsController,
     DepartmentToolsController,
     ServiceAccountDutiesController,
@@ -184,6 +187,7 @@ import { SubscriptionRenewalsController } from './subscription-renewal/subscript
     RenewalHoldHook,
     ResponsibleDeadlineHook,
     AssignmentResponsibleService,
+    MachineAccountService,
     ServiceAccountDutyRepo,
     ServiceAccountDutyService,
     ServiceAccountDutySweeper,

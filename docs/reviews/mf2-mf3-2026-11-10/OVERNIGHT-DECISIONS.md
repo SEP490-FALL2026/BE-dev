@@ -105,6 +105,12 @@
 - **Chạm:** 3 migration trên, `group-request.types.ts` (`ScopeRemovedCancelCause`, `READABLE_CANCEL_CAUSES`), `requests.prisma`.
 - **Đổi sang xóa bản nháp bằng cách giữ:** đọc `contentOf` cho kind `SERVICE_ACCOUNT` như "retired" và bỏ khối 3 của migration.
 
+### D-19 · X-SA.2 · Route P13 `POST /license-assignments/{id}/machine-account`: chi tiết SPEC không nêu
+- **Câu hỏi:** (1) "người giữ không phải IT Admin ⟹ 422" áp cho bật hay cả tắt cờ? (2) seat đã kết thúc/hỏng, và dòng `SERVICE` cũ, trả gì? (3) `note` khi tắt cờ? (4) FE đọc cờ ở đâu?
+- **ĐÃ CHỌN:** (1) chỉ **bật** cờ cần người giữ là IT Admin dùng được (tài khoản hoạt động + còn làm việc, cùng phép thử `findUsableItAdminEmployeeIds`); **tắt** cờ luôn được phép (người đã thôi làm IT Admin phải bỏ được cờ), nếu trùng seat cá nhân cùng thuê bao ⟹ 23P01 ⟹ 409 `LICENSE_ASSIGNMENT.MACHINE_ACCOUNT_OVERLAP`. (2) Seat đã kết thúc/hết hiệu lực định sẵn/`failed`/`cancelled` ⟹ 409 `LICENSE_ASSIGNMENT.NOT_OPEN` (mã đã có); dòng `SERVICE` lịch sử ⟹ 422 `LICENSE_ASSIGNMENT.NOT_PERSONAL` (mã mới). Thứ tự xét: loại seat, mở, người giữ. (3) Bật cần `note` 1–500 ký tự sau khi cắt (thiếu ⟹ 422 `VALIDATION_ERROR`); tắt: không cần `note`, nếu gửi thì bỏ qua và `machine_account_note` về NULL (CHECK cờ ⇔ ghi chú). Gửi đúng trạng thái đang có ⟹ 200, không ghi, không Audit. (4) Thêm `isMachineAccount`, `machineAccountNote` vào dòng `GET /license-assignments` và vào `AssignmentRecord` (chỉ thêm khóa), thêm `MACHINE_ACCOUNT_CONVERSION` vào enum `source` của DTO (không có thì đọc dòng đã chuyển sẽ lỗi serialize). Audit: `LICENSE_ASSIGNMENT.MACHINE_ACCOUNT_FLAGGED` / `_NOTE_CHANGED` / `_UNFLAGGED`, không ghi mã định danh tài khoản hay lý do. Không khóa thuê bao (không đổi số seat; ràng buộc INV-02 do DB xét).
+- **Chạm:** `licensing/machine-account/` (policy + spec, service, controller, dto, errors, http-errors), `assignment/assignment.mapper.ts` (mới, dùng chung cho hai controller), `assignment.dto.ts`, `assignment.repo.ts` (`setMachineAccount`), registry ngoại lệ collection `licenseAssignmentList` (thêm 2 khóa vào `itemProperties`).
+- **Đổi nếu Owner muốn khác:** cần IT Admin cho cả thao tác tắt ⟹ bỏ ngoại lệ trong `machineAccountRefusal`; nếu chỉ IT Admin phụ trách phòng được bật ⟹ thêm điều kiện ở service.
+
 ## Bị chặn
 
 (chưa có)

@@ -23,16 +23,16 @@ export const listAssignmentsQuerySchema = z.strictObject({
   subscriptionId: z.uuid().optional(),
   planId: z.uuid().optional(),
   employeeId: z.uuid().optional(),
-  source: z.enum(['BASELINE', 'HANDOVER', 'REQUEST', 'RENEWAL_CARRY']).optional(),
+  source: z.enum(['BASELINE', 'HANDOVER', 'REQUEST', 'RENEWAL_CARRY', 'MACHINE_ACCOUNT_CONVERSION']).optional(),
   kind: z.enum(['PERSONAL', 'SERVICE']).optional(),
   ...pageQuery,
 });
 export const assignmentIdParamSchema = z.strictObject({ id: z.uuid() });
 export const subscriptionIdParamSchema = z.strictObject({ id: z.uuid() });
 
-const assignmentSchema = z.strictObject({
+export const assignmentSchema = z.strictObject({
   id: z.uuid(),
-  source: z.enum(['BASELINE', 'HANDOVER', 'REQUEST', 'RENEWAL_CARRY']),
+  source: z.enum(['BASELINE', 'HANDOVER', 'REQUEST', 'RENEWAL_CARRY', 'MACHINE_ACCOUNT_CONVERSION']),
   kind: z.enum(['PERSONAL', 'SERVICE']),
   planId: z.uuid(),
   subscriptionId: z.uuid().nullable(),
@@ -48,6 +48,8 @@ const assignmentSchema = z.strictObject({
   validUntil: z.string().nullable(),
   expectedEndDate: z.string().nullable(),
   predecessorId: z.uuid().nullable(),
+  isMachineAccount: z.boolean(),
+  machineAccountNote: z.string().nullable(),
   failedAt: z.iso.datetime().nullable(),
   cancelledAt: z.iso.datetime().nullable(),
   createdAt: z.iso.datetime(),

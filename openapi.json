@@ -27597,7 +27597,10 @@
             "name": "source",
             "required": false,
             "in": "query",
-            "schema": { "type": "string", "enum": ["BASELINE", "HANDOVER", "REQUEST", "RENEWAL_CARRY"] }
+            "schema": {
+              "type": "string",
+              "enum": ["BASELINE", "HANDOVER", "REQUEST", "RENEWAL_CARRY", "MACHINE_ACCOUNT_CONVERSION"]
+            }
           },
           {
             "name": "kind",
@@ -28090,6 +28093,302 @@
         },
         "security": [{ "bearer": [] }],
         "summary": "Change the person responsible for a service account",
+        "tags": ["license-assignments"]
+      }
+    },
+    "/api/v1/license-assignments/{id}/machine-account": {
+      "post": {
+        "operationId": "licenseAssignmentSetMachineAccount",
+        "parameters": [
+          { "name": "id", "required": true, "in": "path", "schema": { "format": "uuid", "type": "string" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/MachineAccountBodyDto" } } }
+        },
+        "responses": {
+          "200": {
+            "description": "The seat as it is now, with isMachineAccount and machineAccountNote. Turning the flag on needs a note (the reason) and a seat of an IT Admin who works; turning it off clears the note. Asking for what already is changes nothing and answers the same. The seats taken do not change on any day.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/MachineAccountResponseDto" },
+                    { "properties": { "message": { "example": "LICENSE_ASSIGNMENT.MACHINE_ACCOUNT_CHANGED" } } }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_BAD_REQUEST": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_BAD_REQUEST",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHENTICATION_REQUIRED": {
+                    "summary": "A Bearer access token is required.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHENTICATION_REQUIRED",
+                        "message": "A Bearer access token is required.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "INVALID_ACCESS_TOKEN": {
+                    "summary": "The access token is invalid.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "INVALID_ACCESS_TOKEN",
+                        "message": "The access token is invalid.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only an IT Admin changes the flag of a seat.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHORIZATION.FORBIDDEN": {
+                    "summary": "You do not have permission to perform this action.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHORIZATION.FORBIDDEN",
+                        "message": "You do not have permission to perform this action.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The assignment does not exist (LICENSE_ASSIGNMENT.NOT_FOUND).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "LICENSE_ASSIGNMENT.NOT_FOUND": {
+                    "summary": "The assignment does not exist.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "LICENSE_ASSIGNMENT.NOT_FOUND",
+                        "message": "The assignment does not exist.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The seat has ended, is set to end, failed or was cancelled (LICENSE_ASSIGNMENT.NOT_OPEN), or turning the flag off would leave the person with two personal seats of the subscription for an overlapping period (LICENSE_ASSIGNMENT.MACHINE_ACCOUNT_OVERLAP).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "LICENSE_ASSIGNMENT.NOT_OPEN": {
+                    "summary": "The flag of a machine account cannot be changed on this seat: NOT_OPEN.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "LICENSE_ASSIGNMENT.NOT_OPEN",
+                        "message": "The flag of a machine account cannot be changed on this seat: NOT_OPEN.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "LICENSE_ASSIGNMENT.MACHINE_ACCOUNT_OVERLAP": {
+                    "summary": "The person holds another personal seat of this subscription for an overlapping period: the flag stays on.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "LICENSE_ASSIGNMENT.MACHINE_ACCOUNT_OVERLAP",
+                        "message": "The person holds another personal seat of this subscription for an overlapping period: the flag stays on.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_PAYLOAD_TOO_LARGE": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_PAYLOAD_TOO_LARGE",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_UNSUPPORTED_MEDIA_TYPE": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_UNSUPPORTED_MEDIA_TYPE",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The request is invalid (VALIDATION_ERROR: the flag on without a note) or refused: LICENSE_ASSIGNMENT.NOT_PERSONAL (a service account of the earlier releases) or LICENSE_ASSIGNMENT.MACHINE_ACCOUNT_HOLDER_NOT_IT_ADMIN (the person who holds the seat is not an IT Admin who works).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "VALIDATION_ERROR": {
+                    "summary": "Request validation failed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "VALIDATION_ERROR",
+                        "message": "Request validation failed.",
+                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "LICENSE_ASSIGNMENT.NOT_PERSONAL": {
+                    "summary": "The flag of a machine account cannot be changed on this seat: NOT_PERSONAL.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "LICENSE_ASSIGNMENT.NOT_PERSONAL",
+                        "message": "The flag of a machine account cannot be changed on this seat: NOT_PERSONAL.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "LICENSE_ASSIGNMENT.MACHINE_ACCOUNT_HOLDER_NOT_IT_ADMIN": {
+                    "summary": "The flag of a machine account cannot be changed on this seat: HOLDER_NOT_IT_ADMIN.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "LICENSE_ASSIGNMENT.MACHINE_ACCOUNT_HOLDER_NOT_IT_ADMIN",
+                        "message": "The flag of a machine account cannot be changed on this seat: HOLDER_NOT_IT_ADMIN.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_TOO_MANY_REQUESTS": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_TOO_MANY_REQUESTS",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "TOKEN_VERIFICATION_UNAVAILABLE": {
+                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
+                        "message": "Authentication is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SERVICE_UNAVAILABLE": {
+                    "summary": "The service is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SERVICE_UNAVAILABLE",
+                        "message": "The service is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "bearer": [] }],
+        "summary": "Turn the flag \"used for a machine account\" of a seat on or off",
         "tags": ["license-assignments"]
       }
     },
@@ -93322,7 +93621,10 @@
                   "type": "object",
                   "properties": {
                     "id": { "type": "string", "format": "uuid" },
-                    "source": { "type": "string", "enum": ["BASELINE", "HANDOVER", "REQUEST", "RENEWAL_CARRY"] },
+                    "source": {
+                      "type": "string",
+                      "enum": ["BASELINE", "HANDOVER", "REQUEST", "RENEWAL_CARRY", "MACHINE_ACCOUNT_CONVERSION"]
+                    },
                     "kind": { "type": "string", "enum": ["PERSONAL", "SERVICE"] },
                     "planId": { "type": "string", "format": "uuid" },
                     "subscriptionId": { "type": "string", "format": "uuid", "nullable": true },
@@ -93338,6 +93640,8 @@
                     "validUntil": { "type": "string", "nullable": true },
                     "expectedEndDate": { "type": "string", "nullable": true },
                     "predecessorId": { "type": "string", "format": "uuid", "nullable": true },
+                    "isMachineAccount": { "type": "boolean" },
+                    "machineAccountNote": { "type": "string", "nullable": true },
                     "failedAt": { "type": "string", "format": "date-time", "nullable": true },
                     "cancelledAt": { "type": "string", "format": "date-time", "nullable": true },
                     "createdAt": { "type": "string", "format": "date-time" },
@@ -93391,6 +93695,8 @@
                     "validUntil",
                     "expectedEndDate",
                     "predecessorId",
+                    "isMachineAccount",
+                    "machineAccountNote",
                     "failedAt",
                     "cancelledAt",
                     "createdAt",
@@ -93456,7 +93762,10 @@
                 "type": "object",
                 "properties": {
                   "id": { "type": "string", "format": "uuid" },
-                  "source": { "type": "string", "enum": ["BASELINE", "HANDOVER", "REQUEST", "RENEWAL_CARRY"] },
+                  "source": {
+                    "type": "string",
+                    "enum": ["BASELINE", "HANDOVER", "REQUEST", "RENEWAL_CARRY", "MACHINE_ACCOUNT_CONVERSION"]
+                  },
                   "kind": { "type": "string", "enum": ["PERSONAL", "SERVICE"] },
                   "planId": { "type": "string", "format": "uuid" },
                   "subscriptionId": { "type": "string", "format": "uuid", "nullable": true },
@@ -93472,6 +93781,8 @@
                   "validUntil": { "type": "string", "nullable": true },
                   "expectedEndDate": { "type": "string", "nullable": true },
                   "predecessorId": { "type": "string", "format": "uuid", "nullable": true },
+                  "isMachineAccount": { "type": "boolean" },
+                  "machineAccountNote": { "type": "string", "nullable": true },
                   "failedAt": { "type": "string", "format": "date-time", "nullable": true },
                   "cancelledAt": { "type": "string", "format": "date-time", "nullable": true },
                   "createdAt": { "type": "string", "format": "date-time" }
@@ -93494,6 +93805,8 @@
                   "validUntil",
                   "expectedEndDate",
                   "predecessorId",
+                  "isMachineAccount",
+                  "machineAccountNote",
                   "failedAt",
                   "cancelledAt",
                   "createdAt"
@@ -93504,7 +93817,10 @@
                 "type": "object",
                 "properties": {
                   "id": { "type": "string", "format": "uuid" },
-                  "source": { "type": "string", "enum": ["BASELINE", "HANDOVER", "REQUEST", "RENEWAL_CARRY"] },
+                  "source": {
+                    "type": "string",
+                    "enum": ["BASELINE", "HANDOVER", "REQUEST", "RENEWAL_CARRY", "MACHINE_ACCOUNT_CONVERSION"]
+                  },
                   "kind": { "type": "string", "enum": ["PERSONAL", "SERVICE"] },
                   "planId": { "type": "string", "format": "uuid" },
                   "subscriptionId": { "type": "string", "format": "uuid", "nullable": true },
@@ -93520,6 +93836,8 @@
                   "validUntil": { "type": "string", "nullable": true },
                   "expectedEndDate": { "type": "string", "nullable": true },
                   "predecessorId": { "type": "string", "format": "uuid", "nullable": true },
+                  "isMachineAccount": { "type": "boolean" },
+                  "machineAccountNote": { "type": "string", "nullable": true },
                   "failedAt": { "type": "string", "format": "date-time", "nullable": true },
                   "cancelledAt": { "type": "string", "format": "date-time", "nullable": true },
                   "createdAt": { "type": "string", "format": "date-time" }
@@ -93542,6 +93860,8 @@
                   "validUntil",
                   "expectedEndDate",
                   "predecessorId",
+                  "isMachineAccount",
+                  "machineAccountNote",
                   "failedAt",
                   "cancelledAt",
                   "createdAt"
@@ -93550,6 +93870,87 @@
               }
             },
             "required": ["ended", "created"],
+            "additionalProperties": false,
+            "nullable": true
+          }
+        },
+        "required": ["success", "message", "data"],
+        "additionalProperties": false
+      },
+      "MachineAccountBodyDto": {
+        "type": "object",
+        "properties": {
+          "isMachineAccount": { "type": "boolean" },
+          "note": { "type": "string", "minLength": 1, "maxLength": 500 }
+        },
+        "required": ["isMachineAccount"],
+        "additionalProperties": false
+      },
+      "MachineAccountResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "enum": [true] },
+          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "assignment": {
+                "type": "object",
+                "properties": {
+                  "id": { "type": "string", "format": "uuid" },
+                  "source": {
+                    "type": "string",
+                    "enum": ["BASELINE", "HANDOVER", "REQUEST", "RENEWAL_CARRY", "MACHINE_ACCOUNT_CONVERSION"]
+                  },
+                  "kind": { "type": "string", "enum": ["PERSONAL", "SERVICE"] },
+                  "planId": { "type": "string", "format": "uuid" },
+                  "subscriptionId": { "type": "string", "format": "uuid", "nullable": true },
+                  "employeeId": { "type": "string", "format": "uuid" },
+                  "accountIdentifier": { "type": "string" },
+                  "reason": { "type": "string", "nullable": true },
+                  "costCenterId": { "type": "string", "format": "uuid", "nullable": true },
+                  "owningDepartmentId": { "type": "string", "format": "uuid", "nullable": true },
+                  "effectiveFrom": { "type": "string" },
+                  "effectiveFromBasis": { "type": "string", "enum": ["ACTUAL", "RECORDED"] },
+                  "grantedOn": { "type": "string", "nullable": true },
+                  "effectiveFromLabel": { "type": "string", "nullable": true },
+                  "validUntil": { "type": "string", "nullable": true },
+                  "expectedEndDate": { "type": "string", "nullable": true },
+                  "predecessorId": { "type": "string", "format": "uuid", "nullable": true },
+                  "isMachineAccount": { "type": "boolean" },
+                  "machineAccountNote": { "type": "string", "nullable": true },
+                  "failedAt": { "type": "string", "format": "date-time", "nullable": true },
+                  "cancelledAt": { "type": "string", "format": "date-time", "nullable": true },
+                  "createdAt": { "type": "string", "format": "date-time" }
+                },
+                "required": [
+                  "id",
+                  "source",
+                  "kind",
+                  "planId",
+                  "subscriptionId",
+                  "employeeId",
+                  "accountIdentifier",
+                  "reason",
+                  "costCenterId",
+                  "owningDepartmentId",
+                  "effectiveFrom",
+                  "effectiveFromBasis",
+                  "grantedOn",
+                  "effectiveFromLabel",
+                  "validUntil",
+                  "expectedEndDate",
+                  "predecessorId",
+                  "isMachineAccount",
+                  "machineAccountNote",
+                  "failedAt",
+                  "cancelledAt",
+                  "createdAt"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": ["assignment"],
             "additionalProperties": false,
             "nullable": true
           }
@@ -97039,6 +97440,7 @@
                           "BENEFICIARY_TRANSFERRED",
                           "SYSTEM_BENEFICIARY_LEFT",
                           "SYSTEM_BENEFICIARY_TRANSFERRED",
+                          "SYSTEM_SCOPE_REMOVED",
                           "SPENDING_APPROVER_PARTY"
                         ]
                       },
@@ -97566,6 +97968,7 @@
                           "BENEFICIARY_TRANSFERRED",
                           "SYSTEM_BENEFICIARY_LEFT",
                           "SYSTEM_BENEFICIARY_TRANSFERRED",
+                          "SYSTEM_SCOPE_REMOVED",
                           "SPENDING_APPROVER_PARTY"
                         ]
                       },
@@ -98434,6 +98837,7 @@
                               "BENEFICIARY_TRANSFERRED",
                               "SYSTEM_BENEFICIARY_LEFT",
                               "SYSTEM_BENEFICIARY_TRANSFERRED",
+                              "SYSTEM_SCOPE_REMOVED",
                               "SPENDING_APPROVER_PARTY"
                             ]
                           },
@@ -101810,6 +102214,7 @@
                           "BENEFICIARY_TRANSFERRED",
                           "SYSTEM_BENEFICIARY_LEFT",
                           "SYSTEM_BENEFICIARY_TRANSFERRED",
+                          "SYSTEM_SCOPE_REMOVED",
                           "SPENDING_APPROVER_PARTY"
                         ]
                       },
@@ -102957,6 +103362,7 @@
                           "BENEFICIARY_TRANSFERRED",
                           "SYSTEM_BENEFICIARY_LEFT",
                           "SYSTEM_BENEFICIARY_TRANSFERRED",
+                          "SYSTEM_SCOPE_REMOVED",
                           "SPENDING_APPROVER_PARTY"
                         ]
                       },
@@ -103201,6 +103607,7 @@
                         "BENEFICIARY_TRANSFERRED",
                         "SYSTEM_BENEFICIARY_LEFT",
                         "SYSTEM_BENEFICIARY_TRANSFERRED",
+                        "SYSTEM_SCOPE_REMOVED",
                         "SPENDING_APPROVER_PARTY",
                         null
                       ],

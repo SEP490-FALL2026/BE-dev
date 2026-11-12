@@ -229,7 +229,7 @@ export const COLLECTION_EXCEPTIONS: readonly CollectionException[] = [
     findings: ['LD-13'],
     owner: 'licensing-assignment-read-contracts',
     rationale:
-      'Decision 5: which identity fields of the holder an assignment row shows. Since LD-10 (23/10/2026) the row carries employee {employeeId, employeeCode, fullName}, plan and costCenter read in batches: the spec default, not an Owner decision. Reviewed after the G5/G6 merge (Prompt 02, 26/10/2026): the row gained `cancelledAt` (a grant cancelled when its request was withdrawn), no identity field; decision 5 is still open.',
+      'Decision 5: which identity fields of the holder an assignment row shows. Since LD-10 (23/10/2026) the row carries employee {employeeId, employeeCode, fullName}, plan and costCenter read in batches: the spec default, not an Owner decision. Reviewed after the G5/G6 merge (Prompt 02, 26/10/2026): the row gained `cancelledAt` (a grant cancelled when its request was withdrawn), no identity field; decision 5 is still open. Reviewed with QĐ-110m (13/11/2026): the row gained `isMachineAccount` and `machineAccountNote` (the flag of a machine account of an IT Admin and its reason), no identity field; decision 5 is still open.',
     removeWhen: 'The Owner decides point 5 of LD-13 and the chosen contract ships.',
     itemProperties: [
       'accountIdentifier',
@@ -246,7 +246,9 @@ export const COLLECTION_EXCEPTIONS: readonly CollectionException[] = [
       'failedAt',
       'grantedOn',
       'id',
+      'isMachineAccount',
       'kind',
+      'machineAccountNote',
       'owningDepartmentId',
       'plan',
       'planId',

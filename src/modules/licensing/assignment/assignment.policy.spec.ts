@@ -25,6 +25,8 @@ const bot: AssignmentRecord = {
   validUntil: null,
   expectedEndDate: null,
   predecessorId: null,
+  isMachineAccount: false,
+  machineAccountNote: null,
   failedAt: null,
   cancelledAt: null,
   createdAt: new Date('2026-10-01T00:00:00.000Z'),

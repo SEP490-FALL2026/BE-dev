@@ -11,7 +11,6 @@ import { ApiSuccessResponse } from '../../../infrastructure/http/decorators/api-
 import { RequireRoles } from '../../../infrastructure/security/decorators/access.decorators';
 import { CurrentPrincipal } from '../../../infrastructure/security/models/current-principal';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import type { AssignmentView } from '../public/licensing.types';
 import { toLicensingApiException } from '../licensing.http-errors';
 import {
   AssignmentIdParamDto,
@@ -21,6 +20,7 @@ import {
   ResponsibleChangeResponseDto,
 } from './assignment.dto';
 import { AssignmentListService } from './assignment-list.service';
+import { toAssignmentWire } from './assignment.mapper';
 import { AssignmentResponsibleService } from './assignment-responsible.service';
 import {
   SERVICE_ACCOUNT_ERROR_EXAMPLES as EXAMPLES,
@@ -38,13 +38,6 @@ const NOT_FOUND = {
   description: 'The assignment does not exist (LICENSE_ASSIGNMENT.NOT_FOUND).',
   examples: [EXAMPLES.ASSIGNMENT_NOT_FOUND],
 } as const;
-
-const toWire = (view: AssignmentView) => ({
-  ...view,
-  failedAt: view.failedAt?.toISOString() ?? null,
-  cancelledAt: view.cancelledAt?.toISOString() ?? null,
-  createdAt: view.createdAt.toISOString(),
-});
 
 /**
  * The assignments of seats (`US-02-05`). They are read here and are created by the seat baseline import and by a change of
@@ -76,7 +69,7 @@ export class AssignmentsController {
     try {
       const page = await this.assignmentList.list(query);
 
-      return { items: page.items.map(toWire), pagination: page.pagination };
+      return { items: page.items.map(toAssignmentWire), pagination: page.pagination };
     } catch (error) {
       throw toLicensingApiException(error);
     }
@@ -128,7 +121,7 @@ export class AssignmentsController {
         expectedEndDate: body.expectedEndDate ?? null,
       });
 
-      return { ended: toWire(ended), created: toWire(created) };
+      return { ended: toAssignmentWire(ended), created: toAssignmentWire(created) };
     } catch (error) {
       throw toServiceAccountApiException(error);
     }
