@@ -54,13 +54,6 @@ export class ApplicationInternalHasNoVendorError extends Error {
   }
 }
 
-export class ApplicationBusinessOwnerInvalidError extends Error {
-  constructor() {
-    super('The Business Owner must be an employee who is still working.');
-    this.name = 'ApplicationBusinessOwnerInvalidError';
-  }
-}
-
 export class ApplicationFunctionalGroupInvalidError extends Error {
   constructor() {
     super('The functional group does not exist or is not active.');
@@ -132,14 +125,6 @@ export class ApplicationAlreadyRetiredError extends Error {
   }
 }
 
-/** The Business Owner of the application has not confirmed that it may be retired (`QĐ-62n`). */
-export class ApplicationRetirementNeedsConfirmationError extends Error {
-  constructor() {
-    super('The Business Owner has to confirm before the application is retired.');
-    this.name = 'ApplicationRetirementNeedsConfirmationError';
-  }
-}
-
 export interface RetirementBlockingAssignment {
   assignmentId: string;
   employeeId: string;
@@ -164,20 +149,5 @@ export class ApplicationRetirementBlockedError extends Error {
   ) {
     super('Assignments or subscriptions still hold the application.');
     this.name = 'ApplicationRetirementBlockedError';
-  }
-}
-
-export class ApplicationRetirementNoteRequiredError extends Error {
-  constructor() {
-    super('The confirmation of the Business Owner needs its content.');
-    this.name = 'ApplicationRetirementNoteRequiredError';
-  }
-}
-
-/** The person named is not the Business Owner of the application today, or no longer works. */
-export class ApplicationRetirementNotBusinessOwnerError extends Error {
-  constructor() {
-    super('Only the Business Owner of the application, still working, confirms its retirement.');
-    this.name = 'ApplicationRetirementNotBusinessOwnerError';
   }
 }

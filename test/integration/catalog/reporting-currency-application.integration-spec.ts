@@ -19,7 +19,6 @@ describe('the reporting currency under the application (integration, DB-01 and D
   let ctx: HttpTestApp;
   let seed: SeededInstallation;
   let it1: ApiAccount;
-  let businessOwner: string;
   let changer: Client;
   let finance: FinanceApi;
   let runner: TransactionRunner;
@@ -32,7 +31,7 @@ describe('the reporting currency under the application (integration, DB-01 and D
     seed = await seedInstallation(ctx.app);
     const admin = await adminToken(ctx, seed);
     it1 = await createActivatedAccount(ctx, seed, { code: 'E-IT1', email: 'it1@acme.vn', role: 'IT_ADMIN', admin });
-    businessOwner = (await insertEmployeeFixture(ctx.app, seed, { code: 'E-OWN', email: 'owner@acme.vn' })).employeeId;
+    await insertEmployeeFixture(ctx.app, seed, { code: 'E-OWN', email: 'owner@acme.vn' });
     finance = ctx.app.get(FinanceApi, { strict: false });
     runner = ctx.app.get(TransactionRunner, { strict: false });
     changer = new Client({ connectionString: ctx.database.url });
@@ -58,7 +57,6 @@ describe('the reporting currency under the application (integration, DB-01 and D
           kind: 'SAAS',
           vendorName: 'Figma Inc',
           dataSensitivity: 'LOW',
-          businessOwnerEmployeeId: businessOwner,
           communication: NO,
         })
         .expect(201),

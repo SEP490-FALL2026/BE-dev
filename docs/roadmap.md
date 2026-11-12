@@ -1433,3 +1433,7 @@ Nếu sau này dùng GitHub Projects quản lý tiến độ, chuyển trạng t
 Local stacked branch `feat/qd95-one-role-per-account`: Tasks 1-6 committed; Task 7 documents the HTTP changes and superseded designs. [Plan and evidence](workspace/items/qd95-one-role-per-account/plan.md) records quick checks and test replacements. Integration/e2e are written but deliberately not run in this implementation session; review and acceptance remain pending. No push, merge or deployment.
 
 FE/mobile contract: create accepts `role?` (EMPLOYEE default), PUT `/app-users/{id}/role` replaces both additive endpoints (404), `/me.selfServiceOnly` removed; `roles` remains an array with one role.
+
+## Gỡ Business Owner khỏi code đang chạy, 13/11/2026 (`QĐ-111g`, gói BUG-B)
+
+Nhánh `feat/mf2-mf3`: ứng dụng có cột `responsible_it_admin_employee_id` (người tạo, đổi bằng `POST /applications/{id}/responsibility-transfer`; `GET /it-admins` để chọn); năm route Business Owner đã xóa (`business-owner-warnings`, `applications/{id}/business-owners`, `retirement-confirmations`, `term-opinions` GET/POST), `retire` không chờ xác nhận. **Ngừng đọc/ghi, chưa drop:** các cột `applications.business_owner_employee_id`, `access_request_proposals.proposed_business_owner_employee_id`, `subscription_renewals.business_owner_opinion` và các bảng `application_business_owners`, `plan_term_opinions`, `application_retirement_confirmations` giữ nguyên dữ liệu; **drop ở đợt dọn** (expand–contract), cùng với migration xóa quan hệ Prisma `ApplicationLegacyBusinessOwner`.

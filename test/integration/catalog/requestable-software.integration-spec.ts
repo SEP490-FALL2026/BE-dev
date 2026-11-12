@@ -72,7 +72,6 @@ describe('the software a person may request (integration, real PostgreSQL)', () 
       kind,
       ...(kind === 'INTERNAL' ? {} : { vendorName: `${name} Vendor` }),
       dataSensitivity: 'MEDIUM',
-      businessOwnerEmployeeId: h.businessOwner,
       communication: NO,
     });
     const planId = await declarePlan(h.ctx, h.it1.accessToken, {
@@ -147,7 +146,6 @@ describe('the software a person may request (integration, real PostgreSQL)', () 
       kind: 'SAAS',
       vendorName: 'Sel Planless Vendor',
       dataSensitivity: 'LOW',
-      businessOwnerEmployeeId: h.businessOwner,
       communication: NO,
     });
   }, 300000);

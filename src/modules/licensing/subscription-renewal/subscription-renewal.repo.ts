@@ -81,7 +81,6 @@ function toRecord(row: Row): RenewalRecord {
     proposedChoice: row.proposedChoice,
     proposedQuantity: row.proposedQuantity,
     proposalNote: row.proposalNote,
-    businessOwnerOpinion: row.businessOwnerOpinion,
     proposedByEmployeeId: row.proposedByEmployeeId,
     proposedAt: row.proposedAt,
     decision: decisionOf(row),
@@ -115,12 +114,12 @@ export class SubscriptionRenewalRepo {
   async insert(tx: DbTx, input: NewRenewal): Promise<RenewalRecord | null> {
     const inserted = await tx.$queryRaw<{ id: string }[]>`
       INSERT INTO subscription_renewals (id, organization_id, subscription_id, notice_basis, notice_base_date, proposed_choice,
-             proposed_quantity, proposal_note, business_owner_opinion, proposed_by_employee_id, proposed_by_app_user_id,
+             proposed_quantity, proposal_note, proposed_by_employee_id, proposed_by_app_user_id,
              updated_at)
       VALUES (gen_random_uuid(), ${input.organizationId}::uuid, ${input.subscriptionId}::uuid,
               ${input.noticeBasis}::"RenewalNoticeBasis", ${input.noticeBaseDate}::date,
               ${input.proposedChoice}::"RenewalChoice", ${input.proposedQuantity}::int, ${input.proposalNote},
-              ${input.businessOwnerOpinion}, ${input.proposedByEmployeeId}::uuid, ${input.proposedByAppUserId}::uuid, now())
+              ${input.proposedByEmployeeId}::uuid, ${input.proposedByAppUserId}::uuid, now())
       ON CONFLICT (subscription_id) WHERE state <> 'STALE' DO NOTHING
       RETURNING id`;
     if (inserted.length === 0) return null;

@@ -13,7 +13,6 @@ interface DetailWire {
   proposal: {
     choice: string;
     quantity: number | null;
-    businessOwnerOpinion: string | null;
     releasedSeatCount: number;
   };
   decision: {
@@ -58,7 +57,7 @@ describe('the proposal and the confirmation of a renewal (integration, real Post
     ).rows;
 
   describe('the proposal (US-11-05 AC-1, AC-3, AC-5 → AC-8, AC-15)', () => {
-    it('puts the case in the queue of the head of the owner department, who is told, with the seats to take back and the opinion recorded', async () => {
+    it('puts the case in the queue of the head of the owner department, who is told, with the seats to take back', async () => {
       const reduceUnit = await h.unit(3);
       const { subscriptionId, seats } = await h.termWithSeats(reduceUnit, 20, { quantity: 5 });
 
@@ -68,7 +67,6 @@ describe('the proposal and the confirmation of a renewal (integration, real Post
           choice: 'REDUCE',
           proposedQuantity: 1,
           releasedAssignmentIds: [seats[2], seats[0]],
-          businessOwnerOpinion: 'Keep one seat',
         })
         .expect(201);
       const renewal = h.dataOf<{ renewal: DetailWire }>(response).renewal;
@@ -79,7 +77,7 @@ describe('the proposal and the confirmation of a renewal (integration, real Post
         milestone: { basis: 'DECLARED', baseDate: h.inDays(20) },
         usage: { status: 'NOT_AVAILABLE' },
         period: { seatsInUse: 3 },
-        proposal: { choice: 'REDUCE', quantity: 1, businessOwnerOpinion: 'Keep one seat', releasedSeatCount: 2 },
+        proposal: { choice: 'REDUCE', quantity: 1, releasedSeatCount: 2 },
         decision: null,
       });
       expect(

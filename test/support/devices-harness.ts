@@ -179,7 +179,6 @@ export class DevicesHarness extends DocumentHarness {
       kind,
       ...(kind === 'INTERNAL' ? {} : { vendorName: this.unique('Vendor') }),
       dataSensitivity: 'LOW',
-      businessOwnerEmployeeId: this.businessOwner,
       communication: { personToPersonMessaging: communication, callsOrMeetings: false, mailbox: false },
     });
   }

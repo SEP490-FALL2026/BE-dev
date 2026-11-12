@@ -3,7 +3,7 @@ import { fromDateColumn, toDateColumn, type BusinessDate } from '../../../core/b
 import { Prisma } from '../../../generated/prisma/client';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
-import type { OpinionRecord, TermsContent, TermsRecord } from './plan-terms.types';
+import type { TermsContent, TermsRecord } from './plan-terms.types';
 
 type TermsRow = Prisma.PlanTermsGetPayload<object>;
 
@@ -31,7 +31,7 @@ const columnsOf = (content: TermsContent) => ({
   cancellationRefundNote: content.cancellationRefund,
 });
 
-/** The one writer of `plan_terms` and `plan_term_opinions`: what IT read in the terms of a plan, and the opinions on it. */
+/** The one writer of `plan_terms` (the opinions that were kept stay in `plan_term_opinions`, unread, `QĐ-111g`): what IT read in the terms of a plan. */
 @Injectable()
 export class PlanTermsRepo {
   constructor(private readonly prisma: PrismaService) {}
@@ -62,28 +62,5 @@ export class PlanTermsRepo {
     });
 
     return new Map(rows.map((row) => [row.planId, row.lastReviewedOn ? fromDateColumn(row.lastReviewedOn) : null]));
-  }
-
-  async insertOpinion(
-    tx: DbTx,
-    input: { planId: string; businessOwnerEmployeeId: string; opinion: string; recordedByAppUserId: string },
-  ): Promise<OpinionRecord> {
-    return tx.planTermOpinion.create({ data: input });
-  }
-
-  /** One page of the opinions on a plan, newest first, and the total, from one snapshot. */
-  listOpinions(planId: string, skip: number, take: number): Promise<{ items: OpinionRecord[]; total: number }> {
-    return this.prisma.$transaction(
-      async (tx) => ({
-        items: await tx.planTermOpinion.findMany({
-          where: { planId },
-          orderBy: [{ recordedAt: 'desc' }, { id: 'desc' }],
-          skip,
-          take,
-        }),
-        total: await tx.planTermOpinion.count({ where: { planId } }),
-      }),
-      { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead },
-    );
   }
 }

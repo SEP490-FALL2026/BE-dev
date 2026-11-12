@@ -12,7 +12,6 @@ const VALID_APPLICATION = {
   kind: 'SAAS',
   vendorName: 'Figma Inc',
   dataSensitivity: 'MEDIUM',
-  businessOwnerEmployeeId: ID,
   communication: NO,
 };
 
@@ -86,10 +85,12 @@ describe('application catalog routes (e2e, no database)', () => {
     const asIt = () => ({ Authorization: bearer(principal(['IT_ADMIN'])) });
     const without = (key: keyof typeof VALID_APPLICATION) =>
       Object.fromEntries(Object.entries(VALID_APPLICATION).filter(([name]) => name !== key));
-    const withoutOwner = without('businessOwnerEmployeeId');
 
-    it('AF-17, QĐ-104: takes a POST that names no Business Owner (the field is optional; the database part is in the integration suite)', () => {
-      expect(declareApplicationBodySchema.safeParse(withoutOwner).success).toBe(true);
+    it('QĐ-111g: takes a POST that names nobody (the IT Admin who declares it is the one responsible) and refuses one that still names a Business Owner', () => {
+      expect(declareApplicationBodySchema.safeParse(VALID_APPLICATION).success).toBe(true);
+      expect(
+        declareApplicationBodySchema.safeParse({ ...VALID_APPLICATION, businessOwnerEmployeeId: ID }).success,
+      ).toBe(false);
     });
     const withoutCommunication = without('communication');
     const withoutSensitivity = without('dataSensitivity');
@@ -98,7 +99,7 @@ describe('application catalog routes (e2e, no database)', () => {
       ['no name', { ...VALID_APPLICATION, name: undefined }],
       ['a kind that is not one', { ...VALID_APPLICATION, kind: 'FREEWARE' }],
       ['no kind', { ...VALID_APPLICATION, kind: undefined }],
-      ['a Business Owner that is not a uuid', { ...VALID_APPLICATION, businessOwnerEmployeeId: 'B1' }],
+      ['a Business Owner, which is no field any more', { ...VALID_APPLICATION, businessOwnerEmployeeId: ID }],
       ['no sensitivity', withoutSensitivity],
       ['a sensitivity that is not one', { ...VALID_APPLICATION, dataSensitivity: 'EXTREME' }],
       ['no communication answers', withoutCommunication],

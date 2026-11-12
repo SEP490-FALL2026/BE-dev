@@ -1,7 +1,7 @@
 import { addDays, type BusinessDate } from '../../../../core/business-date';
 
 /** Who an alert of the milestone of a renewal is sent to, as which role (`US-11-01`). */
-export type AlertAudience = 'IT_ADMIN' | 'FINANCE' | 'BUSINESS_OWNER' | 'SPENDING_APPROVER' | 'SUPER_ADMIN';
+export type AlertAudience = 'IT_ADMIN' | 'FINANCE' | 'SPENDING_APPROVER' | 'SUPER_ADMIN';
 
 export interface DueMilestone {
   /** The number of days before the base date the parameter names. */
@@ -41,7 +41,7 @@ export const finalAlertSkipped = (state: { decided: boolean; outcomeRecorded: bo
   state.decided && state.outcomeRecorded;
 
 /**
- * The people told of a milestone (`US-11-01` AC-1, AC-10, AC-11): the IT Admin, Finance, the Business Owner who still works and the
+ * The people told of a milestone (`US-11-01` AC-1, AC-10, AC-11, `QĐ-111g`): the IT Admin, Finance and the
  * person who decides spending; the Super Admin only at the last milestone. Nobody else — a head of department and an employee are
  * never among them. A person who holds two of these roles is told once, as the first of them.
  */
@@ -49,7 +49,6 @@ export function alertRecipients(
   people: {
     itAdmin: string | null;
     finance: string | null;
-    businessOwner: string | null;
     approver: string | null;
     superAdmin: string | null;
   },
@@ -58,7 +57,6 @@ export function alertRecipients(
   const ordered: [AlertAudience, string | null][] = [
     ['IT_ADMIN', people.itAdmin],
     ['FINANCE', people.finance],
-    ['BUSINESS_OWNER', people.businessOwner],
     ['SPENDING_APPROVER', people.approver],
     ['SUPER_ADMIN', final ? people.superAdmin : null],
   ];

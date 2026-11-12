@@ -43,7 +43,7 @@ describe('F5-02 IT đề xuất giảm, trưởng phòng sở hữu xác nhận,
       choice: 'REDUCE',
       proposedQuantity: 0,
       releasedAssignmentIds: [seatId],
-      businessOwnerOpinion: 'Nhóm đã chuyển sang công cụ khác',
+      note: 'Nhóm đã chuyển sang công cụ khác',
     });
     expect(proposed.status).toBe(201);
     renewalId = call().data<{ renewal: { id: string } }>(proposed).renewal.id;

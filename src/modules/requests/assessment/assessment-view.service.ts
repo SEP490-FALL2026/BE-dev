@@ -28,7 +28,6 @@ export class AssessmentViewService {
 
     const peopleIds = [
       step?.assigneeEmployeeId,
-      assessment.proposedBusinessOwnerEmployeeId,
       assessment.completedByEmployeeId,
       assessment.rejectedByEmployeeId,
     ].filter((id): id is string => id !== null && id !== undefined);
@@ -64,7 +63,6 @@ export class AssessmentViewService {
       dataSensitivity: assessment.dataSensitivity,
       opinion: assessment.opinionStatus && { status: assessment.opinionStatus, note: assessment.opinionNote },
       equivalentTool: toolOf(plans, assessment.equivalentPlanId),
-      proposedBusinessOwner: person(assessment.proposedBusinessOwnerEmployeeId),
       controlLevel: assessment.controlLevel,
       controlRiskNote: assessment.controlRiskNote,
       quote,
@@ -110,7 +108,7 @@ const toProposalWire = (proposal: ProposalRecord): AssessmentWire['proposal'] =>
 
 const toStepWire = (
   step: AssessmentStepRecord,
-  assignee: AssessmentWire['proposedBusinessOwner'],
+  assignee: NonNullable<AssessmentWire['step']>['assignee'],
 ): NonNullable<AssessmentWire['step']> => ({
   state: step.state,
   assignee,

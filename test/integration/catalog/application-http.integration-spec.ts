@@ -1,13 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import request from 'supertest';
 import { ApiAccount, adminToken, createActivatedAccount } from '../../support/api-accounts';
-import {
-  HttpTestApp,
-  SeededInstallation,
-  createHttpTestApp,
-  insertEmployeeFixture,
-  seedInstallation,
-} from '../../support/http-test-app';
+import { HttpTestApp, SeededInstallation, createHttpTestApp, seedInstallation } from '../../support/http-test-app';
 
 interface ApplicationWire {
   id: string;
@@ -17,7 +11,8 @@ interface ApplicationWire {
   dictionaryServiceLineId: string | null;
   domains: string[];
   dataSensitivity: string;
-  businessOwner: { employeeId: string; employeeCode: string; fullName: string; status: string };
+  responsibleItAdmin: { employeeId: string; employeeCode: string; fullName: string } | null;
+  needsResponsible: boolean;
   communication: {
     personToPersonMessaging: boolean;
     callsOrMeetings: boolean;
@@ -43,7 +38,6 @@ describe('the application catalog over HTTP (integration, real PostgreSQL)', () 
   let it1: ApiAccount;
   let finance: ApiAccount;
   let employee: ApiAccount;
-  let owner: string;
   let counter = 0;
   const server = () => ctx.app.getHttpServer();
   const as = (account: ApiAccount) => ({ Authorization: `Bearer ${account.accessToken}` });
@@ -65,7 +59,6 @@ describe('the application catalog over HTTP (integration, real PostgreSQL)', () 
       role: 'EMPLOYEE',
       admin,
     });
-    owner = (await insertEmployeeFixture(ctx.app, seed, { code: 'E-OWN', email: 'owner@acme.vn' })).employeeId;
   }, 120000);
 
   afterAll(async () => {
@@ -80,7 +73,6 @@ describe('the application catalog over HTTP (integration, real PostgreSQL)', () 
     kind: 'SAAS',
     vendorName: unique('Vendor'),
     dataSensitivity: 'MEDIUM',
-    businessOwnerEmployeeId: owner,
     communication: NO,
     ...extra,
   });
@@ -128,18 +120,8 @@ describe('the application catalog over HTTP (integration, real PostgreSQL)', () 
         [resourceId],
       )
     ).rows;
-  const terminated = async (): Promise<string> => {
-    const { employeeId } = await insertEmployeeFixture(ctx.app, seed, {
-      code: unique('E-GONE'),
-      email: `gone${counter}@acme.vn`,
-    });
-    await ctx.sql.query(`UPDATE employees SET status = 'TERMINATED' WHERE id = $1`, [employeeId]);
-
-    return employeeId;
-  };
-
   describe('declaring an application (US-04-01)', () => {
-    it('AC-1: Figma with a dictionary line, a working Business Owner and three "no" is stored without the flag, vendor made once, all audited', async () => {
+    it('AC-1: Figma with a dictionary line, the IT Admin who declares it as the one responsible and three "no" is stored without the flag, vendor made once, all audited', async () => {
       const { groupId, lineId } = await dictionary('Figma Inc', 'Figma');
 
       const created = dataOf<ApplicationWire>(
@@ -148,7 +130,6 @@ describe('the application catalog over HTTP (integration, real PostgreSQL)', () 
           kind: 'SAAS',
           dictionaryServiceLineId: lineId,
           dataSensitivity: 'MEDIUM',
-          businessOwnerEmployeeId: owner,
           communication: NO,
           domains: ['WWW.figma.com'],
         }).expect(201),
@@ -161,7 +142,8 @@ describe('the application catalog over HTTP (integration, real PostgreSQL)', () 
         dictionaryServiceLineId: lineId,
         domains: ['figma.com'],
         dataSensitivity: 'MEDIUM',
-        businessOwner: { employeeId: owner, employeeCode: 'E-OWN', status: 'ACTIVE' },
+        responsibleItAdmin: { employeeId: it1.employeeId, employeeCode: 'E-IT1' },
+        needsResponsible: false,
         communication: { ...NO, isCommunicationService: false, note: null },
         usageCollectionDefault: null,
         functionalGroup: null,
@@ -202,47 +184,42 @@ describe('the application catalog over HTTP (integration, real PostgreSQL)', () 
       expect(created.usageCollectionDefault).toBeNull();
     });
 
-    it('AC-4, AF-17 QĐ-104: refuses an unknown or departed Business Owner, for a catalogued and for an internal application, storing nothing; one with none is taken', async () => {
+    it('QĐ-111g: there is no field for a Business Owner, a body that names one is refused whole and nothing is stored; the IT Admin who declares is the one responsible', async () => {
       const before = await counts();
 
       expect(codeOf(await create(base({ businessOwnerEmployeeId: randomUUID() })).expect(422))).toBe(
-        'APPLICATION.BUSINESS_OWNER_INVALID',
+        'VALIDATION_ERROR',
       );
-      expect(codeOf(await create(base({ businessOwnerEmployeeId: await terminated() })).expect(422))).toBe(
-        'APPLICATION.BUSINESS_OWNER_INVALID',
-      );
-      expect(
-        codeOf(
-          await create(
-            base({ kind: 'INTERNAL', vendorName: undefined, businessOwnerEmployeeId: await terminated() }),
-          ).expect(422),
-        ),
-      ).toBe('APPLICATION.BUSINESS_OWNER_INVALID');
       expect(await counts()).toEqual(before);
 
-      // The Business Owner is no longer required (QĐ-104, AF-17): an application that names none is declared, with no owner.
-      const withoutOwner = omit(base(), 'businessOwnerEmployeeId');
-      const created = await create(withoutOwner).expect(201);
-      expect(JSON.stringify(created.body)).toMatch(/"businessOwner":null/);
+      const created = dataOf<ApplicationWire>(await create(base()).expect(201));
+      expect(created.responsibleItAdmin).toMatchObject({ employeeId: it1.employeeId });
+      expect(created.needsResponsible).toBe(false);
+      const stored = await ctx.sql.query<{ r: string | null; b: string | null }>(
+        `SELECT responsible_it_admin_employee_id AS r, business_owner_employee_id AS b FROM applications WHERE id = $1`,
+        [created.id],
+      );
+      expect(stored.rows).toEqual([{ r: it1.employeeId, b: null }]);
     });
 
-    it('AC-4: a Business Owner who leaves while the application is being declared does not get through', async () => {
-      const { employeeId } = await insertEmployeeFixture(ctx.app, seed, {
-        code: unique('E-LEAVING'),
-        email: `leaving${counter}@acme.vn`,
-      });
-      const before = await counts();
-      await ctx.sql.query('BEGIN');
-      await ctx.sql.query(`UPDATE employees SET status = 'TERMINATED' WHERE id = $1`, [employeeId]);
+    it('QĐ-111g, m-05: an application whose responsible person is no longer a usable IT Admin says it needs one, and the list says the same', async () => {
+      const created = await app();
+      await ctx.sql.query(`UPDATE app_users SET status = 'LOCKED' WHERE employee_id = $1`, [it1.employeeId]);
+      try {
+        const read = dataOf<ApplicationWire>(await get(created.id, finance).expect(200));
+        const listed = dataOf<{ items: ApplicationWire[] }>(
+          await request(server())
+            .get('/api/v1/applications')
+            .query({ search: created.name })
+            .set(as(finance))
+            .expect(200),
+        ).items;
 
-      const pending = create(base({ businessOwnerEmployeeId: employeeId })).then((response) => response);
-      await new Promise((resolve) => setTimeout(resolve, 400));
-      await ctx.sql.query('COMMIT');
-      const response = await pending;
-
-      expect(response.status).toBe(422);
-      expect(codeOf(response)).toBe('APPLICATION.BUSINESS_OWNER_INVALID');
-      expect(await counts()).toEqual(before);
+        expect(read).toMatchObject({ responsibleItAdmin: { employeeId: it1.employeeId }, needsResponsible: true });
+        expect(listed.map((item) => item.needsResponsible)).toEqual([true]);
+      } finally {
+        await ctx.sql.query(`UPDATE app_users SET status = 'ACTIVE' WHERE employee_id = $1`, [it1.employeeId]);
+      }
     });
 
     it('AC-5: software outside the dictionary is stored and proposes itself to the dictionary, once', async () => {
@@ -357,7 +334,6 @@ describe('the application catalog over HTTP (integration, real PostgreSQL)', () 
           name: unique('Cổng báo cáo nội bộ'),
           kind: 'INTERNAL',
           dataSensitivity: 'LOW',
-          businessOwnerEmployeeId: owner,
           communication: NO,
         }).expect(201),
       );
@@ -378,7 +354,6 @@ describe('the application catalog over HTTP (integration, real PostgreSQL)', () 
         name,
         kind: 'INTERNAL',
         dataSensitivity: 'LOW',
-        businessOwnerEmployeeId: owner,
         communication: NO,
       };
       await create(body).expect(201);
@@ -537,11 +512,8 @@ describe('the application catalog over HTTP (integration, real PostgreSQL)', () 
   });
 
   describe('changing and reading', () => {
-    it('updates the name, sensitivity, domains, owner, one answer and the note, auditing before and after', async () => {
+    it('updates the name, sensitivity, domains, one answer and the note, auditing before and after', async () => {
       const created = await app({ domains: ['a.example.com'] });
-      const newOwner = (
-        await insertEmployeeFixture(ctx.app, seed, { code: unique('E-NEW'), email: `new${counter}@acme.vn` })
-      ).employeeId;
       const group = await functionalGroup();
 
       const updated = dataOf<ApplicationWire>(
@@ -549,7 +521,6 @@ describe('the application catalog over HTTP (integration, real PostgreSQL)', () 
           name: unique('Renamed'),
           dataSensitivity: 'HIGH',
           domains: ['https://B.example.com/x', 'a.example.com'],
-          businessOwnerEmployeeId: newOwner,
           communication: { mailbox: true, note: 'shared mailbox' },
           functionalGroupId: group.id,
         }).expect(200),
@@ -558,7 +529,7 @@ describe('the application catalog over HTTP (integration, real PostgreSQL)', () 
       expect(updated).toMatchObject({
         dataSensitivity: 'HIGH',
         domains: ['b.example.com', 'a.example.com'],
-        businessOwner: { employeeId: newOwner },
+        responsibleItAdmin: { employeeId: it1.employeeId },
         communication: { mailbox: true, isCommunicationService: true, note: 'shared mailbox' },
         usageCollectionDefault: 'NOT_COLLECTED',
         functionalGroup: { id: group.id },
@@ -584,11 +555,11 @@ describe('the application catalog over HTTP (integration, real PostgreSQL)', () 
       expect((await auditOf(created.id)).map((event) => event.action)).toEqual(['APPLICATION.CREATED']);
     });
 
-    it('refuses a departed Business Owner on update, an empty update, a missing application, and the fields that cannot change', async () => {
+    it('refuses a Business Owner on update (no field), an empty update, a missing application, and the fields that cannot change', async () => {
       const created = await app();
 
-      expect(codeOf(await patch(created.id, { businessOwnerEmployeeId: await terminated() }).expect(422))).toBe(
-        'APPLICATION.BUSINESS_OWNER_INVALID',
+      expect(codeOf(await patch(created.id, { businessOwnerEmployeeId: randomUUID() }).expect(422))).toBe(
+        'VALIDATION_ERROR',
       );
       expect(codeOf(await patch(created.id, {}).expect(422))).toBe('APPLICATION.UPDATE_EMPTY');
       expect(codeOf(await patch(randomUUID(), { name: 'x' }).expect(404))).toBe('APPLICATION.NOT_FOUND');
@@ -623,7 +594,6 @@ describe('the application catalog over HTTP (integration, real PostgreSQL)', () 
         name: `${tag} Internal`,
         kind: 'INTERNAL',
         dataSensitivity: 'LOW',
-        businessOwnerEmployeeId: owner,
         communication: NO,
       }).expect(201);
 

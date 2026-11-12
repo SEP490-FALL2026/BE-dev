@@ -9,20 +9,12 @@ import { PlanFactsService } from '../plan/plan-facts.service';
 import { SeatOccupancyHook } from '../public/catalog.extension-points';
 import { SubscriptionFactsService } from '../subscription/subscription-facts.service';
 import {
-  ApplicationAlreadyRetiredError,
   ApplicationNotFoundError,
   type RetirementBlockingAssignment,
   type RetirementBlockingSubscription,
 } from '../catalog-entry/application.errors';
-import {
-  activeTermSubscriptions,
-  assertConfirmable,
-  cleanConfirmationNote,
-  decideRetirement,
-  ownerConfirmationNeeded,
-  RETIREMENT_LIST_LIMIT,
-} from './application-retirement.policy';
-import { ApplicationRetirementRepo, type RetirementConfirmationRecord } from './application-retirement.repo';
+import { activeTermSubscriptions, decideRetirement, RETIREMENT_LIST_LIMIT } from './application-retirement.policy';
+import { ApplicationRetirementRepo } from './application-retirement.repo';
 import { ApplicationRepo } from '../catalog-entry/application.repo';
 
 /** What holds the application: the first of each (`RETIREMENT_LIST_LIMIT`), and the counts of all of them. */
@@ -42,21 +34,15 @@ export interface RetirementBlockers {
 export interface RetirementView {
   status: 'APPROVED' | 'RETIRED';
   retiredAt: Date | null;
-  /** The newest confirmations, at most `RETIREMENT_LIST_LIMIT`; `confirmationTotal` counts them all. */
-  confirmations: RetirementConfirmationRecord[];
-  confirmationTotal: number;
-  /** The Business Owner of today has confirmed, or the application names none, so there is nothing to confirm (`QĐ-104`). */
-  confirmed: boolean;
   blockers: RetirementBlockers;
   canRetire: boolean;
 }
 
 /**
- * Retiring an application (`US-04-01` AC-8, AC-9, AC-14). The Business Owner of today confirms in writing, kept for good (an
- * application that names no Business Owner, `QĐ-104`, needs no confirmation: the IT Admin who retires it is the one who decides);
- * the application is then retired only if no assignment holds a seat of it and no term subscription of it is still running.
- * A refusal lists what holds it and creates nothing: no revocation, no cancellation. The plans of the application are locked
- * for the decision, so a grant that commits first is seen, and one that comes later finds the application retired.
+ * Retiring an application (`US-04-01` AC-9, AC-14, `QĐ-111g`). The IT Admin decides, nobody confirms: the application is retired only if no
+ * assignment holds a seat of it and no term subscription of it is still running. A refusal lists what holds it and creates nothing: no
+ * revocation, no cancellation. The plans of the application are locked for the decision, so a grant that commits first is seen, and one
+ * that comes later finds the application retired.
  */
 @Injectable()
 export class ApplicationRetirementService {
@@ -71,92 +57,26 @@ export class ApplicationRetirementService {
     private readonly runner: TransactionRunner,
   ) {}
 
-  /**
-   * Records what the Business Owner confirmed. Throws ApplicationNotFoundError, ApplicationAlreadyRetiredError,
-   * ApplicationRetirementNotBusinessOwnerError and ApplicationRetirementNoteRequiredError.
-   */
-  async confirm(
-    actor: AuthenticatedPrincipal,
-    applicationId: string,
-    input: { businessOwnerEmployeeId: string; note: string },
-  ): Promise<RetirementConfirmationRecord> {
-    const note = cleanConfirmationNote(input.note);
-    const organization = await this.requireOrganization();
-
-    return this.runner.run(async (tx) => {
-      const application = await this.applications.lock(tx, applicationId);
-      if (!application) throw new ApplicationNotFoundError();
-      if (application.status === 'RETIRED') throw new ApplicationAlreadyRetiredError();
-      // The owner must still be working when the confirmation is kept (INV-06): a departure being recorded is waited for.
-      // Only the current owner can confirm, so only that employee (who exists) is locked; anyone else is refused below.
-      if (input.businessOwnerEmployeeId === application.businessOwnerEmployeeId) {
-        await this.organizationReads.lockEmployeeForShare(tx, input.businessOwnerEmployeeId);
-      }
-      const owner = await this.organizationReads.getEmployee(input.businessOwnerEmployeeId, tx);
-      assertConfirmable({
-        currentOwnerEmployeeId: application.businessOwnerEmployeeId,
-        businessOwnerEmployeeId: input.businessOwnerEmployeeId,
-        ownerStatus: owner?.status ?? null,
-      });
-
-      const confirmation = await this.retirements.insertConfirmation(tx, {
-        organizationId: organization.id,
-        applicationId,
-        businessOwnerEmployeeId: input.businessOwnerEmployeeId,
-        note,
-        recordedByAppUserId: actor.appUserId,
-      });
-      await this.audit.record(
-        tx,
-        catalogAuditEvent(
-          actor,
-          organization.id,
-          'APPLICATION.RETIREMENT_CONFIRMED',
-          'Application',
-          applicationId,
-          null,
-          {
-            confirmationId: confirmation.id,
-            businessOwnerEmployeeId: input.businessOwnerEmployeeId,
-            note,
-          },
-        ),
-      );
-
-      return confirmation;
-    });
-  }
-
   /** What would stop the retirement now, and whether it would go through: read, not decided. Throws ApplicationNotFoundError. */
   async get(applicationId: string): Promise<RetirementView> {
     const application = await this.applications.find(applicationId);
     if (!application) throw new ApplicationNotFoundError();
     const today = await this.organizationReads.businessToday();
-    const confirmations = await this.retirements.confirmations(applicationId, RETIREMENT_LIST_LIMIT);
     const state = await this.retirements.stateOf(applicationId);
     const blockers = await this.blockersOf(applicationId, today);
-    const confirmed =
-      !ownerConfirmationNeeded(application.businessOwnerEmployeeId) ||
-      (await this.retirements.latestBy(applicationId, application.businessOwnerEmployeeId)) !== null;
 
     return {
       status: application.status,
       retiredAt: state?.retiredAt ?? null,
-      confirmations: confirmations.items,
-      confirmationTotal: confirmations.total,
-      confirmed,
       blockers,
       canRetire:
-        application.status === 'APPROVED' &&
-        confirmed &&
-        blockers.assignmentTotal === 0 &&
-        blockers.subscriptionTotal === 0,
+        application.status === 'APPROVED' && blockers.assignmentTotal === 0 && blockers.subscriptionTotal === 0,
     };
   }
 
   /**
-   * Retires the application. Throws ApplicationNotFoundError, ApplicationAlreadyRetiredError,
-   * ApplicationRetirementNeedsConfirmationError and ApplicationRetirementBlockedError (with what holds it).
+   * Retires the application, with no confirmation to wait for. Throws ApplicationNotFoundError, ApplicationAlreadyRetiredError
+   * and ApplicationRetirementBlockedError (with what holds it).
    */
   async retire(actor: AuthenticatedPrincipal, applicationId: string): Promise<void> {
     const organization = await this.requireOrganization();
@@ -167,23 +87,17 @@ export class ApplicationRetirementService {
       if (!application) throw new ApplicationNotFoundError();
       await this.plans.lockPlansOfApplication(tx, applicationId);
       const today = await this.organizationReads.businessToday(now, tx);
-      const confirmation = await this.retirements.latestBy(applicationId, application.businessOwnerEmployeeId, tx);
       const blockers = await this.blockersOf(applicationId, today, tx);
 
       decideRetirement({
         retired: application.status === 'RETIRED',
-        confirmedByCurrentOwner: confirmation !== null || !ownerConfirmationNeeded(application.businessOwnerEmployeeId),
         assignments: blockers.assignments,
         subscriptions: blockers.subscriptions,
         assignmentTotal: blockers.assignmentTotal,
         subscriptionTotal: blockers.subscriptionTotal,
       });
-      // An application with no Business Owner is retired with no confirmation to name (the database allows it).
-      await this.applications.markRetired(tx, applicationId, {
-        appUserId: actor.appUserId,
-        confirmationId: confirmation?.id ?? null,
-        now,
-      });
+      // No confirmation to name: the column stays null (the database allows it).
+      await this.applications.markRetired(tx, applicationId, { appUserId: actor.appUserId, confirmationId: null, now });
       await this.audit.record(
         tx,
         catalogAuditEvent(
@@ -193,12 +107,7 @@ export class ApplicationRetirementService {
           'Application',
           applicationId,
           { status: 'APPROVED' },
-          {
-            status: 'RETIRED',
-            confirmationId: confirmation?.id ?? null,
-            businessOwnerEmployeeId: confirmation?.businessOwnerEmployeeId ?? null,
-            note: confirmation?.note ?? null,
-          },
+          { status: 'RETIRED' },
         ),
       );
     });

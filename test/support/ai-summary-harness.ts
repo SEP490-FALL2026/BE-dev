@@ -113,7 +113,7 @@ export class AiSummaryHarness extends GroupHarness {
     const response = await request(this.server())
       .post('/api/v1/subscription-renewals')
       .set(this.as(this.it1))
-      .send({ subscriptionId, choice: 'RENEW', businessOwnerOpinion: opinion });
+      .send({ subscriptionId, choice: 'RENEW', note: opinion });
     if (response.status !== 201) throw new Error(`propose: ${response.status} ${JSON.stringify(response.body)}`);
 
     return { renewalId: this.dataOf<{ renewal: { id: string } }>(response).renewal.id, subscriptionId };

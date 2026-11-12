@@ -44,7 +44,6 @@ function toRecord(row: Row): AssessmentRecord {
     opinionStatus: row.opinionStatus,
     opinionNote: row.opinionNote,
     equivalentPlanId: row.equivalentPlanId,
-    proposedBusinessOwnerEmployeeId: row.proposedBusinessOwnerEmployeeId,
     controlLevel: row.controlLevel,
     controlRiskNote: row.controlRiskNote,
     rejectionKind: row.rejectionKind,

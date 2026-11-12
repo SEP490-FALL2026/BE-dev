@@ -80,7 +80,6 @@ describe('write integrity of catalog, finance and licensing (integration, DB-03,
       .send({
         kind: 'SAAS',
         dataSensitivity: 'LOW',
-        businessOwnerEmployeeId: h.businessOwner,
         communication: NO,
         ...body,
       });

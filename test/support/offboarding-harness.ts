@@ -38,7 +38,6 @@ export interface CaseWire {
   blockers?: Record<string, number>;
   warnings?: {
     departmentWithoutHeadFrom: string | null;
-    businessOwnerApplications: number;
     accountLockNotRecorded: boolean;
     registered: Record<string, number>;
   };

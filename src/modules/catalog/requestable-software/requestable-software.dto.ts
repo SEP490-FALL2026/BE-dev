@@ -3,7 +3,7 @@ import { successEnvelopeSchema } from '../../../infrastructure/http/dto/success-
 import { createZodDto } from '../../../infrastructure/http/dto/zod-dto';
 
 /**
- * The catalog as a person who asks for software reads it. Only what helps them pick is on the wire: no Business Owner, price,
+ * The catalog as a person who asks for software reads it. Only what helps them pick is on the wire: no responsible IT Admin, price,
  * amount, subscription, contract, seat count, key or workspace. Whether the department can price a plan is a status, never a
  * figure: the amount is the preview's to show.
  */

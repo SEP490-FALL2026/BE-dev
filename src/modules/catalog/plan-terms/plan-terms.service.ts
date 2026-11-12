@@ -8,11 +8,7 @@ import { OrganizationReadApi } from '../../organization/public/organization-read
 import { catalogAuditEvent } from '../catalog-audit-event.mapper';
 import { PlanFactsService } from '../plan/plan-facts.service';
 import { SubscriptionNoticeService } from '../subscription/subscription-notice.service';
-import {
-  PlanTermsNotApplicableError,
-  PlanTermsPlanNotFoundError,
-  PlanTermsTextInvalidError,
-} from './plan-terms.errors';
+import { PlanTermsPlanNotFoundError } from './plan-terms.errors';
 import {
   assertInstallLimit,
   assertReviewDate,
@@ -22,7 +18,7 @@ import {
   reviewDue,
 } from './plan-terms.policy';
 import { PlanTermsRepo } from './plan-terms.repo';
-import type { OpinionView, ReviewWarning, SharingPolicy, TermsContent, TermsRecord } from './plan-terms.types';
+import type { ReviewWarning, SharingPolicy, TermsContent, TermsRecord } from './plan-terms.types';
 
 export interface TermsInput {
   termsUrl?: string | null;
@@ -39,15 +35,11 @@ export interface PlanTermsView {
   applicable: boolean;
   sharingPolicy: SharingPolicy | null;
   terms: TermsRecord | null;
-  /** The newest opinions, at most `OPINIONS_IN_VIEW`; `opinionTotal` counts them all. */
-  opinions: OpinionView[];
-  opinionTotal: number;
   /** The earliest review alerts, at most `WARNINGS_IN_VIEW`; `warningTotal` counts them all. */
   warnings: ReviewWarning[];
   warningTotal: number;
 }
 
-export const OPINIONS_IN_VIEW = 50;
 export const WARNINGS_IN_VIEW = 50;
 
 const snapshot = (terms: TermsContent | null) =>
@@ -76,7 +68,7 @@ const contentOf = (terms: TermsRecord): TermsContent => ({
 });
 
 /**
- * What IT read in the terms of a plan, the opinions the Business Owner gave on them, and the alert that says the terms
+ * What IT read in the terms of a plan, and the alert that says the terms
  * need a new review. The alert is derived when it is read from the active subscriptions and the date of the last review;
  * it is not stored, so it closes by itself when IT records a review. The system keeps the words as given and judges
  * nothing (`US-04-11` AC-2).
@@ -102,36 +94,21 @@ export class PlanTermsService {
         applicable: false,
         sharingPolicy: plan.sharingPolicy,
         terms: null,
-        opinions: [],
-        opinionTotal: 0,
         warnings: [],
         warningTotal: 0,
       };
     }
 
-    const [terms, opinions, warnings] = await Promise.all([
-      this.terms.find(planId),
-      this.opinionPage(planId, { page: 1, pageSize: OPINIONS_IN_VIEW }),
-      this.warningsFor(planId),
-    ]);
+    const [terms, warnings] = await Promise.all([this.terms.find(planId), this.warningsFor(planId)]);
 
     return {
       planId,
       applicable: true,
       sharingPolicy: plan.sharingPolicy,
       terms,
-      opinions: opinions.items,
-      opinionTotal: opinions.pagination.totalItems,
       warnings: warnings.slice(0, WARNINGS_IN_VIEW),
       warningTotal: warnings.length,
     };
-  }
-
-  /** Throws PlanTermsPlanNotFoundError. One page of the opinions on a plan, newest first. */
-  async opinions(planId: string, query: { page: number; pageSize: number }): Promise<Page<OpinionView>> {
-    if (!(await this.plans.find(planId))) throw new PlanTermsPlanNotFoundError();
-
-    return this.opinionPage(planId, query);
   }
 
   /**
@@ -186,48 +163,6 @@ export class PlanTermsService {
     });
   }
 
-  /**
-   * Records an opinion of the Business Owner of the application, as the IT Admin gives it: one more line, naming who
-   * recorded it and when. It adds no step, no deadline and no approver, and nothing waits for it.
-   */
-  async recordOpinion(actor: AuthenticatedPrincipal, planId: string, input: { opinion: string }): Promise<OpinionView> {
-    const organization = await this.organizationReads.getOrganization();
-    if (!organization) throw new Error('Plan terms were used before installation');
-    const text = cleanTermsText(input.opinion);
-    if (text === null) throw new PlanTermsTextInvalidError();
-
-    const recorded = await this.runner.run(async (tx) => {
-      const plan = await this.plans.lockShared(tx, planId);
-      if (!plan) throw new PlanTermsPlanNotFoundError();
-      assertTermsApplicable(plan.provisioningType);
-      // An application declared since QĐ-104 names no Business Owner: there is nobody whose opinion this would be.
-      if (plan.businessOwnerEmployeeId === null) {
-        throw new PlanTermsNotApplicableError(
-          'The application names no Business Owner (QĐ-104): no opinion of one is recorded.',
-        );
-      }
-
-      const opinion = await this.terms.insertOpinion(tx, {
-        planId,
-        businessOwnerEmployeeId: plan.businessOwnerEmployeeId,
-        opinion: text,
-        recordedByAppUserId: actor.appUserId,
-      });
-      await this.audit.record(
-        tx,
-        catalogAuditEvent(actor, organization.id, 'PLAN_TERM_OPINION.RECORDED', 'Plan', planId, null, {
-          opinionId: opinion.id,
-          businessOwnerEmployeeId: opinion.businessOwnerEmployeeId,
-          opinion: opinion.opinion,
-        }),
-      );
-
-      return opinion;
-    });
-
-    return (await this.viewOpinions([recorded]))[0];
-  }
-
   /** The open review alerts of every plan, the earliest milestone first. */
   async warnings(query: {
     page: number;
@@ -270,39 +205,5 @@ export class PlanTermsService {
         a.planName.localeCompare(b.planName) ||
         a.subscriptionId.localeCompare(b.subscriptionId),
     );
-  }
-
-  private async opinionPage(planId: string, query: { page: number; pageSize: number }): Promise<Page<OpinionView>> {
-    const { items, total } = await this.terms.listOpinions(planId, (query.page - 1) * query.pageSize, query.pageSize);
-
-    return pageOf(await this.viewOpinions(items), total, query.page, query.pageSize);
-  }
-
-  private async viewOpinions(
-    records: Array<{
-      id: string;
-      businessOwnerEmployeeId: string;
-      opinion: string;
-      recordedByAppUserId: string;
-      recordedAt: Date;
-    }>,
-  ): Promise<OpinionView[]> {
-    const employees = await this.organizationReads.getEmployees([
-      ...new Set(records.map((record) => record.businessOwnerEmployeeId)),
-    ]);
-    const byId = new Map(employees.map((employee) => [employee.id, employee]));
-
-    return records.map((record) => {
-      const employee = byId.get(record.businessOwnerEmployeeId);
-      if (!employee) throw new Error('The Business Owner of an opinion is not an employee');
-
-      return {
-        id: record.id,
-        businessOwner: { employeeId: employee.id, employeeCode: employee.employeeCode, fullName: employee.fullName },
-        opinion: record.opinion,
-        recordedBy: record.recordedByAppUserId,
-        recordedAt: record.recordedAt,
-      };
-    });
   }
 }

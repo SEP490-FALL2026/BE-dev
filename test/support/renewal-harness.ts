@@ -109,7 +109,6 @@ export class RenewalHarness extends ExpiryHarness {
       kind: 'LICENSED',
       vendorName: this.unique('Vendor'),
       dataSensitivity: 'LOW',
-      businessOwnerEmployeeId: this.businessOwner,
       communication: { personToPersonMessaging: false, callsOrMeetings: false, mailbox: false },
     });
     const planId = await declarePlan(this.ctx, this.it1.accessToken, {
