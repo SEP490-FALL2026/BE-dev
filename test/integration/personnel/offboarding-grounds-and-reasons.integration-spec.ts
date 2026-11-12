@@ -46,7 +46,11 @@ describe('the basis and the reasons of a departure (integration, real PostgreSQL
 
     expect(await detailOf(wire.id, 'LAST_DAY_CHANGED')).toMatchObject({ grounds: { reference: basis } });
     const [event] = await h.auditEventsOf('OFFBOARDING_CASE.LAST_DAY_CHANGED', wire.id);
-    expect(event.after).toMatchObject({ lastWorkingDay: h.day(20), reason: 'Bàn giao kéo dài', grounds: { reference: basis } });
+    expect(event.after).toMatchObject({
+      lastWorkingDay: h.day(20),
+      reason: 'Bàn giao kéo dài',
+      grounds: { reference: basis },
+    });
   });
 
   it('keeps the basis of a cancellation in the change and in the Audit Trail (AC-15)', async () => {
