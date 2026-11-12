@@ -10,6 +10,7 @@ import {
   assertDeclarableCycle,
   assertPoolTerms,
   assertResponsibleNamed,
+  defaultResponsibleOf,
   isLiveSubscription,
   isPooledPlan,
   liveIdsByPlan,
@@ -227,5 +228,31 @@ describe('the order a grant that names no subscription takes them (P0-05)', () =
     ]);
 
     expect(ordered.map((source) => source.id)).toEqual(['primary', 'dear', 'cheap', 'free-of-price']);
+  });
+});
+
+describe('the IT Admin a new subscription answers to when the declaration names none (QĐ-111g, BB-3)', () => {
+  const given = (over: Partial<Parameters<typeof defaultResponsibleOf>[0]> = {}) =>
+    defaultResponsibleOf({
+      named: undefined,
+      applicationResponsible: 'it-app',
+      applicationResponsibleIsUsable: true,
+      ...over,
+    });
+
+  it('keeps the one the declaration names, whatever the application has', () => {
+    expect(given({ named: 'it-body' })).toBe('it-body');
+    expect(given({ named: 'it-body', applicationResponsible: null, applicationResponsibleIsUsable: false })).toBe(
+      'it-body',
+    );
+  });
+
+  it('takes the IT Admin responsible for the application when none is named and they are still a usable IT Admin', () => {
+    expect(given()).toBe('it-app');
+  });
+
+  it('leaves it NULL when the application names nobody, or the one it names is no longer a usable IT Admin', () => {
+    expect(given({ applicationResponsible: null, applicationResponsibleIsUsable: false })).toBeNull();
+    expect(given({ applicationResponsible: 'it-gone', applicationResponsibleIsUsable: false })).toBeNull();
   });
 });

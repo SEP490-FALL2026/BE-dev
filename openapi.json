@@ -93518,7 +93518,11 @@
           "noticePeriodDays": { "type": "integer", "minimum": 0, "maximum": 3650 },
           "autoRenew": { "type": "boolean" },
           "allowsMidTermReduction": { "type": "boolean" },
-          "responsibleItAdminEmployeeId": { "type": "string", "format": "uuid" },
+          "responsibleItAdminEmployeeId": {
+            "description": "The IT Admin who answers for the subscription. When it is not sent, the IT Admin responsible for the application of the plan is taken if they still work as an IT Admin; otherwise it stays empty and an active subscription refuses to be saved without one.",
+            "type": "string",
+            "format": "uuid"
+          },
           "vendorMinimumSeats": { "type": "integer", "minimum": 1, "maximum": 1000000000 }
         },
         "required": ["planId", "kind"],

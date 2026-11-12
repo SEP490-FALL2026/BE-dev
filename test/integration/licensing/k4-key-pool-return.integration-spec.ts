@@ -106,7 +106,11 @@ describe('BR-MF1-09: a K4 key back to the store and withdrawn from it (integrati
     const usableBefore = (await listed(seat.subscriptionId)).summary.usableKeys;
 
     const done = await h
-      .revoked(seat.taskId, { completion: 'KEY_DEACTIVATED', evidence: 'Deactivated on the laptop' })
+      .revoked(seat.taskId, {
+        completion: 'KEY_DEACTIVATED',
+        evidence: 'Deactivated on the laptop',
+        keyDisposition: 'RETURN_TO_STORE',
+      })
       .expect(200);
 
     expect(h.dataOf<{ task: TaskWire }>(done).task).toMatchObject({ status: 'COMPLETED' });
@@ -160,12 +164,17 @@ describe('BR-MF1-09: a K4 key back to the store and withdrawn from it (integrati
       .revoked(seat.taskId, { completion: 'KEY_DEACTIVATED', evidence: 'x', keyDisposition: 'WITHDRAW' })
       .expect(422);
     const otherWay = await h.revoked(seat.taskId, { completion: 'ACCOUNT_REMOVED', evidence: 'x' }).expect(422);
-    const noEvidence = await h.revoked(seat.taskId, { completion: 'KEY_DEACTIVATED', evidence: ' ' }).expect(422);
+    const noEvidence = await h
+      .revoked(seat.taskId, { completion: 'KEY_DEACTIVATED', evidence: ' ', keyDisposition: 'RETURN_TO_STORE' })
+      .expect(422);
+    // QĐ-111p: a K4 completion must say where the key goes; it is no longer put back by default.
+    const noDisposition = await h.revoked(seat.taskId, { completion: 'KEY_DEACTIVATED', evidence: 'x' }).expect(422);
 
-    expect([noReason, otherWay, noEvidence].map((response) => h.codeOf(response))).toEqual([
+    expect([noReason, otherWay, noEvidence, noDisposition].map((response) => h.codeOf(response))).toEqual([
       'REVOCATION.WITHDRAWAL_REASON_REQUIRED',
       'REVOCATION.COMPLETION_NOT_ALLOWED',
       'PROVISIONING_TASK.EVIDENCE_REQUIRED',
+      'REVOCATION.KEY_DISPOSITION_REQUIRED',
     ]);
     expect((await keysOf(seat.subscriptionId)).find((key) => key.id === seat.keyId)).toMatchObject({
       status: 'ASSIGNED',
@@ -188,7 +197,9 @@ describe('BR-MF1-09: a K4 key back to the store and withdrawn from it (integrati
     const { taskId } = await h.open(assignmentId, 'RETURN');
     await h.claim(taskId).expect(200);
 
-    await h.revoked(taskId, { completion: 'KEY_DEACTIVATED', evidence: 'Deactivated' }).expect(200);
+    await h
+      .revoked(taskId, { completion: 'KEY_DEACTIVATED', evidence: 'Deactivated', keyDisposition: 'RETURN_TO_STORE' })
+      .expect(200);
 
     expect((await h.auditEvents('ProvisioningTask', taskId)).at(-1)).toMatchObject({
       action: 'PROVISIONING_TASK.REVOCATION_COMPLETED',

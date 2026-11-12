@@ -20,6 +20,11 @@ export class ApplicationFactsService {
     return this.applications.lockShared(tx, id);
   }
 
+  /** The IT Admin named responsible for the application (`QĐ-111g`), who may since have left; null when none is named or it does not exist. */
+  async responsibleItAdminOf(applicationId: string, tx?: DbTx): Promise<string | null> {
+    return (await this.applications.find(applicationId, tx))?.responsibleItAdminEmployeeId ?? null;
+  }
+
   /** How many applications the catalog holds. */
   count(): Promise<number> {
     return this.applications.count();
