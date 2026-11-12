@@ -1,4 +1,5 @@
-﻿import request from 'supertest';
+import { groundsNoteOfBasis } from '../../../src/modules/personnel/personnel-grounds.policy';
+import request from 'supertest';
 import type { ApiAccount } from '../../support/api-accounts';
 import { NoticeHarness, type NoticeWire } from '../../support/notice-harness';
 import type { Department, Person } from '../../support/request-harness';
@@ -545,7 +546,8 @@ describe('verifying and recording the notices of the heads (integration, real Po
       const [event] = await h.auditEventsOf('PERSONNEL_NOTICE.RECORDED', wire.id);
       expect(event.after).toMatchObject({ grounds: h.resignation });
       const [offboarding] = await h.auditEventsOf('OFFBOARDING_CASE.RECORDED', row.recorded_event_id as string);
-      expect(offboarding.after).toMatchObject({ grounds: h.resignation });
+      // The departure the notice becomes keeps its basis in one box: the four parts the Super Admin gave, read as a sentence.
+      expect(offboarding.after).toMatchObject({ grounds: { reference: groundsNoteOfBasis(h.resignation) } });
     });
   });
 

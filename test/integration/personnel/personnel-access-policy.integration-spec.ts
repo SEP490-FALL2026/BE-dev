@@ -88,7 +88,7 @@ describe('who may write and who may read the events of the personnel context (in
               employeeId: who.employeeId,
               lastWorkingDay: h.day(10),
               accessBlockMode: 'WITH_LAST_DAY',
-              grounds: h.grounds,
+              groundsNote: h.groundsNote,
             }),
         ];
         for (const attempt of attempts)

@@ -27,7 +27,7 @@ describe('MF-5 phòng sở hữu không có trưởng phòng: hồ sơ chờ và
       employeeId: await world.facts.employeeId('NV-ENGH'),
       lastWorkingDay: call().today(),
       accessBlockMode: 'BLOCK_NOW',
-      grounds: { type: 'HR_DECISION', reference: 'QĐ-NV-2026-09', issuer: 'Phòng Nhân sự', issuedOn: call().today() },
+      groundsNote: 'Quyết định nghỉ việc QĐ-NV-2026-09 của Phòng Nhân sự',
       successor: { kind: 'NONE' },
     });
     world.clock.jumpDays(1);

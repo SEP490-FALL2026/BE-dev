@@ -4,7 +4,7 @@ import { successEnvelopeSchema } from '../../../infrastructure/http/dto/success-
 import { REVOCATION_SOURCES } from '../../licensing/public/licensing.types';
 import { ROLE_FLAGS } from '../public/personnel.types';
 import { businessDay } from '../../../infrastructure/http/dto/business-date.dto';
-import { groundsBodySchema } from '../personnel-grounds.dto';
+import { groundsNoteBodySchema } from '../personnel-grounds.dto';
 
 const flag = z.enum(['true', 'false']).transform((value) => value === 'true');
 
@@ -20,7 +20,7 @@ const recordBodySchema = z.strictObject({
   // The last working day and the mode are always given: the Super Admin chooses both on purpose, there is no default (`QĐ-96c`).
   lastWorkingDay: businessDay,
   accessBlockMode: z.enum(['WITH_LAST_DAY', 'BLOCK_NOW']),
-  grounds: groundsBodySchema,
+  groundsNote: groundsNoteBodySchema,
   successor: successorBodySchema.optional(),
   // A transfer that waits and would take effect after the last working day is cancelled with the departure: the Super Admin confirms it,
   // the reason is the standard one and the basis is the one of the departure.
@@ -32,11 +32,11 @@ const reasonSchema = z.string().trim().min(1).max(1000);
 const changeLastDayBodySchema = z.strictObject({
   lastWorkingDay: businessDay,
   reason: reasonSchema,
-  grounds: groundsBodySchema,
+  groundsNote: groundsNoteBodySchema,
   successor: successorBodySchema.optional(),
 });
 
-const cancelBodySchema = z.strictObject({ reason: reasonSchema, grounds: groundsBodySchema });
+const cancelBodySchema = z.strictObject({ reason: reasonSchema, groundsNote: groundsNoteBodySchema });
 
 /** The person left on their last working day: nothing is typed, and the lock of the company account is the IT Admin's step. */
 const markLeftBodySchema = z.strictObject({});
@@ -74,13 +74,6 @@ const pagination = z.strictObject({
 
 const employeeBrief = z.strictObject({ id: z.uuid(), employeeCode: z.string(), fullName: z.string() });
 const stateSchema = z.enum(['HANDING_OVER', 'LEFT', 'CANCELLED']);
-/** The basis as it was kept: the box in `reference`; the other three parts are present only for an event written before the box. */
-const groundsSchema = z.strictObject({
-  type: z.string().nullable(),
-  reference: z.string(),
-  issuer: z.string().nullable(),
-  issuedOn: z.string().nullable(),
-});
 const stepState = z.enum(['PENDING', 'IN_PROGRESS', 'DONE']);
 
 /** The row of the list: who, where the case stands, the days and what still needs a person. */
@@ -137,8 +130,8 @@ export const offboardingDetailSchema = offboardingSummarySchema.extend({
   firstPlacementRestored: z.boolean().optional(),
   priorWorkState: z.enum(['WORKING', 'ON_LONG_LEAVE']),
   departureEffectiveOn: z.string(),
-  /** The basis of the departure. Null in the minimal projection an IT Admin reads. */
-  grounds: groundsSchema.nullable(),
+  /** The basis of the departure in one box, what a form fills in again. Null in the minimal projection an IT Admin reads. */
+  groundsNote: z.string().nullable(),
   /** Who follows the head of the department the person leaves; null when they did not head it, and in the minimal projection. */
   headSuccessor: z.strictObject({ kind: z.enum(['EMPLOYEE', 'NONE']), employee: employeeBrief.nullable() }).nullable(),
   /** The account that recorded it; null when the controlled procedure did (`recordedByProcedure`). */

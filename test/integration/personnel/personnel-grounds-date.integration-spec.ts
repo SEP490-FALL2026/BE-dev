@@ -24,42 +24,6 @@ describe('the day a basis was issued (integration, real PostgreSQL)', () => {
   const grounds = (issuedOn: string) => ({ ...h.grounds, issuedOn });
   const OPERATIONS: Array<[string, string, string, (issuedOn: string) => object]> = [
     [
-      'offboardingCaseRecord',
-      'post',
-      '/offboarding-cases',
-      (day) => ({ employeeId: id, lastWorkingDay: h.day(10), accessBlockMode: 'WITH_LAST_DAY', grounds: grounds(day) }),
-    ],
-    [
-      'offboardingCaseChangeLastDay',
-      'post',
-      `/offboarding-cases/${id}/last-day-changes`,
-      (day) => ({ lastWorkingDay: h.day(20), reason: 'x', grounds: grounds(day) }),
-    ],
-    [
-      'offboardingCaseCancel',
-      'post',
-      `/offboarding-cases/${id}/cancellation`,
-      (day) => ({ reason: 'x', grounds: grounds(day) }),
-    ],
-    [
-      'departmentTransferRecord',
-      'post',
-      '/department-transfers',
-      (day) => ({ employeeId: id, toDepartmentId: id, effectiveOn: h.day(10), grounds: grounds(day) }),
-    ],
-    [
-      'departmentTransferReschedule',
-      'post',
-      `/department-transfers/${id}/rescheduling`,
-      (day) => ({ newEffectiveOn: h.day(12), reason: 'x', grounds: grounds(day) }),
-    ],
-    [
-      'departmentTransferCancel',
-      'post',
-      `/department-transfers/${id}/cancellation`,
-      (day) => ({ reason: 'x', grounds: grounds(day) }),
-    ],
-    [
       'personnelNoticeRecord',
       'post',
       `/personnel-notices/${id}/recording`,

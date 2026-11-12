@@ -21,7 +21,7 @@ export interface CaseWire {
   department?: { id: string; code: string; name: string };
   priorWorkState?: 'WORKING' | 'ON_LONG_LEAVE';
   departureEffectiveOn?: string;
-  grounds?: { type: string; reference: string; issuer: string; issuedOn: string } | null;
+  groundsNote?: string | null;
   headSuccessor?: { kind: 'EMPLOYEE' | 'NONE'; employee: { id: string } | null } | null;
   recordedByAppUserId?: string | null;
   recordedByProcedure?: boolean;
@@ -103,17 +103,17 @@ export class OffboardingHarness extends HandoverHarness {
     request(this.server()).get(`/api/v1/offboarding-cases/${id}/rights${query}`).set(this.as(account));
   caseChanges = (id: string, query = '', account: ApiAccount = this.sa) =>
     request(this.server()).get(`/api/v1/offboarding-cases/${id}/changes${query}`).set(this.as(account));
-  /** The basis is given with every move and every cancellation (`S-10`); a test that wants it missing passes `grounds: undefined`. */
+  /** The basis is given with every move and every cancellation (`S-10`); a test that wants it missing passes `groundsNote: undefined`. */
   changeLastDay = (id: string, body: object, account: ApiAccount = this.sa) =>
     request(this.server())
       .post(`/api/v1/offboarding-cases/${id}/last-day-changes`)
       .set(this.as(account))
-      .send({ grounds: this.grounds, ...body });
+      .send({ groundsNote: this.groundsNote, ...body });
   cancelCase = (id: string, body: object, account: ApiAccount = this.sa) =>
     request(this.server())
       .post(`/api/v1/offboarding-cases/${id}/cancellation`)
       .set(this.as(account))
-      .send({ grounds: this.grounds, ...body });
+      .send({ groundsNote: this.groundsNote, ...body });
   markLeft = (id: string, body: object = {}, account: ApiAccount = this.sa) =>
     request(this.server()).post(`/api/v1/offboarding-cases/${id}/departure`).set(this.as(account)).send(body);
   /**
@@ -169,7 +169,7 @@ export class OffboardingHarness extends HandoverHarness {
     employeeId: person.employeeId,
     lastWorkingDay: this.day(10),
     accessBlockMode: 'WITH_LAST_DAY',
-    grounds: this.grounds,
+    groundsNote: this.groundsNote,
     ...extra,
   });
 

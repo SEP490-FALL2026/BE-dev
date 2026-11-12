@@ -55,7 +55,7 @@ describe('unplaced employee offboarding and first placement (integration, real P
       .recordCase({
         employeeId: emp.id,
         lastWorkingDay: h.day(10),
-        grounds: h.grounds,
+        groundsNote: h.groundsNote,
       })
       .expect(201);
 
@@ -110,7 +110,7 @@ describe('unplaced employee offboarding and first placement (integration, real P
       .recordCase({
         employeeId: emp.id,
         lastWorkingDay: h.day(5),
-        grounds: h.grounds,
+        groundsNote: h.groundsNote,
       })
       .expect(201);
 
@@ -174,7 +174,7 @@ describe('unplaced employee offboarding and first placement (integration, real P
       .recordCase({
         employeeId: emp.id,
         lastWorkingDay: h.day(12),
-        grounds: h.grounds,
+        groundsNote: h.groundsNote,
       })
       .expect(409);
 
@@ -208,7 +208,7 @@ describe('unplaced employee offboarding and first placement (integration, real P
         .recordCase({
           employeeId: emp.id,
           lastWorkingDay: h.day(5),
-          grounds: h.grounds,
+          groundsNote: h.groundsNote,
         })
         .expect(201),
     );
@@ -256,7 +256,7 @@ describe('unplaced employee offboarding and first placement (integration, real P
         .recordCase({
           employeeId: empA.id,
           lastWorkingDay: h.day(10),
-          grounds: h.grounds,
+          groundsNote: h.groundsNote,
         })
         .expect(201),
     );
@@ -294,7 +294,7 @@ describe('unplaced employee offboarding and first placement (integration, real P
         .recordCase({
           employeeId: empB.id,
           lastWorkingDay: h.day(10),
-          grounds: h.grounds,
+          groundsNote: h.groundsNote,
         })
         .expect(201),
     );
@@ -320,7 +320,7 @@ describe('unplaced employee offboarding and first placement (integration, real P
       .recordCase({
         employeeId: emp.id,
         lastWorkingDay: h.day(10),
-        grounds: h.grounds,
+        groundsNote: h.groundsNote,
       })
       .expect(201);
 
@@ -346,7 +346,7 @@ describe('unplaced employee offboarding and first placement (integration, real P
         employeeId: emp.id,
         toDepartmentId: des.id,
         effectiveOn: h.day(5),
-        grounds: h.grounds,
+        groundsNote: h.groundsNote,
       })
       .expect(409);
 
@@ -436,7 +436,7 @@ describe('unplaced employee offboarding and first placement (integration, real P
         .send({ departmentId: des.id, effectiveFrom: validFrom })
         .expect(201);
 
-      const same = await h.recordCase({ employeeId: emp.id, lastWorkingDay: validFrom, grounds: h.grounds });
+      const same = await h.recordCase({ employeeId: emp.id, lastWorkingDay: validFrom, groundsNote: h.groundsNote });
       expect([same.status, h.codeOf(same)]).toEqual([409, 'OFFBOARDING_CASE.PLACEMENT_OVERLAP']);
       expect(h.detailsOf(same)).toEqual({ reason: 'FIRST_PLACEMENT_PENDING', validFrom });
       expect(await h.placementCount(emp.id)).toBe(1);
@@ -449,7 +449,7 @@ describe('unplaced employee offboarding and first placement (integration, real P
       try {
         const assignmentId = await h.seatOf(person, { subscriptionId: tool }, employeeCode);
         const wire = h.dataOf<CaseWire>(
-          await h.recordCase({ employeeId: emp.id, lastWorkingDay: h.day(20), grounds: h.grounds }).expect(201),
+          await h.recordCase({ employeeId: emp.id, lastWorkingDay: h.day(20), groundsNote: h.groundsNote }).expect(201),
         );
 
         expect(wire.department).toMatchObject({ id: des.id });
@@ -479,7 +479,7 @@ describe('unplaced employee offboarding and first placement (integration, real P
           .recordCase({
             employeeId: (await createUnplacedEmployee()).id,
             lastWorkingDay: h.day(10),
-            grounds: h.grounds,
+            groundsNote: h.groundsNote,
           })
           .expect(201),
       );

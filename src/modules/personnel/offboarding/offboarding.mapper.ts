@@ -137,7 +137,7 @@ export function toDetail(
       : null,
     priorWorkState: record.priorWorkState,
     departureEffectiveOn: record.departureEffectiveOn,
-    grounds: full ? { ...record.grounds } : null,
+    groundsNote: full ? record.grounds.reference : null,
     headSuccessor:
       full && handover
         ? {

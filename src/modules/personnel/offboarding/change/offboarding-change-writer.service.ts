@@ -4,7 +4,7 @@ import { OrganizationHistoryApi } from '../../../organization/public/organizatio
 import { LeaveDepartureService } from '../../leave/leave-departure.service';
 import { PersonnelNotifier } from '../../event-notice/personnel-notifier.service';
 import { PersonnelFileHooks } from '../../event-notice/personnel-file-hooks.service';
-import { groundsSnapshot, normalizedGrounds, type GroundsInput } from '../../personnel-grounds.policy';
+import { groundsSnapshot, normalizedGroundsNote } from '../../personnel-grounds.policy';
 import { actorColumns, type PersonnelActor } from '../../public/personnel.types';
 import { headSuccessorLabel } from '../../transfer/transfer.policy';
 import { OffboardingAuditService } from '../offboarding-audit.service';
@@ -60,7 +60,7 @@ export class OffboardingChangeWriter {
       placementClosedId: scheduled.placementClosedId,
     });
     await this.handovers.moveAccessBlock(tx, held.employeeId, input.lastWorkingDay);
-    await this.recordMove(tx, actor, { held, moved, reason: input.reason.trim(), grounds: input.grounds });
+    await this.recordMove(tx, actor, { held, moved, reason: input.reason.trim(), groundsNote: input.groundsNote });
     await this.handovers.reconcile(tx, actor, moved);
     await this.hooks.onDueChanged(tx, {
       fileKind: 'OFFBOARDING',
@@ -78,10 +78,10 @@ export class OffboardingChangeWriter {
   private async recordMove(
     tx: DbTx,
     actor: PersonnelActor,
-    move: { held: OffboardingRecord; moved: OffboardingRecord; reason: string; grounds: GroundsInput | undefined },
+    move: { held: OffboardingRecord; moved: OffboardingRecord; reason: string; groundsNote: string | undefined },
   ): Promise<void> {
     const { held, moved, reason } = move;
-    const grounds = move.grounds ? groundsSnapshot(normalizedGrounds(move.grounds)) : null;
+    const grounds = move.groundsNote ? groundsSnapshot(normalizedGroundsNote(move.groundsNote)) : null;
     const by = actorColumns(actor);
     await this.repo.insertChange(tx, {
       caseId: held.id,
@@ -120,7 +120,7 @@ export class OffboardingChangeWriter {
     tx: DbTx,
     actor: PersonnelActor,
     held: OffboardingRecord,
-    why: { reason: string; today: string; grounds?: GroundsInput },
+    why: { reason: string; today: string; groundsNote?: string },
   ): Promise<OffboardingRecord & { firstPlacementRestored?: boolean }> {
     const { reason } = why;
     if (held.departmentId !== null) {
@@ -145,7 +145,7 @@ export class OffboardingChangeWriter {
       reason,
       detail: {
         workState: resumed,
-        grounds: why.grounds ? groundsSnapshot(normalizedGrounds(why.grounds)) : null,
+        grounds: why.groundsNote ? groundsSnapshot(normalizedGroundsNote(why.groundsNote)) : null,
         ...(firstPlacementRestored !== undefined ? { firstPlacementRestored } : {}),
       },
       changedByAppUserId: by.appUserId,
@@ -160,7 +160,7 @@ export class OffboardingChangeWriter {
       {
         state: 'CANCELLED',
         reason,
-        grounds: why.grounds ? groundsSnapshot(normalizedGrounds(why.grounds)) : null,
+        grounds: why.groundsNote ? groundsSnapshot(normalizedGroundsNote(why.groundsNote)) : null,
         workState: resumed,
         accessBlock: block,
       },

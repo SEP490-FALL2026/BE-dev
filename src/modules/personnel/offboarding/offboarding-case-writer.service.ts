@@ -5,7 +5,7 @@ import { isUniqueViolation } from '../../../infrastructure/database/unique-viola
 import { OrganizationApi } from '../../organization/public/organization.api';
 import { PersonnelNotifier } from '../event-notice/personnel-notifier.service';
 import { PersonnelFileHooks } from '../event-notice/personnel-file-hooks.service';
-import { groundsSnapshot, normalizedGrounds } from '../personnel-grounds.policy';
+import { groundsSnapshot, normalizedGroundsNote } from '../personnel-grounds.policy';
 import { actorColumns, type PersonnelActor } from '../public/personnel.types';
 import { TransferGuardService } from '../transfer/transfer-guard.service';
 import { headSuccessorLabel } from '../transfer/transfer.policy';
@@ -114,7 +114,7 @@ export class OffboardingCaseWriter {
       lastWorkingDay: input.lastWorkingDay as BusinessDate,
       departureEffectiveOn: seen.endsOn,
       handoverDueOn,
-      grounds: normalizedGrounds(input.grounds ?? {}),
+      grounds: normalizedGroundsNote(input.groundsNote ?? ''),
       headHandover: scheduled.headHandover,
       placementClosedId: scheduled.placementClosedId,
       cancelledPlacementId: cancelled?.placementId ?? null,
@@ -157,7 +157,7 @@ export class OffboardingCaseWriter {
       lastWorkingDay: record.lastWorkingDay,
       departureEffectiveOn: seen.endsOn,
       handoverDueOn: record.handoverDueOn,
-      grounds: groundsSnapshot(normalizedGrounds(input.grounds ?? {})),
+      grounds: groundsSnapshot(normalizedGroundsNote(input.groundsNote ?? '')),
       headSuccessor,
       departmentWithoutHeadFrom: departmentWithoutHeadFrom(scheduled.headHandover, seen.endsOn),
       transferCancelled,

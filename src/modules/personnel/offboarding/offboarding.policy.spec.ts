@@ -18,7 +18,7 @@ import {
   type RightFacts,
 } from './offboarding.policy';
 
-const GROUNDS = { type: 'HR_DECISION', reference: 'QD-1/2026', issuer: 'HR', issuedOn: '2026-10-01' };
+const NOTE = 'Quyết định nghỉ việc số QD-1/2026';
 
 const record = (extra: Partial<RecordFacts> = {}): RecordFacts => ({
   today: '2026-10-24',
@@ -27,7 +27,7 @@ const record = (extra: Partial<RecordFacts> = {}): RecordFacts => ({
   lastWorkingDay: '2026-11-03',
   accessBlockMode: 'WITH_LAST_DAY',
   employee: { status: 'ACTIVE', workState: 'WORKING' },
-  grounds: GROUNDS,
+  groundsNote: NOTE,
   pendingTransfer: null,
   cancelPendingTransfer: false,
   namedAsSuccessor: false,
@@ -96,13 +96,9 @@ describe('whether a departure may be recorded', () => {
     ['a planned day in the past', { lastWorkingDay: '2026-10-23' }, 'LAST_WORKING_DAY_INVALID'],
     ['a day before the person came', { hireDate: '2026-11-10' }, 'LAST_WORKING_DAY_INVALID'],
     ['a day before the placement began', { placementFrom: '2026-11-10' }, 'LAST_WORKING_DAY_INVALID'],
-    ['no basis', { grounds: undefined }, 'GROUNDS_REQUIRED'],
-    [
-      'a basis that is the code of a notice',
-      { grounds: { ...GROUNDS, reference: 'BM09-2026-000001' } },
-      'GROUNDS_IS_NOTICE',
-    ],
-    ['a basis lacking its issuer', { grounds: { ...GROUNDS, issuer: ' ' } }, 'GROUNDS_INCOMPLETE'],
+    ['no basis', { groundsNote: undefined }, 'GROUNDS_REQUIRED'],
+    ['a basis over 500 characters', { groundsNote: 'a'.repeat(501) }, 'GROUNDS_TOO_LONG'],
+    ['a basis that is the code of a notice', { groundsNote: 'BM09-2026-000001' }, 'GROUNDS_IS_NOTICE'],
     [
       'a transfer that takes effect first, without the confirmation to cancel it',
       { pendingTransfer: { effectiveOn: '2026-12-01' } },
@@ -140,7 +136,7 @@ describe('moving, cancelling and leaving', () => {
     currentLastWorkingDay: '2026-11-03',
     newLastWorkingDay: '2026-11-20',
     reason: 'Dời ngày',
-    grounds: GROUNDS,
+    groundsNote: NOTE,
     successor: null,
     ...extra,
   });
@@ -151,12 +147,8 @@ describe('moving, cancelling and leaving', () => {
     ['is not a cancelled case', { state: 'CANCELLED' }, 'NOT_HANDING_OVER'],
     ['is not allowed after the last day', { today: '2026-11-04' }, 'LAST_DAY_ALREADY_PASSED'],
     ['needs a reason', { reason: '  ' }, 'REASON_REQUIRED'],
-    ['needs a basis', { grounds: undefined }, 'GROUNDS_REQUIRED'],
-    [
-      'needs a basis that is not a notice',
-      { grounds: { ...GROUNDS, reference: 'BM09-2026-000123' } },
-      'GROUNDS_IS_NOTICE',
-    ],
+    ['needs a basis', { groundsNote: undefined }, 'GROUNDS_REQUIRED'],
+    ['needs a basis that is not a notice', { groundsNote: 'BM09-2026-000123' }, 'GROUNDS_IS_NOTICE'],
     ['is not the same day', { newLastWorkingDay: '2026-11-03' }, 'NO_CHANGE'],
     ['is not in the past', { newLastWorkingDay: '2026-10-20' }, 'LAST_WORKING_DAY_INVALID'],
     [
@@ -169,10 +161,10 @@ describe('moving, cancelling and leaving', () => {
   });
 
   it('cancels a handover under way with a reason and a basis, and only that', () => {
-    expect(cancelRefusal({ state: 'HANDING_OVER', reason: 'Rút', grounds: GROUNDS })).toBeNull();
-    expect(code(cancelRefusal({ state: 'HANDING_OVER', reason: '', grounds: GROUNDS }))).toBe('REASON_REQUIRED');
+    expect(cancelRefusal({ state: 'HANDING_OVER', reason: 'Rút', groundsNote: NOTE })).toBeNull();
+    expect(code(cancelRefusal({ state: 'HANDING_OVER', reason: '', groundsNote: NOTE }))).toBe('REASON_REQUIRED');
     expect(code(cancelRefusal({ state: 'HANDING_OVER', reason: 'Rút' }))).toBe('GROUNDS_REQUIRED');
-    expect(code(cancelRefusal({ state: 'LEFT', reason: 'Rút', grounds: GROUNDS }))).toBe('CASE_LEFT');
+    expect(code(cancelRefusal({ state: 'LEFT', reason: 'Rút', groundsNote: NOTE }))).toBe('CASE_LEFT');
   });
 });
 

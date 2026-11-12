@@ -22,7 +22,7 @@ const STATUS: Readonly<Record<string, HttpStatus>> = {
   NOT_HANDING_OVER: HttpStatus.CONFLICT,
   LAST_WORKING_DAY_AHEAD: HttpStatus.CONFLICT,
   GROUNDS_REQUIRED: HttpStatus.UNPROCESSABLE_ENTITY,
-  GROUNDS_INCOMPLETE: HttpStatus.UNPROCESSABLE_ENTITY,
+  GROUNDS_TOO_LONG: HttpStatus.UNPROCESSABLE_ENTITY,
   GROUNDS_IS_NOTICE: HttpStatus.UNPROCESSABLE_ENTITY,
   REASON_REQUIRED: HttpStatus.UNPROCESSABLE_ENTITY,
   SUCCESSOR_NOT_A_MEMBER_ON_DATE: HttpStatus.UNPROCESSABLE_ENTITY,
@@ -55,7 +55,7 @@ const MESSAGES: Readonly<Record<string, string>> = {
   LAST_WORKING_DAY_AHEAD:
     'The last working day has not come yet: move it to an earlier day to let the employee leave sooner.',
   GROUNDS_REQUIRED: 'The basis of the departure is required.',
-  GROUNDS_INCOMPLETE: 'The basis lacks a part: its type, number, issuer or day of issue.',
+  GROUNDS_TOO_LONG: 'The basis is longer than 500 characters.',
   GROUNDS_IS_NOTICE: 'The code of a notice is not the document the departure rests on.',
   REASON_REQUIRED: 'A reason is required.',
   SUCCESSOR_NOT_A_MEMBER_ON_DATE: 'The person named cannot head the department on that day.',
@@ -119,7 +119,7 @@ export const OFFBOARDING_ERROR_EXAMPLES = {
     new OffboardingRefusedError('LAST_WORKING_DAY_AHEAD', { lastWorkingDay: '2026-01-02' }),
   ),
   GROUNDS_REQUIRED: example(new OffboardingRefusedError('GROUNDS_REQUIRED')),
-  GROUNDS_INCOMPLETE: example(new OffboardingRefusedError('GROUNDS_INCOMPLETE', { missing: ['issuedOn'] })),
+  GROUNDS_TOO_LONG: example(new OffboardingRefusedError('GROUNDS_TOO_LONG')),
   GROUNDS_IS_NOTICE: example(new OffboardingRefusedError('GROUNDS_IS_NOTICE')),
   REASON_REQUIRED: example(new OffboardingRefusedError('REASON_REQUIRED')),
   SUCCESSOR_NOT_A_MEMBER_ON_DATE: example(

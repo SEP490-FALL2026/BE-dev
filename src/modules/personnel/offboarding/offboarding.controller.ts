@@ -1,5 +1,4 @@
 import { Body, Controller, Get, HttpStatus, Param, Post, Query } from '@nestjs/common';
-import { PersonnelGroundsDateService } from '../personnel-grounds-date.service';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   ApiErrorResponses,
@@ -72,8 +71,8 @@ const PERSON_REFUSALS = [E.EMPLOYEE_LEFT, E.ALREADY_HANDING_OVER, E.PENDING_EVEN
 const DAY_REFUSALS = [E.LAST_WORKING_DAY_INVALID, E.SUCCESSOR_NOT_A_MEMBER_ON_DATE] as const;
 
 const GROUNDS_REFUSALS =
-  'the basis is the code of a notice and not a document (OFFBOARDING_CASE.GROUNDS_IS_NOTICE), it is issued after today (PERSONNEL.GROUNDS_ISSUED_ON_FUTURE); a basis that is missing or lacks a part is a VALIDATION_ERROR';
-const GROUNDS_EXAMPLES = [E.GROUNDS_IS_NOTICE, PERSONNEL_ACCESS_ERROR_EXAMPLES.GROUNDS_ISSUED_ON_FUTURE] as const;
+  'the basis (groundsNote) is only the code of a notice and not a document (OFFBOARDING_CASE.GROUNDS_IS_NOTICE); a basis that is missing, blank or over 500 characters is a VALIDATION_ERROR';
+const GROUNDS_EXAMPLES = [E.GROUNDS_IS_NOTICE] as const;
 
 /**
  * The departure of a person: a handover with the last working day and the basis it rests on, blocked from the last working day or from the day it is recorded (the Super Admin
@@ -90,7 +89,6 @@ export class OffboardingController {
     private readonly left: OffboardingLeftService,
     private readonly view: OffboardingViewService,
     private readonly detail: OffboardingDetailService,
-    private readonly groundsDate: PersonnelGroundsDateService,
   ) {}
 
   @Post()
@@ -127,7 +125,6 @@ export class OffboardingController {
     },
   )
   async record(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Body() body: RecordOffboardingBodyDto) {
-    await this.groundsDate.assertNotInFuture(body.grounds);
     try {
       return await this.detail.detailOf(await this.offboarding.record(userActor(actor), body));
     } catch (error) {
@@ -242,7 +239,6 @@ export class OffboardingController {
     @Param() params: OffboardingIdParamDto,
     @Body() body: ChangeLastDayBodyDto,
   ) {
-    await this.groundsDate.assertNotInFuture(body.grounds);
     try {
       const record = await this.changes.changeLastDay(userActor(actor), params.id, body);
 
@@ -279,7 +275,6 @@ export class OffboardingController {
     @Param() params: OffboardingIdParamDto,
     @Body() body: CancelOffboardingBodyDto,
   ) {
-    await this.groundsDate.assertNotInFuture(body.grounds);
     try {
       const record = await this.changes.cancel(userActor(actor), params.id, body);
       const detail = await this.detail.detailOf(record);

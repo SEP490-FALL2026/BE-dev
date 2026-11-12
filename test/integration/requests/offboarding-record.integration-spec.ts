@@ -64,7 +64,7 @@ describe('recording a departure (integration, real PostgreSQL)', () => {
       heldRights: 4,
       priorWorkState: 'WORKING',
       recordedByProcedure: false,
-      grounds: h.grounds,
+      groundsNote: h.groundsNote,
       employee: { id: person.employeeId },
       department: { id: des.id },
       headSuccessor: null,
@@ -83,7 +83,7 @@ describe('recording a departure (integration, real PostgreSQL)', () => {
     const [event] = await h.auditEventsOf('OFFBOARDING_CASE.RECORDED', wire.id);
     expect(event.after).toMatchObject({
       lastWorkingDay: h.day(10),
-      grounds: h.grounds,
+      grounds: { reference: h.groundsNote },
       accessBlockMode: 'WITH_LAST_DAY',
     });
     expect((await h.auditEventsOf('PERSONNEL.EMPLOYEE_INFORMED', wire.id)).length).toBe(1);
@@ -106,13 +106,13 @@ describe('recording a departure (integration, real PostgreSQL)', () => {
     const withoutDay = await h.recordCase({
       employeeId: person.employeeId,
       accessBlockMode: 'WITH_LAST_DAY',
-      grounds: h.grounds,
+      groundsNote: h.groundsNote,
     });
     const withoutMode = await h.recordCase({
       employeeId: person.employeeId,
       lastWorkingDay: h.day(10),
       accessBlockMode: undefined,
-      grounds: h.grounds,
+      groundsNote: h.groundsNote,
     });
     const retired = await h.recordCase(h.body(person, { abrupt: true }));
     for (const response of [withoutDay, withoutMode, retired])
@@ -128,15 +128,15 @@ describe('recording a departure (integration, real PostgreSQL)', () => {
     );
   });
 
-  it('refuses a departure without a whole basis or on the code of a notice and changes nothing (AC-23)', async () => {
+  it('refuses a departure without a basis in one box, with the old four-part one, or on the code of a notice and changes nothing (AC-23)', async () => {
     const { person } = await leaver();
     const before = await nothingWritten(person);
 
     const none = await h.recordCase({ employeeId: person.employeeId, lastWorkingDay: h.day(10) });
     const incomplete = await h.recordCase(
-      h.body(person, { grounds: { type: 'HR_DECISION', reference: 'QD-1/2026', issuer: '', issuedOn: '2026-10-01' } }),
+      h.body(person, { groundsNote: undefined, grounds: { type: 'HR_DECISION', reference: 'QD-1/2026' } }),
     );
-    const notice = await h.recordCase(h.body(person, { grounds: { ...h.grounds, reference: 'BM09-2026-000123' } }));
+    const notice = await h.recordCase(h.body(person, { groundsNote: 'BM09-2026-000123' }));
 
     expect([none, incomplete, notice].map((response) => [response.status, h.codeOf(response)])).toEqual([
       [422, 'VALIDATION_ERROR'],
@@ -316,7 +316,7 @@ describe('recording a departure (integration, real PostgreSQL)', () => {
       employeeId: person.employeeId,
       toDepartmentId: department.id,
       effectiveOn,
-      grounds: h.grounds,
+      groundsNote: h.groundsNote,
     });
 
     it('is cancelled in the same action when the last working day falls before it, on a confirmation, with the standard reason and the basis of the departure', async () => {
@@ -341,7 +341,7 @@ describe('recording a departure (integration, real PostgreSQL)', () => {
       expect(cancelled).toMatchObject({
         status: 'CANCELLED',
         cancellation: { reason: 'DEPARTURE_BEFORE_TRANSFER' },
-        grounds: h.grounds,
+        groundsNote: h.groundsNote,
       });
       const placements = await h.placements(person.employeeId);
       expect(placements.map((placement) => placement.department_id)).toEqual([des.id]);

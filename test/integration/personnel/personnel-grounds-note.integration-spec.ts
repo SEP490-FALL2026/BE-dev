@@ -70,7 +70,7 @@ describe('the basis in one box in the database (integration, real PostgreSQL)', 
       employeeId,
       startedOn: h.day(-10),
       approvedReturnOn: h.day(10),
-      grounds: h.approval,
+      groundsNote: h.approval,
     });
     leaveId = leave.id;
   }, 300000);

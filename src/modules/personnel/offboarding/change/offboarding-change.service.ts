@@ -1,6 +1,5 @@
 import { Injectable } from '@nestjs/common';
 import type { DbTx } from '../../../../infrastructure/database/transaction-runner';
-import type { GroundsInput } from '../../personnel-grounds.policy';
 import type { PersonnelActor } from '../../public/personnel.types';
 import { OffboardingRefusedError } from '../offboarding.errors';
 import { cancelRefusal } from '../offboarding.policy';
@@ -52,17 +51,17 @@ export class OffboardingChangeService {
   cancel(
     actor: PersonnelActor,
     id: string,
-    input: { reason: string; grounds?: GroundsInput | undefined },
+    input: { reason: string; groundsNote?: string | undefined },
     outer?: DbTx,
   ): Promise<OffboardingRecord & { firstPlacementRestored?: boolean }> {
     return this.frame.runEvent(actor, id, { lockDepartment: true, outer }, async (tx, { held, today }) => {
-      const refusal = cancelRefusal({ state: held.state, reason: input.reason, grounds: input.grounds });
+      const refusal = cancelRefusal({ state: held.state, reason: input.reason, groundsNote: input.groundsNote });
       if (refusal) throw new OffboardingRefusedError(refusal.code, refusal.details);
 
       return this.writer.cancel(tx, actor, held, {
         reason: input.reason.trim(),
         today,
-        ...(input.grounds ? { grounds: input.grounds } : {}),
+        ...(input.groundsNote ? { groundsNote: input.groundsNote } : {}),
       });
     });
   }

@@ -5,7 +5,7 @@ import { bodyOf } from '../../support/api-body';
 import { bearer, createHttpContractApp, principal } from '../../support/http-contract-app';
 
 const ID = '3f0c7d54-9e1b-4f6a-8d2c-5b7a1e9c0d11';
-const GROUNDS = { type: 'HR_DECISION', reference: 'QD-12/2026', issuer: 'HR Department', issuedOn: '2026-10-01' };
+const NOTE = 'Quyết định số QD-12/2026 của phòng Nhân sự';
 
 type Call = (server: App) => request.Test;
 
@@ -15,7 +15,7 @@ const ROUTES: Array<[string, Call]> = [
     (server) =>
       request(server)
         .post('/api/v1/offboarding-cases')
-        .send({ employeeId: ID, lastWorkingDay: '2026-11-03', grounds: GROUNDS }),
+        .send({ employeeId: ID, lastWorkingDay: '2026-11-03', groundsNote: NOTE }),
   ],
   ['GET /offboarding-cases', (server) => request(server).get('/api/v1/offboarding-cases')],
   ['GET /offboarding-cases/{id}', (server) => request(server).get(`/api/v1/offboarding-cases/${ID}`)],
@@ -123,26 +123,28 @@ describe('offboarding case routes (e2e, no database)', () => {
       employeeId: ID,
       lastWorkingDay: '2026-11-03',
       accessBlockMode: 'WITH_LAST_DAY',
-      grounds: GROUNDS,
+      groundsNote: NOTE,
     };
 
     it.each([
-      ['no employee', { lastWorkingDay: '2026-11-03', accessBlockMode: 'WITH_LAST_DAY', grounds: GROUNDS }],
-      ['no mode', { employeeId: ID, lastWorkingDay: '2026-11-03', grounds: GROUNDS }],
+      ['no employee', { lastWorkingDay: '2026-11-03', accessBlockMode: 'WITH_LAST_DAY', groundsNote: NOTE }],
+      ['no mode', { employeeId: ID, lastWorkingDay: '2026-11-03', groundsNote: NOTE }],
       ['no basis', { employeeId: ID, lastWorkingDay: '2026-11-03', accessBlockMode: 'WITH_LAST_DAY' }],
-      ['a basis of a kind outside the list', { ...RECORD, grounds: { ...GROUNDS, type: 'DECISION' } }],
-      ['a basis without an issuer', { ...RECORD, grounds: { ...GROUNDS, issuer: ' ' } }],
-      ['a basis with a day that is not a date', { ...RECORD, grounds: { ...GROUNDS, issuedOn: '01/10/2026' } }],
+      ['a blank basis', { ...RECORD, groundsNote: '  ' }],
+      ['a basis of 501 characters', { ...RECORD, groundsNote: 'a'.repeat(501) }],
+      [
+        'the old four-part basis',
+        { ...RECORD, groundsNote: undefined, grounds: { type: 'HR_DECISION', reference: 'X' } },
+      ],
       ['the retired reason to cancel the transfer', { ...RECORD, pendingTransferCancellation: { reason: 'x' } }],
       ['a confirmation to cancel the transfer that is not true', { ...RECORD, cancelPendingTransfer: false }],
-      ['no last day', { employeeId: ID, accessBlockMode: 'BLOCK_NOW', grounds: GROUNDS }],
+      ['no last day', { employeeId: ID, accessBlockMode: 'BLOCK_NOW', groundsNote: NOTE }],
       ['the retired flag', { ...RECORD, abrupt: true }],
       ['a mode that is not known', { ...RECORD, accessBlockMode: 'LATER' }],
       ['an employee that is not an id', { ...RECORD, employeeId: 'E1' }],
       ['a last day that is not a date', { ...RECORD, lastWorkingDay: '03/11/2026' }],
       ['a successor of no kind', { ...RECORD, successor: { employeeId: ID } }],
       ['a field the route does not know', { ...RECORD, reasonForLeaving: 'x' }],
-      ['a field inside the basis the route does not know', { ...RECORD, grounds: { ...GROUNDS, note: 'x' } }],
     ])('refuses %s with 422', async (_name, payload) => {
       const response = await request(app.getHttpServer())
         .post('/api/v1/offboarding-cases')
@@ -216,7 +218,7 @@ describe('offboarding case routes (e2e, no database)', () => {
         (server: App) =>
           request(server)
             .post(`/api/v1/offboarding-cases/${ID}/last-day-changes`)
-            .send({ lastWorkingDay: '2026-11-20', grounds: GROUNDS }),
+            .send({ lastWorkingDay: '2026-11-20', groundsNote: NOTE }),
       ],
       [
         'a move of the day without a basis',
@@ -230,7 +232,7 @@ describe('offboarding case routes (e2e, no database)', () => {
         'a cancellation without a reason',
         'POST /offboarding-cases/{id}/cancellation',
         (server: App) =>
-          request(server).post(`/api/v1/offboarding-cases/${ID}/cancellation`).send({ grounds: GROUNDS }),
+          request(server).post(`/api/v1/offboarding-cases/${ID}/cancellation`).send({ groundsNote: NOTE }),
       ],
       [
         'a cancellation without a basis',
@@ -238,12 +240,12 @@ describe('offboarding case routes (e2e, no database)', () => {
         (server: App) => request(server).post(`/api/v1/offboarding-cases/${ID}/cancellation`).send({ reason: 'x' }),
       ],
       [
-        'a cancellation with a basis of a kind outside the list',
+        'a cancellation with a basis that is not a sentence',
         'POST /offboarding-cases/{id}/cancellation',
         (server: App) =>
           request(server)
             .post(`/api/v1/offboarding-cases/${ID}/cancellation`)
-            .send({ reason: 'x', grounds: { ...GROUNDS, type: 'DECISION' } }),
+            .send({ reason: 'x', groundsNote: { reference: 'QD-12/2026' } }),
       ],
       [
         'revocations naming a seat that is not an id',

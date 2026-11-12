@@ -1,6 +1,6 @@
 import { addDays, type BusinessDate } from '../../../core/business-date';
 import { addWorkingDays, type NonWorkingDates } from '../../../core/working-days';
-import { groundsRefusal, type GroundsInput } from '../personnel-grounds.policy';
+import { groundsNoteRefusal } from '../personnel-grounds.policy';
 import type { AccessBlockMode, OffboardingState } from './offboarding.types';
 
 /** What the policy refuses, as a semantic code (`OFFBOARDING_CASE.<code>` on the wire) and the facts a person needs to put it right. */
@@ -71,7 +71,7 @@ export interface RecordFacts extends LastDayFacts {
   lastWorkingDay: BusinessDate | undefined;
   accessBlockMode: AccessBlockMode;
   employee: { status: 'ACTIVE' | 'TERMINATED'; workState: 'WORKING' | 'ON_LONG_LEAVE' | 'HANDING_OVER' | 'LEFT' };
-  grounds: GroundsInput | undefined;
+  groundsNote: string | undefined;
   /** The transfer of the person that waits, if any. */
   pendingTransfer: { effectiveOn: BusinessDate } | null;
   /** The Super Admin confirmed that the transfer that waits is cancelled with the departure. */
@@ -96,9 +96,8 @@ export function recordRefusal(facts: RecordFacts): OffboardingRefusal | null {
       ? blockNowDayRefusal(facts.lastWorkingDay, facts)
       : plannedDayRefusal(facts.lastWorkingDay, facts);
   if (day) return day;
-  const grounds = groundsRefusal(facts.grounds);
-  if (grounds)
-    return { code: grounds.reason, details: 'missing' in grounds ? { missing: grounds.missing } : undefined };
+  const grounds = groundsFault(facts.groundsNote);
+  if (grounds) return grounds;
 
   const transfer = pendingTransferRefusal(
     facts.pendingTransfer,
@@ -127,17 +126,16 @@ export function pendingTransferRefusal(
   return cancelRequested ? null : { code: 'TRANSFER_CANCELLATION_REQUIRED' };
 }
 
-/** The basis as a refusal of the departure flow: a part missing, or the code of a notice. Null when it is whole. */
-function groundsFault(grounds: GroundsInput | undefined | null): OffboardingRefusal | null {
-  const found = groundsRefusal(grounds);
-  if (!found) return null;
+/** The basis as a refusal of the departure flow: the box empty or too long, or the code of a notice. Null when it is fine. */
+function groundsFault(groundsNote: string | undefined | null): OffboardingRefusal | null {
+  const found = groundsNoteRefusal(groundsNote);
 
-  return { code: found.reason, ...('missing' in found ? { details: { missing: found.missing } } : {}) };
+  return found ? { code: found.reason } : null;
 }
 
 export interface ChangeLastDayFacts extends LastDayFacts {
   state: OffboardingState;
-  grounds?: GroundsInput | undefined;
+  groundsNote?: string | undefined;
   currentLastWorkingDay: BusinessDate;
   newLastWorkingDay: BusinessDate;
   reason: string;
@@ -163,7 +161,7 @@ export function changeLastDayRefusal(facts: ChangeLastDayFacts): OffboardingRefu
   if (facts.today > facts.currentLastWorkingDay)
     return { code: 'LAST_DAY_ALREADY_PASSED', details: { lastWorkingDay: facts.currentLastWorkingDay } };
   if (facts.reason.trim() === '') return { code: 'REASON_REQUIRED' };
-  const basis = groundsFault(facts.grounds);
+  const basis = groundsFault(facts.groundsNote);
   if (basis) return basis;
   const day = plannedDayRefusal(facts.newLastWorkingDay, facts);
   if (day) return day;
@@ -176,13 +174,13 @@ export function changeLastDayRefusal(facts: ChangeLastDayFacts): OffboardingRefu
 export function cancelRefusal(facts: {
   state: OffboardingState;
   reason: string;
-  grounds?: GroundsInput | undefined;
+  groundsNote?: string | undefined;
 }): OffboardingRefusal | null {
   const state = notHandingOverRefusal(facts.state);
   if (state) return state;
   if (facts.reason.trim() === '') return { code: 'REASON_REQUIRED' };
 
-  return groundsFault(facts.grounds);
+  return groundsFault(facts.groundsNote);
 }
 
 /**

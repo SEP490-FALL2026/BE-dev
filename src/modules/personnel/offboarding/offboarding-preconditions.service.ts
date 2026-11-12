@@ -211,7 +211,7 @@ export class OffboardingPreconditions {
       lastWorkingDay: input.lastWorkingDay,
       accessBlockMode: input.accessBlockMode,
       employee: { status: held.employee.status, workState: held.employee.workState },
-      grounds: input.grounds,
+      groundsNote: input.groundsNote,
       pendingTransfer: held.pending && { effectiveOn: held.pending.effectiveOn },
       cancelPendingTransfer: input.cancelPendingTransfer === true,
       namedAsSuccessor: await this.repo.isNamedSuccessorOfPendingTransfer(tx, input.employeeId),

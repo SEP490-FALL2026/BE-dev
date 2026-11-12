@@ -1,5 +1,5 @@
 import type { BusinessDate } from '../../../core/business-date';
-import type { GroundsInput, RecordedGrounds } from '../personnel-grounds.policy';
+import type { RecordedGrounds } from '../personnel-grounds.policy';
 import type { RoleFlag } from '../public/personnel.types';
 
 /** How the access of the person is blocked: from the day after the last working day, or from the day the departure is recorded (QĐ-96c). */
@@ -119,7 +119,8 @@ export interface RecordOffboardingInput {
   employeeId: string;
   lastWorkingDay?: BusinessDate | undefined;
   accessBlockMode: AccessBlockMode;
-  grounds?: GroundsInput | undefined;
+  /** The basis in one box (`QĐ-110a`). */
+  groundsNote?: string | undefined;
   successor?: SuccessorChoice | undefined;
   /** The Super Admin confirms that a transfer waiting to take effect after the last working day is cancelled with the departure. */
   cancelPendingTransfer?: true | undefined;
@@ -130,7 +131,7 @@ export interface RecordOffboardingInput {
 export interface ChangeLastDayInput {
   lastWorkingDay: BusinessDate;
   reason: string;
-  grounds?: GroundsInput | undefined;
+  groundsNote?: string | undefined;
   successor?: SuccessorChoice | undefined;
 }
 

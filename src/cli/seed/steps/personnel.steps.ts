@@ -5,17 +5,7 @@ import type { DemoPersonnelEvent } from '../fixture/demo-fixture.types';
 
 type Result = { status: StepOutcome['status']; label: string };
 
-/** The basis the Super Admin records an event on: a document from outside the application (a decision, an approved application). */
-function grounds(ctx: DemoRunContext, code: string) {
-  return {
-    type: 'HR_DECISION' as const,
-    reference: `${ctx.fixture.marker}-QD-${code}`,
-    issuer: 'Phòng Nhân sự (nguồn ban hành ngoài hệ thống)',
-    issuedOn: dayOffset(ctx.today, -1),
-  };
-}
-
-/** The same basis in one box, as the routes that take it ask for it (`QĐ-110a`). */
+/** The basis the Super Admin records an event on, in one box (`QĐ-110a`): a document from outside the application. */
 function groundsNote(ctx: DemoRunContext, code: string): string {
   return `${ctx.fixture.marker}-QD-${code}: quyết định của phòng Nhân sự (nguồn ban hành ngoài hệ thống)`;
 }
@@ -56,7 +46,7 @@ async function record(ctx: DemoRunContext, event: DemoPersonnelEvent): Promise<R
             employeeId,
             lastWorkingDay: ctx.today,
             accessBlockMode: 'BLOCK_NOW',
-            grounds: grounds(ctx, event.employee),
+            groundsNote: groundsNote(ctx, event.employee),
             successor: { kind: 'NONE' },
           },
         };
