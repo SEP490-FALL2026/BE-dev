@@ -7,7 +7,7 @@
 - Gói: **W8** (giao code), hạng mục cuối của đợt.
 - Nguồn: Docs `9c7f386`; BE `bc10bd1c` (đầu đợt: `1c41354e` — pin tracker, `openapi.json` gốc để so). Tài liệu FE
   `D:\FPT\FALL2026\Docs\Figma UI-UX\API-Integration\` (README, `changes/maintenance.md`, generator `tools/build-api-docs.mjs`). Mẫu đợt trước:
-  `docs/reviews/qd96-100-alignment-2026-11-05/fe-batch/PROMPT-FE-DOCS-DOT-1.md`, `FIELD-CHANGES-DOT-1.md`. Câu TẠM CHỌN: không có câu
+  `docs/reviews/qd96-100-alignment-2026-11-05/fe-batch/PROMPT-FE-DOCS-DOT-1.md` (nhật ký review đã xóa 11/11/2026 — xem git history), `FIELD-CHANGES-DOT-1.md`. Câu TẠM CHỌN: không có câu
   nghiệp vụ; lựa chọn kỹ thuật (cách so contract) ghi ở _Behavior_ 1.
 - Nhóm roadmap: không — bó finding `qd103-108-alignment`.
 - [Kế hoạch](plan.md).

@@ -246,7 +246,7 @@ export class ProposalsController {
   @ApiSuccessResponse(AccessRequestResponseDto, {
     message: 'ACCESS_REQUEST.INTERNAL_SOFTWARE_REGISTERED',
     description:
-      'The software the company built itself is registered in the catalog with its Business Owner and one plan granted by hand, and the request goes the way that has no spend: the IT Admin grants it. No vendor, contract, subscription, invoice, commitment or seat bought is made. With a payment (a quote in the body) the request keeps its spend step and waits for the head to send it on.',
+      'The software the company built itself is registered in the catalog, answered for by the IT Admin who registers it, with one plan granted by hand, and the request goes the way that has no spend: the IT Admin grants it. No vendor, contract, subscription, invoice, commitment or seat bought is made. With a payment (a quote in the body) the request keeps its spend step and waits for the head to send it on.',
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,
@@ -261,10 +261,9 @@ export class ProposalsController {
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
-        'The Business Owner is missing or has left (APPLICATION.BUSINESS_OWNER_INVALID), the data sensitivity is not known (ASSESSMENT.INCOMPLETE), the quote cannot price the request (ASSESSMENT.QUOTE_NOT_IN_FORCE and the others), or the body is invalid (VALIDATION_ERROR). Nothing is registered and the request stays with the IT Admin.',
+        'The data sensitivity is not known (ASSESSMENT.INCOMPLETE), the quote cannot price the request (ASSESSMENT.QUOTE_NOT_IN_FORCE and the others), or the body is invalid (VALIDATION_ERROR). Nothing is registered and the request stays with the IT Admin.',
       examples: [
         VALIDATION_EXAMPLE,
-        EXAMPLES.BUSINESS_OWNER_INVALID,
         EXAMPLES.INCOMPLETE_DATA_SENSITIVITY,
         EXAMPLES.QUOTE_PERIOD_INVALID,
         EXAMPLES.QUOTE_NOT_IN_FORCE,
@@ -295,7 +294,7 @@ export class ProposalsController {
   @ApiSuccessResponse(AccessRequestResponseDto, {
     message: 'ACCESS_REQUEST.CATALOG_LINKED',
     description:
-      'After the spending approver has decided the request, the IT Admin links it to the plan registered in the catalog, whose application must have a Business Owner who still works. The grant is possible only after this.',
+      'After the spending approver has decided the request, the IT Admin links it to the plan registered in the catalog. The grant is possible only after this.',
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,
@@ -309,8 +308,8 @@ export class ProposalsController {
     {
       status: HttpStatus.CONFLICT,
       description:
-        'The request is not waiting for its grant or is already linked (ACCESS_REQUEST.CATALOG_LINK_NOT_ALLOWED), the application is retired (ACCESS_REQUEST.APPLICATION_RETIRED), or it has no Business Owner who works (ACCESS_REQUEST.BUSINESS_OWNER_REQUIRED).',
-      examples: [EXAMPLES.CATALOG_LINK_NOT_ALLOWED, EXAMPLES.APPLICATION_RETIRED, EXAMPLES.BUSINESS_OWNER_REQUIRED],
+        'The request is not waiting for its grant or is already linked (ACCESS_REQUEST.CATALOG_LINK_NOT_ALLOWED) or the application is retired (ACCESS_REQUEST.APPLICATION_RETIRED).',
+      examples: [EXAMPLES.CATALOG_LINK_NOT_ALLOWED, EXAMPLES.APPLICATION_RETIRED],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,

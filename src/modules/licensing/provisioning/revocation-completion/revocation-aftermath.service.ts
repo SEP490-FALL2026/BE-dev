@@ -22,6 +22,11 @@ export class RevocationAftermath {
     private readonly leaverAlert: RevocationLeaverAlert,
   ) {}
 
+  /** Whether the seat holds a key (a K4 seat granted before the key pool holds none), its row locked until commit. */
+  holdsKey(tx: DbTx, assignmentId: string): Promise<boolean> {
+    return this.keys.holdsKey(tx, assignmentId);
+  }
+
   async follow(
     tx: DbTx,
     actor: AuthenticatedPrincipal,

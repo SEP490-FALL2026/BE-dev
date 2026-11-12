@@ -1,7 +1,7 @@
 # Spec: qd96-100-remove-budget-revision-and-high-value — ngân sách đã duyệt khóa cả năm; bỏ ngưỡng giá trị cao
 
 - Phụ trách: AI theo giao việc Owner (05/11/2026); người nhận implement tiếp quản spec/plan và evidence.
-- Thiết kế ban đầu bởi: AI (agent C-SPEC-B) theo [tracker qd96-100](../../../reviews/qd96-100-alignment-2026-11-05/README.md),
+- Thiết kế ban đầu bởi: AI (agent C-SPEC-B) theo tracker qd96-100 (nhật ký review đã xóa 11/11/2026 — xem git history),
   `LEDGER.md` L-124, L-125; Q-02 B.
 - Thiết kế: `draft`. Owner review: chưa review. Peer review: chưa có.
 - Nguồn: Docs `3d73a7f` (BRD 4.0 `FR-5.15`; US 05/11/2026 — `US-06-09` AC-31 (AC-7→AC-10, AC-17 bị thay); `QĐ-97b`, `QĐ-97c`,

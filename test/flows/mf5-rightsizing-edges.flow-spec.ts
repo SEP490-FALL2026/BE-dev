@@ -144,7 +144,7 @@ describe('MF-5 giảm, hủy và đề xuất lỗi thời: các biên của F5-
       const subscriptionId = await call().subscriptionOf('Cursor Pro');
       const proposed = await propose(subscriptionId, {
         choice: 'CANCEL',
-        businessOwnerOpinion: 'Chuyển sang công cụ khác',
+        note: 'Chuyển sang công cụ khác',
       });
       expect(proposed.status).toBe(201);
       cancelId = call().data<{ renewal: { id: string } }>(proposed).renewal.id;

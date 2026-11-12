@@ -7,7 +7,7 @@
 - Nguồn: Docs `9c7f386` (BRD 4.10 `BR-MF5-04`, `FR-3.10`, bảng thông báo dòng 1044–1045; QT v1.7 mục 5.5, A.4 dòng _Ân hạn trước khi gỡ seat
   thu hồi do `G3`/`G4`_; `QĐ-94j`, `QĐ-98g`, `QĐ-100c`, `QĐ-103j`, `QĐ-62p`(1), `QĐ-64a`), BE `46b6a94e` (đọc ở `712044f9`). Ledger: L4-10,
   L4-15 (giữ). Luật R-J07 (hồi quy), R-J08. Kỹ thuật (chốt ở đây): Q-88 vế _mốc khi quyết lại_ và _báo một lần_.
-- Nhóm roadmap: không — bó finding `qd103-108-alignment` (đợt W6).
+- Nhóm roadmap: G6, G7 (từ re-pin scope map 11/11/2026) — bó finding `qd103-108-alignment` (đợt W6).
 - Kế hoạch: `plan.md` cùng thư mục.
 
 ## Business outcome
@@ -20,8 +20,8 @@ dụng_; lý do đã gỡ không còn được đọc ở đâu (bàn giao, danh
 
 ## Sizing decision
 
-- Container: bó finding `qd103-108-alignment` (W6).
-- Mode: `technical-enabler`
+- Container: G6, G7 (nhóm giao việc, không phải ranh giới hạng mục); bó finding `qd103-108-alignment` (W6). Trước re-pin 11/11/2026 là ngoài nhóm.
+- Mode: `grouped-stories`.
 - Outcome and owner: capability `licensing/provisioning` (facade `LicensingApi.openRevocation` mở rộng, `LicensingApi.withdrawRevocationReason` mới).
 - Boundaries: 1 migration `licensing` (không thêm giá trị enum ⟹ không cần `*_values`); 5 operation đổi hợp đồng (không route mới); 1 moment mới của
   `RevocationListeners`; 2 mã thông báo. Ước ~32 file, 4 task ⟹ một phase.
@@ -29,13 +29,15 @@ dụng_; lý do đã gỡ không còn được đọc ở đâu (bàn giao, danh
   khi hủy nghỉ việc **không** làm ở W6 (NOTES §5).
 - Not smaller: mốc, gỡ lý do và tính lại mốc cùng sửa bảng lý do và quy tắc _một seat một tác vụ, nhiều lý do_ (`QĐ-64a`).
 - Siblings: `qd103-ghost-seat-manager-decision` (nơi gọi duy nhất truyền `timing` + `notice`), `qd103-ghost-seat-g1-g2` (đọc trạng thái tác vụ).
-- Scope map: n/a
+- Scope map: [G6](../../../roadmap.md#work-item-decomposition-g6), [G7](../../../roadmap.md#work-item-decomposition-g7).
 
 ## Primary Story/AC
 
-| Story | AC                      | Coverage | Phần còn lại thuộc                                                    |
-| ----- | ----------------------- | -------- | --------------------------------------------------------------------- |
-| —     | L4-10 (đủ), L4-15 (giữ) | n/a      | quyết định/hủy/mở lại ghost seat: `qd103-ghost-seat-manager-decision` |
+| Story    | AC                | Coverage | Phần còn lại thuộc                                                                                                                                                                                                                                           |
+| -------- | ----------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| US-07-05 | AC-10, AC-22      | partial  | AC còn lại và vế chung theo scope map: `g6-revocation-by-grant-kind`, `qd103-k4-key-pool`, `g6-transfer-tool-review`, `g6-downstream-integration`, `g6-handover-confirmation`, `qd103-ghost-seat-manager-decision`, `qd103-commitment-release-on-revocation` |
+| US-10-06 | AC-2, AC-10→AC-12 | partial  | AC còn lại và vế chung theo scope map: `qd103-ghost-seat-manager-decision`                                                                                                                                                                                   |
+| US-10-07 | AC-18, AC-19      | partial  | AC còn lại và vế chung theo scope map: `qd103-ghost-seat-manager-decision`, `qd103-ghost-seat-g1-g2`, `qd103-commitment-release-on-revocation`                                                                                                               |
 
 ## Supporting references
 
@@ -44,6 +46,8 @@ AC-10→AC-12 (trả lại, hủy); `US-07-05` AC-10, AC-22 (tác vụ còn mở
 AC-19 (hồi quy cam kết). Spec cũ `qd96-100-revocation-deadline-and-withdraw` (chỉ tham khảo, §4 luật 9): **còn dùng** cột `due_on`/`not_before`,
 mốc gộp `MIN`, 409 `NOT_BEFORE`, trigger lý do chỉ cho phép _gỡ_, `REASON_WITHDRAWN`; **bỏ** báo người giữ cho mọi nguồn (trái R-J08 — ở đây
 opt-in), actor `SYSTEM`, sweeper quá hạn, tham số nghỉ việc.
+
+_Re-pin 11/11/2026 ([C3](../../../reviews/mf2-mf3-2026-11-10/C3-SCOPE-MAP-REPIN.md)):_ trước là `technical-enabler`, dòng `n/a` của bảng Primary: L4-10 (đủ), L4-15 (giữ) — quyết định/hủy/mở lại ghost seat: `qd103-ghost-seat-manager-decision`. Bảng Primary claim AC của tối đa ba Story chính lấy từ danh sách trên, chỉ AC đang dùng ở Docs `5bb2e6a` (số AC của EP-05/EP-06/EP-12 không đổi giữa `9c7f386` và `5bb2e6a`); khóa khác của danh sách trên giữ chủ hiện có hoặc là `deferred` tới hạng mục này trong scope map. Claim theo spec và commit đã merge (PR #36), chưa đối chiếu từng AC trên code.
 
 ## Explicit out of scope
 

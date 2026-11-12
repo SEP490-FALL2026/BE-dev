@@ -8,7 +8,7 @@
   `QĐ-100j`, `QĐ-100u`, `QĐ-100w`, `QĐ-103r`, `QĐ-104c`(1), `QĐ-104d`(1); QT v1.7 mục 1.4–1.7, A.4), BE `1cd81101`. Ledger: L2-13,
   L2-14, L2-16, L1-23 (+ dòng mới đề nghị cho người nhận nhắc SLA bước nhu cầu); luật R-B05, R-B06 (vế lô), R-B07. Câu TẠM CHỌN:
   Q-26 (dữ liệu Finance rà soát cũ); dùng Q-29 (số tiền 0 của Request tiếp tục).
-- Nhóm roadmap: không — bó finding `qd103-108-alignment`.
+- Nhóm roadmap: G5 (từ re-pin scope map 11/11/2026) — bó finding `qd103-108-alignment`.
 - [Kế hoạch](plan.md).
 
 ## Business outcome
@@ -22,8 +22,8 @@ SLA nhắc người giữ + người yêu cầu (`QĐ-100j`). **Không còn** Fi
 
 ## Sizing decision
 
-- Container: bó finding `qd103-108-alignment` (đợt W3), ngoài nhóm G.
-- Mode: `technical-enabler`.
+- Container: G5 (nhóm giao việc, không phải ranh giới hạng mục); bó finding `qd103-108-alignment` (đợt W3). Trước re-pin 11/11/2026 là ngoài nhóm.
+- Mode: `grouped-stories`.
 - Outcome and owner: `requests/spend` (policy + service kiểm), capability mới `requests/reserve-confirmation` (xác nhận dự
   phòng, không controller) và `requests/spend-effects` (giữ cam kết, trả về — thay `budget-information/`), `requests/spend-approval`
   (quyết định), `requests/spend-approval-view`, `requests/spend-submission` (route xác nhận), `requests/status` (thông báo),
@@ -35,19 +35,23 @@ SLA nhắc người giữ + người yêu cầu (`QĐ-100j`). **Không còn** Fi
 - Not smaller: ba kết quả, xác nhận dự phòng và kiểm lại lúc duyệt là một luật trên cùng snapshot; gỡ nhánh Finance cùng lúc vì
   kết quả `FINANCE_REVIEW` không còn tồn tại trong policy mới (để lại thì code chết, test sai nghĩa).
 - Siblings: `qd103-request-amount-and-term` (trước), `qd103-commitment-current-year`, `qd103-request-single-step-routing` (sau).
-- Scope map: n/a
+- Scope map: [G5](../../../roadmap.md#work-item-decomposition-g5).
 
 ## Primary Story/AC
 
-| Story | AC                         | Coverage | Phần còn lại thuộc                                                                                           |
-| ----- | -------------------------- | -------- | ------------------------------------------------------------------------------------------------------------ |
-| —     | L2-13, L2-14, L2-16, L1-23 | n/a      | gỡ chặn `qd103-commitment-current-year`, `qd103-request-single-step-routing`, W8 `qd103-api-docs-regression` |
+| Story    | AC                                                                    | Coverage | Phần còn lại thuộc                                                                                                                                                                                                                                                                                                        |
+| -------- | --------------------------------------------------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| US-06-01 | AC-2, AC-3, AC-9, AC-18, AC-21→AC-24, AC-28                           | partial  | AC còn lại và vế chung theo scope map: `g5-spend-approval-decision`, `qd103-request-amount-and-term`, `g5-group-requests`, `qd93-remove-fallback-substitute-approvers`, `qd96-100-remove-spend-override`, `qd96-100-request-year-without-spend-date`, `qd103-request-single-step-routing`, `qd103-grant-from-shared-pool` |
+| US-06-12 | AC-1, AC-4, AC-5, AC-8, AC-9, AC-11, AC-14, AC-20, AC-23, AC-25→AC-28 | partial  | AC còn lại và vế chung theo scope map: `g5-budget-check-and-finance-review`, `qd96-100-plan-line-removal-and-bm10-lines`, `qd96-100-request-year-without-spend-date`, `qd96-100-request-term-limit`, `qd103-seat-month-cost-pool-line`, `qd103-request-single-step-routing`                                               |
+| US-06-16 | AC-1→AC-6, AC-8, AC-9                                                 | partial  | AC còn lại và vế chung theo scope map: `qd103-request-single-step-routing`                                                                                                                                                                                                                                                |
 
 ## Supporting references
 
 `US-06-12` AC-1, AC-4, AC-5, AC-8, AC-9, AC-11, AC-14, AC-20, AC-23, AC-25→AC-28; `US-06-01` AC-2, AC-3, AC-9, AC-18, AC-21→AC-24,
 AC-28; `US-06-14` AC-9, AC-12, AC-13; `US-06-16` AC-1→AC-6, AC-8, AC-9. Spec cũ `qd96-100-budget-check-three-outcomes`,
 `-reserve-confirmation`, `-remove-finance-review-path`, `-remove-spend-override`, `-spend-notifications` chỉ đọc tham khảo.
+
+_Re-pin 11/11/2026 ([C3](../../../reviews/mf2-mf3-2026-11-10/C3-SCOPE-MAP-REPIN.md)):_ trước là `technical-enabler`, dòng `n/a` của bảng Primary: L2-13, L2-14, L2-16, L1-23 — gỡ chặn `qd103-commitment-current-year`, `qd103-request-single-step-routing`, W8 `qd103-api-docs-regression`. Bảng Primary claim AC của tối đa ba Story chính lấy từ danh sách trên, chỉ AC đang dùng ở Docs `5bb2e6a` (số AC của EP-05/EP-06/EP-12 không đổi giữa `9c7f386` và `5bb2e6a`); khóa khác của danh sách trên giữ chủ hiện có hoặc là `deferred` tới hạng mục này trong scope map. Claim theo spec và commit đã merge (PR #36), chưa đối chiếu từng AC trên code.
 
 ## Explicit out of scope
 

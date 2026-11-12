@@ -84,7 +84,7 @@ export class RenewalDecisionTrail {
         },
       ),
     );
-    const itAdmin = await this.parties.itAdminOf(period.ownerDepartmentId, tx);
+    const itAdmin = await this.parties.itAdminOf(period, tx);
     const finance = await this.parties.financeOf(tx);
     await this.notifier.tell(tx, {
       organizationId: decided.organizationId,

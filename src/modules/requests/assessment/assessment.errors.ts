@@ -19,7 +19,7 @@ export class AssessmentIncompleteError extends Error {
 /** Internal software is completed by registering it in the catalog, not by completing the assessment (`US-05-20`). */
 export class AssessmentInternalByRegistrationError extends Error {
   constructor() {
-    super('Internal software is completed by registering it in the catalog with its Business Owner.');
+    super('Internal software is completed by registering it in the catalog.');
     this.name = 'AssessmentInternalByRegistrationError';
   }
 }
@@ -42,7 +42,7 @@ export class AssessmentQuoteRefusedError extends Error {
 
 /** Internal software cannot be registered for this request: it was not classified so, or the catalog refuses it (`US-05-20` AC-4, AC-8). */
 export class InternalRegistrationRefusedError extends Error {
-  constructor(readonly reason: 'NOT_INTERNAL' | 'BUSINESS_OWNER_INVALID' | 'NAME_TAKEN') {
+  constructor(readonly reason: 'NOT_INTERNAL' | 'NAME_TAKEN') {
     super(`The internal software cannot be registered: ${reason}.`);
     this.name = 'InternalRegistrationRefusedError';
   }
@@ -50,17 +50,15 @@ export class InternalRegistrationRefusedError extends Error {
 
 /** A vendor, plan or person the assessment names does not exist. */
 export class AssessmentReferenceNotFoundError extends Error {
-  constructor(
-    readonly field: 'vendorId' | 'equivalentPlanId' | 'alternativePlanId' | 'proposedBusinessOwnerEmployeeId',
-  ) {
+  constructor(readonly field: 'vendorId' | 'equivalentPlanId' | 'alternativePlanId') {
     super(`The ${field} of the assessment does not exist.`);
     this.name = 'AssessmentReferenceNotFoundError';
   }
 }
 
-/** The request cannot be linked to the plan: it is not waiting for its grant, or the software has no Business Owner who works (`US-05-06` AC-4, AC-8). */
+/** The request cannot be linked to the plan: it is not waiting for its grant (`US-05-06` AC-4, AC-8). */
 export class CatalogLinkRefusedError extends Error {
-  constructor(readonly reason: 'NOT_LINKABLE' | 'BUSINESS_OWNER_REQUIRED') {
+  constructor(readonly reason: 'NOT_LINKABLE') {
     super(`The request cannot be linked to the plan: ${reason}.`);
     this.name = 'CatalogLinkRefusedError';
   }

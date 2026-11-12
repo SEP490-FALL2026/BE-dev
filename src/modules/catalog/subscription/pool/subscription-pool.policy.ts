@@ -25,6 +25,23 @@ export interface PoolTermsInput {
 
 const DECLARABLE_CYCLES: readonly string[] = ['MONTHLY', 'ANNUAL'] satisfies readonly DeclarableBillingCycle[];
 
+/**
+ * The IT Admin a new subscription answers to (`QĐ-111g`, `BB-3`): the one the declaration names, else the IT Admin responsible for its
+ * application while they are still a usable IT Admin (the test of `IdentityAccessApi.findUsableItAdminEmployeeIds`), else nobody. Only a
+ * declaration is judged here, never a subscription that exists; the rule that an active one names somebody is `assertResponsibleNamed`.
+ */
+export function defaultResponsibleOf(input: {
+  named: string | undefined;
+  applicationResponsible: string | null;
+  applicationResponsibleIsUsable: boolean;
+}): string | null {
+  if (input.named !== undefined) return input.named;
+
+  return input.applicationResponsible !== null && input.applicationResponsibleIsUsable
+    ? input.applicationResponsible
+    : null;
+}
+
 /** A new write names only a monthly or an annual billing cycle (`Q-09`); `QUARTERLY` and `OTHER` stay readable on data written earlier. */
 export function assertDeclarableCycle(billingCycle: string | undefined): void {
   if (billingCycle !== undefined && !DECLARABLE_CYCLES.includes(billingCycle)) {

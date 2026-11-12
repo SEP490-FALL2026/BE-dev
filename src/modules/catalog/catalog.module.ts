@@ -10,11 +10,11 @@ import { OrganizationModule } from '../organization/organization.module';
 import { CatalogApi } from './public/catalog.api';
 import { SeatBaselinePhaseHook, SeatOccupancyHook } from './public/catalog.extension-points';
 import { ApplicationFactsService } from './catalog-entry/application-facts.service';
-import { ApplicationOwnerService } from './catalog-entry/application-owner.service';
 import { ApplicationRetirementController } from './application-retirement/application-retirement.controller';
+import { ApplicationResponsibilityController } from './application-responsibility/application-responsibility.controller';
+import { ApplicationResponsibilityService } from './application-responsibility/application-responsibility.service';
 import { ApplicationRetirementRepo } from './application-retirement/application-retirement.repo';
 import { ApplicationRetirementService } from './application-retirement/application-retirement.service';
-import { ApplicationOwnersController } from './catalog-entry/application-owners.controller';
 import { ApplicationRepo } from './catalog-entry/application.repo';
 import { ApplicationListService } from './catalog-entry/application-list.service';
 import { ApplicationWriteGuards } from './catalog-entry/application-write-guards.service';
@@ -34,15 +34,15 @@ import { FunctionalGroupFactsService } from './functional-group/functional-group
 import { FunctionalGroupRepo } from './functional-group/functional-group.repo';
 import { FunctionalGroupService } from './functional-group/functional-group.service';
 import { FunctionalGroupsController } from './functional-group/functional-groups.controller';
-import { PlanTermsRepo } from './plan-terms/plan-terms.repo';
-import { PlanTermsService } from './plan-terms/plan-terms.service';
-import { PlanTermsController } from './plan-terms/plan-terms.controller';
 import { PlanFactsService } from './plan/plan-facts.service';
 import { PlanUsageRepo } from './plan/plan-usage.repo';
 import { PlanWorkspaceService } from './plan/plan-workspace.service';
 import { PlanRepo } from './plan/plan.repo';
 import { PlanService } from './plan/plan.service';
 import { PlansController } from './plan/plans.controller';
+import { PlanTermsController } from './plan-terms/plan-terms.controller';
+import { PlanTermsRepo } from './plan-terms/plan-terms.repo';
+import { PlanTermsService } from './plan-terms/plan-terms.service';
 import { RequestableSoftwareController } from './requestable-software/requestable-software.controller';
 import { RequestableSoftwareRepo } from './requestable-software/requestable-software.repo';
 import { RequestableSoftwareService } from './requestable-software/requestable-software.service';
@@ -100,16 +100,19 @@ import { VendorRepo } from './vendor/vendor.repo';
     ApplicationsController,
     FunctionalGroupsController,
     PlansController,
+    PlanTermsController,
     VendorsController,
     SubscriptionsController,
-    PlanTermsController,
-    ApplicationOwnersController,
     ApplicationRetirementController,
+    ApplicationResponsibilityController,
     ContractsController,
     DocumentsController,
     RequestableSoftwareController,
   ],
   providers: [
+    ApplicationResponsibilityService,
+    PlanTermsService,
+    PlanTermsRepo,
     VendorDictionaryService,
     VendorRecognitionService,
     VendorProposalService,
@@ -165,9 +168,6 @@ import { VendorRepo } from './vendor/vendor.repo';
     ApplicationRetirementService,
     CatalogApi,
     SubscriptionPeriodApi,
-    PlanTermsService,
-    PlanTermsRepo,
-    ApplicationOwnerService,
     RequestableSoftwareRepo,
     RequestableSoftwareService,
   ],

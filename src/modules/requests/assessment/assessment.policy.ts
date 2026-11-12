@@ -12,7 +12,7 @@ import type { AssessmentFields } from '../access-request/assessment-record.types
 export type CompletionVerdict =
   | { kind: 'OK' }
   | { kind: 'INCOMPLETE'; missing: string[] }
-  /** Internal software is completed by registering it in the catalog with its Business Owner (`US-05-20`), not here. */
+  /** Internal software is completed by registering it in the catalog (`US-05-20`), not here. */
   | { kind: 'INTERNAL_BY_REGISTRATION' }
   /** A tool that cannot be controlled is refused at the gate with a reason (`US-05-18` AC-1), not sent on. */
   | { kind: 'UNCONTROLLABLE' };
@@ -22,7 +22,7 @@ const REQUIRED_FLAGS = ['adminConsole', 'memberExport', 'sso'] as const;
 /**
  * What the assessment of paid or licensed software still lacks, in the order a screen shows it (`US-05-06` AC-3): the
  * minimum of `QĐ-22`, the control level, the quote that gives the request its amount and, for data that is highly
- * sensitive, the opinion of the Business Owner or the reason there is none (`OI-05a`: an opinion that is missing does not
+ * sensitive, the opinion that was obtained or the reason there is none (`OI-05a`: an opinion that is missing does not
  * stop the request, but the IT Admin says so).
  */
 export function missingFields(fields: AssessmentFields): string[] {

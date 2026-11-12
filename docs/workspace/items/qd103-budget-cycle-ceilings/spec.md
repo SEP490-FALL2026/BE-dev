@@ -7,7 +7,7 @@
   `QĐ-106k`, `QĐ-100k`, `QĐ-94l`(4), `QĐ-82l`(4); quy trình v1.7 mục 4.1–4.3; `US-06-15` AC-1, AC-3, AC-5→AC-8, AC-10,
   AC-13, AC-15, AC-17), BE `d9c46552`. Ledger: L1-08, L1-19; luật R-I02, R-I03 (vế mở kỳ), R-I04. Câu TẠM CHỌN: Q-02 = A;
   câu mới (đề xuất, xem REVISION-NOTES W2): bỏ phát hành khi sửa, tập phòng chia Trần, người nhận thông báo, quyền theo khóa tham số.
-- Nhóm roadmap: không — bó finding `qd103-108-alignment` (scope map G5 chưa re-pin, xem tracker §5).
+- Nhóm roadmap: G5 (từ re-pin scope map 11/11/2026) — bó finding `qd103-108-alignment` (scope map G5 chưa re-pin, xem tracker §5).
 - [Kế hoạch](plan.md).
 
 ## Business outcome
@@ -20,8 +20,8 @@ số thuộc Finance. `ops:seed` vẫn chạy. Kiểm bằng test HTTP + integra
 
 ## Sizing decision
 
-- Container: bó finding `qd103-108-alignment` (đợt W2), ngoài nhóm G.
-- Mode: `technical-enabler`.
+- Container: G5 (nhóm giao việc, không phải ranh giới hạng mục); bó finding `qd103-108-alignment` (đợt W2). Trước re-pin 11/11/2026 là ngoài nhóm.
+- Mode: `single-story`.
 - Outcome and owner: capability mới `budgets/cycle/` sở hữu kỳ, trần và phát hành; `operating-parameters` sở hữu quyền sửa
   theo khóa; `installation/seed` giữ `ops:seed` chạy được.
 - Boundaries: 2 bảng mới, 6 operation mới, 1 điều kiện mới ở `budgetProposalSubmit`/`Resubmit`; quyền theo khóa tham số;
@@ -32,13 +32,13 @@ số thuộc Finance. `ops:seed` vẫn chạy. Kiểm bằng test HTTP + integra
 - Not smaller: phát hành kiểm tổng cần Trần năm, Trần phòng và dự phòng kho trong một transaction; seed vỡ ngay khi luật
   Q-02 vào nên phải sửa cùng hạng mục (tracker §4 luật 8).
 - Siblings: `qd103-department-effective-year`, `qd103-budget-baseline-annual-check`, `qd103-budget-proposal-lines-cleanup`, `qd103-budget-views`.
-- Scope map: n/a
+- Scope map: [G5](../../../roadmap.md#work-item-decomposition-g5).
 
 ## Primary Story/AC
 
-| Story | AC           | Coverage | Phần còn lại thuộc                                                                |
-| ----- | ------------ | -------- | --------------------------------------------------------------------------------- |
-| —     | L1-08, L1-19 | n/a      | gỡ chặn `qd103-budget-baseline-annual-check`, `qd103-budget-check-three-outcomes` |
+| Story    | AC                                                | Coverage | Phần còn lại thuộc                                                                                                                                                                                                                              |
+| -------- | ------------------------------------------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| US-06-15 | AC-1, AC-3, AC-5→AC-8, AC-10, AC-13, AC-15, AC-17 | partial  | AC còn lại và vế chung theo scope map: `qd103-calendar-fiscal-year`, `qd103-budget-baseline-annual-check`, `qd103-budget-views`, `qd103-department-effective-year`; AC-4, AC-18 `deferred` tới chính `qd103-budget-cycle-ceilings` (chưa claim) |
 
 ## Supporting references
 
@@ -46,6 +46,8 @@ số thuộc Finance. `ops:seed` vẫn chạy. Kiểm bằng test HTTP + integra
 tracker). `FR-5.16`(2): _Trần của phòng = cam kết đã ký + seat kế hoạch × giá tháng + khoản ưu tiên_. QT 4.3 điều kiện
 tối thiểu: _mỗi phòng có Trần của phòng; đã nhập Dự phòng kho dùng chung_. QT 4.1: Người duyệt chi xem kỳ ở trang tổng
 quan (thắng `US-06-15` AC-1 _báo cả Người duyệt chi_ theo thứ tự nguồn — ghi câu tạm chọn để Owner xác nhận).
+
+_Re-pin 11/11/2026 ([C3](../../../reviews/mf2-mf3-2026-11-10/C3-SCOPE-MAP-REPIN.md)):_ trước là `technical-enabler`, dòng `n/a` của bảng Primary: L1-08, L1-19 — gỡ chặn `qd103-budget-baseline-annual-check`, `qd103-budget-check-three-outcomes`. Bảng Primary claim AC của tối đa ba Story chính lấy từ danh sách trên, chỉ AC đang dùng ở Docs `5bb2e6a` (số AC của EP-05/EP-06/EP-12 không đổi giữa `9c7f386` và `5bb2e6a`); khóa khác của danh sách trên giữ chủ hiện có hoặc là `deferred` tới hạng mục này trong scope map. Claim theo spec và commit đã merge (PR #36), chưa đối chiếu từng AC trên code.
 
 ## Explicit out of scope
 

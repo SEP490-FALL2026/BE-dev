@@ -8,7 +8,7 @@
   1074–1076; QT v1.7 mục 5.3–5.5, ngoại lệ MF-5, A.4; sơ đồ `MF-5` L1 v4.1, `SBF-04` `d_route` (_gộp theo tuần_); `QĐ-66t`, `QĐ-66r`, `QĐ-90c`, `QĐ-94e`,
   `QĐ-94j`, `QĐ-100c`, `QĐ-103j`, `QĐ-103y`(1)(2), `QĐ-104a`, `QĐ-104h`, `QĐ-62i`, `QĐ-62p`(1), `QĐ-64a`, `QĐ-58b`), BE `46b6a94e` (đọc ở `712044f9`).
   Ledger: L4-06, L4-08. Luật R-J02→R-J07. Theo nguồn: Q-87, Q-89, Q-95, Q-96; kỹ thuật (chốt ở đây): Q-88, Q-90, Q-94, thứ tự khóa.
-- Nhóm roadmap: không — bó finding `qd103-108-alignment` (đợt W6).
+- Nhóm roadmap: G7 (từ re-pin scope map 11/11/2026) — bó finding `qd103-108-alignment` (đợt W6).
 - Kế hoạch: `plan.md` cùng thư mục.
 
 ## Business outcome
@@ -23,8 +23,8 @@ kết thúc. Dashboard trưởng phòng đếm ghost seat thật (`counted`).
 
 ## Sizing decision
 
-- Container: bó finding `qd103-108-alignment` (W6).
-- Mode: `technical-enabler`
+- Container: G7 (nhóm giao việc, không phải ranh giới hạng mục); bó finding `qd103-108-alignment` (W6). Trước re-pin 11/11/2026 là ngoài nhóm.
+- Mode: `grouped-stories`.
 - Outcome and owner: `optimization` capability mới `decision/` (L3: hàng đợi, quyết định, trả lại, định tuyến, job theo dõi); `ghost-seat/` (nhánh
   `G3`/`G4` của listener kết cục); `board/` (`Get` cho trưởng phòng, mở lại tác vụ); `dashboards/manager`. Nơi gọi duy nhất truyền `timing` + `notice`.
 - Boundaries: 2 migration (`*_values` + chính); 5 operation mới; 3 đổi; 2 tham số; 6 mã thông báo; 1 job; 1 đăng ký `RevocationDecisionContributions`
@@ -33,19 +33,23 @@ kết thúc. Dashboard trưởng phòng đếm ghost seat thật (`counted`).
   đã quyết xác nhận, `handover-confirmer.policy.ts:35`); giảm ở điểm điều chỉnh (W5); rà soát quyền định kỳ `US-10-09` (ngoài MVP); seed demo (W7).
 - Not smaller: quyết định, trả lại, tạm dừng và định tuyến cùng sửa vòng đời một khuyến nghị; tách ra thì trạng thái không đóng được.
 - Siblings: `qd103-ghost-seat-g3-g4`, `qd103-revocation-grace-notice`, `qd103-ghost-seat-g1-g2`.
-- Scope map: n/a
+- Scope map: [G7](../../../roadmap.md#work-item-decomposition-g7).
 
 ## Primary Story/AC
 
-| Story | AC                | Coverage | Phần còn lại thuộc                                                             |
-| ----- | ----------------- | -------- | ------------------------------------------------------------------------------ |
-| —     | L4-06, L4-08 (đủ) | n/a      | kịch bản demo MF-5: `qd103-seed-demo-v4` (W7); `US-10-09` ngoài MVP (`QĐ-90d`) |
+| Story    | AC                                               | Coverage | Phần còn lại thuộc                                                                                                                                                                                                                        |
+| -------- | ------------------------------------------------ | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| US-10-06 | AC-1→AC-20                                       | partial  | AC còn lại và vế chung theo scope map: `qd103-revocation-grace-notice`                                                                                                                                                                    |
+| US-10-07 | AC-1→AC-3, AC-5→AC-7, AC-12, AC-13, AC-18, AC-19 | partial  | AC còn lại và vế chung theo scope map: `qd103-ghost-seat-g1-g2`, `qd103-revocation-grace-notice`, `qd103-commitment-release-on-revocation`; AC-8→AC-10, AC-14→AC-17 `deferred` tới chính `qd103-ghost-seat-manager-decision` (chưa claim) |
+| US-10-08 | AC-1, AC-4, AC-6, AC-7                           | partial  | AC còn lại và vế chung theo scope map: `qd103-ghost-seat-g3-g4`                                                                                                                                                                           |
 
 ## Supporting references
 
 `US-10-06` AC-1→AC-20, `US-10-07` AC-1→AC-3, AC-5→AC-7, AC-12, AC-13, AC-18, AC-19, `US-10-08` AC-1, AC-4, AC-6, AC-7, `US-10-04` AC-1, AC-10,
 `US-10-03` AC-11, AC-13, `US-10-05` AC-3, `US-07-05` AC-10, AC-20, `US-12-15` dòng 4, 5, 9, 20, 22, 27, 30 và AC-9, AC-13, AC-19, AC-20, AC-25.
 Spec cũ `g7-g3-g4-decisions` chỉ là khung; `qd96-100-revocation-deadline-and-withdraw` — xem `qd103-revocation-grace-notice`.
+
+_Re-pin 11/11/2026 ([C3](../../../reviews/mf2-mf3-2026-11-10/C3-SCOPE-MAP-REPIN.md)):_ trước là `technical-enabler`, dòng `n/a` của bảng Primary: L4-06, L4-08 (đủ) — kịch bản demo MF-5: `qd103-seed-demo-v4` (W7); `US-10-09` ngoài MVP (`QĐ-90d`). Bảng Primary claim AC của tối đa ba Story chính lấy từ danh sách trên, chỉ AC đang dùng ở Docs `5bb2e6a` (số AC của EP-05/EP-06/EP-12 không đổi giữa `9c7f386` và `5bb2e6a`); khóa khác của danh sách trên giữ chủ hiện có hoặc là `deferred` tới hạng mục này trong scope map. Claim theo spec và commit đã merge (PR #36), chưa đối chiếu từng AC trên code.
 
 ## Explicit out of scope
 

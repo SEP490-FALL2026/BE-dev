@@ -7,7 +7,7 @@
 - Nguồn: Docs `9c7f386` (BRD 4.10 mục 4.1, 4.2 `SoD-1`→`SoD-8`, 4.3, 5.5.3 bảng _Ai xem báo cáo nào_ và trang tổng quan Super Admin, `FR-3.7`,
   `FR-3.11`, `FR-5.14`; `QĐ-53a`, `QĐ-82m`, `QĐ-97c`, `QĐ-103b`, `QĐ-103p`, `QĐ-104l`), BE `bc10bd1c`. Gap (bảng `API-GAP-W8.md` trong thư mục
   tracker): A#10, A#22, A#55, A#56, B#47. Câu TẠM CHỌN: Q-121 → Q-129 (`QUESTIONS.md` của tracker; Q-124 đổi theo audit).
-- Nhóm roadmap: không — bó finding `qd103-108-alignment`.
+- Nhóm roadmap: G5 (từ re-pin scope map 11/11/2026) — bó finding `qd103-108-alignment`.
 - [Kế hoạch](plan.md).
 
 ## Business outcome
@@ -22,20 +22,22 @@ Vai không được xem nhận 403 (sai vai/sai phòng) hoặc 404 (chi tiết k
 
 ## Sizing decision
 
-- Container: bó finding `qd103-108-alignment` (đợt W8), ngoài nhóm G.
-- Mode: `technical-enabler`
+- Container: G5 (nhóm giao việc, không phải ranh giới hạng mục); bó finding `qd103-108-alignment` (đợt W8). Trước re-pin 11/11/2026 là ngoài nhóm.
+- Mode: `grouped-stories`.
 - Outcome and owner: `requests` — capability mới `request-history/` (danh sách theo vai, dòng thời gian, route cờ Super Admin); sửa vị từ đọc ở `access-request/access-request.policy.ts`, vế người thụ hưởng ở `my-requests/`; `audit/public` thêm hai hàm đọc theo tài nguyên.
 - Boundaries: chỉ đọc; 1 migration (index); 4 operation mới; 4 operation đổi quyền đọc hoặc query; không ghi dữ liệu nghiệp vụ; ước ~35 file.
 - Not larger: báo cáo `KPI-2` (`US-12-06`), cờ _Finance tự xác nhận hóa đơn_ (`qd103-purchase-invoice-followups`), tiền/ngân sách trên dòng danh sách (ở `spendApprovalList`, `budgetCommitmentList`, `budgetMine`), bảng theo dõi nghẽn của Super Admin (`US-12-15`).
 - Not smaller: vị từ đọc chi tiết và phạm vi dòng danh sách phải đổi cùng lúc — danh sách trả dòng mà chi tiết 404 là lỗi hợp đồng.
 - Siblings: `qd103-mf1-followups`, `qd103-api-docs-regression`.
-- Scope map: n/a
+- Scope map: [G5](../../../roadmap.md#work-item-decomposition-g5).
 
 ## Primary Story/AC
 
-| Story | AC                                  | Coverage | Phần còn lại thuộc                  |
-| ----- | ----------------------------------- | -------- | ----------------------------------- |
-| —     | W8-GAP-A#22, A#55, A#56, A#10, B#47 | n/a      | gỡ chặn `qd103-api-docs-regression` |
+| Story    | AC         | Coverage | Phần còn lại thuộc                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| -------- | ---------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| US-05-15 | AC-9       | partial  | AC còn lại và vế chung theo scope map: `g5-request-status-notifications`, `qd103-request-single-step-routing`                                                                                                                                                                                                                                                                                                                                         |
+| US-05-24 | AC-1, AC-4 | partial  | AC còn lại và vế chung theo scope map: `qd103-request-single-step-routing`                                                                                                                                                                                                                                                                                                                                                                            |
+| US-06-09 | AC-2       | partial  | AC còn lại và vế chung theo scope map: `g5-budget-proposal-and-review`, `g5-budget-check-and-finance-review`, `g5-commitment-creation`, `g5-budget-version-decision`, `g3-downstream-finance-integration`, `qd93-budget-record-attachments`, `qd96-100-annual-budget-reserve-and-floor`, `qd96-100-remove-budget-revision-and-high-value`, `qd103-budget-proposal-lines-cleanup`, `qd103-budget-baseline-annual-check`, `qd103-budget-cycle-ceilings` |
 
 ## Supporting references
 
@@ -44,6 +46,8 @@ phần của mình); `US-01-*` (EP-01.md:294, :314 AC-6: trưởng phòng xem l�
 Audit Trail); `US-05-24` AC-1, AC-4 + _Phạm vi quyền_ (Super Admin chỉ **xem** cờ trên báo cáo); `US-06-09` AC-2 (Finance theo khoản cam kết về
 Request); `US-03-*` AC-17 (trưởng phòng chỉ phòng mình); BRD `FR-3.11`; `QĐ-53a`. Spec W3 `qd103-request-single-step-routing` mục 4 (audit
 `ACCESS_REQUEST.NO_NEED_APPROVER` khi gửi Request nội bộ một bước).
+
+_Re-pin 11/11/2026 ([C3](../../../reviews/mf2-mf3-2026-11-10/C3-SCOPE-MAP-REPIN.md)):_ trước là `technical-enabler`, dòng `n/a` của bảng Primary: W8-GAP-A#22, A#55, A#56, A#10, B#47 — gỡ chặn `qd103-api-docs-regression`. Bảng Primary claim AC của tối đa ba Story chính lấy từ danh sách trên, chỉ AC đang dùng ở Docs `5bb2e6a` (số AC của EP-05/EP-06/EP-12 không đổi giữa `9c7f386` và `5bb2e6a`); khóa khác của danh sách trên giữ chủ hiện có hoặc là `deferred` tới hạng mục này trong scope map. Claim theo spec và commit đã merge (PR #36), chưa đối chiếu từng AC trên code.
 
 ## Explicit out of scope
 

@@ -94,7 +94,7 @@ export class TransfersController {
     status: HttpStatus.CREATED,
     message: 'DEPARTMENT_TRANSFER.RECORDED',
     description:
-      'The transfer was recorded: the placement the person has ends on the day and the new one begins on it, and the head of the department they leave is handed over or left empty as chosen. A day of today takes effect at once. The seats the person holds are not touched. A warning lists the applications the person is Business Owner of, which need another owner.',
+      'The transfer was recorded: the placement the person has ends on the day and the new one begins on it, and the head of the department they leave is handed over or left empty as chosen. A day of today takes effect at once. The seats the person holds are not touched.',
   })
   @ApiErrorResponses(
     ...WRITE_COMMON,
@@ -132,9 +132,7 @@ export class TransfersController {
   async record(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Body() body: RecordTransferBodyDto) {
     await this.groundsDate.assertNotInFuture(body.grounds);
     try {
-      const outcome = await this.transfers.record(userActor(actor), body);
-
-      return await this.query.recordedOf(outcome.transfer, outcome.warnings);
+      return await this.query.recordedOf(await this.transfers.record(userActor(actor), body));
     } catch (error) {
       throw toTransferApiException(error);
     }

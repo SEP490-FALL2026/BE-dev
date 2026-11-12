@@ -1,5 +1,4 @@
 import { Injectable } from '@nestjs/common';
-import { CatalogApi } from '../../../catalog/public/catalog.api';
 import { LicensingApi } from '../../../licensing/public/licensing.api';
 import { LicensingHandoverApi } from '../../../licensing/public/licensing-handover.api';
 import { IdentityAccessApi } from '../../../identity-access/public/identity-access.api';
@@ -28,7 +27,6 @@ export class OffboardingDetailService {
     private readonly organizationReads: OrganizationReadApi,
     private readonly licensing: LicensingApi,
     private readonly licensingHandovers: LicensingHandoverApi,
-    private readonly catalog: CatalogApi,
     private readonly sources: OffboardingSources,
     private readonly roleDuties: RoleDutiesService,
     private readonly identity: IdentityAccessApi,
@@ -50,7 +48,7 @@ export class OffboardingDetailService {
     const facts = departureDetailFacts(record, { live, seats, terminating, duties, opened, registered });
 
     const roles = await this.rolesOf(record, live);
-    const [employees, department, owned, warnings] = await this.othersOf(record, live);
+    const [employees, department, warnings] = await this.othersOf(record, live);
 
     return toDetail(
       record,
@@ -66,7 +64,6 @@ export class OffboardingDetailService {
         ),
         checklist: facts.checklist,
         blockers: facts.blockers,
-        businessOwnerApplications: owned.total,
         registeredWarnings: nonZero(warnings),
       },
       access,
@@ -83,7 +80,7 @@ export class OffboardingDetailService {
     return roles.get(record.employeeId);
   }
 
-  /** The names, the department, whether the person owns applications and what the flows that come after warn of. */
+  /** The names, the department and what the flows that come after warn of. */
   private othersOf(record: OffboardingRecord, live: boolean) {
     return Promise.all([
       this.employeesOf([
@@ -91,7 +88,6 @@ export class OffboardingDetailService {
         ...(record.headHandover?.successorEmployeeId ? [record.headHandover.successorEmployeeId] : []),
       ]),
       record.departmentId ? this.organizationReads.getDepartmentBrief(record.departmentId) : Promise.resolve(null),
-      live ? this.catalog.getApplicationsOwnedBy(record.employeeId, 1) : Promise.resolve({ total: 0 }),
       live ? this.sources.warningsOf(record.employeeId) : Promise.resolve({}),
     ]);
   }

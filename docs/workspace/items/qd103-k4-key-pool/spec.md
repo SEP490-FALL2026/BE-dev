@@ -9,7 +9,7 @@
   ([REVISION-NOTES](../../../reviews/qd103-108-alignment-2026-11-08/QUESTIONS.md)).
 - Spec cũ đọc tham khảo: `a05-k4-key-grant-by-device` (lấy: khóa thuê bao → khóa key `FOR UPDATE` → đăng ký thiết bị, hai IT tranh khóa
   cuối ⟹ đúng một), `a05-k4-device-revocation` (lấy: hoàn tất = gỡ kích hoạt; bỏ: trạng thái `RETIRED`). Đã kiểm lại theo nguồn §2.
-- Nhóm roadmap: không — bó finding `qd103-108-alignment`.
+- Nhóm roadmap: G4, G6 (từ re-pin scope map 11/11/2026) — bó finding `qd103-108-alignment`.
 - [Kế hoạch](plan.md).
 
 ## Business outcome
@@ -22,8 +22,8 @@ chỉ còn hai trạng thái; _rút khỏi kho_ là hành động có lý do, kh
 
 ## Sizing decision
 
-- Container: bó finding `qd103-108-alignment` (đợt W4), ngoài nhóm G.
-- Mode: `technical-enabler`.
+- Container: G4, G6 (nhóm giao việc, không phải ranh giới hạng mục); bó finding `qd103-108-alignment` (đợt W4). Trước re-pin 11/11/2026 là ngoài nhóm.
+- Mode: `grouped-stories`.
 - Outcome and owner: `licensing/license-key` (trạng thái khóa, rút khỏi kho), `licensing/provisioning` (cấp/thu hồi `K4`), `licensing/shared-pool`
   (kho khóa), `devices/registry` (bind hook thiết bị), `personnel/offboarding` + `requests/return-request` (mở `K4` ở nơi gọi), `requests/grant`
   (giải phóng khi cấp từ kho), `budgets` (lý do giải phóng mới).
@@ -34,19 +34,23 @@ chỉ còn hai trạng thái; _rút khỏi kho_ là hành động có lý do, kh
   thì người nghỉ việc vẫn giữ khóa (DA4-01).
 - Siblings: `qd103-grant-from-shared-pool` (`purchase_kind`, `addPoolSeat`, `shared-pool`, `facts.fromPool`, bảng _tránh được_),
   `qd103-commitment-release-on-revocation` (listener bỏ qua `K4`).
-- Scope map: n/a
+- Scope map: [G4](../../../roadmap.md#work-item-decomposition-g4), [G6](../../../roadmap.md#work-item-decomposition-g6).
 
 ## Primary Story/AC
 
-| Story | AC                  | Coverage | Phần còn lại thuộc                                                                     |
-| ----- | ------------------- | -------- | -------------------------------------------------------------------------------------- |
-| —     | L2-21, L4-11, L3-21 | n/a      | gỡ chặn `qd103-purchase-invoice-sbf19` (hóa đơn `K4`), W6 ghost seat `K4` qua `SBF-18` |
+| Story    | AC          | Coverage | Phần còn lại thuộc                                                                                                                                                                                                                                                       |
+| -------- | ----------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| US-07-01 | AC-2, AC-10 | partial  | AC còn lại và vế chung theo scope map: `g4-provisioning-queue-manual`, `g4-request-and-transfer-integration`, `qd103-grant-from-shared-pool`, `g4-seat-baseline-import`, `qd103-new-year-auto-commitments`                                                               |
+| US-07-05 | AC-6, AC-7  | partial  | AC còn lại và vế chung theo scope map: `g6-revocation-by-grant-kind`, `g6-transfer-tool-review`, `qd103-revocation-grace-notice`, `g6-downstream-integration`, `g6-handover-confirmation`, `qd103-ghost-seat-manager-decision`, `qd103-commitment-release-on-revocation` |
+| US-07-13 | AC-6        | partial  | AC còn lại và vế chung theo scope map: `qd103-grant-from-shared-pool`                                                                                                                                                                                                    |
 
 ## Supporting references
 
 `US-07-13` AC-6 (giá mua, giải phóng toàn bộ, _tránh được_ 250); `US-07-01` AC-10 (thiết bị công ty đã đăng ký; không đăng ký ⟹ từ chối),
 AC-2 (tranh khóa cuối); `US-07-05` AC-6 (về kho), AC-7 (_không chuyển máy_ ⟹ sức chứa không tăng — thực hiện bằng rút khỏi kho theo Q-10 B,
 chờ Owner sửa chữ _ngừng dùng_ ở Docs); `US-05-08`/SBF-03a (hoàn trả); `US-06-06`; `FR-5.8`(2) _toàn bộ khi `K4` cấp từ kho_.
+
+_Re-pin 11/11/2026 ([C3](../../../reviews/mf2-mf3-2026-11-10/C3-SCOPE-MAP-REPIN.md)):_ trước là `technical-enabler`, dòng `n/a` của bảng Primary: L2-21, L4-11, L3-21 — gỡ chặn `qd103-purchase-invoice-sbf19` (hóa đơn `K4`), W6 ghost seat `K4` qua `SBF-18`. Bảng Primary claim AC của tối đa ba Story chính lấy từ danh sách trên, chỉ AC đang dùng ở Docs `5bb2e6a` (số AC của EP-05/EP-06/EP-12 không đổi giữa `9c7f386` và `5bb2e6a`); khóa khác của danh sách trên giữ chủ hiện có hoặc là `deferred` tới hạng mục này trong scope map. Claim theo spec và commit đã merge (PR #36), chưa đối chiếu từng AC trên code.
 
 ## Explicit out of scope
 

@@ -94,7 +94,7 @@ export interface CompletionInput {
   accessState?: AccessState | undefined;
   accessCutOn?: BusinessDate | undefined;
   accessEvidence?: string | undefined;
-  /** K4 only: where the key goes; back to the store when not said. */
+  /** K4 only, required: where the key goes (`QĐ-111p`). */
   keyDisposition?: KeyDisposition | undefined;
   /** K4 only, with `WITHDRAW`: why the key is withdrawn from the store. */
   withdrawalReason?: string | undefined;
@@ -129,17 +129,20 @@ export interface KeyReturnPlan {
 }
 
 /**
- * Where the key of the seat goes (`US-07-05` AC-6, AC-7, `QĐ-103d`, Q-10 B): only a K4 seat has one, and it goes back to the store unless
- * the IT Admin withdraws it (a key that may not move to another device), which needs a reason. Null for any other kind, which names
- * neither. Throws RevocationCompletionError (`COMPLETION_NOT_ALLOWED`, `WITHDRAWAL_REASON_REQUIRED`).
+ * Where the key of the seat goes (`US-07-05` AC-6, AC-7, `QĐ-103d`, `QĐ-111p`): only a K4 seat has one, and the IT Admin must say it: back
+ * to the store, or withdrawn from it (a key that may not move to another device), which needs a reason. Null for any other kind, which
+ * names neither. A K4 seat granted before the key pool holds no key: nothing is asked and nothing is recorded about one, whatever was sent
+ * (Owner 12/11/2026). Throws RevocationCompletionError (`KEY_DISPOSITION_REQUIRED`, `COMPLETION_NOT_ALLOWED`, `WITHDRAWAL_REASON_REQUIRED`).
  */
-export function planKeyReturn(input: CompletionInput, type: ProvisioningKind): KeyReturnPlan | null {
+export function planKeyReturn(input: CompletionInput, type: ProvisioningKind, holdsKey: boolean): KeyReturnPlan | null {
   if (type !== 'K4') {
     if (input.keyDisposition !== undefined || input.withdrawalReason !== undefined) fail('COMPLETION_NOT_ALLOWED');
 
     return null;
   }
-  const disposition = input.keyDisposition ?? 'RETURN_TO_STORE';
+  if (!holdsKey) return null;
+  const disposition = input.keyDisposition;
+  if (disposition === undefined) fail('KEY_DISPOSITION_REQUIRED');
   const withdrawalReason = blankToNull(input.withdrawalReason);
   if (disposition === 'RETURN_TO_STORE') {
     if (withdrawalReason !== null) fail('COMPLETION_NOT_ALLOWED');

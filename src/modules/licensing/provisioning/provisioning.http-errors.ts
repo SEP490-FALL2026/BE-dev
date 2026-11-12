@@ -203,6 +203,7 @@ export const PROVISIONING_ERROR_EXAMPLES = {
   ACCESS_STATE_REQUIRED: example(new RevocationCompletionError('ACCESS_STATE_REQUIRED')),
   ACCESS_STATE_INVALID: example(new RevocationCompletionError('ACCESS_STATE_INVALID')),
   WITHDRAWAL_REASON_REQUIRED: example(new RevocationCompletionError('WITHDRAWAL_REASON_REQUIRED')),
+  KEY_DISPOSITION_REQUIRED: example(new RevocationCompletionError('KEY_DISPOSITION_REQUIRED')),
   KEY_REQUIRED: example(new ProvisioningKeyError('KEY_REQUIRED')),
   KEY_NOT_APPLICABLE: example(new ProvisioningKeyError('KEY_NOT_APPLICABLE')),
   KEY_NOT_FOUND: example(new LicenseKeyNotFoundError()),

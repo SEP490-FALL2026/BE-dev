@@ -5,7 +5,7 @@
 - Thiết kế: `ready`. Owner review: chưa review (chế độ tự chạy — Owner kiểm buổi sáng).
 - Nguồn: Docs `9c7f386` (BRD 4.10 `FR-5.1`, `BR-MF4-06`; `QĐ-104e`(1), `QĐ-104a`; quy trình v1.7 A.4 _Năm tài chính_), BE
   `b9854ef5`. Ledger: L1-07, L1-25, L2-25, L2-40, L3-27 ([LEDGER](../../../reviews/qd103-108-alignment-2026-11-08/LEDGER.md)); luật R-I01, R-K02, R-D03.
-- Nhóm roadmap: không — bó finding `qd103-108-alignment`.
+- Nhóm roadmap: G5 (từ re-pin scope map 11/11/2026) — bó finding `qd103-108-alignment`.
 - [Kế hoạch](plan.md).
 
 ## Business outcome
@@ -16,8 +16,8 @@ Mọi chỗ tính năm (năm của Request, kiểm tra ngân sách, phiên bản
 
 ## Sizing decision
 
-- Container: bó finding `qd103-108-alignment` (đợt W1), ngoài nhóm G.
-- Mode: `technical-enabler`.
+- Container: G5 (nhóm giao việc, không phải ranh giới hạng mục); bó finding `qd103-108-alignment` (đợt W1). Trước re-pin 11/11/2026 là ngoài nhóm.
+- Mode: `single-story`.
 - Outcome and owner: primitive năm của `src/core` (`fiscal-year.ts`, `term-limit.ts`) và registry tham số của
   `operating-parameters`; mọi module chỉ là nơi gọi.
 - Boundaries: không đổi bảng nghiệp vụ; một migration dữ liệu đóng giá trị tham số cũ; bỏ một key khỏi API tham số.
@@ -25,18 +25,20 @@ Mọi chỗ tính năm (năm của Request, kiểm tra ngân sách, phiên bản
   đóng năm 01/01 và khoản cam kết 01/01 thuộc W2/W4.
 - Not smaller: tách bỏ tham số khỏi đổi nơi gọi sẽ để lại code đọc một key không còn — hai việc là một đổi chữ ký.
 - Siblings: `qd103-shared-pool-subscription` (cùng W1, độc lập).
-- Scope map: n/a
+- Scope map: [G5](../../../roadmap.md#work-item-decomposition-g5).
 
 ## Primary Story/AC
 
-| Story | AC           | Coverage | Phần còn lại thuộc                                                                                        |
-| ----- | ------------ | -------- | --------------------------------------------------------------------------------------------------------- |
-| —     | L1-07, L2-25 | n/a      | gỡ chặn `qd103-budget-cycle-ceilings`, `qd103-request-amount-and-term`, `qd103-new-year-auto-commitments` |
+| Story    | AC   | Coverage | Phần còn lại thuộc                                                                                                                                                  |
+| -------- | ---- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| US-06-15 | AC-1 | partial  | AC còn lại và vế chung theo scope map: `qd103-budget-cycle-ceilings`, `qd103-budget-baseline-annual-check`, `qd103-budget-views`, `qd103-department-effective-year` |
 
 ## Supporting references
 
 `US-06-15` AC-1 (kỳ theo năm dương lịch), `US-06-18`, `US-05-23` (thời hạn không cắt 31/12). `QĐ-104e`(1): _Năm tài chính cố
 định = năm dương lịch; bỏ tham số tháng bắt đầu năm tài chính._ `QĐ-104a`: bỏ _cắt mọi quyền tại 31/12_.
+
+_Re-pin 11/11/2026 ([C3](../../../reviews/mf2-mf3-2026-11-10/C3-SCOPE-MAP-REPIN.md)):_ trước là `technical-enabler`, dòng `n/a` của bảng Primary: L1-07, L2-25 — gỡ chặn `qd103-budget-cycle-ceilings`, `qd103-request-amount-and-term`, `qd103-new-year-auto-commitments`. Bảng Primary claim AC của tối đa ba Story chính lấy từ danh sách trên, chỉ AC đang dùng ở Docs `5bb2e6a` (số AC của EP-05/EP-06/EP-12 không đổi giữa `9c7f386` và `5bb2e6a`); khóa khác của danh sách trên giữ chủ hiện có hoặc là `deferred` tới hạng mục này trong scope map. Claim theo spec và commit đã merge (PR #36), chưa đối chiếu từng AC trên code.
 
 ## Explicit out of scope
 

@@ -13,7 +13,7 @@ import {
   cleanApplicationName,
   cleanNote,
   isCommunicationService,
-  replacementRequired,
+  needsResponsible,
   usageCollectionDefault,
   vendorSourceOf,
 } from './application.policy';
@@ -108,12 +108,19 @@ describe('vendorSourceOf', () => {
   });
 });
 
-describe('replacementRequired (US-04-06: the flag is read from the status, never stored)', () => {
-  it('AC-1, AC-2: a Business Owner who has left needs replacing', () => {
-    expect(replacementRequired('TERMINATED')).toBe(true);
+describe('needsResponsible (QĐ-111g, US-04-06: the flag is read from the account, never stored)', () => {
+  const usable = new Set(['it-1', 'it-2']);
+
+  it('is true when nobody is responsible', () => {
+    expect(needsResponsible(null, usable)).toBe(true);
   });
 
-  it('AC-6: one who is still working does not, whatever department they moved to', () => {
-    expect(replacementRequired('ACTIVE')).toBe(false);
+  it('is true when the responsible person is no longer a usable IT Admin (left, locked, lost the role)', () => {
+    expect(needsResponsible('gone', usable)).toBe(true);
+    expect(needsResponsible('it-1', new Set())).toBe(true);
+  });
+
+  it('is false while the responsible person is a usable IT Admin', () => {
+    expect(needsResponsible('it-2', usable)).toBe(false);
   });
 });

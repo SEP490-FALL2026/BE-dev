@@ -2,13 +2,7 @@ import { randomUUID } from 'node:crypto';
 import request from 'supertest';
 import { pretendBusinessToday } from '../../support/pretend-today';
 import { ApiAccount, adminToken, createActivatedAccount } from '../../support/api-accounts';
-import {
-  HttpTestApp,
-  SeededInstallation,
-  createHttpTestApp,
-  insertEmployeeFixture,
-  seedInstallation,
-} from '../../support/http-test-app';
+import { HttpTestApp, SeededInstallation, createHttpTestApp, seedInstallation } from '../../support/http-test-app';
 
 interface TermsWire {
   termsUrl: string | null;
@@ -37,13 +31,6 @@ interface TermsView {
   applicable: boolean;
   sharingPolicy: string | null;
   terms: TermsWire | null;
-  opinions: Array<{
-    id: string;
-    businessOwner: { employeeId: string; employeeCode: string; fullName: string };
-    opinion: string;
-    recordedBy: string;
-    recordedAt: string;
-  }>;
   warnings: WarningWire[];
 }
 
@@ -65,7 +52,6 @@ describe('plan terms and review alerts over HTTP (integration, real PostgreSQL)'
   let it1: ApiAccount;
   let finance: ApiAccount;
   let employee: ApiAccount;
-  let businessOwner: { employeeId: string; code: string };
   let counter = 0;
   const server = () => ctx.app.getHttpServer();
   const as = (account: ApiAccount) => ({ Authorization: `Bearer ${account.accessToken}` });
@@ -87,8 +73,6 @@ describe('plan terms and review alerts over HTTP (integration, real PostgreSQL)'
       role: 'EMPLOYEE',
       admin,
     });
-    const owner = await insertEmployeeFixture(ctx.app, seed, { code: 'E-OWN', email: 'owner@acme.vn' });
-    businessOwner = { employeeId: owner.employeeId, code: 'E-OWN' };
   }, 120000);
 
   afterEach(() => {
@@ -120,7 +104,6 @@ describe('plan terms and review alerts over HTTP (integration, real PostgreSQL)'
           kind,
           ...(kind === 'INTERNAL' ? {} : { vendorName: unique('Vendor') }),
           dataSensitivity: 'LOW',
-          businessOwnerEmployeeId: businessOwner.employeeId,
           communication: NO,
         })
         .expect(201),
@@ -165,8 +148,6 @@ describe('plan terms and review alerts over HTTP (integration, real PostgreSQL)'
     request(server()).put(`/api/v1/plans/${planId}/terms`).set(as(account)).send(body);
   const getTerms = (planId: string, account: ApiAccount = it1) =>
     request(server()).get(`/api/v1/plans/${planId}/terms`).set(as(account));
-  const postOpinion = (planId: string, body: object, account: ApiAccount = it1) =>
-    request(server()).post(`/api/v1/plans/${planId}/term-opinions`).set(as(account)).send(body);
   const warningsOf = async (planId: string): Promise<WarningWire[]> =>
     dataOf<{ items: WarningWire[] }>(
       await request(server()).get('/api/v1/plan-warnings').query({ pageSize: 100 }).set(as(it1)).expect(200),
@@ -203,7 +184,7 @@ describe('plan terms and review alerts over HTTP (integration, real PostgreSQL)'
         cancellationRefund: 'Báo hủy trước 30 ngày, tự gia hạn, không hoàn tiền',
       });
       const read = dataOf<TermsView>(await getTerms(planId).expect(200));
-      expect(read).toMatchObject({ applicable: true, sharingPolicy: 'NOT_ALLOWED', opinions: [], warnings: [] });
+      expect(read).toMatchObject({ applicable: true, sharingPolicy: 'NOT_ALLOWED', warnings: [] });
       expect(read.terms).toMatchObject({ dataLocation: 'Lưu trữ tại EU' });
       const events = (await auditOf(planId)).filter((event) => event.action === 'PLAN_TERMS.SET');
       expect(events).toEqual([
@@ -453,63 +434,31 @@ describe('plan terms and review alerts over HTTP (integration, real PostgreSQL)'
     });
   });
 
-  describe('the opinion of the Business Owner (AC-6)', () => {
-    it('is kept with the Business Owner of the application, who recorded it and when, and adds no step', async () => {
+  describe('the opinion of the Business Owner is gone (QĐ-111g)', () => {
+    it('has no route that records or lists one, and the terms carry no opinion', async () => {
       const { planId } = await plan();
-      const before = { audit: (await auditOf(planId)).length };
 
-      const recorded = dataOf<TermsView['opinions'][number]>(
-        await postOpinion(planId, { opinion: '  Nên rà điều khoản chia sẻ   trước kỳ gia hạn ' }).expect(201),
-      );
-
-      expect(recorded).toMatchObject({
-        businessOwner: { employeeId: businessOwner.employeeId, employeeCode: 'E-OWN' },
-        opinion: 'Nên rà điều khoản chia sẻ trước kỳ gia hạn',
-        recordedBy: it1.appUserId,
-      });
-      expect(new Date(recorded.recordedAt).getTime()).toBeGreaterThan(0);
-      expect(dataOf<TermsView>(await getTerms(planId).expect(200)).opinions.map((item) => item.id)).toEqual([
-        recorded.id,
-      ]);
-      const events = await auditOf(planId);
-      expect(events).toHaveLength(before.audit + 1);
-      expect(events[events.length - 1]).toMatchObject({
-        action: 'PLAN_TERM_OPINION.RECORDED',
-        actor_roles: ['IT_ADMIN'],
-      });
-      expect(await warningsOf(planId)).toEqual([]);
-    });
-
-    it('lists the newest opinion first, never changes one, and refuses an empty or over-long opinion', async () => {
-      const { planId } = await plan();
-      const first = dataOf<{ id: string }>(await postOpinion(planId, { opinion: 'first' }).expect(201));
-      const second = dataOf<{ id: string }>(await postOpinion(planId, { opinion: 'second' }).expect(201));
-
-      expect(dataOf<TermsView>(await getTerms(planId).expect(200)).opinions.map((item) => item.id)).toEqual([
-        second.id,
-        first.id,
-      ]);
-      expect(codeOf(await postOpinion(planId, { opinion: '   ' }).expect(422))).toBe('PLAN_TERMS.TEXT_INVALID');
-      expect(codeOf(await postOpinion(planId, { opinion: 'x'.repeat(2001) }).expect(422))).toBe(
-        'PLAN_TERMS.TEXT_INVALID',
-      );
-      await expect(
-        ctx.sql.query(`UPDATE plan_term_opinions SET opinion = 'changed' WHERE id = $1`, [first.id]),
-      ).rejects.toMatchObject({ code: '55000' });
+      await request(server())
+        .post(`/api/v1/plans/${planId}/term-opinions`)
+        .set(as(it1))
+        .send({ opinion: 'x' })
+        .expect(404);
+      await request(server()).get(`/api/v1/plans/${planId}/term-opinions`).set(as(it1)).expect(404);
+      const read = dataOf<TermsView>(await getTerms(planId).expect(200));
+      expect(read).not.toHaveProperty('opinions');
+      expect(read).not.toHaveProperty('opinionTotal');
     });
   });
 
   describe('a plan with no terms (AC-7)', () => {
-    it('has no terms, no opinion and no alert for a K5 plan of an internal application', async () => {
+    it('has no terms and no alert for a K5 plan of an internal application', async () => {
       const { planId } = await plan({ kind: 'INTERNAL' });
       const before = await n('plan_terms');
 
       expect(codeOf(await putTerms(planId, SIX_POINTS).expect(422))).toBe('PLAN_TERMS.NOT_APPLICABLE');
-      expect(codeOf(await postOpinion(planId, { opinion: 'x' }).expect(422))).toBe('PLAN_TERMS.NOT_APPLICABLE');
       expect(dataOf<TermsView>(await getTerms(planId).expect(200))).toMatchObject({
         applicable: false,
         terms: null,
-        opinions: [],
         warnings: [],
       });
       expect(await warningsOf(planId)).toEqual([]);
@@ -521,35 +470,26 @@ describe('plan terms and review alerts over HTTP (integration, real PostgreSQL)'
 
       expect(codeOf(await getTerms(missing).expect(404))).toBe('PLAN.NOT_FOUND');
       expect(codeOf(await putTerms(missing, {}).expect(404))).toBe('PLAN.NOT_FOUND');
-      expect(codeOf(await postOpinion(missing, { opinion: 'x' }).expect(404))).toBe('PLAN.NOT_FOUND');
     });
   });
 
   describe('who may use it (AC-8)', () => {
-    it('turns Finance, an employee and the Super Admin away from recording terms and opinions, and keeps Finance out of the alerts', async () => {
+    it('turns Finance, an employee and the Super Admin away from recording terms, and keeps Finance out of the alerts', async () => {
       const { planId } = await plan();
       await putTerms(planId, { aiTraining: 'as recorded' }).expect(200);
       const before = {
         terms: await n('plan_terms'),
-        opinions: await n('plan_term_opinions'),
         audit: await n('audit_events'),
       };
       const asSuperAdmin = { Authorization: `Bearer ${admin}` };
 
       for (const account of [finance, employee]) {
         await putTerms(planId, { aiTraining: 'changed' }, account).expect(403);
-        await postOpinion(planId, { opinion: 'x' }, account).expect(403);
       }
       await request(server()).put(`/api/v1/plans/${planId}/terms`).set(asSuperAdmin).send({}).expect(403);
-      await request(server())
-        .post(`/api/v1/plans/${planId}/term-opinions`)
-        .set(asSuperAdmin)
-        .send({ opinion: 'x' })
-        .expect(403);
 
       expect({
         terms: await n('plan_terms'),
-        opinions: await n('plan_term_opinions'),
         audit: await n('audit_events'),
       }).toEqual(before);
       expect(dataOf<TermsView>(await getTerms(planId).expect(200)).terms?.aiTraining).toBe('as recorded');

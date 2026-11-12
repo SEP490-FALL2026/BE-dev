@@ -9,7 +9,7 @@ import { TransferRefusedError } from './transfer.errors';
 import type { TransferChangeWire, TransferDetailWire, TransferRecordedWire, TransferSummaryWire } from './transfer.dto';
 import { toChange, toDetail, toRecorded, toSummary, type TransferNames } from './transfer.mapper';
 import { TransferRepo, type TransferFactRow } from './transfer.repo';
-import type { TransferListFilter, TransferRecord, TransferWarning } from './transfer.types';
+import type { TransferListFilter, TransferRecord } from './transfer.types';
 
 export interface Paged<T> {
   items: T[];
@@ -86,8 +86,8 @@ export class TransferQueryService {
     return toDetail(record, await this.namesOfRecord(record), access);
   }
 
-  async recordedOf(record: TransferRecord, warnings: TransferWarning[]): Promise<TransferRecordedWire> {
-    return toRecorded(record, await this.namesOfRecord(record), warnings);
+  async recordedOf(record: TransferRecord): Promise<TransferRecordedWire> {
+    return toRecorded(record, await this.namesOfRecord(record));
   }
 
   async listChanges(

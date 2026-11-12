@@ -5,7 +5,7 @@
 - Thiết kế: `draft`. Owner review: chưa review.
 - Nguồn: Docs `3d73a7f` (BRD 4.0 `FR-2.8` BRD:345, `FR-3.22`; US `US-05-02` AC-11, `US-05-14` AC-9, `US-05-17` AC-8 (bị thay);
   `QĐ-98a` PD:405, `QĐ-62h` PD:293, `QĐ-82l(18)` PD:315, `QĐ-87`), BE `3e4553b9`. Quyết định phiên Owner `Q-03` a1 + b1 + c1
-  ([QUESTIONS.md](../../../reviews/qd96-100-alignment-2026-11-05/QUESTIONS.md) mục D). Ledger: L-205, L-220.
+  (QUESTIONS.md (nhật ký review đã xóa 11/11/2026 — xem git history) mục D). Ledger: L-205, L-220.
 - Nhóm roadmap: G5 — chỉ là planning container (xem `## Sizing decision`).
 - [Kế hoạch](plan.md).
 

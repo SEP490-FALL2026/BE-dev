@@ -7,7 +7,7 @@
   `QĐ-94c`(3); QT v1.7 mục 1.1, A.4 dòng _Cửa sổ Request tiếp tục_), BE `1cd81101`. Ledger: L2-22, L2-24, L2-37 (vế cửa sổ);
   luật R-D02, R-D04, R-D05. Câu TẠM CHỌN: Q-03 = A (giữ tự kéo dài khi duyệt); mới Q-34 (lượt quét trễ khi tham số vừa đổi);
   dùng Q-29 (Request tiếp tục có kỳ mới ở năm sau ⟹ số tiền năm hiện hành 0).
-- Nhóm roadmap: không — bó finding `qd103-108-alignment`.
+- Nhóm roadmap: G5 (từ re-pin scope map 11/11/2026) — bó finding `qd103-108-alignment`.
 - [Kế hoạch](plan.md).
 
 ## Business outcome
@@ -21,8 +21,8 @@ không khoản cam kết năm nay — Q-29), phần năm sau do khoản 01/01 (W
 
 ## Sizing decision
 
-- Container: bó finding `qd103-108-alignment` (đợt W3), ngoài nhóm G.
-- Mode: `technical-enabler`.
+- Container: G5 (nhóm giao việc, không phải ranh giới hạng mục); bó finding `qd103-108-alignment` (đợt W3). Trước re-pin 11/11/2026 là ngoài nhóm.
+- Mode: `grouped-stories`.
 - Outcome and owner: `licensing/expiry` sở hữu cửa sổ đã mở (bảng, lượt quét, thông báo); `requests/renewal-request` kiểm cửa
   sổ khi gửi; `operating-parameters` khai khóa.
 - Boundaries: 1 migration (bảng licensing); 1 khóa tham số; 1 hàm public licensing; 1 lỗi mới ở `accessRequestRenewalSubmit`;
@@ -31,13 +31,14 @@ không khoản cam kết năm nay — Q-29), phần năm sau do khoản 01/01 (W
   là một bước ở `qd103-request-single-step-routing`; Request tiếp tục **nhóm** (`QĐ-100ab`) chưa có route — ngoài W3 (NOTES).
 - Not smaller: cửa sổ mở (licensing) và kiểm cửa sổ (requests) phải dùng cùng một giá trị đã chốt (R-D05).
 - Siblings: `qd103-request-amount-and-term`, `qd103-request-single-step-routing`.
-- Scope map: n/a
+- Scope map: [G5](../../../roadmap.md#work-item-decomposition-g5).
 
 ## Primary Story/AC
 
-| Story | AC                  | Coverage | Phần còn lại thuộc                                                       |
-| ----- | ------------------- | -------- | ------------------------------------------------------------------------ |
-| —     | L2-22, L2-24, L2-37 | n/a      | gỡ chặn `qd103-subscription-adjustment-point` (đếm Request tiếp tục chờ) |
+| Story    | AC                                                      | Coverage | Phần còn lại thuộc                                                                                                                                                                                                                                 |
+| -------- | ------------------------------------------------------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| US-05-14 | AC-1, AC-2, AC-4, AC-5, AC-7→AC-10, AC-12, AC-13, AC-16 | partial  | AC còn lại và vế chung theo scope map: `g5-return-and-renewal-requests`, `qd96-100-renewal-chaining-and-window`, `qd93-remove-fallback-substitute-approvers`; AC-17, AC-20, AC-21 `deferred` tới chính `qd103-renewal-request-window` (chưa claim) |
+| US-05-23 | AC-6                                                    | partial  | AC còn lại và vế chung theo scope map: `qd103-request-amount-and-term`, `qd103-commitment-current-year`                                                                                                                                            |
 
 ## Supporting references
 
@@ -45,6 +46,8 @@ không khoản cam kết năm nay — Q-29), phần năm sau do khoản 01/01 (W
 ngày kết thúc đã duyệt (tham số; đổi tham số thì cửa sổ chưa mở theo giá trị mới — `QĐ-108b`) tới ngày kết thúc; hệ thống nhắc
 người dùng và trưởng phòng khi cửa sổ mở_. Spec cũ `qd96-100-renewal-chaining-and-window` chỉ đọc tham khảo (còn: nối tiếp, cửa
 sổ 30 ngày; đổi: tham số, chỉ quyền có thời hạn).
+
+_Re-pin 11/11/2026 ([C3](../../../reviews/mf2-mf3-2026-11-10/C3-SCOPE-MAP-REPIN.md)):_ trước là `technical-enabler`, dòng `n/a` của bảng Primary: L2-22, L2-24, L2-37 — gỡ chặn `qd103-subscription-adjustment-point` (đếm Request tiếp tục chờ). Bảng Primary claim AC của tối đa ba Story chính lấy từ danh sách trên, chỉ AC đang dùng ở Docs `5bb2e6a` (số AC của EP-05/EP-06/EP-12 không đổi giữa `9c7f386` và `5bb2e6a`); khóa khác của danh sách trên giữ chủ hiện có hoặc là `deferred` tới hạng mục này trong scope map. Claim theo spec và commit đã merge (PR #36), chưa đối chiếu từng AC trên code.
 
 ## Explicit out of scope
 

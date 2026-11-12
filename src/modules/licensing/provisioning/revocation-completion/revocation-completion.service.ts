@@ -64,7 +64,9 @@ export class RevocationCompletionService {
         const plan = await this.completedFacts.planOf(tx, locked.assignment.planId);
         const assignment = await this.ending.lock(tx, locked.assignmentId);
         const done = planCompletion(input, { type: plan.provisioningType, startsOn: assignment.effectiveFrom, today });
-        const key = planKeyReturn(input, plan.provisioningType);
+        // A K4 seat granted before the key pool holds no key: nothing is asked about one (Owner 12/11/2026).
+        const holdsKey = plan.provisioningType === 'K4' && (await this.aftermath.holdsKey(tx, locked.assignmentId));
+        const key = planKeyReturn(input, plan.provisioningType, holdsKey);
 
         await this.tasks.markRevocationCompleted(tx, locked.id, actor.appUserId, done, now);
         await this.ending.end(tx, actor, { organizationId, assignment, until: done.endOn, taskId: locked.id });

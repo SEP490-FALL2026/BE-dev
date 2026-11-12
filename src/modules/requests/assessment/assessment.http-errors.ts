@@ -60,20 +60,12 @@ export function toAssessmentApiException(error: unknown): unknown {
     });
   }
   if (error instanceof CatalogLinkRefusedError) {
-    return refuse(
-      HttpStatus.CONFLICT,
-      error.reason === 'NOT_LINKABLE'
-        ? 'ACCESS_REQUEST.CATALOG_LINK_NOT_ALLOWED'
-        : 'ACCESS_REQUEST.BUSINESS_OWNER_REQUIRED',
-      error.message,
-    );
+    return refuse(HttpStatus.CONFLICT, 'ACCESS_REQUEST.CATALOG_LINK_NOT_ALLOWED', error.message);
   }
   if (error instanceof InternalRegistrationRefusedError) {
     if (error.reason === 'NOT_INTERNAL') return refuse(HttpStatus.CONFLICT, 'ASSESSMENT.NOT_INTERNAL', error.message);
-    // The codes of the catalog's own refusals (`US-04-01`), so a client that knows them reads them here as well.
-    return error.reason === 'NAME_TAKEN'
-      ? refuse(HttpStatus.CONFLICT, 'APPLICATION.NAME_TAKEN', error.message)
-      : refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'APPLICATION.BUSINESS_OWNER_INVALID', error.message);
+    // The code of the catalog's own refusal (`US-04-01`), so a client that knows it reads it here as well.
+    return refuse(HttpStatus.CONFLICT, 'APPLICATION.NAME_TAKEN', error.message);
   }
   const money = toMoneyApiException(error);
   if (money !== error) return money;
@@ -113,10 +105,8 @@ export const ASSESSMENT_ERROR_EXAMPLES = {
   // One message template whose field varies (details.field names it): the vendor stands for the fields of the save.
   REFERENCE_NOT_FOUND: example(new AssessmentReferenceNotFoundError('vendorId')),
   CATALOG_LINK_NOT_ALLOWED: example(new CatalogLinkRefusedError('NOT_LINKABLE')),
-  BUSINESS_OWNER_REQUIRED: example(new CatalogLinkRefusedError('BUSINESS_OWNER_REQUIRED')),
   NOT_INTERNAL: example(new InternalRegistrationRefusedError('NOT_INTERNAL')),
   NAME_TAKEN: example(new InternalRegistrationRefusedError('NAME_TAKEN')),
-  BUSINESS_OWNER_INVALID: example(new InternalRegistrationRefusedError('BUSINESS_OWNER_INVALID')),
   MONEY_SCALE_EXCEEDED: example(new MoneyScaleExceededError(2)),
   MONEY_OUT_OF_RANGE: example(new MoneyOutOfRangeError()),
   CURRENCY_NOT_SUPPORTED: example(new CurrencyNotSupportedError('XYZ')),

@@ -49,6 +49,10 @@ export interface GhostSeatFilter {
   applicationId?: string;
   /** Only the recommendations of these department ids, and the ones that belong to none (`G1`). */
   departmentIds?: readonly string[];
+  /** Only the recommendations of this department (no `G1`, which belongs to none). */
+  departmentId?: string;
+  /** Only the recommendations about this holder. */
+  employeeId?: string;
 }
 
 type Row = Prisma.GhostSeatRecommendationGetPayload<object>;
@@ -132,6 +136,8 @@ const whereOf = (organizationId: string, filter: GhostSeatFilter): Prisma.GhostS
   ...(filter.departmentIds
     ? { OR: [{ departmentId: null }, { departmentId: { in: [...filter.departmentIds] } }] }
     : {}),
+  ...(filter.departmentId ? { departmentId: filter.departmentId } : {}),
+  ...(filter.employeeId ? { employeeId: filter.employeeId } : {}),
 });
 
 /** All the SQL of the recommendations. */

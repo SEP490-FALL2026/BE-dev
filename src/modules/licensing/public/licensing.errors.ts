@@ -364,7 +364,9 @@ export type RevocationCompletionProblem =
   | 'PAID_THROUGH_REQUIRED'
   | 'ACCESS_STATE_REQUIRED'
   | 'ACCESS_STATE_INVALID'
-  | 'WITHDRAWAL_REASON_REQUIRED';
+  | 'WITHDRAWAL_REASON_REQUIRED'
+  /** A K4 completion must say where the key goes (`QĐ-111p`). */
+  | 'KEY_DISPOSITION_REQUIRED';
 
 /** The way a revocation is completed does not fit its kind of provisioning, or lacks what the kind needs to be stored. */
 export class RevocationCompletionError extends Error {

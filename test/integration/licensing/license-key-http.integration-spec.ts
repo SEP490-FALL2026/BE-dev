@@ -358,7 +358,6 @@ describe('the vault of license keys over HTTP (integration, real PostgreSQL)', (
           kind: 'LICENSED',
           vendorName: h.unique('Vendor'),
           dataSensitivity: 'LOW',
-          businessOwnerEmployeeId: h.businessOwner,
           communication: { personToPersonMessaging: false, callsOrMeetings: false, mailbox: false },
         })
         .expect(201),

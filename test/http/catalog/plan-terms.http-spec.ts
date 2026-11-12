@@ -20,10 +20,6 @@ type Call = (server: App) => request.Test;
 /** The routes only the IT Admin may call (US-04-11 AC-8). */
 const WRITE_ROUTES: Array<[string, Call]> = [
   ['PUT /plans/{id}/terms', (s) => request(s).put(`/api/v1/plans/${ID}/terms`).send(VALID_TERMS)],
-  [
-    'POST /plans/{id}/term-opinions',
-    (s) => request(s).post(`/api/v1/plans/${ID}/term-opinions`).send({ opinion: 'ok' }),
-  ],
 ];
 
 describe('plan terms routes (e2e, no database)', () => {
@@ -56,7 +52,7 @@ describe('plan terms routes (e2e, no database)', () => {
     ['an account with no role', [], []],
     ['a department head, whose role is derived', [], ['MANAGER']],
     ['the spending approver, whose role is derived', [], ['SPENDING_APPROVER']],
-  ])('refuses %s on every route that records terms or opinions with 403', async (_name, direct, derived) => {
+  ])('refuses %s on every route that records terms with 403', async (_name, direct, derived) => {
     for (const [route, call] of WRITE_ROUTES) {
       const response = await call(app.getHttpServer())
         .set('Authorization', bearer(principal([...direct, ...derived])))
@@ -115,23 +111,8 @@ describe('plan terms routes (e2e, no database)', () => {
     });
 
     it.each([
-      ['no opinion', {}],
-      ['an opinion that is not text', { opinion: 7 }],
-      ['an unknown field', { opinion: 'ok', approved: true }],
-    ])('turns away a POST of an opinion with %s, 422 VALIDATION_ERROR', async (_name, body) => {
-      const response = await request(app.getHttpServer())
-        .post(`/api/v1/plans/${ID}/term-opinions`)
-        .set(asIt())
-        .send(body)
-        .expect(422);
-
-      expect(bodyOf(response).error.code).toBe('VALIDATION_ERROR');
-    });
-
-    it.each([
       ['GET terms', (s: App) => request(s).get('/api/v1/plans/not-a-uuid/terms')],
       ['PUT terms', (s: App) => request(s).put('/api/v1/plans/not-a-uuid/terms').send({})],
-      ['POST opinion', (s: App) => request(s).post('/api/v1/plans/not-a-uuid/term-opinions').send({ opinion: 'x' })],
     ])('turns away %s with an id that is not a UUID, 422', async (_name, call) => {
       const response = await call(app.getHttpServer()).set(asIt()).expect(422);
 
@@ -150,10 +131,12 @@ describe('plan terms routes (e2e, no database)', () => {
   });
 
   describe('nothing is deleted or decided', () => {
-    it('has no route that deletes the terms or an opinion, or concludes anything: 404, even for the IT Admin', async () => {
+    it('has no route that deletes the terms, records or lists an opinion of a Business Owner (`QĐ-111g`), or concludes anything: 404, even for the IT Admin', async () => {
       for (const [method, path] of [
         ['delete', `/api/v1/plans/${ID}/terms`],
         ['delete', `/api/v1/plans/${ID}/term-opinions/${ID}`],
+        ['get', `/api/v1/plans/${ID}/term-opinions`],
+        ['post', `/api/v1/plans/${ID}/term-opinions`],
         ['post', `/api/v1/plans/${ID}/terms/conclusions`],
         ['post', `/api/v1/plan-warnings/${ID}/revocations`],
       ] as const) {

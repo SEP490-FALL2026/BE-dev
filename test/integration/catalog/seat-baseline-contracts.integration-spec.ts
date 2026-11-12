@@ -22,7 +22,6 @@ describe('what licensing reads of catalog and organization (integration, real Po
   let organization: OrganizationApi;
   let organizationReads: OrganizationReadApi;
   let runner: TransactionRunner;
-  let businessOwner: string;
   let counter = 0;
   const server = () => ctx.app.getHttpServer();
   const as = (account: ApiAccount) => ({ Authorization: `Bearer ${account.accessToken}` });
@@ -34,7 +33,7 @@ describe('what licensing reads of catalog and organization (integration, real Po
     seed = await seedInstallation(ctx.app);
     const admin = await adminToken(ctx, seed);
     it1 = await createActivatedAccount(ctx, seed, { code: 'E-IT1', email: 'it1@acme.vn', role: 'IT_ADMIN', admin });
-    businessOwner = (await insertEmployeeFixture(ctx.app, seed, { code: 'E-OWN', email: 'owner@acme.vn' })).employeeId;
+    await insertEmployeeFixture(ctx.app, seed, { code: 'E-OWN', email: 'owner@acme.vn' });
     catalog = ctx.app.get(CatalogApi, { strict: false });
     organization = ctx.app.get(OrganizationApi, { strict: false });
     organizationReads = ctx.app.get(OrganizationReadApi, { strict: false });
@@ -55,7 +54,6 @@ describe('what licensing reads of catalog and organization (integration, real Po
           kind,
           ...(kind === 'INTERNAL' ? {} : { vendorName: unique('Vendor') }),
           dataSensitivity: 'LOW',
-          businessOwnerEmployeeId: businessOwner,
           communication: NO,
         })
         .expect(201),

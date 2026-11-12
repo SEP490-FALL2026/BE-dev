@@ -1,6 +1,6 @@
 # catalog
 
-Mục đích: danh mục phần mềm dùng chung — từ điển vendor, ứng dụng và Business Owner, nhóm chức năng, plan và điều khoản
+Mục đích: danh mục phần mềm dùng chung — từ điển vendor, ứng dụng và IT Admin phụ trách, nhóm chức năng, plan và điều khoản
 của plan, subscription/mua đứt, hợp đồng và file đính kèm. Story chính: US-04-01 → US-04-07, US-04-11, US-12-09 (route
 hồ sơ thuế vendor); US-05-20 (đăng ký phần mềm nội bộ, gọi qua facade). Tầng: T4 (`scripts/arch/tiers.cjs`). Phụ thuộc:
 audit, organization, identity-access, finance, operating-parameters. Được dùng bởi: licensing, budgets, requests,
@@ -13,7 +13,7 @@ personnel, onboarding, data-import (chỉ type); gốc `src/app/app.module.ts` v
 
 - `CatalogApi` ([public/catalog.api.ts](public/catalog.api.ts)) — facade cho module khác:
   - `findSeatTarget`, `findPlanSeatTargets`, `lockSeatTarget` — đích ghế (một subscription hoặc một plan nội bộ).
-  - `getPlanSummaries`, `getPlanRevocationInfo`, `getSimilarPlanIds`, `getPlanVendorId`, `getPlanVendorIds` (nhiều plan trong một lần đọc), `getPlanBusinessOwnerId` — đọc
+  - `getPlanSummaries`, `getPlanRevocationInfo`, `getSimilarPlanIds`, `getPlanVendorId`, `getPlanVendorIds` (nhiều plan trong một lần đọc), `getPlanResponsibleItAdminId` — đọc
     plan.
   - `getPlanPrice(planId, tx?)` — giá của plan từ thuê bao chính (`pickPriceSource`: cờ `is_primary_for_plan`, không có thì giá tháng quy đổi
     (`price_reporting_minor`) cao nhất, hòa thì `start_date` cũ hơn rồi `id`), không theo phòng (S1-02, `BR-MF1-07`); trả `{ kind: RECURRING | ONE_TIME,
@@ -68,12 +68,14 @@ file thuần xuống tầng thấp, hoặc đưa dịch vụ điều phối lên
   `vendor-dictionary.controller.ts`; `VendorDictionaryService`, `VendorRecognitionService`, `VendorProposalService`.
 - `vendor/` — danh sách vendor, hồ sơ thuế và ước tính thuế (US-12-09, dữ liệu qua `FinanceApi`);
   `vendors.controller.ts`; `VendorQueryService`, `VendorTaxService`.
-- `catalog-entry/` — ứng dụng (US-04-01), Business Owner (US-04-06), gợi ý K2 (`k2-recommendation.policy.ts`);
-  `applications.controller.ts`, `application-owners.controller.ts`; `ApplicationService` (phần kiểm trước khi ghi ở
+- `catalog-entry/` — ứng dụng (US-04-01), IT Admin phụ trách (`QĐ-111g`: người tạo, đọc `responsibleItAdmin`/`needsResponsible`), gợi ý K2 (`k2-recommendation.policy.ts`);
+  `applications.controller.ts`; `ApplicationService` (phần kiểm trước khi ghi ở
   `ApplicationWriteGuards`, phần đổi trạng thái là hàm thuần trong `application-state.policy.ts`). Gốc của module: `plan/` và
   `subscription/` đọc ứng dụng qua `ApplicationFactsService`; ứng dụng muốn biết plan của mình để gợi ý K2 thì khai
   `application-plans.types.ts` (`ApplicationPlans`) và `plan/plan-facts.service.ts` trả lời, `catalog.module.ts` nối hai bên.
-- `application-retirement/` — retire ứng dụng (xác nhận của Business Owner, chặn bởi assignment/subscription); đọc ứng dụng,
+- `application-responsibility/` — chuyển IT Admin phụ trách ứng dụng (`POST /applications/{id}/responsibility-transfer`, khóa dòng ứng dụng,
+  `QĐ-111g`, R-26); `application-responsibility.policy.ts` quyết ai chuyển cho ai.
+- `application-retirement/` — retire ứng dụng (IT Admin quyết, không ai xác nhận; chặn bởi assignment/subscription); đọc ứng dụng,
   plan và subscription nên đứng trên cả ba; controller, dto, policy, repo, `ApplicationRetirementService`.
 - `internal-software-registration/` — đăng ký phần mềm nội bộ: tạo ứng dụng và plan trong một transaction; đứng trên
   `catalog-entry/` và `plan/`; `InternalSoftwareRegistrationService` (facade `CatalogApi` gọi).
@@ -85,7 +87,7 @@ file thuần xuống tầng thấp, hoặc đưa dịch vụ điều phối lên
 - `functional-group/` — nhóm chức năng (BR-06.9); `functional-groups.controller.ts`; `FunctionalGroupService`.
 - `plan/` — plan của ứng dụng, workspace profile K2 (US-04-02); `plans.controller.ts`; `PlanService`,
   `PlanWorkspaceService`.
-- `plan-terms/` — điều khoản, ý kiến Business Owner, cảnh báo review (US-04-11); `plan-terms.controller.ts`;
+- `plan-terms/` — điều khoản, cảnh báo review (US-04-11; ý kiến Business Owner đã gỡ, `QĐ-111g`); `plan-terms.controller.ts`;
   `PlanTermsService`.
 - `subscription/` — subscription và mua đứt (US-04-03, US-04-05), đích ghế, giá; `subscriptions.controller.ts`;
   `SubscriptionService`, `SubscriptionChangeService` (đổi subscription; kiểm trước khi ghi ở `SubscriptionChangeGuard`),
@@ -123,7 +125,7 @@ file thuần xuống tầng thấp, hoặc đưa dịch vụ điều phối lên
 - Chuỗi kỳ: `subscriptions.renewed_from_id` đặt một lần lúc tạo, cùng plan/phòng sở hữu, kỳ TERM, bắt đầu sau kỳ cũ (trigger
   `subscriptions_renewal_chain`); một kỳ có tối đa một kỳ nối tiếp (unique).
 - Số lượng subscription không thấp hơn số ghế đang chiếm (`assertQuantityNotBelowOccupied`, `seat-guard.policy.ts`);
-  retire ứng dụng chỉ khi Business Owner đã xác nhận và không còn assignment/subscription chặn
+  retire ứng dụng chỉ khi không còn assignment/subscription chặn
   (`application-retirement/application-retirement.service.ts`). Cả hai đọc ghế qua `SeatOccupancyHook`.
 - `lockSeatTarget`: subscription `FOR UPDATE`, plan nội bộ `FOR SHARE` tới hết transaction (`seat-target.service.ts`).
 - Thay đổi tạo/tăng/kéo dài khoản phải trả của thuê bao `K1`/`K5` có phòng sở hữu cần phòng đó có Cost Center đang dùng (F26,

@@ -99,6 +99,14 @@ export class RegistryQueryRepo {
     );
   }
 
+  /** How many machines are in this state: the number `page` reports as its total for the same filter, with no page read. */
+  async countByState(organizationId: string, state: CollectionState): Promise<number> {
+    const counted = await this.prisma.$queryRaw<{ total: bigint }[]>`
+      SELECT count(*) AS total ${FROM_SQL} WHERE ${whereOf({ organizationId, state })}`;
+
+    return Number(counted[0]?.total ?? 0n);
+  }
+
   async one(organizationId: string, id: string): Promise<DeviceSummaryRow | null> {
     const rows = await this.prisma.$queryRaw<DeviceSummaryRow[]>`
       SELECT d.id, d.asset_code AS "assetCode", d.hostname, d.os, d.retired_at AS "retiredAt",

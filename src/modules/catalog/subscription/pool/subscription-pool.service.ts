@@ -5,6 +5,7 @@ import { AuditApi } from '../../../audit/public/audit.api';
 import { IdentityAccessApi } from '../../../identity-access/public/identity-access.api';
 import { OrganizationReadApi } from '../../../organization/public/organization-read.api';
 import { catalogAuditEvent } from '../../catalog-audit-event.mapper';
+import { ApplicationFactsService } from '../../catalog-entry/application-facts.service';
 import type { LockedPlan } from '../../plan/plan-facts.service';
 import { PoolSeatNotAddableError } from '../../public/catalog.errors';
 import { SeatBaselinePhaseHook } from '../../public/catalog.extension-points';
@@ -16,6 +17,7 @@ import {
 import {
   assertPoolTerms,
   assertResponsibleNamed,
+  defaultResponsibleOf,
   isPooledPlan,
   liveIdsByPlan,
   liveSiblingsOf,
@@ -61,7 +63,25 @@ export class SubscriptionPoolService {
     private readonly subscriptions: SubscriptionRepo,
     private readonly audit: AuditApi,
     private readonly baselinePhase: SeatBaselinePhaseHook,
+    private readonly applications: ApplicationFactsService,
   ) {}
+
+  /**
+   * The IT Admin a subscription being declared answers to (`QĐ-111g`): the one the declaration names, else the one responsible for the
+   * application of its plan while they are a usable IT Admin, else none. Read inside the transaction of the declaration.
+   */
+  async responsibleOfDeclaration(tx: DbTx, applicationId: string, named: string | undefined): Promise<string | null> {
+    if (named !== undefined) return named;
+    const responsible = await this.applications.responsibleItAdminOf(applicationId, tx);
+    const usable =
+      responsible === null ? new Set<string>() : await this.identity.findUsableItAdminEmployeeIds([responsible], tx);
+
+    return defaultResponsibleOf({
+      named,
+      applicationResponsible: responsible,
+      applicationResponsibleIsUsable: responsible !== null && usable.has(responsible),
+    });
+  }
 
   /**
    * The commitment, the K1 plan and the IT Admin who answers for it, judged on the state a write leaves. Throws the errors of

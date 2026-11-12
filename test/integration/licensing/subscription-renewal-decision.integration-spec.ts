@@ -13,7 +13,6 @@ interface DetailWire {
   proposal: {
     choice: string;
     quantity: number | null;
-    businessOwnerOpinion: string | null;
     releasedSeatCount: number;
   };
   decision: {
@@ -58,7 +57,7 @@ describe('the proposal and the confirmation of a renewal (integration, real Post
     ).rows;
 
   describe('the proposal (US-11-05 AC-1, AC-3, AC-5 → AC-8, AC-15)', () => {
-    it('puts the case in the queue of the head of the owner department, who is told, with the seats to take back and the opinion recorded', async () => {
+    it('puts the case in the queue of the head of the owner department, who is told, with the seats to take back', async () => {
       const reduceUnit = await h.unit(3);
       const { subscriptionId, seats } = await h.termWithSeats(reduceUnit, 20, { quantity: 5 });
 
@@ -68,7 +67,6 @@ describe('the proposal and the confirmation of a renewal (integration, real Post
           choice: 'REDUCE',
           proposedQuantity: 1,
           releasedAssignmentIds: [seats[2], seats[0]],
-          businessOwnerOpinion: 'Keep one seat',
         })
         .expect(201);
       const renewal = h.dataOf<{ renewal: DetailWire }>(response).renewal;
@@ -79,7 +77,7 @@ describe('the proposal and the confirmation of a renewal (integration, real Post
         milestone: { basis: 'DECLARED', baseDate: h.inDays(20) },
         usage: { status: 'NOT_AVAILABLE' },
         period: { seatsInUse: 3 },
-        proposal: { choice: 'REDUCE', quantity: 1, businessOwnerOpinion: 'Keep one seat', releasedSeatCount: 2 },
+        proposal: { choice: 'REDUCE', quantity: 1, releasedSeatCount: 2 },
         decision: null,
       });
       expect(
@@ -300,6 +298,24 @@ describe('the proposal and the confirmation of a renewal (integration, real Post
         [id],
       );
       expect(rows).toEqual([{ decider_role: 'OWNER_DEPARTMENT_HEAD' }]);
+    });
+
+    it('QĐ-111g, CO-6: tells the IT Admin responsible for the subscription of the decision, not the one in charge of the department', async () => {
+      const itSub = await h.account('E-IT-DEC', await h.person('E-IT-DEC'), 'IT_ADMIN');
+      const { subscriptionId } = await h.termWithSeats({ ...unit, members: [] }, 15);
+      await h.ctx.sql.query(`UPDATE subscriptions SET responsible_it_admin_employee_id = $2 WHERE id = $1`, [
+        subscriptionId,
+        itSub.employeeId,
+      ]);
+      const id = await h.proposedRenewal({ subscriptionId, choice: 'RENEW' });
+
+      await h.confirmRenewal(id, unit.head.account, { reason: 'Still used by the team' }).expect(200);
+
+      const told = await h.notices('SUBSCRIPTION_RENEWAL_DECIDED', id);
+      // The IT Admin who proposed (it1, also in charge of the department) is told as the proposer; the responsible one as the IT Admin.
+      expect(told.map((row) => row.recipient_employee_id).sort()).toEqual(
+        [h.it1.employeeId, itSub.employeeId, h.finance.employeeId].sort(),
+      );
     });
 
     it('opens the revocations of the seats the IT Admin proposed when it confirms a reduction (F26)', async () => {

@@ -623,28 +623,29 @@ describe('requests over HTTP: software that is not in the catalog (integration, 
       }
     });
 
-    it('is refused for a plan that does not exist, and one whose software has no Business Owner who works', async () => {
+    it('is refused for a plan that does not exist, and is not refused for software with no Business Owner or no responsible IT Admin (QĐ-111b, QĐ-111g)', async () => {
       const proposed = await decidedForSpend();
       const orphan = await h.plan('K5');
       await h.ctx.sql.query(
-        `UPDATE applications SET business_owner_employee_id = $2
+        `UPDATE applications SET business_owner_employee_id = NULL, responsible_it_admin_employee_id = NULL
           WHERE id = (SELECT application_id FROM plans WHERE id = $1)`,
-        [orphan, (await h.staff(design, `DES-GONE${(counter += 1)}`)).employeeId],
-      );
-      await h.ctx.sql.query(
-        `UPDATE employees SET status = 'TERMINATED'
-          WHERE id = (SELECT business_owner_employee_id FROM applications
-                       WHERE id = (SELECT application_id FROM plans WHERE id = $1))`,
         [orphan],
       );
 
       const missing = await h
         .linkPlan(proposed.id, '00000000-0000-4000-8000-000000000000', itInCharge.account)
         .expect(404);
-      const noOwner = await h.linkPlan(proposed.id, orphan, itInCharge.account).expect(409);
+      await h.linkPlan(proposed.id, orphan, itInCharge.account).expect(200);
 
       expect(h.codeOf(missing)).toBe('ACCESS_REQUEST.PLAN_NOT_FOUND');
-      expect(h.codeOf(noOwner)).toBe('ACCESS_REQUEST.BUSINESS_OWNER_REQUIRED');
+      const events = await h.auditEvents('ACCESS_REQUEST', proposed.id);
+      const linked = events.find((event) => event.action === 'ACCESS_REQUEST.CATALOG_LINKED');
+      expect(linked?.after).toMatchObject({
+        requestId: proposed.id,
+        planId: orphan,
+        responsibleItAdminEmployeeId: null,
+      });
+      expect(linked?.after).not.toHaveProperty('businessOwnerEmployeeId');
     });
 
     it('is the only way to a seat: no grant before the plan is linked, a grant after (AC-8)', async () => {

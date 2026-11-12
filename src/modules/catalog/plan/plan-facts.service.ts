@@ -79,9 +79,9 @@ export class PlanFactsService implements ApplicationPlans {
     return this.plans.findVendorIds(planIds);
   }
 
-  /** Who owns the application of the plan now: a person the organization may since have lost (`INV-06`). */
-  businessOwnerIdOf(planId: string, tx?: DbTx): Promise<string | null> {
-    return this.plans.findBusinessOwnerId(planId, tx);
+  /** The IT Admin responsible for the application of the plan now (`QĐ-111g`); a person the organization may since have lost. */
+  responsibleItAdminIdOf(planId: string, tx?: DbTx): Promise<string | null> {
+    return this.plans.findResponsibleItAdminId(planId, tx);
   }
 
   /** The plans declared under an application: for the rules and the views that look at a software through its plans. */

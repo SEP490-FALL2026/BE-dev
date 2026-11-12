@@ -13,7 +13,7 @@ export const snapshot = (application: ApplicationRecord) => ({
   dictionaryServiceLineId: application.dictionaryServiceLineId,
   domains: application.domains,
   dataSensitivity: application.dataSensitivity,
-  businessOwnerEmployeeId: application.businessOwnerEmployeeId,
+  responsibleItAdminEmployeeId: application.responsibleItAdminEmployeeId,
   functionalGroupId: application.functionalGroup?.id ?? null,
   personToPersonMessaging: application.communication.personToPersonMessaging,
   callsOrMeetings: application.communication.callsOrMeetings,
@@ -55,17 +55,16 @@ export function sameCommunication(a: ApplicationCommunication, b: ApplicationCom
 
 /**
  * What an update of an application changes (`US-04-01`, `US-04-02`): each field the update gives that differs from what the application has.
- * `cleaned` is what the name, the domains and the note became once cleaned. Nothing is checked here: the references (the Business Owner,
- * the functional group, the dictionary line) are judged by the caller, in that order, for the ones that changed.
+ * `cleaned` is what the name, the domains and the note became once cleaned. Nothing is checked here: the references (the functional group,
+ * the dictionary line) are judged by the caller, in that order, for the ones that changed.
  */
 export function applicationChangesOf(
   current: Pick<
     ApplicationRecord,
-    'name' | 'domains' | 'dataSensitivity' | 'businessOwnerEmployeeId' | 'dictionaryServiceLineId' | 'communication'
+    'name' | 'domains' | 'dataSensitivity' | 'dictionaryServiceLineId' | 'communication'
   > & { functionalGroup: { id: string } | null },
   input: {
     dataSensitivity?: DataSensitivity;
-    businessOwnerEmployeeId?: string;
     functionalGroupId?: string | null;
     dictionaryServiceLineId?: string | null;
     communication?: Partial<CommunicationAnswers> & { note?: string | null };
@@ -95,24 +94,17 @@ function scalarChangesOf(
   return changes;
 }
 
-/** The Business Owner, the functional group and the dictionary line: what the application refers to. */
+/** The functional group and the dictionary line: what the application refers to. */
 function referenceChangesOf(
-  current: Pick<ApplicationRecord, 'businessOwnerEmployeeId' | 'dictionaryServiceLineId'> & {
+  current: Pick<ApplicationRecord, 'dictionaryServiceLineId'> & {
     functionalGroup: { id: string } | null;
   },
   input: {
-    businessOwnerEmployeeId?: string;
     functionalGroupId?: string | null;
     dictionaryServiceLineId?: string | null;
   },
 ): ApplicationChanges {
   const changes: ApplicationChanges = {};
-  if (
-    input.businessOwnerEmployeeId !== undefined &&
-    input.businessOwnerEmployeeId !== current.businessOwnerEmployeeId
-  ) {
-    changes.businessOwnerEmployeeId = input.businessOwnerEmployeeId;
-  }
   if (input.functionalGroupId !== undefined && input.functionalGroupId !== (current.functionalGroup?.id ?? null)) {
     changes.functionalGroupId = input.functionalGroupId;
   }

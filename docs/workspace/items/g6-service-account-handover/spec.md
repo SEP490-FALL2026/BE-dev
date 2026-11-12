@@ -26,9 +26,11 @@ Khi một nhân viên đang chịu trách nhiệm tài khoản dịch vụ (bot,
 
 | Story    | AC                           | Coverage | Phần còn lại thuộc                                                                                                                                                                                                                                                                                    |
 | -------- | ---------------------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| US-03-08 | AC-1, AC-4→AC-7, AC-9, AC-10 | full     | —                                                                                                                                                                                                                                                                                                     |
+| US-03-08 | AC-1, AC-4→AC-7, AC-9, AC-10 | partial  | re-pin 11/11/2026 — AC-11: `g6-service-account-handover` (`deferred`)                                                                                                                                                                                                                                 |
 | US-03-01 | AC-9                         | partial  | AC-1, AC-2, AC-4→AC-8, AC-11, AC-13→AC-16, AC-18→AC-24: `g6-transfer-record`; AC-12: `g3-downstream-finance-integration`; vế báo cáo chi phí theo tháng của AC-1: `g6-downstream-integration`; vế ghi bàn giao của AC-21: `g6-offboarding-record`                                                     |
 | US-03-04 | AC-17                        | partial  | AC-1→AC-10, AC-14→AC-16, AC-18→AC-23, AC-26, AC-29: `g6-offboarding-record`; AC-11, AC-13, AC-27, AC-28: `g6-leaver-role-and-workspace-duties`; AC-24, AC-25: `g6-leaver-request-closure`; vế khuyến nghị `G2` của AC-3, AC-21, vế tiết kiệm của AC-6 và vế K4 của AC-16: `g6-downstream-integration` |
+
+_Re-pin 11/11/2026 ([C3](../../../reviews/mf2-mf3-2026-11-10/C3-SCOPE-MAP-REPIN.md)):_ `US-03-08` đổi `full` → `partial` vì Docs `5bb2e6a` thêm AC hoặc hạng mục khác cùng hiện thực khóa của Story này (scope map); phần đã code không đổi.
 
 ## Supporting references
 

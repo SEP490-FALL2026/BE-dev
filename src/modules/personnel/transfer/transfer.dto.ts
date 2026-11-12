@@ -97,13 +97,8 @@ export const transferDetailSchema = transferSummarySchema.extend({
   closure: z.strictObject({ closedAt: z.iso.datetime(), closedByAppUserId: z.uuid() }).nullable(),
 });
 
-const warningSchema = z.strictObject({
-  code: z.enum(['BUSINESS_OWNER_KEEP_OR_CHANGE']),
-  applications: z.array(z.strictObject({ id: z.uuid(), name: z.string() })).max(20),
-  totalApplications: z.number().int().positive(),
-});
-
-export const transferRecordedSchema = transferDetailSchema.extend({ warnings: z.array(warningSchema).max(1) });
+/** What recording a transfer answers with: the transfer as the detail shows it (the warning about Business Owner applications is gone, `QĐ-111g`). */
+export const transferRecordedSchema = transferDetailSchema;
 
 const changeSchema = z.strictObject({
   id: z.uuid(),

@@ -31,29 +31,16 @@ describe('the last milestone left out (QĐ-62t, US-11-01 AC-8)', () => {
   });
 });
 
-describe('the people told (US-11-01 AC-1, AC-10, AC-11)', () => {
-  const people = { itAdmin: 'IT1', finance: 'F1', businessOwner: 'B1', approver: 'C1', superAdmin: 'S1' };
+describe('the people told (US-11-01 AC-1, AC-10, AC-11, QĐ-111g: no Business Owner)', () => {
+  const people = { itAdmin: 'IT1', finance: 'F1', approver: 'C1', superAdmin: 'S1' };
 
-  it('tells the four roles, and the Super Admin only at the last milestone', () => {
-    expect(alertRecipients(people, false).map((r) => r.audience)).toEqual([
-      'IT_ADMIN',
-      'FINANCE',
-      'BUSINESS_OWNER',
-      'SPENDING_APPROVER',
-    ]);
-    expect(alertRecipients(people, true).map((r) => r.employeeId)).toEqual(['IT1', 'F1', 'B1', 'C1', 'S1']);
+  it('tells the IT Admin, Finance and the spending approver, and the Super Admin only at the last milestone', () => {
+    expect(alertRecipients(people, false).map((r) => r.audience)).toEqual(['IT_ADMIN', 'FINANCE', 'SPENDING_APPROVER']);
+    expect(alertRecipients(people, true).map((r) => r.employeeId)).toEqual(['IT1', 'F1', 'C1', 'S1']);
   });
 
-  it('leaves out a Business Owner who left and tells a person who holds two roles once', () => {
-    expect(alertRecipients({ ...people, businessOwner: null }, false).map((r) => r.employeeId)).toEqual([
-      'IT1',
-      'F1',
-      'C1',
-    ]);
-    expect(alertRecipients({ ...people, approver: 'IT1' }, false).map((r) => r.employeeId)).toEqual([
-      'IT1',
-      'F1',
-      'B1',
-    ]);
+  it('leaves out a role nobody holds and tells a person who holds two roles once', () => {
+    expect(alertRecipients({ ...people, finance: null }, false).map((r) => r.employeeId)).toEqual(['IT1', 'C1']);
+    expect(alertRecipients({ ...people, approver: 'IT1' }, false).map((r) => r.employeeId)).toEqual(['IT1', 'F1']);
   });
 });

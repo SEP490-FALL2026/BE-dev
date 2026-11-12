@@ -56,7 +56,7 @@ const toPlan = (row: PlanRow): RequestablePlanRecord => ({
 });
 
 /**
- * The catalog as a person who asks for software reads it. It selects only what may be shown to them: no Business Owner, price,
+ * The catalog as a person who asks for software reads it. It selects only what may be shown to them: no responsible IT Admin, price,
  * subscription, contract, seat, key or workspace; the list reads the columns of a row and nothing a detail adds.
  */
 @Injectable()

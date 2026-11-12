@@ -26,7 +26,6 @@ export const planTermsBodySchema = z.strictObject({
   commercialUse: text,
   cancellationRefund: text,
 });
-export const opinionBodySchema = z.strictObject({ opinion: z.string().max(10000) });
 export const planWarningsQuerySchema = z.strictObject({
   page: z.coerce.number().int().positive().default(1),
   pageSize: z.coerce.number().int().positive().max(100).default(20),
@@ -44,13 +43,6 @@ const termsSchema = z.strictObject({
   cancellationRefund: z.string().nullable(),
   updatedAt: z.iso.datetime(),
 });
-const opinionSchema = z.strictObject({
-  id: z.uuid(),
-  businessOwner: z.strictObject({ employeeId: z.uuid(), employeeCode: z.string(), fullName: z.string() }),
-  opinion: z.string(),
-  recordedBy: z.uuid(),
-  recordedAt: z.iso.datetime(),
-});
 const warningSchema = z.strictObject({
   code: z.literal('TERMS_REVIEW_DUE'),
   planId: z.uuid(),
@@ -65,9 +57,7 @@ const warningSchema = z.strictObject({
 });
 
 export class PlanTermsBodyDto extends createZodDto(planTermsBodySchema) {}
-export class OpinionBodyDto extends createZodDto(opinionBodySchema) {}
 export class PlanWarningsQueryDto extends createZodDto(planWarningsQuerySchema) {}
-export class TermOpinionsQueryDto extends createZodDto(planWarningsQuerySchema) {}
 export class PlanIdParamDto extends createZodDto(planIdParamSchema) {}
 export class PlanTermsResponseDto extends createZodDto(
   successEnvelopeSchema(
@@ -76,8 +66,6 @@ export class PlanTermsResponseDto extends createZodDto(
       applicable: z.boolean(),
       sharingPolicy: z.enum(['ALLOWED', 'NOT_ALLOWED']).nullable(),
       terms: termsSchema.nullable(),
-      opinions: z.array(opinionSchema).max(50),
-      opinionTotal: z.number().int().nonnegative(),
       warnings: z.array(warningSchema).max(50),
       warningTotal: z.number().int().nonnegative(),
     }),
@@ -85,20 +73,6 @@ export class PlanTermsResponseDto extends createZodDto(
 ) {}
 export class PlanTermsSetResponseDto extends createZodDto(
   successEnvelopeSchema(z.strictObject({ terms: termsSchema, changed: z.boolean() })),
-) {}
-export class OpinionResponseDto extends createZodDto(successEnvelopeSchema(opinionSchema)) {}
-export class OpinionPageResponseDto extends createZodDto(
-  successEnvelopeSchema(
-    z.strictObject({
-      items: z.array(opinionSchema),
-      pagination: z.strictObject({
-        page: z.number().int().positive(),
-        pageSize: z.number().int().positive(),
-        totalItems: z.number().int().nonnegative(),
-        totalPages: z.number().int().nonnegative(),
-      }),
-    }),
-  ),
 ) {}
 export class PlanWarningPageResponseDto extends createZodDto(
   successEnvelopeSchema(

@@ -77,13 +77,14 @@ export class GhostSeatSeatStateRepo {
 
   async seatStatePage(
     organizationId: string,
-    filter: { applicationId?: string; status?: SeatStatus },
+    filter: { applicationId?: string; status?: SeatStatus; employeeIds?: readonly string[] },
     page: { skip: number; take: number },
   ): Promise<{ items: SeatStateRecord[]; total: number }> {
     const where = {
       organizationId,
       ...(filter.applicationId ? { applicationId: filter.applicationId } : {}),
       ...(filter.status ? { status: filter.status } : {}),
+      ...(filter.employeeIds ? { employeeId: { in: [...filter.employeeIds] } } : {}),
     };
     const rows = await this.prisma.ghostSeatSeatState.findMany({
       where,

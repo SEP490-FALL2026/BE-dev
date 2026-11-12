@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpStatus, Param, Post, Put, Query } from '@nestjs/common';
+import { Body, Controller, Get, HttpStatus, Param, Put, Query } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   ApiErrorResponses,
@@ -12,20 +12,16 @@ import { RequireRoles } from '../../../infrastructure/security/decorators/access
 import { CurrentPrincipal } from '../../../infrastructure/security/models/current-principal';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import {
-  OpinionBodyDto,
-  OpinionPageResponseDto,
-  OpinionResponseDto,
   PlanIdParamDto,
   PlanTermsBodyDto,
   PlanTermsResponseDto,
   PlanTermsSetResponseDto,
   PlanWarningPageResponseDto,
   PlanWarningsQueryDto,
-  TermOpinionsQueryDto,
 } from './plan-terms.dto';
 import { PLAN_TERMS_ERROR_EXAMPLES as EXAMPLES, toPlanTermsApiException } from './plan-terms.http-errors';
 import { PlanTermsService } from './plan-terms.service';
-import type { OpinionView, TermsRecord } from './plan-terms.types';
+import type { TermsRecord } from './plan-terms.types';
 
 const AUTH_ERRORS = [UNAUTHENTICATED_RESPONSE, GUARDED_SERVICE_UNAVAILABLE_RESPONSE] as const;
 const IT_ONLY = {
@@ -50,11 +46,9 @@ const toTermsWire = (terms: TermsRecord) => ({
   updatedAt: terms.updatedAt.toISOString(),
 });
 
-const toOpinionWire = (opinion: OpinionView) => ({ ...opinion, recordedAt: opinion.recordedAt.toISOString() });
-
 /**
  * The terms of a plan, as IT read them (`US-04-11`). The IT Admin records the link, the date of the last review and the
- * checklist, and the opinion of the Business Owner; Finance may read the terms. The review alerts are read here, derived
+ * checklist; Finance may read the terms. The review alerts are read here, derived
  * from the subscriptions. Nothing in these routes judges the terms or decides anything: no route concludes, deletes or
  * revokes.
  */
@@ -69,7 +63,7 @@ export class PlanTermsController {
   @ApiSuccessResponse(PlanTermsResponseDto, {
     message: 'PLAN_TERMS.FETCHED',
     description:
-      'The terms as IT recorded them, the sharing policy kept on the plan, the opinions on them, and the review alerts open for the plan. A K5 plan answers applicable false.',
+      'The terms as IT recorded them, the sharing policy kept on the plan, and the review alerts open for the plan. A K5 plan answers applicable false.',
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,
@@ -89,11 +83,7 @@ export class PlanTermsController {
     try {
       const view = await this.terms.get(params.id);
 
-      return {
-        ...view,
-        terms: view.terms ? toTermsWire(view.terms) : null,
-        opinions: view.opinions.map(toOpinionWire),
-      };
+      return { ...view, terms: view.terms ? toTermsWire(view.terms) : null };
     } catch (error) {
       throw toPlanTermsApiException(error);
     }
@@ -129,67 +119,6 @@ export class PlanTermsController {
       const { terms, changed } = await this.terms.set(actor, params.id, body);
 
       return { terms: toTermsWire(terms), changed };
-    } catch (error) {
-      throw toPlanTermsApiException(error);
-    }
-  }
-
-  @Get('plans/:id/term-opinions')
-  @RequireRoles('IT_ADMIN', 'FINANCE')
-  @ApiOperation({ operationId: 'planTermOpinionList', summary: 'List the opinions on the terms of a plan' })
-  @ApiSuccessResponse(OpinionPageResponseDto, {
-    message: 'PLAN_TERM_OPINION.LISTED',
-    description: 'A page of the opinions of the Business Owner on the terms of the plan, the newest first.',
-  })
-  @ApiErrorResponses(
-    ...AUTH_ERRORS,
-    {
-      status: HttpStatus.FORBIDDEN,
-      description: 'Only the IT Admin and Finance read the opinions.',
-      examples: [FORBIDDEN_EXAMPLE],
-    },
-    NOT_FOUND,
-    {
-      status: HttpStatus.UNPROCESSABLE_ENTITY,
-      description: 'The id is not a UUID or the query is invalid (VALIDATION_ERROR).',
-      examples: [VALIDATION_EXAMPLE],
-    },
-  )
-  async listOpinions(@Param() params: PlanIdParamDto, @Query() query: TermOpinionsQueryDto) {
-    try {
-      const page = await this.terms.opinions(params.id, query);
-
-      return { items: page.items.map(toOpinionWire), pagination: page.pagination };
-    } catch (error) {
-      throw toPlanTermsApiException(error);
-    }
-  }
-
-  @Post('plans/:id/term-opinions')
-  @RequireRoles('IT_ADMIN')
-  @ApiOperation({
-    operationId: 'planTermOpinionRecord',
-    summary: 'Record an opinion of the Business Owner on the terms',
-  })
-  @ApiSuccessResponse(OpinionResponseDto, {
-    status: HttpStatus.CREATED,
-    message: 'PLAN_TERM_OPINION.RECORDED',
-    description:
-      'The opinion is kept with the Business Owner of the application, who recorded it and when. It adds no step, deadline or approver.',
-  })
-  @ApiErrorResponses(...AUTH_ERRORS, IT_ONLY, NOT_FOUND, {
-    status: HttpStatus.UNPROCESSABLE_ENTITY,
-    description:
-      'The request is invalid (VALIDATION_ERROR), the opinion is empty or too long (PLAN_TERMS.TEXT_INVALID) or the plan has no terms or its application names no Business Owner (PLAN_TERMS.NOT_APPLICABLE).',
-    examples: [VALIDATION_EXAMPLE, EXAMPLES.TEXT_INVALID, EXAMPLES.NOT_APPLICABLE],
-  })
-  async recordOpinion(
-    @CurrentPrincipal() actor: AuthenticatedPrincipal,
-    @Param() params: PlanIdParamDto,
-    @Body() body: OpinionBodyDto,
-  ) {
-    try {
-      return toOpinionWire(await this.terms.recordOpinion(actor, params.id, body));
     } catch (error) {
       throw toPlanTermsApiException(error);
     }

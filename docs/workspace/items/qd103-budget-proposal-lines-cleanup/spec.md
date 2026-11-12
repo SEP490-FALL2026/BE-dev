@@ -7,7 +7,7 @@
   `QĐ-97b`, `QĐ-97c`; quy trình v1.7 mục 4.4–4.5, 4.7, A.4 _Ngưỡng giải trình ZBB_; L1 MF-4 bước 5–7, 9; `US-06-10` AC-1, AC-2,
   AC-20; `US-06-09` AC-31), BE `d9c46552`. Ledger: L1-20, L1-21, L1-22; luật R-I05 (cờ vượt, bất biến), R-I08. Câu tạm
   chọn mới (đề xuất, REVISION-NOTES W2): vế ZBB _đơn giá tăng_, vế ZBB `KPI-3` theo `QĐ-94l`, dữ liệu legacy `REVISION`.
-- Nhóm roadmap: không — bó finding `qd103-108-alignment` (xem tracker §5).
+- Nhóm roadmap: G5 (từ re-pin scope map 11/11/2026) — bó finding `qd103-108-alignment` (xem tracker §5).
 - [Kế hoạch](plan.md).
 
 ## Business outcome
@@ -20,8 +20,8 @@ kỳ/hạn báo giá/giá trị cao. `ops:seed` vẫn chạy.
 
 ## Sizing decision
 
-- Container: bó finding `qd103-108-alignment` (đợt W2), ngoài nhóm G.
-- Mode: `technical-enabler`.
+- Container: G5 (nhóm giao việc, không phải ranh giới hạng mục); bó finding `qd103-108-alignment` (đợt W2). Trước re-pin 11/11/2026 là ngoài nhóm.
+- Mode: `grouped-stories`.
 - Outcome and owner: `budgets/proposal` + `budgets/version` (dạng dòng), lõi `budgets/budget` (enum/kiểu), `budgets/cycle`
   (phần dòng của gói); `installation/migration-preflight` (chặn dữ liệu legacy); seed.
 - Boundaries: một migration (thêm cột dòng, drop cột/enum thừa); DTO dòng của đề xuất/phiên bản/import; bỏ extension
@@ -31,13 +31,14 @@ kỳ/hạn báo giá/giá trị cao. `ops:seed` vẫn chạy.
 - Not smaller: dọn cột thừa cùng bảng dòng với cột mới — hai migration trên cùng bảng không có lợi; seed vỡ ngay khi
   `lineType`/`priorityRank` bắt buộc nên sửa cùng hạng mục (tracker §4 luật 8).
 - Siblings: `qd103-budget-cycle-ceilings`, `qd103-budget-baseline-annual-check`.
-- Scope map: n/a
+- Scope map: [G5](../../../roadmap.md#work-item-decomposition-g5).
 
 ## Primary Story/AC
 
-| Story | AC                  | Coverage | Phần còn lại thuộc           |
-| ----- | ------------------- | -------- | ---------------------------- |
-| —     | L1-20, L1-21, L1-22 | n/a      | gỡ chặn `qd103-budget-views` |
+| Story    | AC                | Coverage | Phần còn lại thuộc                                                                                                                                                                                                                                                                                                                                                                                                                              |
+| -------- | ----------------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| US-06-09 | AC-31             | partial  | AC còn lại và vế chung theo scope map: `g5-budget-proposal-and-review`, `g5-budget-check-and-finance-review`, `g5-commitment-creation`, `qd103-request-history-by-role`, `g5-budget-version-decision`, `g3-downstream-finance-integration`, `qd93-budget-record-attachments`, `qd96-100-annual-budget-reserve-and-floor`, `qd96-100-remove-budget-revision-and-high-value`, `qd103-budget-baseline-annual-check`, `qd103-budget-cycle-ceilings` |
+| US-06-10 | AC-1, AC-2, AC-20 | partial  | AC còn lại và vế chung theo scope map: `g5-budget-proposal-and-review`, `qd96-100-plan-line-removal-and-bm10-lines`, `qd103-budget-views`, `qd93-budget-record-attachments`; AC-17→AC-19, AC-21 `deferred` tới chính `qd103-budget-proposal-lines-cleanup` (chưa claim)                                                                                                                                                                         |
 
 ## Supporting references
 
@@ -46,6 +47,8 @@ _Renew/Change/New/Cancel_ có `KPI-3 < 70 %` và dòng đơn giá tăng `> 10 %`
 `FR-5.15`(1), QT 4.4 chỉ ghi _Renew/Change_ cho vế `KPI-3`; theo thứ tự nguồn áp `QĐ-94l`, ghi câu tạm chọn). QT 4.4 điều
 kiện tối thiểu: _đã xếp hạng ưu tiên; dòng vượt Trần của phòng có lý do_. Spec cũ `qd96-100-plan-line-removal-and-bm10-lines`,
 `qd96-100-remove-budget-revision-and-high-value` chỉ đọc tham khảo.
+
+_Re-pin 11/11/2026 ([C3](../../../reviews/mf2-mf3-2026-11-10/C3-SCOPE-MAP-REPIN.md)):_ trước là `technical-enabler`, dòng `n/a` của bảng Primary: L1-20, L1-21, L1-22 — gỡ chặn `qd103-budget-views`. Bảng Primary claim AC của tối đa ba Story chính lấy từ danh sách trên, chỉ AC đang dùng ở Docs `5bb2e6a` (số AC của EP-05/EP-06/EP-12 không đổi giữa `9c7f386` và `5bb2e6a`); khóa khác của danh sách trên giữ chủ hiện có hoặc là `deferred` tới hạng mục này trong scope map. Claim theo spec và commit đã merge (PR #36), chưa đối chiếu từng AC trên code.
 
 ## Explicit out of scope
 

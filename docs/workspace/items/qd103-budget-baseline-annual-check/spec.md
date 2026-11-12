@@ -8,7 +8,7 @@
   `US-06-15` AC-2, AC-12, AC-15, AC-16, AC-17; `US-06-19` AC-1→AC-5), BE `d9c46552`. Ledger: L1-09, L1-10, L1-11; luật
   R-I03 (số liệu nền), R-I05 (không trưởng phòng, nhắc hạn), R-I06, R-I08 (phiên bản có cờ đi tiếp). Câu tạm chọn mới (đề
   xuất, REVISION-NOTES W2): tập phiên bản tính ở B4, lý do khi chia lại số cơ sở, người nhận nhắc hạn.
-- Nhóm roadmap: không — bó finding `qd103-108-alignment` (xem tracker §5).
+- Nhóm roadmap: G5 (từ re-pin scope map 11/11/2026) — bó finding `qd103-108-alignment` (xem tracker §5).
 - [Kế hoạch](plan.md).
 
 ## Business outcome
@@ -21,8 +21,8 @@ nhắc liên kết Cost Center cho phòng thiếu.
 
 ## Sizing decision
 
-- Container: bó finding `qd103-108-alignment` (đợt W2), ngoài nhóm G.
-- Mode: `technical-enabler`.
+- Container: G5 (nhóm giao việc, không phải ranh giới hạng mục); bó finding `qd103-108-alignment` (đợt W2). Trước re-pin 11/11/2026 là ngoài nhóm.
+- Mode: `grouped-stories`.
 - Outcome and owner: capability `budgets/cycle/` (số liệu nền, gói tổng hợp, job nhắc hạn) và `budgets/version/` (kiểm B4,
   phiên bản từ số liệu nền, lý do số cơ sở).
 - Boundaries: đọc licensing/catalog/organization qua API public; 2 cột mới ở `budget_versions`; 2 operation đọc mới; đổi
@@ -31,19 +31,22 @@ nhắc liên kết Cost Center cho phòng thiếu.
   `qd103-budget-proposal-lines-cleanup`; view của trưởng phòng ở `qd103-budget-views`.
 - Not smaller: kiểm B4 cần gói tổng hợp; phiên bản từ số liệu nền cần số liệu nền.
 - Siblings: `qd103-budget-cycle-ceilings`, `qd103-department-effective-year`, `qd103-budget-proposal-lines-cleanup`, `qd103-budget-views`.
-- Scope map: n/a
+- Scope map: [G5](../../../roadmap.md#work-item-decomposition-g5).
 
 ## Primary Story/AC
 
-| Story | AC                  | Coverage | Phần còn lại thuộc                            |
-| ----- | ------------------- | -------- | --------------------------------------------- |
-| —     | L1-09, L1-10, L1-11 | n/a      | gỡ chặn `qd103-budget-proposal-lines-cleanup` |
+| Story    | AC                       | Coverage | Phần còn lại thuộc                                                                                                                                          |
+| -------- | ------------------------ | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| US-06-15 | AC-2, AC-12, AC-15→AC-17 | partial  | AC còn lại và vế chung theo scope map: `qd103-budget-cycle-ceilings`, `qd103-calendar-fiscal-year`, `qd103-budget-views`, `qd103-department-effective-year` |
+| US-06-19 | AC-1→AC-5                | full     | —                                                                                                                                                           |
 
 ## Supporting references
 
 `US-06-15` AC-2, AC-12, AC-15, AC-16, AC-17; `US-06-19` AC-1→AC-5. `QĐ-100v`: vượt ⟹ Finance chọn chia lại số cơ sở/dự
 phòng **kèm lý do** hoặc trả đề xuất. `FR-5.15`(6): Finance và Người duyệt chi thấy toàn bộ. Spec cũ
 `qd96-100-annual-budget-reserve-and-floor` chỉ đọc tham khảo (bỏ sàn cam kết chuyển tiếp).
+
+_Re-pin 11/11/2026 ([C3](../../../reviews/mf2-mf3-2026-11-10/C3-SCOPE-MAP-REPIN.md)):_ trước là `technical-enabler`, dòng `n/a` của bảng Primary: L1-09, L1-10, L1-11 — gỡ chặn `qd103-budget-proposal-lines-cleanup`. Bảng Primary claim AC của tối đa ba Story chính lấy từ danh sách trên, chỉ AC đang dùng ở Docs `5bb2e6a` (số AC của EP-05/EP-06/EP-12 không đổi giữa `9c7f386` và `5bb2e6a`); khóa khác của danh sách trên giữ chủ hiện có hoặc là `deferred` tới hạng mục này trong scope map. Claim theo spec và commit đã merge (PR #36), chưa đối chiếu từng AC trên code.
 
 ## Explicit out of scope
 

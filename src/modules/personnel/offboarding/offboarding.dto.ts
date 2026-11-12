@@ -123,7 +123,6 @@ const checklistSchema = z.strictObject({
 
 const warningsSchema = z.strictObject({
   departmentWithoutHeadFrom: z.string().nullable(),
-  businessOwnerApplications: z.number().int().nonnegative(),
   accountLockNotRecorded: z.boolean(),
   /** The workspaces of K2 plans the person owns or administers, by plan id with the application and plan names: they will lose their owner. */
   workspaces: z.record(z.uuid(), z.string()),

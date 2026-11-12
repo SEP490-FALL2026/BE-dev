@@ -55,7 +55,6 @@ export interface RenewalRecord {
   proposedChoice: RenewalChoice;
   proposedQuantity: number | null;
   proposalNote: string | null;
-  businessOwnerOpinion: string | null;
   proposedByEmployeeId: string;
   proposedAt: Date;
   decision: RenewalDecisionRecord | null;
@@ -71,7 +70,6 @@ export interface NewRenewal {
   proposedChoice: RenewalChoice;
   proposedQuantity: number | null;
   proposalNote: string | null;
-  businessOwnerOpinion: string | null;
   proposedByEmployeeId: string;
   proposedByAppUserId: string;
 }

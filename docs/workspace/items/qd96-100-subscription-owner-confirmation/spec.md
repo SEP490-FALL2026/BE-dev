@@ -1,7 +1,7 @@
 # Spec: qd96-100-subscription-owner-confirmation — trưởng phòng sở hữu xác nhận đề xuất điều chỉnh thuê bao của IT
 
 - Phụ trách: AI theo giao việc Owner (05/11/2026, lượt "FE nối 5 main flow" — chat MF-5).
-- Thiết kế ban đầu bởi: AI (agent V2-MF2-MF3-MF5) theo [ITEMS #9](../../../reviews/qd96-100-alignment-2026-11-05/ITEMS.md),
+- Thiết kế ban đầu bởi: AI (agent V2-MF2-MF3-MF5) theo ITEMS #9 (nhật ký review đã xóa 11/11/2026 — xem git history),
   ledger L-601, L-602, L-603, L-610, L-614, L-617; finding F26 (P0) của review Docs `main-flows-api-contract-review-2026-11-05`.
 - Thiết kế: `draft`. Owner review: chưa review.
 - **Mức FE-tonight: Phần A = `A`** (đã làm, `verified` local 05/11/2026) (contract + logic thật tối thiểu cho bước 5.7 → 5.8 → 5.9); **Phần B = `B`** (sau demo).
@@ -19,7 +19,7 @@ trưởng phòng chỉ đọc hồ sơ thuê bao phòng mình. Kiểm bằng HTT
 ## Sizing decision
 
 - Container: bó finding `qd96-100-alignment` (track L), Story thuộc G8 — chỉ là container.
-- Mode: `split-story`.
+- Mode: `technical-enabler`.
 - Phases: Phần A tối nay; Phần B ghi ở cuối _Behavior and design_, cùng thư mục, không giả là xong.
 - Outcome and owner: vai xác nhận điều chỉnh thuê bao (`QĐ-94d`(2)); capability `licensing/subscription-renewal`.
 - Boundaries: một migration (CHECK `decider_role`); ops `subscriptionRenewalPropose`,
@@ -34,10 +34,11 @@ trưởng phòng chỉ đọc hồ sơ thuê bao phòng mình. Kiểm bằng HTT
 
 ## Primary Story/AC
 
-| Story    | AC                    | Coverage | Phần còn lại thuộc                                                                                                                                                                                                                                            |
-| -------- | --------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| US-11-06 | AC-1→AC-7, AC-9→AC-14 | partial  | AC-8: `qd96-100-renewal-milestones-and-recipients`; AC-15, AC-16: `qd96-100-subscription-lifecycle`                                                                                                                                                           |
-| US-11-05 | AC-11→AC-14, AC-23    | partial  | AC-1, AC-6→AC-10, AC-26, AC-28, AC-29: `qd96-100-subscription-lifecycle`; AC-5: `g7-g1-g2-recommendations`; AC-2→AC-4, AC-15→AC-22, AC-24, AC-25, AC-27: hạng mục `a06-*` hiện có của EP-11 (map G8: AC-11→AC-14 vế cũ giữ chủ `a06-renewal-execution-chain`) |
+| Story | AC              | Coverage | Phần còn lại thuộc                                                           |
+| ----- | --------------- | -------- | ---------------------------------------------------------------------------- |
+| —     | Story `RETIRED` | n/a      | US-11-06, US-11-05 `RETIRED`; thay bởi `qd103-subscription-adjustment-point` |
+
+_Re-pin 11/11/2026 ([C3](../../../reviews/mf2-mf3-2026-11-10/C3-SCOPE-MAP-REPIN.md)):_ bỏ khỏi bảng `US-11-06` AC-1→AC-7, AC-9→AC-14 (partial); `US-11-05` AC-11→AC-14, AC-23 (partial) — Story `RETIRED` ở Docs `5bb2e6a` (`US-11-06` `QĐ-103e`, `US-11-05` `QĐ-103e`, `QĐ-103q`); code đã merge là lịch sử, khóa ở scope map là `not affected`. Không còn Story nào nên `Mode` đổi `technical-enabler` (dòng `n/a` nêu hạng mục thay thế).
 
 ## Supporting references
 
