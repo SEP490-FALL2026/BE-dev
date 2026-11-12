@@ -82,8 +82,6 @@ export const offboardingSummarySchema = z.strictObject({
   employee: employeeBrief,
   state: stateSchema,
   accessBlockMode: z.enum(['WITH_LAST_DAY', 'BLOCK_NOW']),
-  /** Deprecated: `accessBlockMode === 'BLOCK_NOW'`. */
-  abrupt: z.boolean(),
   lastWorkingDay: z.string(),
   /** Always null since `QĐ-110g` (no deadline of a handover is told): the key stays until the clients stop reading it, then goes. */
   handoverDueOn: z.string().nullable(),

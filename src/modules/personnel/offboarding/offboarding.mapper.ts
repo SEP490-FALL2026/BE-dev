@@ -50,7 +50,6 @@ export function toSummary(
     employee: brief(employees, record.employeeId),
     state: record.state,
     accessBlockMode: record.accessBlockMode,
-    abrupt: record.accessBlockMode === 'BLOCK_NOW',
     lastWorkingDay: record.lastWorkingDay,
     // No deadline of a handover is told any more (`QĐ-110g`): the key stays, always null, until the clients stop reading it.
     handoverDueOn: null,

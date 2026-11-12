@@ -182,6 +182,11 @@ describe('offboarding case routes (e2e, no database)', () => {
         (server: App) => request(server).get('/api/v1/offboarding-cases?roleFlag=ADMIN'),
       ],
       [
+        'a role of the approver that was retired (QĐ-93c)',
+        'GET /offboarding-cases',
+        (server: App) => request(server).get('/api/v1/offboarding-cases?roleFlag=FALLBACK_APPROVER'),
+      ],
+      [
         'the open requests of a case that is not an id',
         'GET /offboarding-cases/{id}/open-requests',
         (server: App) => request(server).get('/api/v1/offboarding-cases/not-an-id/open-requests'),

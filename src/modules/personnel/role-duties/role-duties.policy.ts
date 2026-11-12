@@ -19,16 +19,20 @@ export function flagsOf(facts: RoleFacts): RoleFlag[] {
     SUPER_ADMIN_HOLDER: facts.superAdmin,
     FINANCE: facts.finance,
     SPENDING_APPROVER: facts.spendingApprover,
-    // The substitute and the fallback approver are gone (`QĐ-93c`): no flag of them is made now, and the two names stay only to read
-    // the flags of a case recorded before.
-    SUBSTITUTE_APPROVER: false,
-    FALLBACK_APPROVER: false,
     IT_ADMIN_IN_CHARGE: facts.itAdminDepartments > 0,
     DEPARTMENT_HEAD: facts.headsDepartment,
     WORKSPACE_OWNER: facts.workspaces > 0,
   };
 
   return ROLE_FLAGS.filter((flag) => held[flag]);
+}
+
+/**
+ * The flags of a snapshot read from the database, in the order it holds them, without the names the wire no longer has (the substitute
+ * and the fallback approver, `QĐ-93c`): a case recorded before may still carry them in `role_flags`, none is made now.
+ */
+export function knownFlags(stored: readonly string[]): RoleFlag[] {
+  return stored.filter((flag): flag is RoleFlag => (ROLE_FLAGS as readonly string[]).includes(flag));
 }
 
 /** Every flag with whether it is held: the shape the wire gives, which has no list. */

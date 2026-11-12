@@ -185,6 +185,37 @@ describe('the roles of a person who leaves and the duties of a workspace (integr
     });
   });
 
+  describe('the two approvers that were retired (QĐ-93c, QĐ-110)', () => {
+    it('reads a snapshot recorded before without them, so moving the last day tells nobody again and rewrites the snapshot', async () => {
+      const department = await h.departmentWithUnit('P-RDX');
+      const person = await h.worker(department, code());
+      await h.setRole('SPENDING_APPROVER', person);
+      try {
+        const wire = await h.recordedCase(person);
+        const atRecord = await flaggedEvents(wire.id);
+        // A case recorded before the two names left the wire carries them in the column (the database enum keeps both).
+        await h.ctx.sql.query(
+          `UPDATE offboarding_cases SET role_flags = ARRAY['SPENDING_APPROVER', 'FALLBACK_APPROVER', 'SUBSTITUTE_APPROVER']::"OffboardingRoleFlag"[] WHERE id = $1`,
+          [wire.id],
+        );
+
+        await h.changeLastDay(wire.id, { lastWorkingDay: h.day(14), reason: 'Bàn giao muộn hơn' }).expect(200);
+
+        expect(await flaggedEvents(wire.id)).toHaveLength(atRecord.length);
+        expect(await stored(wire.id)).toEqual(['SPENDING_APPROVER']);
+        const read = h.dataOf<FlaggedCase>(await h.readCase(wire.id).expect(200));
+        expect(Object.keys(read.roleFlags)).not.toEqual(expect.arrayContaining(['FALLBACK_APPROVER']));
+        expect(read).not.toHaveProperty('abrupt');
+      } finally {
+        await h.setRole('SPENDING_APPROVER', h.boss);
+      }
+    });
+
+    it.each(['FALLBACK_APPROVER', 'SUBSTITUTE_APPROVER'])('refuses the list filtered by %s with 422', async (flag) => {
+      await h.listCases(`?roleFlag=${flag}`).expect(422);
+    });
+  });
+
   describe('what the person sees of their own departure (AC-12)', () => {
     it('shows a person who does not leave nothing, and never the departure of someone else', async () => {
       expect(h.dataOf<NoticeWire | null>(await notice(h.finance).expect(200))).toBeNull();
@@ -348,7 +379,7 @@ describe('the roles of a person who leaves and the duties of a workspace (integr
       expect(dataStatements(bigFiltered.statements)).toHaveLength(dataStatements(small.statements).length);
       const rows = h.dataOf<{ items: FlaggedCase[] }>(big.result).items;
       expect(rows.length).toBeGreaterThanOrEqual(12);
-      expect(rows.every((row) => Object.keys(row.roleFlags).length === 8)).toBe(true);
+      expect(rows.every((row) => Object.keys(row.roleFlags).length === 6)).toBe(true);
       const filtered = h.dataOf<{ items: FlaggedCase[] }>(bigFiltered.result).items;
       expect(filtered.map((row) => row.employee.id)).toContain(approver.employeeId);
       // The filter reads the snapshot taken when the case was written: fewer cases, not the ones that held no role.

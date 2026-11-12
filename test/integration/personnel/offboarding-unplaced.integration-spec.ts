@@ -407,7 +407,8 @@ describe('unplaced employee offboarding and first placement (integration, real P
 
       const wire = await h.recordedCase(person, { accessBlockMode: 'BLOCK_NOW', lastWorkingDay: h.today() });
 
-      expect(wire).toMatchObject({ state: 'LEFT', accessBlockMode: 'BLOCK_NOW', abrupt: true });
+      expect(wire).toMatchObject({ state: 'LEFT', accessBlockMode: 'BLOCK_NOW' });
+      expect(wire).not.toHaveProperty('abrupt');
       expect(await h.count('handover_duties')).toBe(0);
       await h.revokeRights(wire.id, { accountLock: LOCK }).expect(200);
       const [right] = await rightsOf(wire.id);
