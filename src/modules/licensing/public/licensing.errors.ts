@@ -158,15 +158,16 @@ export class ProvisioningResponsibleInvalidError extends Error {
 
 /**
  * The beneficiary has left, or a departure blocks their access from today: no task to grant starts for them (`QĐ-77f`, `QĐ-110d`). The
- * cause says which, for a client that tells a person at work from one who is gone.
+ * reason says which, for a client that tells a person at work from one who is gone (`details.cause` on the wire; the field is not called
+ * `cause`, which would hide `Error.cause`).
  */
 export class ProvisioningBeneficiaryDepartedError extends Error {
   constructor(
     readonly requestId: string,
-    readonly cause: 'LEFT' | 'ACCESS_BLOCKED' = 'LEFT',
+    readonly reason: 'LEFT' | 'ACCESS_BLOCKED' = 'LEFT',
   ) {
     super(
-      cause === 'LEFT'
+      reason === 'LEFT'
         ? 'The beneficiary has left the company.'
         : 'The access of the beneficiary is blocked by their departure.',
     );

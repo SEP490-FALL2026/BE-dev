@@ -43,11 +43,11 @@ export class ProvisioningHolderService {
    * transaction of the act. Throws ProvisioningBeneficiaryDepartedError.
    */
   async requireCanBegin(tx: DbTx, requestId: string, employee: { id: string; status: string }): Promise<void> {
-    const cause = beneficiaryGrantRefusal({
+    const reason = beneficiaryGrantRefusal({
       status: employee.status,
       accessBlocked: employee.status === 'ACTIVE' && (await this.identity.isAccessBlocked(employee.id, tx)),
     });
-    if (cause) throw new ProvisioningBeneficiaryDepartedError(requestId, cause);
+    if (reason) throw new ProvisioningBeneficiaryDepartedError(requestId, reason);
   }
 
   /**
