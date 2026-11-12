@@ -36,7 +36,7 @@ describe('moving and cancelling a handover (integration, real PostgreSQL)', () =
 
   describe('moving the last working day (AC-14)', () => {
     it('moves the placement and the day the confirmation is due, and keeps the reason', async () => {
-      const { person, seat } = await leaver();
+      const { person } = await leaver();
       const wire = await h.recordedCase(person);
 
       const moved = h.dataOf<CaseWire>(
@@ -50,7 +50,6 @@ describe('moving and cancelling a handover (integration, real PostgreSQL)', () =
       });
       const placements = await h.placements(person.employeeId);
       expect(placements[placements.length - 1].valid_to).toBe(h.day(21));
-      expect((await h.dutyRows(seat))[0].due_on).toBe(h.dueBefore(h.day(20)));
       expect(await h.changeKinds(wire.id)).toEqual(['RECORDED', 'LAST_DAY_CHANGED']);
       const log = h.dataOf<{ items: { kind: string; oldLastWorkingDay: string | null; reason: string | null }[] }>(
         await h.caseChanges(wire.id).expect(200),
@@ -181,7 +180,7 @@ describe('moving and cancelling a handover (integration, real PostgreSQL)', () =
 
   describe('cancelling (AC-15, AC-19, AC-26)', () => {
     it('gives the person back the department, the confirmations are cancelled, and no task was ever made', async () => {
-      const { person, seat } = await leaver();
+      const { person } = await leaver();
       const wire = await h.recordedCase(person);
       const tasks = await h.taskCount();
 
@@ -195,7 +194,6 @@ describe('moving and cancelling a handover (integration, real PostgreSQL)', () =
       expect(await h.workState(person.employeeId)).toBe('ACTIVE/WORKING');
       const placements = await h.placements(person.employeeId);
       expect(placements[placements.length - 1].valid_to).toBeNull();
-      expect((await h.dutyRows(seat))[0]).toMatchObject({ cancel_reason: 'Rút đơn nghỉ việc' });
       expect(await h.taskCount()).toBe(tasks);
       expect(await h.changeKinds(wire.id)).toEqual(['RECORDED', 'CANCELLED']);
       // The person can be recorded again.

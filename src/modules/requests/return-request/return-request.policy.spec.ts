@@ -169,7 +169,7 @@ describe('who confirms the handover of a return, and what the return says when i
     expect(handoverOnTime('2026-11-10', '2026-11-11')).toBe(false);
   });
 
-  it('says in the audit entry who sent it, which seat, which task and what the handover asks, and never the reason', () => {
+  it('says in the audit entry who sent it, which seat and which task, and never the reason; it asks nothing of a handover (QĐ-110g)', () => {
     expect(
       returnSubmittedDetail({
         id: 'ret-1',
@@ -181,8 +181,6 @@ describe('who confirms the handover of a return, and what the return says when i
         departmentId: 'dep-1',
         revocationTaskId: 'task-1',
         revocationTaskCreated: true,
-        handoverRequired: true,
-        handoverDueOn: '2026-11-05',
         originRequestId: null,
       }),
     ).toEqual({
@@ -195,8 +193,6 @@ describe('who confirms the handover of a return, and what the return says when i
       departmentId: 'dep-1',
       revocationTaskId: 'task-1',
       revocationTaskCreated: true,
-      handoverRequired: true,
-      handoverDueOn: '2026-11-05',
       originRequestId: null,
     });
   });

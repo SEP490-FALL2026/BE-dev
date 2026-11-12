@@ -27,7 +27,7 @@ export function departureEffectiveOn(facts: {
   return floors.reduce((latest, day) => (day > latest ? day : latest));
 }
 
-/** The day the confirmation of the handover is due: the last working day less one working day (`OI-14c`, `US-03-04` AC-1, AC-7). */
+/** The day the old column `handover_due_on` of a planned departure holds: the last working day less one working day (no handover is confirmed by it any more, `QĐ-110g`). */
 export function handoverDueOn(lastWorkingDay: BusinessDate, nonWorkingDates: NonWorkingDates): BusinessDate {
   return addWorkingDays(lastWorkingDay, -1, nonWorkingDates);
 }
@@ -368,8 +368,6 @@ export interface Checklist {
 export interface ChecklistFacts {
   blockNow: boolean;
   lockRecorded: boolean;
-  /** Duties that wait for a confirmation and that nobody has gone on without (`AC-7`). */
-  pendingDuties: number;
   heldRights: number;
   withoutTask: number;
   accessRunsOn: number;
@@ -379,7 +377,8 @@ export interface ChecklistFacts {
 }
 
 /**
- * The four steps of the checklist `BM-08` in the order they are done (`US-03-04` AC-20): the handover of the data of each tool, the
+ * The four steps of the checklist `BM-08` in the order they are done (`US-03-04` AC-20): the handover of the data of each tool (always
+ * done: no confirmation of a handover is asked any more, `QĐ-110g`, and the clients still wait on four steps), the
  * lock of the company account (urgent when the departure is blocked now, and it comes before or with the first revocation), the removal
  * of the rights (a K1 whose access runs on to the end of the paid period is not done), and the seats given back, which is written only
  * for a seat whose task completed (`QĐ-62i`).
@@ -390,7 +389,7 @@ export function checklistOf(facts: ChecklistFacts): Checklist {
     facts.heldRights === 0 ? 'DONE' : revoked > 0 || facts.accessRunsOn > 0 ? 'IN_PROGRESS' : 'PENDING';
 
   return {
-    dataHandover: { state: facts.pendingDuties === 0 ? 'DONE' : 'PENDING', pendingDuties: facts.pendingDuties },
+    dataHandover: { state: 'DONE', pendingDuties: 0 },
     accountLock: { state: facts.lockRecorded ? 'DONE' : 'PENDING', urgent: facts.blockNow && !facts.lockRecorded },
     revokeAccess: {
       state: revoking,

@@ -51,7 +51,7 @@ describe('the return of a seat over PostgreSQL (US-05-13)', () => {
   };
 
   describe('the holder returns their seat, and the head confirms it is no longer needed (AC-1, AC-2, AC-9)', () => {
-    it('queues the revocation at once, with no step to approve, and does not give the seat back yet (AC-1)', async () => {
+    it('queues the revocation at once, with no step to approve and no handover to confirm, and does not give the seat back yet (AC-1)', async () => {
       const { unit, assignmentId } = await holder(lossy);
       const requestsBefore = await h.requestRows();
       const freeBefore = await h.freeSeats(lossy.subscriptionId);
@@ -68,7 +68,7 @@ describe('the return of a seat over PostgreSQL (US-05-13)', () => {
         requestedOn: h.today(),
         reason: 'The project is over',
         revocationNote: NOTE,
-        handover: { required: true, confirmed: false, flagged: false },
+        handover: { required: false, dueOn: null, confirmed: false, flagged: false },
         completedAt: null,
         failedAt: null,
       });
@@ -253,7 +253,6 @@ describe('the return of a seat over PostgreSQL (US-05-13)', () => {
       expect(done.returnRequest.completedAt).not.toBeNull();
       expect((await h.eventsOf('RETURN_REQUEST.COMPLETED', wire.id))[0].after).toMatchObject({
         holderEmployeeId: unit.member.employeeId,
-        handoverFlagged: false,
       });
       // It saves nothing: no commitment or invoice moves.
       expect(await h.count('budget_commitments')).toEqual(commitmentsBefore);

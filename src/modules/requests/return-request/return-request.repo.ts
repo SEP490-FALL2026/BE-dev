@@ -215,11 +215,8 @@ export class ReturnRequestRepo {
     });
   }
 
-  async markCompleted(tx: DbTx, id: string, at: Date, flagged: boolean): Promise<void> {
-    await tx.returnRequest.update({
-      where: { id },
-      data: { state: 'COMPLETED', completedAt: at, handoverFlagged: flagged },
-    });
+  async markCompleted(tx: DbTx, id: string, at: Date): Promise<void> {
+    await tx.returnRequest.update({ where: { id }, data: { state: 'COMPLETED', completedAt: at } });
   }
 
   async markFailed(tx: DbTx, id: string, at: Date, reason: string): Promise<void> {

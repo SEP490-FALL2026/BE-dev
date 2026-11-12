@@ -30,8 +30,7 @@ export interface DepartureWritten {
 
 /**
  * Writes the case of a departure and what follows it, in one transaction after the endings (`US-03-04` AC-2, AC-8, AC-23, AC-29): the
- * row (one blocked now with a last working day that is not ahead is `LEFT` at once), its first change, the audit entries, the hook of the file, the confirmation of the handover
- * for every tool, and the notices. Returns the case as it is read back, with what the database filled in.
+ * row (one blocked now with a last working day that is not ahead is `LEFT` at once), its first change, the audit entries, the hook of the file, the refusal of the person after the last day, and the notices. Returns the case as it is read back, with what the database filled in.
  */
 @Injectable()
 export class OffboardingCaseWriter {
@@ -173,7 +172,7 @@ export class OffboardingCaseWriter {
     });
   }
 
-  /** The hook of the file, the confirmation of the handover, the leaving of a departure blocked now, and the notices. */
+  /** The hook of the file, the refusal of the person after the last day, the leaving of a departure blocked now, and the notices. */
   private async announce(
     tx: DbTx,
     actor: PersonnelActor,
@@ -188,7 +187,6 @@ export class OffboardingCaseWriter {
       employeeId: record.employeeId,
       dueOn: record.departureEffectiveOn,
     });
-    if (seen.before) await this.handovers.open(tx, actor, record, { leaverIsHead: seen.leavesAsHead, today });
     const leftAtOnce = this.leavesAtOnce(input, done);
     if (input.accessBlockMode === 'WITH_LAST_DAY') {
       // From the day after the last working day the person is refused, whatever the state of the case (QĐ-100q).

@@ -16,8 +16,8 @@ import type { JudgedMove } from './offboarding-change-judge.service';
 
 /**
  * Writes the move of the last working day of a handover, or its cancellation, once it was judged (`US-03-04` AC-14, AC-15, AC-22, AC-26):
- * the periods of the record put back and written again for the move, the record, its change and the audit entry, the confirmation of the
- * handover for the new deadline (or cancelled), the hook of the file, and the notice, in the transaction of the event.
+ * the periods of the record put back and written again for the move, the record, its change and the audit entry, the refusal of the person
+ * moved with the day (or dropped), the hook of the file, and the notice, in the transaction of the event.
  */
 @Injectable()
 export class OffboardingChangeWriter {
@@ -53,7 +53,7 @@ export class OffboardingChangeWriter {
     const moved = await this.repo.reschedule(tx, held.id, {
       lastWorkingDay: input.lastWorkingDay,
       departureEffectiveOn: judged.endsOn,
-      // A departure blocked now has no handover deadline to move: its hold is counted from the day it was recorded.
+      // A departure blocked now has no deadline of the old handover column to move.
       handoverDueOn:
         held.accessBlockMode === 'BLOCK_NOW' ? null : await this.handovers.plannedDueOn(input.lastWorkingDay),
       headHandover: scheduled.headHandover,
@@ -61,7 +61,6 @@ export class OffboardingChangeWriter {
     });
     await this.handovers.moveAccessBlock(tx, held.employeeId, input.lastWorkingDay);
     await this.recordMove(tx, actor, { held, moved, reason: input.reason.trim(), groundsNote: input.groundsNote });
-    await this.handovers.reconcile(tx, actor, moved);
     await this.hooks.onDueChanged(tx, {
       fileKind: 'OFFBOARDING',
       fileId: held.id,
@@ -115,7 +114,7 @@ export class OffboardingChangeWriter {
     );
   }
 
-  /** Puts the periods back, cancels the confirmation of the handover, and brings the person back to what they were doing (`AC-26`). */
+  /** Puts the periods back, drops the block that has not taken effect, and brings the person back to what they were doing (`AC-26`). */
   async cancel(
     tx: DbTx,
     actor: PersonnelActor,
@@ -127,7 +126,6 @@ export class OffboardingChangeWriter {
       await this.periods.undo(tx, held);
     }
     const firstPlacementRestored = await this.periods.restoreFirstPlacement(tx, held);
-    await this.handovers.cancel(tx, actor, held, reason);
     // A block that has not taken effect goes with the handover; one that has stays until the Super Admin lifts it with a reason (QĐ-100q).
     const block = await this.handovers.releaseAccessBlock(tx, held.employeeId, why.today);
     // The person is back to what they were doing: a leave ended for the handover is taken up again when its day is still ahead (`AC-26`).

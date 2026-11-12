@@ -96,10 +96,6 @@ describe('a transfer between departments and the review of the tools (e2e)', () 
   });
 
   it('the IT Admin removes the account of the tool given up: that seat ends and the one kept stays', async () => {
-    // A tool that loses data on removal waits for the head to confirm the handover first.
-    for (const duty of await h.dutyRows(givenUp)) {
-      await h.confirmDuty(duty.id, { value: 'HANDLED' }, newHead.account).expect(201);
-    }
     await h.claim(taskId).expect(200);
     await h.revoked(taskId, { completion: 'ACCOUNT_REMOVED', evidence: 'Removed from the workspace' }).expect(200);
 

@@ -12,7 +12,6 @@ export interface DepartureDetailReads {
   seats: readonly { assignmentId: string; revocation: unknown }[];
   /** The seats whose renewal is cancelled but whose access runs on to the end of the paid period. */
   terminating: ReadonlySet<string>;
-  duties: readonly { status: string; flaggedUnconfirmed: boolean }[];
   /** The seats this case asked to have revoked. */
   opened: readonly string[];
   /** What the flows that come after the record registered, each with how many things it still waits on. */
@@ -35,7 +34,6 @@ export function departureDetailFacts(
       ? checklistOf({
           blockNow: record.accessBlockMode === 'BLOCK_NOW',
           lockRecorded,
-          pendingDuties: reads.duties.filter((duty) => duty.status === 'OPEN' && !duty.flaggedUnconfirmed).length,
           heldRights: seats.length,
           withoutTask: seats.filter((seat) => seat.revocation === null).length,
           accessRunsOn,

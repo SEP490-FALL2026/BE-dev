@@ -1,4 +1,3 @@
-import { RevocationHookRefusedError } from '../../licensing/public/licensing.errors';
 import type { ReturnableProblem, SenderRefusal } from './return-request.policy';
 
 export type ReturnRefusal =
@@ -31,23 +30,5 @@ export class ReturnRequestRefusedError extends Error {
   ) {
     super(`The return of the seat is refused: ${reason}.`);
     this.name = 'ReturnRequestRefusedError';
-  }
-}
-
-/**
- * The revocation of a seat that was returned cannot be completed yet: the handover that loses data is not confirmed by the person
- * who triggered the return, and its deadline has not passed (`US-05-13` AC-6). Thrown from the hook of the revocation, which the
- * licensing mapper answers as a conflict with this code.
- */
-export class ReturnHandoverPendingError extends RevocationHookRefusedError {
-  constructor(returnRequestId: string, dueOn: string) {
-    super(
-      'PROVISIONING.HANDOVER_PENDING',
-      'The handover of the data has to be confirmed before the seat is taken away.',
-      {
-        returnRequestId,
-        dueOn,
-      },
-    );
   }
 }

@@ -1,6 +1,5 @@
 import { Injectable } from '@nestjs/common';
 import { LicensingApi } from '../../../licensing/public/licensing.api';
-import { LicensingHandoverApi } from '../../../licensing/public/licensing-handover.api';
 import { IdentityAccessApi } from '../../../identity-access/public/identity-access.api';
 import { OrganizationReadApi } from '../../../organization/public/organization-read.api';
 import type { EmployeeRecord } from '../../../organization/public/organization.types';
@@ -17,8 +16,7 @@ const nonZero = (counts: Record<string, number>): Record<string, number> =>
   Object.fromEntries(Object.entries(counts).filter(([, count]) => count > 0));
 
 /**
- * One departure in full (`US-03-04` AC-7, AC-20): for a case that is not cancelled, what the person still holds with the
- * confirmation of each handover, the four steps, what keeps the case open and what needs a person; the minimal projection for the IT Admin.
+ * One departure in full (`US-03-04` AC-7, AC-20): for a case that is not cancelled, what the person still holds, the four steps, what keeps the case open and what needs a person; the minimal projection for the IT Admin.
  */
 @Injectable()
 export class OffboardingDetailService {
@@ -26,7 +24,6 @@ export class OffboardingDetailService {
     private readonly repo: OffboardingRepo,
     private readonly organizationReads: OrganizationReadApi,
     private readonly licensing: LicensingApi,
-    private readonly licensingHandovers: LicensingHandoverApi,
     private readonly sources: OffboardingSources,
     private readonly roleDuties: RoleDutiesService,
     private readonly identity: IdentityAccessApi,
@@ -42,10 +39,9 @@ export class OffboardingDetailService {
         ? (await this.licensing.listTerminatingAccess([record.employeeId])).map((access) => access.assignmentId)
         : [],
     );
-    const duties = await this.licensingHandovers.getHandoverDutiesOf(seats.map((seat) => seat.assignmentId));
     const opened = live ? await this.repo.openedAssignmentIds(record.id) : [];
     const registered = live ? await this.sources.blockersOf(record.employeeId) : {};
-    const facts = departureDetailFacts(record, { live, seats, terminating, duties, opened, registered });
+    const facts = departureDetailFacts(record, { live, seats, terminating, opened, registered });
 
     const roles = await this.rolesOf(record, live);
     const [employees, department, warnings] = await this.othersOf(record, live);

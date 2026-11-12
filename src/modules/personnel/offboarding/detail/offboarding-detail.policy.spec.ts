@@ -15,11 +15,6 @@ describe('what the detail of a departure is read against (US-03-04 AC-7, AC-20, 
     live: true,
     seats: [seat('a'), seat('b', { taskId: 't-1' }), seat('c')],
     terminating: new Set(['c']),
-    duties: [
-      { status: 'OPEN', flaggedUnconfirmed: false },
-      { status: 'OPEN', flaggedUnconfirmed: true },
-      { status: 'CONFIRMED', flaggedUnconfirmed: false },
-    ],
     opened: ['a', 'x'],
     registered: { WORKSPACE: 1 },
   };
@@ -30,9 +25,9 @@ describe('what the detail of a departure is read against (US-03-04 AC-7, AC-20, 
     expect(facts).toMatchObject({ heldRights: 3, accessRunsOn: 1 });
   });
 
-  it('fills the checklist from the duties that wait without being gone on, the seats without a task, and the seats given back', () => {
+  it('fills the checklist from the seats without a task and the seats given back; the handover step is always done (QĐ-110g)', () => {
     expect(departureDetailFacts(record(), live).checklist).toMatchObject({
-      dataHandover: { state: 'PENDING', pendingDuties: 1 },
+      dataHandover: { state: 'DONE', pendingDuties: 0 },
       accountLock: { state: 'PENDING', urgent: false },
       revokeAccess: { state: 'IN_PROGRESS', heldRights: 3, withoutTask: 2, accessRunsOn: 1 },
       seatsReleased: { opened: 2, released: 1 },
@@ -54,7 +49,6 @@ describe('what the detail of a departure is read against (US-03-04 AC-7, AC-20, 
       live: false,
       seats: [],
       terminating: new Set<string>(),
-      duties: [],
       opened: [],
       registered: {},
     });

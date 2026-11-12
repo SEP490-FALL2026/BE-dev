@@ -98,7 +98,7 @@ export class OffboardingController {
     status: HttpStatus.CREATED,
     message: 'OFFBOARDING_CASE.RECORDED',
     description:
-      'The handover was recorded with the last working day and the basis, or, blocked now, the departure was recorded with the access of the person refused from the next request (a last working day that is today or past leaves the person at once). The placement of the person ends the day after the last working day, the head of the department they leave is handed over or left empty as chosen (a warning says from when), a long leave ends, a transfer that would take effect later is cancelled with the reason given, and the head of the department is asked to confirm the handover of every tool. No seat is taken away and no task is made. A person with no placement in force (department null) is recorded the same way with no placement to end and no head handover; a first placement not yet in force that starts after the last working day is cancelled with the record, and put back if the case is cancelled.',
+      'The handover was recorded with the last working day and the basis, or, blocked now, the departure was recorded with the access of the person refused from the next request (a last working day that is today or past leaves the person at once). The placement of the person ends the day after the last working day, the head of the department they leave is handed over or left empty as chosen (a warning says from when), a long leave ends, a transfer that would take effect later is cancelled with the reason given. No seat is taken away and no task is made. A person with no placement in force (department null) is recorded the same way with no placement to end and no head handover; a first placement not yet in force that starts after the last working day is cancelled with the record, and put back if the case is cancelled.',
   })
   @ApiErrorResponses(
     ...WRITE_COMMON,
@@ -218,7 +218,7 @@ export class OffboardingController {
   @ApiSuccessResponse(OffboardingDetailResponseDto, {
     message: 'OFFBOARDING_CASE.LAST_DAY_CHANGED',
     description:
-      'The last working day moved: the placement of the person and the handover of the head move with it, the day the confirmation is due is counted again, and the reason and the basis are kept. Only a handover under way before its last working day can move.',
+      'The last working day moved: the placement of the person and the handover of the head move with it, and the reason and the basis are kept. Only a handover under way before its last working day can move.',
   })
   @ApiErrorResponses(
     ...WRITE_COMMON,
@@ -254,7 +254,7 @@ export class OffboardingController {
   @ApiSuccessResponse(OffboardingDetailResponseDto, {
     message: 'OFFBOARDING_CASE.CANCELLED',
     description:
-      'The handover was cancelled: the person keeps the department and, if they headed it, the head, the confirmations that waited are cancelled, and they are back to what they were doing (a long leave still ahead included). A first placement the case had cancelled is put back when its department is still active, and firstPlacementRestored says whether it was. No task is made or taken away.',
+      'The handover was cancelled: the person keeps the department and, if they headed it, the head, and they are back to what they were doing (a long leave still ahead included). A first placement the case had cancelled is put back when its department is still active, and firstPlacementRestored says whether it was. No task is made or taken away.',
   })
   @ApiErrorResponses(
     ...WRITE_COMMON,

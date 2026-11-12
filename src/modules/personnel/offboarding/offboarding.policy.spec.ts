@@ -275,11 +275,10 @@ describe('what keeps a case open and the four steps', () => {
     });
   });
 
-  it('puts the steps in the order they are done and marks the lock urgent only for a departure nobody planned', () => {
+  it('puts the steps in the order they are done, marks the lock urgent only for a departure nobody planned, and never waits on a handover (QĐ-110g)', () => {
     const steps = checklistOf({
       blockNow: true,
       lockRecorded: false,
-      pendingDuties: 2,
       heldRights: 3,
       withoutTask: 3,
       accessRunsOn: 0,
@@ -288,7 +287,7 @@ describe('what keeps a case open and the four steps', () => {
     });
 
     expect(steps).toEqual({
-      dataHandover: { state: 'PENDING', pendingDuties: 2 },
+      dataHandover: { state: 'DONE', pendingDuties: 0 },
       accountLock: { state: 'PENDING', urgent: true },
       revokeAccess: { state: 'PENDING', heldRights: 3, withoutTask: 3, accessRunsOn: 0 },
       seatsReleased: { state: 'PENDING', opened: 0, released: 0 },
@@ -297,7 +296,6 @@ describe('what keeps a case open and the four steps', () => {
       checklistOf({
         blockNow: false,
         lockRecorded: true,
-        pendingDuties: 0,
         heldRights: 1,
         withoutTask: 0,
         accessRunsOn: 1,
@@ -313,7 +311,6 @@ describe('what keeps a case open and the four steps', () => {
       checklistOf({
         blockNow: false,
         lockRecorded: true,
-        pendingDuties: 0,
         heldRights: 0,
         withoutTask: 0,
         accessRunsOn: 0,

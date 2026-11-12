@@ -132,8 +132,6 @@ export function returnSubmittedDetail(created: {
   departmentId: string;
   revocationTaskId: string;
   revocationTaskCreated: boolean;
-  handoverRequired: boolean;
-  handoverDueOn: string | null;
   originRequestId: string | null;
 }): { [key: string]: string | boolean | null } {
   return {
@@ -146,8 +144,6 @@ export function returnSubmittedDetail(created: {
     departmentId: created.departmentId,
     revocationTaskId: created.revocationTaskId,
     revocationTaskCreated: created.revocationTaskCreated,
-    handoverRequired: created.handoverRequired,
-    handoverDueOn: created.handoverDueOn,
     originRequestId: created.originRequestId,
   };
 }

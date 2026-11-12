@@ -14,7 +14,7 @@ import type { OffboardingRecord, RecordOffboardingInput } from './offboarding.ty
  * is `LEFT` at once (`US-03-04` AC-2, AC-8, AC-18, AC-19, AC-23, AC-29, `US-03-03` AC-6, `US-03-01` AC-21). One transaction under the
  * locks of the protocol (the departments by id, the employee, a chosen successor, the accounts): the transfer that would still wait
  * is cancelled, a long leave ends, the head of the department the person leaves is handed over (never a reason to refuse, `QĐ-77k`),
- * the placement ends the day after the last working day, and the confirmation of the handover is opened for every tool. No seat is
+ * the placement ends the day after the last working day. No seat is
  * taken away and no task is made here (`AC-5`).
  */
 @Injectable()

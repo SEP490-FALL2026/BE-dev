@@ -58,14 +58,6 @@ describe('what the database refuses about a return and a renewal (US-05-13, US-0
     await h.stop();
   });
 
-  const returnOf = async (target: { subscriptionId: string }) => {
-    counter += 1;
-    const unit = await h.departmentWithHead(`P-CN${counter}`);
-    const assignmentId = await h.seatOf(unit.member, target);
-    const wire = await h.returned(unit.member.account, { assignmentId, reason: 'The project is over' });
-
-    return { unit, assignmentId, id: wire.id, taskId: (await h.returnRow(wire.id)).revocation_task_id };
-  };
   /** A change the database accepts only as a repair: the trigger that guards what was said is set aside for the statement. */
   const unguarded = async (text: string, values: unknown[]): Promise<string | null> => {
     await h.ctx.sql.query(`ALTER TABLE return_requests DISABLE TRIGGER return_requests_immutable`);
@@ -75,10 +67,31 @@ describe('what the database refuses about a return and a renewal (US-05-13, US-0
       await h.ctx.sql.query(`ALTER TABLE return_requests ENABLE TRIGGER return_requests_immutable`);
     }
   };
+  /**
+   * A return as it is sent today asks for no handover (QĐ-110g). `legacy` makes it the row an older version wrote for a plan that
+   * loses data (a handover required, due three days after the return), which the columns and the rules of the table still hold
+   * until they are dropped.
+   */
+  const returnOf = async (target: { subscriptionId: string }, legacy = false) => {
+    counter += 1;
+    const unit = await h.departmentWithHead(`P-CN${counter}`);
+    const assignmentId = await h.seatOf(unit.member, target);
+    const wire = await h.returned(unit.member.account, { assignmentId, reason: 'The project is over' });
+    if (legacy) {
+      expect(
+        await unguarded(
+          `UPDATE return_requests SET handover_required = true, handover_due_on = requested_on + 3 WHERE id = $1`,
+          [wire.id],
+        ),
+      ).toBeNull();
+    }
+
+    return { unit, assignmentId, id: wire.id, taskId: (await h.returnRow(wire.id)).revocation_task_id };
+  };
 
   describe('the return of a seat', () => {
     it('keeps the state and the columns that say it in step, and the handover with the plan that asks for it', async () => {
-      const asked = await returnOf(lossy);
+      const asked = await returnOf(lossy, true);
       const free = await returnOf(plain);
 
       expect(await sqlState(`UPDATE return_requests SET state = 'COMPLETED' WHERE id = $1`, [asked.id])).toBe(CHECK);
@@ -117,7 +130,7 @@ describe('what the database refuses about a return and a renewal (US-05-13, US-0
     });
 
     it('holds the source to who sent it, the reason to a text and the confirmer to the sender', async () => {
-      const asked = await returnOf(lossy);
+      const asked = await returnOf(lossy, true);
 
       expect(await unguarded(`UPDATE return_requests SET source = 'HEAD_CONFIRMATION' WHERE id = $1`, [asked.id])).toBe(
         CHECK,
@@ -127,7 +140,7 @@ describe('what the database refuses about a return and a renewal (US-05-13, US-0
       expect(lastConstraint).toBe('return_requests_text_check');
       expect(await unguarded(`UPDATE return_requests SET revocation_note = ' ' WHERE id = $1`, [asked.id])).toBe(CHECK);
       // Whoever confirms the handover is the person who sent the return: when the head sent it, the holder cannot confirm it.
-      const byHead = await returnOf(lossy);
+      const byHead = await returnOf(lossy, true);
       expect(
         await unguarded(
           `UPDATE return_requests SET handover_confirmed_at = now(), handover_confirmed_by_employee_id = holder_employee_id,
@@ -139,7 +152,7 @@ describe('what the database refuses about a return and a renewal (US-05-13, US-0
     });
 
     it('never deletes a return, never changes what it said when it was sent and writes the confirmation once', async () => {
-      const asked = await returnOf(lossy);
+      const asked = await returnOf(lossy, true);
 
       expect(await sqlState(`DELETE FROM return_requests WHERE id = $1`, [asked.id])).toBe(FINAL);
       for (const set of [
@@ -154,7 +167,12 @@ describe('what the database refuses about a return and a renewal (US-05-13, US-0
         expect(await sqlState(`UPDATE return_requests SET ${set} WHERE id = $1`, [asked.id])).toBe(FINAL);
       }
 
-      await h.confirmHandover(asked.id, asked.unit.member.account).expect(200);
+      expect(
+        await sqlState(
+          `UPDATE return_requests SET handover_confirmed_at = now(), handover_confirmed_by_employee_id = requested_by_employee_id WHERE id = $1`,
+          [asked.id],
+        ),
+      ).toBeNull();
       expect(await sqlState(`UPDATE return_requests SET handover_confirmed_at = now() WHERE id = $1`, [asked.id])).toBe(
         FINAL,
       );
