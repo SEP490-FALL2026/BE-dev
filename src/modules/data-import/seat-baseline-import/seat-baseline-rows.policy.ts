@@ -68,8 +68,6 @@ export interface SeatFacts {
       owningUnit?: { departmentId: string; costCenter: { id: string; code: string; status: string } | null } | null;
     }
   >;
-  /** By Cost Center code. */
-  costCenters: ReadonlyMap<string, { id: string; kind: string; status: string }>;
   companyDomains: readonly string[];
   existing: readonly ExistingAssignment[];
 }
@@ -81,19 +79,14 @@ const MASK_INVALID = '[masked: invalid]';
 
 const cell = (cells: SeatCells, column: SeatColumn): string => (cells[column] ?? '').trim();
 
-/** The codes of the people and of the Cost Centers the rows name, to look up in one read each. */
-export function lookupNamesOf(rows: readonly { cells: SeatCells }[]): {
-  employeeCodes: string[];
-  costCenterCodes: string[];
-} {
+/** The codes of the people the rows name, to look up in one read. */
+export function lookupNamesOf(rows: readonly { cells: SeatCells }[]): { employeeCodes: string[] } {
   const employees = new Set<string>();
-  const costCenters = new Set<string>();
   for (const { cells } of rows) {
     if (cell(cells, 'employee_code')) employees.add(cell(cells, 'employee_code').toUpperCase());
-    if (cell(cells, 'cost_center_code')) costCenters.add(cell(cells, 'cost_center_code'));
   }
 
-  return { employeeCodes: [...employees], costCenterCodes: [...costCenters] };
+  return { employeeCodes: [...employees] };
 }
 
 /**
@@ -119,14 +112,13 @@ const overlaps = (a: SeatPeriod, b: SeatPeriod): boolean =>
 
 interface Accepted {
   employeeId: string;
-  kind: 'PERSONAL' | 'SERVICE';
+  /** Counts for INV-02: a personal seat that is not flagged as a machine account (`R-9`). A row of a file is always one. */
+  personal: boolean;
   normalizedAccountIdentifier: string;
   period: SeatPeriod;
 }
 
-type SeatKind = 'PERSONAL' | 'SERVICE';
 type SeatEmployee = NonNullable<ReturnType<SeatFacts['employees']['get']>>;
-type OwningUnit = NonNullable<SeatEmployee['owningUnit']>;
 
 /** The day a seat starts, and why the granted date was refused when it was. */
 interface SeatStart {
@@ -134,19 +126,15 @@ interface SeatStart {
   refusal: 'GRANTED_ON_INVALID' | 'GRANTED_ON_IN_FUTURE' | null;
 }
 
-/** Where a seat is charged: the Cost Center and the department written with it. */
-interface SeatCharge {
-  errors: SeatRowErrorCode[];
-  costCenterId: string | null;
-  owningDepartmentId: string | null;
-}
+/**
+ * The kind the row asks for: an empty kind is a personal seat; a shared account and a service account are refused by their own reasons
+ * (`QĐ-110m`: the seat of an IT Admin used for a machine account is flagged after it is granted, never written by the import).
+ */
+function judgeKind(kindText: string): SeatRowErrorCode[] {
+  if (kindText === '' || kindText === 'personal') return [];
+  if (kindText === 'service') return ['SERVICE_ACCOUNT_NOT_SUPPORTED'];
 
-/** The kind the row asks for: an empty kind is a personal seat; a shared account is refused by its own reason. */
-function judgeKind(kindText: string): { kind: SeatKind | null; errors: SeatRowErrorCode[] } {
-  if (kindText === '' || kindText === 'personal') return { kind: 'PERSONAL', errors: [] };
-  if (kindText === 'service') return { kind: 'SERVICE', errors: [] };
-
-  return { kind: null, errors: [kindText === 'shared' ? 'SHARED_ACCOUNT_NOT_SUPPORTED' : 'KIND_INVALID'] };
+  return [kindText === 'shared' ? 'SHARED_ACCOUNT_NOT_SUPPORTED' : 'KIND_INVALID'];
 }
 
 function employeeErrors(employee: SeatEmployee | undefined): SeatRowErrorCode[] {
@@ -155,11 +143,14 @@ function employeeErrors(employee: SeatEmployee | undefined): SeatRowErrorCode[] 
   return employee.status !== 'ACTIVE' ? ['EMPLOYEE_NOT_ACTIVE'] : [];
 }
 
-/** The account identifier: given, not a secret, a name at all, and of the company for a personal seat or an email. */
+/**
+ * The account identifier: given, not a secret, a name at all, and of the company (`companyChecked` is false for a row refused for its kind,
+ * which is not asked to be a personal seat's account).
+ */
 function identifierErrors(
   identifier: string,
-  kind: SeatKind | null,
   companyDomains: readonly string[],
+  companyChecked: boolean,
 ): SeatRowErrorCode[] {
   if (identifier === '') return ['ACCOUNT_IDENTIFIER_MISSING'];
   // A stored row holds the mask where a token was: it is judged again as the token it replaced, so the preview stands.
@@ -167,9 +158,8 @@ function identifierErrors(
   if (identifier === MASK_INVALID) return ['ACCOUNT_IDENTIFIER_INVALID'];
   if (looksLikeSecret(identifier)) return ['ACCOUNT_IDENTIFIER_LOOKS_LIKE_SECRET'];
   if (hasInvalidCharacters(identifier)) return ['ACCOUNT_IDENTIFIER_INVALID'];
-  const ofTheCompany = kind !== null && (kind === 'PERSONAL' || identifier.includes('@'));
 
-  return ofTheCompany && !isCompanyAccount(identifier, companyDomains) ? ['NOT_COMPANY_ACCOUNT'] : [];
+  return companyChecked && !isCompanyAccount(identifier, companyDomains) ? ['NOT_COMPANY_ACCOUNT'] : [];
 }
 
 /** The granted date when it is a real day not after the record date; without one, the record date. */
@@ -205,101 +195,37 @@ function judgeEnd(
   return { expectedEndDate: endText, errors: [] };
 }
 
-/** The Cost Center the row names, when it names one: it exists, and it is the Unit the account is charged to. */
-function namedCostCenterErrors(costCenterCode: string, unit: OwningUnit | null, facts: SeatFacts): SeatRowErrorCode[] {
-  if (costCenterCode === '') return [];
-  const named = facts.costCenters.get(costCenterCode);
-  if (!named) return ['COST_CENTER_NOT_FOUND'];
-
-  return unit && named.id !== unit.costCenter?.id ? ['COST_CENTER_NOT_OWNING_UNIT'] : [];
-}
-
-function owningUnitErrors(unit: OwningUnit): SeatRowErrorCode[] {
-  // A department that has no Cost Center in use yet (`QĐ-87d(1)`) has nothing to charge the account to: the same refusal
-  // as a Unit that was retired. The seats of a subscription are one pool for every department (`QĐ-103d`): the department that owns
-  // the subscription, if any, is not compared with the one of the account.
-  return !unit.costCenter || unit.costCenter.status !== 'ACTIVE' ? ['COST_CENTER_INACTIVE'] : [];
-}
-
-/**
- * A service account belongs to the department of the person who answers for it, and is charged to the Unit of that
- * department (`QĐ-86c`); the Cost Center column, when given, can only name that Unit.
- */
-function judgeServiceCharge(
-  employee: SeatEmployee | undefined,
-  reason: string,
-  costCenterCode: string,
-  facts: SeatFacts,
-): SeatCharge {
-  const errors: SeatRowErrorCode[] = [];
-  if (reason === '') errors.push('REASON_REQUIRED');
-  const unit = employee?.owningUnit ?? null;
-  if (employee && !unit) errors.push('OWNING_DEPARTMENT_NOT_FOUND');
-  errors.push(...namedCostCenterErrors(costCenterCode, unit, facts));
-  if (!unit) return { errors, costCenterId: null, owningDepartmentId: null };
-  errors.push(...owningUnitErrors(unit));
-
-  return { errors, costCenterId: unit.costCenter?.id ?? null, owningDepartmentId: unit.departmentId };
-}
-
-/**
- * A personal seat names no Cost Center. It is held by the department the person is in (`QĐ-103d`), whoever owns the subscription: the pool of
- * seats is every department's, so a person of another department than the owner's is a valid row and nobody reviews it afterwards.
- */
-function judgePersonalCharge(costCenterCode: string, employee: SeatEmployee | undefined): SeatCharge {
-  return {
-    errors: costCenterCode !== '' ? ['COST_CENTER_NOT_ALLOWED'] : [],
-    costCenterId: null,
-    owningDepartmentId: employee?.owningUnit?.departmentId ?? null,
-  };
-}
-
-function judgeCharge(
-  kind: SeatKind | null,
-  employee: SeatEmployee | undefined,
-  cells: SeatCells,
-  facts: SeatFacts,
-): SeatCharge {
-  const costCenterCode = cell(cells, 'cost_center_code');
-  if (kind === 'SERVICE') return judgeServiceCharge(employee, cell(cells, 'reason'), costCenterCode, facts);
-  if (kind === 'PERSONAL') return judgePersonalCharge(costCenterCode, employee);
-
-  return { errors: [], costCenterId: null, owningDepartmentId: null };
-}
-
 /**
  * What one row says, read and checked on its own: the errors it has and, when it has none, what to write. The reasons
  * come in a fixed order: the kind, the person, the account, the dates, then where the seat is charged.
  */
 function judgeAlone(cells: SeatCells, facts: SeatFacts): { errors: SeatRowErrorCode[]; parsed: ParsedSeatRow | null } {
-  const { kind, errors: kindErrors } = judgeKind(cell(cells, 'kind').toLowerCase());
+  const kindErrors = judgeKind(cell(cells, 'kind').toLowerCase());
   const employee = facts.employees.get(cell(cells, 'employee_code').toUpperCase());
   const identifier = cell(cells, 'account_identifier');
   const grantedOn = cell(cells, 'granted_on');
   const start = judgeStart(grantedOn, facts.recordedOn);
   const end = judgeEnd(cell(cells, 'expected_end_date'), start, employee);
-  const charge = judgeCharge(kind, employee, cells, facts);
   const errors: SeatRowErrorCode[] = [
     ...kindErrors,
     ...employeeErrors(employee),
-    ...identifierErrors(identifier, kind, facts.companyDomains),
+    ...identifierErrors(identifier, facts.companyDomains, kindErrors.length === 0),
     ...startErrors(start, employee),
     ...end.errors,
-    ...charge.errors,
   ];
 
-  if (errors.length > 0 || kind === null || !employee) return { errors, parsed: null };
-  const reason = cell(cells, 'reason');
+  if (errors.length > 0 || !employee) return { errors, parsed: null };
 
   return {
     errors,
     parsed: {
-      kind,
+      kind: 'PERSONAL',
       employeeId: employee.id,
       accountIdentifier: identifier,
-      reason: reason === '' ? null : reason,
-      costCenterId: charge.costCenterId,
-      owningDepartmentId: charge.owningDepartmentId,
+      reason: null,
+      costCenterId: null,
+      // The department the person is in on the day of the import, whoever owns the subscription: the pool of seats is every department's.
+      owningDepartmentId: employee.owningUnit?.departmentId ?? null,
       effectiveFrom: start.effectiveFrom,
       effectiveFromBasis: grantedOn === '' ? 'RECORDED' : 'ACTUAL',
       expectedEndDate: end.expectedEndDate,
@@ -309,7 +235,7 @@ function judgeAlone(cells: SeatCells, facts: SeatFacts): { errors: SeatRowErrorC
 
 /**
  * Judges the rows of a seat baseline file against the data as it is (`US-02-05`), in the order of the file: each row on
- * its own first (the person, the account, the dates, the time-limited staff, the service account), then, for a row that
+ * its own first (the person, the account, the dates, the time-limited staff), then, for a row that
  * is right in itself, against the seats already kept and the rows accepted before it: one person once at a time
  * (`INV-02`), one account identifier at a time, and for a subscription the seats bought (`INV-01`), counted on the days
  * the seats start as the database does. A row that is wrong takes no seat. Pure: the preview and the confirmation judge
@@ -321,7 +247,7 @@ export function judgeSeatRows(
 ): SeatRowResult[] {
   const accepted: Accepted[] = facts.existing.map((assignment) => ({
     employeeId: assignment.employeeId,
-    kind: assignment.kind,
+    personal: assignment.kind === 'PERSONAL' && !assignment.isMachineAccount,
     normalizedAccountIdentifier: assignment.normalizedAccountIdentifier,
     period: periodOf(assignment),
   }));
@@ -341,10 +267,8 @@ export function judgeSeatRows(
         errors.push('ACCOUNT_IDENTIFIER_IN_USE');
       }
       if (
-        parsed.kind === 'PERSONAL' &&
         accepted.some(
-          (other) =>
-            other.kind === 'PERSONAL' && other.employeeId === parsed.employeeId && overlaps(other.period, period),
+          (other) => other.personal && other.employeeId === parsed.employeeId && overlaps(other.period, period),
         )
       ) {
         errors.push('OVERLAP');
@@ -355,7 +279,7 @@ export function judgeSeatRows(
       if (errors.length === 0) {
         accepted.push({
           employeeId: parsed.employeeId,
-          kind: parsed.kind,
+          personal: true,
           normalizedAccountIdentifier: normalized,
           period,
         });

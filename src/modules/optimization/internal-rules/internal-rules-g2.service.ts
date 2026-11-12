@@ -31,6 +31,7 @@ const chainOf = (record: GhostSeatRecord): ChainRecommendation => ({
 
 const factsOf = (seat: RuleSeat, holderLeft: boolean): SeatFacts => ({
   kind: seat.kind,
+  isMachineAccount: seat.isMachineAccount,
   provisioningType: seat.provisioningType,
   pricingModel: seat.pricingModel,
   holderLeft,

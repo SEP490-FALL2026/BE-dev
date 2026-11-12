@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import request from 'supertest';
 import { pretendBusinessToday } from '../../support/pretend-today';
 import { AssignmentWire, SeatHarness } from '../../support/seat-baseline-harness';
+import { legacyServiceAccount } from '../../support/legacy-service-account';
 
 const h = new SeatHarness();
 
@@ -64,7 +65,14 @@ describe('license assignments over HTTP (integration, real PostgreSQL)', () => {
       today('2026-10-01');
       const subscriptionId = await h.subscription(10);
       await h.crowd('LST', 3);
-      await h.written({ subscriptionId }, [row('LST0'), row('LST1'), bot('LST2', 'lst-bot')]);
+      await h.written({ subscriptionId }, [row('LST0'), row('LST1')]);
+      // A service account of the earlier releases: nothing writes one any more, the list still shows it and filters by its kind.
+      await legacyServiceAccount(h.ctx.sql, {
+        subscriptionId,
+        employeeId: (await h.ctx.sql.query<{ id: string }>(`SELECT id FROM employees WHERE employee_code = 'LST2'`))
+          .rows[0].id,
+        identifier: 'lst-bot',
+      });
 
       expect(await h.assignmentsOf({ subscriptionId, kind: 'SERVICE' })).toHaveLength(1);
       expect(await h.assignmentsOf({ subscriptionId, kind: 'PERSONAL' })).toHaveLength(2);
@@ -78,54 +86,15 @@ describe('license assignments over HTTP (integration, real PostgreSQL)', () => {
     });
   });
 
-  describe('AC-7: a service account', () => {
-    it('is held by the person responsible, owned by their department and charged to its Unit, and makes no new employee', async () => {
-      today('2026-10-01');
+  describe('QĐ-110m: no service account any more', () => {
+    it('refuses a row of the kind service with SERVICE_ACCOUNT_NOT_SUPPORTED, names the columns of a service account as ignored, and makes no assignment', async () => {
       const subscriptionId = await h.subscription(10);
-      const unit = await h.ownUnit();
-      const holder = await h.person('SVC1');
-      const employees = await h.count('employees');
+      await h.person('SVC1');
 
-      await h.written({ subscriptionId }, [bot('SVC1', 'ci-bot')]);
+      const preview = await h.preview({ subscriptionId }, [bot('SVC1', 'ci-bot')]);
 
-      expect(await h.count('employees')).toBe(employees);
-      expect(await h.assignmentsOf({ subscriptionId })).toEqual([
-        expect.objectContaining({
-          kind: 'SERVICE',
-          employeeId: holder,
-          accountIdentifier: 'ci-bot',
-          reason: 'CI pipeline',
-          costCenterId: unit.id,
-          owningDepartmentId: unit.departmentId,
-        }),
-      ]);
-    });
-
-    it('refuses a service row without a reason, with an unknown Cost Center, with one that is not the owning Unit, or without a department', async () => {
-      const subscriptionId = await h.subscription(10);
-      const other = await h.costCenter('UNIT');
-      await h.crowd('SVR', 5, [3]);
-      const unit = await h.ownUnit();
-      const own = (await h.ctx.sql.query<{ code: string }>(`SELECT code FROM cost_centers WHERE id = $1`, [unit.id]))
-        .rows[0].code;
-
-      const preview = await h.preview({ subscriptionId }, [
-        bot('SVR0', 'bot-a', { reason: '' }),
-        bot('SVR1', 'bot-b', { cost_center_code: 'CC-NONE-9' }),
-        bot('SVR2', 'bot-c', { cost_center_code: other.code }),
-        bot('SVR3', 'bot-d'),
-        bot('SVR4', 'bot-e', { cost_center_code: own }),
-      ]);
-
-      expect(preview.summary).toMatchObject({
-        valid: 1,
-        byCode: {
-          REASON_REQUIRED: 1,
-          COST_CENTER_NOT_FOUND: 1,
-          COST_CENTER_NOT_OWNING_UNIT: 1,
-          OWNING_DEPARTMENT_NOT_FOUND: 1,
-        },
-      });
+      expect(preview.summary).toMatchObject({ valid: 0, byCode: { SERVICE_ACCOUNT_NOT_SUPPORTED: 1 } });
+      expect(await h.assignmentsOf({ subscriptionId })).toEqual([]);
     });
   });
 

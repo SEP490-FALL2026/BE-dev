@@ -210,13 +210,21 @@ export class AssignmentRepo {
       where: target.subscriptionId
         ? { subscriptionId: target.subscriptionId }
         : { planId: target.planId, subscriptionId: null },
-      select: { employeeId: true, kind: true, normalizedAccountIdentifier: true, validFrom: true, validUntil: true },
+      select: {
+        employeeId: true,
+        kind: true,
+        isMachineAccount: true,
+        normalizedAccountIdentifier: true,
+        validFrom: true,
+        validUntil: true,
+      },
       orderBy: [{ validFrom: 'asc' }, { id: 'asc' }],
     });
 
     return rows.map((row) => ({
       employeeId: row.employeeId,
       kind: row.kind,
+      isMachineAccount: row.isMachineAccount,
       normalizedAccountIdentifier: row.normalizedAccountIdentifier,
       effectiveFrom: fromDateColumn(row.validFrom),
       validUntil: row.validUntil ? fromDateColumn(row.validUntil) : null,

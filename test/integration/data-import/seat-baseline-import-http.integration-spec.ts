@@ -253,32 +253,33 @@ describe('the seat baseline import over HTTP (integration, real PostgreSQL)', ()
   });
 
   describe('AC-9, AC-13, AC-14: the account', () => {
+    /** A row of a person with the account identifier the test wants (the kind is the personal one). */
     const bot = (code: string, identifier: string, extra: Record<string, string> = {}) => ({
       employee_code: code,
       account_identifier: identifier,
-      kind: 'service',
-      reason: 'CI pipeline',
       ...extra,
     });
 
-    it('takes a personal seat and two bots for one person, and refuses a repeated or missing identifier and a token', async () => {
+    it('refuses a repeated or missing identifier and a token, and a service account, which the import does not take (QĐ-110m)', async () => {
       const subscriptionId = await h.subscription(10);
-      await h.person('BOT1');
+      for (const code of ['BOT1', 'BOT2', 'BOT3', 'BOT4', 'BOT5', 'BOT6']) await h.person(code);
 
       const preview = await h.preview({ subscriptionId }, [
         row('BOT1'),
-        bot('BOT1', 'ci-bot'),
-        bot('BOT1', 'release-bot'),
-        bot('BOT1', ' CI-Bot '),
-        bot('BOT1', ''),
-        bot('BOT1', 'ghp_abc123'),
+        bot('BOT2', 'bot2@acme.vn'),
+        bot('BOT3', ' BOT2@acme.vn '),
+        bot('BOT4', ''),
+        bot('BOT5', 'ghp_abc123'),
+        bot('BOT6', 'ci-bot', { kind: 'service', reason: 'CI pipeline' }),
       ]);
 
-      expect(preview.summary).toMatchObject({ valid: 3, errors: 3 });
+      expect(preview.summary).toMatchObject({ valid: 2, errors: 4 });
       const rows = await rowsOf(preview.id);
-      expect(codesAt(rows, 5)).toEqual(['ACCOUNT_IDENTIFIER_IN_USE']);
-      expect(codesAt(rows, 6)).toEqual(['ACCOUNT_IDENTIFIER_MISSING']);
-      expect(codesAt(rows, 7)).toEqual(['ACCOUNT_IDENTIFIER_LOOKS_LIKE_SECRET']);
+      expect(codesAt(rows, 4)).toEqual(['ACCOUNT_IDENTIFIER_IN_USE']);
+      expect(codesAt(rows, 5)).toEqual(['ACCOUNT_IDENTIFIER_MISSING']);
+      expect(codesAt(rows, 6)).toEqual(['ACCOUNT_IDENTIFIER_LOOKS_LIKE_SECRET']);
+      expect(codesAt(rows, 7)).toEqual(['SERVICE_ACCOUNT_NOT_SUPPORTED']);
+      expect(preview.ignoredColumns).toContain('reason');
     });
 
     it('never keeps a token: the row shows it masked, and the stored row and the audit trail do not hold it', async () => {

@@ -76,6 +76,8 @@ export interface NewBaselineAssignment {
 export interface ExistingAssignment {
   employeeId: string;
   kind: AssignmentKind;
+  /** A flagged seat (`R-9`) does not count for INV-02: the person may take their own personal seat beside it. */
+  isMachineAccount: boolean;
   normalizedAccountIdentifier: string;
   effectiveFrom: BusinessDate;
   validUntil: BusinessDate | null;

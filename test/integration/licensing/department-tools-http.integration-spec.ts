@@ -5,6 +5,7 @@ import { LicensingRenewalApi } from '../../../src/modules/licensing/public/licen
 import { ApiAccount, createActivatedAccount } from '../../support/api-accounts';
 import { RevocationHarness } from '../../support/revocation-harness';
 import { changeRoleTo } from '../../support/builders/account.builder';
+import { legacyServiceAccount } from '../../support/legacy-service-account';
 
 const h = new RevocationHarness();
 
@@ -129,10 +130,15 @@ describe('the tools a department uses (US-03-06 AC-13, AC-17, F22, integration, 
       person('F-1'),
       { ...person('D-6'), granted_on: '2025-01-01' },
     ]);
-    await h.written({ subscriptionId: githubSubscription }, [
-      person('D-4'),
-      { employee_code: 'D-5', account_identifier: 'ci-bot', kind: 'service', reason: 'CI' },
-    ]);
+    await h.written({ subscriptionId: githubSubscription }, [person('D-4')]);
+    // A service account of the earlier releases, written by SQL: it stays readable in the tools a department uses.
+    const d5 = await h.ctx.sql.query<{ id: string }>(`SELECT id FROM employees WHERE employee_code = 'D-5'`);
+    await legacyServiceAccount(h.ctx.sql, {
+      subscriptionId: githubSubscription,
+      employeeId: d5.rows[0].id,
+      identifier: 'ci-bot',
+      reason: 'CI',
+    });
     await h.written({ subscriptionId: slackSubscription }, [person('F-1', 'slack-'), person('D-1', 'slack-')]);
     // Internal software has no subscription, so no owner: the seat of a member of finance on it is read through the member.
     await h.written({ planId: await h.plan('K5') }, [person('F-1', 'portal-')]);
@@ -164,7 +170,7 @@ describe('the tools a department uses (US-03-06 AC-13, AC-17, F22, integration, 
     });
     expect(result.items.find((item) => item.employeeCode === 'D-5')).toMatchObject({
       kind: 'SERVICE',
-      source: 'BASELINE',
+      source: 'REQUEST',
       holderStatus: 'ACTIVE',
     });
     expect(result.summary.map((entry) => entry.seats).sort()).toEqual([1, 2, 4]);

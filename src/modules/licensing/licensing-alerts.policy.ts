@@ -74,50 +74,6 @@ export function renewalWindowOpenedAlert(input: {
   };
 }
 
-/** Line 13, the reminder: the person who answers for service accounts has a file that takes effect on a day; once for the file and day. */
-export function serviceAccountDueAlert(
-  file: { employeeId: string; fileKind: string; fileId: string; dueOn: BusinessDate },
-  accountCount: number,
-): LicensingAlert {
-  return {
-    code: 'SERVICE_ACCOUNT_RESPONSIBLE_DUE',
-    subject: { type: 'Employee', id: file.employeeId },
-    params: {
-      employeeId: file.employeeId,
-      fileKind: file.fileKind,
-      fileId: file.fileId,
-      dueOn: file.dueOn,
-      accountCount,
-    },
-    eventKey: `SERVICE_ACCOUNT_RESPONSIBLE_DUE:${file.fileId}:${file.dueOn}`,
-  };
-}
-
-/** Line 13, the alert: the day came and the account still has nobody new; once for the account and the day. */
-export function serviceAccountOverdueAlert(row: {
-  assignmentId: string;
-  employeeId: string;
-  owningDepartmentId: string | null;
-  fileKind: string;
-  fileId: string;
-  dueOn: BusinessDate;
-}): LicensingAlert {
-  return {
-    code: 'SERVICE_ACCOUNT_RESPONSIBLE_OVERDUE',
-    subject: { type: 'LicenseAssignment', id: row.assignmentId },
-    // Picked one by one: the row a caller holds also carries the identifier of the account, which no notice may say.
-    params: {
-      assignmentId: row.assignmentId,
-      employeeId: row.employeeId,
-      owningDepartmentId: row.owningDepartmentId,
-      fileKind: row.fileKind,
-      fileId: row.fileId,
-      dueOn: row.dueOn,
-    },
-    eventKey: `SERVICE_ACCOUNT_RESPONSIBLE_OVERDUE:${row.assignmentId}:${row.dueOn}`,
-  };
-}
-
 /**
  * Line 38: whether a completed revocation leaves a person who leaves with a K1 access until the end of the paid period — the renewal
  * was cancelled with the access left to run, and a departure is among the reasons that asked for it (`QĐ-77l`).

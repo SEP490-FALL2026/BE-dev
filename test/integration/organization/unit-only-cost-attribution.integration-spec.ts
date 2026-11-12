@@ -10,6 +10,7 @@ import {
 } from '../../support/disposable-database';
 import { pretendBusinessToday } from '../../support/pretend-today';
 import { SeatHarness } from '../../support/seat-baseline-harness';
+import { legacyServiceAccount } from '../../support/legacy-service-account';
 
 const MIGRATIONS = join(process.cwd(), 'prisma', 'migrations');
 const UNIT_ONLY = '_cost_centers_unit_only';
@@ -215,12 +216,6 @@ describe('cost attribution to Units only (integration, BBI-D04 → BBI-D08, BBI-
           })
           .then(created),
       ).id;
-    const bot = (code: string, identifier: string) => ({
-      employee_code: code,
-      account_identifier: identifier,
-      kind: 'service',
-      reason: 'CI pipeline',
-    });
     const deactivate = (id: string) =>
       request(h.server())
         .post(`/api/v1/departments/${id}/deactivate`)
@@ -231,8 +226,13 @@ describe('cost attribution to Units only (integration, BBI-D04 → BBI-D08, BBI-
       const ops = await department('P-UO3');
       const subscriptionId = await h.subscription(10, 'K2', ops.id);
       const owner = await enter(ops.code, 'UO-OWN3');
-      await h.written({ subscriptionId }, [bot('UO-OWN3', 'uo3-bot')]);
-      const service = (await h.assignmentsOf({ subscriptionId, kind: 'SERVICE' }))[0];
+      // A service account of the earlier releases, written by SQL (nothing writes one any more).
+      const serviceId = await legacyServiceAccount(h.ctx.sql, {
+        subscriptionId,
+        employeeId: owner,
+        identifier: 'uo3-bot',
+      });
+      const service = { id: serviceId };
       // The placement began on the day the person was entered; nobody is a member any more: only the service account keeps the department in use.
       await h.ctx.sql.query(`UPDATE employee_placements SET valid_to = valid_from + 1 WHERE employee_id = $1`, [owner]);
 
@@ -249,22 +249,6 @@ describe('cost attribution to Units only (integration, BBI-D04 → BBI-D08, BBI-
       await h.ctx.sql.query(`UPDATE subscriptions SET end_date = '2026-12-10' WHERE id = $1`, [subscriptionId]);
       today('2026-12-20');
       await deactivate(ops.id).expect(200);
-    });
-
-    it('takes no new service account into a department that was retired meanwhile', async () => {
-      today('2026-12-01');
-      const ops = await department('P-UO4');
-      const subscriptionId = await h.subscription(10, 'K2', ops.id);
-      const owner = await enter(ops.code, 'UO-OWN4');
-      await h.ctx.sql.query(`UPDATE employee_placements SET valid_to = valid_from + 1 WHERE employee_id = $1`, [owner]);
-      await h.ctx.sql.query(`UPDATE departments SET status = 'INACTIVE', deactivated_at = now() WHERE id = $1`, [
-        ops.id,
-      ]);
-
-      const preview = await h.preview({ subscriptionId }, [bot('UO-OWN4', 'uo4-bot')]);
-
-      expect(preview.summary).toMatchObject({ valid: 0 });
-      expect(await h.assignmentsOf({ subscriptionId })).toEqual([]);
     });
   });
 });

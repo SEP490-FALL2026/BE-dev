@@ -119,6 +119,8 @@ export const IN_APP_NOTIFICATION_CODES = [
   'BUDGET_BASELINE_VERSION_HEAD_ASSIGNED',
   // The alerts of the rights (`a03-license-inbox-alerts`, `FR-5.14`): a right about to end, a handover not confirmed, a service
   // account whose person leaves, a person who left and keeps a K1 access to the end of the paid period. Ids, codes and days only.
+  // The codes of the handover and of the service account are read only (`QĐ-110g`, `QĐ-110m`): nothing writes one any more, a row of
+  // an inbox that holds one still reads.
   'LICENSE_EXPIRY_REMINDER',
   // The window of the renewal of a right opened (BR-MF1-08a): told once to the holder and the head of their department.
   'RENEWAL_WINDOW_OPENED',

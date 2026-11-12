@@ -3,8 +3,6 @@ import {
   leaverAccessAlert,
   leaverKeepsAccess,
   recipientsOf,
-  serviceAccountDueAlert,
-  serviceAccountOverdueAlert,
   usableOrNull,
   type LicensingAlert,
 } from './licensing-alerts.policy';
@@ -12,9 +10,7 @@ import {
 const A = '00000000-0000-4000-8000-00000000000a';
 const E = '00000000-0000-4000-8000-00000000000e';
 const P = '00000000-0000-4000-8000-00000000000b';
-const D = '00000000-0000-4000-8000-00000000000d';
 const T = '00000000-0000-4000-8000-00000000000c';
-const F = '00000000-0000-4000-8000-00000000000f';
 
 describe('who an alert of a right goes to (US-12-15)', () => {
   it('tells each person once and nobody in the place of a role nobody holds', () => {
@@ -60,36 +56,6 @@ describe('what each alert says and its key (FR-5.14 lines 3, 12, 13, 38)', () =>
     ).not.toBe(holder.eventKey);
   });
 
-  it('reminds of a service account before the day once for the file and day, and alerts after it once for the account and day (line 13)', () => {
-    const file = { employeeId: E, fileKind: 'TRANSFER', fileId: F, dueOn: '2026-07-01' };
-    const due = serviceAccountDueAlert(file, 2);
-    const overdue = serviceAccountOverdueAlert({ assignmentId: A, owningDepartmentId: D, ...file });
-
-    expect(due).toEqual({
-      code: 'SERVICE_ACCOUNT_RESPONSIBLE_DUE',
-      subject: { type: 'Employee', id: E },
-      params: { ...file, accountCount: 2 },
-      eventKey: `SERVICE_ACCOUNT_RESPONSIBLE_DUE:${F}:2026-07-01`,
-    });
-    expect(serviceAccountDueAlert({ ...file, dueOn: '2026-07-15' }, 2).eventKey).not.toBe(due.eventKey);
-    // The row of a duty also carries the identifier of the account and its plan: neither reaches the notice.
-    const fromRow = serviceAccountOverdueAlert({
-      assignmentId: A,
-      owningDepartmentId: D,
-      ...file,
-      accountIdentifier: 'ci-bot@acme.vn',
-      planId: P,
-    } as Parameters<typeof serviceAccountOverdueAlert>[0]);
-    expect(Object.keys(fromRow.params).sort()).toEqual(
-      ['assignmentId', 'dueOn', 'employeeId', 'fileId', 'fileKind', 'owningDepartmentId'].sort(),
-    );
-    expect(overdue).toMatchObject({
-      code: 'SERVICE_ACCOUNT_RESPONSIBLE_OVERDUE',
-      subject: { type: 'LicenseAssignment', id: A },
-      eventKey: `SERVICE_ACCOUNT_RESPONSIBLE_OVERDUE:${A}:2026-07-01`,
-    });
-  });
-
   it('tells a K1 access that runs on for a person who leaves, and nothing for any other completion (line 38, QĐ-77l)', () => {
     expect(leaverKeepsAccess({ accessState: 'UNTIL_PAID_END', sources: ['DEPARTURE'] })).toBe(true);
     expect(leaverKeepsAccess({ accessState: 'UNTIL_PAID_END', sources: ['RETURN', 'ABRUPT_DEPARTURE'] })).toBe(true);
@@ -107,7 +73,6 @@ describe('what each alert says and its key (FR-5.14 lines 3, 12, 13, 38)', () =>
   });
 
   it('carries only flat ids, codes, days and counts, never a name, an identifier of an account or a note', () => {
-    const file = { employeeId: E, fileKind: 'OFFBOARDING', fileId: F, dueOn: '2026-09-30' };
     const alerts: LicensingAlert[] = [
       expiryReminderAlert({
         assignmentId: A,
@@ -116,8 +81,6 @@ describe('what each alert says and its key (FR-5.14 lines 3, 12, 13, 38)', () =>
         expectedEndDate: '2026-09-30',
         audience: 'IT_ADMIN',
       }),
-      serviceAccountDueAlert(file, 1),
-      serviceAccountOverdueAlert({ assignmentId: A, owningDepartmentId: null, ...file }),
       leaverAccessAlert({ taskId: T, assignmentId: A, employeeId: E, planId: P, accessUntil: '2026-11-30' }),
     ];
 

@@ -26,21 +26,13 @@ describe('a closed seat baseline over HTTP (integration, real PostgreSQL)', () =
       await request(h.server()).get('/api/v1/seat-baseline').set(h.as(h.it1)).expect(200),
     );
 
-  it('is open at the start: the baseline can be imported, and a service account is kept for later', async () => {
+  it('is open at the start: the baseline can be imported', async () => {
     expect(await state()).toEqual({ closed: false, closedAt: null });
     subscriptionId = await h.subscription(10);
     await h.person('OPEN1');
     await h.person('OPEN2');
 
-    const { import: written } = await h.written({ subscriptionId }, [
-      row('OPEN1'),
-      {
-        employee_code: 'OPEN2',
-        account_identifier: 'open-bot',
-        kind: 'service',
-        reason: 'CI pipeline',
-      },
-    ]);
+    const { import: written } = await h.written({ subscriptionId }, [row('OPEN1'), row('OPEN2')]);
 
     expect(written.result?.created).toBe(2);
   });
