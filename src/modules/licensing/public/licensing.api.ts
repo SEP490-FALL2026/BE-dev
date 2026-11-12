@@ -24,6 +24,7 @@ import type {
   SeatHolding,
   RevocationSource,
   SelfExecutionMode,
+  SystemActor,
   TerminatingAccess,
   WithdrawnRevocation,
   WithdrawRevocationInput,
@@ -52,9 +53,14 @@ export class LicensingApi {
    * reason is added to it. Done in the transaction of the source, which decides who is revoked and why; the seat is given back
    * only when the task is completed. Asking again for the same source and reference changes nothing. Throws
    * RevocationRefusedError, AssignmentNotFoundError, AssignmentNotOpenError, SeatTargetNotFoundError and
-   * ProvisioningAnotherItAdminNeededError.
+   * ProvisioningAnotherItAdminNeededError. A sweeper that acts on a rule passes the system as `actor`: the task is then marked as made by
+   * the system and no self-execution rule applies.
    */
-  openRevocation(tx: DbTx, actor: AuthenticatedPrincipal, input: OpenRevocationInput): Promise<OpenedRevocation> {
+  openRevocation(
+    tx: DbTx,
+    actor: AuthenticatedPrincipal | SystemActor,
+    input: OpenRevocationInput,
+  ): Promise<OpenedRevocation> {
     return this.revocations.open(tx, actor, input);
   }
 

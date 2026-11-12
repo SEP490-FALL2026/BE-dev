@@ -84,13 +84,13 @@ export type RevocationEvent =
   | {
       /**
        * A task was opened or a reason added to it. `reasons` are all the task has, the first first; `actor` is who asked for the
-       * revocation and `now` the instant the source gave (or the clock): the day a deadline counts from.
+       * revocation (null when the system did, on a rule) and `now` the instant the source gave (or the clock): the day a deadline counts from.
        */
       moment: 'OPENED';
       task: RevocationTaskFacts;
       reasons: readonly RevocationReasonFacts[];
       context: RevocationContext;
-      actor: AuthenticatedPrincipal;
+      actor: AuthenticatedPrincipal | null;
       now: Date;
     }
   | {

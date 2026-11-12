@@ -261,7 +261,8 @@ export class ProvisioningTaskRepo {
       assignmentId: string;
       source: RevocationSource;
       defaultResponsibleEmployeeId: string | null;
-      createdByAppUserId: string;
+      /** An account, or the system (T-10): exactly one, as the CHECK of the table says. */
+      creator: { appUserId: string } | { system: true };
       maxAttempts: number;
     },
   ): Promise<ProvisioningTaskRecord> {
@@ -273,7 +274,9 @@ export class ProvisioningTaskRepo {
         channel: 'MANUAL',
         revocationSource: input.source,
         defaultResponsibleEmployeeId: input.defaultResponsibleEmployeeId,
-        createdByAppUserId: input.createdByAppUserId,
+        ...('system' in input.creator
+          ? { createdBySystem: true, createdByAppUserId: null }
+          : { createdByAppUserId: input.creator.appUserId }),
         maxAttempts: input.maxAttempts,
       },
       include: WITH_ASSIGNMENT,

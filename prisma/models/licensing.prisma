@@ -190,7 +190,9 @@ model ProvisioningTask {
   purchaseKind                 ProvisioningPurchaseKind? @map("purchase_kind")
   purchaseReason               String?                  @map("purchase_reason")
   purchasedAt                  DateTime?                @map("purchased_at") @db.Timestamptz(6)
-  createdByAppUserId           String                   @map("created_by_app_user_id") @db.Uuid
+  // Who made the task: an account, or the system on a rule nobody decides in the moment (exactly one; a CHECK in the migration).
+  createdByAppUserId           String?                  @map("created_by_app_user_id") @db.Uuid
+  createdBySystem              Boolean                  @default(false) @map("created_by_system")
   createdAt                    DateTime                 @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt                    DateTime                 @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
 

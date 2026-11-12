@@ -1,6 +1,7 @@
 import type { AuthenticatedPrincipal } from '../../infrastructure/security/tokens/access-token-verifier.port';
 import type { AuditEventInput, AuditValue } from '../audit/public/audit.types';
 import type { OperatorAuditActor } from './public/licensing-handover.types';
+import { isSystemActor, type SystemActor } from './public/licensing.types';
 
 /**
  * The audit event for a change made by `actor` (a user acting as themselves), correlated by their session. With `operator` (the
@@ -8,7 +9,7 @@ import type { OperatorAuditActor } from './public/licensing-handover.types';
  * ticket row as the correlation, and the context of the command added to what the event says after the change.
  */
 export function licensingAuditEvent(
-  actor: AuthenticatedPrincipal,
+  actor: AuthenticatedPrincipal | SystemActor,
   organizationId: string,
   action: string,
   resourceType: string,
@@ -30,6 +31,21 @@ export function licensingAuditEvent(
       after: operator.context ? { ...(after ?? {}), ...operator.context } : after,
       correlationId: operator.ticketId,
       operatorReference: operator.ticketRef,
+    };
+  }
+
+  if (isSystemActor(actor)) {
+    return {
+      organizationId,
+      actorKind: 'SYSTEM',
+      actorAppUserId: null,
+      actorRoles: [],
+      action,
+      resourceType,
+      resourceId,
+      before,
+      after,
+      correlationId: actor.correlationId,
     };
   }
 

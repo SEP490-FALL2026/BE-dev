@@ -42,7 +42,7 @@ describe('opening the revocation of a seat, the one gate of every source (integr
     await h.stop();
   });
 
-  it('US-07-05 AC-3: refuses a request with no source or one that is none of the thirteen, and writes nothing', async () => {
+  it('US-07-05 AC-3: refuses a request with no source or one that is none of the fourteen, and writes nothing', async () => {
     const assignmentId = await h.seat({ subscriptionId: k2 }, code());
     const before = { tasks: await tasks(), reasons: await h.count('provisioning_task_reasons') };
 
@@ -54,7 +54,7 @@ describe('opening the revocation of a seat, the one gate of every source (integr
     expect(await h.liveTaskOf(assignmentId)).toBeNull();
   });
 
-  it('US-07-05 AC-11: every one of the thirteen sources opens a task that names it, in the queue of the IT Admin, by hand', async () => {
+  it('US-07-05 AC-11: every one of the fourteen sources opens a task that names it, in the queue of the IT Admin, by hand', async () => {
     const opened: { source: string; assignmentId: string; taskId: string }[] = [];
     for (const source of REVOCATION_SOURCES) {
       const assignmentId = await h.seat({ subscriptionId: k2 }, code());
@@ -95,7 +95,7 @@ describe('opening the revocation of a seat, the one gate of every source (integr
       expect(JSON.stringify(events)).not.toContain('vì ');
       expect(JSON.stringify(events)).not.toContain('@acme.vn');
     }
-    expect(opened).toHaveLength(13);
+    expect(opened).toHaveLength(14);
   }, 300000);
 
   it('opens the task in the queue of the IT Admin in charge of the department of the holder today', async () => {
@@ -459,6 +459,69 @@ describe('opening the revocation of a seat, the one gate of every source (integr
       expect(claimable).not.toContain(taskId);
       expect(waiting).toContain(taskId);
       expect(waiting).not.toContain(plain);
+    });
+  });
+
+  describe('a revocation the system opens on a rule, with nobody to name (QĐ-110c, QĐ-110p)', () => {
+    const SYSTEM = { kind: 'SYSTEM', correlationId: 'deadline-sweep-2026-11-16' } as const;
+
+    it('makes the task as the system: marked so, no account behind it, and the audit event says SYSTEM', async () => {
+      const assignmentId = await h.seat({ subscriptionId: k2 }, code());
+
+      const answer = await h.open(assignmentId, 'TRANSFER', {
+        actor: SYSTEM,
+        decision: { decidedRole: 'SYSTEM', referenceKind: 'DEPARTMENT_TRANSFER', referenceId: randomUUID() },
+      });
+
+      expect(answer).toMatchObject({ created: true, status: 'QUEUED' });
+      const row = (
+        await h.ctx.sql.query<{ created_by_system: boolean; created_by_app_user_id: string | null }>(
+          `SELECT created_by_system, created_by_app_user_id FROM provisioning_tasks WHERE id = $1`,
+          [answer.taskId],
+        )
+      ).rows[0];
+      expect(row).toEqual({ created_by_system: true, created_by_app_user_id: null });
+      const audit = (
+        await h.ctx.sql.query<{ actor_kind: string; actor_app_user_id: string | null; correlation_id: string }>(
+          `SELECT actor_kind, actor_app_user_id, correlation_id FROM audit_events
+            WHERE resource_type = 'ProvisioningTask' AND resource_id = $1`,
+          [answer.taskId],
+        )
+      ).rows[0];
+      expect(audit).toEqual({
+        actor_kind: 'SYSTEM',
+        actor_app_user_id: null,
+        correlation_id: 'deadline-sweep-2026-11-16',
+      });
+    });
+
+    it('is not an IT Admin asking for their own seat: no self-execution is judged and nobody is told', async () => {
+      const assignmentId = await h.seat({ subscriptionId: k1 }, code());
+
+      const answer = await h.open(assignmentId, 'DEPARTURE', { actor: SYSTEM });
+
+      expect((await h.auditEvents('ProvisioningTask', answer.taskId))[0].after).toMatchObject({ selfExecuted: false });
+    });
+
+    it('a task made by an account is not marked as the system; the database refuses a task with both or neither creator', async () => {
+      const byAccount = await h.open(await h.seat({ subscriptionId: k2 }, code()), 'RETURN');
+      expect(
+        (
+          await h.ctx.sql.query<{ created_by_system: boolean }>(
+            `SELECT created_by_system FROM provisioning_tasks WHERE id = $1`,
+            [byAccount.taskId],
+          )
+        ).rows[0].created_by_system,
+      ).toBe(false);
+
+      await expect(
+        h.ctx.sql.query(`UPDATE provisioning_tasks SET created_by_system = true WHERE id = $1`, [byAccount.taskId]),
+      ).rejects.toMatchObject({ constraint: 'provisioning_tasks_creator_check' });
+      await expect(
+        h.ctx.sql.query(`UPDATE provisioning_tasks SET created_by_app_user_id = NULL WHERE id = $1`, [
+          byAccount.taskId,
+        ]),
+      ).rejects.toMatchObject({ constraint: 'provisioning_tasks_creator_check' });
     });
   });
 

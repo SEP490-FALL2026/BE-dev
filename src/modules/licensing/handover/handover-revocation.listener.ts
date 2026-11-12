@@ -43,6 +43,9 @@ export class HandoverRevocationHook implements OnModuleInit {
   private heard(tx: DbTx, event: RevocationEvent): Promise<void> {
     switch (event.moment) {
       case 'OPENED':
+        // The system opens only the revocations of rules that need no confirmation of a handover (QĐ-110g): no duty is made for them.
+        if (event.actor === null) return Promise.resolve();
+
         return this.handovers.openFromTask(tx, event.actor, event.task, event.reasons, event.context, event.now);
       case 'REASON_WITHDRAWN':
         // A reason was taken back: the duty is looked at again from the reasons that stand (a task cancelled owes nothing).

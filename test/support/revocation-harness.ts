@@ -8,6 +8,7 @@ import type {
   RevocationContext,
   RevocationDecision,
   RevocationSource,
+  SystemActor,
   WithdrawnRevocation,
 } from '../../src/modules/licensing/public/licensing.types';
 import type { ApiAccount } from './api-accounts';
@@ -47,7 +48,8 @@ export interface OpenOptions {
   /** The timing a source asks for (BR-MF5-04) and the notice to the holder (US-10-06 AC-2). */
   timing?: { dueOn?: string; notBefore?: string };
   notice?: { holder: true };
-  actor?: AuthenticatedPrincipal;
+  /** An account, or the system (a sweeper): the task is then marked as made by the system and no account made it. */
+  actor?: AuthenticatedPrincipal | SystemActor;
   now?: Date;
 }
 

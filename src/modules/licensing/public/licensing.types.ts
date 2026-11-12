@@ -1,4 +1,5 @@
 import type { BusinessDate } from '../../../core/business-date';
+import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import type { SeatTarget } from '../../catalog/public/catalog.types';
 
 export type AssignmentKind = 'PERSONAL' | 'SERVICE';
@@ -304,6 +305,21 @@ export interface OpenRevocationInput {
   /** `{ holder: true }`: the person who holds the seat is told once that its revocation is coming. Nothing given: nobody is told. */
   notice?: { holder: true };
   now?: Date;
+}
+
+/**
+ * The system acting on a rule nobody decides in the moment (the revocation when the grace of a transfer ends, `QĐ-110p`): no account, so
+ * the task it makes is marked as made by the system (T-10) and its audit event says `SYSTEM`. `correlationId` ties the event to the pass
+ * that made it (the key of the sweep and the day).
+ */
+export interface SystemActor {
+  readonly kind: 'SYSTEM';
+  readonly correlationId: string;
+}
+
+/** Whether `actor` is the system rather than an account. An account carries no `kind`. */
+export function isSystemActor(actor: AuthenticatedPrincipal | SystemActor): actor is SystemActor {
+  return 'kind' in actor && actor.kind === 'SYSTEM';
 }
 
 export interface RevocationContext {
