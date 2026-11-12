@@ -249,7 +249,8 @@ export const requestSchema = z.strictObject({
    * Who closed the request because the person it was for left, when, why and the note they gave; null for any other request.
    * `cancelledBy` is null, and `cause` is `SPENDING_APPROVER_PARTY`, when the conversion command closed it because the spending
    * approver is one of its parties (`QĐ-93k(1)`), or `SYSTEM_BENEFICIARY_LEFT` / `SYSTEM_BENEFICIARY_TRANSFERRED` when the system closed
-   * it because the person it was for left or was moved to another department (`QĐ-110d`, `QĐ-110o`): no employee closed it.
+   * it because the person it was for left or was moved to another department (`QĐ-110d`, `QĐ-110o`), or `SYSTEM_SCOPE_REMOVED` when it was a
+   * request for a service account, a kind that left the scope (`QĐ-110m`): no employee closed it.
    */
   cancellation: z
     .strictObject({

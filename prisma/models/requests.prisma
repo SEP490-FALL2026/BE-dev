@@ -82,6 +82,8 @@ enum AccessRequestCancelCause {
   // another department (the day the transfer takes effect). Nobody closed it: the column of who closed it is empty for these two.
   SYSTEM_BENEFICIARY_LEFT
   SYSTEM_BENEFICIARY_TRANSFERRED
+  // The system closed a request for a service account that was still open when that kind left the scope (QĐ-110m). Nobody closed it.
+  SYSTEM_SCOPE_REMOVED
 }
 
 // Pricing model of a plan: recurring (monthly/yearly), one-time (perpetual license).

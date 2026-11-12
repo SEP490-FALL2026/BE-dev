@@ -33,10 +33,18 @@ export type LineCancelCause = 'BENEFICIARY_LEFT' | 'BENEFICIARY_TRANSFERRED';
 export type SystemCancelCause = 'SYSTEM_BENEFICIARY_LEFT' | 'SYSTEM_BENEFICIARY_TRANSFERRED';
 
 /**
- * What a row can carry as the cause of a closing, as it is read: the two causes of the IT Admin, the two of the system, and the one the
- * conversion command writes when the spending approver is a party of the request (`QĐ-93k(1)`); nobody closed those (OD-6).
+ * Why the system closed a request for a service account that was still open when that kind left the scope (`QĐ-110m`): written once, by the
+ * migration that removed it, on a request and never on a line. Nobody closed it.
  */
-export type ReadableCancelCause = LineCancelCause | SystemCancelCause | 'SPENDING_APPROVER_PARTY';
+export type ScopeRemovedCancelCause = 'SYSTEM_SCOPE_REMOVED';
+
+/**
+ * What a row can carry as the cause of a closing, as it is read: the two causes of the IT Admin, the two of the system, the one of a kind
+ * that left the scope, and the one the conversion command writes when the spending approver is a party of the request (`QĐ-93k(1)`);
+ * nobody closed those (OD-6).
+ */
+export type ReadableCancelCause =
+  LineCancelCause | SystemCancelCause | ScopeRemovedCancelCause | 'SPENDING_APPROVER_PARTY';
 
 /** Whether the cause is one of the system: nobody closed what carries it. */
 export const isSystemCancelCause = (cause: ReadableCancelCause): cause is SystemCancelCause =>
@@ -48,6 +56,7 @@ export const READABLE_CANCEL_CAUSES = [
   'BENEFICIARY_TRANSFERRED',
   'SYSTEM_BENEFICIARY_LEFT',
   'SYSTEM_BENEFICIARY_TRANSFERRED',
+  'SYSTEM_SCOPE_REMOVED',
   'SPENDING_APPROVER_PARTY',
 ] as const satisfies readonly ReadableCancelCause[];
 
