@@ -1,4 +1,5 @@
 import { Module } from '@nestjs/common';
+import { DevicesModule } from '../devices/devices.module';
 import { IdentityAccessFacadeModule } from '../identity-access/identity-access-facade.module';
 import { LicensingModule } from '../licensing/licensing.module';
 import { OrganizationModule } from '../organization/organization.module';
@@ -22,6 +23,7 @@ import { SuperAdminDashboardService } from './super-admin/super-admin-dashboard.
  */
 @Module({
   imports: [
+    DevicesModule,
     OrganizationModule,
     IdentityAccessFacadeModule,
     LicensingModule,
