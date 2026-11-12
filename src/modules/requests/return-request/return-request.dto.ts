@@ -42,12 +42,15 @@ export const returnSummarySchema = z.strictObject({
   requestedBy: employeeRef,
   department: z.strictObject({ id: z.uuid(), code: z.string(), name: z.string() }),
   requestedOn: z.string(),
-  /** The handover of the data that the person who triggered the return confirms: asked only of a plan whose removal loses data. */
+  /**
+   * Since `QĐ-110g` no handover is asked of anyone: `required` is always false and `dueOn` null (also on a return an older release
+   * wrote as required); `confirmed` and `flagged` are what was recorded then, as history. The key stays until the clients stop reading it.
+   */
   handover: z.strictObject({
     required: z.boolean(),
     dueOn: z.string().nullable(),
     confirmed: z.boolean(),
-    /** The revocation was completed after the deadline without the confirmation. */
+    /** An older return: the revocation was completed after the deadline without the confirmation. */
     flagged: z.boolean(),
   }),
   createdAt: z.iso.datetime(),

@@ -51,7 +51,7 @@
 
 ### D-8 · X-H.3 · Các khóa của bàn giao ở API đọc (`rights[].handover`, `assignment-expiry-queue[].handover`, `checklist.dataHandover`, `return-requests[].handover*`): bỏ khóa hay giữ giá trị cố định?
 - **A:** bỏ khóa ngay. Ưu: gọn. Nhược: FE đang đóng hồ sơ cần checklist "đúng 4 bước" đều `DONE` (R2 K5-iv) và đọc `handover` ⟹ hỏng nếu bỏ trước FE.
-- **B:** giữ khóa với giá trị cố định: `handover: null`, `dataHandover: { state: 'DONE', pendingDuties: 0 }`, phiếu trả mới `handover.required=false`; phiếu cũ vẫn hiện dữ liệu cột. Bỏ khóa ở pha B sau khi FE phát hành.
+- **B:** giữ khóa với giá trị cố định: `handover: null`, `dataHandover: { state: 'DONE', pendingDuties: 0 }`, phiếu trả **mọi** phiếu `handover.required=false`, `dueOn=null` (D-16; `confirmed`/`flagged` là lịch sử đã ghi). Bỏ khóa ở pha B sau khi FE phát hành.
 - **ĐÃ CHỌN: B.** Lý do: SPEC P3 ("khóa `handover` trả `null`, giữ hình"), R2 pha A/B và `QĐ-110g` không đòi bỏ khóa. Chạm: `offboarding.mapper.ts`, `expiry-queue.service.ts`, `offboarding.policy.ts`, DTO (chỉ đổi mô tả). Tài liệu API FE ghi "luôn null/DONE".
 - **Đổi sang A:** xóa khóa ở 3 DTO + `toRight` + queue + policy; ghi changelog FE.
 
@@ -83,6 +83,13 @@
 - **B:** wire trả `null`, giữ khóa (như D-8), cột `handover_due_on` vẫn được ghi cho CHECK/guard (D-7 giữ phần này).
 - **ĐÃ CHỌN: B.** Lý do: `QĐ-110g`, SPEC S6; giữ khóa để FE chưa gãy. Chạm: `offboarding.mapper.ts` (`toSummary` luôn `null`), `OffboardingSummaryRecord` và `offboarding-list.repo.ts` không đọc cột nữa, mô tả DTO; test `offboarding-record`, `offboarding-change` khẳng định `null` ở wire **và** cột vẫn có ngày (`caseRow`). `HandingOverCase.handoverDueOn` (facade `personnel`, không lên wire, không ai đọc) giữ tới pha B.
 - **Đổi lại A:** trả `record.handoverDueOn` ở mapper và đọc lại cột ở `offboarding-list.repo.ts`.
+
+### D-16 · X-H review (Optional) · Phiếu trả cũ còn `AWAITING_REVOCATION` vẫn hiện `handover.required=true` trên wire
+- **A:** giữ giá trị cột cho phiếu cũ (D-8 ban đầu). Nhược: FE có thể hiện nút xác nhận gọi route đã xóa (404).
+- **B:** ép `required=false`, `dueOn=null` cho mọi phiếu; `confirmed` và `flagged` giữ như đã ghi (lịch sử đọc), vì chúng không mở nút nào.
+- **C:** ép cả bốn trường. Nhược: phiếu cũ đã xác nhận hiện `confirmed=false`, mất lịch sử đúng.
+- **ĐÃ CHỌN: B.** Lý do: `QĐ-110g`, review X-H; FE gạt nút theo `required && !confirmed` nên ẩn hẳn. Chạm: `return-request-query.service.ts`, `return-request.repo.ts` (summary không đọc cột `handover_required`/`handover_due_on` nữa), mô tả DTO; test `return-request.integration-spec` dựng dòng cũ bằng SQL (tắt trigger bất biến) và đọc lại bằng list + detail.
+- **Đổi sang A/C:** trả `row.handoverRequired`/`row.handoverDueOn` (A) hoặc ép thêm `confirmed:false`, `flagged:false` (C) ở cùng chỗ.
 
 ## Bị chặn
 

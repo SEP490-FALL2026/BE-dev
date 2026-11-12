@@ -34,7 +34,7 @@ export interface ReturnRequestRecord {
   createdAt: Date;
 }
 
-/** What a row of a list needs of a return: who, which seat, the state and the handover, none of the long texts. */
+/** What a row of a list needs of a return: who, which seat, the state and what was confirmed once, none of the long texts. */
 export type ReturnRequestSummaryRecord = Pick<
   ReturnRequestRecord,
   | 'id'
@@ -45,8 +45,6 @@ export type ReturnRequestSummaryRecord = Pick<
   | 'departmentId'
   | 'source'
   | 'requestedOn'
-  | 'handoverRequired'
-  | 'handoverDueOn'
   | 'handoverConfirmedAt'
   | 'handoverFlagged'
   | 'state'
@@ -92,8 +90,6 @@ const SUMMARY_SELECT = {
   departmentId: true,
   source: true,
   requestedOn: true,
-  handoverRequired: true,
-  handoverDueOn: true,
   handoverConfirmedAt: true,
   handoverFlagged: true,
   state: true,
@@ -107,7 +103,6 @@ const toSummary = (
 ): ReturnRequestSummaryRecord => ({
   ...row,
   requestedOn: fromDateColumn(row.requestedOn),
-  handoverDueOn: row.handoverDueOn ? fromDateColumn(row.handoverDueOn) : null,
 });
 
 const toRecord = (row: Prisma.ReturnRequestGetPayload<object>): ReturnRequestRecord => ({
