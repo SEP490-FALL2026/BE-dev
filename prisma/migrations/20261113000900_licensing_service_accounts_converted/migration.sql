@@ -18,9 +18,14 @@
 --
 -- What is not converted and is listed in a notice instead: a service account with a task of the grant or the revocation still alive, a duty of handover
 -- still open, a person who answers for it who has a personnel file (a transfer, a departure) that is not closed, one that has not started, one that ends
--- by itself the day it would be converted, and one for which no IT Admin can act. A duty of handover is open as the application judged it
+-- by itself the day it would be converted, one whose subscription cannot take the new seat (see below), and one for which no IT Admin can act. A duty of handover is open as the application judged it
 -- (`OPEN_DUTY`, the unique index of one open duty per seat and `20261113000500_handover_duties_cancel_open`): neither confirmed nor cancelled. The moment
 -- `proceeded_unconfirmed_at` only marks an open duty whose revocation went ahead without the confirmation, so it does not close it.
+--
+-- The new seat does not raise the number of seats a subscription holds on any day (the old one ends the day the new one begins and the new one keeps
+-- its end), but the trigger of INV-01 (`license_assignments_capacity_on_insert`) judges the subscription as a whole on every insert: one that already holds
+-- more seats than it bought on a day of the new period, or that does not say how many it bought, refuses the insert and would stop this whole file. So the
+-- same count is made first (`pg_temp.slm_capacity_refusal`, the query of that trigger on the rows as they are) and such an account is kept, with its reason.
 
 CREATE OR REPLACE FUNCTION pg_temp.slm_usable_it_admin(candidate uuid) RETURNS boolean
 LANGUAGE sql STABLE AS $$
@@ -38,12 +43,50 @@ LANGUAGE sql STABLE AS $$
     );
 $$;
 
+CREATE OR REPLACE FUNCTION pg_temp.slm_capacity_refusal(sub_id uuid, from_day date, until_day date) RETURNS text
+LANGUAGE plpgsql STABLE AS $$
+DECLARE
+    seats integer;
+    peak bigint;
+BEGIN
+    SELECT s."purchased_quantity" INTO seats FROM "subscriptions" s WHERE s."id" = sub_id;
+    IF seats IS NULL THEN
+        RETURN 'its subscription does not say how many seats were bought';
+    END IF;
+
+    -- As `license_assignment_check_capacity`: the seats taken on the day the new period starts and on the start of every other seat inside it.
+    SELECT COALESCE(MAX(per_day."occupied"), 0) INTO peak FROM (
+        SELECT (
+            SELECT count(*) FROM "license_assignments" b
+             WHERE b."subscription_id" = sub_id
+               AND b."valid_from" <= d."day"
+               AND (b."valid_until" IS NULL OR d."day" < b."valid_until")
+        ) AS "occupied"
+        FROM (
+            SELECT from_day AS "day"
+            UNION
+            SELECT a."valid_from"
+              FROM "license_assignments" a
+             WHERE a."subscription_id" = sub_id
+               AND a."valid_from" > from_day
+               AND (until_day IS NULL OR a."valid_from" < until_day)
+        ) d
+    ) per_day;
+    IF peak > seats THEN
+        RETURN 'its subscription already holds more seats than were bought';
+    END IF;
+
+    RETURN NULL;
+END;
+$$;
+
 -- 1. The service accounts still in force become seats flagged as a machine account.
 DO $$
 DECLARE
     rec RECORD;
     target uuid;
     why text;
+    capacity_why text;
     end_day date;
     new_id uuid;
     in_force_before integer;
@@ -74,6 +117,8 @@ BEGIN
         end_day := CASE WHEN rec.valid_from >= rec.day THEN rec.valid_from + 1 ELSE rec.day END;
         target := NULL;
         why := NULL;
+        capacity_why := CASE WHEN rec.subscription_id IS NOT NULL
+                             THEN pg_temp.slm_capacity_refusal(rec.subscription_id, end_day, rec.valid_until) END;
 
         IF EXISTS (
             SELECT 1 FROM "provisioning_tasks" t
@@ -97,6 +142,8 @@ BEGIN
             why := 'it has not started yet';
         ELSIF rec.valid_until IS NOT NULL AND rec.valid_until <= end_day THEN
             why := 'it ends by itself on the day it would be converted';
+        ELSIF capacity_why IS NOT NULL THEN
+            why := capacity_why;
         ELSE
             IF pg_temp.slm_usable_it_admin(rec.employee_id) THEN
                 target := rec.employee_id;

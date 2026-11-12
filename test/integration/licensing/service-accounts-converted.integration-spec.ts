@@ -324,6 +324,49 @@ describe('the migration that takes service accounts out of the scope (integratio
       expect(await successorOf(cancelled)).not.toBeNull();
     }, 180_000);
 
+    it('keeps a service account whose subscription already holds more seats than were bought, or does not say how many, and says why: the rest of the file still runs', async () => {
+      const crowded = await h.subscription(5, 'K2');
+      const unknown = await h.subscription(5, 'K2');
+      const worker = await h.person(code());
+      const first = await serviceAccount(crowded, worker);
+      const second = await serviceAccount(crowded, worker);
+      const noCount = await serviceAccount(unknown, worker);
+      const fine = await serviceAccount(subscriptions.seed, worker);
+      // The seats were reduced below the seats taken, which the database lets stand (only the application guards it), and one subscription lost its number.
+      await h.ctx.sql.query(`UPDATE subscriptions SET purchased_quantity = 1 WHERE id = $1`, [crowded]);
+      await h.ctx.sql.query(`UPDATE subscriptions SET status = 'DRAFT', purchased_quantity = NULL WHERE id = $1`, [
+        unknown,
+      ]);
+
+      const told = await migrate();
+
+      for (const id of [first, second]) {
+        expect(await successorOf(id)).toBeNull();
+        expect((await seatRow(id)).valid_until).toBeNull();
+        expect(told.find((line) => line.includes(id))).toContain(
+          'its subscription already holds more seats than were bought',
+        );
+      }
+      expect(await successorOf(noCount)).toBeNull();
+      expect(told.find((line) => line.includes(noCount))).toContain(
+        'its subscription does not say how many seats were bought',
+      );
+      expect(await successorOf(fine)).not.toBeNull();
+      expect(await seatsTaken(crowded, today())).toBe(2);
+    }, 180_000);
+
+    it('converts the account of a subscription with no free seat: the new seat takes the place of the old one, so a full subscription stays full', async () => {
+      const full = await h.subscription(1, 'K2');
+      const worker = await h.person(code());
+      const bot = await serviceAccount(full, worker);
+      expect(await seatsTaken(full, today())).toBe(1);
+
+      await migrate();
+
+      expect(await successorOf(bot)).not.toBeNull();
+      expect(await seatsTaken(full, today())).toBe(1);
+    }, 180_000);
+
     it('leaves one that has not started yet, and one for which no IT Admin can act', async () => {
       const worker = await h.person(code());
       const future = await serviceAccount(subscriptions.seed, worker, { validFrom: tomorrow() });
