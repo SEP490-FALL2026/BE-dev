@@ -45,6 +45,24 @@ export interface BeneficiaryGoneResult {
   needsItCheck: BeneficiaryGoneItem[];
 }
 
+/** A request, or the line of the person in a request for a group, that closing would deal with, as the preview tells it. */
+export interface BeneficiaryGonePreviewItem extends BeneficiaryGoneItem {
+  type: string;
+  /** The state of the request; of the line of the person when the request is for a group. */
+  state: string;
+}
+
+/**
+ * What `cancelForBeneficiaryGone` would do, read and never written: `wouldCancel` end as cancelled, `needsItCheck` are left to the IT
+ * Admin because a grant is being carried out. `heldToRelease` is what the requests that end hold and have not spent, one entry for each
+ * commitment (the share of a person in a request for a group is not in it).
+ */
+export interface BeneficiaryGonePreview {
+  wouldCancel: BeneficiaryGonePreviewItem[];
+  needsItCheck: BeneficiaryGonePreviewItem[];
+  heldToRelease: { requestId: string; currency: string; heldMinor: bigint }[];
+}
+
 /** The longest reason a step of the summary source carries, in characters (code points): what the summary may read of it (`US-15-05`). */
 export const AI_SOURCE_REASON_LENGTH = 1000;
 

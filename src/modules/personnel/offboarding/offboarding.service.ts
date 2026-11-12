@@ -1,7 +1,9 @@
 import { Injectable } from '@nestjs/common';
+import type { BusinessDate } from '../../../core/business-date';
 import { TransactionRunner, type DbTx } from '../../../infrastructure/database/transaction-runner';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import type { PersonnelActor } from '../public/personnel.types';
+import { DepartureImpactService } from '../departure-deadline/departure-impact.service';
 import { TransferGuardService } from '../transfer/transfer-guard.service';
 import { OffboardingCaseWriter } from './offboarding-case-writer.service';
 import { OffboardingEndings } from './offboarding-endings.service';
@@ -28,6 +30,7 @@ export class OffboardingService {
     private readonly preconditions: OffboardingPreconditions,
     private readonly endings: OffboardingEndings,
     private readonly writer: OffboardingCaseWriter,
+    private readonly impact: DepartureImpactService,
   ) {}
 
   /** Throws OffboardingRefusedError for everything the policy or the database refuses, and PersonnelAccessRefusedError for the actor. */
@@ -46,8 +49,22 @@ export class OffboardingService {
     const input = { ...given, lastWorkingDay: lastWorkingDayOf(given.accessBlockMode, given.lastWorkingDay, today) };
 
     const { seen, held } = await this.preconditions.require(tx, actor, input, today);
+    // What the departure will do, read before anything is written and shared with the preview, is kept with the record (`MF2-B.3`).
+    const impact = await this.impact.impactOf(tx, {
+      employeeId: input.employeeId,
+      today,
+      lastWorkingDay: input.lastWorkingDay as BusinessDate,
+      headSuccessorRequired: seen.leavesAsHead,
+    });
     const scheduled = await this.endings.end(tx, actor, input, { seen, held, organizationId: organization.id, today });
 
-    return this.writer.write(tx, actor, input, { seen, held, scheduled, organizationId: organization.id, today });
+    return this.writer.write(tx, actor, input, {
+      seen,
+      held,
+      scheduled,
+      impact,
+      organizationId: organization.id,
+      today,
+    });
   }
 }

@@ -1,12 +1,18 @@
 import { Injectable } from '@nestjs/common';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
+import { BudgetsApi } from '../../budgets/public/budgets.api';
 import { LicensingApi } from '../../licensing/public/licensing.api';
 import type { SystemActor } from '../../licensing/public/licensing.types';
 import { AccessRequestRepo } from '../access-request/access-request.repo';
 import type { AccessRequestRecord } from '../access-request/access-request.types';
 import type { LineRecord } from '../access-request/group-request.types';
 import { RequestLineRepo } from '../group-request/request-line.repo';
-import type { BeneficiaryGoneInput, BeneficiaryGoneResult } from '../public/requests.types';
+import type {
+  BeneficiaryGoneInput,
+  BeneficiaryGonePreview,
+  BeneficiaryGonePreviewItem,
+  BeneficiaryGoneResult,
+} from '../public/requests.types';
 import { BeneficiaryGoneClosing } from './beneficiary-gone-closing.service';
 import { BeneficiaryGoneItNotice } from './beneficiary-gone-it-notice.service';
 import { goneCauseOf, verdictOf, type GoneVerdict } from './beneficiary-gone-scope.policy';
@@ -32,6 +38,7 @@ export class BeneficiaryGoneCancellation {
     private readonly licensing: LicensingApi,
     private readonly closing: BeneficiaryGoneClosing,
     private readonly itNotice: BeneficiaryGoneItNotice,
+    private readonly budgets: BudgetsApi,
   ) {}
 
   async run(
@@ -59,6 +66,33 @@ export class BeneficiaryGoneCancellation {
     }
 
     return result;
+  }
+
+  /**
+   * What `run` would do, read and never written (`P23`): each open request is judged by the same policy, from its state as it is read now,
+   * and nothing is locked, so a request that moves meanwhile is judged again when the system really closes it. What the requests that
+   * end hold of the budget comes from the budgets in one read. A request for a group is judged by the line of the person.
+   */
+  async preview(
+    tx: DbTx,
+    input: BeneficiaryGoneInput,
+    openRequestIds: readonly string[],
+  ): Promise<BeneficiaryGonePreview> {
+    const wouldCancel: BeneficiaryGonePreviewItem[] = [];
+    const needsItCheck: BeneficiaryGonePreviewItem[] = [];
+    for (const requestId of openRequestIds) {
+      const request = await this.requests.findById(requestId, tx);
+      if (!request) continue;
+      const [line = null] =
+        request.type === 'GROUP_GRANT' ? await this.lines.read(tx, requestId, [input.employeeId]) : [];
+      const verdict = verdictOf(input.scope, request, line?.state ?? null);
+      if (verdict === 'SKIP') continue;
+      const item = { requestId, line: line !== null, type: request.type, state: line?.state ?? request.state };
+      (verdict === 'CANCEL' ? wouldCancel : needsItCheck).push(item);
+    }
+    const whole = wouldCancel.filter((item) => !item.line).map((item) => item.requestId);
+
+    return { wouldCancel, needsItCheck, heldToRelease: await this.budgets.heldByRequests(whole, tx) };
   }
 
   /**

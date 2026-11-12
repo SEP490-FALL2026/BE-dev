@@ -6,6 +6,7 @@ import { OrganizationApi } from '../../organization/public/organization.api';
 import { PersonnelNotifier } from '../event-notice/personnel-notifier.service';
 import { PersonnelFileHooks } from '../event-notice/personnel-file-hooks.service';
 import { groundsSnapshot, normalizedGroundsNote } from '../personnel-grounds.policy';
+import type { DepartureImpact } from '../departure-deadline/departure-impact.types';
 import { actorColumns, type PersonnelActor } from '../public/personnel.types';
 import { TransferGuardService } from '../transfer/transfer-guard.service';
 import { headSuccessorLabel } from '../transfer/transfer.policy';
@@ -24,8 +25,23 @@ export interface DepartureWritten {
   seen: DepartureSeen;
   held: DepartureHeld;
   scheduled: ScheduledDeparture;
+  /** What the departure was read to do before it was written: kept with the record, not re-read. */
+  impact: DepartureImpact;
   organizationId: string;
   today: BusinessDate;
+}
+
+/** What the record keeps of the impact read before it: how many of each, what goes back to the budget and the deadline (the lists are read again from the sources). */
+function impactSummary(
+  impact: DepartureImpact,
+): Record<string, string | number | { currency: string; amountMinor: string }[]> {
+  return {
+    rights: impact.rightsToRevoke.length,
+    requestsToCancel: impact.openRequestsToCancel.length,
+    provisioningInFlight: impact.provisioningInFlight.length,
+    commitmentToRelease: impact.commitmentToRelease,
+    revocationDueOn: impact.revocationDueOn,
+  };
 }
 
 /**
@@ -146,6 +162,7 @@ export class OffboardingCaseWriter {
         departureEffectiveOn: seen.endsOn,
         headSuccessor,
         transferCancelled,
+        impact: impactSummary(done.impact),
       },
       changedByAppUserId: by.appUserId,
       changedByTicketId: by.ticketId,

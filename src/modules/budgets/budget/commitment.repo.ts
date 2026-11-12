@@ -4,6 +4,7 @@ import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type {
   CommittedAmount,
+  HeldAmount,
   CommitmentHoldInput,
   CommitmentReleaseReason,
   HeldCommitment,
@@ -375,6 +376,27 @@ export class CommitmentRepo {
       select: { requestId: true, amountMinor: true, currency: true },
       orderBy: [{ requestId: 'asc' }, { year: 'asc' }],
     });
+  }
+
+  /**
+   * What each of the requests still holds (the amount less what went back and what became an expense), for the commitments that are held,
+   * in one read that locks nothing: for a preview of what closing the requests would free.
+   */
+  async heldOfRequests(requestIds: readonly string[], tx?: DbTx): Promise<HeldAmount[]> {
+    if (requestIds.length === 0) return [];
+    const rows = await (tx ?? this.prisma).budgetCommitment.findMany({
+      where: { requestId: { in: [...requestIds] }, state: 'HELD' },
+      select: { requestId: true, amountMinor: true, releasedMinor: true, appliedMinor: true, currency: true },
+      orderBy: [{ requestId: 'asc' }, { year: 'asc' }],
+    });
+
+    return rows
+      .map((row) => ({
+        requestId: row.requestId,
+        currency: row.currency,
+        heldMinor: row.amountMinor - row.releasedMinor - row.appliedMinor,
+      }))
+      .filter((row) => row.heldMinor > 0n);
   }
 
   /** Whether the request holds any commitment: Finance reads such a request from the commitment (`US-06-09` AC-2). */

@@ -10,14 +10,8 @@ import { OffboardingFrame } from './offboarding-frame.service';
 import { OffboardingLeftService } from './offboarding-left.service';
 import { OffboardingRefusedError } from './offboarding.errors';
 import { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
-import {
-  closeRefusal,
-  isBlocked,
-  isRevocableType,
-  ownBlock,
-  revocationSelection,
-  type RightFacts,
-} from './offboarding.policy';
+import { closeRefusal, isBlocked, ownBlock, revocationSelection, type RightFacts } from './offboarding.policy';
+import { isRevocableType } from '../departure-deadline/departure-impact.policy';
 import { OffboardingRepo } from './offboarding.repo';
 import type { OffboardingRecord, OpenRevocationsInput } from './offboarding.types';
 

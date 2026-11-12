@@ -3,7 +3,12 @@ import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { SystemActor } from '../../licensing/public/licensing.types';
 import { OpenRequestService } from '../access-request/open-request/open-request.service';
 import { BeneficiaryGoneCancellation } from '../cancellation/beneficiary-gone-cancellation.service';
-import type { BeneficiaryGoneInput, BeneficiaryGoneResult, OpenRequestOfBeneficiary } from './requests.types';
+import type {
+  BeneficiaryGoneInput,
+  BeneficiaryGonePreview,
+  BeneficiaryGoneResult,
+  OpenRequestOfBeneficiary,
+} from './requests.types';
 
 /**
  * The facade of the requests context that other contexts call. It answers what the personnel context shows beside the record of a
@@ -29,6 +34,14 @@ export class RequestsApi {
     input: BeneficiaryGoneInput,
   ): Promise<BeneficiaryGoneResult> {
     return this.gone.run(tx, actor, input, await this.open.idsOf(tx, input.employeeId));
+  }
+
+  /**
+   * What `cancelForBeneficiaryGone` would do for the same input, read and never written, in the caller's transaction: the requests it
+   * would end, those it would leave to the IT Admin, and what the ones that end hold of the budget. Locks nothing and tells nobody.
+   */
+  async previewBeneficiaryGone(tx: DbTx, input: BeneficiaryGoneInput): Promise<BeneficiaryGonePreview> {
+    return this.gone.preview(tx, input, await this.open.idsOf(tx, input.employeeId));
   }
 
   /**

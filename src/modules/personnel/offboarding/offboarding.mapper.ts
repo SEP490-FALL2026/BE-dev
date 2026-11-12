@@ -10,15 +10,9 @@ import { groundsNoteOf } from '../personnel-grounds.policy';
 import type { ReadAccess } from '../personnel-self-action.policy';
 import { ROLE_FLAGS, type RoleFlagMap } from '../public/personnel.types';
 import type { Checklist } from './offboarding.policy';
+import { isRevocableType } from '../departure-deadline/departure-impact.policy';
 import type { OffboardingChangeRecord, OffboardingRecord, OffboardingSummaryRecord } from './offboarding.types';
-import {
-  accessBlockedFrom,
-  isBlocked,
-  isPastLastDay,
-  isRevocableType,
-  ownBlock,
-  type DepartureBlock,
-} from './offboarding.policy';
+import { accessBlockedFrom, isBlocked, isPastLastDay, ownBlock, type DepartureBlock } from './offboarding.policy';
 
 const UNKNOWN = '';
 

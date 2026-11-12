@@ -25,6 +25,7 @@ audit, notifications. Được dùng bởi: requests; gốc `src/app/app.module.
     có quyền `K1`/`K2` đang chạy hoặc đã duyệt chi chưa cấp; chỉ Request mới có khoản, không có khoản theo Assignment.
   - `requestHoldsCommitment` — request có giữ commitment không, điều kiện để Finance đọc nó (US-06-09 AC-2).
   - `committedByRequests` — số tiền mỗi commitment của một loạt request, một lần đọc (danh sách lô chi của Finance).
+  - `heldByRequests` — số còn giữ (chưa chi, chưa trả) của các commitment `HELD` của một loạt request, một lần đọc không khóa (xem trước việc hủy Request của người nghỉ, MF2-B.3).
 - `public/budgets.types.ts` — input/output của facade (`YearBudgetFacts`, `PlanLineFacts`, `CommitmentHoldInput`…).
 - `public/budgets.extension-points.ts` — ba point dưới đây, contract `BudgetChangeListener`,
   `CommitmentReleaseGuard`, `CommitmentRequestFacts` (+ `CommitmentRequestView`) và hàm `budgetChangeHandler`.

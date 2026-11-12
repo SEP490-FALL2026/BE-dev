@@ -131,3 +131,10 @@ export interface CommittedAmount {
   amountMinor: bigint;
   currency: string;
 }
+
+/** What a request still holds and has not spent or given back, in one currency: the part of a commitment that going back to the budget would free. */
+export interface HeldAmount {
+  requestId: string;
+  currency: string;
+  heldMinor: bigint;
+}

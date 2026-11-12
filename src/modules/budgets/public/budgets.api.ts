@@ -6,6 +6,7 @@ import type {
   CommittedAmount,
   CommitmentHoldInput,
   CommitmentReleaseInput,
+  HeldAmount,
   HeldCommitment,
   ReleasedCommitment,
   SeatCommitment,
@@ -78,6 +79,14 @@ export class BudgetsApi {
   /** What each of the requests was committed for, one entry for each commitment, in one read: for a list that counts and adds them. */
   committedByRequests(requestIds: readonly string[]): Promise<CommittedAmount[]> {
     return this.commitments.committedBy(requestIds);
+  }
+
+  /**
+   * What each of the requests still holds, unspent and not given back, for the commitments that are held: what closing them would free.
+   * One read that locks nothing, in the caller's transaction when it has one; a request that holds nothing is absent.
+   */
+  heldByRequests(requestIds: readonly string[], tx?: DbTx): Promise<HeldAmount[]> {
+    return this.commitments.heldBy(requestIds, tx);
   }
 
   /** Whether the request holds a commitment, which is what lets Finance read it (`US-06-09` AC-2). */
