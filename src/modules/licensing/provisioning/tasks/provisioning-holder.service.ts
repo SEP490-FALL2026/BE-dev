@@ -51,6 +51,22 @@ export class ProvisioningHolderService {
   }
 
   /**
+   * The same for the claim of a task that is queued: the beneficiary is held `FOR SHARE` first, as the grant holds them, so a departure that
+   * blocks them in another transaction either finishes before the block is read here or waits for this one. Throws
+   * ProvisioningBeneficiaryDepartedError.
+   */
+  async requireCanBeginTask(tx: DbTx, requestId: string, employeeId: string): Promise<void> {
+    try {
+      await this.organizationReads.lockEmployeeForShare(tx, employeeId);
+    } catch (error) {
+      if (error instanceof EmployeeNotFoundError) return;
+      throw error;
+    }
+    const employee = await this.organizationReads.getEmployee(employeeId, tx);
+    if (employee) await this.requireCanBegin(tx, requestId, employee);
+  }
+
+  /**
    * Throws EmployeeNotFoundError, ProvisioningBeneficiaryDepartedError, ProvisioningBeneficiaryNotStartedError,
    * ProvisioningPersonalAccountError and ProvisioningAnotherItAdminNeededError (an IT Admin does not queue the grant of their own
    * request while another usable IT Admin can, `QĐ-77m`).

@@ -242,6 +242,10 @@
 - **A:** chỉ gác khi `locked.status === 'QUEUED'` (chưa bắt đầu). **B:** giữ như cũ. **ĐÃ CHỌN A** (đúng chữ của D-31). Hệ quả có chủ ý: trước đây `claim` còn từ chối nhận lại tác vụ `IN_PROGRESS` của người **đã nghỉ** (`status != ACTIVE`); nay nhận lại được, cùng lý do (IT khác đối chiếu rồi đóng), không có đường nào cấp thêm: `complete` vẫn đòi bằng chứng và `grant` mới vẫn bị cổng chặn. **Đổi sang B:** bỏ điều kiện `locked.status === 'QUEUED'` ở `provisioning.service.ts` (`claim`).
 - **Chạm:** `licensing/provisioning/tasks/provisioning.service.ts`, test `leaver-request-closure` (ca nhận lại bởi `it2`).
 
+### D-34 · MF2-B review (Optional, gộp) · năm việc nhỏ sau review của gói MF2-B
+
+- **Khóa nhân viên ở `claim` (làm):** `ProvisioningHolderService.requireCanBeginTask` khóa người thụ hưởng `FOR SHARE` rồi mới đọc dòng chặn (`isAccessBlocked`), như đường `grant` (`personal`). Ca ghi nghỉ việc giữ khóa `FOR UPDATE` của người đó trong lúc `claim` đang chạy: `claim` chờ rồi thấy dòng chặn (test khóa chờ với `waitForLockWaiters`, đỏ khi bỏ khóa). Thứ tự khóa: tác vụ (khóa sẵn bởi `frame.work`) rồi nhân viên; đường ghi nghỉ việc khóa nhân viên rồi không khóa tác vụ `FOR UPDATE`, nên không tạo vòng. **Đổi lại:** bỏ `requireCanBeginTask`, gọi lại `getEmployee` + `requireCanBegin`.
+
 ## Bị chặn
 
 (chưa có)

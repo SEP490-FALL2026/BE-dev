@@ -86,8 +86,7 @@ export class ProvisioningService {
           await this.revocation.emit(tx, { moment: 'BEFORE_WORK', task: toRevocationFacts(locked), now });
         } else if (locked.status === 'QUEUED') {
           // Only a task not yet begun is held back: one already being worked may change hands, for the IT Admin to check with the vendor (`QĐ-110d`).
-          const beneficiary = await this.organizationReads.getEmployee(locked.assignment.employeeId, tx);
-          if (beneficiary) await this.holders.requireCanBegin(tx, locked.requestId ?? '', beneficiary);
+          await this.holders.requireCanBeginTask(tx, locked.requestId ?? '', locked.assignment.employeeId);
         }
         await this.repo.markClaimed(tx, locked.id, actor.appUserId, now);
         if (locked.kind === 'REVOKE') {
