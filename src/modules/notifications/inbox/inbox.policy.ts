@@ -169,6 +169,8 @@ export const PARAM_KEYS_BY_CODE: Readonly<Record<InAppNotificationCode, readonly
   TRANSFER_RIGHTS_REVOKING: ['transferId', 'employeeId', 'toDepartmentId', 'rightCount'],
   // A request closed because its beneficiary left or moved (`QĐ-110d`, `QĐ-110o`): `reasonKind` is DEPARTURE or TRANSFER.
   REQUEST_CANCELLED_BENEFICIARY_GONE: ['requestId', 'beneficiaryEmployeeId', 'reasonKind'],
+  // The same, for the request the system left to the IT Admin because its grant is being carried out (`QĐ-110d`).
+  REQUEST_BENEFICIARY_GONE_IT_CHECK: ['requestId', 'beneficiaryEmployeeId', 'reasonKind'],
   // The list of software of a department (`QĐ-110s`, `QĐ-110t`).
   DEPARTMENT_SOFTWARE_PROPOSED: ['proposalId', 'departmentId', 'applicationId', 'planId'],
   DEPARTMENT_SOFTWARE_PROPOSAL_DECIDED: ['proposalId', 'departmentId', 'applicationId', 'planId', 'decision', 'reason'],

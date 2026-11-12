@@ -131,6 +131,31 @@ describe('what the request is left with when every line has ended (US-05-17, US-
     });
   });
 
+  it('is cancelled by nobody when the last cancelled line was closed by the system: the sender did not close it (QĐ-110d)', () => {
+    const lines = [
+      line({
+        state: 'CANCELLED',
+        endedAt: at('2026-11-02'),
+        endedByEmployeeId: 'it-1',
+        cancelCause: 'BENEFICIARY_LEFT',
+      }),
+      line({
+        state: 'CANCELLED',
+        endedAt: at('2026-11-09'),
+        endedByEmployeeId: null,
+        cancelCause: 'SYSTEM_BENEFICIARY_TRANSFERRED',
+      }),
+    ];
+
+    expect(requestEndingOf('CANCELLED', lines, 'sender', now)).toEqual({
+      kind: 'CANCELLATION',
+      cancelledAt: at('2026-11-09'),
+      cancelledByEmployeeId: null,
+      cause: 'SYSTEM_BENEFICIARY_TRANSFERRED',
+      note: null,
+    });
+  });
+
   it('is cancelled by the sender, today, because the person left, when no cancelled line says otherwise', () => {
     expect(requestEndingOf('CANCELLED', [line({ state: 'CANCELLED' })], 'sender', now)).toEqual({
       kind: 'CANCELLATION',

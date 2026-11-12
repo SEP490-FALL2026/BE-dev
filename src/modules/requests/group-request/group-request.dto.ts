@@ -9,7 +9,7 @@ import {
   pricingSchema,
   requestSchema,
 } from '../access-request/access-request.dto';
-import { LINE_STATES } from '../access-request/group-request.types';
+import { LINE_STATES, READABLE_CANCEL_CAUSES } from '../access-request/group-request.types';
 
 /**
  * The most people the body of a request for a group may carry: a bound against abuse, far above what a head may name. The limit of
@@ -131,8 +131,11 @@ const lineSchema = z.strictObject({
   endedAt: z.iso.datetime().nullable(),
   endedBy: employeeRef.nullable(),
   endReason: z.string().nullable(),
-  /** Why the line ended as cancelled: the IT Admin closed it, or the conversion command because the spending approver is a party. */
-  cancelCause: z.enum(['BENEFICIARY_LEFT', 'BENEFICIARY_TRANSFERRED', 'SPENDING_APPROVER_PARTY']).nullable(),
+  /**
+   * Why the line ended as cancelled: the IT Admin closed it, the conversion command because the spending approver is a party, or the
+   * system because the person left or was moved to another department (`QĐ-110d`, `QĐ-110o`).
+   */
+  cancelCause: z.enum(READABLE_CANCEL_CAUSES).nullable(),
 });
 
 export class GroupBodyDto extends createZodDto(groupBodySchema) {}

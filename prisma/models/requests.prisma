@@ -78,6 +78,10 @@ enum AccessRequestCancelCause {
   // The conversion command closed it because the spending approver is one of its parties (QĐ-93d(2), QĐ-93k(1)); nobody closed it:
   // the one cause for which the column of who closed it may be empty (OD-6).
   SPENDING_APPROVER_PARTY
+  // The system closed it because the person it is for is gone (QĐ-110d, QĐ-110o): they left (the day access is blocked) or were moved to
+  // another department (the day the transfer takes effect). Nobody closed it: the column of who closed it is empty for these two.
+  SYSTEM_BENEFICIARY_LEFT
+  SYSTEM_BENEFICIARY_TRANSFERRED
 }
 
 // Pricing model of a plan: recurring (monthly/yearly), one-time (perpetual license).

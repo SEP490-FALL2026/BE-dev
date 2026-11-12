@@ -6,7 +6,7 @@ import type { ReleasedCommitment } from '../../budgets/public/budgets.types';
 import { SpendBatchRepo } from '../spend/spend-batch.repo';
 import { SpendStepRepo } from '../spend/spend-step.repo';
 
-/** Why a request ends before its grant is done: its requester withdrew it, or the IT Admin closed it because its beneficiary left. */
+/** Why a request ends before its grant is done: its requester withdrew it, or it was closed because its beneficiary left or was moved. */
 export type RequestEndReason = 'REQUEST_WITHDRAWN' | 'REQUEST_CANCELLED';
 
 /**
@@ -27,7 +27,7 @@ export class RequestEndService {
   /** Returns what was released from the commitments of the request; throws BudgetCommitmentRefusedError for amounts that do not fit. */
   async close(
     tx: DbTx,
-    actor: AuthenticatedPrincipal,
+    actor: AuthenticatedPrincipal | null,
     request: { id: string; organizationId: string },
     reason: RequestEndReason,
     now: Date,

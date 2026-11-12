@@ -1,5 +1,5 @@
 import type { NotificationIntent, StatusRule } from '../request-status.types';
-import { outcomeRecipients, requestOf, text } from './status-rule.policy';
+import { goneNotice, outcomeRecipients, requestOf, text } from './status-rule.policy';
 
 /**
  * What became of one person of a request for a group, told to the requester and to that person alone (`US-05-15` AC-9): the events of
@@ -97,8 +97,10 @@ export const GROUP_RULES: Readonly<Record<string, StatusRule>> = {
   // else of the group is told (the line carries `beneficiaryEmployeeId`).
   'ACCESS_REQUEST.LINE_CANCELLED': {
     subject: 'ACCESS_REQUEST',
-    needs: ['REQUEST'],
+    needs: ['REQUEST', 'FINANCE'],
     build: (event, facts): NotificationIntent[] => {
+      const gone = goneNotice(event, facts);
+      if (gone !== null) return [gone];
       const request = requestOf(facts);
       const closedBy = text(event.after, 'cancelledByEmployeeId');
 

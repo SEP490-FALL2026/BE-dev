@@ -1,5 +1,5 @@
 import type { NotificationIntent, StatusRule } from '../request-status.types';
-import { outcomeRecipients, requestOf, text } from './status-rule.policy';
+import { goneNotice, outcomeRecipients, requestOf, text } from './status-rule.policy';
 
 /**
  * How a request ended, or a decision on it, told to the requester and to the people it is for (rows 3 to 8 and 16 of the table of
@@ -122,10 +122,13 @@ export const OUTCOME_RULES: Readonly<Record<string, StatusRule>> = {
   },
   // 16: the IT Admin closed the request because the person it was for left (the order is the business of G6). Never a
   // withdrawal and never a failure.
+  // The system closed it because the person it was for left or was moved (`QĐ-110d`, `QĐ-110o`): the requester and Finance are told.
   'ACCESS_REQUEST.CANCELLED': {
     subject: 'ACCESS_REQUEST',
-    needs: ['REQUEST'],
+    needs: ['REQUEST', 'FINANCE'],
     build: (event, facts): NotificationIntent[] => {
+      const gone = goneNotice(event, facts);
+      if (gone !== null) return [gone];
       const request = requestOf(facts);
       const closedBy = text(event.after, 'cancelledByEmployeeId');
 

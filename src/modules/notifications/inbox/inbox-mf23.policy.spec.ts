@@ -42,6 +42,7 @@ describe('the notices of MF-2 and MF-3 and of what goes with them (QĐ-110, QĐ-
     ['TRANSFER_GRACE_ENDING', { transferId: ID, employeeId: OTHER, graceEndsOn: '2026-11-20' }],
     ['TRANSFER_RIGHTS_REVOKING', { transferId: ID, employeeId: OTHER, toDepartmentId: ID, rightCount: 2 }],
     ['REQUEST_CANCELLED_BENEFICIARY_GONE', { requestId: ID, beneficiaryEmployeeId: OTHER, reasonKind: 'DEPARTURE' }],
+    ['REQUEST_BENEFICIARY_GONE_IT_CHECK', { requestId: ID, beneficiaryEmployeeId: OTHER, reasonKind: 'TRANSFER' }],
     ['DEPARTMENT_SOFTWARE_PROPOSED', { proposalId: ID, departmentId: OTHER, applicationId: ID, planId: null }],
     [
       'DEPARTMENT_SOFTWARE_PROPOSAL_DECIDED',

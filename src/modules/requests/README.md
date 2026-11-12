@@ -15,6 +15,12 @@ controller) và `requests-work-facade.module.ts` (phần worker chạy, API dùn
 - `RequestsApi` ([public/requests.api.ts](public/requests.api.ts)) — `listOpenOfBeneficiary`: request còn mở của một
   người, hiện cạnh hồ sơ nghỉ việc (US-03-04 AC-24); personnel gọi. Tham số `filter.departmentId` (tùy chọn) chỉ giữ request
   gửi từ phòng đó — trưởng phòng đọc một thành viên (`personnel/department-member`); không có `filter` thì như cũ.
+  `cancelForBeneficiaryGone(tx, SystemActor, { employeeId, scope })` (X0.7, `QĐ-110d`, `QĐ-110o`): **hệ thống** đóng Request còn mở của người đã
+  nghỉ/chuyển, trong giao dịch của bên gọi. `ALL_OPEN` (MF-2, mốc chặn) = mọi Request mở (trả phí, `K5`, đề xuất case B, Request tiếp tục, dòng nhóm);
+  `PAID_OLD_DEPARTMENT` (MF-3, ngày hiệu lực) = Request trả phí `GRANT`/`RENEWAL`/nhóm gửi từ phòng cũ. Chưa có tác vụ cấp chạy ⟹ `CANCELLED` với
+  nguyên nhân `SYSTEM_BENEFICIARY_LEFT`/`SYSTEM_BENEFICIARY_TRANSFERRED` (không ai đóng, `cancelled_by_employee_id` rỗng), cam kết chưa chi về ngân
+  sách, thông báo `REQUEST_CANCELLED_BENEFICIARY_GONE` (người gửi + Finance); đang cấp (`EXECUTING`) ⟹ không đụng, trả về `needsItCheck` và gửi
+  `REQUEST_BENEFICIARY_GONE_IT_CHECK` cho IT phụ trách để đối chiếu nhà cung cấp rồi đóng tay. Chạy lại không đóng lần hai.
 - `RequestsAiSourceApi` ([public/requests-ai-source.api.ts](public/requests-ai-source.api.ts)) — `openStepsHeldBy`: bước nhu
   cầu và bước duyệt chi đang chờ một người (cùng bộ lọc với hai hàng đợi `need-decision-queue` và hàng đợi của người duyệt chi),
   sớm giao trước, lý do đầy đủ cắt 1000 ký tự; `stillHeldBy`: bước nào còn mở và còn giao người đó. Nguồn của tóm tắt AI (US-15-05).
@@ -146,7 +152,7 @@ cùng cần; phần ghi nằm ở `assessment/assessment.repo.ts`.
     `AssessmentGate` (khóa đề xuất, người thẩm định, bước của IT Admin); `ProposalService`,
     `need-spend.service.ts`, `internal-registration.service.ts` (đăng ký nội bộ; `internalRegistrationBasis`, `registeredShapeOf`,
     `actsForAssignee` ở `assessment.policy.ts`); `proposal-review/` — `proposals.controller.ts`.
-  - `grant-queue/` — hàng đợi cấp của IT Admin (US-03-02; gửi thay một người đã gỡ, QĐ-96); `cancellation/` — IT Admin đóng request của người đã nghỉ (US-03-04).
+  - `grant-queue/` — hàng đợi cấp của IT Admin (US-03-02; gửi thay một người đã gỡ, QĐ-96); `cancellation/` — IT Admin đóng request của người đã nghỉ (US-03-04) và hệ thống đóng request của người đã nghỉ/chuyển (`beneficiary-gone-*`, X0.7).
   - Lịch sử Request theo vai, chỉ đọc (L3 `request-history/`, qd103-request-history-by-role): `GET /me/access-requests` (người gửi; `involvement`
     SENT/FOR_ME/ALL, người thụ hưởng Request nhóm chỉ thấy `myLine` của mình), `GET /departments/{id}/access-requests` (trưởng phòng hôm nay của
     phòng), `GET /access-requests` (IT Admin toàn tổ chức; Người duyệt chi Request đã mở bước chi; Finance Request đã duyệt chi),

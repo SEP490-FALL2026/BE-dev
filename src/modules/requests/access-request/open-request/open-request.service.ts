@@ -17,6 +17,11 @@ export class OpenRequestService {
     private readonly catalog: CatalogApi,
   ) {}
 
+  /** The ids of every request the person is a beneficiary of that is open, oldest first: what the system closes when they are gone. */
+  idsOf(tx: DbTx, employeeId: string): Promise<string[]> {
+    return this.repo.idsOf(tx, employeeId);
+  }
+
   async pageOf(
     employeeId: string,
     page: { skip: number; take: number },

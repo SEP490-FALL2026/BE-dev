@@ -2,6 +2,7 @@ import { createZodDto } from '../../../infrastructure/http/dto/zod-dto';
 import { z } from 'zod';
 import { successEnvelopeSchema } from '../../../infrastructure/http/dto/success-envelope.dto';
 import { businessDate } from '../../../infrastructure/http/dto/business-date.dto';
+import { READABLE_CANCEL_CAUSES } from './group-request.types';
 
 /** The longest note of a reason or a label a request keeps; the DTO bounds the request with them. */
 export const REASON_MAX_LENGTH = 1000;
@@ -247,13 +248,14 @@ export const requestSchema = z.strictObject({
   /**
    * Who closed the request because the person it was for left, when, why and the note they gave; null for any other request.
    * `cancelledBy` is null, and `cause` is `SPENDING_APPROVER_PARTY`, when the conversion command closed it because the spending
-   * approver is one of its parties (`QĐ-93k(1)`): no employee closed it.
+   * approver is one of its parties (`QĐ-93k(1)`), or `SYSTEM_BENEFICIARY_LEFT` / `SYSTEM_BENEFICIARY_TRANSFERRED` when the system closed
+   * it because the person it was for left or was moved to another department (`QĐ-110d`, `QĐ-110o`): no employee closed it.
    */
   cancellation: z
     .strictObject({
       cancelledBy: employeeRef.nullable(),
       cancelledAt: z.iso.datetime(),
-      cause: z.enum(['BENEFICIARY_LEFT', 'BENEFICIARY_TRANSFERRED', 'SPENDING_APPROVER_PARTY']),
+      cause: z.enum(READABLE_CANCEL_CAUSES),
       note: z.string().nullable(),
     })
     .nullable(),

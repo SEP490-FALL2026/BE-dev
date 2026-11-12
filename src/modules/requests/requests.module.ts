@@ -12,6 +12,7 @@ import { LicensingModule } from '../licensing/licensing.module';
 import { FinanceModule } from '../finance/finance.module';
 import { IdentityAccessFacadeModule } from '../identity-access/identity-access-facade.module';
 import { OperatingParametersModule } from '../operating-parameters/operating-parameters.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 import { OrganizationModule } from '../organization/organization.module';
 import { AccessRequestGrantGate } from './grant/access-request-grant.listener';
 import { SeatReleaseRepo } from './grant/seat-release.repo';
@@ -64,6 +65,9 @@ import { WithdrawalWriter } from './withdraw/withdrawal-writer.service';
 import { WithdrawalService } from './withdraw/withdrawal.service';
 import { CancellationController } from './cancellation/cancellation.controller';
 import { DepartureCancellationService } from './cancellation/departure-cancellation.service';
+import { BeneficiaryGoneCancellation } from './cancellation/beneficiary-gone-cancellation.service';
+import { BeneficiaryGoneClosing } from './cancellation/beneficiary-gone-closing.service';
+import { BeneficiaryGoneItNotice } from './cancellation/beneficiary-gone-it-notice.service';
 import { OpenRequestRepo } from './access-request/open-request/open-request.repo';
 import { OpenRequestService } from './access-request/open-request/open-request.service';
 import { CostCenterOpenRequestsReader } from './access-request/open-request/cost-center-open-requests.listener';
@@ -194,6 +198,8 @@ import { MyRequestsService } from './my-requests/my-requests.service';
     RequestsRoutingFacadeModule,
     DatabaseModule,
     AuditModule,
+    // The inbox notice to the IT Admin for a request the system left to them (`BeneficiaryGoneItNotice`).
+    NotificationsModule,
     OrganizationModule,
     IdentityAccessFacadeModule,
     CatalogModule,
@@ -269,6 +275,10 @@ import { MyRequestsService } from './my-requests/my-requests.service';
     WithdrawalWriter,
     WithdrawalService,
     DepartureCancellationService,
+    // The system closes the open requests of a person who is gone (`QĐ-110d`, `QĐ-110o`); `RequestsApi` opens it to `personnel`.
+    BeneficiaryGoneClosing,
+    BeneficiaryGoneItNotice,
+    BeneficiaryGoneCancellation,
     OpenRequestRepo,
     OpenRequestService,
     // What the organization asks before it retires a department or a Cost Center: the requests that are not over.

@@ -25,14 +25,9 @@ export interface OpenRequestRow {
 export class OpenRequestRepo {
   constructor(private readonly prisma: PrismaService) {}
 
-  /** `filter.departmentId` keeps only the requests sent from that department (a department head reads the open work of a member). */
-  async pageOf(
-    employeeId: string,
-    page: { skip: number; take: number },
-    tx?: DbTx,
-    filter: { departmentId?: string } = {},
-  ): Promise<{ items: OpenRequestRow[]; total: number }> {
-    const where = {
+  /** What makes a request open for the person (see the class): shared by the page and by the ids. */
+  private openOf(employeeId: string, filter: { departmentId?: string } = {}) {
+    return {
       beneficiaries: { some: { employeeId } },
       ...(filter.departmentId === undefined ? {} : { departmentId: filter.departmentId }),
       // A request being drafted is written by the release after this one and is not read here.
@@ -42,6 +37,31 @@ export class OpenRequestRepo {
         { type: 'GROUP_GRANT' as const, lines: { some: { employeeId, state: { in: [...OPEN_LINE_STATES] } } } },
       ],
     };
+  }
+
+  /**
+   * The ids of every request the person is a beneficiary of that is open, oldest first, in the caller's transaction: what the system
+   * closes when the person is gone (`BeneficiaryGoneCancellation`). A person has few open requests (the limits of `MF-1` bound them),
+   * so there is no page; the order is fixed so two passes lock them in the same order.
+   */
+  async idsOf(tx: DbTx, employeeId: string): Promise<string[]> {
+    const rows = await tx.accessRequest.findMany({
+      where: this.openOf(employeeId),
+      select: { id: true },
+      orderBy: [{ submittedAt: 'asc' }, { id: 'asc' }],
+    });
+
+    return rows.map((row) => row.id);
+  }
+
+  /** `filter.departmentId` keeps only the requests sent from that department (a department head reads the open work of a member). */
+  async pageOf(
+    employeeId: string,
+    page: { skip: number; take: number },
+    tx?: DbTx,
+    filter: { departmentId?: string } = {},
+  ): Promise<{ items: OpenRequestRow[]; total: number }> {
+    const where = this.openOf(employeeId, filter);
     const read = async (client: DbTx) => {
       const rows = await client.accessRequest.findMany({
         where,

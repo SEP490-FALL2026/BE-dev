@@ -4,7 +4,7 @@ import { fromDateColumn, toDateColumn } from '../../../core/business-date';
 import type { Prisma } from '../../../generated/prisma/client';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
-import type { LineCancelCause, LineRecord, LineState } from '../access-request/group-request.types';
+import type { LineCancelCause, LineRecord, LineState, SystemCancelCause } from '../access-request/group-request.types';
 
 export interface NewLine {
   requestId: string;
@@ -22,7 +22,7 @@ export interface LineMove {
   endedAt?: Date;
   endedByEmployeeId?: string | null;
   endReason?: string | null;
-  cancelCause?: LineCancelCause;
+  cancelCause?: LineCancelCause | SystemCancelCause;
   withdrawalRequestedAt?: Date;
 }
 

@@ -163,6 +163,8 @@ export const IN_APP_NOTIFICATION_CODES = [
   'TRANSFER_GRACE_ENDING',
   'TRANSFER_RIGHTS_REVOKING',
   'REQUEST_CANCELLED_BENEFICIARY_GONE',
+  // The grant of a request of that person is being carried out, so the system did not close it: the IT Admin checks the vendor and closes it.
+  'REQUEST_BENEFICIARY_GONE_IT_CHECK',
   'DEPARTMENT_SOFTWARE_PROPOSED',
   'DEPARTMENT_SOFTWARE_PROPOSAL_DECIDED',
   'VENDOR_ADMINS_BELOW_MINIMUM',
