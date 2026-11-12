@@ -20,19 +20,25 @@ const noDirection: ContractGateFacts['costCenterDirection'] = {
 const gates = (overrides: Partial<ContractGateFacts['subscriptionOwner']> = {}): ContractGateFacts => ({
   subscriptionOwner: { schema: 'READY', subscriptionIds: [], ...overrides },
   costCenterDirection: noDirection,
-  retiredKinds: { pendingNoticeIds: [], pendingTransferIds: [], pendingMoveIds: [] },
+  retiredKinds: { pendingNoticeIds: [], pendingTransferIds: [], pendingMoveIds: [], serviceAccountIds: [] },
   legacyReturns: noReturns,
 });
 const direction = (overrides: Partial<ContractGateFacts['costCenterDirection']> = {}): ContractGateFacts => ({
   subscriptionOwner: { schema: 'NO_TABLE', subscriptionIds: [] },
   costCenterDirection: { ...noDirection, schema: 'READY', ...overrides },
-  retiredKinds: { pendingNoticeIds: [], pendingTransferIds: [], pendingMoveIds: [] },
+  retiredKinds: { pendingNoticeIds: [], pendingTransferIds: [], pendingMoveIds: [], serviceAccountIds: [] },
   legacyReturns: noReturns,
 });
 const retired = (overrides: Partial<ContractGateFacts['retiredKinds']> = {}): ContractGateFacts => ({
   subscriptionOwner: { schema: 'NO_TABLE', subscriptionIds: [] },
   costCenterDirection: noDirection,
-  retiredKinds: { pendingNoticeIds: [], pendingTransferIds: [], pendingMoveIds: [], ...overrides },
+  retiredKinds: {
+    pendingNoticeIds: [],
+    pendingTransferIds: [],
+    pendingMoveIds: [],
+    serviceAccountIds: [],
+    ...overrides,
+  },
   legacyReturns: noReturns,
 });
 const converged: PreflightReport = {
@@ -184,6 +190,31 @@ describe('judgeContractGates: the kinds that are gone (F41, F06, spec L.4, L.5)'
     expect(judgeContractGates(retired())).toEqual({ blockers: [], information: [] });
   });
 
+  it('lists a service account still in force as information by id and in order, and never as a blocker (the deploy that converts it must run)', () => {
+    const report = withContractGates(converged, judgeContractGates(retired({ serviceAccountIds: ['a-9', 'a-2'] })));
+
+    expect(report.status).toBe('READY');
+    expect(report.blockers).toEqual([]);
+    expect(report.information).toEqual([
+      { code: 'SERVICE_ACCOUNT_STILL_IN_FORCE', assignmentId: 'a-2' },
+      { code: 'SERVICE_ACCOUNT_STILL_IN_FORCE', assignmentId: 'a-9' },
+    ]);
+  });
+
+  it('says in the text how many service accounts are still in force, which ones, and which guide ends them, in a ready report', () => {
+    const text = formatPreflight(
+      withContractGates(converged, judgeContractGates(retired({ serviceAccountIds: ['a-9', 'a-2'] }))),
+    );
+
+    expect(text).toMatch(/^Preflight: READY/);
+    expect(text).toContain('2 service account(s) are still in force.');
+    expect(text).toContain('SERVICE_ACCOUNT_STILL_IN_FORCE');
+    expect(text).toContain('assignment a-2');
+    expect(text).toContain('assignment a-9');
+    expect(text).toContain('20261113000900_licensing_service_accounts_converted');
+    expect(text).toContain('docs/guides/service-account-conversion.md');
+  });
+
   it('blocks a ready report, and is ready again once the IT Admin has rejected and cancelled them', () => {
     const open = withContractGates(converged, judgeContractGates(retired({ pendingNoticeIds: ['n-1'] })));
     const done = withContractGates(converged, judgeContractGates(retired()));
@@ -218,7 +249,7 @@ describe('withContractGates', () => {
       judgeContractGates({
         subscriptionOwner: { schema: 'READY', subscriptionIds: [] },
         costCenterDirection: { ...noDirection, schema: 'READY' },
-        retiredKinds: { pendingNoticeIds: [], pendingTransferIds: [], pendingMoveIds: [] },
+        retiredKinds: { pendingNoticeIds: [], pendingTransferIds: [], pendingMoveIds: [], serviceAccountIds: [] },
         legacyReturns: noReturns,
       }),
     );

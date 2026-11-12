@@ -24,6 +24,7 @@ trong docs/architecture. Các gói triển khai auth/US cũ đã được dọn 
 - [Seed demo](guides/seed.md): `pnpm ops:seed`, fixture v2, local/VPS wrappers and one-time rebuild runbook.
 
 - [Container, PostgreSQL roles và deploy](guides/containers.md): chuẩn bị hạ tầng, backup, migration và phục hồi release.
+- [Tài khoản dịch vụ còn lại sau migration chuyển đổi](guides/service-account-conversion.md): đọc `ops:preflight`, lý do giữ dòng và chạy lại file migration.
 
 ## Quyết định còn áp dụng
 

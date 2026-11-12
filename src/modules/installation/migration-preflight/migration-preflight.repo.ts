@@ -278,7 +278,35 @@ export class MigrationPreflightRepo {
       pendingNoticeIds: notices.map((row) => row.id),
       pendingTransferIds: transfers.map((row) => row.id),
       pendingMoveIds: moves.map((row) => row.id),
+      serviceAccountIds: await this.serviceAccountsInForce(tx),
     };
+  }
+
+  /**
+   * The service accounts still in force (`QĐ-110m`, review of X-SA): `kind = 'SERVICE'`, not failed, not cancelled, with no end day or one after
+   * today in the calendar of the organization (the migration `…_licensing_service_accounts_converted` reads the same condition), that no
+   * record continues (a row the migration converted on its last day is ended by a record that follows it, and counts as converted).
+   * Probed first: the table and the four columns exist from `…_licensing_provisioning_failure_handling` on, an older or an empty
+   * database has none. `kind` is read as text, so a database whose enum has no `SERVICE` reads nothing instead of failing.
+   */
+  private async serviceAccountsInForce(tx: DbTx): Promise<string[]> {
+    const [probe] = await tx.$queryRaw<{ ready: boolean }[]>`
+      SELECT to_regclass('public.license_assignments') IS NOT NULL AND to_regclass('public.organizations') IS NOT NULL AND
+             (SELECT count(*) FROM information_schema.columns
+               WHERE table_schema = 'public' AND table_name = 'license_assignments'
+                 AND column_name IN ('failed_at', 'cancelled_at', 'predecessor_id', 'valid_until')) = 4 AS "ready"`;
+    if (!probe.ready) return [];
+
+    const rows = await tx.$queryRaw<{ id: string }[]>`
+      SELECT a."id"::text AS "id"
+        FROM "license_assignments" a
+        JOIN "organizations" o ON o."id" = a."organization_id"
+       WHERE a."kind"::text = 'SERVICE' AND a."failed_at" IS NULL AND a."cancelled_at" IS NULL
+         AND (a."valid_until" IS NULL OR a."valid_until" > (now() AT TIME ZONE o."time_zone")::date)
+         AND NOT EXISTS (SELECT 1 FROM "license_assignments" s WHERE s."predecessor_id" = a."id")
+       ORDER BY a."id"`;
+
+    return rows.map((row) => row.id);
   }
 
   /**

@@ -2,6 +2,9 @@ import { randomUUID } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import request from 'supertest';
+import { TransactionRunner } from '../../../src/infrastructure/database/transaction-runner';
+import { MigrationPreflightRepo } from '../../../src/modules/installation/migration-preflight/migration-preflight.repo';
+import { MigrationPreflightApi } from '../../../src/modules/installation/public/migration-preflight.api';
 import { buildActivatedAccount } from '../../support/builders/account.builder';
 import { PROJECT_ROOT } from '../../support/cli-process';
 import { migrationEndingWith } from '../../support/migration-history';
@@ -299,6 +302,38 @@ describe('the migration that takes service accounts out of the scope (integratio
       } finally {
         await h.ctx.sql.query(`UPDATE role_grants SET revoked_at = NULL WHERE role = 'IT_ADMIN'`);
       }
+    }, 180_000);
+
+    it('is told to the operator by ops:preflight: the rows still in force are listed as information, those converted or ended are not, and nothing blocks', async () => {
+      const preflight = new MigrationPreflightApi(h.ctx.app.get(TransactionRunner), new MigrationPreflightRepo());
+      const listed = async (): Promise<string[]> => {
+        const report = await preflight.judge();
+        expect(report.blockers.map((blocker) => blocker.code)).not.toContain('SERVICE_ACCOUNT_STILL_IN_FORCE');
+
+        return report.information.flatMap((item) =>
+          item.code === 'SERVICE_ACCOUNT_STILL_IN_FORCE' ? [item.assignmentId] : [],
+        );
+      };
+      const worker = await h.person(code());
+      const notStarted = await serviceAccount(subscriptions.seed, worker, { validFrom: tomorrow() });
+      const convertible = await serviceAccount(subscriptions.seed, worker);
+      const beganToday = await serviceAccount(subscriptions.seed, worker, { validFrom: today() });
+      const ended = await serviceAccount(subscriptions.seed, worker, {
+        validFrom: '2026-01-05',
+        validUntil: '2026-02-01',
+      });
+
+      expect(await listed()).toEqual(expect.arrayContaining([notStarted, convertible, beganToday]));
+      expect(await listed()).not.toContain(ended);
+
+      await migrate();
+
+      // The one that began on the day of the migration ends tomorrow, and is still in force today: a record follows it, so it counts as converted.
+      const after = await listed();
+      expect(after).toContain(notStarted);
+      expect(after).not.toContain(convertible);
+      expect(after).not.toContain(beganToday);
+      expect(after).not.toContain(ended);
     }, 180_000);
 
     it('leaves the history alone: the service rows already ended and the rows that failed are not touched', async () => {

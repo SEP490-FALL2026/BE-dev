@@ -24,6 +24,7 @@
       "docs/guides/bootstrap-installation.md",
       "docs/guides/demo-dataset.md",
       "docs/guides/seed.md",
+      "docs/guides/service-account-conversion.md",
       "docs/roadmap.md",
       "src/README.md",
       "test/support/README.md",
