@@ -1,7 +1,7 @@
 import type { OffboardingState } from '../offboarding.types';
 import { departureDetailFacts } from './offboarding-detail.policy';
 
-const seat = (assignmentId: string, revocation: unknown = null) => ({ assignmentId, revocation });
+const seat = (assignmentId: string, revocation: { status: string } | null = null) => ({ assignmentId, revocation });
 const record = (extra: { state?: OffboardingState; closedAt?: Date | null } = {}) => ({
   accessBlockMode: 'WITH_LAST_DAY' as const,
   state: 'HANDING_OVER' as OffboardingState,
@@ -13,7 +13,7 @@ const record = (extra: { state?: OffboardingState; closedAt?: Date | null } = {}
 describe('what the detail of a departure is read against (US-03-04 AC-7, AC-20, QĐ-62i)', () => {
   const live = {
     live: true,
-    seats: [seat('a'), seat('b', { taskId: 't-1' }), seat('c')],
+    seats: [seat('a'), seat('b', { status: 'QUEUED' }), seat('c')],
     terminating: new Set(['c']),
     opened: ['a', 'x'],
     registered: { WORKSPACE: 1 },
@@ -23,6 +23,16 @@ describe('what the detail of a departure is read against (US-03-04 AC-7, AC-20, 
     const facts = departureDetailFacts(record(), live);
 
     expect(facts).toMatchObject({ heldRights: 3, accessRunsOn: 1 });
+  });
+
+  it('counts the rights left without a completed task: the seats with no task and the seats whose task still waits (QĐ-110c)', () => {
+    expect(departureDetailFacts(record(), live).rightsWithoutCompletedTask).toBe(3);
+    expect(
+      departureDetailFacts(record(), {
+        ...live,
+        seats: [seat('a', { status: 'COMPLETED' }), seat('b', { status: 'IN_PROGRESS' }), seat('c')],
+      }).rightsWithoutCompletedTask,
+    ).toBe(2);
   });
 
   it('fills the checklist from the seats without a task and the seats given back; the handover step is always done (QĐ-110g)', () => {
@@ -53,6 +63,12 @@ describe('what the detail of a departure is read against (US-03-04 AC-7, AC-20, 
       registered: {},
     });
 
-    expect(facts).toMatchObject({ heldRights: 0, accessRunsOn: 0, checklist: null, blockers: {} });
+    expect(facts).toMatchObject({
+      heldRights: 0,
+      rightsWithoutCompletedTask: 0,
+      accessRunsOn: 0,
+      checklist: null,
+      blockers: {},
+    });
   });
 });

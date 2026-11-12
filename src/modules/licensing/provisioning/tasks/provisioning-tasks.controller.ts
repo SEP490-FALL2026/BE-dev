@@ -118,7 +118,7 @@ export class ProvisioningTasksController {
   @ApiSuccessResponse(TaskPageResponseDto, {
     message: 'PROVISIONING_TASK.LISTED',
     description:
-      'The tasks of both channels in one queue, the oldest first, each with the time it has taken. scope MINE is the IT Admin in charge by default, GENERAL the tasks nobody in charge works, ALL every task. A revocation says the day it may not be done before (notBefore), its due day (dueOn) and whether it may be taken today (claimableNow); claimableNow=true lists only what may be taken today, false only the revocations still in their grace.',
+      'The tasks of both channels in one queue, the oldest first, each with the time it has taken. scope MINE is the IT Admin in charge by default, GENERAL the tasks nobody in charge works, ALL every task. A revocation says the day it may not be done before (notBefore), its due day (dueOn) and whether it may be taken today (claimableNow); claimableNow=true lists only what may be taken today, false only the revocations still in their grace. overdue=true lists only the tasks past their due day that are not over (completed, cancelled or closed as failed), the late revocations of a departure among them, false all the others.',
   })
   @ApiErrorResponses(...AUTH_ERRORS, IT_ONLY, {
     status: HttpStatus.UNPROCESSABLE_ENTITY,

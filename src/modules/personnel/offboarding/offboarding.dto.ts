@@ -59,6 +59,8 @@ const listQuerySchema = z.strictObject({
   state: z.enum(['HANDING_OVER', 'LEFT', 'CANCELLED']).optional(),
   pastLastDay: flag.optional(),
   accountLockMissing: flag.optional(),
+  /** `true`: the departures past the deadline of their revocations with a right still without a completed task; `false`: the others (`QĐ-110c`). */
+  revocationOverdue: flag.optional(),
   roleFlag: z.enum(ROLE_FLAGS).optional(),
   ...pageQuery,
 });
@@ -92,6 +94,16 @@ export const offboardingSummarySchema = z.strictObject({
   /** The first day the departure refuses the person; null for a cancelled case. */
   accessBlockedFrom: z.string().nullable(),
   heldRights: z.number().int().nonnegative(),
+  /**
+   * The deadline of the revocations is on the case (`QĐ-110c`, `M-09`): `dueOn` is the working day after the last working day (null for a case
+   * closed or cancelled before the rule), `rightsWithoutCompletedTask` the personal seats of the person that have no task of revocation completed
+   * (those nobody opened a task for included; 0 for a cancelled case) and `overdue` whether today is past `dueOn` with such a seat left.
+   */
+  revocation: z.strictObject({
+    dueOn: z.string().nullable(),
+    overdue: z.boolean(),
+    rightsWithoutCompletedTask: z.number().int().nonnegative(),
+  }),
   accountLockMissing: z.boolean(),
   closed: z.boolean(),
   /** Every role that needs someone to take over, with whether the person holds it now (all false for a case that was cancelled). */

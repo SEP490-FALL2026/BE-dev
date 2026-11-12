@@ -94,6 +94,8 @@ describe('provisioning queue routes (e2e, no database)', () => {
     ['a status that does not exist', 'get', `${BASE}?status=DONE`, undefined],
     // BR-MF5-04: the filter of the tasks that may be taken today is a flag.
     ['a claimableNow that is not a flag', 'get', `${BASE}?claimableNow=maybe`, undefined],
+    // QĐ-110c: the filter of the tasks past their due day is a flag.
+    ['an overdue that is not a flag', 'get', `${BASE}?overdue=maybe`, undefined],
     // A hand-off changes only the channel: its body is an empty object, and the evidence is asked when the work by hand completes (F08).
     ['a hand-off that still carries evidence', 'post', `${BASE}/${ID}/hand-off`, { evidence: 'x' }],
     ['a hand-off with an unknown field', 'post', `${BASE}/${ID}/hand-off`, { password: 'p' }],
@@ -182,6 +184,16 @@ describe('provisioning queue routes (e2e, no database)', () => {
     for (const flag of ['true', 'false']) {
       const response = await request(app.getHttpServer())
         .get(`${BASE}?claimableNow=${flag}`)
+        .set('Authorization', bearer(principal(['IT_ADMIN'])));
+
+      expect(response.status).not.toBe(422);
+    }
+  });
+
+  it('QĐ-110c: accepts the filter of the tasks past their due day', async () => {
+    for (const flag of ['true', 'false']) {
+      const response = await request(app.getHttpServer())
+        .get(`${BASE}?overdue=${flag}`)
         .set('Authorization', bearer(principal(['IT_ADMIN'])));
 
       expect(response.status).not.toBe(422);

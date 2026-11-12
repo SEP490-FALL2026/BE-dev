@@ -54,6 +54,7 @@ export class OffboardingDetailService {
         today,
         block: await this.identity.findDepartureBlock(record.employeeId),
         heldRights: facts.heldRights,
+        rightsWithoutCompletedTask: facts.rightsWithoutCompletedTask,
         roleFlags: roles?.map,
         workspaces: Object.fromEntries(
           (roles?.workspaces ?? []).map((duty) => [duty.planId, `${duty.applicationName} / ${duty.planName}`]),

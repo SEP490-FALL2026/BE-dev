@@ -165,6 +165,8 @@ export class OffboardingRevocationService {
           note: reason,
         },
         context: { ...(held.departmentId ? { departmentId: held.departmentId } : {}) },
+        // The task is due the day the case is (`QĐ-110c`, `M-09`): one deadline for every right of the person. A case closed before the rule has none.
+        ...(held.revocationDueOn ? { timing: { dueOn: held.revocationDueOn } } : {}),
       });
     } catch (error) {
       if (error instanceof RevocationRefusedError)

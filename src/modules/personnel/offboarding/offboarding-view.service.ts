@@ -5,6 +5,7 @@ import { LicensingApi } from '../../licensing/public/licensing.api';
 import { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import type { EmployeeRecord } from '../../organization/public/organization.types';
+import { RevocationOverdueService } from '../departure-deadline/revocation-overdue.service';
 import { PersonnelAccessRefusedError } from '../public/personnel.errors';
 import { readAccessOf, type ReadAccess } from '../personnel-self-action.policy';
 import { RoleDutiesService } from '../role-duties/role-duties.service';
@@ -55,6 +56,7 @@ export class OffboardingViewService {
     private readonly roleDuties: RoleDutiesService,
     private readonly identity: IdentityAccessApi,
     private readonly detail: OffboardingDetailService,
+    private readonly overdue: RevocationOverdueService,
   ) {}
 
   async list(
@@ -63,12 +65,16 @@ export class OffboardingViewService {
   ): Promise<Paged<OffboardingSummaryWire>> {
     const { departmentIds } = await this.scopeOf(actor);
     const today = await this.organizationReads.businessToday();
-    const { items, total } = await this.lists.list({ ...filter, ...(departmentIds ? { departmentIds } : {}), today });
-    const employees = await this.employeesOf(items.map((item) => item.employeeId));
-    const held = await this.licensing.countPersonalSeatsOf(
-      items.filter((item) => item.state !== 'CANCELLED').map((item) => item.employeeId),
+    const { items, total } = await this.lists.list({
+      ...filter,
+      ...(departmentIds ? { departmentIds } : {}),
+      ...(await this.revocationOverdueNarrowing(filter.revocationOverdue, today, departmentIds)),
       today,
-    );
+    });
+    const employees = await this.employeesOf(items.map((item) => item.employeeId));
+    const liveEmployeeIds = items.filter((item) => item.state !== 'CANCELLED').map((item) => item.employeeId);
+    const held = await this.licensing.countPersonalSeatsOf(liveEmployeeIds, today);
+    const withoutCompletedTask = await this.licensing.countPersonalSeatsWithoutCompletedTaskOf(liveEmployeeIds, today);
 
     const roles = await this.roleDuties.flagMapsOf(items.filter((item) => item.state !== 'CANCELLED'));
     const blocks = await this.identity.findDepartureBlocks(items.map((item) => item.employeeId));
@@ -79,12 +85,29 @@ export class OffboardingViewService {
           today,
           block: blocks.get(item.employeeId) ?? null,
           heldRights: held.get(item.employeeId) ?? 0,
+          rightsWithoutCompletedTask: withoutCompletedTask.get(item.employeeId) ?? 0,
           roleFlags: roles.get(item.employeeId),
         }),
       ),
       total,
       filter,
     );
+  }
+
+  /**
+   * The filter `revocationOverdue` (`QĐ-110c`): the seats are `licensing`'s, so the departures past the deadline of their revocations that
+   * still have a right without a completed task are worked out first (the same reading the telling uses), and the page is then cut from
+   * them (`true`) or from all the others (`false`), so the pages and the total stay exact.
+   */
+  private async revocationOverdueNarrowing(
+    wanted: boolean | undefined,
+    today: BusinessDate,
+    departmentIds: readonly string[] | undefined,
+  ): Promise<Pick<OffboardingListFilter, 'onlyIds' | 'exceptIds'>> {
+    if (wanted === undefined) return {};
+    const ids = (await this.overdue.overdueCases(today, departmentIds)).map((late) => late.id);
+
+    return wanted ? { onlyIds: ids } : { exceptIds: ids };
   }
 
   async get(actor: AuthenticatedPrincipal, id: string): Promise<OffboardingDetailWire> {

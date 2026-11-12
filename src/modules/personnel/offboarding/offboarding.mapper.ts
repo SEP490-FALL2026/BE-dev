@@ -10,6 +10,7 @@ import { groundsNoteOf } from '../personnel-grounds.policy';
 import type { ReadAccess } from '../personnel-self-action.policy';
 import { ROLE_FLAGS, type RoleFlagMap } from '../public/personnel.types';
 import type { Checklist } from './offboarding.policy';
+import { isRevocationOverdue } from '../departure-deadline/departure-deadline.policy';
 import { isRevocableType } from '../departure-deadline/departure-impact.policy';
 import type { OffboardingChangeRecord, OffboardingRecord, OffboardingSummaryRecord } from './offboarding.types';
 import { accessBlockedFrom, isBlocked, isPastLastDay, ownBlock, type DepartureBlock } from './offboarding.policy';
@@ -31,6 +32,8 @@ export function toSummary(
   facts: {
     today: string;
     heldRights: number;
+    /** The personal seats of the person with no task of revocation completed (0 for a cancelled case). */
+    rightsWithoutCompletedTask: number;
     roleFlags?: RoleFlagMap | undefined;
     /** The block the departure put on the access of the person, if any. */
     block?: DepartureBlock | null | undefined;
@@ -51,6 +54,19 @@ export function toSummary(
     accessBlocked,
     accessBlockedFrom: accessBlockedFrom(record, block),
     heldRights: facts.heldRights,
+    revocation: {
+      dueOn: record.revocationDueOn,
+      rightsWithoutCompletedTask: facts.rightsWithoutCompletedTask,
+      overdue: isRevocationOverdue(
+        {
+          state: record.state,
+          closed: record.closed,
+          dueOn: record.revocationDueOn,
+          rightsWithoutCompletedTask: facts.rightsWithoutCompletedTask,
+        },
+        facts.today,
+      ),
+    },
     // A handover that is already blocked is waiting for the IT Admin to lock the account like a departure that has happened (L3).
     accountLockMissing: (record.state === 'LEFT' || accessBlocked) && !record.accountLocked && !record.closed,
     closed: record.closed,
@@ -61,6 +77,7 @@ export function toSummary(
 export interface DetailFacts {
   today: string;
   heldRights: number;
+  rightsWithoutCompletedTask: number;
   roleFlags?: RoleFlagMap | undefined;
   block?: DepartureBlock | null | undefined;
   /** The workspaces of K2 plans the person owns or administers, by plan id with the names. */
@@ -114,6 +131,7 @@ export function toDetail(
         accessBlockMode: record.accessBlockMode,
         lastWorkingDay: record.lastWorkingDay,
         leftOn: record.leftOn,
+        revocationDueOn: record.revocationDueOn,
         accountLocked: locked,
         closed: record.closedAt !== null,
         headsDepartment: record.headHandover !== null,

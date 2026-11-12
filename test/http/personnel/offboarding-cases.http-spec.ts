@@ -1,8 +1,10 @@
 import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { App } from 'supertest/types';
+import { createOpenApiDocument } from '../../../src/app/configure-application';
 import { bodyOf } from '../../support/api-body';
 import { bearer, createHttpContractApp, principal } from '../../support/http-contract-app';
+import { OPENAPI_DOCUMENT_BUDGET_MS } from '../../support/openapi-document-budget';
 
 const ID = '3f0c7d54-9e1b-4f6a-8d2c-5b7a1e9c0d11';
 const NOTE = 'Quyết định số QD-12/2026 của phòng Nhân sự';
@@ -171,6 +173,11 @@ describe('offboarding case routes (e2e, no database)', () => {
         (server: App) => request(server).get('/api/v1/offboarding-cases?pastLastDay=maybe'),
       ],
       [
+        'a revocationOverdue that is not true or false',
+        'GET /offboarding-cases',
+        (server: App) => request(server).get('/api/v1/offboarding-cases?revocationOverdue=maybe'),
+      ],
+      [
         'a page size over the limit',
         'GET /offboarding-cases',
         (server: App) => request(server).get('/api/v1/offboarding-cases?pageSize=101'),
@@ -284,4 +291,27 @@ describe('offboarding case routes (e2e, no database)', () => {
       expect(bodyOf(response).error.code).toBe('VALIDATION_ERROR');
     });
   });
+
+  it('QĐ-110c: accepts the filter of the departures past the deadline of their revocations', async () => {
+    for (const flag of ['true', 'false']) {
+      const response = await request(app.getHttpServer())
+        .get(`/api/v1/offboarding-cases?revocationOverdue=${flag}`)
+        .set('Authorization', bearer(principal(['SUPER_ADMIN'])));
+
+      expect(response.status).not.toBe(422);
+    }
+  });
+
+  it(
+    'QĐ-110c: documents the deadline of the revocations on the case and the filter of the list',
+    () => {
+      const document = createOpenApiDocument(app);
+      const list = JSON.stringify((document.paths['/api/v1/offboarding-cases'] as { get: unknown }).get);
+      const schemas = JSON.stringify(document.components?.schemas ?? {});
+
+      expect(list).toContain('revocationOverdue');
+      for (const field of ['"rightsWithoutCompletedTask"', '"revocation"']) expect(schemas).toContain(field);
+    },
+    OPENAPI_DOCUMENT_BUDGET_MS,
+  );
 });

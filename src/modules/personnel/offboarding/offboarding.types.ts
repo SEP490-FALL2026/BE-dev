@@ -81,6 +81,8 @@ export interface OffboardingSummaryRecord {
   leftOn: BusinessDate | null;
   accountLocked: boolean;
   closed: boolean;
+  /** The day the IT Admin has until to take every right away; null for a case closed or cancelled before the rule (`QĐ-110c`). */
+  revocationDueOn: BusinessDate | null;
   /** The person headed the department they leave: one of the roles that need someone to take over (`US-03-04` AC-11). */
   headsDepartment: boolean;
 }
@@ -107,6 +109,11 @@ export interface OffboardingListFilter {
   accountLockMissing?: boolean;
   /** Only the cases whose snapshot of roles, taken when the departure was recorded, has this one. */
   roleFlag?: RoleFlag;
+  /** `true`: only the departures past the deadline of their revocations that still have a right without a completed task; `false`: all the others (`QĐ-110c`). */
+  revocationOverdue?: boolean;
+  /** The ids the service worked out from `revocationOverdue`: only these cases, or every case but these. */
+  onlyIds?: readonly string[];
+  exceptIds?: readonly string[];
   today: BusinessDate;
   page: number;
   pageSize: number;

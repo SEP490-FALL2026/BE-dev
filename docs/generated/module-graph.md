@@ -109,14 +109,14 @@ flowchart BT
   optimization -->|9| usage
   organization -->|10| audit
   organization -->|5| notifications
-  personnel -->|23| audit
+  personnel -->|24| audit
   personnel -->|5| catalog
   personnel -->|2| devices
   personnel -->|20| identity_access
-  personnel -->|23| licensing
+  personnel -->|24| licensing
   personnel -->|6| notifications
-  personnel -->|5| operating_parameters
-  personnel -->|88| organization
+  personnel -->|6| operating_parameters
+  personnel -->|89| organization
   personnel -->|7| requests
   requests -->|59| audit
   requests -->|23| budgets

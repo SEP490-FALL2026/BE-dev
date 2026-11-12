@@ -16,6 +16,7 @@ export interface CaseWire {
   accessBlocked: boolean;
   accessBlockedFrom: string | null;
   heldRights: number;
+  revocation: { dueOn: string | null; overdue: boolean; rightsWithoutCompletedTask: number };
   accountLockMissing: boolean;
   closed: boolean;
   department?: { id: string; code: string; name: string };

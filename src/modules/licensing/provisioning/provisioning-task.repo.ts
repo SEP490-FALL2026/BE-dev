@@ -18,12 +18,58 @@ export interface TaskPageFilter {
   status?: ProvisioningTaskStatus;
   /** `true`: only the revocations that may be taken today (no day not before, or it has come), and every grant; `false`: only those still in their grace. */
   claimableOn?: { today: BusinessDate; claimable: boolean };
+  /** `true`: only the tasks past their due day that are not over (completed, cancelled or closed as failed); `false`: all the others. */
+  overdueOn?: { today: BusinessDate; overdue: boolean };
   /** Only the tasks this employee is in charge of by default. */
   responsibleEmployeeId?: string;
   /** Only the tasks nobody is in charge of, or whose person in charge is one of these (who no longer work). */
   generalQueueOf?: readonly string[];
   skip: number;
   take: number;
+}
+
+/** The tasks that need no more work: a task of these statuses is never late. */
+const OVER = ['COMPLETED', 'CANCELLED', 'CLOSED_FAILED'] as const;
+
+/**
+ * Late (`QĐ-110c`): a due day before today on a task that is not over. The others are written out, not negated, so a task with no due day
+ * (every grant, a revocation nobody gave one) is among them: a negation would drop the row whose due day is NULL.
+ */
+function overdueWhere(overdue: { today: BusinessDate; overdue: boolean }): Prisma.ProvisioningTaskWhereInput {
+  const today = toDateColumn(overdue.today);
+
+  return overdue.overdue
+    ? { dueOn: { lt: today }, status: { notIn: [...OVER] } }
+    : { OR: [{ dueOn: null }, { dueOn: { gte: today } }, { status: { in: [...OVER] } }] };
+}
+
+/** The conditions of one page of the queue: the plain ones side by side, the ones made of alternatives each in its own `AND`. */
+function pageWhere(filter: TaskPageFilter): Prisma.ProvisioningTaskWhereInput {
+  const and: Prisma.ProvisioningTaskWhereInput[] = [];
+  if (filter.claimableOn) {
+    const today = toDateColumn(filter.claimableOn.today);
+    and.push(
+      filter.claimableOn.claimable
+        ? { OR: [{ notBefore: null }, { notBefore: { lte: today } }] }
+        : { notBefore: { gt: today } },
+    );
+  }
+  if (filter.overdueOn) and.push(overdueWhere(filter.overdueOn));
+  if (filter.generalQueueOf) {
+    and.push({
+      OR: [
+        { defaultResponsibleEmployeeId: null },
+        { defaultResponsibleEmployeeId: { in: [...filter.generalQueueOf] } },
+      ],
+    });
+  }
+
+  return {
+    ...(filter.channel ? { channel: filter.channel } : {}),
+    ...(filter.status ? { status: filter.status } : {}),
+    ...(filter.responsibleEmployeeId ? { defaultResponsibleEmployeeId: filter.responsibleEmployeeId } : {}),
+    ...(and.length > 0 ? { AND: and } : {}),
+  };
 }
 
 /**
@@ -379,29 +425,7 @@ export class ProvisioningTaskRepo {
    * are not selected (`LD-08`); the record carries them as null.
    */
   async page(filter: TaskPageFilter): Promise<{ items: ProvisioningTaskRecord[]; total: number }> {
-    const todayColumn = filter.claimableOn ? toDateColumn(filter.claimableOn.today) : null;
-    const where: Prisma.ProvisioningTaskWhereInput = {
-      ...(filter.claimableOn && todayColumn
-        ? {
-            AND: [
-              filter.claimableOn.claimable
-                ? { OR: [{ notBefore: null }, { notBefore: { lte: todayColumn } }] }
-                : { notBefore: { gt: todayColumn } },
-            ],
-          }
-        : {}),
-      ...(filter.channel ? { channel: filter.channel } : {}),
-      ...(filter.status ? { status: filter.status } : {}),
-      ...(filter.responsibleEmployeeId ? { defaultResponsibleEmployeeId: filter.responsibleEmployeeId } : {}),
-      ...(filter.generalQueueOf
-        ? {
-            OR: [
-              { defaultResponsibleEmployeeId: null },
-              { defaultResponsibleEmployeeId: { in: [...filter.generalQueueOf] } },
-            ],
-          }
-        : {}),
-    };
+    const where = pageWhere(filter);
 
     return this.prisma.$transaction(
       async (tx) => {

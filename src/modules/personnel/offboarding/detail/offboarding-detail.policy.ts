@@ -1,3 +1,4 @@
+import { rightsWithoutCompletedTask } from '../../departure-deadline/departure-deadline.policy';
 import { blockersOf, checklistOf, type Checklist } from '../offboarding.policy';
 import type { OffboardingRecord } from '../offboarding.types';
 
@@ -9,7 +10,7 @@ import type { OffboardingRecord } from '../offboarding.types';
 export interface DepartureDetailReads {
   /** The case is not cancelled: only then are the rights, the steps and what keeps it open read at all. */
   live: boolean;
-  seats: readonly { assignmentId: string; revocation: unknown }[];
+  seats: readonly { assignmentId: string; revocation: { status: string } | null }[];
   /** The seats whose renewal is cancelled but whose access runs on to the end of the paid period. */
   terminating: ReadonlySet<string>;
   /** The seats this case asked to have revoked. */
@@ -21,7 +22,13 @@ export interface DepartureDetailReads {
 export function departureDetailFacts(
   record: Pick<OffboardingRecord, 'accessBlockMode' | 'state' | 'accountLockAt' | 'closedAt'>,
   reads: DepartureDetailReads,
-): { heldRights: number; accessRunsOn: number; checklist: Checklist | null; blockers: Record<string, number> } {
+): {
+  heldRights: number;
+  rightsWithoutCompletedTask: number;
+  accessRunsOn: number;
+  checklist: Checklist | null;
+  blockers: Record<string, number>;
+} {
   const { seats } = reads;
   const held = new Set(seats.map((seat) => seat.assignmentId));
   const accessRunsOn = seats.filter((seat) => reads.terminating.has(seat.assignmentId)).length;
@@ -29,6 +36,7 @@ export function departureDetailFacts(
 
   return {
     heldRights: seats.length,
+    rightsWithoutCompletedTask: rightsWithoutCompletedTask(seats),
     accessRunsOn,
     checklist: reads.live
       ? checklistOf({

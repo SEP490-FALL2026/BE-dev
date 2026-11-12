@@ -90,6 +90,11 @@ export const listTasksQuerySchema = z.strictObject({
     .enum(['true', 'false'])
     .transform((value) => value === 'true')
     .optional(),
+  /** `true`: only the tasks past their due day that are not over; `false`: all the others (`QĐ-110c`). */
+  overdue: z
+    .enum(['true', 'false'])
+    .transform((value) => value === 'true')
+    .optional(),
   ...pageQuery,
 });
 export const taskIdParamSchema = z.strictObject({ id: z.uuid() });

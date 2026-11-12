@@ -10333,6 +10333,12 @@
             "schema": { "type": "string", "enum": ["true", "false"] }
           },
           {
+            "name": "revocationOverdue",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string", "enum": ["true", "false"] }
+          },
+          {
             "name": "roleFlag",
             "required": false,
             "in": "query",
@@ -10369,7 +10375,7 @@
         ],
         "responses": {
           "200": {
-            "description": "A page of departures, by last working day, optionally of one person, one state, those handing over whose last working day has passed, or those whose company account is not recorded as locked, or those whose person held one of the roles that need someone to take over when the departure was recorded (the Super Admin, Finance, an approval role, the IT Admin in charge of a department, the head of a department, the owner or administrator of a workspace). Each row says who, where the case stands, the days, how many rights the person still holds and which of those roles they hold now.",
+            "description": "A page of departures, by last working day, optionally of one person, one state, those handing over whose last working day has passed, or those whose company account is not recorded as locked, or those whose person held one of the roles that need someone to take over when the departure was recorded (the Super Admin, Finance, an approval role, the IT Admin in charge of a department, the head of a department, the owner or administrator of a workspace). Each row says who, where the case stands, the days, how many rights the person still holds and which of those roles they hold now. `revocation` is the deadline of the revocations, kept on the case: its day (`dueOn`, the working day after the last working day), how many personal seats have no task of revocation completed (those nobody opened a task for included) and whether the case is `overdue` (today is past the day with such a seat left). revocationOverdue=true lists only the late departures, false all the others.",
             "content": {
               "application/json": {
                 "schema": {
@@ -29343,6 +29349,12 @@
             "schema": { "type": "string", "enum": ["true", "false"] }
           },
           {
+            "name": "overdue",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string", "enum": ["true", "false"] }
+          },
+          {
             "name": "page",
             "required": false,
             "in": "query",
@@ -29363,7 +29375,7 @@
         ],
         "responses": {
           "200": {
-            "description": "The tasks of both channels in one queue, the oldest first, each with the time it has taken. scope MINE is the IT Admin in charge by default, GENERAL the tasks nobody in charge works, ALL every task. A revocation says the day it may not be done before (notBefore), its due day (dueOn) and whether it may be taken today (claimableNow); claimableNow=true lists only what may be taken today, false only the revocations still in their grace.",
+            "description": "The tasks of both channels in one queue, the oldest first, each with the time it has taken. scope MINE is the IT Admin in charge by default, GENERAL the tasks nobody in charge works, ALL every task. A revocation says the day it may not be done before (notBefore), its due day (dueOn) and whether it may be taken today (claimableNow); claimableNow=true lists only what may be taken today, false only the revocations still in their grace. overdue=true lists only the tasks past their due day that are not over (completed, cancelled or closed as failed), the late revocations of a departure among them, false all the others.",
             "content": {
               "application/json": {
                 "schema": {
@@ -87947,6 +87959,16 @@
               "accessBlocked": { "type": "boolean" },
               "accessBlockedFrom": { "type": "string", "nullable": true },
               "heldRights": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+              "revocation": {
+                "type": "object",
+                "properties": {
+                  "dueOn": { "type": "string", "nullable": true },
+                  "overdue": { "type": "boolean" },
+                  "rightsWithoutCompletedTask": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+                },
+                "required": ["dueOn", "overdue", "rightsWithoutCompletedTask"],
+                "additionalProperties": false
+              },
               "accountLockMissing": { "type": "boolean" },
               "closed": { "type": "boolean" },
               "roleFlags": {
@@ -88131,6 +88153,7 @@
               "accessBlocked",
               "accessBlockedFrom",
               "heldRights",
+              "revocation",
               "accountLockMissing",
               "closed",
               "roleFlags",
@@ -88189,6 +88212,16 @@
                     "accessBlocked": { "type": "boolean" },
                     "accessBlockedFrom": { "type": "string", "nullable": true },
                     "heldRights": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                    "revocation": {
+                      "type": "object",
+                      "properties": {
+                        "dueOn": { "type": "string", "nullable": true },
+                        "overdue": { "type": "boolean" },
+                        "rightsWithoutCompletedTask": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+                      },
+                      "required": ["dueOn", "overdue", "rightsWithoutCompletedTask"],
+                      "additionalProperties": false
+                    },
                     "accountLockMissing": { "type": "boolean" },
                     "closed": { "type": "boolean" },
                     "roleFlags": {
@@ -88215,6 +88248,7 @@
                     "accessBlocked",
                     "accessBlockedFrom",
                     "heldRights",
+                    "revocation",
                     "accountLockMissing",
                     "closed",
                     "roleFlags"
@@ -88577,6 +88611,16 @@
               "accessBlocked": { "type": "boolean" },
               "accessBlockedFrom": { "type": "string", "nullable": true },
               "heldRights": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+              "revocation": {
+                "type": "object",
+                "properties": {
+                  "dueOn": { "type": "string", "nullable": true },
+                  "overdue": { "type": "boolean" },
+                  "rightsWithoutCompletedTask": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+                },
+                "required": ["dueOn", "overdue", "rightsWithoutCompletedTask"],
+                "additionalProperties": false
+              },
               "accountLockMissing": { "type": "boolean" },
               "closed": { "type": "boolean" },
               "roleFlags": {
@@ -88770,6 +88814,7 @@
               "accessBlocked",
               "accessBlockedFrom",
               "heldRights",
+              "revocation",
               "accountLockMissing",
               "closed",
               "roleFlags",

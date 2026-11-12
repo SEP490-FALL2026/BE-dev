@@ -41,6 +41,7 @@ export class ProvisioningService {
       status?: ProvisioningTaskStatus;
       scope: TaskScope;
       claimableNow?: boolean;
+      overdue?: boolean;
       page: number;
       pageSize: number;
     },
@@ -52,6 +53,9 @@ export class ProvisioningService {
       ...(query.scope === 'GENERAL' ? { generalQueueOf: await this.responsibleWhoLeft() } : {}),
       ...(query.claimableNow !== undefined
         ? { claimableOn: { today: await this.organizationReads.businessToday(), claimable: query.claimableNow } }
+        : {}),
+      ...(query.overdue !== undefined
+        ? { overdueOn: { today: await this.organizationReads.businessToday(), overdue: query.overdue } }
         : {}),
       skip: (query.page - 1) * query.pageSize,
       take: query.pageSize,

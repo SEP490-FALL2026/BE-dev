@@ -5,7 +5,7 @@ import { nthWorkingDayFrom } from '../../../src/core/working-days';
 import { PROJECT_ROOT } from '../../support/cli-process';
 import { migrationEndingWith } from '../../support/migration-history';
 import { RevocationOverdueService } from '../../../src/modules/personnel/departure-deadline/revocation-overdue.service';
-import { OffboardingHarness } from '../../support/offboarding-harness';
+import { OffboardingHarness, type CaseWire } from '../../support/offboarding-harness';
 import type { Department, Person } from '../../support/request-harness';
 
 const h = new OffboardingHarness();
@@ -298,6 +298,122 @@ describe('the deadline of the revocations of a departure (integration, real Post
 
       expect(await passAt(addDays(h.today(), 60))).toBe(0);
       expect(await noticesOf(wire.id)).toEqual([]);
+    }, 180_000);
+  });
+
+  describe('the deadline of the case on the tasks, on the case and in the lists (P3, QĐ-110c)', () => {
+    const LOCK = { note: 'Đã khóa tài khoản công ty' };
+    interface Page<T> {
+      items: T[];
+      pagination: { totalItems: number };
+    }
+    const casePage = async (query: string, account = h.sa) =>
+      h.dataOf<Page<CaseWire>>(await h.listCases(query, account).expect(200));
+    const taskPage = async (query: Record<string, string>) =>
+      h.dataOf<Page<{ id: string; dueOn: string | null; status: string }>>(await h.list(query).expect(200));
+    const dueOnOfTask = async (taskId: string): Promise<string | null> =>
+      (
+        await h.ctx.sql.query<{ due: string | null }>(
+          `SELECT to_char(due_on, 'YYYY-MM-DD') AS due FROM provisioning_tasks WHERE id = $1`,
+          [taskId],
+        )
+      ).rows[0].due;
+    const holder = async (): Promise<{ person: Person; seats: string[] }> => {
+      const code = `E-RD-T${(counter += 1)}`;
+      const person = await h.worker(des, code);
+      const seats: string[] = [];
+      for (const subscriptionId of subscriptions) seats.push(await h.seatOf(person, { subscriptionId }, code));
+
+      return { person, seats };
+    };
+
+    it('opens the tasks of a departure with the due day of the case, and the card of the task says it', async () => {
+      const { person, seats } = await holder();
+      const wire = await h.recordedCase(person, { accessBlockMode: 'BLOCK_NOW', lastWorkingDay: undefined });
+      const due = dueAfter(h.today());
+
+      await h.revokeRights(wire.id, { assignmentIds: seats, accountLock: LOCK }).expect(200);
+
+      for (const seat of seats) {
+        const taskId = (await h.liveTaskOf(seat)) as string;
+        expect(await dueOnOfTask(taskId)).toBe(due);
+        expect(h.dataOf<{ task: { dueOn: string } }>(await h.getTask(taskId).expect(200)).task.dueOn).toBe(due);
+      }
+    }, 180_000);
+
+    it('lists only the tasks past their due day that are not over with overdue=true, and all the others with overdue=false', async () => {
+      const { person, seats } = await holder();
+      const wire = await h.recordedCase(person, { accessBlockMode: 'BLOCK_NOW', lastWorkingDay: undefined });
+      await h.revokeRights(wire.id, { assignmentIds: seats, accountLock: LOCK }).expect(200);
+      const [late, onTime] = [(await h.liveTaskOf(seats[0])) as string, (await h.liveTaskOf(seats[1])) as string];
+      await h.ctx.sql.query('UPDATE provisioning_tasks SET due_on = $2::date WHERE id = $1', [late, h.day(-1)]);
+      const ids = (page: { items: { id: string }[] }) => page.items.map((item) => item.id);
+
+      expect(ids(await taskPage({ overdue: 'true', pageSize: '100' }))).toEqual(expect.arrayContaining([late]));
+      expect(ids(await taskPage({ overdue: 'true', pageSize: '100' }))).not.toContain(onTime);
+      expect(ids(await taskPage({ overdue: 'false', pageSize: '100' }))).toEqual(expect.arrayContaining([onTime]));
+      expect(ids(await taskPage({ overdue: 'false', pageSize: '100' }))).not.toContain(late);
+
+      await h.claim(late).expect(200);
+      await h.revoked(late, { completion: 'ACCOUNT_REMOVED', evidence: 'Đã gỡ khỏi workspace' }).expect(200);
+      expect(ids(await taskPage({ overdue: 'true', pageSize: '100' }))).not.toContain(late);
+      expect(ids(await taskPage({ overdue: 'false', pageSize: '100' }))).toContain(late);
+    }, 180_000);
+
+    it('tells the deadline on the case and in the list, filters the list by it, and keeps the pages and the total exact', async () => {
+      const lateOne = await h.recordedCase((await holder()).person);
+      await h.ctx.sql.query(
+        `UPDATE offboarding_cases SET last_working_day = '2026-09-30', departure_effective_on = '2026-10-01',
+                revocation_due_on = '2026-10-01', handover_due_on = '2026-09-29' WHERE id = $1`,
+        [lateOne.id],
+      );
+      const onTime = await h.recordedCase((await holder()).person);
+
+      const detail = h.dataOf<CaseWire>(await h.readCase(lateOne.id).expect(200));
+      expect(detail.revocation).toEqual({ dueOn: '2026-10-01', overdue: true, rightsWithoutCompletedTask: 2 });
+      expect(h.dataOf<CaseWire>(await h.readCase(onTime.id).expect(200)).revocation).toEqual({
+        dueOn: dueAfter(h.day(10)),
+        overdue: false,
+        rightsWithoutCompletedTask: 2,
+      });
+
+      const overdue = await casePage('?revocationOverdue=true&pageSize=100');
+      const others = await casePage('?revocationOverdue=false&pageSize=100');
+      const all = await casePage('?pageSize=100');
+      expect(overdue.items.map((item) => item.id)).toContain(lateOne.id);
+      expect(overdue.items.every((item) => item.revocation.overdue)).toBe(true);
+      expect(others.items.map((item) => item.id)).toEqual(expect.arrayContaining([onTime.id]));
+      expect(others.items.map((item) => item.id)).not.toContain(lateOne.id);
+      expect(others.items.some((item) => item.revocation.overdue)).toBe(false);
+      expect(overdue.pagination.totalItems + others.pagination.totalItems).toBe(all.pagination.totalItems);
+      const firstPage = await casePage('?revocationOverdue=false&pageSize=1&page=1');
+      expect(firstPage.items).toHaveLength(1);
+      expect(firstPage.pagination.totalItems).toBe(others.pagination.totalItems);
+    }, 180_000);
+
+    it('lets the IT Admin in charge of the department read the departures past the deadline', async () => {
+      const lateOne = await h.recordedCase((await holder()).person);
+      await h.ctx.sql.query(
+        `UPDATE offboarding_cases SET last_working_day = '2026-09-30', departure_effective_on = '2026-10-01',
+                revocation_due_on = '2026-10-01', handover_due_on = '2026-09-29' WHERE id = $1`,
+        [lateOne.id],
+      );
+
+      const asIt = await casePage('?revocationOverdue=true&pageSize=100', h.it1);
+
+      expect(asIt.items.map((item) => item.id)).toContain(lateOne.id);
+    }, 180_000);
+
+    it('does not tell a cancelled case as late, and shows no right for it', async () => {
+      const wire = await h.recordedCase((await holder()).person);
+      await h.cancelCase(wire.id, { reason: 'Người ở lại làm việc' }).expect(200);
+
+      const detail = h.dataOf<CaseWire>(await h.readCase(wire.id).expect(200));
+
+      expect(detail.revocation).toMatchObject({ overdue: false, rightsWithoutCompletedTask: 0 });
+      expect((await casePage('?revocationOverdue=true&pageSize=100')).items.map((item) => item.id)).not.toContain(
+        wire.id,
+      );
     }, 180_000);
   });
 });
