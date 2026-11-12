@@ -72,7 +72,7 @@ export class BoardController {
   @ApiSuccessResponse(RecommendationPageResponseDto, {
     message: 'GHOST_SEAT_RECOMMENDATIONS.LISTED',
     description:
-      'One page of recommendations (G1, G2), newest first, filtered by group, tier, state, application and department scope.',
+      'One page of recommendations (G1, G2), newest first, filtered by group, tier, state, application, department scope (MINE = the departments of the IT Admin, ALL = the organization), one department and one holder; a department or a holder outside the scope reads an empty page. A holder is shown by code, never by name.',
   })
   @ApiErrorResponses(...AUTH_ERRORS, forbidden('an IT Admin'), QUERY_INVALID)
   async list(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Query() query: RecommendationListQueryDto) {
@@ -115,9 +115,9 @@ export class BoardController {
       'One page of seats, each with exactly one state (active, inactive, no data, identity not matched, insufficient evidence or excluded) and the gate that left it out; a seat with no data or an identity not matched has no days.',
   })
   @ApiErrorResponses(...AUTH_ERRORS, forbidden('an IT Admin'), QUERY_INVALID)
-  async seatStates(@Query() query: SeatStateListQueryDto) {
+  async seatStates(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Query() query: SeatStateListQueryDto) {
     try {
-      return await this.queries.listSeatStates(query);
+      return await this.queries.listSeatStates(actor, query);
     } catch (error) {
       throw toGhostSeatApiException(error);
     }

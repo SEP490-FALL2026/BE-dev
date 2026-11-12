@@ -6,7 +6,7 @@ import { canReclaim, confidenceLabelOf, headEvidenceOf, labelsOf } from './board
 export interface RowNames {
   planName: string;
   applicationName: string;
-  holder: { employeeCode: string; fullName: string } | null;
+  holder: { employeeCode: string } | null;
 }
 
 /** What a G3/G4 adds to the row: the confidence with its reasons, the days, the labels and the money; empty for the other groups. */
@@ -41,7 +41,7 @@ export const toSummaryWire = (record: GhostSeatRecord, names: RowNames) => ({
   assignmentId: record.assignmentId,
   holder:
     record.employeeId && names.holder
-      ? { employeeId: record.employeeId, employeeCode: names.holder.employeeCode, fullName: names.holder.fullName }
+      ? { employeeId: record.employeeId, employeeCode: names.holder.employeeCode }
       : null,
   freeSeats: record.freeSeats,
   countsTowardVacantCost: record.countsTowardVacantCost,

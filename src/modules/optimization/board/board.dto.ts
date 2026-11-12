@@ -54,12 +54,23 @@ export const recommendationListQuerySchema = z.strictObject({
   state: z.enum(GHOST_SEAT_STATES).optional(),
   applicationId: z.uuid().optional(),
   departmentScope: z.enum(['MINE', 'ALL']).default('ALL'),
+  departmentId: z
+    .uuid()
+    .optional()
+    .meta({ description: 'Only this department; a department outside the scope reads an empty page.' }),
+  employeeId: z.uuid().optional().meta({ description: 'Only this holder; one outside the scope reads an empty page.' }),
   ...pageQuery,
 });
 
 export const seatStateListQuerySchema = z.strictObject({
   applicationId: z.uuid().optional(),
   status: z.enum(SEAT_STATUSES).optional(),
+  departmentScope: z.enum(['MINE', 'ALL']).default('ALL'),
+  departmentId: z
+    .uuid()
+    .optional()
+    .meta({ description: 'Only the holders placed in this department; one outside the scope reads an empty page.' }),
+  employeeId: z.uuid().optional().meta({ description: 'Only this holder; one outside the scope reads an empty page.' }),
   ...pageQuery,
 });
 
@@ -106,7 +117,7 @@ const recommendationSummarySchema = z.strictObject({
   plan: z.strictObject({ planId: z.uuid(), planName: z.string() }),
   subscriptionId: z.uuid().nullable(),
   assignmentId: z.uuid().nullable(),
-  holder: z.strictObject({ employeeId: z.uuid(), employeeCode: z.string(), fullName: z.string() }).nullable(),
+  holder: z.strictObject({ employeeId: z.uuid(), employeeCode: z.string() }).nullable(),
   freeSeats: z.number().int().nonnegative().nullable(),
   countsTowardVacantCost: z.boolean().nullable(),
   revocationTaskId: z.uuid().nullable(),
@@ -218,7 +229,7 @@ const seatStateSchema = z.strictObject({
   seatChainId: z.uuid(),
   assignmentId: z.uuid(),
   application: z.strictObject({ applicationId: z.uuid(), applicationName: z.string() }),
-  holder: z.strictObject({ employeeId: z.uuid(), employeeCode: z.string(), fullName: z.string() }).nullable(),
+  holder: z.strictObject({ employeeId: z.uuid(), employeeCode: z.string() }).nullable(),
   status: z.enum(SEAT_STATUSES),
   reason: z.enum(SKIP_GATES).nullable().meta({ description: 'The gate that left the seat out, when one did.' }),
   lastActiveDate: responseBusinessDate.nullable(),
