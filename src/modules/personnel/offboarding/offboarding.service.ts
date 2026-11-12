@@ -9,7 +9,8 @@ import { OffboardingCaseWriter } from './offboarding-case-writer.service';
 import { OffboardingEndings } from './offboarding-endings.service';
 import { OffboardingFrame } from './offboarding-frame.service';
 import { OffboardingPreconditions } from './offboarding-preconditions.service';
-import { lastWorkingDayOf } from './offboarding.policy';
+import { OffboardingRefusedError } from './offboarding.errors';
+import { blockNowDayIsTodayRefusal, lastWorkingDayOf } from './offboarding.policy';
 import type { OffboardingRecord, RecordOffboardingInput } from './offboarding.types';
 
 /**
@@ -47,6 +48,9 @@ export class OffboardingService {
     const today = await this.organizationReads.businessToday(new Date(), tx);
     // A departure blocked now works to the end of the day it is recorded: a last working day left out is today (`QĐ-110b`).
     const input = { ...given, lastWorkingDay: lastWorkingDayOf(given.accessBlockMode, given.lastWorkingDay, today) };
+    // Asked before the person is read: a day that is not today is wrong whatever the placements of the person are (`QĐ-110b`).
+    const wrongDay = blockNowDayIsTodayRefusal(given.accessBlockMode, given.lastWorkingDay, today);
+    if (wrongDay) throw new OffboardingRefusedError(wrongDay.code, wrongDay.details);
 
     const { seen, held } = await this.preconditions.require(tx, actor, input, today);
     // What the departure will do, read before anything is written and shared with the preview, is kept with the record (`MF2-B.3`).

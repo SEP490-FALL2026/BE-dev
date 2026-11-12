@@ -246,6 +246,7 @@
 
 - **Khóa nhân viên ở `claim` (làm):** `ProvisioningHolderService.requireCanBeginTask` khóa người thụ hưởng `FOR SHARE` rồi mới đọc dòng chặn (`isAccessBlocked`), như đường `grant` (`personal`). Ca ghi nghỉ việc giữ khóa `FOR UPDATE` của người đó trong lúc `claim` đang chạy: `claim` chờ rồi thấy dòng chặn (test khóa chờ với `waitForLockWaiters`, đỏ khi bỏ khóa). Thứ tự khóa: tác vụ (khóa sẵn bởi `frame.work`) rồi nhân viên; đường ghi nghỉ việc khóa nhân viên rồi không khóa tác vụ `FOR UPDATE`, nên không tạo vòng. **Đổi lại:** bỏ `requireCanBeginTask`, gọi lại `getEmployee` + `requireCanBegin`.
 - **Tên trường lỗi (làm):** `ProvisioningBeneficiaryDepartedError.cause` đổi thành `reason` để khỏi che `Error.cause` (ES2022); khóa wire `details.cause` giữ nguyên (`cause: error.reason` ở `provisioning.http-errors.ts`), nên FE và OpenAPI không đổi.
+- **Ngày `BLOCK_NOW` sai bị từ chối trước khi đọc người (làm):** `blockNowDayIsTodayRefusal` (policy thuần) chạy ở `OffboardingService.recordInTx` ngay sau khi biết hôm nay, trước `preconditions.require`; trước đây một người có lần xếp phòng đầu chưa bắt đầu nhận `409 PLACEMENT_OVERLAP` (`FIRST_PLACEMENT_PENDING`) thay vì `422 BLOCK_NOW_DAY_IS_TODAY`. Hệ quả: ngày sai được báo ngay cả khi người không tồn tại (422 thay 404), như một lỗi nhập liệu. `recordRefusal` giữ kiểm tra cũ để policy tự đủ. **Đổi lại:** bỏ lệnh gọi ở `recordInTx`.
 
 ## Bị chặn
 

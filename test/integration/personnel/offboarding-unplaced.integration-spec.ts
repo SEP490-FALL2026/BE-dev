@@ -186,6 +186,31 @@ describe('unplaced employee offboarding and first placement (integration, real P
     expect(rows).toHaveLength(1);
   });
 
+  it('3b. a departure blocked now with a day other than today is 422 BLOCK_NOW_DAY_IS_TODAY, before the first placement that has not begun is looked at', async () => {
+    const emp = await createUnplacedEmployee();
+    await request(h.server())
+      .post(`/api/v1/employees/${emp.id}/first-placements`)
+      .set(h.as(h.sa))
+      .send({ departmentId: des.id, effectiveFrom: h.day(10) })
+      .expect(201);
+
+    const response = await h.recordCase({
+      employeeId: emp.id,
+      accessBlockMode: 'BLOCK_NOW',
+      lastWorkingDay: h.day(12),
+      groundsNote: h.groundsNote,
+    });
+
+    expect([response.status, h.codeOf(response), h.detailsOf(response)]).toEqual([
+      422,
+      'OFFBOARDING_CASE.LAST_WORKING_DAY_INVALID',
+      { reason: 'BLOCK_NOW_DAY_IS_TODAY', today: h.today() },
+    ]);
+    const { rows } = await h.ctx.sql.query('SELECT id FROM employee_placements WHERE employee_id = $1', [emp.id]);
+    expect(rows).toHaveLength(1);
+    expect(await h.caseCount(emp.id)).toBe(0);
+  });
+
   it('4. reschedules last working day: refuses when >= cancelled validFrom, accepts when < cancelled validFrom', async () => {
     const emp = await createUnplacedEmployee();
 

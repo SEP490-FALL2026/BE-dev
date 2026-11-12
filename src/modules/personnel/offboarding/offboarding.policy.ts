@@ -70,13 +70,31 @@ export function lastWorkingDayOf(
 }
 
 /**
- * A departure blocked now: its last working day is the day it is recorded (`QĐ-110b`, S2), not before the person came or the placement
- * began. A day left out is today; any other day is refused with the reason `BLOCK_NOW_DAY_IS_TODAY`.
+ * The first thing asked of a departure blocked now, before the person is read or anything is locked (`QĐ-110b`, S2): its last working day is
+ * the day it is recorded. A day left out is today; any other day is refused with the reason `BLOCK_NOW_DAY_IS_TODAY`. A planned handover
+ * has nothing to judge here.
+ */
+export function blockNowDayIsTodayRefusal(
+  accessBlockMode: AccessBlockMode,
+  day: BusinessDate | undefined,
+  today: BusinessDate,
+): OffboardingRefusal | null {
+  if (accessBlockMode !== 'BLOCK_NOW') return null;
+  const chosen = day === undefined || day.trim() === '' ? today : day;
+
+  return chosen === today
+    ? null
+    : { code: 'LAST_WORKING_DAY_INVALID', details: { reason: 'BLOCK_NOW_DAY_IS_TODAY', today } };
+}
+
+/**
+ * A departure blocked now: its last working day is the day it is recorded, not before the person came or the placement began (the day
+ * itself is also asked early by {@link blockNowDayIsTodayRefusal}, so this keeps the record policy whole on its own).
  */
 function blockNowDayRefusal(day: BusinessDate | undefined, facts: LastDayFacts): OffboardingRefusal | null {
+  const early = blockNowDayIsTodayRefusal('BLOCK_NOW', day, facts.today);
+  if (early) return early;
   const chosen = day === undefined || day.trim() === '' ? facts.today : day;
-  if (chosen !== facts.today)
-    return { code: 'LAST_WORKING_DAY_INVALID', details: { reason: 'BLOCK_NOW_DAY_IS_TODAY', today: facts.today } };
   if (chosen < facts.hireDate) return { code: 'LAST_WORKING_DAY_INVALID', details: { reason: 'BEFORE_HIRE_DATE' } };
   if (facts.placementFrom !== null && chosen < facts.placementFrom)
     return {

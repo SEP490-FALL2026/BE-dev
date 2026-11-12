@@ -1,5 +1,6 @@
 import {
   changeLastDayRefusal,
+  blockNowDayIsTodayRefusal,
   departureEffectiveOn,
   lastWorkingDayOf,
   leavesAtOnce,
@@ -86,6 +87,25 @@ describe('the last working day of a departure blocked now is the day it is recor
   it('is left at once: blocked now with today as the last working day', () => {
     expect(leavesAtOnce({ accessBlockMode: 'BLOCK_NOW', lastWorkingDay: TODAY, today: TODAY })).toBe(true);
     expect(leavesAtOnce({ accessBlockMode: 'WITH_LAST_DAY', lastWorkingDay: TODAY, today: TODAY })).toBe(false);
+  });
+});
+
+describe('the day of a departure blocked now is asked before the person is read', () => {
+  it.each([
+    ['left out', undefined, null],
+    ['blank', '  ', null],
+    ['today', TODAY, null],
+    ['yesterday', '2026-11-11', 'BLOCK_NOW_DAY_IS_TODAY'],
+    ['tomorrow', '2026-11-13', 'BLOCK_NOW_DAY_IS_TODAY'],
+  ])('a day %s', (_name, day, reason) => {
+    expect(blockNowDayIsTodayRefusal('BLOCK_NOW', day, TODAY)).toEqual(
+      reason ? { code: 'LAST_WORKING_DAY_INVALID', details: { reason, today: TODAY } } : null,
+    );
+  });
+
+  it('asks nothing of a planned handover, whatever its day', () => {
+    expect(blockNowDayIsTodayRefusal('WITH_LAST_DAY', '2026-11-30', TODAY)).toBeNull();
+    expect(blockNowDayIsTodayRefusal('WITH_LAST_DAY', undefined, TODAY)).toBeNull();
   });
 });
 
