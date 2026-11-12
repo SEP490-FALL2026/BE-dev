@@ -97,6 +97,15 @@
   `PERSONNEL_NOTICE_REVIEW_WORKING_DAYS`) it sets `overdue_noticed_at` and writes the audit event `PERSONNEL_NOTICE.OVERDUE` in one
   transaction, so a notice is told once however many instances run; a failed pass only logs. It only tells: the notice is never recorded or
   rejected by the calendar and the person it is about is not changed. Run one by hand with `NoticeOverdueService.noticeOverdue(now)`.
+  The API also runs `RevocationOverdueSweeper` once an hour (the first pass five minutes after start, unreferenced timer): for each departure that
+  is not cancelled or closed and is past `offboarding_cases.revocation_due_on` (the `DEPARTURE_REVOCATION_WORKING_DAYS`th working day after the last
+  working day, `QĐ-110c`) and whose person still holds a personal seat with **no task of revocation completed** (counted through
+  `LicensingApi.countPersonalSeatsWithoutCompletedTaskOf`, whether or not the IT Admin ever opened a task), on a working day, it writes the
+  notice `REVOCATION_OVERDUE` to the IT Admin in charge of the department (never the person who left; the first IT Admin who can act when none
+  is named) and to the Super Admin, with the audit event `OFFBOARDING_CASE.REVOCATION_OVERDUE` (actor `SYSTEM`) in the same transaction. The key
+  `offboarding:<case>:<day>` is unique for a recipient, so a case is told once for each working day however many instances or passes run; no
+  notice on a Saturday, a Sunday or a non-working date; a failed pass only logs. It only tells: no task is opened, no seat taken away, the case is
+  never changed. Run one by hand with `RevocationOverdueService.noticeOverdue(now)`.
   The API also runs `SaasIssueSweeper` once an hour (the first pass five minutes after start, unreferenced timer): it closes each resolved
   report of an error in a SaaS right whose last day to reopen (`saas_issues.reopen_until`, fixed when it was resolved from
   `SAAS_ISSUE_REOPEN_WORKING_DAYS`) has passed (state `CLOSED`, a `SYSTEM` entry and the audit event `SAAS_ISSUE.CLOSED`, under the row lock),

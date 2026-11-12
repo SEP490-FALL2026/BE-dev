@@ -138,6 +138,48 @@ export class PersonnelNotifier {
       await this.tell(tx, input.organizationId, itAdmin, 'ABRUPT_DEPARTURE_RECORDED', { ...parameters, eventKey });
   }
 
+  /**
+   * The IT Admin a departure is told through (`QĐ-110c`): the one named for the department the person leaves, unless that is the person
+   * themselves (their account is blocked, so the notice would reach nobody who can act), and otherwise the first IT Admin whose account can
+   * act. A case without a department goes to the first one. Null when no IT Admin can act.
+   */
+  async itAdminOfDeparture(
+    tx: DbTx,
+    input: { departmentId: string | null; employeeId: string },
+  ): Promise<string | null> {
+    const named = input.departmentId
+      ? await this.organizationReads.getItAdminInChargeOfDepartment(input.departmentId, tx)
+      : null;
+    if (named !== null && named !== input.employeeId) return named;
+
+    return (await this.identity.findAllUsableItAdminEmployeeIds(tx)).find((id) => id !== input.employeeId) ?? null;
+  }
+
+  /**
+   * The rights of a departure are still not taken away past the day (`QĐ-110c`): the IT Admin in charge and the Super Admin are told, once
+   * for the case and the day (`offboarding:<case>:<day>`), so a pass that runs again, or on another instance, writes nothing. Returns whether
+   * a notice was written.
+   */
+  async revocationOverdue(
+    tx: DbTx,
+    input: Common & { caseId: string; dueOn: BusinessDate; rightCount: number; today: BusinessDate },
+  ): Promise<boolean> {
+    const notice: NoticeParts = {
+      subject: { type: 'OFFBOARDING_CASE', id: input.caseId },
+      params: { caseId: input.caseId, employeeId: input.employeeId, dueOn: input.dueOn, rightCount: input.rightCount },
+      eventKey: `offboarding:${input.caseId}:${input.today}`,
+    };
+    const itAdmin = await this.itAdminOfDeparture(tx, input);
+    const superAdmin = (await this.identity.getSuperAdminHolder(tx))?.employeeId ?? null;
+    const recipients = new Set([itAdmin, superAdmin].filter((id): id is string => id !== null));
+    let written = false;
+    for (const recipient of recipients) {
+      written = (await this.tell(tx, input.organizationId, recipient, 'REVOCATION_OVERDUE', notice)) || written;
+    }
+
+    return written;
+  }
+
   /** A person who holds a role that needs someone to take over is leaving: the Super Admin is told, once for each role. */
   async roleHolderLeaving(
     tx: DbTx,
@@ -193,14 +235,15 @@ export class PersonnelNotifier {
     if (holder) await this.tell(tx, organizationId, holder.employeeId, code, notice);
   }
 
-  private async tell(
+  /** True when the notice was written, false when the recipient already has one for this event key. */
+  private tell(
     tx: DbTx,
     organizationId: string,
     recipientEmployeeId: string,
     code: InAppNotificationCode,
     notice: NoticeParts,
-  ): Promise<void> {
-    await this.notifications.notifyInApp(tx, { organizationId, recipientEmployeeId, code, ...notice });
+  ): Promise<boolean> {
+    return this.notifications.notifyInApp(tx, { organizationId, recipientEmployeeId, code, ...notice });
   }
 }
 

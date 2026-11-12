@@ -55,8 +55,8 @@ Bốn point mở, cả bốn đều do listener trong chính module đăng ký:
 ## Hướng phụ thuộc giữa capability (R6)
 
 Không vòng (`pnpm arch:capabilities --module personnel`, gate `capability-graph`). Từ thấp lên cao: `event-notice`,
-`department-member`, `departure-deadline` (chỉ gọi facade của `organization`, `licensing`, `requests`, `operating-parameters`; không import capability
-anh em) → `role-duties`, `transfer`, `transfer-review` → `notice` → `leave` → `offboarding` →
+`department-member` → `departure-deadline` (gọi facade của `organization`, `licensing`, `requests`, `operating-parameters`, `audit`; chỉ import capability
+anh em `event-notice` để báo, nên `event-notice` không được import lại nó) → `role-duties`, `transfer`, `transfer-review` → `notice` → `leave` → `offboarding` →
 `super-admin-event`. Recorder điều chuyển nằm ở `notice/` (đứng trên `transfer/`); recorder nghỉ dài hạn và thôi việc nằm ở
 `leave/`, `offboarding/` (đứng trên `notice/`).
 
@@ -87,10 +87,17 @@ anh em) → `role-duties`, `transfer`, `transfer-review` → `notice` → `leave
   `DEPARTURE_REVOCATION_IT_CLOSE` khi còn tác vụ đang làm) và, qua hook `onCancelled` (`accessBlockInForce`), kết thúc đăng ký thiết bị;
   `offboarding-change.policy.ts`). Hồ sơ đã `LEFT` không hủy được (409 `CASE_LEFT`, R-41).
 - `departure-deadline/` — hạn thu hồi và tác động của nghỉ việc (MF2-B.3, MF2-D…): `DepartureImpactService.impactOf(tx, …)` **chỉ đọc** (quyền sẽ thu hồi qua
-  `LicensingApi.listPersonalSeatsOf`, Request sẽ hủy / tác vụ cấp đang chạy / cam kết sẽ giải phóng qua `RequestsApi.previewBeneficiaryGone`, hạn thu hồi =
-  `revocationDueOn` theo `DEPARTURE_REVOCATION_WORKING_DAYS`; `responsibilities` null và `vendorAdminRoles` rỗng tới X-IT). `OffboardingService` đọc nó trước khi
-  ghi và lưu số đếm vào thay đổi `RECORDED`; route xem trước `P23` thêm sau (RD.3) trên cùng service. `departure-impact.policy.ts` giữ luật thuần (hạn, cộng
-  cam kết theo tiền tệ, `isRevocableType`); capability này không import `offboarding/`.
+  `LicensingApi.listPersonalSeatsOf`, Request sẽ hủy / tác vụ cấp đang chạy / cam kết sẽ giải phóng qua `RequestsApi.previewBeneficiaryGone`, hạn thu hồi;
+  `responsibilities` null và `vendorAdminRoles` rỗng tới X-IT). `OffboardingService` đọc nó trước khi ghi và lưu số đếm vào thay đổi `RECORDED`; route xem
+  trước `P23` thêm sau (RD.3) trên cùng service. `departure-impact.policy.ts` giữ luật thuần (cộng cam kết theo tiền tệ, `isRevocableType`).
+  **Hạn thu hồi trên hồ sơ** (`QĐ-110c`, MF2-D): `departure-deadline.policy.ts` (`revocationDueOn` = `nthWorkingDayFrom(ngày cuối + 1, N)`,
+  `isRevocationOverdue`, `overdueNoticeOwed`), `DepartureDeadlineService.revocationDueOn` đọc `DEPARTURE_REVOCATION_WORKING_DAYS` và lịch nghỉ; cột
+  `offboarding_cases.revocation_due_on` được ghi lúc ghi hồ sơ và tính lại khi đổi ngày cuối; tác vụ thu hồi IT mở lấy `due_on` = hạn này. **Quá hạn** =
+  hôm nay > hạn và còn quyền cá nhân chưa có tác vụ `COMPLETED` (kể cả chưa mở tác vụ, đếm qua
+  `LicensingApi.countPersonalSeatsWithoutCompletedTaskOf`); `RevocationOverdueSweeper` (mỗi giờ, API) → `RevocationOverdueService.noticeOverdue(now)` báo
+  `REVOCATION_OVERDUE` tới IT phụ trách (không phải chính người nghỉ) và Super Admin, mỗi ngày làm việc một lần mỗi hồ sơ (`eventKey`
+  `offboarding:<caseId>:<ngày>`), kèm audit `OFFBOARDING_CASE.REVOCATION_OVERDUE` (SYSTEM); `overdueCases` dùng chung với bộ lọc `revocationOverdue` của
+  danh sách hồ sơ. Capability này không import `offboarding/`.
 - `department-member/` — trưởng phòng đọc một người đang ở phòng mình hôm nay (`QĐ-41c`(2)); `department-member.controller.ts`
   (`GET /departments/{id}/employees/{employeeId}` + `…/software-rights` + `…/open-requests`, `@RequireRoles('MANAGER')`),
   `DepartmentMemberQueryService` (hồ sơ không email/hợp đồng + hai số đếm; hai danh sách phân trang ≤ 100),

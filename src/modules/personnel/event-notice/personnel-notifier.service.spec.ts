@@ -13,6 +13,11 @@ interface World {
   superAdmin?: string | null;
   itAdminInCharge?: string | null;
   firstUsableItAdmin?: string | null;
+  /** The IT Admin named for the department itself (what a departure is told through), and the IT Admins whose account can act. */
+  itAdminOfDepartment?: string | null;
+  usableItAdmins?: string[];
+  /** Every notice already exists for its recipient and event key: `notifyInApp` writes nothing. */
+  alreadyTold?: boolean;
 }
 
 function notifierOf(world: World = {}) {
@@ -22,7 +27,7 @@ function notifierOf(world: World = {}) {
     notifyInApp: jest.fn((_tx: DbTx, input: InAppNotificationInput) => {
       told.push(input);
 
-      return Promise.resolve(true);
+      return Promise.resolve(!world.alreadyTold);
     }),
     holdForDepartment: jest.fn((_tx: DbTx, input: unknown) => {
       held.push(input);
@@ -37,10 +42,12 @@ function notifierOf(world: World = {}) {
         new Map(ids.flatMap((id) => (world.heads?.[id] ? [[id, { employeeId: world.heads[id] }] as const] : []))),
       ),
     getItAdminInCharge: () => Promise.resolve({ departmentId: 'd1', itAdminEmployeeId: world.itAdminInCharge ?? null }),
+    getItAdminInChargeOfDepartment: () => Promise.resolve(world.itAdminOfDepartment ?? null),
   } as unknown as OrganizationReadApi;
   const identity = {
     getSuperAdminHolder: () => Promise.resolve(world.superAdmin ? { employeeId: world.superAdmin } : null),
     findFirstUsableItAdminEmployeeId: () => Promise.resolve(world.firstUsableItAdmin ?? null),
+    findAllUsableItAdminEmployeeIds: () => Promise.resolve(world.usableItAdmins ?? []),
   } as unknown as IdentityAccessApi;
 
   return { notifier: new PersonnelNotifier(notifications, organization, identity), told, held };
@@ -192,5 +199,72 @@ describe('who is told of an event of the personnel context (F17, spec B)', () =>
     ]);
     expect(told[0].params).toEqual({ employeeId: 'p', departmentId: 'd1', dueOn: '2026-11-04' });
     expect(held).toEqual([expect.objectContaining({ departmentId: 'd1', code: 'TRANSFER_REVIEW_DUE' })]);
+  });
+
+  describe('the rights of a departure still not taken away past the day (QĐ-110c)', () => {
+    const facts = {
+      organizationId: ORGANIZATION,
+      employeeId: 'leaver',
+      departmentId: 'd1',
+      caseId: 'c1',
+      dueOn: '2026-10-01',
+      rightCount: 2,
+      today: '2026-10-02',
+    };
+
+    it('tells the IT Admin in charge of the department and the Super Admin, with ids, the day and the count only, once for the case and the day', async () => {
+      const { notifier, told } = notifierOf({ superAdmin: 'sa', itAdminOfDepartment: 'it-in-charge' });
+
+      const written = await notifier.revocationOverdue(TX, facts);
+
+      expect(written).toBe(true);
+      expect(recipients(told, 'REVOCATION_OVERDUE')).toEqual(['it-in-charge', 'sa']);
+      expect(told[0]).toMatchObject({
+        subject: { type: 'OFFBOARDING_CASE', id: 'c1' },
+        params: { caseId: 'c1', employeeId: 'leaver', dueOn: '2026-10-01', rightCount: 2 },
+        eventKey: 'offboarding:c1:2026-10-02',
+      });
+      expect(Object.keys(told[0].params).sort()).toEqual(['caseId', 'dueOn', 'employeeId', 'rightCount']);
+    });
+
+    it('says nothing was written when every notice of the day already exists', async () => {
+      const { notifier } = notifierOf({ superAdmin: 'sa', itAdminOfDepartment: 'it', alreadyTold: true });
+
+      expect(await notifier.revocationOverdue(TX, facts)).toBe(false);
+    });
+
+    it('does not tell the person who left as the IT Admin: another IT Admin who can act is told, and the Super Admin', async () => {
+      const { notifier, told } = notifierOf({
+        superAdmin: 'sa',
+        itAdminOfDepartment: 'leaver',
+        usableItAdmins: ['leaver', 'it-other'],
+      });
+
+      await notifier.revocationOverdue(TX, facts);
+
+      expect(recipients(told, 'REVOCATION_OVERDUE')).toEqual(['it-other', 'sa']);
+    });
+
+    it('tells the first IT Admin who can act when the department names none, and only the Super Admin when there is none', async () => {
+      const named = notifierOf({ superAdmin: 'sa', itAdminOfDepartment: null, usableItAdmins: ['it-a', 'it-b'] });
+      const none = notifierOf({ superAdmin: 'sa', itAdminOfDepartment: null, usableItAdmins: [] });
+
+      await named.notifier.revocationOverdue(TX, facts);
+      await none.notifier.revocationOverdue(TX, facts);
+
+      expect(recipients(named.told, 'REVOCATION_OVERDUE')).toEqual(['it-a', 'sa']);
+      expect(recipients(none.told, 'REVOCATION_OVERDUE')).toEqual(['sa']);
+    });
+
+    it('tells a person who is both the IT Admin in charge and the Super Admin once, and a case without a department through the first IT Admin', async () => {
+      const both = notifierOf({ superAdmin: 'sa', itAdminOfDepartment: 'sa' });
+      const unplaced = notifierOf({ superAdmin: 'sa', usableItAdmins: ['it-a'] });
+
+      await both.notifier.revocationOverdue(TX, facts);
+      await unplaced.notifier.revocationOverdue(TX, { ...facts, departmentId: null });
+
+      expect(recipients(both.told, 'REVOCATION_OVERDUE')).toEqual(['sa']);
+      expect(recipients(unplaced.told, 'REVOCATION_OVERDUE')).toEqual(['it-a', 'sa']);
+    });
   });
 });

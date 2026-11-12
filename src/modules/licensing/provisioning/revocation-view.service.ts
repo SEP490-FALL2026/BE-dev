@@ -95,6 +95,15 @@ export class RevocationViewService {
     return this.reads.countPersonalSeats(employeeIds, onDate, tx);
   }
 
+  /** How many personal seats each of these people holds on `onDate` or will without a completed task of revocation, in one statement (none: absent). */
+  countPersonalSeatsWithoutCompletedTask(
+    employeeIds: readonly string[],
+    onDate: BusinessDate,
+    tx?: DbTx,
+  ): Promise<Map<string, number>> {
+    return this.reads.countPersonalSeatsWithoutCompletedTask(employeeIds, onDate, tx);
+  }
+
   /** The paid applications each of these people uses on `onDate` or will (GH-3), in one statement. */
   paidApplicationsOf(
     employeeIds: readonly string[],

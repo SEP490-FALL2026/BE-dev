@@ -9,8 +9,11 @@ import { OperatingParametersModule } from '../operating-parameters/operating-par
 import { OrganizationModule } from '../organization/organization.module';
 import { RequestsModule } from '../requests/requests.module';
 import { DepartmentMemberController } from './department-member/department-member.controller';
+import { DepartureDeadlineRepo } from './departure-deadline/departure-deadline.repo';
 import { DepartureDeadlineService } from './departure-deadline/departure-deadline.service';
 import { DepartureImpactService } from './departure-deadline/departure-impact.service';
+import { RevocationOverdueSweeper } from './departure-deadline/revocation-overdue.job';
+import { RevocationOverdueService } from './departure-deadline/revocation-overdue.service';
 import { DepartmentMemberQueryService } from './department-member/department-member-query.service';
 import { DepartmentOpenWorkReader } from './event-notice/department-open-work.listener';
 import { DepartmentOpenWorkRepo } from './event-notice/department-open-work.repo';
@@ -153,8 +156,11 @@ import { TransferReviewsController } from './transfer-review/transfer-reviews.co
     NoticesController,
   ],
   providers: [
+    DepartureDeadlineRepo,
     DepartureDeadlineService,
     DepartureImpactService,
+    RevocationOverdueService,
+    RevocationOverdueSweeper,
     PersonnelFileHookContributions,
     PersonnelFileHooks,
     PersonnelGroundsDateService,

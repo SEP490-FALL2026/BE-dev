@@ -154,6 +154,33 @@ export class RevocationReadRepo {
   }
 
   /**
+   * How many personal seats each of these people holds on `day` or will that have **no task of revocation completed**, in one statement (the
+   * people with none are absent): the seats nobody has opened a task for and those whose task waits, runs or failed. What the late rights of
+   * a departure are counted by (`QĐ-110c`); the seats are the ones `personalSeatsOf` reads, so the two never disagree.
+   */
+  async countPersonalSeatsWithoutCompletedTask(
+    employeeIds: readonly string[],
+    day: BusinessDate,
+    tx?: DbTx,
+  ): Promise<Map<string, number>> {
+    if (employeeIds.length === 0) return new Map();
+    const rows = await (tx ?? this.prisma).licenseAssignment.groupBy({
+      by: ['employeeId'],
+      where: {
+        employeeId: { in: [...employeeIds] },
+        kind: 'PERSONAL',
+        failedAt: null,
+        cancelledAt: null,
+        OR: [{ validUntil: null }, { validUntil: { gt: toDateColumn(day) } }],
+        provisioningTasks: { none: { kind: 'REVOKE', status: 'COMPLETED' } },
+      },
+      _count: { _all: true },
+    });
+
+    return new Map(rows.map((row) => [row.employeeId, row._count._all]));
+  }
+
+  /**
    * The paid applications each of these people uses on `day` or will (GH-3, `BR-MF1-01g`): their personal seats not failed, not
    * cancelled and not ended, of an application that is not internal and of a plan that is not `K5`. Two plans of one application are
    * one application. One statement; the people with none are absent.

@@ -134,6 +134,18 @@ export class LicensingApi {
   }
 
   /**
+   * How many personal seats each of these people holds on `onDate` or will **without a completed task of revocation**, in one statement
+   * (the people with none are absent): the late rights of a departure (`QĐ-110c`), whether or not a task was ever opened for the seat.
+   */
+  countPersonalSeatsWithoutCompletedTaskOf(
+    employeeIds: readonly string[],
+    onDate: BusinessDate,
+    tx?: DbTx,
+  ): Promise<Map<string, number>> {
+    return this.revocationView.countPersonalSeatsWithoutCompletedTask(employeeIds, onDate, tx);
+  }
+
+  /**
    * The paid applications each of these people uses on `onDate` or will, as ids of applications (GH-3, `BR-MF1-01g`): a personal seat
    * not failed, cancelled or ended, of an application that is not internal and a plan that is not `K5`; two plans of one application
    * count once. One statement; the people with none are absent.

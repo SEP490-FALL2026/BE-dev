@@ -4,6 +4,7 @@ import { addDays } from '../../../src/core/business-date';
 import { nthWorkingDayFrom } from '../../../src/core/working-days';
 import { PROJECT_ROOT } from '../../support/cli-process';
 import { migrationEndingWith } from '../../support/migration-history';
+import { RevocationOverdueService } from '../../../src/modules/personnel/departure-deadline/revocation-overdue.service';
 import { OffboardingHarness } from '../../support/offboarding-harness';
 import type { Department, Person } from '../../support/request-harness';
 
@@ -17,11 +18,14 @@ const NONE: ReadonlySet<string> = new Set();
  */
 describe('the deadline of the revocations of a departure (integration, real PostgreSQL)', () => {
   let des: Department;
+  let subscriptions: string[];
   let counter = 0;
 
   beforeAll(async () => {
     await h.start();
     des = await h.departmentWithUnit('P-RD');
+    await h.setItAdminInCharge(des, { employeeId: h.it1.employeeId, account: h.it1 });
+    subscriptions = [await h.subscription(40, 'K2'), await h.subscription(40, 'K2')];
   }, 300000);
 
   afterAll(async () => {
@@ -160,5 +164,140 @@ describe('the deadline of the revocations of a departure (integration, real Post
         h.ctx.sql.query('UPDATE offboarding_cases SET revocation_due_on = last_working_day WHERE id = $1', [wire.id]),
       ).rejects.toThrow(/offboarding_cases_revocation_due_check/);
     }, 120_000);
+  });
+
+  describe('the telling that the rights are past the deadline (T-MF2 case 1)', () => {
+    const LOCK = { note: 'Đã khóa tài khoản công ty' };
+    /** The pass looks at every open case, so the deadlines the tests before left are cleared: a case with none is never late. */
+    beforeEach(async () => {
+      await h.ctx.sql.query(
+        `UPDATE offboarding_cases SET revocation_due_on = NULL WHERE state <> 'CANCELLED' AND closed_at IS NULL`,
+      );
+    });
+    const overdue = () => h.ctx.app.get(RevocationOverdueService, { strict: false });
+    /** The hourly pass, run by hand at noon of `day` in the calendar of the organization. */
+    const passAt = (day: string): Promise<number> => overdue().noticeOverdue(new Date(`${day}T12:00:00Z`));
+    /** The working day number `n` after `day` over a calendar with no day off. */
+    const workingDayAfter = (day: string, n = 1): string => nthWorkingDayFrom(addDays(day, 1), n, NONE);
+    const noticesOf = async (caseId: string) =>
+      (
+        await h.ctx.sql.query<{ recipient: string; event_key: string; params: Record<string, unknown> }>(
+          `SELECT recipient_employee_id AS recipient, event_key, params FROM in_app_notifications
+            WHERE code = 'REVOCATION_OVERDUE' AND subject_id = $1 ORDER BY event_key, recipient_employee_id`,
+          [caseId],
+        )
+      ).rows;
+    const eventsOf = async (caseId: string): Promise<{ actor_kind: string }[]> =>
+      (
+        await h.ctx.sql.query<{ actor_kind: string }>(
+          `SELECT actor_kind::text AS actor_kind FROM audit_events
+            WHERE action = 'OFFBOARDING_CASE.REVOCATION_OVERDUE' AND resource_id = $1`,
+          [caseId],
+        )
+      ).rows;
+    /** A person with a seat in each of the two subscriptions. */
+    const holder = async (): Promise<{ person: Person; seats: string[] }> => {
+      const code = `E-RD-S${(counter += 1)}`;
+      const person = await h.worker(des, code);
+      const seats: string[] = [];
+      for (const subscriptionId of subscriptions) seats.push(await h.seatOf(person, { subscriptionId }, code));
+
+      return { person, seats };
+    };
+    const recipientsOf = (notices: { recipient: string }[]) => notices.map((notice) => notice.recipient).sort();
+    /** Written as the rule would have: the last working day Wednesday 30/09/2026, the deadline Thursday 01/10 (a handover under way may move its days). */
+    const withDaysOf2026Autumn = (id: string) =>
+      h.ctx.sql.query(
+        `UPDATE offboarding_cases SET last_working_day = '2026-09-30', departure_effective_on = '2026-10-01',
+                revocation_due_on = '2026-10-01', handover_due_on = '2026-09-29' WHERE id = $1`,
+        [id],
+      );
+
+    it('tells the IT Admin in charge and the Super Admin on Friday 02/10 and Monday 05/10 for a last day of Wednesday 30/09, though no task was ever opened; not on the deadline, nor on the weekend; once a day', async () => {
+      const { person } = await holder();
+      const wire = await h.recordedCase(person);
+      await withDaysOf2026Autumn(wire.id);
+      const tasks = await h.taskCount();
+
+      expect(await passAt('2026-10-01')).toBe(0);
+      expect(await passAt('2026-10-02')).toBe(1);
+      expect(await passAt('2026-10-02')).toBe(0);
+      expect(await passAt('2026-10-03')).toBe(0);
+      expect(await passAt('2026-10-04')).toBe(0);
+      expect(await passAt('2026-10-05')).toBe(1);
+
+      const notices = await noticesOf(wire.id);
+      expect(notices.map((notice) => notice.event_key)).toEqual([
+        `offboarding:${wire.id}:2026-10-02`,
+        `offboarding:${wire.id}:2026-10-02`,
+        `offboarding:${wire.id}:2026-10-05`,
+        `offboarding:${wire.id}:2026-10-05`,
+      ]);
+      expect(recipientsOf(notices.slice(0, 2))).toEqual([h.it1.employeeId, h.sa.employeeId].sort());
+      expect(notices[0].params).toEqual({
+        caseId: wire.id,
+        employeeId: person.employeeId,
+        dueOn: '2026-10-01',
+        rightCount: 2,
+      });
+      expect(await eventsOf(wire.id)).toEqual([{ actor_kind: 'SYSTEM' }, { actor_kind: 'SYSTEM' }]);
+      // It only tells: no task opened, no seat taken away, the case unchanged.
+      expect(await h.taskCount()).toBe(tasks);
+      expect((await h.caseRow(wire.id)).state).toBe('HANDING_OVER');
+    }, 180_000);
+
+    it('writes one notice for a case and a day when two passes run together', async () => {
+      const { person } = await holder();
+      const wire = await h.recordedCase(person);
+      await withDaysOf2026Autumn(wire.id);
+
+      const told = await Promise.all([passAt('2026-10-02'), passAt('2026-10-02')]);
+
+      expect(told.reduce((sum, count) => sum + count, 0)).toBe(1);
+      expect(await noticesOf(wire.id)).toHaveLength(2);
+      expect(await eventsOf(wire.id)).toHaveLength(1);
+    }, 180_000);
+
+    it('counts the rights left without a completed task: a task that waits still counts, a completed one does not, and the telling stops when none is left', async () => {
+      const { person, seats } = await holder();
+      const wire = await h.recordedCase(person, { accessBlockMode: 'BLOCK_NOW', lastWorkingDay: undefined });
+      const due = workingDayAfter(h.today());
+      const [late1, late2, late3, late4] = [1, 2, 3, 4].map((n) => workingDayAfter(due, n));
+      const taskOf = async (seat: string): Promise<string> => (await h.liveTaskOf(seat)) as string;
+      const rightCountOn = async (day: string): Promise<unknown> =>
+        (await noticesOf(wire.id)).find((notice) => notice.event_key.endsWith(day))?.params.rightCount;
+      const completeSeat = async (seat: string): Promise<void> => {
+        await h.claim(await taskOf(seat)).expect(200);
+        await h
+          .revoked(await taskOf(seat), { completion: 'ACCOUNT_REMOVED', evidence: 'Đã gỡ khỏi workspace' })
+          .expect(200);
+      };
+
+      expect(await passAt(due)).toBe(0);
+      expect(await passAt(late1)).toBe(1);
+      expect(await rightCountOn(late1)).toBe(2);
+
+      await h.revokeRights(wire.id, { assignmentIds: [seats[0]], accountLock: LOCK }).expect(200);
+      await completeSeat(seats[0]);
+      expect(await passAt(late2)).toBe(1);
+      expect(await rightCountOn(late2)).toBe(1);
+
+      await h.revokeRights(wire.id, { assignmentIds: [seats[1]] }).expect(200);
+      expect(await passAt(late3)).toBe(1);
+      expect(await rightCountOn(late3)).toBe(1);
+
+      await completeSeat(seats[1]);
+      expect(await passAt(late4)).toBe(0);
+      expect(await rightCountOn(late4)).toBeUndefined();
+    }, 240_000);
+
+    it('tells nothing for a cancelled case, however long after its deadline', async () => {
+      const { person } = await holder();
+      const wire = await h.recordedCase(person);
+      await h.cancelCase(wire.id, { reason: 'Người ở lại làm việc' }).expect(200);
+
+      expect(await passAt(addDays(h.today(), 60))).toBe(0);
+      expect(await noticesOf(wire.id)).toEqual([]);
+    }, 180_000);
   });
 });
