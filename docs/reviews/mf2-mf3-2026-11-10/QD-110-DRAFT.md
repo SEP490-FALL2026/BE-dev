@@ -51,10 +51,10 @@
 
 ## F. Danh sách phần mềm của phòng
 
-| Mã        | Luật                                                                                                                                                                                                                                                                                                                                                                          | Thay / sửa                                                                                                 |
-| --------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| `QĐ-110s` | Mỗi phòng có **danh sách phần mềm của phòng** (ứng dụng + gói trong danh mục) do **IT Admin phụ trách phòng** thêm/sửa/bỏ. Danh sách **chỉ để hướng dẫn**: nhân viên/trưởng phòng xem khi gửi Request; **không tự cấp** khi vào phòng; Request phần mềm đã có trong danh mục nhưng ngoài danh sách vẫn đi `MF-1` bình thường                                                  | Đảo `QĐ-87h`(1) (bộ công cụ chuẩn) ở dạng chỉ hướng dẫn; `QĐ-87h`(2) danh sách tự suy ra nay do IT quản lý |
-| `QĐ-110t` | **Đề xuất thêm vào danh sách của phòng:** nhân viên hoặc trưởng phòng đề xuất một ứng dụng/gói **đã có trong danh mục** kèm lý do ⟹ IT Admin phụ trách phòng chấp nhận (thêm vào danh sách) hoặc từ chối kèm lý do. Phần mềm **chưa có trong danh mục** ⟹ Request phần mềm mới như cũ (trưởng phòng duyệt ⟹ IT đánh giá mức kiểm soát `SBF-15` ⟹ ngân sách ⟹ Người duyệt chi) | Mới                                                                                                        |
+| Mã        | Luật                                                                                                                                                                                                                                                                                                                                                                                      | Thay / sửa                                                                                                 |
+| --------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| `QĐ-110s` | Mỗi phòng có **danh sách phần mềm của phòng** (ứng dụng + gói trong danh mục) do **IT Admin phụ trách phòng** thêm/sửa/bỏ. Danh sách **chỉ để hướng dẫn**: nhân viên/trưởng phòng xem khi gửi Request; **không tự cấp** khi vào phòng; Request phần mềm đã có trong danh mục nhưng ngoài danh sách vẫn đi `MF-1` bình thường                                                              | Đảo `QĐ-87h`(1) (bộ công cụ chuẩn) ở dạng chỉ hướng dẫn; `QĐ-87h`(2) danh sách tự suy ra nay do IT quản lý |
+| `QĐ-110t` | **Đề xuất thêm vào danh sách của phòng:** **chỉ trưởng phòng** (Owner 11/11, Q1b) đề xuất một ứng dụng/gói **đã có trong danh mục** kèm lý do ⟹ IT Admin phụ trách phòng chấp nhận (thêm vào danh sách) hoặc từ chối kèm lý do. Phần mềm **chưa có trong danh mục** ⟹ Request phần mềm mới như cũ (trưởng phòng duyệt ⟹ IT đánh giá mức kiểm soát `SBF-15` ⟹ ngân sách ⟹ Người duyệt chi) | Mới                                                                                                        |
 
 ## F2. Thuê bao trong kho và mua thêm (Owner 11/11 tối)
 
@@ -74,6 +74,26 @@ khi triển khai bản mới ⟹ ân hạn tính từ ngày triển khai.
 - Để **đợt luồng phụ**: nhân sự có thời hạn tự tạo hồ sơ nghỉ việc ở ngày hết hạn; điều chuyển hàng loạt khi tái cơ cấu; nhân viên quay lại làm; thu hồi sớm trong ân hạn.
 - Thuê bao trong kho ghi thêm (`QĐ-110u`) và báo khi mua thêm (`QĐ-110v`): xem mục F2.
 - Vì kế nhiệm bắt buộc, ca _phòng không có trưởng phòng_ (`QĐ-110i`) chỉ còn xảy ra khi phòng vốn chưa có trưởng phòng.
+
+## G3. Đối chiếu 13 điểm TẠM CHỌN T-1…T-13 (Owner 12/11)
+
+| Điểm | Nội dung cũ                                                     | Kết cục                                                                  |
+| ---- | --------------------------------------------------------------- | ------------------------------------------------------------------------ |
+| T-1  | Hệ thống tự đóng hồ sơ                                          | Thành luật `QĐ-110e`                                                     |
+| T-2  | Từ lúc bị chặn, IT không cấp quyền mới                          | Thành luật `QĐ-110d`                                                     |
+| T-4  | Người chuyển bị ghi nghỉ việc trong chồng lấn ⟹ MF-2 tiếp quản  | Thành luật `QĐ-110r`                                                     |
+| T-5  | Từ chối điều chuyển lần hai khi lần một chưa xong               | Thành luật `QĐ-110r`                                                     |
+| T-6  | Seat được giữ không tính "chi phí tránh được"                   | Bỏ: mô hình mới không giữ seat (`QĐ-110p`)                               |
+| T-7  | IT phòng mới làm tác vụ giữ seat/thu hồi                        | Thành luật `QĐ-110p` (chỉ còn thu hồi, giao IT phụ trách phòng mới)      |
+| T-8  | Hai Request cùng phần mềm thì Request đúng gói quyết            | Bỏ: không liên kết Request mới với quyền cũ (`QĐ-110p`)                  |
+| T-9  | Điều chuyển đã hiệu lực trước bản mới ⟹ tính từ ngày triển khai | Giữ (mục G)                                                              |
+| T-10 | Tác vụ do hệ thống tạo đánh dấu _hệ thống tạo_                  | Giữ (mục G)                                                              |
+| T-11 | Phòng cũ chịu phí seat tới khi IT xác nhận giữ                  | **Đổi** (Owner 12/11): ân hạn 5 ngày, phí tính **phòng mới** (`QĐ-110r`) |
+| T-12 | Không lưu lý do nghỉ                                            | Thành luật `QĐ-110a`                                                     |
+| T-13 | Hủy Request tài khoản dịch vụ còn mở của người chuyển           | Bỏ: không còn tài khoản dịch vụ (`QĐ-110m`)                              |
+
+Cùng ngày Owner chốt: tài khoản dịch vụ cũ có người chịu trách nhiệm không phải IT ⟹ giao IT Admin phụ trách phòng; email tài khoản công ty
+đứng tên thuê bao (`QĐ-110u`(1)) tùy chọn, thiếu thì gắn cờ; route cũ bị bỏ được **xóa luôn** trong đợt code này.
 
 ## H. Các đợt sau (ghi để truy vết, không thuộc MF-2/MF-3)
 
