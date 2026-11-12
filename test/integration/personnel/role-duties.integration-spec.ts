@@ -117,7 +117,8 @@ describe('the roles of a person who leaves and the duties of a workspace (integr
       const headed = await h.departmentWithUnit('P-RDH');
       const head = await h.worker(headed, code());
       await h.makeHead(headed, head);
-      const headCase = await h.recordedCase(head, { successor: { kind: 'NONE' } });
+      const heir = await h.worker(headed, code(), ['MANAGER']);
+      const headCase = await h.recordedCase(head, { successor: { kind: 'EMPLOYEE', employeeId: heir.employeeId } });
 
       expect(flagsOf(wire as FlaggedCase)).toEqual(['IT_ADMIN_IN_CHARGE']);
       expect(flagsOf(headCase as FlaggedCase)).toEqual(['DEPARTMENT_HEAD']);
@@ -127,7 +128,7 @@ describe('the roles of a person who leaves and the duties of a workspace (integr
         actor_kind: 'SYSTEM',
         after: { stage: 'RECORDED', priority: 'NORMAL', itAdminDepartmentCodes: ['P-RDR'] },
       });
-      expect((await flaggedEvents(headCase.id))[0].after.departmentHeadSuccessor).toBe('NONE');
+      expect((await flaggedEvents(headCase.id))[0].after.departmentHeadSuccessor).toBe('EMPLOYEE');
       expect(await stored(wire.id)).toEqual(['IT_ADMIN_IN_CHARGE']);
       expect(await stored(headCase.id)).toEqual(['DEPARTMENT_HEAD']);
       // The roles are read again when the case is read, and the person who left the role no longer holds it.

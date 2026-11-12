@@ -1,6 +1,7 @@
 import { type BusinessDate } from '../../../core/business-date';
 import { placementReasons } from '../../organization/public/employee-placement.policy';
 import { groundsNoteRefusal } from '../personnel-grounds.policy';
+import { successorCandidateRefusal, type SuccessorFacts } from '../personnel-successor.policy';
 
 /**
  * What the policy of a transfer refuses, as a semantic code (`DEPARTMENT_TRANSFER.<code>` on the wire) and the facts a person
@@ -9,26 +10,6 @@ import { groundsNoteRefusal } from '../personnel-grounds.policy';
 export interface TransferRefusal {
   code: string;
   details?: Record<string, unknown>;
-}
-
-export interface SuccessorFacts {
-  /** The person leaves a department they head across the day before it takes effect, and the department changes. */
-  required: boolean;
-  /** What the caller chose; undefined when nothing was said. */
-  chosen: { kind: 'EMPLOYEE'; employeeId: string } | { kind: 'NONE' } | undefined;
-  /** For a chosen employee: how they stand on the day. Read only when one is chosen. */
-  candidate: {
-    isTransferee: boolean;
-    memberOfOldDepartmentOnDay: boolean;
-    stillWorking: boolean;
-    holdsSuperAdmin: boolean;
-    /** The account of the person holds a MANAGER grant that is in force; false when they have no account (QĐ-93a). */
-    holdsManager: boolean;
-    /** The account of the person holds the SPENDING_APPROVER grant, who never heads a department (QĐ-93b). */
-    holdsSpendingApprover: boolean;
-    /** Their own transfer waits: they would leave the department the head is handed to. */
-    hasPendingTransfer: boolean;
-  } | null;
 }
 
 export interface NewTransferFacts {
@@ -66,23 +47,17 @@ function reasonAndGrounds(reason: string, groundsNote: string | undefined): Tran
   return refused ? { code: refused.reason } : null;
 }
 
-/** Who the head of the old department is to be, or that nobody is (`US-03-01` AC-8, `QĐ-66a`). */
+/**
+ * Who the head of the old department is to be, or that nobody is (`US-03-01` AC-8, `QĐ-66a`). A transfer still lets a head choose that
+ * nobody follows; `QĐ-110h` withdraws that choice for it too, and the transfer then judges with `successorRequiredRefusal` of the shared
+ * policy (`MF3-A.2`), which the departure uses already.
+ */
 export function successorRefusal(successor: SuccessorFacts): TransferRefusal | null {
   if (!successor.required) return null;
   if (successor.chosen === undefined) return { code: 'HEAD_SUCCESSOR_REQUIRED' };
   if (successor.chosen.kind === 'NONE') return null;
-  const candidate = successor.candidate;
-  const refuse = (reason: string): TransferRefusal => ({ code: 'SUCCESSOR_NOT_A_MEMBER_ON_DATE', details: { reason } });
-  if (candidate === null || !candidate.memberOfOldDepartmentOnDay) return refuse('NOT_A_MEMBER_ON_DATE');
-  if (candidate.isTransferee) return refuse('SAME_PERSON');
-  if (candidate.hasPendingTransfer) return refuse('HAS_PENDING_TRANSFER');
-  if (!candidate.stillWorking) return refuse('EMPLOYEE_NOT_ACTIVE');
-  if (candidate.holdsSuperAdmin) return refuse('SUPER_ADMIN_CANNOT_HEAD');
-  // The spending approver first: they never hold MANAGER (QĐ-93b), so judged second they would only hear that MANAGER is missing.
-  if (candidate.holdsSpendingApprover) return refuse('SPENDING_APPROVER_CANNOT_HEAD');
-  if (!candidate.holdsManager) return refuse('MANAGER_ROLE_REQUIRED');
 
-  return null;
+  return successorCandidateRefusal(successor.candidate);
 }
 
 /** The day a change takes effect must be today or later and after the first day of the placement it ends. */

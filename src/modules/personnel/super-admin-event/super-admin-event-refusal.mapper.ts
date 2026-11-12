@@ -1,6 +1,7 @@
 import { ApiException } from '../../../infrastructure/http/errors/api.exception';
 import { EmployeeEmailTakenError, EmployeeOpenSeatNeedsEndError } from '../../organization/public/organization.errors';
 import { LeaveRefusedError } from '../leave/leave.errors';
+import { SUCCESSOR_REQUIRED_CODE } from '../personnel-access.http-errors';
 import { NoticeRefusedError } from '../notice/notice.errors';
 import { OffboardingRefusedError } from '../offboarding/offboarding.errors';
 import { PersonnelAccessRefusedError } from '../public/personnel.errors';
@@ -26,8 +27,12 @@ export function refusalOf(error: unknown): SuperAdminEventRefusedError | null {
   if (error instanceof TransferRefusedError)
     return new SuperAdminEventRefusedError(`DEPARTMENT_TRANSFER.${error.code}`, reasonOf(error.details));
   if (error instanceof LeaveRefusedError) return new SuperAdminEventRefusedError(`LONG_LEAVE.${error.code}`);
-  if (error instanceof OffboardingRefusedError)
-    return new SuperAdminEventRefusedError(`OFFBOARDING_CASE.${error.code}`, reasonOf(error.details));
+  if (error instanceof OffboardingRefusedError) {
+    // The word the application answers, not prefixed by the case: a head who leaves must name a successor (`QĐ-110h`).
+    const word = error.code === 'SUCCESSOR_REQUIRED' ? SUCCESSOR_REQUIRED_CODE : `OFFBOARDING_CASE.${error.code}`;
+
+    return new SuperAdminEventRefusedError(word, reasonOf(error.details));
+  }
   if (error instanceof NoticeRefusedError) return new SuperAdminEventRefusedError(`PERSONNEL_NOTICE.${error.code}`);
   // A race the database refused after the check of the correction of the record: the same words as the check.
   if (error instanceof EmployeeEmailTakenError) return new SuperAdminEventRefusedError('PROFILE.WORK_EMAIL_TAKEN');

@@ -68,7 +68,11 @@ const CONCURRENT = 'the person or the case was changed meanwhile (CONCURRENT_CHA
 const NOT_UNDER_WAY = [E.CASE_LEFT, E.NOT_HANDING_OVER] as const;
 const CONCURRENT_EXAMPLES = [E.CONCURRENT_CHANGE] as const;
 const PERSON_REFUSALS = [E.EMPLOYEE_LEFT, E.ALREADY_HANDING_OVER, E.PENDING_EVENT_EXISTS] as const;
-const DAY_REFUSALS = [E.LAST_WORKING_DAY_INVALID, E.SUCCESSOR_NOT_A_MEMBER_ON_DATE] as const;
+const SUCCESSOR_REFUSALS = [
+  PERSONNEL_ACCESS_ERROR_EXAMPLES.SUCCESSOR_REQUIRED,
+  E.SUCCESSOR_NOT_A_MEMBER_ON_DATE,
+] as const;
+const DAY_REFUSALS = [E.LAST_WORKING_DAY_INVALID, ...SUCCESSOR_REFUSALS] as const;
 
 const GROUNDS_REFUSALS =
   'the basis (groundsNote) is only the code of a notice and not a document (OFFBOARDING_CASE.GROUNDS_IS_NOTICE); a basis that is missing, blank or over 500 characters is a VALIDATION_ERROR';
@@ -114,7 +118,7 @@ export class OffboardingController {
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
-      description: `The body is invalid (VALIDATION_ERROR), there is no last working day or it is not allowed (OFFBOARDING_CASE.LAST_WORKING_DAY_REQUIRED, LAST_WORKING_DAY_INVALID), ${GROUNDS_REFUSALS}, a transfer that waits would be cancelled by the departure and the confirmation is missing (TRANSFER_CANCELLATION_REQUIRED), or the person chosen to follow the head cannot take the department that day (SUCCESSOR_NOT_A_MEMBER_ON_DATE): nothing is saved.`,
+      description: `The body is invalid (VALIDATION_ERROR), there is no last working day or it is not allowed (OFFBOARDING_CASE.LAST_WORKING_DAY_REQUIRED, LAST_WORKING_DAY_INVALID), ${GROUNDS_REFUSALS}, a transfer that waits would be cancelled by the departure and the confirmation is missing (TRANSFER_CANCELLATION_REQUIRED), the person heads the department they leave and names nobody to follow them or gives "nobody" (PERSONNEL.SUCCESSOR_REQUIRED, details.departmentId), or the person chosen to follow the head cannot take the department that day (OFFBOARDING_CASE.SUCCESSOR_NOT_A_MEMBER_ON_DATE): nothing is saved.`,
       examples: [
         VALIDATION_EXAMPLE,
         E.LAST_WORKING_DAY_REQUIRED,
@@ -230,7 +234,7 @@ export class OffboardingController {
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
-      description: `The body is invalid, such as one without a reason or a basis (VALIDATION_ERROR), ${GROUNDS_REFUSALS}, the day is the same or not allowed (NO_CHANGE, LAST_WORKING_DAY_INVALID), or the head of the department cannot be handed over on the new day (SUCCESSOR_NOT_A_MEMBER_ON_DATE): nothing is saved, and the old day and the old choice stay.`,
+      description: `The body is invalid, such as one without a reason or a basis (VALIDATION_ERROR), ${GROUNDS_REFUSALS}, the day is the same or not allowed (NO_CHANGE, LAST_WORKING_DAY_INVALID), the person heads the department and no employee follows them (PERSONNEL.SUCCESSOR_REQUIRED: a case recorded earlier with "nobody" must name one now), or the head of the department cannot be handed over on the new day (OFFBOARDING_CASE.SUCCESSOR_NOT_A_MEMBER_ON_DATE): nothing is saved, and the old day and the old choice stay.`,
       examples: [VALIDATION_EXAMPLE, ...GROUNDS_EXAMPLES, E.NO_CHANGE, ...DAY_REFUSALS],
     },
   )

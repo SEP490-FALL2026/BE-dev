@@ -10,8 +10,8 @@ import {
   successorRefusal,
   type NewTransferFacts,
   type PendingTransferFacts,
-  type SuccessorFacts,
 } from './transfer.policy';
+import type { SuccessorFacts } from '../personnel-successor.policy';
 
 const NOTE = 'Quyết định điều chuyển số QD-12/2026 của HR';
 const NO_SUCCESSOR: SuccessorFacts = { required: false, chosen: undefined, candidate: null };
@@ -116,56 +116,19 @@ describe('who follows the head of the department a person leaves (US-03-01 AC-8,
     expect(successorRefusal(NO_SUCCESSOR)).toBeNull();
   });
 
-  it('asks for a choice, and accepts that nobody follows', () => {
+  // QĐ-110h withdraws "nobody follows" for a transfer too; MF3-A.2 moves this wrapper onto `successorRequiredRefusal`.
+  it('asks for a choice, and still accepts that nobody follows until MF3-A.2', () => {
     expect(successorRefusal(required({}))?.code).toBe('HEAD_SUCCESSOR_REQUIRED');
     expect(successorRefusal(required({ chosen: { kind: 'NONE' } }))).toBeNull();
   });
 
-  it.each([
-    ['is not a member of the old department that day', { memberOfOldDepartmentOnDay: false }, 'NOT_A_MEMBER_ON_DATE'],
-    ['is the person who moves', { isTransferee: true }, 'SAME_PERSON'],
-    ['has left', { stillWorking: false }, 'EMPLOYEE_NOT_ACTIVE'],
-    ['holds Super Admin', { holdsSuperAdmin: true }, 'SUPER_ADMIN_CANNOT_HEAD'],
-    ['has a transfer of their own waiting', { hasPendingTransfer: true }, 'HAS_PENDING_TRANSFER'],
-  ])('refuses a successor who %s', (_name, patch, reason) => {
-    expect(
-      successorRefusal(required({ chosen: { kind: 'EMPLOYEE', employeeId: 'e' }, candidate: { ...member, ...patch } })),
-    ).toEqual({ code: 'SUCCESSOR_NOT_A_MEMBER_ON_DATE', details: { reason } });
-  });
-
-  it('refuses a successor without MANAGER (US-03-01 AC-8, US-03-06 AC-23)', () => {
+  it('judges a person chosen by the shared policy of the successor (every refusal of it is in personnel-successor.policy.spec)', () => {
     const chosen = { kind: 'EMPLOYEE', employeeId: 'e' } as const;
 
     expect(successorRefusal(required({ chosen, candidate: { ...member, holdsManager: false } }))).toEqual({
       code: 'SUCCESSOR_NOT_A_MEMBER_ON_DATE',
       details: { reason: 'MANAGER_ROLE_REQUIRED' },
     });
-  });
-
-  it('refuses the spending approver as successor before the MANAGER check, which they never pass (US-03-06 AC-24)', () => {
-    const chosen = { kind: 'EMPLOYEE', employeeId: 'e' } as const;
-
-    expect(
-      successorRefusal(
-        required({ chosen, candidate: { ...member, holdsManager: false, holdsSpendingApprover: true } }),
-      ),
-    ).toEqual({ code: 'SUCCESSOR_NOT_A_MEMBER_ON_DATE', details: { reason: 'SPENDING_APPROVER_CANNOT_HEAD' } });
-  });
-
-  it('judges the Super Admin before the spending approver and the spending approver before the missing MANAGER', () => {
-    const chosen = { kind: 'EMPLOYEE', employeeId: 'e' } as const;
-    const reasonOf = (patch: Partial<NonNullable<SuccessorFacts['candidate']>>) =>
-      successorRefusal(required({ chosen, candidate: { ...member, ...patch } }))?.details?.reason;
-
-    expect(reasonOf({ holdsSuperAdmin: true, holdsSpendingApprover: true, holdsManager: false })).toBe(
-      'SUPER_ADMIN_CANNOT_HEAD',
-    );
-    expect(reasonOf({ holdsSpendingApprover: true, holdsManager: false })).toBe('SPENDING_APPROVER_CANNOT_HEAD');
-    expect(reasonOf({ holdsManager: false, hasPendingTransfer: true })).toBe('HAS_PENDING_TRANSFER');
-  });
-
-  it('refuses a successor who does not exist, and accepts a member who works', () => {
-    const chosen = { kind: 'EMPLOYEE', employeeId: 'e' } as const;
     expect(successorRefusal(required({ chosen, candidate: null }))?.code).toBe('SUCCESSOR_NOT_A_MEMBER_ON_DATE');
     expect(successorRefusal(required({ chosen, candidate: member }))).toBeNull();
   });

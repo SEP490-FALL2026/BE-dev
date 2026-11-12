@@ -6,11 +6,12 @@ import type { AuthenticatedPrincipal } from '../../../infrastructure/security/to
 import { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { PersonnelAccessRefusedError } from '../public/personnel.errors';
+import { successorRequiredRefusal, type SuccessorFacts } from '../personnel-successor.policy';
 import { operatorSubjectRefusal, userWriterRefusal } from '../personnel-self-action.policy';
 import type { PersonnelActor } from '../public/personnel.types';
 import { TransferRefusedError } from './transfer.errors';
 import { TransferRepo } from './transfer.repo';
-import { successorRefusal, type SuccessorFacts, type TransferRefusal } from './transfer.policy';
+import { type TransferRefusal } from './transfer.policy';
 import type { SuccessorChoice } from './transfer.types';
 
 /** What the writes of a transfer judge alike: who the actor is to the person moved, and how the next head of a department stands. */
@@ -91,23 +92,28 @@ export class TransferGuardService {
   }
 
   /**
-   * Whether the person chosen to follow a head who leaves can take the department on `day`, judged as for a transfer (a member that
-   * day, still working, not a Super Admin, not the person leaving, not leaving the department themselves); null when they can. The
-   * departure never insists on a successor: nobody chosen is a choice. The caller holds the department and the employees.
+   * Whether the person chosen to follow a head who leaves can take the department on `day` (`QĐ-110h`): one is required, and `NONE` or
+   * nothing is refused with `SUCCESSOR_REQUIRED` (naming the department); a person named is judged as for a transfer (a member that day,
+   * still working, not a Super Admin, not the person leaving, not leaving the department themselves). Null when they can. The caller
+   * holds the department and the employees, and calls it only for a person who heads the department on their last day.
    */
   async judgeSuccessor(
     tx: DbTx,
     input: { chosen: SuccessorChoice | undefined; leaverId: string; departmentId: string; day: BusinessDate },
   ): Promise<TransferRefusal | null> {
-    return successorRefusal(
+    const refusal = successorRequiredRefusal(
       await this.successorFacts(tx, {
         required: true,
-        chosen: input.chosen ?? { kind: 'NONE' },
+        chosen: input.chosen,
         transfereeId: input.leaverId,
         oldDepartmentId: input.departmentId,
         day: input.day,
       }),
     );
+
+    return refusal?.code === 'SUCCESSOR_REQUIRED'
+      ? { ...refusal, details: { departmentId: input.departmentId } }
+      : refusal;
   }
 
   /**

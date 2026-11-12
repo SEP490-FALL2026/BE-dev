@@ -164,15 +164,32 @@ describe('recording a departure (integration, real PostgreSQL)', () => {
       return { department, head, next };
     };
 
-    it('is recorded without a successor: the department has no head from the day after, and the answer warns of it', async () => {
+    it('refuses a head who names nobody to follow them, or gives "nobody", and writes nothing (QĐ-110h)', async () => {
       const { department, head } = await headedDepartment();
+      const before = await nothingWritten(head);
 
-      const wire = await h.recordedCase(head);
+      for (const successor of [undefined, { kind: 'NONE' }]) {
+        const response = await h.recordCase(h.body(head, { successor }));
 
-      expect(wire.headSuccessor).toEqual({ kind: 'NONE', employee: null });
-      expect(wire.warnings?.departmentWithoutHeadFrom).toBe(h.day(11));
-      const periods = await h.headPeriods(department.id);
-      expect(periods).toEqual([expect.objectContaining({ employee_id: head.employeeId, valid_to: h.day(11) })]);
+        expect([response.status, h.codeOf(response), h.detailsOf(response)]).toEqual([
+          422,
+          'PERSONNEL.SUCCESSOR_REQUIRED',
+          { departmentId: department.id },
+        ]);
+      }
+      expect(await nothingWritten(head)).toEqual(before);
+      expect(await h.headPeriods(department.id)).toEqual([
+        expect.objectContaining({ employee_id: head.employeeId, valid_to: null }),
+      ]);
+    });
+
+    it('asks nothing of a person who does not head the department, whatever they give', async () => {
+      const { department, next } = await headedDepartment();
+
+      const wire = await h.recordedCase(next, { successor: { kind: 'NONE' } });
+
+      expect(wire.headSuccessor).toBeNull();
+      expect((await h.headPeriods(department.id))[0].valid_to).toBeNull();
     });
 
     it('hands the department to a member from the day after the last working day, and not before', async () => {
@@ -189,7 +206,7 @@ describe('recording a departure (integration, real PostgreSQL)', () => {
       ]);
     });
 
-    it('refuses a successor without MANAGER and the spending approver, writes nothing, and still records the departure with nobody (US-03-04 AC-8, US-03-06 AC-23, AC-24)', async () => {
+    it('refuses a successor without MANAGER and the spending approver, and writes nothing (US-03-04 AC-8, US-03-06 AC-23, AC-24)', async () => {
       const { department, head } = await headedDepartment();
       const withoutRole = await h.worker(department, code('N'));
       const approver = await h.worker(department, code('A'));
@@ -213,10 +230,6 @@ describe('recording a departure (integration, real PostgreSQL)', () => {
       ]);
       expect(await nothingWritten(head)).toEqual(before);
       await clearSpendingApprover(h.ctx, h.admin);
-
-      const recorded = await h.recordedCase(head, { successor: { kind: 'NONE' } });
-
-      expect(recorded.headSuccessor).toEqual({ kind: 'NONE', employee: null });
       expect(await h.headPeriods(department.id)).toEqual([expect.objectContaining({ employee_id: head.employeeId })]);
     });
 
@@ -266,19 +279,29 @@ describe('recording a departure (integration, real PostgreSQL)', () => {
       expect((await h.auditEventsOf('OFFBOARDING_CASE.ACCOUNT_LOCK_REMINDER', wire.id)).length).toBe(1);
     });
 
-    it('does not wait for a successor of the head who goes: the department has no head from the day', async () => {
+    it('hands the department to the successor the day after, though the head works to the end of the day it is recorded (QĐ-110b, m-11)', async () => {
       const department = await h.departmentWithUnit(code('P'));
       const head = await h.worker(department, code('E'));
       await h.makeHead(department, head);
+      const next = await h.worker(department, code('H'), ['MANAGER']);
       await h.ctx.sql.query(`UPDATE department_head_periods SET valid_from = '2026-10-02' WHERE employee_id = $1`, [
         head.employeeId,
       ]);
 
-      const wire = await h.recordedCase(head, { accessBlockMode: 'BLOCK_NOW', lastWorkingDay: h.day(-1) });
+      const wire = await h.recordedCase(head, {
+        accessBlockMode: 'BLOCK_NOW',
+        lastWorkingDay: h.today(),
+        successor: { kind: 'EMPLOYEE', employeeId: next.employeeId },
+      });
 
       expect(wire.state).toBe('LEFT');
-      expect(wire.warnings?.departmentWithoutHeadFrom).toBe(h.today());
-      expect((await h.headPeriods(department.id))[0].valid_to).toBe(h.today());
+      expect(wire.lastWorkingDay).toBe(h.today());
+      expect(wire.departureEffectiveOn).toBe(h.day(1));
+      expect(wire.warnings?.departmentWithoutHeadFrom).toBeNull();
+      expect(await h.headPeriods(department.id)).toEqual([
+        expect.objectContaining({ employee_id: head.employeeId, valid_to: h.day(1) }),
+        expect.objectContaining({ employee_id: next.employeeId, valid_from: h.day(1), valid_to: null }),
+      ]);
     });
   });
 

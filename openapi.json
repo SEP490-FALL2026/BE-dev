@@ -10162,7 +10162,7 @@
             }
           },
           "422": {
-            "description": "The body is invalid (VALIDATION_ERROR), there is no last working day or it is not allowed (OFFBOARDING_CASE.LAST_WORKING_DAY_REQUIRED, LAST_WORKING_DAY_INVALID), the basis (groundsNote) is only the code of a notice and not a document (OFFBOARDING_CASE.GROUNDS_IS_NOTICE); a basis that is missing, blank or over 500 characters is a VALIDATION_ERROR, a transfer that waits would be cancelled by the departure and the confirmation is missing (TRANSFER_CANCELLATION_REQUIRED), or the person chosen to follow the head cannot take the department that day (SUCCESSOR_NOT_A_MEMBER_ON_DATE): nothing is saved.",
+            "description": "The body is invalid (VALIDATION_ERROR), there is no last working day or it is not allowed (OFFBOARDING_CASE.LAST_WORKING_DAY_REQUIRED, LAST_WORKING_DAY_INVALID), the basis (groundsNote) is only the code of a notice and not a document (OFFBOARDING_CASE.GROUNDS_IS_NOTICE); a basis that is missing, blank or over 500 characters is a VALIDATION_ERROR, a transfer that waits would be cancelled by the departure and the confirmation is missing (TRANSFER_CANCELLATION_REQUIRED), the person heads the department they leave and names nobody to follow them or gives \"nobody\" (PERSONNEL.SUCCESSOR_REQUIRED, details.departmentId), or the person chosen to follow the head cannot take the department that day (OFFBOARDING_CASE.SUCCESSOR_NOT_A_MEMBER_ON_DATE): nothing is saved.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -10198,6 +10198,18 @@
                         "code": "OFFBOARDING_CASE.LAST_WORKING_DAY_INVALID",
                         "message": "The last working day cannot be that day.",
                         "details": { "reason": "IN_PAST", "today": "2026-01-01" },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "PERSONNEL.SUCCESSOR_REQUIRED": {
+                    "summary": "The person heads the department they leave: name an employee of it who follows them as head.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "PERSONNEL.SUCCESSOR_REQUIRED",
+                        "message": "The person heads the department they leave: name an employee of it who follows them as head.",
+                        "details": { "departmentId": "<department-id>" },
                         "requestId": "req_example"
                       }
                     }
@@ -11304,7 +11316,7 @@
             }
           },
           "422": {
-            "description": "The body is invalid, such as one without a reason or a basis (VALIDATION_ERROR), the basis (groundsNote) is only the code of a notice and not a document (OFFBOARDING_CASE.GROUNDS_IS_NOTICE); a basis that is missing, blank or over 500 characters is a VALIDATION_ERROR, the day is the same or not allowed (NO_CHANGE, LAST_WORKING_DAY_INVALID), or the head of the department cannot be handed over on the new day (SUCCESSOR_NOT_A_MEMBER_ON_DATE): nothing is saved, and the old day and the old choice stay.",
+            "description": "The body is invalid, such as one without a reason or a basis (VALIDATION_ERROR), the basis (groundsNote) is only the code of a notice and not a document (OFFBOARDING_CASE.GROUNDS_IS_NOTICE); a basis that is missing, blank or over 500 characters is a VALIDATION_ERROR, the day is the same or not allowed (NO_CHANGE, LAST_WORKING_DAY_INVALID), the person heads the department and no employee follows them (PERSONNEL.SUCCESSOR_REQUIRED: a case recorded earlier with \"nobody\" must name one now), or the head of the department cannot be handed over on the new day (OFFBOARDING_CASE.SUCCESSOR_NOT_A_MEMBER_ON_DATE): nothing is saved, and the old day and the old choice stay.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -11351,6 +11363,18 @@
                         "code": "OFFBOARDING_CASE.LAST_WORKING_DAY_INVALID",
                         "message": "The last working day cannot be that day.",
                         "details": { "reason": "IN_PAST", "today": "2026-01-01" },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "PERSONNEL.SUCCESSOR_REQUIRED": {
+                    "summary": "The person heads the department they leave: name an employee of it who follows them as head.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "PERSONNEL.SUCCESSOR_REQUIRED",
+                        "message": "The person heads the department they leave: name an employee of it who follows them as head.",
+                        "details": { "departmentId": "<department-id>" },
                         "requestId": "req_example"
                       }
                     }

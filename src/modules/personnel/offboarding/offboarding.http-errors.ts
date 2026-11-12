@@ -2,7 +2,7 @@ import { HttpStatus } from '@nestjs/common';
 import { ApiException } from '../../../infrastructure/http/errors/api.exception';
 import { toUnavailableApiException } from '../../../infrastructure/http/errors/service-unavailable';
 import { errorExampleOf } from '../../../infrastructure/http/openapi-error-examples';
-import { toPersonnelAccessApiException } from '../personnel-access.http-errors';
+import { successorRequiredException, toPersonnelAccessApiException } from '../personnel-access.http-errors';
 import { OffboardingRefusedError } from './offboarding.errors';
 
 /** The answer of each refusal, by its semantic code. A code the table does not know is a programming error and stays a 500. */
@@ -81,6 +81,8 @@ export function toOffboardingApiException(error: unknown): unknown {
   const refused = toPersonnelAccessApiException(error);
   if (refused) return refused;
   if (!(error instanceof OffboardingRefusedError)) return toUnavailableApiException(error) ?? error;
+  // The same word for a departure and a transfer, so it is not prefixed `OFFBOARDING_CASE.` (`QĐ-110h`).
+  if (error.code === 'SUCCESSOR_REQUIRED') return successorRequiredException(error.details);
   const status = STATUS[error.code];
   if (status === undefined) return error;
 
