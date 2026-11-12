@@ -77,7 +77,6 @@ export interface OffboardingSummaryRecord {
   accessBlockMode: AccessBlockMode;
   lastWorkingDay: BusinessDate;
   leftOn: BusinessDate | null;
-  handoverDueOn: BusinessDate | null;
   accountLocked: boolean;
   closed: boolean;
   /** The person headed the department they leave: one of the roles that need someone to take over (`US-03-04` AC-11). */

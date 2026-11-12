@@ -46,7 +46,7 @@
 ### D-7 · X-H.2 · `offboarding_cases.handover_due_on`: còn ghi cho hồ sơ có ngày cuối không?
 - **A:** ngừng ghi (NULL). Nhược: CHECK `offboarding_cases_due_for_planned_only_check` + guard còn đòi cột này cho hồ sơ `WITH_LAST_DAY`; phải viết migration thay CHECK/guard (R4 trong R2).
 - **B:** vẫn ghi `plannedDueOn` (ngày cuối trừ 1 ngày làm việc), bỏ khỏi API ở pha B.
-- **ĐÃ CHỌN: B.** Lý do: không migration cấu trúc, không rủi ro trigger; R2 Q4 khuyến nghị "giữ cột chết". Căn cứ: R2 §4.2 A2/C21, SPEC §6 ("không drop ở đợt này"). Chạm: `personnel/offboarding/offboarding-handover.service.ts` (`plannedDueOn`), commit 8e6bc748. API `handoverDueOn` giữ.
+- **ĐÃ CHỌN: B.** Lý do: không migration cấu trúc, không rủi ro trigger; R2 Q4 khuyến nghị "giữ cột chết". Căn cứ: R2 §4.2 A2/C21, SPEC §6 ("không drop ở đợt này"). Chạm: `personnel/offboarding/offboarding-handover.service.ts` (`plannedDueOn`), commit 8e6bc748. API `handoverDueOn` **trước đây** giữ giá trị thật; review X-H sửa: wire trả `null` (xem D-15).
 - **Đổi sang A:** migration thay CHECK + guard `offboarding_cases`, bỏ `plannedDueOn`, bỏ khóa `handoverDueOn` ở DTO list/detail.
 
 ### D-8 · X-H.3 · Các khóa của bàn giao ở API đọc (`rights[].handover`, `assignment-expiry-queue[].handover`, `checklist.dataHandover`, `return-requests[].handover*`): bỏ khóa hay giữ giá trị cố định?
@@ -77,6 +77,12 @@
 - **B:** thêm audit event mỗi dòng. Nhược: migration không có người/phiên để nêu làm tác nhân, cột `created_by_app_user_id` đã là NOT NULL của dòng cũ; lịch sử `HANDOVER_DUTY.*` cũ vẫn còn đủ.
 - **ĐÃ CHỌN: A.** Lý do: đơn giản, đúng SPEC; `cancel_reason` là TEXT tự do (không enum nên không cần migration `_values`). Có khối `DO $$ … RAISE` đếm mở trước/hủy/mở sau và dừng nếu còn dòng mở. Chạm: `prisma/migrations/20261113000500_handover_duties_cancel_open/migration.sql`, test `licensing/handover-removed.integration-spec.ts`. Owner đếm lại `SELECT count(*) FROM handover_duties WHERE confirmed_at IS NULL AND cancelled_at IS NULL` trước deploy (cần 0 sau migration).
 - **Đổi sang B:** thêm vào migration một `INSERT INTO audit_events` cho từng dòng với `actor_kind = 'SYSTEM'`.
+
+### D-15 · X-H review (Required) · `handoverDueOn` trên wire của hồ sơ nghỉ việc còn lộ ngày thật
+- **A:** giữ ngày thật trên wire (D-7 như ban đầu). Nhược: trái SPEC S6 và `QĐ-110g` ("không hạn bàn giao"): FE thấy một hạn không ai xác nhận.
+- **B:** wire trả `null`, giữ khóa (như D-8), cột `handover_due_on` vẫn được ghi cho CHECK/guard (D-7 giữ phần này).
+- **ĐÃ CHỌN: B.** Lý do: `QĐ-110g`, SPEC S6; giữ khóa để FE chưa gãy. Chạm: `offboarding.mapper.ts` (`toSummary` luôn `null`), `OffboardingSummaryRecord` và `offboarding-list.repo.ts` không đọc cột nữa, mô tả DTO; test `offboarding-record`, `offboarding-change` khẳng định `null` ở wire **và** cột vẫn có ngày (`caseRow`). `HandingOverCase.handoverDueOn` (facade `personnel`, không lên wire, không ai đọc) giữ tới pha B.
+- **Đổi lại A:** trả `record.handoverDueOn` ở mapper và đọc lại cột ở `offboarding-list.repo.ts`.
 
 ## Bị chặn
 

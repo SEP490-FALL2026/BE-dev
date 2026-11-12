@@ -52,7 +52,8 @@ export function toSummary(
     accessBlockMode: record.accessBlockMode,
     abrupt: record.accessBlockMode === 'BLOCK_NOW',
     lastWorkingDay: record.lastWorkingDay,
-    handoverDueOn: record.handoverDueOn,
+    // No deadline of a handover is told any more (`QĐ-110g`): the key stays, always null, until the clients stop reading it.
+    handoverDueOn: null,
     pastLastDay: isPastLastDay(record.state, record.lastWorkingDay, facts.today),
     accessBlocked,
     accessBlockedFrom: accessBlockedFrom(record, block),
@@ -120,7 +121,6 @@ export function toDetail(
         accessBlockMode: record.accessBlockMode,
         lastWorkingDay: record.lastWorkingDay,
         leftOn: record.leftOn,
-        handoverDueOn: record.handoverDueOn,
         accountLocked: locked,
         closed: record.closedAt !== null,
         headsDepartment: record.headHandover !== null,

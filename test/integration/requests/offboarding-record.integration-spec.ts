@@ -60,7 +60,8 @@ describe('recording a departure (integration, real PostgreSQL)', () => {
       abrupt: false,
       lastWorkingDay: h.day(10),
       departureEffectiveOn: h.day(11),
-      handoverDueOn: h.dueBefore(h.day(10)),
+      // No deadline of a handover is told any more (QĐ-110g): the key stays, always null, though the column is still written.
+      handoverDueOn: null,
       heldRights: 4,
       priorWorkState: 'WORKING',
       recordedByProcedure: false,
@@ -71,6 +72,8 @@ describe('recording a departure (integration, real PostgreSQL)', () => {
       left: null,
       accountLockMissing: false,
     });
+    // The old column is still written (its constraint asks for it) and never told.
+    expect((await h.caseRow(wire.id)).handover_due_on).toBe(h.dueBefore(h.day(10)));
     expect(await h.workState(person.employeeId)).toBe('ACTIVE/HANDING_OVER');
     const placements = await h.placements(person.employeeId);
     expect(placements[placements.length - 1].valid_to).toBe(h.day(11));

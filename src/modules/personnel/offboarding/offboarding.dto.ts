@@ -85,6 +85,7 @@ export const offboardingSummarySchema = z.strictObject({
   /** Deprecated: `accessBlockMode === 'BLOCK_NOW'`. */
   abrupt: z.boolean(),
   lastWorkingDay: z.string(),
+  /** Always null since `QĐ-110g` (no deadline of a handover is told): the key stays until the clients stop reading it, then goes. */
   handoverDueOn: z.string().nullable(),
   pastLastDay: z.boolean(),
   /** The departure refuses the person today (the last working day has passed, or they have left): the IT Admin may lock the account and open the revocations. */

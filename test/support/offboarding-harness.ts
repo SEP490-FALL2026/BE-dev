@@ -11,7 +11,8 @@ export interface CaseWire {
   accessBlockMode: 'WITH_LAST_DAY' | 'BLOCK_NOW';
   abrupt: boolean;
   lastWorkingDay: string;
-  handoverDueOn: string | null;
+  /** Always null on the wire since `QĐ-110g`. */
+  handoverDueOn: null;
   pastLastDay: boolean;
   accessBlocked: boolean;
   accessBlockedFrom: string | null;

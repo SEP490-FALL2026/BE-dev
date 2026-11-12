@@ -46,8 +46,9 @@ describe('moving and cancelling a handover (integration, real PostgreSQL)', () =
       expect(moved).toMatchObject({
         lastWorkingDay: h.day(20),
         departureEffectiveOn: h.day(21),
-        handoverDueOn: h.dueBefore(h.day(20)),
+        handoverDueOn: null,
       });
+      expect((await h.caseRow(wire.id)).handover_due_on).toBe(h.dueBefore(h.day(20)));
       const placements = await h.placements(person.employeeId);
       expect(placements[placements.length - 1].valid_to).toBe(h.day(21));
       expect(await h.changeKinds(wire.id)).toEqual(['RECORDED', 'LAST_DAY_CHANGED']);

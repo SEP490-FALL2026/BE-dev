@@ -11,7 +11,6 @@ const SUMMARY = {
   accessBlockMode: true,
   lastWorkingDay: true,
   leftOn: true,
-  handoverDueOn: true,
   accountLockAt: true,
   closedAt: true,
   roleFlags: true,
@@ -55,7 +54,6 @@ export class OffboardingListRepo {
             accessBlockMode: row.accessBlockMode,
             lastWorkingDay: fromDateColumn(row.lastWorkingDay),
             leftOn: row.leftOn ? fromDateColumn(row.leftOn) : null,
-            handoverDueOn: row.handoverDueOn ? fromDateColumn(row.handoverDueOn) : null,
             accountLocked: row.accountLockAt !== null,
             closed: row.closedAt !== null,
             // Whether the person headed the department they leave is told by the snapshot, so the list never reads the handover of the head.
