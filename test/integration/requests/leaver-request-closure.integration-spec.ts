@@ -532,6 +532,25 @@ describe('the requests and grants of a person who left (integration, real Postgr
       // The task already being worked is not touched: it is the IT Admin's to check with the vendor and close (QĐ-110d).
       expect((await taskOf(working)).status).toBe('IN_PROGRESS');
     });
+
+    it('lets another IT Admin take over a task already being worked once the block is in force: the check with the vendor can change hands', async () => {
+      const u = await example();
+      const working = await approvedFor(u, u.leaver, 5 * M);
+      const workingTask = await granted(working);
+      await h.claim(workingTask).expect(200);
+      await h.recordedCase(u.leaver);
+      await h.ctx.sql.query(`UPDATE employee_access_blocks SET blocked_from = $2::date WHERE employee_id = $1`, [
+        u.leaver.employeeId,
+        h.today(),
+      ]);
+
+      const other = await h.worker(u.department, `LR-I${n}`, ['IT_ADMIN']);
+
+      const taken = await h.claim(workingTask, other.account).expect(200);
+
+      expect(h.dataOf<{ task: TaskWire }>(taken).task).toMatchObject({ id: workingTask, status: 'IN_PROGRESS' });
+      expect((await taskOf(working)).status).toBe('IN_PROGRESS');
+    });
   });
 
   describe('what the database refuses', () => {

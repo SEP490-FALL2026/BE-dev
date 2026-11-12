@@ -69,8 +69,9 @@ export class ProvisioningService {
   }
 
   /**
-   * Takes the task (or takes it over from another IT Admin). A revocation is taken whoever its beneficiary is, a person who
-   * left included; a listener of the revocation may refuse it by throwing at `BEFORE_WORK` (none does today). Throws ProvisioningTaskNotFoundError,
+   * Takes the task (or takes it over from another IT Admin, whoever its beneficiary is by then). A revocation is taken whoever its
+   * beneficiary is, a person who left included; a task to grant is begun only for a beneficiary who works and whose access is not blocked
+   * (`QĐ-77f`, `QĐ-110d`), and one already in progress is not judged again. A listener of the revocation may refuse it by throwing at `BEFORE_WORK` (none does today). Throws ProvisioningTaskNotFoundError,
    * ProvisioningTaskNotManualError, ProvisioningTaskStateError, ProvisioningBeneficiaryDepartedError and
    * ProvisioningAnotherItAdminNeededError.
    */
@@ -83,7 +84,8 @@ export class ProvisioningService {
           // A revocation with a day not before is not taken before it (`US-10-07` AC-18): nothing changes and nobody is told.
           assertNotBefore(locked.notBefore, await this.organizationReads.businessToday(now, tx));
           await this.revocation.emit(tx, { moment: 'BEFORE_WORK', task: toRevocationFacts(locked), now });
-        } else {
+        } else if (locked.status === 'QUEUED') {
+          // Only a task not yet begun is held back: one already being worked may change hands, for the IT Admin to check with the vendor (`QĐ-110d`).
           const beneficiary = await this.organizationReads.getEmployee(locked.assignment.employeeId, tx);
           if (beneficiary) await this.holders.requireCanBegin(tx, locked.requestId ?? '', beneficiary);
         }

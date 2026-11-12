@@ -236,6 +236,12 @@
 - **`isRevocableType`** chuyển từ `offboarding.policy.ts` sang `departure-deadline/departure-impact.policy.ts` (hai nơi dùng: mapper/service quyền của hồ sơ và danh sách quyền sẽ thu hồi; để `departure-deadline` khỏi import `offboarding`).
 - **Chạm:** `personnel/departure-deadline/*` (mới: policy, types, service, spec), `personnel.module.ts`, `offboarding.service.ts`, `offboarding-case-writer.service.ts`, `offboarding-revocation.service.ts`, `offboarding.mapper.ts`, `offboarding.policy.ts`; `requests/public/requests.{api,types}.ts`, `requests/cancellation/beneficiary-gone-cancellation.service.ts`; `budgets/public/budgets.{api,types}.ts`, `budgets/commitment/commitment.service.ts`, `budgets/budget/commitment.repo.ts`; README ba module; test `departure-impact.integration-spec.ts`.
 
+### D-33 · MF2-B review (Required) · `claim` chặn tác vụ cấp của người bị chặn: chỉ tác vụ chưa bắt đầu hay cả tác vụ đang làm
+
+- **Lỗi:** D-31 chọn cổng `requireCanBegin` ở `claim`, nhưng `claim` cũng là đường IT Admin khác **nhận lại** tác vụ `IN_PROGRESS`; cổng chạy với mọi tác vụ không thu hồi nên tác vụ đang làm của người bị chặn không chuyển tay được để đối chiếu nhà cung cấp, trái D-31 và `QĐ-110d` ("tác vụ cấp đang chạy ⟹ hàng việc IT đối chiếu rồi đóng").
+- **A:** chỉ gác khi `locked.status === 'QUEUED'` (chưa bắt đầu). **B:** giữ như cũ. **ĐÃ CHỌN A** (đúng chữ của D-31). Hệ quả có chủ ý: trước đây `claim` còn từ chối nhận lại tác vụ `IN_PROGRESS` của người **đã nghỉ** (`status != ACTIVE`); nay nhận lại được, cùng lý do (IT khác đối chiếu rồi đóng), không có đường nào cấp thêm: `complete` vẫn đòi bằng chứng và `grant` mới vẫn bị cổng chặn. **Đổi sang B:** bỏ điều kiện `locked.status === 'QUEUED'` ở `provisioning.service.ts` (`claim`).
+- **Chạm:** `licensing/provisioning/tasks/provisioning.service.ts`, test `leaver-request-closure` (ca nhận lại bởi `it2`).
+
 ## Bị chặn
 
 (chưa có)
