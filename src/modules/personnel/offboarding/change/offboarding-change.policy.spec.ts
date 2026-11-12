@@ -33,8 +33,8 @@ describe('what cancelling a handover does to the tasks and the machines (MF2-C, 
     expect(cancelTakesBackEffects('NONE')).toBe(false);
   });
 
-  it('counts what the withdrawn reasons did to the tasks and ignores the seats the departure never asked for (revocationsWithdrawnOf)', () => {
-    expect(revocationsWithdrawnOf([])).toEqual({ cancelled: 0, itAdminToClose: 0, continues: 0 });
+  it('counts what the withdrawn reasons did to the tasks, tells the tasks already completed apart, and ignores the seats the departure never asked for (revocationsWithdrawnOf)', () => {
+    expect(revocationsWithdrawnOf([])).toEqual({ cancelled: 0, itAdminToClose: 0, continues: 0, alreadyDone: 0 });
     expect(
       revocationsWithdrawnOf([
         'CANCELLED',
@@ -44,6 +44,6 @@ describe('what cancelling a handover does to the tasks and the machines (MF2-C, 
         'NOT_FOUND',
         'ALREADY_ENDED',
       ]),
-    ).toEqual({ cancelled: 2, itAdminToClose: 1, continues: 1 });
+    ).toEqual({ cancelled: 2, itAdminToClose: 1, continues: 1, alreadyDone: 1 });
   });
 });

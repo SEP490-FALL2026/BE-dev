@@ -58,7 +58,7 @@ export class OffboardingCancelTakeBack {
       inForce,
       withdrawn: inForce
         ? await this.withdrawRevocations(tx, actor, held, today)
-        : { cancelled: 0, itAdminToClose: 0, continues: 0 },
+        : { cancelled: 0, itAdminToClose: 0, continues: 0, alreadyDone: 0 },
     };
   }
 

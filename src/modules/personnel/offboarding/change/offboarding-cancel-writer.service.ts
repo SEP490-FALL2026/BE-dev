@@ -94,7 +94,8 @@ export class OffboardingCancelWriter {
     const { reason, settled, firstPlacementRestored } = done;
     const by = actorColumns(actor);
     const grounds = done.groundsNote ? groundsSnapshot(normalizedGroundsNote(done.groundsNote)) : null;
-    const { cancelled, itAdminToClose, continues } = settled.withdrawn;
+    const { cancelled, itAdminToClose, continues, alreadyDone } = settled.withdrawn;
+    // A task already completed is not a withdrawal: it is told in the answer and the audit, and gives the log no line.
     const count = cancelled + itAdminToClose + continues;
     if (count > 0)
       await this.repo.insertChange(tx, {
@@ -130,7 +131,7 @@ export class OffboardingCancelWriter {
         grounds,
         workState: done.workState,
         accessBlock: settled.block,
-        revocationsWithdrawn: { cancelled, itAdminToClose, continues },
+        revocationsWithdrawn: { cancelled, itAdminToClose, continues, alreadyDone },
       },
     );
   }

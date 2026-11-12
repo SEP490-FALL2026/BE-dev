@@ -88000,9 +88000,10 @@
                 "properties": {
                   "cancelled": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
                   "itAdminToClose": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
-                  "continues": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+                  "continues": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                  "alreadyDone": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
                 },
-                "required": ["cancelled", "itAdminToClose", "continues"],
+                "required": ["cancelled", "itAdminToClose", "continues", "alreadyDone"],
                 "additionalProperties": false
               },
               "priorWorkState": { "type": "string", "enum": ["WORKING", "ON_LONG_LEAVE"] },
@@ -88652,9 +88653,10 @@
                 "properties": {
                   "cancelled": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
                   "itAdminToClose": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
-                  "continues": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+                  "continues": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                  "alreadyDone": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
                 },
-                "required": ["cancelled", "itAdminToClose", "continues"],
+                "required": ["cancelled", "itAdminToClose", "continues", "alreadyDone"],
                 "additionalProperties": false
               },
               "priorWorkState": { "type": "string", "enum": ["WORKING", "ON_LONG_LEAVE"] },

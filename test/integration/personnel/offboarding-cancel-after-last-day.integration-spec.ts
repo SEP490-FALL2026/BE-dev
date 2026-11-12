@@ -31,6 +31,7 @@ interface RegistrationRow {
 describe('cancelling a handover after its last working day (integration, real PostgreSQL)', () => {
   let des: Department;
   let subscriptions: string[];
+  let k1: string;
   let counter = 0;
   let assets = 0;
 
@@ -38,6 +39,7 @@ describe('cancelling a handover after its last working day (integration, real Po
     await h.start();
     des = await h.departmentWithUnit('P-CL');
     subscriptions = [await h.subscription(60, 'K2'), await h.subscription(60, 'K2'), await h.subscription(60, 'K2')];
+    k1 = await h.subscription(60, 'K1');
   }, 300000);
 
   afterAll(async () => {
@@ -171,7 +173,7 @@ describe('cancelling a handover after its last working day (integration, real Po
 
       const body = h.dataOf<CaseWire & { revocationsWithdrawn: object }>(cancelled);
       expect(body).toMatchObject({ state: 'CANCELLED' });
-      expect(body.revocationsWithdrawn).toEqual({ cancelled: 1, itAdminToClose: 1, continues: 1 });
+      expect(body.revocationsWithdrawn).toEqual({ cancelled: 1, itAdminToClose: 1, continues: 1, alreadyDone: 0 });
       // The task that waited is cancelled as no longer applying; the seat stays as it was.
       expect(await taskOf(tasks.a)).toMatchObject({ status: 'CANCELLED', close_reason: 'NO_LONGER_APPLIES' });
       expect((await h.assignmentRow(seats[0])).valid_until).toBeNull();
@@ -231,6 +233,69 @@ describe('cancelling a handover after its last working day (integration, real Po
     });
   });
 
+  describe('what a cancellation leaves alone (MF2-C review)', () => {
+    /** A person with a seat in a plan of K2, a seat in a plan of K1 and a second seat in a plan of K2, past their last working day. */
+    const pastLastDayWithThreeSeats = async () => {
+      const code = `E-CL-${(counter += 1)}`;
+      const person = await h.worker(des, code);
+      const [waiting, runsOn, done] = [
+        await h.seatOf(person, { subscriptionId: subscriptions[0] }, code),
+        await h.seatOf(person, { subscriptionId: k1 }, code),
+        await h.seatOf(person, { subscriptionId: subscriptions[1] }, code),
+      ];
+      const wire = await h.recordedCase(person);
+      await pastLastDay(wire, person);
+      await h.lockAccount(wire.id, LOCK).expect(200);
+      await h.revokeRights(wire.id, {}).expect(200);
+
+      return { person, wire, seats: { waiting, runsOn, done } };
+    };
+    const completeTask = async (taskId: string, body: object): Promise<void> => {
+      await h.claim(taskId).expect(200);
+      await h.revoked(taskId, body).expect(200);
+    };
+
+    it('takes nothing back from a task that is completed, and tells those whose access runs on apart (alreadyDone)', async () => {
+      const { wire, seats } = await pastLastDayWithThreeSeats();
+      const [waiting, runsOn, done] = [
+        (await h.liveTaskOf(seats.waiting)) as string,
+        (await h.liveTaskOf(seats.runsOn)) as string,
+        (await h.liveTaskOf(seats.done)) as string,
+      ];
+      // A K1 seat whose renewal is cancelled keeps its access to the end of the paid period: its task is completed and the seat is still held.
+      await completeTask(runsOn, {
+        completion: 'RENEWAL_CANCELLED',
+        evidence: 'Đã hủy gia hạn',
+        paidThroughOn: h.day(36),
+        accessState: 'UNTIL_PAID_END',
+      });
+      await completeTask(done, { completion: 'ACCOUNT_REMOVED', evidence: 'Đã gỡ khỏi workspace' });
+
+      const cancelled = await h.cancelCase(wire.id, { reason: 'Ở lại sau ngày cuối' }).expect(200);
+
+      expect(h.dataOf<{ revocationsWithdrawn: object }>(cancelled).revocationsWithdrawn).toEqual({
+        cancelled: 1,
+        itAdminToClose: 0,
+        continues: 0,
+        alreadyDone: 1,
+      });
+      for (const completed of [runsOn, done]) {
+        expect(await taskOf(completed)).toMatchObject({ status: 'COMPLETED' });
+        expect(await reasonsOf(completed)).toEqual([{ source: 'DEPARTURE', withdrawn: false }]);
+        expect((await h.auditEventsOf('PROVISIONING_TASK.REASON_WITHDRAWN', completed)).length).toBe(0);
+      }
+      expect(await taskOf(waiting)).toMatchObject({ status: 'CANCELLED', close_reason: 'NO_LONGER_APPLIES' });
+      // Only the withdrawal is written in the log of the case: the completed tasks are not part of it.
+      const [line] = (
+        await h.ctx.sql.query<{ detail: { count: number } }>(
+          `SELECT detail FROM offboarding_case_changes WHERE case_id = $1 AND kind = 'REVOCATIONS_WITHDRAWN'`,
+          [wire.id],
+        )
+      ).rows;
+      expect(line.detail.count).toBe(1);
+    }, 240_000);
+  });
+
   describe('a handover whose last working day is not past', () => {
     it('takes nothing back: the person keeps their machines and no task is touched', async () => {
       const { person } = await leaver();
@@ -244,6 +309,7 @@ describe('cancelling a handover after its last working day (integration, real Po
         cancelled: 0,
         itAdminToClose: 0,
         continues: 0,
+        alreadyDone: 0,
       });
       expect(await registrationsOf(person.employeeId)).toEqual([{ id: registration, end_cause: null, ended: false }]);
       expect(await h.taskCount()).toBe(tasks);
@@ -263,6 +329,7 @@ describe('cancelling a handover after its last working day (integration, real Po
         cancelled: 0,
         itAdminToClose: 0,
         continues: 0,
+        alreadyDone: 0,
       });
       expect(await registrationsOf(person.employeeId)).toEqual([
         { id: registration, end_cause: 'DEPARTURE_BLOCKED', ended: true },

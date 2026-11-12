@@ -45,11 +45,18 @@ export interface RevocationsWithdrawn {
   itAdminToClose: number;
   /** Tasks that go on because another source still asks for the revocation. */
   continues: number;
+  /** Tasks already completed (a K1 seat whose access runs on to the end of the paid period): nothing is taken back and nothing is left to the IT Admin. */
+  alreadyDone: number;
 }
 
 /** The count of the outcomes of the withdrawals; a seat the departure never asked a revocation for, or whose task ended, counts nowhere. */
 export function revocationsWithdrawnOf(outcomes: readonly WithdrawnRevocation['outcome'][]): RevocationsWithdrawn {
   const count = (outcome: WithdrawnRevocation['outcome']): number => outcomes.filter((one) => one === outcome).length;
 
-  return { cancelled: count('CANCELLED'), itAdminToClose: count('IT_ADMIN_TO_CLOSE'), continues: count('CONTINUES') };
+  return {
+    cancelled: count('CANCELLED'),
+    itAdminToClose: count('IT_ADMIN_TO_CLOSE'),
+    continues: count('CONTINUES'),
+    alreadyDone: count('ALREADY_ENDED'),
+  };
 }

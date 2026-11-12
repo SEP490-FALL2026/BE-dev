@@ -142,7 +142,8 @@ export const offboardingDetailSchema = offboardingSummarySchema.extend({
   firstPlacementRestored: z.boolean().optional(),
   /**
    * Only on the answer to the cancellation: what taking back the reasons of the departure did to the tasks of revocation (`QĐ-110c`).
-   * All zero when the last working day had not passed, when nothing was opened, or when no task carried a reason of this departure.
+   * All zero when the last working day had not passed, when nothing was opened, or when no task carried a reason of this departure; a task already
+   * completed is told apart in `alreadyDone` so the four numbers add up to the tasks the seats of the person had.
    */
   revocationsWithdrawn: z
     .strictObject({
@@ -152,6 +153,8 @@ export const offboardingDetailSchema = offboardingSummarySchema.extend({
       itAdminToClose: z.number().int().nonnegative(),
       /** Tasks that go on because another source still asks for the revocation of the seat. */
       continues: z.number().int().nonnegative(),
+      /** Tasks already completed (a K1 seat whose access runs on to the end of the paid period): nothing was taken back, nothing is left to close. */
+      alreadyDone: z.number().int().nonnegative(),
     })
     .optional(),
   priorWorkState: z.enum(['WORKING', 'ON_LONG_LEAVE']),

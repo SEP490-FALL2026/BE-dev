@@ -323,6 +323,14 @@ Không sửa code; SPEC không bị sửa trong lượt này (spec là của Own
 - **Chạm:** `offboarding.dto.ts` (query + `revocation`), `offboarding.mapper.ts`, `offboarding.types.ts`, `offboarding-list.repo.ts`, `offboarding-view.service.ts`, `detail/offboarding-detail.{policy,service}.ts`, `offboarding.controller.ts` (mô tả), `offboarding-revocation.service.ts`; `licensing/provisioning/provisioning.dto.ts`, `provisioning-task.repo.ts` (`pageWhere`, `overdueWhere`), `tasks/provisioning.service.ts`, `tasks/provisioning-tasks.controller.ts` (mô tả); `openapi.json`, `docs/generated/module-graph.md`; test `departure-revocation-deadline.integration-spec.ts`, `offboarding-cases.http-spec.ts`, `provisioning.http-spec.ts`, `offboarding-summary.mapper.spec.ts`, `offboarding-detail.policy.spec.ts`.
 - **Đổi lại:** muốn bỏ `?overdue=false` (chỉ giữ `true`): đổi enum ở `listTasksQuerySchema`; muốn khối `revocation` chỉ ở chi tiết: bỏ khỏi `offboardingSummarySchema` (giữ ở detail schema).
 
+### D-44 · MF2-C review (b) · Tác vụ đã `COMPLETED` khi hủy hồ sơ: thêm số đếm `alreadyDone` hay chỉ ghi chú OpenAPI
+
+- **A:** chỉ ghi vào mô tả OpenAPI rằng tác vụ đã `COMPLETED` không được tính. Ưu: không đổi hình response. Nhược: FE không phân biệt "0 vì không có gì" với "0 vì mọi tác vụ đã xong"; bốn con số không cộng lại thành số tác vụ của các ghế.
+- **B:** thêm `alreadyDone` vào `revocationsWithdrawn` (đếm kết quả `ALREADY_ENDED` của `withdrawRevocationReason`). Ưu: thêm khóa, không phá FE đang đọc ba khóa cũ; test pin được. Nhược: một khóa nữa.
+- **ĐÃ CHỌN: B.** `alreadyDone` luôn có (0 khi không có); `count` của dòng nhật ký `REVOCATIONS_WITHDRAWN` vẫn chỉ cộng ba loại rút lý do (tác vụ xong không phải một lần rút) nên nhật ký không thêm dòng khi chỉ có `alreadyDone`; audit `OFFBOARDING_CASE.CANCELLED` kèm cả bốn số. Tác vụ `COMPLETED` không bị chạm (không rút lý do, không audit `REASON_WITHDRAWN`): thực tế chỉ ghế K1 `UNTIL_PAID_END` (đã xong nhưng ghế còn giữ tới hết kỳ trả phí) vào được nhánh này vì ghế đã xong bình thường đã hết hiệu lực nên không còn trong danh sách ghế.
+- **Chạm:** `change/offboarding-change.policy.ts` (+spec), `change/offboarding-cancel-takeback.service.ts` (giá trị mặc định), `change/offboarding-cancel-writer.service.ts`, `offboarding.dto.ts`, `openapi.json`; test `offboarding-cancel-after-last-day.integration-spec.ts` (ca K1 `UNTIL_PAID_END` + ghế K2 đã xong + ghế đang chờ).
+- **Đổi lại:** bỏ khóa khỏi `RevocationsWithdrawn`/DTO và ghi chú vào mô tả OpenAPI (phương án A).
+
 ## Bị chặn
 
 (chưa có)
