@@ -10,6 +10,7 @@ import { OrganizationModule } from '../organization/organization.module';
 import { RequestsModule } from '../requests/requests.module';
 import { DepartmentMemberController } from './department-member/department-member.controller';
 import { DepartureClosureRepo } from './departure-closure/departure-closure.repo';
+import { MailboxLockRevocationListener } from './departure-closure/mailbox-lock-revocation.listener';
 import { MailboxLockController } from './departure-closure/mailbox-lock.controller';
 import { MailboxLockService } from './departure-closure/mailbox-lock.service';
 import { AccountLockOverdueService } from './departure-deadline/account-lock-overdue.service';
@@ -167,6 +168,7 @@ import { TransferReviewsController } from './transfer-review/transfer-reviews.co
   providers: [
     DepartureClosureRepo,
     MailboxLockService,
+    MailboxLockRevocationListener,
     AccountLockOverdueService,
     BlockAnnouncementService,
     BlockMomentEffects,

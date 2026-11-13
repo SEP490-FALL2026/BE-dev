@@ -1,4 +1,10 @@
-import { mailboxLockRefusal, type MailboxLockFacts } from './departure-closure.policy';
+import type { K1ChecklistFacts } from '../../licensing/public/licensing.types';
+import {
+  mailboxLockRefusal,
+  mailboxLockedByTask,
+  systemMailboxLockDue,
+  type MailboxLockFacts,
+} from './departure-closure.policy';
 
 const ready: MailboxLockFacts = { closed: false, blocked: true, accountLocked: true, k1RightsOpen: 0 };
 
@@ -28,5 +34,30 @@ describe('the lock of the mailbox for good, item (1b) of BM-08 (QĐ-110e, B-1, P
     expect(mailboxLockRefusal({ ...everythingWrong, closed: false, blocked: true })).toEqual({
       code: 'ACCOUNT_LOCK_FIRST',
     });
+  });
+});
+
+const departure = (...doneCodes: K1ChecklistFacts['doneCodes']): K1ChecklistFacts => ({
+  variant: 'DEPARTURE',
+  doneCodes,
+});
+
+describe('the lock of the mailbox the last K1 revocation of a person ticks (QĐ-111az, R-1, P28)', () => {
+  it.each<[string, K1ChecklistFacts | null, boolean]>([
+    ['the last K1 revocation of a departure, lock ticked', departure('EVIDENCE_RECORDED', 'MAILBOX_LOCKED'), true],
+    ['a K1 revocation that is not the last (no lock step, five steps)', departure('EVIDENCE_RECORDED'), false],
+    ['a K1 revocation of a person who stays', { variant: 'STILL_EMPLOYED', doneCodes: ['RENEWAL_DISABLED'] }, false],
+    ['a revocation of another kind of seat (no checklist)', null, false],
+  ])('says %s: %s', (_name, checklist, ticked) => {
+    expect(mailboxLockedByTask(checklist)).toBe(ticked);
+  });
+
+  it('is due for the system only when it is ticked, the company account (1a) is locked and (1b) is not written yet', () => {
+    const due = { ticked: true, accountLocked: true, mailboxLocked: false };
+
+    expect(systemMailboxLockDue(due)).toBe(true);
+    expect(systemMailboxLockDue({ ...due, ticked: false })).toBe(false);
+    expect(systemMailboxLockDue({ ...due, accountLocked: false })).toBe(false);
+    expect(systemMailboxLockDue({ ...due, mailboxLocked: true })).toBe(false);
   });
 });

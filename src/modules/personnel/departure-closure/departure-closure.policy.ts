@@ -1,3 +1,4 @@
+import type { K1ChecklistFacts } from '../../licensing/public/licensing.types';
 import type { OffboardingRefusal } from '../offboarding/offboarding.policy';
 
 /** What the lock of the mailbox for good, item (1b) of `BM-08`, is judged on. */
@@ -24,4 +25,24 @@ export function mailboxLockRefusal(facts: MailboxLockFacts): OffboardingRefusal 
   if (facts.k1RightsOpen > 0) return { code: 'MAILBOX_LOCK_BEFORE_K1', details: { k1RightsOpen: facts.k1RightsOpen } };
 
   return null;
+}
+
+/**
+ * Whether the K1 revocation that was just completed ticked the lock of the mailbox (`QĐ-111az`, `R-1`): only the checklist of a departure has that
+ * step, and only the last K1 revocation of the person carries it (D-62), so a task that is not the last never says so.
+ */
+export function mailboxLockedByTask(checklist: K1ChecklistFacts | null): boolean {
+  return checklist !== null && checklist.variant === 'DEPARTURE' && checklist.doneCodes.includes('MAILBOX_LOCKED');
+}
+
+/**
+ * Whether the system writes item (1b) now (`P28`): the last K1 revocation ticked it, (1a) is written (it always is before a departure's
+ * revocation is opened, but a revocation another source asked for can end in the same hour) and (1b) was not written already.
+ */
+export function systemMailboxLockDue(facts: {
+  ticked: boolean;
+  accountLocked: boolean;
+  mailboxLocked: boolean;
+}): boolean {
+  return facts.ticked && facts.accountLocked && !facts.mailboxLocked;
 }

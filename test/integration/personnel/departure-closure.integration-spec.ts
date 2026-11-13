@@ -1,3 +1,4 @@
+import { Client } from 'pg';
 import { OffboardingHarness, type CaseWire, type RightWire } from '../../support/offboarding-harness';
 import type { Department, Person } from '../../support/request-harness';
 import { k1Checklist } from '../../support/k1-checklist';
@@ -173,5 +174,98 @@ describe('the end of a departure: the lock of the mailbox and the closing of the
 
       expect(refused(response)).toEqual([403, 'AUTHORIZATION.FORBIDDEN']);
     });
+  });
+
+  describe('item (1b) written by the system when the last K1 revocation ticks the lock of the mailbox (P28, R-1)', () => {
+    /** The IT Admin opens every revocation of the person and returns the tasks of the K1 seats, in the order of the seats. */
+    const openedTasks = async (id: string, seats: string[]) => {
+      await h.revokeRights(id, {}).expect(200);
+      const rights = await rightsOf(id);
+
+      return seats.map((seat) => rights.find((right) => right.assignmentId === seat)?.revocation?.taskId ?? '');
+    };
+    /** The IT Admin takes the K1 task and completes it with the checklist of a departure (the last step ticked unless `withLock` is false). */
+    const completeK1 = async (taskId: string, withLock = true): Promise<void> => {
+      await h.claim(taskId).expect(200);
+      await h
+        .revoked(taskId, {
+          completion: 'RENEWAL_CANCELLED',
+          evidence: 'đã hủy gia hạn',
+          paidThroughOn: h.day(36),
+          accessState: 'UNTIL_PAID_END',
+          k1Checklist: k1Checklist('DEPARTURE', undefined, { withLock }),
+        })
+        .expect(200);
+    };
+    const mailboxLines = async (caseId: string) =>
+      (
+        await h.ctx.sql.query<{ changed_by_app_user_id: string | null; changed_by_ticket_id: string | null }>(
+          `SELECT changed_by_app_user_id, changed_by_ticket_id FROM offboarding_case_changes WHERE case_id = $1 AND kind = 'MAILBOX_LOCKED'`,
+          [caseId],
+        )
+      ).rows;
+
+    it('writes it itself for the last K1 revocation of a person, with no account, and the route then answers as it was', async () => {
+      const { seats, wire } = await lockedLeaver([k2, k1]);
+      const [, k1Task] = await openedTasks(wire.id, seats);
+
+      await completeK1(k1Task);
+
+      const written = h.dataOf<CaseWire>(await h.readCase(wire.id).expect(200));
+      expect(written.mailboxLock).toMatchObject({ recordedByAppUserId: null, recordedBySystem: true, note: null });
+      const row = await h.caseRow(wire.id);
+      expect([row.mailbox_lock_at !== null, row.mailbox_lock_by_app_user_id]).toEqual([true, null]);
+      expect(await mailboxLines(wire.id)).toEqual([{ changed_by_app_user_id: null, changed_by_ticket_id: null }]);
+      const [event] = await h.auditEventsOf('OFFBOARDING_CASE.MAILBOX_LOCK_RECORDED', wire.id);
+      expect(event).toMatchObject({ actor_kind: 'SYSTEM', actor_app_user_id: null, after: { by: 'SYSTEM' } });
+
+      const again = h.dataOf<CaseWire>(await h.lockMailbox(wire.id, MAILBOX).expect(200));
+      expect(again.mailboxLock).toEqual(written.mailboxLock);
+      expect(await mailboxLines(wire.id)).toHaveLength(1);
+    });
+
+    it('writes nothing for a K1 revocation that is not the last (five steps) and writes at the last one', async () => {
+      const second = await h.subscription(60, 'K1');
+      const { seats, wire } = await lockedLeaver([k1, second]);
+      const tasks = await openedTasks(wire.id, seats);
+
+      await completeK1(tasks[0], false);
+
+      expect((await h.caseRow(wire.id)).mailbox_lock_at).toBeNull();
+      expect(refused(await h.lockMailbox(wire.id))).toEqual([409, 'OFFBOARDING_CASE.MAILBOX_LOCK_BEFORE_K1']);
+      await completeK1(tasks[1]);
+      expect(h.dataOf<CaseWire>(await h.readCase(wire.id).expect(200)).mailboxLock).toMatchObject({
+        recordedBySystem: true,
+      });
+    });
+
+    it('does not wait for a case another command holds: the revocation is completed, (1b) is not lost and the IT Admin writes it', async () => {
+      const { seats, wire } = await lockedLeaver([k1]);
+      const [task] = await openedTasks(wire.id, seats);
+      await h.claim(task).expect(200);
+      const holder = new Client({ connectionString: h.ctx.database.url });
+      await holder.connect();
+      await holder.query('BEGIN');
+      await holder.query('SELECT id FROM offboarding_cases WHERE id = $1 FOR UPDATE', [wire.id]);
+      try {
+        const done = await h.revoked(task, {
+          completion: 'RENEWAL_CANCELLED',
+          evidence: 'đã hủy gia hạn',
+          paidThroughOn: h.day(36),
+          accessState: 'UNTIL_PAID_END',
+          k1Checklist: k1Checklist('DEPARTURE'),
+        });
+
+        expect(done.status).toBe(200);
+      } finally {
+        await holder.query('ROLLBACK');
+        await holder.end();
+      }
+      expect((await h.caseRow(wire.id)).mailbox_lock_at).toBeNull();
+
+      const byHand = h.dataOf<CaseWire>(await h.lockMailbox(wire.id, MAILBOX).expect(200));
+
+      expect(byHand.mailboxLock).toMatchObject({ recordedByAppUserId: h.it1.appUserId, recordedBySystem: false });
+    }, 60_000);
   });
 });
