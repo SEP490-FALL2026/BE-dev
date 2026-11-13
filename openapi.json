@@ -88634,6 +88634,7 @@
                     "count": { "type": "integer", "minimum": 0, "maximum": 9007199254740991, "nullable": true },
                     "changedByAppUserId": { "type": "string", "format": "uuid", "nullable": true },
                     "changedByProcedure": { "type": "boolean" },
+                    "changedBySystem": { "type": "boolean" },
                     "changedAt": { "type": "string", "format": "date-time" }
                   },
                   "required": [
@@ -88645,6 +88646,7 @@
                     "count",
                     "changedByAppUserId",
                     "changedByProcedure",
+                    "changedBySystem",
                     "changedAt"
                   ],
                   "additionalProperties": false

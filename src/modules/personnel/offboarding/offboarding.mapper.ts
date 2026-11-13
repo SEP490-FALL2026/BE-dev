@@ -239,6 +239,7 @@ export function toChange(change: OffboardingChangeRecord): OffboardingChangeWire
     count: change.kind === 'REVOCATIONS_OPENED' && typeof count === 'number' ? count : null,
     changedByAppUserId: change.changedByAppUserId,
     changedByProcedure: change.changedByTicketId !== null,
+    changedBySystem: change.changedByAppUserId === null && change.changedByTicketId === null,
     changedAt: change.changedAt.toISOString(),
   };
 }

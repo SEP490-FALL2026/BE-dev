@@ -279,9 +279,14 @@ const changeSchema = z.strictObject({
   reason: z.string().nullable(),
   /** For the revocations opened: how many rights were asked for. */
   count: z.number().int().nonnegative().nullable(),
-  /** The account that did it; null when the controlled procedure did (`changedByProcedure`). */
+  /**
+   * Who did it, one of three: an account (`changedByAppUserId`), the controlled procedure (`changedByProcedure`, no account), or the system
+   * (`changedBySystem`, no account and no procedure: the block at the block moment, the lock of the mailbox the last K1 revocation ticked, the
+   * closing of the case). `changedByAppUserId` is null for the last two.
+   */
   changedByAppUserId: z.uuid().nullable(),
   changedByProcedure: z.boolean(),
+  changedBySystem: z.boolean(),
   changedAt: z.iso.datetime(),
 });
 

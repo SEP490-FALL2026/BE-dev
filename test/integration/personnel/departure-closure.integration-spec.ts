@@ -319,6 +319,15 @@ describe('the end of a departure: the lock of the mailbox and the closing of the
       ]);
       const [event] = await h.auditEventsOf('OFFBOARDING_CASE.CLOSED', wire.id);
       expect(event).toMatchObject({ actor_kind: 'SYSTEM', actor_app_user_id: null });
+      // The log tells the lines the system wrote apart from those of an account.
+      const log = h.dataOf<{ items: { kind: string; changedByAppUserId: string | null; changedBySystem: boolean }[] }>(
+        await h.caseChanges(wire.id, '?pageSize=100').expect(200),
+      );
+      expect(log.items.filter((line) => line.changedBySystem).map((line) => line.kind)).toEqual(['CLOSED_BY_SYSTEM']);
+      expect(log.items.find((line) => line.kind === 'MAILBOX_LOCKED')).toMatchObject({
+        changedByAppUserId: h.it1.appUserId,
+        changedBySystem: false,
+      });
       // Closed once: asking for (1b) again answers 200 with the case as it is and writes nothing more.
       await h.lockMailbox(wire.id, {}).expect(200);
       expect(await h.auditEventsOf('OFFBOARDING_CASE.CLOSED', wire.id)).toHaveLength(1);

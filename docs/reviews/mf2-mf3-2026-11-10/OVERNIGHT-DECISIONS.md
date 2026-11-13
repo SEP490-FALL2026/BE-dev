@@ -526,6 +526,13 @@ Không sửa code; SPEC không bị sửa trong lượt này (spec là của Own
 - **Đổi lại:** muốn báo lại khi người phụ trách đổi: bỏ lời gọi `markLockOverdueTold` ở `AccountLockOverdueService.tellOne` và để khóa sự kiện theo người nhận làm dấu (lỗi D-68 quay lại); muốn bỏ cột: migration sau `DROP COLUMN` (chỉ mất dấu).
 - **Chạm:** `prisma/migrations/20261113001600_personnel_account_lock_overdue_at/`, `prisma/models/personnel.prisma`, `departure-deadline/account-lock-overdue.service.ts`, `departure-deadline/block-moment.repo.ts`; test `departure-block-moment.integration-spec.ts` (+1 ca: đổi IT phụ trách giữa hai lượt, đã kiểm đỏ trước khi sửa).
 
+### D-69 · MF2-G review MF2-E (d) · Dòng nhật ký do hệ thống ghi trên dây: thêm trường hay chỉ ghi chú
+
+- **Vấn đề:** `GET /offboarding-cases/{id}/changes` trả dòng `ACCESS_BLOCKED` (E.1) với `changedByAppUserId = null` và `changedByProcedure = false`; FE đọc "không tài khoản, không thủ tục" thành lỗi dữ liệu. Nay có thêm hai loại do hệ thống ghi (`MAILBOX_LOCKED` khi tick cuối của tác vụ `K1` cuối, `CLOSED_BY_SYSTEM`).
+- **Phương án:** A. chỉ ghi chú vào mô tả (FE tự suy "cả hai rỗng = hệ thống", mong manh). B. **thêm trường `changedBySystem: boolean`** = không tài khoản và không ticket (cùng cách `changedByProcedure` được suy), kèm chú thích ba khả năng. **ĐÃ CHỌN B** (thêm trường, không đổi trường cũ; FE cũ bỏ qua trường lạ). Trường chỉ ở dòng nhật ký (`changeSchema`); chi tiết hồ sơ đã có `recordedBySystem` (`mailboxLock`) và `closedBySystem` (`closure`) từ G.1/G.3.
+- **Đổi lại:** bỏ trường: xóa khỏi `changeSchema` và `toChange` (một test mapper + một ca integration đọc nó).
+- **Chạm:** `offboarding/offboarding.dto.ts`, `offboarding.mapper.ts`, `openapi.json`; test mới `offboarding/detail/offboarding-change.mapper.spec.ts` (3 ca, đã kiểm đỏ), ca log trong `departure-closure.integration-spec.ts`.
+
 ## Bị chặn
 
 (chưa có)
