@@ -92,7 +92,7 @@ flowchart BT
   licensing -->|11| identity_access
   licensing -->|8| notifications
   licensing -->|7| operating_parameters
-  licensing -->|53| organization
+  licensing -->|54| organization
   onboarding -->|2| catalog
   onboarding -->|2| data_import
   onboarding -->|2| identity_access
