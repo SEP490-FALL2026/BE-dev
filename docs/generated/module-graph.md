@@ -118,13 +118,13 @@ flowchart BT
   personnel -->|6| operating_parameters
   personnel -->|95| organization
   personnel -->|8| requests
-  requests -->|59| audit
+  requests -->|58| audit
   requests -->|23| budgets
   requests -->|29| catalog
   requests -->|9| finance
-  requests -->|30| identity_access
+  requests -->|31| identity_access
   requests -->|49| licensing
-  requests -->|9| notifications
+  requests -->|10| notifications
   requests -->|11| operating_parameters
   requests -->|82| organization
   usage -->|7| audit

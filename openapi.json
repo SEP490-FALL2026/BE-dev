@@ -38959,7 +38959,7 @@
         },
         "responses": {
           "201": {
-            "description": "The request is fixed to its branch and chain of steps, charged to the Unit Cost Center of the department of the sender on the day, and its need step is given to the one person the routing table names. A requester who is the current head, or whose department has no effective head, skips the need step; paid requests are checked immediately and a blocked request stays saved for revision.",
+            "description": "The request is fixed to its branch and chain of steps, charged to the Unit Cost Center of the department of the sender on the day, and its need step is given to the one person the routing table names. A requester who is the current head skips the need step, and so does a request for free internal software from a department with no effective head (it goes straight to the IT Admin and carries the audit flag NO_NEED_APPROVER); a paid request from a department with no effective head waits at the need step for a head (waitingReason NO_DEPARTMENT_HEAD) and keeps its deadline when one is named. Paid requests that skip the need step are checked immediately and a blocked request stays saved for revision.",
             "content": {
               "application/json": {
                 "schema": {
@@ -41276,7 +41276,7 @@
         },
         "responses": {
           "201": {
-            "description": "The request takes the third branch (the need, the assessment of the IT Admin, the spend decision, the grant) with no plan, and the assessment is opened for the IT Admin. The price is missing until the IT Admin records a quote.",
+            "description": "The request takes the third branch (the need, the assessment of the IT Admin, the spend decision, the grant) with no plan, and the assessment is opened for the IT Admin. The price is missing until the IT Admin records a quote. From a department with no effective head the proposal waits at the need step for a head (waitingReason NO_DEPARTMENT_HEAD) and does not reach the IT Admin before its need is decided, because it is not yet known whether the software will be free or paid; the head of a department sends it without a need step.",
             "content": {
               "application/json": {
                 "schema": {
