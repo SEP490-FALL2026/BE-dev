@@ -14,6 +14,7 @@ import { DepartureClosureRepo } from './departure-closure/departure-closure.repo
 import { DepartureClosureService } from './departure-closure/departure-closure.service';
 import { MailboxLockRevocationListener } from './departure-closure/mailbox-lock-revocation.listener';
 import { MailboxLockController } from './departure-closure/mailbox-lock.controller';
+import { MailboxLockSettlement } from './departure-closure/mailbox-lock-settlement.service';
 import { MailboxLockService } from './departure-closure/mailbox-lock.service';
 import { AccountLockOverdueService } from './departure-deadline/account-lock-overdue.service';
 import { BlockAnnouncementService } from './departure-deadline/block-announcement.service';
@@ -171,6 +172,7 @@ import { TransferReviewsController } from './transfer-review/transfer-reviews.co
     DepartureClosureService,
     DepartureClosureSweeper,
     MailboxLockService,
+    MailboxLockSettlement,
     MailboxLockRevocationListener,
     AccountLockOverdueService,
     BlockAnnouncementService,

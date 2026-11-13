@@ -120,8 +120,14 @@
   `ACCOUNT_LOCK_OVERDUE:<case>`, once for the case, with the audit event `OFFBOARDING_CASE.ACCOUNT_LOCK_OVERDUE`) when a departure blocked now
   has no lock of the company account from the day after it was recorded. It revokes nothing and opens no task. Run one by hand with
   `BlockAnnouncementService.announce(now)` and `AccountLockOverdueService.notice(now)`.
-  The API also runs `DepartureClosureSweeper` once an hour (the first pass five minutes after start, unreferenced timer): for each departure whose
-  person has left, that is not closed and has the lock of the mailbox (1b) written (`offboarding_cases.mailbox_lock_at`), it closes the case when
+  The API also runs `DepartureClosureSweeper` once an hour (the first pass five minutes after start, unreferenced timer). It first writes the lock of
+  the mailbox (1b) that the listener of the last K1 revocation could not write because another command held the case (`MailboxLockSettlement`,
+  D-72): for each departure that is not closed and has (1a) and not (1b), when `LicensingApi.listPeopleWithMailboxLockTicked` says a completed K1
+  revocation of the person kept a departure checklist with the step `MAILBOX_LOCKED` ticked, and the person holds no K1 seat without a completed
+  revocation, it writes (1b) by the system (the line `MAILBOX_LOCKED` with no account, the audit event `OFFBOARDING_CASE.MAILBOX_LOCK_RECORDED`, actor
+  `SYSTEM`) and closes the case if that was the last thing it waited for, in a transaction of its own that locks the employee, then the case. Then,
+  for each departure whose person has left, that is not closed and has the lock of the mailbox (1b) written (`offboarding_cases.mailbox_lock_at`), it
+  closes the case when
   nothing keeps it open (`QĐ-110e`, `B-1`): every personal seat of the person has a completed task of revocation (counted through
   `LicensingApi.countPersonalSeatsWithoutCompletedTaskOf`) and the lock of the company account (1a) is written. Each case has a transaction of
   its own that locks the employee, then the case `FOR UPDATE`, reads it again and writes `closed_at` with no account (`closed_by_app_user_id`
@@ -129,7 +135,7 @@
   instance, a pass run again or a command at the same time never both act; a case that fails is logged and tried again at the next pass without
   stopping the others. The same closing is asked for at the moment a fact that closes the case is written (the last revocation of the person
   completed, (1b) recorded on the route), so the hourly pass only settles what those did not reach. It revokes nothing and opens no task. Run one by
-  hand with `DepartureClosureService.sweep(now)`.
+  hand with `MailboxLockSettlement.settle(now)` and `DepartureClosureService.sweep(now)`.
   The API also runs `SaasIssueSweeper` once an hour (the first pass five minutes after start, unreferenced timer): it closes each resolved
   report of an error in a SaaS right whose last day to reopen (`saas_issues.reopen_until`, fixed when it was resolved from
   `SAAS_ISSUE_REOPEN_WORKING_DAYS`) has passed (state `CLOSED`, a `SYSTEM` entry and the audit event `SAAS_ISSUE.CLOSED`, under the row lock),

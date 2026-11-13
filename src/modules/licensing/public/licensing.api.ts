@@ -161,6 +161,15 @@ export class LicensingApi {
   }
 
   /**
+   * Which of these people have a completed K1 revocation that ticked the lock of the mailbox of a departure (the step only the last K1
+   * revocation of a person carries): what the personnel module settles the lock of the mailbox from when it could not write it as the
+   * revocation completed (`P28`). One statement for any number of people; the people with none are absent.
+   */
+  listPeopleWithMailboxLockTicked(employeeIds: readonly string[], tx?: DbTx): Promise<Set<string>> {
+    return this.revocationView.mailboxLockTickedAmong(employeeIds, tx);
+  }
+
+  /**
    * The paid applications each of these people uses on `onDate` or will, as ids of applications (GH-3, `BR-MF1-01g`): a personal seat
    * not failed, cancelled or ended, of an application that is not internal and a plan that is not `K5`; two plans of one application
    * count once. One statement; the people with none are absent.

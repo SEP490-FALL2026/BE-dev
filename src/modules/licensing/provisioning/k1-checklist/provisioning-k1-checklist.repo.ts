@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { Prisma } from '../../../../generated/prisma/client';
 import { PrismaService } from '../../../../infrastructure/database/prisma.service';
 import type { DbTx } from '../../../../infrastructure/database/transaction-runner';
 import { k1ChecklistJson } from './provisioning-k1-checklist.json';
@@ -55,6 +56,30 @@ export class ProvisioningK1ChecklistRepo {
       employeeId: row.assignment.employeeId,
       planId: row.assignment.planId,
     }));
+  }
+
+  /**
+   * The checklists kept by the completed revocations of these people, in one read: only a K1 revocation keeps one, so a person with none is not
+   * in the map. What the system reads to find the people whose last K1 revocation ticked the lock of the mailbox when it could not write it then.
+   */
+  async completedOf(employeeIds: readonly string[], tx?: DbTx): Promise<Map<string, StoredK1Checklist[]>> {
+    if (employeeIds.length === 0) return new Map();
+    const rows = await (tx ?? this.prisma).provisioningTask.findMany({
+      where: {
+        kind: 'REVOKE',
+        status: 'COMPLETED',
+        k1Checklist: { not: Prisma.DbNull },
+        assignment: { employeeId: { in: [...employeeIds] } },
+      },
+      select: { k1Checklist: true, assignment: { select: { employeeId: true } } },
+    });
+    const kept = new Map<string, StoredK1Checklist[]>();
+    for (const row of rows) {
+      const checklist = k1ChecklistJson.decode(row.k1Checklist);
+      if (checklist) kept.set(row.assignment.employeeId, [...(kept.get(row.assignment.employeeId) ?? []), checklist]);
+    }
+
+    return kept;
   }
 
   /** The checklists kept by these tasks, in one read; a task that keeps none is not in the map. */

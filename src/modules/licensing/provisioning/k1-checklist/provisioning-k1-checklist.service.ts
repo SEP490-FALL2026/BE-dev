@@ -81,6 +81,26 @@ export class ProvisioningK1Checklist {
   }
 
   /**
+   * Which of these people have a completed K1 revocation whose checklist is the one of a departure with the lock of the mailbox ticked
+   * (`MAILBOX_LOCKED`, which only the last K1 revocation of a person carries, D-62): what the personnel module reads to write the lock of the
+   * mailbox for good when the revocation completed while it could not (`P28`, D-72). One query for any number of people.
+   */
+  async mailboxLockedAmong(employeeIds: readonly string[], tx?: DbTx): Promise<Set<string>> {
+    const kept = await this.checklists.completedOf(employeeIds, tx);
+
+    return new Set(
+      [...kept]
+        .filter(([, checklists]) =>
+          checklists.some(
+            (checklist) =>
+              checklist.variant === 'DEPARTURE' && checklist.items.some((item) => item.code === 'MAILBOX_LOCKED'),
+          ),
+        )
+        .map(([employeeId]) => employeeId),
+    );
+  }
+
+  /**
    * The checklist on the card of each of these K1 revocations that shows one: the list to tick while the task is open, what was ticked once it
    * is completed. `reasons` are the ones that stand. Reads the completed tasks' checklists in one query and the K1 revocations still to do of
    * the people of the open tasks in another, to tell whether an open task is the last of its person (the steps it has depend on it).

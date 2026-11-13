@@ -1,5 +1,6 @@
 import { Client } from 'pg';
 import request from 'supertest';
+import { MailboxLockSettlement } from '../../../src/modules/personnel/departure-closure/mailbox-lock-settlement.service';
 import { DepartureClosureService } from '../../../src/modules/personnel/departure-closure/departure-closure.service';
 import { OffboardingHarness, type CaseWire, type RightWire } from '../../support/offboarding-harness';
 import type { Department, Person } from '../../support/request-harness';
@@ -53,6 +54,31 @@ describe('the end of a departure: the lock of the mailbox and the closing of the
   const rightsOf = async (id: string) =>
     h.dataOf<{ items: RightWire[] }>(await h.rightsOf(id, '?pageSize=100').expect(200)).items;
   const refused = (response: { status: number }) => [response.status, h.codeOf(response as never)];
+  const settlement = () => h.ctx.app.get(MailboxLockSettlement);
+  /**
+   * The IT Admin completes a K1 revocation (a departure's, lock of the mailbox ticked) while another command holds the row of the case: the
+   * completion does not wait for it, so the system could not write (1b) then. The task was taken already.
+   */
+  const completeK1WhileCaseIsHeld = async (caseId: string, taskId: string): Promise<void> => {
+    const holder = new Client({ connectionString: h.ctx.database.url });
+    await holder.connect();
+    await holder.query('BEGIN');
+    await holder.query('SELECT id FROM offboarding_cases WHERE id = $1 FOR UPDATE', [caseId]);
+    try {
+      await h
+        .revoked(taskId, {
+          completion: 'RENEWAL_CANCELLED',
+          evidence: 'đã hủy gia hạn',
+          paidThroughOn: h.day(36),
+          accessState: 'UNTIL_PAID_END',
+          k1Checklist: k1Checklist('DEPARTURE'),
+        })
+        .expect(200);
+    } finally {
+      await holder.query('ROLLBACK');
+      await holder.end();
+    }
+  };
 
   describe('item (1b) of BM-08 (P28)', () => {
     it('is written by the IT Admin right after (1a) for a person who holds no K1, once, with the words they add', async () => {
@@ -256,6 +282,9 @@ describe('the end of a departure: the lock of the mailbox and the closing of the
       expect(refused(route)).toEqual([409, 'OFFBOARDING_CASE.MAILBOX_LOCK_BEFORE_K1']);
       expect(h.detailsOf(route)).toMatchObject({ k1RightsOpen: 1 });
       expect(await h.changeKinds(wire.id)).not.toContain('MAILBOX_LOCKED');
+      // Nor does the hourly pass, which reads the checklist the first task kept: the same rule, the same seats.
+      await settlement().settle();
+      expect((await h.caseRow(wire.id)).mailbox_lock_at).toBeNull();
 
       // The other seat is taken away too: now nothing of the person is left on K1, and the system writes it.
       await h.revokeRights(wire.id, {}).expect(200);
@@ -267,35 +296,29 @@ describe('the end of a departure: the lock of the mailbox and the closing of the
       });
     });
 
-    it('does not wait for a case another command holds: the revocation is completed, (1b) is not lost and the IT Admin writes it', async () => {
+    it('does not wait for a case another command holds: the revocation is completed, and the hourly pass writes the lock from the checklist it kept (D-72)', async () => {
       const { seats, wire } = await lockedLeaver([k1]);
       const [task] = await openedTasks(wire.id, seats);
       await h.claim(task).expect(200);
-      const holder = new Client({ connectionString: h.ctx.database.url });
-      await holder.connect();
-      await holder.query('BEGIN');
-      await holder.query('SELECT id FROM offboarding_cases WHERE id = $1 FOR UPDATE', [wire.id]);
-      try {
-        const done = await h.revoked(task, {
-          completion: 'RENEWAL_CANCELLED',
-          evidence: 'đã hủy gia hạn',
-          paidThroughOn: h.day(36),
-          accessState: 'UNTIL_PAID_END',
-          k1Checklist: k1Checklist('DEPARTURE'),
-        });
 
-        expect(done.status).toBe(200);
-      } finally {
-        await holder.query('ROLLBACK');
-        await holder.end();
-      }
+      await completeK1WhileCaseIsHeld(wire.id, task);
+
       expect((await h.caseRow(wire.id)).mailbox_lock_at).toBeNull();
-
-      const byHand = h.dataOf<CaseWire>(await h.lockMailbox(wire.id, MAILBOX).expect(200));
-
-      expect(byHand.mailboxLock).toMatchObject({ recordedByAppUserId: h.it1.appUserId, recordedBySystem: false });
+      const pass = await settlement().settle();
+      expect(pass.failed).toBe(0);
+      expect(pass.written).toBeGreaterThanOrEqual(1);
+      const settled = h.dataOf<CaseWire>(await h.readCase(wire.id).expect(200));
+      expect(settled.mailboxLock).toMatchObject({ recordedByAppUserId: null, recordedBySystem: true, note: null });
+      expect(await h.changeKinds(wire.id)).toContain('MAILBOX_LOCKED');
+      // A pass that comes again finds it written: nothing more, and the route answers as it was.
+      await settlement().settle();
+      expect((await h.changeKinds(wire.id)).filter((kind) => kind === 'MAILBOX_LOCKED')).toHaveLength(1);
+      expect(h.dataOf<CaseWire>(await h.lockMailbox(wire.id, MAILBOX).expect(200)).mailboxLock).toEqual(
+        settled.mailboxLock,
+      );
     }, 60_000);
   });
+
   describe('the system closes a departure that has left, whose revocations are done and whose mailbox is locked (QĐ-110e, T-MF2G)', () => {
     const closing = () => h.ctx.app.get(DepartureClosureService);
     const wireOf = async (id: string) => h.dataOf<CaseWire>(await h.readCase(id).expect(200));
@@ -388,30 +411,15 @@ describe('the end of a departure: the lock of the mailbox and the closing of the
       expect(await wireOf(second.wire.id)).toMatchObject({ closed: true, blockers: {} });
     });
 
-    it('stays open when the last revocation could not write (1b) because the case was held, and the route writes it and closes', async () => {
+    it('stays open when the last revocation could not write (1b) because the case was held, and the IT Admin who is quicker than the hourly pass writes it on the route and the case closes', async () => {
       const { seats, wire } = await lockedLeaver([k1]);
       await h.revokeRights(wire.id, {}).expect(200);
       const task = await taskOf(wire.id, seats[0]);
       await h.claim(task).expect(200);
-      const holder = new Client({ connectionString: h.ctx.database.url });
-      await holder.connect();
-      await holder.query('BEGIN');
-      await holder.query('SELECT id FROM offboarding_cases WHERE id = $1 FOR UPDATE', [wire.id]);
-      try {
-        await h
-          .revoked(task, {
-            completion: 'RENEWAL_CANCELLED',
-            evidence: 'đã hủy gia hạn',
-            paidThroughOn: h.day(36),
-            accessState: 'UNTIL_PAID_END',
-            k1Checklist: k1Checklist('DEPARTURE'),
-          })
-          .expect(200);
-      } finally {
-        await holder.query('ROLLBACK');
-        await holder.end();
-      }
-      // Every task is completed and nothing closed the case: (1b) is missing, and the hourly pass has nothing to close without it.
+
+      await completeK1WhileCaseIsHeld(wire.id, task);
+
+      // Every task is completed and nothing closed the case: (1b) is missing, and the pass that closes has nothing to close without it.
       expect(await wireOf(wire.id)).toMatchObject({ closed: false, mailboxLock: null, heldRights: 1 });
       expect(await closing().sweep()).toMatchObject({ failed: 0 });
       expect((await h.caseRow(wire.id)).closed_at).toBeNull();
@@ -419,6 +427,23 @@ describe('the end of a departure: the lock of the mailbox and the closing of the
       const done = h.dataOf<CaseWire>(await h.lockMailbox(wire.id, {}).expect(200));
 
       expect(done).toMatchObject({ closed: true, mailboxLock: { recordedBySystem: false } });
+    }, 60_000);
+
+    it('is closed by the hourly pass when the last revocation could not write (1b) because the case was held: the pass writes it from the checklist and closes (D-72)', async () => {
+      const { seats, wire } = await lockedLeaver([k1]);
+      await h.revokeRights(wire.id, {}).expect(200);
+      const task = await taskOf(wire.id, seats[0]);
+      await h.claim(task).expect(200);
+      await completeK1WhileCaseIsHeld(wire.id, task);
+      expect(await wireOf(wire.id)).toMatchObject({ closed: false, mailboxLock: null });
+
+      const pass = await settlement().settle();
+
+      expect(pass.failed).toBe(0);
+      const closed = await wireOf(wire.id);
+      expect(closed).toMatchObject({ closed: true, mailboxLock: { recordedBySystem: true } });
+      expect(closed.closure).toMatchObject({ closedByAppUserId: null, closedBySystem: true });
+      expect(await h.changeKinds(wire.id)).toEqual(expect.arrayContaining(['MAILBOX_LOCKED', 'CLOSED_BY_SYSTEM']));
     }, 60_000);
 
     it('does not close while a task failed, and a new task done for the same seat closes it', async () => {

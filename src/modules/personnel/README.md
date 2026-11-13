@@ -113,7 +113,7 @@ anh em `event-notice` để báo, nên `event-notice` không được import l�
   (`LicensingApi.countPersonalSeatsWithoutCompletedTaskOf`) và có (1a) + (1b) (`closureDue` ở `departure-closure.policy.ts`, cùng `blockersOf` của
   `offboarding.policy.ts` mà chi tiết hồ sơ hiện trong `blockers`): dòng nhật ký `CLOSED_BY_SYSTEM`, audit `OFFBOARDING_CASE.CLOSED` (SYSTEM),
   `closed_by_app_user_id` NULL. Được hỏi ngay khi sự kiện đóng được ghi (tác vụ thu hồi hoàn tất, P28), và mỗi giờ bởi `DepartureClosureSweeper`
-  (`DepartureClosureService.sweep`) cho phần còn lại (người được ghi _đã nghỉ việc_ sau cùng, hồ sơ bị giữ lúc listener hỏi). Cột
+  (`MailboxLockSettlement.settle` ghi (1b) từ checklist `K1` đã lưu cho hồ sơ bị giữ lúc listener hỏi, D-72, rồi `DepartureClosureService.sweep`) cho phần còn lại (người được ghi _đã nghỉ việc_ sau cùng, hồ sơ bị giữ lúc listener hỏi). Cột
   `offboarding_cases.mailbox_lock_at/by_app_user_id/note`. Tác vụ `FAILED` giữ hồ sơ mở; IT mở tác vụ mới.
 - `department-member/` — trưởng phòng đọc một người đang ở phòng mình hôm nay (`QĐ-41c`(2)); `department-member.controller.ts`
   (`GET /departments/{id}/employees/{employeeId}` + `…/software-rights` + `…/open-requests`, `@RequireRoles('MANAGER')`),

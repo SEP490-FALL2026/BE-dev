@@ -30,6 +30,28 @@ export class DepartureClosureRepo {
     return row && toRecord(row);
   }
 
+  /**
+   * One page, by id after `afterId`, of the departures that are not closed, have (1a) written and not (1b): the ones the system may still write
+   * (1b) for, from the checklist a K1 revocation kept (D-72). Whether one is due is asked of `licensing` for the whole page.
+   */
+  async pageAwaitingMailboxLock(page: {
+    afterId: string | null;
+    take: number;
+  }): Promise<{ id: string; employeeId: string }[]> {
+    return this.prisma.offboardingCase.findMany({
+      where: {
+        state: { in: ['HANDING_OVER', 'LEFT'] },
+        closedAt: null,
+        accountLockAt: { not: null },
+        mailboxLockAt: null,
+        ...(page.afterId ? { id: { gt: page.afterId } } : {}),
+      },
+      orderBy: { id: 'asc' },
+      take: page.take,
+      select: { id: true, employeeId: true },
+    });
+  }
+
   /** One page, by id after `afterId`, of the departures that have left, are not closed and have (1b) written: the ones the pass may close. */
   async pageClosable(page: { afterId: string | null; take: number }): Promise<{ id: string; employeeId: string }[]> {
     return this.prisma.offboardingCase.findMany({

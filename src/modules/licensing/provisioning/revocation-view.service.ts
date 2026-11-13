@@ -10,6 +10,7 @@ import type {
   RevocationSource,
   TerminatingAccess,
 } from '../public/licensing.types';
+import { ProvisioningK1Checklist } from './k1-checklist/provisioning-k1-checklist.service';
 import { RevocationReadRepo } from './revocation-read.repo';
 
 /**
@@ -23,6 +24,7 @@ export class RevocationViewService {
     private readonly reads: RevocationReadRepo,
     private readonly catalog: CatalogApi,
     private readonly organizationReads: OrganizationReadApi,
+    private readonly k1Checklists: ProvisioningK1Checklist,
   ) {}
 
   async personalSeatsOf(employeeId: string, onDate: BusinessDate, tx?: DbTx): Promise<PersonalSeat[]> {
@@ -118,6 +120,11 @@ export class RevocationViewService {
     tx?: DbTx,
   ): Promise<number> {
     return this.reads.countPersonalSeatsOfKindWithoutCompletedTask(employeeId, kind, onDate, tx);
+  }
+
+  /** Which of these people have a completed K1 revocation that ticked the lock of the mailbox of a departure, in one statement. */
+  mailboxLockTickedAmong(employeeIds: readonly string[], tx?: DbTx): Promise<Set<string>> {
+    return this.k1Checklists.mailboxLockedAmong(employeeIds, tx);
   }
 
   /** The paid applications each of these people uses on `onDate` or will (GH-3), in one statement. */
