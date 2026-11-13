@@ -96,7 +96,7 @@ connection trước khi dọn thủ công; không xóa theo wildcard.
 
 Không assertion, không hook. `flow-template.ts`: mẫu đã seed của lượt (`prepareSeededTemplate` ở global setup, `cloneSeededTemplate` cho từng file),
 mật khẩu dataset và danh sách `SWEEPER_OVERRIDES`. `flow-world.ts`: `FlowWorld.open()` clone mẫu, bật đồng hồ, dựng app, đăng ký các
-pass (`projection`, `sla`, `expiry`, `renewal`, `transferReview`) vào `FlowClock`. `flow-actors.ts`: đăng nhập thật theo mã
+pass (`projection`, `sla`, `expiry`, `renewal`) vào `FlowClock`. `flow-actors.ts`: đăng nhập thật theo mã
 (`signIn`, `ensure`, `as`, `refresh`/`keep`). `flow-clock.ts`: `Date` giả (D0 = ngày thật, 12:00 giờ tổ chức), `jumpTo`/`jumpDays`/
 `jumpWorkingDays` chỉ tiến, luật CR-1 về đồng hồ PostgreSQL. `flow-facts.ts`: chỉ `SELECT` (đếm bảng, một dòng, thông báo, Audit).
 `flow-calls.ts`: gọi API theo vai (`get`/`post`/`put`) và các bước lặp lại của luồng Request.
@@ -150,13 +150,6 @@ fixture SQL không chứng minh workflow tạo tài khoản. Dùng `bodyOf(respo
   to open a revocation), `revoked` (the completion of a task), `makeHeadFrom` (a head named for a day to come) and `auditActions`,
   `liveTaskOf`, `assignmentRow` for what the database keeps. No handover is confirmed any more (`QĐ-110g`), so the harness has no duty:
   a test that wants to say none was made counts the rows of `handover_duties` (the table stays until the later clean-up).
-- `support/transfer-review-harness.ts`: the seat and revocation harness with what the review after a transfer needs: `movedWith` (a person of a
-  department who holds tools and is moved to another from today; returns the seats in the order of the tools and the review the move
-  opened), `moveToday`, the four routes (`reviews`, `review`, `reviewItems`, `decide`), `noticeLateReviews` (the hourly reminder by
-  hand), `backdate` (moves the deadline of a review into the past with the guard trigger off for that one update) and `reviewRows`,
-  `itemRows`, `taskRow`, `reasonRows` for what the database keeps. The opening is in `transfer-review-open.integration-spec.ts`, the
-  decisions and the late review in `transfer-review-decide.integration-spec.ts`, the reads with the statement count in
-  `transfer-review-read.integration-spec.ts`; what the database refuses is in `transfer-review-constraints.integration-spec.ts`.
 - `support/leave-harness.ts`: the transfer harness with what a long leave needs: `worker` (a person who joined long ago, so a leave may
   begin on any recent day), the six routes (`startLeave`, `changeReturnDate`, `confirmReturn`, `readLeave`, `listLeaves`, `leaveChanges`),
   `started` (a leave expected to begin), `noticeOverdueAt(day)` (the hourly reminder by hand, as of a day), `departure()` and `personnel()`

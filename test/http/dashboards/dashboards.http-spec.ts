@@ -52,7 +52,6 @@ const ROUTES: Route[] = [
       sections: {
         needApprovals: COUNTED,
         departmentSoftware: COUNTED,
-        transferReviews: COUNTED,
         ghostSeats: MISSING,
         spending: MISSING,
         spendQueue: AT_SOURCE,

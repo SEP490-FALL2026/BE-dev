@@ -17,7 +17,6 @@ import { InternalRulesSweeper } from '../../../src/modules/optimization/internal
 import { OrganizationChangeSweeper } from '../../../src/modules/organization/change-announcement/organization-change.job';
 import { LeaveReturnSweeper } from '../../../src/modules/personnel/leave/leave-return.job';
 import { NoticeOverdueSweeper } from '../../../src/modules/personnel/notice/notice-overdue.job';
-import { TransferReviewSweeper } from '../../../src/modules/personnel/transfer-review/transfer-review.job';
 import { DemoAccountsApi } from '../../../src/modules/installation/public/demo-accounts.api';
 import { InstallationApi } from '../../../src/modules/installation/public/installation.api';
 import {
@@ -59,7 +58,6 @@ export const SWEEPER_OVERRIDES: { token: unknown; useValue: unknown }[] = [
   OrganizationChangeSweeper,
   LeaveReturnSweeper,
   NoticeOverdueSweeper,
-  TransferReviewSweeper,
   InternalRulesSweeper,
   DecisionFollowUpSweeper,
 ].map((token) => ({ token, useValue: {} }));

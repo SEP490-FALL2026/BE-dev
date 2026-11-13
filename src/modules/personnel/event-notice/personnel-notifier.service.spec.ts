@@ -179,28 +179,6 @@ describe('who is told of an event of the personnel context (F17, spec B)', () =>
     ]);
   });
 
-  it('tells the head of the department the deadline of the review, a late review again with its own key, and keeps it for a department with no head', async () => {
-    const { notifier, told, held } = notifierOf();
-    const review = {
-      organizationId: ORGANIZATION,
-      employeeId: 'p',
-      departmentId: 'd1',
-      reviewId: 'r1',
-      dueOn: '2026-11-04',
-    };
-
-    await notifier.reviewDue(TX, { ...review, headEmployeeId: 'head' });
-    await notifier.reviewDue(TX, { ...review, headEmployeeId: 'head', reminder: true });
-    await notifier.reviewDue(TX, { ...review, headEmployeeId: null });
-
-    expect(told.map((item) => [item.recipientEmployeeId, item.eventKey])).toEqual([
-      ['head', 'TRANSFER_REVIEW_DUE:r1'],
-      ['head', 'TRANSFER_REVIEW_DUE:r1:overdue'],
-    ]);
-    expect(told[0].params).toEqual({ employeeId: 'p', departmentId: 'd1', dueOn: '2026-11-04' });
-    expect(held).toEqual([expect.objectContaining({ departmentId: 'd1', code: 'TRANSFER_REVIEW_DUE' })]);
-  });
-
   describe('the rights of a departure still not taken away past the day (QĐ-110c)', () => {
     const facts = {
       organizationId: ORGANIZATION,

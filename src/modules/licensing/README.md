@@ -67,8 +67,8 @@ dashboards; gốc `src/app/app.module.ts`.
   `REASON_WITHDRAWN { task, withdrawn, remaining, cancelled }` (return bỏ qua). Không còn listener bàn giao (`QĐ-110g`).
 - Mở `RenewalHoldHook` (`licensing.renewal-hold`, Hook) — requests `renewal-request/renewal-hold.listener.ts`.
 - Bind `SeatBaselinePhaseHook` (catalog, `catalog.seat-baseline-phase`) — `seat-baseline/seat-baseline-phase.listener.ts`.
-- Mở `SeatBaselineClosedListeners` (`licensing.seat-baseline-closed`, Listeners) — personnel
-  `transfer-review/post-setup-review.listener.ts`.
+- Mở `SeatBaselineClosedListeners` (`licensing.seat-baseline-closed`, Listeners) — chưa có bên đăng ký (bên duy nhất, rà soát sau thiết lập của
+  personnel, đã gỡ ở MF3-A; từ `QĐ-103d` danh sách người giữ ghế phòng khác luôn rỗng).
 - Mở `RenewalFinancialContributions` (`licensing.renewal-financial-snapshot`, Contributions) — chưa có bên thêm: module
   sở hữu ngân sách/chi phí (requests/budgets) thêm reader; chưa có thì snapshot đóng băng ghi `NOT_CONNECTED`, không 0.
 - Mở `RenewalUsageContributions` (`licensing.renewal-usage-evidence`, Contributions) — chưa có bên thêm: chủ evidence

@@ -342,7 +342,7 @@ export class GhostSeatWorld extends RevocationHarness {
     return id;
   }
 
-  /** The IT Admin closed the transfer (the service accounts are settled): it no longer pauses anything. */
+  /** The transfer is closed (the system does it once every right of the old department is taken back): it no longer pauses anything. */
   async closeTransfer(transferId: string): Promise<void> {
     await this.ctx.sql.query(
       `UPDATE department_transfers SET closed_at = now(), closed_by_app_user_id = gen_random_uuid() WHERE id = $1`,

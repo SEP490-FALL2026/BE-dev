@@ -165,11 +165,6 @@ export class TransferRepo {
     return row && toRecord(row);
   }
 
-  /** How many reviews of the tools the transfer opened still wait for the head (a part of the record that is not closed). */
-  countOpenReviews(tx: DbTx, transferId: string): Promise<number> {
-    return tx.transferReview.count({ where: { transferId, status: 'OPEN' } });
-  }
-
   /** Whether a transfer that waits names this person to follow the head of the department it leaves. */
   async isNamedSuccessorOfPending(tx: DbTx, employeeId: string): Promise<boolean> {
     const rows = await tx.$queryRaw<{ id: string }[]>`
@@ -259,16 +254,6 @@ export class TransferRepo {
         cancelledByTicketId: by.ticketId,
         cancelledReason: by.reason,
       },
-    });
-
-    return toRecord(row);
-  }
-
-  /** Closes an effective transfer that is not closed yet: only the two columns of the closing change. */
-  async close(tx: DbTx, id: string, appUserId: string): Promise<TransferRecord> {
-    const row = await tx.departmentTransfer.update({
-      where: { id },
-      data: { closedAt: new Date(), closedByAppUserId: appUserId },
     });
 
     return toRecord(row);

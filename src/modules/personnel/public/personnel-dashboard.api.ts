@@ -9,11 +9,6 @@ import { PersonnelDashboardFactsRepo } from '../dashboard-facts/dashboard-facts.
 export class PersonnelDashboardApi {
   constructor(private readonly facts: PersonnelDashboardFactsRepo) {}
 
-  /** The open reviews of tools after a transfer into the department, which its head decides. */
-  openTransferReviews(departmentId: string): Promise<number> {
-    return this.facts.openTransferReviews(departmentId);
-  }
-
   /** The departures still handing over among people of these departments; zero for no department. */
   handingOverCases(departmentIds: readonly string[]): Promise<number> {
     return this.facts.handingOverCases(departmentIds);

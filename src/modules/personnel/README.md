@@ -12,7 +12,7 @@ và lệnh `src/cli/record-super-admin-event/`.
 - `PersonnelApi` ([public/personnel.api.ts](public/personnel.api.ts)) — `getLeaveIntervals`: các kỳ nghỉ dài hạn
   chạm một khoảng ngày, trong một câu lệnh, cho rule khuyến nghị của G7 (hiện chưa có bên gọi).
 - `PersonnelDashboardApi` ([public/personnel-dashboard.api.ts](public/personnel-dashboard.api.ts)) — số đếm cho trang tổng
-  quan theo vai (US-12-15 AC-3, AC-4, AC-7): `openTransferReviews`, `handingOverCases`, `noticesAwaitingHandling`; đọc qua
+  quan theo vai (US-12-15 AC-3, AC-4, AC-7): `handingOverCases`, `noticesAwaitingHandling`; đọc qua
   `dashboard-facts/dashboard-facts.repo.ts` (`PersonnelDashboardFactsRepo`), chỉ trả số.
 - `SuperAdminEventApi` ([public/super-admin-event.api.ts](public/super-admin-event.api.ts)) — `run`: ghi một sự kiện
   về chính Super Admin bằng ticket (`pnpm ops:record-super-admin-event`, spec L.2); lỗi `SuperAdminEventRefusedError`
@@ -26,7 +26,8 @@ và lệnh `src/cli/record-super-admin-event/`.
 
 ## Bảng sở hữu
 
-- `department_transfers`, `department_transfer_changes`, `transfer_reviews`, `transfer_review_items`,
+- `department_transfers`, `department_transfer_changes`, `transfer_reviews`, `transfer_review_items`
+  (hai bảng sau chỉ còn dữ liệu cũ, không ai ghi: giữ theo expand–contract, drop ở đợt dọn),
   `employee_leaves`, `employee_leave_changes`, `offboarding_cases`, `offboarding_case_changes`, `personnel_notices`,
   `personnel_notice_verifications`, `personnel_notice_counters`, `super_admin_event_tickets`
   (`prisma/models/personnel.prisma`).
@@ -46,28 +47,23 @@ Bốn point mở của module (cả bốn do listener trong chính module đăng
 - `NoticeRecorderContributions` (`personnel.notice-recorder`) — `notice/transfer-notice.listener.ts`,
   `leave/leave-notice.listener.ts`, `offboarding/offboarding-notice.listener.ts`.
 
-Đăng ký vào: `licensing.revocation` (`RevocationListeners`) — `departure-closure/mailbox-lock-revocation.listener.ts`; `organization.change-listeners` — `transfer/transfer-effective.listener.ts`,
-`transfer-review/transfer-review.listener.ts`; `organization.department-use-readers` —
-`event-notice/department-open-work.listener.ts`; `licensing.seat-baseline-closed` —
-`transfer-review/post-setup-review.listener.ts`; `requests.outcome` —
-`transfer-review/transfer-review-outcome.listener.ts`.
+Đăng ký vào: `licensing.revocation` (`RevocationListeners`) — `departure-closure/mailbox-lock-revocation.listener.ts`; `organization.change-listeners` — `transfer/transfer-effective.listener.ts`; `organization.department-use-readers` —
+`event-notice/department-open-work.listener.ts`.
 
 ## Hướng phụ thuộc giữa capability (R6)
 
 Không vòng (`pnpm arch:capabilities --module personnel`, gate `capability-graph`). Từ thấp lên cao: `event-notice`,
 `department-member` → `departure-deadline` (gọi facade của `organization`, `licensing`, `requests`, `operating-parameters`, `audit`; chỉ import capability
-anh em `event-notice` để báo, nên `event-notice` không được import lại nó) → `role-duties`, `transfer`, `transfer-review` → `notice` → `leave` → `offboarding` →
+anh em `event-notice` để báo, nên `event-notice` không được import lại nó) → `role-duties`, `transfer` → `notice` → `leave` → `offboarding` →
 `super-admin-event`. Recorder điều chuyển nằm ở `notice/` (đứng trên `transfer/`); recorder nghỉ dài hạn và thôi việc nằm ở
 `leave/`, `offboarding/` (đứng trên `notice/`). `departure-closure/` đứng trên `offboarding/` (dùng khung khóa, repo và câu trả lời chi tiết của nó; `offboarding/` không import lại).
 
 ## Capability → file chính
 
-- `transfer/` — chuyển phòng ban: ghi, dời ngày, hủy, đóng (US-03-01); `transfers.controller.ts`; `TransferService` điều phối ba bước:
+- `transfer/` — chuyển phòng ban: ghi, dời ngày, hủy (US-03-01); không còn route đóng và không còn rà soát của trưởng phòng mới (`QĐ-110p`, `QĐ-110r`: hết ân hạn hệ thống thu hồi mọi quyền cũ, hệ thống đóng — MF3-B/C); `transfers.controller.ts`; `TransferService` điều phối ba bước:
   `TransferPreconditions` (đọc, khóa theo thứ tự T-11, kiểm lại sau khóa, chính sách từ chối), `TransferRecorder` (ghi kỳ, bản ghi,
   audit, thông báo). `TransferChangeService` (dời ngày, hủy) giao phần ghi cho `TransferChangeWriter`. `placementHeld`,
   `subjectRefusal`, `headSuccessorLabel`, `previousSuccessorChoice` là hàm thuần trong `transfer.policy.ts`.
-- `transfer-review/` — trưởng phòng mới review mọi ghế cá nhân của người chuyển đến (US-03-07);
-  `transfer-reviews.controller.ts`; `TransferReviewDecisionService`; `transfer-review.job.ts` báo quá hạn mỗi giờ.
 - `leave/` — nghỉ dài hạn, đổi ngày về, xác nhận về (US-03-03); `long-leaves.controller.ts`; `LeaveService`;
   `leave-return.job.ts` báo về trễ mỗi giờ.
 - `offboarding/` — nghỉ việc: ghi, đổi ngày làm cuối, hủy, đã nghỉ, khóa tài khoản (1a), mở thu hồi (US-03-04); không còn route đóng hồ sơ (hệ thống đóng, `departure-closure/`);
@@ -141,14 +137,12 @@ anh em `event-notice` để báo, nên `event-notice` không được import l�
 
 - Người ghi sự kiện là Super Admin (`QĐ-87a`), mỗi service kiểm lại bằng policy; sự kiện về chính Super Admin chỉ qua
   lệnh có ticket: một transaction, từ chối thì rollback cả ticket, chạy lại cùng tham số trả `ALREADY_RECORDED`.
-- Không gì bị thu hồi tự động: thu hồi chỉ mở khi IT Admin yêu cầu; bỏ công cụ ở transfer review đi qua cổng licensing
-  trong cùng transaction. Về trễ sau nghỉ dài hạn và thông báo quá hạn chỉ được báo, không hành động.
+- Không gì bị thu hồi tự động: thu hồi chỉ mở khi IT Admin yêu cầu. Về trễ sau nghỉ dài hạn và thông báo quá hạn chỉ được báo, không hành động.
 - File hook chạy trong transaction của lần ghi, theo thứ tự thêm, như một phần của lần ghi (`OD-R10` = A,
   `personnel-file-hooks.service.ts`): hook ném lỗi — lỗi code, câu SQL hỏng hay một từ chối — làm cả lần ghi hoàn tác, hook sau
   không chạy và lỗi gốc của hook tới exception filter, như một `Listeners`. Hook nào được phép thất bại thì tự bắt lỗi bên trong.
   Dùng Contributions vì một hook là một đối tượng có tới bốn bước tùy chọn, không phải một handler của một sự kiện.
-- `TransferEffectiveListener` được thêm trước `TransferReviewListener` (thứ tự provider trong `personnel.module.ts`);
-  mỗi loại sự kiện có đúng một recorder, recorder thứ hai cùng loại bị từ chối khi module khởi động.
+- Mỗi loại sự kiện có đúng một recorder, recorder thứ hai cùng loại bị từ chối khi module khởi động.
 
 ## Test
 

@@ -71,7 +71,7 @@ describe('a transfer pauses and resumes the recommendation of its holder (integr
     expect((await w.ghostRows('id = $1', [decided]))[0]).toMatchObject({ state: 'RECLAIM_DECIDED', paused_at: null });
   });
 
-  it('US-10-06 AC-16, AC-19, Q-87: the transfer closed and the seat kept: the review tier goes to the head of the new department with a due day counted from the day it enters the queue; audit H1 to H2', async () => {
+  it('US-10-06 AC-16, Q-87: the transfer over and the seat still open: the review tier goes to the head of the department the holder is in now with a due day counted from the day it enters the queue; audit H1 to H2', async () => {
     const e1 = await w.seatIn('E-TP-3', h2.departmentId);
     const transfer = await w.transferOf(e1.employeeId, h1.departmentId, h2.departmentId, '2026-10-12');
     const paused = await w.seedRecommendation({

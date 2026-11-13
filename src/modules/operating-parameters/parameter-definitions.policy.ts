@@ -195,18 +195,6 @@ export const PARAMETER_DEFINITIONS: readonly ParameterDefinition[] = [
     owner: 'FINANCE',
   },
   {
-    key: 'TRANSFER_REVIEW_WORKING_DAYS',
-    label: 'Hạn rà soát quyền sau điều chuyển',
-    group: 'PERSONNEL',
-    shape: { kind: 'int', min: 1, max: 30 },
-    default: 5,
-    unit: 'working days',
-    unitLabel: 'ngày làm việc',
-    description:
-      'How long the new head of a department has to review every right a transferred person holds, paid or internal, counted in working days from the day the transfer takes effect.',
-    source: 'FR-8.2, QĐ-50b, QĐ-56a',
-  },
-  {
     key: 'PERSONNEL_NOTICE_REVIEW_WORKING_DAYS',
     label: 'Hạn xử lý thông báo biến động nhân sự',
     group: 'PERSONNEL',

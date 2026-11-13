@@ -235,14 +235,6 @@
       "count": 1
     }
   },
-  "src/modules/personnel/transfer-review/transfer-review-decision.service.ts": {
-    "complexity": {
-      "count": 1
-    },
-    "max-lines-per-function": {
-      "count": 2
-    }
-  },
   "src/modules/personnel/transfer/transfer.mapper.ts": {
     "complexity": {
       "count": 1

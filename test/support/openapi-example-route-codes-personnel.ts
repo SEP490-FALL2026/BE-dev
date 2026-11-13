@@ -35,14 +35,6 @@ export const ROUTE_ERROR_CODES_PERSONNEL: Readonly<
   departmentTransferChangeList: {
     '404': ['DEPARTMENT_TRANSFER.NOT_FOUND'],
   },
-  departmentTransferClose: {
-    '404': ['DEPARTMENT_TRANSFER.NOT_FOUND'],
-    '409': [
-      'DEPARTMENT_TRANSFER.ALREADY_CANCELLED',
-      'DEPARTMENT_TRANSFER.ALREADY_CLOSED',
-      'DEPARTMENT_TRANSFER.NOT_CLOSEABLE',
-    ],
-  },
   departmentTransferGet: {
     '404': ['DEPARTMENT_TRANSFER.NOT_FOUND'],
   },
@@ -258,21 +250,5 @@ export const ROUTE_ERROR_CODES_PERSONNEL: Readonly<
   personnelNoticeWithdraw: {
     '404': ['PERSONNEL_NOTICE.NOT_FOUND'],
     '409': ['PERSONNEL_NOTICE.NOT_PENDING'],
-  },
-  transferReviewDecide: {
-    '403': ['TRANSFER_REVIEW.NOT_REVIEWER'],
-    '404': ['TRANSFER_REVIEW.ITEM_NOT_FOUND', 'TRANSFER_REVIEW.NOT_FOUND'],
-    '409': [
-      'TRANSFER_REVIEW.DECISION_ALREADY_RECORDED',
-      'TRANSFER_REVIEW.NOT_OPEN',
-      'TRANSFER_REVIEW.REVOCATION_NOT_SUPPORTED',
-      'TRANSFER_REVIEW.SEAT_NOT_OPEN',
-    ],
-  },
-  transferReviewGet: {
-    '404': ['TRANSFER_REVIEW.NOT_FOUND'],
-  },
-  transferReviewItemList: {
-    '404': ['TRANSFER_REVIEW.NOT_FOUND'],
   },
 };

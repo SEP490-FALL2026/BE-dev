@@ -304,20 +304,6 @@ const NESTED_ARRAYS_SECOND_HALF: readonly NestedArrayEntry[] = [
       'Review when a field is added to the figures or to a line of a version, or HISTORY_CHANGES_MAX changes.',
   },
   {
-    key: 'transferReviewGet#unfinishedRequests',
-    classification: 'bounded',
-    findings: ['LD-14'],
-    owner: 'g0-g6-final-business-baseline-remediation',
-    businessMaximum: {
-      maxItems: 20,
-      source:
-        'UNFINISHED_REQUESTS_MAX in transfer-review.dto.ts, the maxItems of the schema, and the take of unfinishedRequestsOf in transfer-review-view.service.ts: the open Requests of the person who moved, for the head to read beside the tools (F29)',
-    },
-    rationale:
-      'The open Requests of the person who was transferred, information only (F29); the Request list has the rest.',
-    removeWhen: 'Review when UNFINISHED_REQUESTS_MAX changes or the review shows the Requests as a paged subresource.',
-  },
-  {
     key: 'employeeGet#placements',
     classification: 'bounded',
     findings: ['LD-14'],

@@ -115,26 +115,6 @@ describe('the departure of a person, the revocations and the closing (integratio
       expect(left.left?.leftOn).toBe(h.day(-3));
       expect(await h.employeeLeftOn(person.employeeId)).toBe(h.day(-3));
     });
-
-    it('ends the review of the tools that waited for the new head: a person who has left is not asked about a tool any more', async () => {
-      const { person } = await leaver();
-      const wire = await h.recordedCase(person);
-      const placement = (await h.placements(person.employeeId))[0];
-      await h.ctx.sql.query(
-        `INSERT INTO transfer_reviews (id, organization_id, employee_id, placement_id, department_id, effective_on, due_on)
-         SELECT gen_random_uuid(), e.organization_id, e.id, p.id, p.department_id, $2::date, $3::date
-           FROM employees e JOIN employee_placements p ON p.id = $4 WHERE e.id = $1`,
-        [person.employeeId, h.day(-5), h.day(-1), placement.id],
-      );
-
-      await h.leaveOnLastDay(wire.id).expect(200);
-
-      const reviews = await h.ctx.sql.query(
-        `SELECT status::text AS status FROM transfer_reviews WHERE employee_id = $1`,
-        [person.employeeId],
-      );
-      expect(reviews.rows).toEqual([{ status: 'SUPERSEDED' }]);
-    });
   });
 
   describe('the revocations (AC-4, AC-5, AC-20)', () => {

@@ -4,9 +4,9 @@ import type { ApiAccount } from '../../support/api-accounts';
 import { PgRelay } from '../../support/pg-relay';
 import { dataStatements, QueryCounter, tablesOf } from '../../support/query-count';
 import type { Department, Person } from '../../support/request-harness';
-import { TransferReviewHarness } from '../../support/transfer-review-harness';
+import { SeatRevocationHarness } from '../../support/seat-revocation-harness';
 
-const h = new TransferReviewHarness();
+const h = new SeatRevocationHarness();
 
 interface Unit {
   department: Department;

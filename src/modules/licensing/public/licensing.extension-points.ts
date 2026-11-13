@@ -162,8 +162,8 @@ export interface SeatBaselineClosedEvent {
 }
 
 /**
- * The modules told of the closing of the seat baseline (the personnel module opens the review after the installation, decided by the
- * head of the department of each holder); a listener that throws rolls the closing back. With none, closing tells nobody.
+ * The modules told of the closing of the seat baseline; a listener that throws rolls the closing back. With none, closing tells nobody.
+ * No module listens now: the review after the setup that personnel opened here went with the review after a transfer (`QĐ-110p`).
  */
 @Injectable()
 export class SeatBaselineClosedListeners extends Listeners<SeatBaselineClosedEvent, DbTx> {

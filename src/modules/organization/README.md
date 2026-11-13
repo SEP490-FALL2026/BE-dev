@@ -53,8 +53,7 @@ operating-parameters, personnel, requests ([module-graph](../../../docs/generate
 
 - Mở ([public/organization.extension-points.ts](public/organization.extension-points.ts)), bên đăng ký `*.listener.ts`:
   - `OrganizationChangeListeners` (`organization.change-listeners`) — organization `department/held-notice-handover`;
-    budgets `proposal/budget-head-change`; personnel `transfer/transfer-effective`,
-    `transfer-review/transfer-review`; requests `reassignment/organization-change`.
+    budgets `proposal/budget-head-change`; personnel `transfer/transfer-effective`; requests `reassignment/organization-change`.
   - `DepartmentUseContributions` (`organization.department-use-readers`) — catalog
     `subscription/subscription-department-use`; licensing `provisioning/department-use/department-open-work`; personnel
     `event-notice/department-open-work`; requests `access-request/open-request/department-open-requests`.

@@ -92,7 +92,6 @@ import { PersonnelDashboardApi } from './public/personnel-dashboard.api';
 import { PersonnelDashboardFactsRepo } from './dashboard-facts/dashboard-facts.repo';
 import { TransferChangeWriter } from './transfer/transfer-change-writer.service';
 import { TransferChangeService } from './transfer/transfer-change.service';
-import { TransferClosureService } from './transfer/transfer-closure.service';
 import { TransferEffectiveListener } from './transfer/transfer-effective.listener';
 import { TransferGuardService } from './transfer/transfer-guard.service';
 import { TransferNoticeRecorder } from './notice/transfer-notice.listener';
@@ -104,19 +103,6 @@ import { TransferPreconditions } from './transfer/transfer-preconditions.service
 import { TransferRecorder } from './transfer/transfer-recorder.service';
 import { TransferService } from './transfer/transfer.service';
 import { TransfersController } from './transfer/transfers.controller';
-import { TransferReviewDecisionService } from './transfer-review/transfer-review-decision.service';
-import { PostSetupReviewListener } from './transfer-review/post-setup-review.listener';
-import { PostSetupReviewService } from './transfer-review/post-setup-review.service';
-import { TransferReviewListRepo } from './transfer-review/transfer-review-list.repo';
-import { TransferReviewListener } from './transfer-review/transfer-review.listener';
-import { TransferReviewOverdueService } from './transfer-review/transfer-review-overdue.service';
-import { TransferReviewOutcomeListener } from './transfer-review/transfer-review-outcome.listener';
-import { TransferReviewReplacementService } from './transfer-review/transfer-review-replacement.service';
-import { TransferReviewRepo } from './transfer-review/transfer-review.repo';
-import { TransferReviewService } from './transfer-review/transfer-review.service';
-import { TransferReviewSweeper } from './transfer-review/transfer-review.job';
-import { TransferReviewViewService } from './transfer-review/transfer-review-view.service';
-import { TransferReviewsController } from './transfer-review/transfer-reviews.controller';
 
 /**
  * What happens to the place of a person in the organization (ADR-0017): the transfer to another department or job title
@@ -156,7 +142,6 @@ import { TransferReviewsController } from './transfer-review/transfer-reviews.co
   ],
   controllers: [
     TransfersController,
-    TransferReviewsController,
     LongLeavesController,
     OffboardingController,
     OffboardingStepsController,
@@ -199,21 +184,8 @@ import { TransferReviewsController } from './transfer-review/transfer-reviews.co
     TransferService,
     TransferChangeWriter,
     TransferChangeService,
-    TransferClosureService,
     TransferQueryService,
     PersonnelOverlapRepo,
-    TransferReviewRepo,
-    TransferReviewListRepo,
-    TransferReviewService,
-    TransferReviewListener,
-    TransferReviewReplacementService,
-    TransferReviewOutcomeListener,
-    PostSetupReviewService,
-    PostSetupReviewListener,
-    TransferReviewDecisionService,
-    TransferReviewViewService,
-    TransferReviewOverdueService,
-    TransferReviewSweeper,
     LeaveRepo,
     LeaveService,
     LeaveQueryService,

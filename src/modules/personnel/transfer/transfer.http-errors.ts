@@ -26,8 +26,6 @@ const STATUS: Readonly<Record<string, HttpStatus>> = {
   CONCURRENT_CHANGE: HttpStatus.CONFLICT,
   ALREADY_EFFECTIVE: HttpStatus.CONFLICT,
   ALREADY_CANCELLED: HttpStatus.CONFLICT,
-  ALREADY_CLOSED: HttpStatus.CONFLICT,
-  NOT_CLOSEABLE: HttpStatus.CONFLICT,
 };
 
 /**
@@ -62,8 +60,6 @@ const MESSAGES: Readonly<Record<string, string>> = {
   CONCURRENT_CHANGE: 'The person was changed by someone else meanwhile; read them again.',
   ALREADY_EFFECTIVE: 'The transfer has taken effect; only a new transfer can change it.',
   ALREADY_CANCELLED: 'The transfer was cancelled.',
-  ALREADY_CLOSED: 'The transfer was closed already.',
-  NOT_CLOSEABLE: 'The transfer cannot be closed yet.',
 };
 
 /**
@@ -144,6 +140,4 @@ export const TRANSFER_ERROR_EXAMPLES = {
   ),
   ALREADY_EFFECTIVE: example(new TransferRefusedError('ALREADY_EFFECTIVE')),
   ALREADY_CANCELLED: example(new TransferRefusedError('ALREADY_CANCELLED')),
-  ALREADY_CLOSED: example(new TransferRefusedError('ALREADY_CLOSED')),
-  NOT_CLOSEABLE: example(new TransferRefusedError('NOT_CLOSEABLE', { blockers: ['NOT_EFFECTIVE'] })),
 } as const;

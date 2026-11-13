@@ -43,11 +43,6 @@ const ROUTES: Array<[string, Call, readonly string[]]> = [
       request(server).post(`/api/v1/department-transfers/${ID}/cancellation`).send({ reason: 'No', groundsNote: NOTE }),
     WRITERS,
   ],
-  [
-    'POST /department-transfers/{id}/closure',
-    (server) => request(server).post(`/api/v1/department-transfers/${ID}/closure`).send({}),
-    ['IT_ADMIN'],
-  ],
 ];
 
 describe('department transfer routes (e2e, no database)', () => {
@@ -86,7 +81,7 @@ describe('department transfer routes (e2e, no database)', () => {
       }
     });
 
-    it('refuses the IT Admin on record, move, cancel and the list of moves, and lets it through to read and to close (F40, F12)', async () => {
+    it('refuses the IT Admin on record, move, cancel and the list of moves, and lets it through to read (F40, F12)', async () => {
       for (const [route, call, allowed] of ROUTES) {
         const response = await call(app.getHttpServer()).set('Authorization', bearer(principal(['IT_ADMIN'])));
         const refused = response.status === 403 && bodyOf(response).error.code === 'AUTHORIZATION.FORBIDDEN';

@@ -32,9 +32,6 @@ export interface LeaveInterval {
   endedOn: BusinessDate | null;
 }
 
-/** The code the wire names for the review of the tools the new head has not finished: it keeps the record of a transfer from being closed. */
-export const TRANSFER_REVIEW_OPEN = 'TRANSFER_REVIEW_OPEN';
-
 /**
  * The code the wire names, under the warnings of a departure, for the requests and grants of the person that are still open: how many
  * there are (`US-03-04` AC-24). It is a warning and never a blocker: nothing closes them by itself, and a case closes without them.
@@ -74,7 +71,7 @@ export const GROUNDS_TYPES = ['HR_DECISION', 'APPROVED_APPLICATION', 'WRITTEN_DI
 
 /**
  * A transfer of a person as the rules of wasted seats read it (`QĐ-90c`): it is _in overlap_ from the day it takes effect until it is
- * closed or cancelled. `closedAt` is set when the IT Admin closed it after the service accounts were settled (`US-03-08`).
+ * closed or cancelled. `closedAt` is set when the system closes it, once every right of the old department is taken back (`QĐ-110r`).
  */
 export interface TransferFact {
   employeeId: string;

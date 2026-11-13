@@ -27,14 +27,13 @@ import {
 } from './transfer.dto';
 import { TRANSFER_ERROR_EXAMPLES as EXAMPLES, toTransferApiException } from './transfer.http-errors';
 import { TransferChangeService } from './transfer-change.service';
-import { TransferClosureService } from './transfer-closure.service';
 import { TransferQueryService } from './transfer-query.service';
 import { TransferService } from './transfer.service';
 
 const FORBIDDEN = {
   status: HttpStatus.FORBIDDEN,
   description:
-    'Only the Super Admin records, moves or cancels a transfer, and reads it in full; the IT Admin reads a minimal projection and closes it (AUTHORIZATION.FORBIDDEN).',
+    'Only the Super Admin records, moves or cancels a transfer, and reads it in full; the IT Admin reads a minimal projection (AUTHORIZATION.FORBIDDEN).',
   examples: [FORBIDDEN_EXAMPLE],
 } as const;
 /** A write by the Super Admin is also refused about themselves: the controlled procedure records that event. */
@@ -68,9 +67,9 @@ const GROUNDS_REFUSALS =
 
 /**
  * Transfers of a person to another department with the day they take effect and the basis they rest on. The Super Admin records,
- * moves and cancels them (`QĐ-87a`); the IT Admin reads a minimal projection of the departments in their charge and closes the
- * record once it has taken effect and the review of the tools of the new head is done. Finance, a department head and an employee are refused. The role
- * is judged again by the service, so this guard is only the outer layer.
+ * moves and cancels them (`QĐ-87a`); the IT Admin reads a minimal projection of the departments in their charge. Nobody closes a
+ * transfer by hand: the system closes it once every right of the old department is taken back (`QĐ-110r`). Finance, a department head
+ * and an employee are refused. The role is judged again by the service, so this guard is only the outer layer.
  */
 @ApiTags('department-transfers')
 @Controller({ path: 'department-transfers', version: '1' })
@@ -79,7 +78,6 @@ export class TransfersController {
     private readonly transfers: TransferService,
     private readonly changes: TransferChangeService,
     private readonly query: TransferQueryService,
-    private readonly closures: TransferClosureService,
   ) {}
 
   @Post()
@@ -268,37 +266,6 @@ export class TransfersController {
       const record = await this.changes.cancel(userActor(actor), params.id, body);
 
       return await this.query.detailOf(record);
-    } catch (error) {
-      throw toTransferApiException(error);
-    }
-  }
-
-  @Post(':id/closure')
-  @RequireRoles('IT_ADMIN')
-  @ApiOperation({ operationId: 'departmentTransferClose', summary: 'Close a transfer that has taken effect' })
-  @ApiSuccessResponse(TransferDetailResponseDto, {
-    message: 'DEPARTMENT_TRANSFER.CLOSED',
-    description:
-      'The transfer is closed: it has taken effect and the review of the tools of the new head is done. Recording a transfer and its taking effect never wait for this; only the closing does.',
-  })
-  @ApiErrorResponses(
-    ...COMMON,
-    NOT_FOUND,
-    {
-      status: HttpStatus.CONFLICT,
-      description:
-        'The transfer cannot be closed yet (DEPARTMENT_TRANSFER.NOT_CLOSEABLE: details.blockers lists NOT_EFFECTIVE while it waits, or TRANSFER_REVIEW_OPEN while the review of the tools of the new head is open), or it was closed already (ALREADY_CLOSED) or cancelled (ALREADY_CANCELLED). Nothing changes.',
-      examples: [EXAMPLES.NOT_CLOSEABLE, EXAMPLES.ALREADY_CLOSED, EXAMPLES.ALREADY_CANCELLED],
-    },
-    {
-      status: HttpStatus.UNPROCESSABLE_ENTITY,
-      description: 'The id is not valid (VALIDATION_ERROR).',
-      examples: [VALIDATION_EXAMPLE],
-    },
-  )
-  async close(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Param() params: TransferIdParamDto) {
-    try {
-      return await this.query.detailOf(await this.closures.close(actor, params.id));
     } catch (error) {
       throw toTransferApiException(error);
     }

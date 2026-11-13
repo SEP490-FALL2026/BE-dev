@@ -259,34 +259,6 @@ export class PersonnelNotifier {
     });
   }
 
-  /**
-   * The head of the department the person came to is told the deadline of the review of their tools. A department with no head yet
-   * keeps the notice for the first head (`QĐ-62c`); a reminder of a late review is a second notice with its own key.
-   */
-  async reviewDue(
-    tx: DbTx,
-    input: Common & { reviewId: string; dueOn: BusinessDate; headEmployeeId: string | null; reminder?: boolean },
-  ): Promise<void> {
-    const parameters = {
-      subject: { type: 'TRANSFER_REVIEW', id: input.reviewId },
-      params: { employeeId: input.employeeId, departmentId: input.departmentId, dueOn: input.dueOn },
-      eventKey: `TRANSFER_REVIEW_DUE:${input.reviewId}${input.reminder ? ':overdue' : ''}`,
-    };
-    if (input.headEmployeeId) {
-      await this.tell(tx, input.organizationId, input.headEmployeeId, 'TRANSFER_REVIEW_DUE', parameters);
-
-      return;
-    }
-    if (input.departmentId) {
-      await this.notifications.holdForDepartment(tx, {
-        organizationId: input.organizationId,
-        departmentId: input.departmentId,
-        code: 'TRANSFER_REVIEW_DUE',
-        ...parameters,
-      });
-    }
-  }
-
   /** The IT Admin of the departure and the Super Admin, a person who is both once and never the person who left; true when a notice was written. */
   private async toItAdminAndSuperAdmin(
     tx: DbTx,

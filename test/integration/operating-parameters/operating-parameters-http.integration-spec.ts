@@ -110,7 +110,8 @@ describe('the operating parameters and the non-working dates over HTTP (integrat
       expect(parameters.get('SPEND_SUBMISSION_WAIT_WORKING_DAYS')?.value).toBe(2);
       expect(parameters.has('BUDGET_PERIOD_KIND')).toBe(false);
       expect([...parameters.keys()].filter((key) => /HIGH_VALUE/.test(key))).toEqual([]);
-      expect(parameters.get('TRANSFER_REVIEW_WORKING_DAYS')?.value).toBe(5);
+      // The review of the new head after a transfer is gone with its parameter (QĐ-110p); the grace takes its place.
+      expect(parameters.has('TRANSFER_REVIEW_WORKING_DAYS')).toBe(false);
       expect(parameters.get('PERSONNEL_NOTICE_REVIEW_WORKING_DAYS')?.value).toBe(2);
       expect(parameters.get('SAAS_ISSUE_RESPONSE_WORKING_DAYS')?.value).toBe(1);
       expect(parameters.get('SAAS_ISSUE_REOPEN_WORKING_DAYS')?.value).toBe(5);
@@ -143,7 +144,6 @@ describe('the operating parameters and the non-working dates over HTTP (integrat
         'BUDGET_RESERVE_DEFAULT_PERCENT',
         'BUDGET_ZBB_KPI3_BELOW_PERCENT',
         'BUDGET_ZBB_PRICE_INCREASE_PERCENT',
-        'TRANSFER_REVIEW_WORKING_DAYS',
         'PERSONNEL_NOTICE_REVIEW_WORKING_DAYS',
         'DEPARTURE_REVOCATION_WORKING_DAYS',
         'TRANSFER_GRACE_WORKING_DAYS',
@@ -184,8 +184,8 @@ describe('the operating parameters and the non-working dates over HTTP (integrat
         unit: 'working days',
         unitLabel: 'ngày làm việc',
       });
-      expect(byKey.get('TRANSFER_REVIEW_WORKING_DAYS')).toMatchObject({
-        label: 'Hạn rà soát quyền sau điều chuyển',
+      expect(byKey.get('TRANSFER_GRACE_WORKING_DAYS')).toMatchObject({
+        label: 'Thời gian ân hạn quyền cũ sau điều chuyển',
         group: 'PERSONNEL',
         groupLabel: 'Nhân sự và bàn giao',
       });
@@ -238,16 +238,16 @@ describe('the operating parameters and the non-working dates over HTTP (integrat
       await setParameter('APPROVAL_SLA_WORKING_DAYS', 2).expect(200);
     });
 
-    it('changes the hand-over review deadline from 5 to 3 working days, and records 5 → 3 (AC-12)', async () => {
-      const response = await setParameter('TRANSFER_REVIEW_WORKING_DAYS', 3).expect(200);
+    it('changes the deadline to answer a SaaS issue again from 5 to 3 working days, and records 5 → 3 (AC-12)', async () => {
+      const response = await setParameter('SAAS_ISSUE_REOPEN_WORKING_DAYS', 3).expect(200);
 
       expect((response.body as { message: string }).message).toBe('PARAMETER.SET');
       expect((response.body as { data: ParameterWire }).data).toMatchObject({ value: 3, default: 5, isDefault: false });
-      expect(await auditFor('TRANSFER_REVIEW_WORKING_DAYS')).toEqual([
+      expect(await auditFor('SAAS_ISSUE_REOPEN_WORKING_DAYS')).toEqual([
         { action: 'PARAMETER.CHANGED', before: { value: 5 }, after: { value: 3 } },
       ]);
       // What is created after the change reads the new value; the service other modules call is the same one.
-      await expect(ctx.app.get(OperatingParametersApi).getValue('TRANSFER_REVIEW_WORKING_DAYS')).resolves.toBe(3);
+      await expect(ctx.app.get(OperatingParametersApi).getValue('SAAS_ISSUE_REOPEN_WORKING_DAYS')).resolves.toBe(3);
     });
 
     it('keeps the history, newest first, and closes the value it replaces', async () => {
@@ -424,8 +424,9 @@ describe('the operating parameters and the non-working dates over HTTP (integrat
       expect(parameters.has('BUDGET_PERIOD_KIND')).toBe(false);
       // 27 before GH-1/2/3 and the renewal window (REQUEST_OPEN_NEW_LIMIT, PAID_SOFTWARE_FLAG_THRESHOLD, RENEWAL_WINDOW_DAYS), then the
       // three of MF-2 and MF-3 (DEPARTURE_REVOCATION_WORKING_DAYS, TRANSFER_GRACE_WORKING_DAYS, TRANSFER_GRACE_REMINDER_WORKING_DAYS), less the
-      // two of the handover that went (ABRUPT_DEPARTURE_HOLD_WORKING_DAYS, HANDOVER_SHORT_DEADLINE_WORKING_DAYS, QĐ-110g).
-      expect(parameters.size).toBe(31);
+      // two of the handover that went (ABRUPT_DEPARTURE_HOLD_WORKING_DAYS, HANDOVER_SHORT_DEADLINE_WORKING_DAYS, QĐ-110g) and the deadline of the
+      // review of the new head after a transfer (TRANSFER_REVIEW_WORKING_DAYS, QĐ-110p).
+      expect(parameters.size).toBe(30);
     });
 
     it('is 404 for a parameter that does not exist, the time zone included (AC-11)', async () => {

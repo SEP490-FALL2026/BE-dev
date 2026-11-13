@@ -86,6 +86,7 @@ export const IN_APP_NOTIFICATION_CODES = [
   'PERSONNEL_NOTICE_OVERDUE',
   'ABRUPT_DEPARTURE_RECORDED',
   'ROLE_HOLDER_LEAVING',
+  // Read only (`QĐ-110p`): nothing writes it since the new head reviews nothing after a transfer; a notice already in an inbox still reads.
   'TRANSFER_REVIEW_DUE',
   'IT_ADMIN_SELF_EXECUTED',
   // The budget loops (`US-12-15` AC-24): ids, years and the reason the people concerned already read; no figure.
