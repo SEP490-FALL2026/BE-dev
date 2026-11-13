@@ -183,7 +183,8 @@ export class PlanService {
           sharingPolicy: input.sharingPolicy === undefined ? current.sharingPolicy : input.sharingPolicy,
           // The flag belongs to a K4 plan: a plan that stops being one loses it (the row says so too), and one that is not K4 cannot be given it.
           hasAdminConsole:
-            input.hasAdminConsole ?? (input.provisioningType === undefined ? current.hasAdminConsole : false),
+            input.hasAdminConsole ??
+            ((input.provisioningType ?? current.provisioningType) === 'K4' ? current.hasAdminConsole : false),
         };
         assertPlanShape({ ...next, applicationKind: current.applicationKind });
         assertAdminConsoleApplicable(next.provisioningType, input.hasAdminConsole);

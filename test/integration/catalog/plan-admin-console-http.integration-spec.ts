@@ -77,6 +77,15 @@ describe('the flag "has an admin console" of a plan (integration, real PostgreSQ
     );
   });
 
+  it('keeps the flag when a change sends the same kind K4 again without the flag (audit C-1)', async () => {
+    const created = h.dataOf<PlanWire>(await declare(body(licensed, 'K4', { hasAdminConsole: true })).expect(201));
+
+    const resent = h.dataOf<PlanWire>(await patch(created.id, { provisioningType: 'K4' }).expect(200));
+
+    expect(resent.hasAdminConsole).toBe(true);
+    expect((await read(created.id)).hasAdminConsole).toBe(true);
+  });
+
   it.each(['K1', 'K2'])(
     'refuses a %s plan that gives the flag, true or false, with 422 and writes nothing',
     async (type) => {
