@@ -1,5 +1,5 @@
 import type { AssignmentRecord } from '../public/licensing.types';
-import { effectiveFromLabel, toAssignmentView, usableDayOf } from './assignment.policy';
+import { effectiveFromLabel, replacedByGrant, toAssignmentView, usableDayOf } from './assignment.policy';
 
 const bot: AssignmentRecord = {
   id: 'a1',
@@ -73,5 +73,52 @@ describe('usableDayOf — M5-01 (FR-4.9 gate 4, QĐ-77n)', () => {
     expect(
       usableDayOf('2026-06-01', [{ status: 'COMPLETED', completedAt: new Date('2026-05-20T03:00:00Z') }], day),
     ).toBe('2026-06-01');
+  });
+});
+
+describe('the right a grant replaces on the same subscription (R-49, QĐ-110q)', () => {
+  const old: AssignmentRecord = { ...bot, id: 'old', kind: 'PERSONAL', employeeId: 'e1', effectiveFrom: '2026-10-01' };
+  const grant = (over: Partial<Parameters<typeof replacedByGrant>[1]> = {}) => ({
+    employeeId: 'e1',
+    target: { planId: 'p1', subscriptionId: 's1' },
+    today: '2026-11-18',
+    revocationUnderWay: false,
+    ...over,
+  });
+
+  it('is ended by the grant of the same person on the same subscription, the day of the grant', () => {
+    expect(replacedByGrant(old, grant())).toBe(true);
+  });
+
+  it('is the same seat target for an internal plan with no subscription: the plan is the target', () => {
+    expect(
+      replacedByGrant({ ...old, subscriptionId: null }, grant({ target: { planId: 'p1', subscriptionId: null } })),
+    ).toBe(true);
+    expect(
+      replacedByGrant({ ...old, subscriptionId: null }, grant({ target: { planId: 'p2', subscriptionId: null } })),
+    ).toBe(false);
+  });
+
+  it.each([
+    [
+      'another subscription of the plan (no overlap to settle: the grace ends it)',
+      { target: { planId: 'p1', subscriptionId: 's2' } },
+    ],
+    ['another person', { employeeId: 'e9' }],
+    ['a revocation under way: it takes the right away itself', { revocationUnderWay: true }],
+  ])('is not touched for %s', (_name, over) => {
+    expect(replacedByGrant(old, grant(over))).toBe(false);
+  });
+
+  it.each([
+    ['a service account', { kind: 'SERVICE' as const }],
+    ['a seat used for a machine account', { isMachineAccount: true }],
+    ['a right that ended', { validUntil: '2026-11-17' }],
+    ['a grant that failed', { failedAt: new Date('2026-10-02T00:00:00.000Z') }],
+    ['a grant that was cancelled', { cancelledAt: new Date('2026-10-02T00:00:00.000Z') }],
+    ['a right that begins the day of the grant: it would end the day it begins', { effectiveFrom: '2026-11-18' }],
+    ['a right that begins after the day of the grant', { effectiveFrom: '2026-11-19' }],
+  ])('is not touched when it is %s', (_name, over) => {
+    expect(replacedByGrant({ ...old, ...over }, grant())).toBe(false);
   });
 });

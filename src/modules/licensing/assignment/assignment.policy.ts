@@ -50,3 +50,43 @@ export function usableDayOf(
 
   return done !== undefined && done > validFrom ? done : validFrom;
 }
+
+/**
+ * Whether the grant of a request ends the right the request replaces the day it is given (R-49, `QĐ-110q`, SPEC MF3-C.4): a person in the grace of a transfer
+ * asked again for software they hold, and the grant lands on the same seat target (the same subscription, or the same plan when it has none), where the
+ * database would refuse two personal rights of one person at once (`INV-02`). The old right is the person's own personal seat, still open, begun before
+ * the day of the grant (it would otherwise end the day it begins), not used for a machine account, and nobody is taking it away already. A grant on
+ * another subscription ends nothing: the grace does, as it does for every other right.
+ */
+export function replacedByGrant(
+  old: Pick<
+    AssignmentRecord,
+    | 'kind'
+    | 'employeeId'
+    | 'planId'
+    | 'subscriptionId'
+    | 'effectiveFrom'
+    | 'validUntil'
+    | 'failedAt'
+    | 'cancelledAt'
+    | 'isMachineAccount'
+  >,
+  grant: {
+    employeeId: string;
+    target: { planId: string; subscriptionId: string | null };
+    today: BusinessDate;
+    revocationUnderWay: boolean;
+  },
+): boolean {
+  const open = old.validUntil === null && old.failedAt === null && old.cancelledAt === null;
+
+  return (
+    old.kind === 'PERSONAL' &&
+    !old.isMachineAccount &&
+    old.employeeId === grant.employeeId &&
+    open &&
+    old.effectiveFrom < grant.today &&
+    !grant.revocationUnderWay &&
+    (old.subscriptionId ?? old.planId) === (grant.target.subscriptionId ?? grant.target.planId)
+  );
+}

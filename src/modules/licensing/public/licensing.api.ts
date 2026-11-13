@@ -99,6 +99,14 @@ export class LicensingApi {
   }
 
   /**
+   * Which of these rights a later right replaced (R-49): the ones the grant of a request ended the day it gave the person the same software again on
+   * the same subscription, and so the grace of a transfer does not take back. One statement.
+   */
+  listRegrantedAssignments(assignmentIds: readonly string[], tx?: DbTx): Promise<Set<string>> {
+    return this.assignments.regrantedAmong(assignmentIds, tx);
+  }
+
+  /**
    * The software a person holds on `onDate` (personal seats begun, not failed, not cancelled, not ended), oldest first, with how many
    * there are in all: what a department head reads of a member. The page and the count share a snapshot, and the number of
    * statements does not grow with the page.

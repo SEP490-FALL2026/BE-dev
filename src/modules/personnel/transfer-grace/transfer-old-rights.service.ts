@@ -33,6 +33,11 @@ export class TransferOldRightsService {
     const base: SnapshotRight[] =
       input.snapshot?.rights ?? (input.closed ? [] : heldOnOrBefore(seats, input.effectiveOn).map(snapshotRightOf));
     const held = new Map(seats.map((seat) => [seat.assignmentId, seat]));
+    // A right the person asked for again in the grace and was given on the same subscription was ended by that grant (R-49): it is not taken back.
+    const regranted = await this.licensing.listRegrantedAssignments(
+      base.map((right) => right.assignmentId),
+      tx,
+    );
 
     return base.slice(0, OLD_RIGHTS_MAX).map((right) => {
       const seat = held.get(right.assignmentId);
@@ -44,7 +49,7 @@ export class TransferOldRightsService {
         provisioningType: right.provisioningType,
         state: seat === undefined ? 'ENDED' : seat.revocation === null ? 'HELD' : 'REVOKING',
         revocation: seat?.revocation ? { taskId: seat.revocation.taskId, status: seat.revocation.status } : null,
-        regranted: false,
+        regranted: regranted.has(right.assignmentId),
       };
     });
   }

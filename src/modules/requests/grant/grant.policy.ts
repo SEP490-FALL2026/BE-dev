@@ -29,6 +29,8 @@ export function grantAnswerFor(
     departmentId: string;
     costCenterId: string | null;
     serviceAccount: ServiceAccountRecord | null;
+    /** The right of the person this request replaces (R-49); only a request of one person sent in the grace of a transfer has one. */
+    replacesAssignmentId?: string | null;
     lines?: readonly { employeeId: string; state: LineState; expectedEndDate: string | null }[];
   },
   employeeId?: string,
@@ -53,6 +55,7 @@ export function grantAnswerFor(
           // A right ends only when the request names the day (`QĐ-104a`); a request made before that, with a term in months, keeps ending
           // with its term unless it is free internal software.
           termBound: expectedEndDate !== null || ((request.termMonths ?? 0) > 0 && request.branch !== 'INTERNAL_FREE'),
+          replacesAssignmentId: request.replacesAssignmentId ?? null,
         };
       }
       if (serviceAccount.boundaryState !== 'ACCEPTED') return { status: 'BOUNDARY_NOT_CHECKED' };

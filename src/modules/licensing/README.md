@@ -102,7 +102,8 @@ dịch vụ nào đọc cả ghế lẫn thu hồi thì đứng trên cả hai (
 - `provisioning/` — task grant và thu hồi; `revocation.service.ts` (mở thu hồi) với `RevocationTaskFactory`,
   `RevocationRecorder`, `revocation-open.policy.ts`; `provisioning.policy.ts`. Con: `tasks/`
   (`provisioning-tasks.controller.ts`; grant: `ProvisioningGrantService` → `ProvisioningGrantPlanner` (xét trước khóa) +
-  `ProvisioningGrantWriter` (ghi trong transaction), `provisioning-grant.policy.ts`; `ProvisioningService` giữ danh sách,
+  `ProvisioningGrantWriter` (ghi trong transaction; Request xin lại trong ân hạn điều chuyển có `replacesAssignmentId` ⟹ `AssignmentService.endReplacedByGrant` kết thúc quyền cũ cùng thuê bao
+  `valid_until` = ngày cấp trước khi chèn quyền mới, R-49; cấp hỏng/hủy ⟹ `giveBackReplaced` mở lại; `LicensingApi.listRegrantedAssignments`), `provisioning-grant.policy.ts`; `ProvisioningService` giữ danh sách,
   claim, hoàn tất, báo lỗi; `ProvisioningDecisionService`), `revocation-completion/`
   (`revocation-tasks.controller.ts`), `grant-cancellation/`, `open-grants/`, `department-use/`, `k1-checklist/` (checklist thu hồi `K1`,
   `QĐ-111az`: biến thể `DEPARTURE` 6 mục / `STILL_EMPLOYED` 2 mục suy từ các lý do còn đứng, kiểm đủ tick + bằng chứng + `doneAt` không giảm theo

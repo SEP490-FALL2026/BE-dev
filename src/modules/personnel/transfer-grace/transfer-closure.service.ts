@@ -107,8 +107,8 @@ export class TransferClosureService {
       ids,
       tx,
     );
-    // The rights asked for again on the same subscription and granted in the grace are added by R-49 (MF3-C.4): none are known before it.
-    const regranted: ReadonlySet<string> = new Set<string>();
+    // The rights the person asked for again on the same subscription and was given in the grace: the grant ended them (R-49).
+    const regranted = await this.licensing.listRegrantedAssignments(ids, tx);
 
     return {
       takenOn: how.today,

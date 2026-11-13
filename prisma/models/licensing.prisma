@@ -50,6 +50,8 @@ model LicenseAssignment {
   // Set once when the grant it was made for was cancelled because the request was withdrawn: the period is empty as well.
   cancelledAt                 DateTime?           @map("cancelled_at") @db.Timestamptz(3)
   predecessorId               String?             @map("predecessor_id") @db.Uuid
+  // The older right of the same person that the grant of this one ended the day it was given (R-49, MF3-C.4): the request asked again in the grace of a transfer.
+  replacesAssignmentId        String?             @map("replaces_assignment_id") @db.Uuid
   baselineImportId            String?             @map("baseline_import_id") @db.Uuid
   // A personal seat of an IT Admin that is used for a machine account (QĐ-110m, R-9): INV-02 leaves it out, so the IT Admin keeps their own
   // personal seat of the same subscription as well. `machineAccountNote` is the reason and is present exactly when the flag is on.
@@ -67,6 +69,8 @@ model LicenseAssignment {
   owningDepartment    Department?                       @relation("AssignmentOwningDepartment", fields: [owningDepartmentId], references: [id], onDelete: Restrict)
   predecessor         LicenseAssignment?                @relation("AssignmentChain", fields: [predecessorId], references: [id], onDelete: Restrict)
   successors          LicenseAssignment[]               @relation("AssignmentChain")
+  replaces            LicenseAssignment?                @relation("AssignmentReplaced", fields: [replacesAssignmentId], references: [id], onDelete: Restrict)
+  replacedBy          LicenseAssignment[]               @relation("AssignmentReplaced")
   baselineImport      SeatBaselineImport?               @relation(fields: [baselineImportId], references: [id], onDelete: Restrict)
   provisioningTasks   ProvisioningTask[]
   poolGrantAvoidedCosts PoolGrantAvoidedCost[]
@@ -86,6 +90,7 @@ model LicenseAssignment {
   @@index([subscriptionId])
   @@index([planId])
   @@index([employeeId])
+  @@index([replacesAssignmentId])
   @@index([baselineImportId])
   @@index([owningDepartmentId])
   @@map("license_assignments")

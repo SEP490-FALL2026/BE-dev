@@ -60,6 +60,8 @@ export class ProvisioningGrantWriter {
     const subscriptionId = await this.subscriptionOf(tx, plan, input.subscriptionId, today);
     await this.requireGrantable(tx, plan, input.subscriptionId, today);
     const target = await this.lockTarget(tx, plan, subscriptionId);
+    // R-49: the right the request replaces ends the day of the grant, before the seats are counted and the new right is written.
+    const replaced = await this.endReplacedRight(tx, actor, claimed, target, input.requestId, today, organization.id);
     // Judged under the locks of the grant, so the count of the free seats cannot change before the seat is written (`BR-MF1-09a`).
     const { decision: purchase, stock } = await this.sharedPool.judgePurchase(tx, {
       planId: plan.planId,
@@ -77,6 +79,7 @@ export class ProvisioningGrantWriter {
       holder,
       effectiveFrom: today,
       expectedEndDate: this.endOfSeat(claimed, today),
+      replacesAssignmentId: replaced,
     });
 
     const bought = grantPurchaseOf(plan.provisioningType, purchase, new Date());
@@ -106,6 +109,34 @@ export class ProvisioningGrantWriter {
     if (holder.selfExecuted === true) await this.frame.tellSuperAdmin(tx, organization.id, task.id, actor.employeeId);
 
     return task;
+  }
+
+  /**
+   * Ends the right a request of a person in the grace of a transfer replaces, when the grant lands on the same seat target (R-49, `QĐ-110q`): the old
+   * right ends the day of the grant, in this transaction, before the new one is written, so the database never sees two personal rights of one person at
+   * once and the seat is counted once. Nothing is done at the vendor and no task of revocation is made. A right a task of revocation is working is left to
+   * that task. Returns the right it ended, or null.
+   */
+  private async endReplacedRight(
+    tx: DbTx,
+    actor: AuthenticatedPrincipal,
+    claimed: Extract<GrantRequestAnswer, { status: 'GRANTABLE' }>,
+    target: SeatTarget,
+    requestId: string,
+    today: string,
+    organizationId: string,
+  ): Promise<string | null> {
+    if (claimed.seat !== 'PERSONAL' || !claimed.replacesAssignmentId) return null;
+
+    return this.assignments.endReplacedByGrant(tx, actor, {
+      organizationId,
+      requestId,
+      employeeId: claimed.employeeId,
+      replacesAssignmentId: claimed.replacesAssignmentId,
+      target,
+      today,
+      revocationUnderWay: await this.repo.hasLiveRevocation(tx, claimed.replacesAssignmentId),
+    });
   }
 
   /**

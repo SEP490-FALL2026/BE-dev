@@ -95,6 +95,8 @@ anh em `event-notice` để báo, nên `event-notice` không được import l�
   `TransferRevocationService.sweep` ngày sau `grace_ends_on` mở `LicensingApi.openRevocation` nguồn `TRANSFER` (actor `SystemActor`, `referenceKind DEPARTMENT_TRANSFER`, `referenceId` = điều chuyển) cho
   mọi quyền cá nhân giữ từ ngày hiệu lực trở về trước còn hiệu lực và có tác vụ thu hồi (`rightsToTakeBack` trong `transfer-sweep.policy.ts`: K3 không có thu hồi nên không tính), giao IT phụ trách
   phòng mới. Idempotent bằng chính cổng `openRevocation`; mỗi điều chuyển một transaction khóa nhân viên rồi điều chuyển.
+  **Cấp lại trong ân hạn (MF3-C.3/C.4, R-49)**: `TransferGraceHoldListener` bind `TransferGraceHoldContributions` của `requests` (quyền đang giữ ∈ `snapshot_before`, `isOldRightOf`); lúc cấp trên cùng thuê bao `licensing` kết thúc quyền cũ
+  (`valid_until` = ngày cấp), nên `rightsToTakeBack` không thấy nó, `oldRights[].regranted` và kết cục `REGRANTED` đọc `LicensingApi.listRegrantedAssignments`.
   **Đóng điều chuyển (MF3-C.2, `QĐ-110r`)** `TransferClosureService.closeIfDue`: hết ân hạn và không còn quyền cũ cần thu hồi (`closureDue`) ⟹ hệ thống đóng (`closed_by_system`, không tài khoản,
   `snapshot_after` = kết cục từng quyền `REVOKED`/`ENDED`/`REGRANTED`/`TAKEN_OVER` qua `rightOutcome`), gồm cả điều chuyển người không giữ quyền nào và điều chuyển m-17; được hỏi ngay khi một tác vụ thu hồi
   của người đó hoàn tất (`TransferClosureListener` bind `RevocationListeners` `AFTER_WORK`, khóa `SKIP LOCKED`) và ở cuối mỗi lượt quét giờ. `supersede`: ghi nghỉ việc trong ân hạn (hook

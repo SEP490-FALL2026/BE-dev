@@ -345,6 +345,15 @@ export class ProvisioningTaskRepo {
     return this.find(locked[0].id, tx);
   }
 
+  /** Whether a task of revocation is working the assignment (not closed as failed, not cancelled), read without a lock. */
+  async hasLiveRevocation(tx: DbTx, assignmentId: string): Promise<boolean> {
+    const live = await tx.provisioningTask.count({
+      where: { assignmentId, kind: 'REVOKE', status: { notIn: ['CLOSED_FAILED', 'CANCELLED'] } },
+    });
+
+    return live > 0;
+  }
+
   /** What the reasons that stand ask of a revocation now: the day not before and the due day, as the policy reads them from the reasons. */
   async markTiming(
     tx: DbTx,

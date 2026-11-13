@@ -194,6 +194,11 @@ export type GrantRequestAnswer =
        * end by term (`qd96-100-approved-end-date`, `Q-03` a1).
        */
       termBound: boolean;
+      /**
+       * The right of the person the request replaces (R-49): a request sent in the grace of a transfer for software they hold. The grant ends it the day it
+       * is given when it lands on the same subscription. Absent for every other request.
+       */
+      replacesAssignmentId?: string | null;
     }
   | {
       status: 'GRANTABLE';

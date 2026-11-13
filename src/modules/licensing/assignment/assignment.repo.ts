@@ -84,6 +84,8 @@ export interface NewAssignment {
   expectedEndDate: BusinessDate | null;
   predecessorId: string | null;
   baselineImportId: string | null;
+  /** The older right of the same person that the grant of this one ended the day it was given (R-49); absent for every other right. */
+  replacesAssignmentId?: string | null;
   /** A record that follows a flagged seat keeps its flag and its reason (`R-9`); every other record is written plain. */
   isMachineAccount: boolean;
   machineAccountNote: string | null;
@@ -117,6 +119,7 @@ export class AssignmentRepo {
         expectedEndDate: input.expectedEndDate ? toDateColumn(input.expectedEndDate) : null,
         predecessorId: input.predecessorId,
         baselineImportId: input.baselineImportId,
+        replacesAssignmentId: input.replacesAssignmentId ?? null,
         isMachineAccount: input.isMachineAccount,
         machineAccountNote: input.machineAccountNote,
         createdByAppUserId: input.createdByAppUserId,
@@ -252,6 +255,34 @@ export class AssignmentRepo {
   /** The assignments of the subscription that have not ended and have not failed as of `day` (a future start included). */
   async countHolding(subscriptionId: string, day: BusinessDate, tx?: DbTx): Promise<number> {
     return (tx ?? this.prisma).licenseAssignment.count({ where: { subscriptionId, ...HOLDING(day) } });
+  }
+
+  /**
+   * Gives back the right a grant ended (R-49) when that grant did not come to be: the right the assignment replaced, if it still ends on the day the
+   * assignment began, is open again. Returns its id, or null when there was none or it ended some other way since. The new assignment has failed or
+   * been cancelled before this runs, so its period is empty and the two never overlap.
+   */
+  async reopenReplacedBy(tx: DbTx, newAssignmentId: string): Promise<string | null> {
+    const rows = await tx.$queryRaw<{ id: string }[]>`
+      UPDATE license_assignments AS old SET valid_until = NULL
+        FROM license_assignments AS replacement
+       WHERE replacement.id = ${newAssignmentId}::uuid AND old.id = replacement.replaces_assignment_id
+         AND old.valid_until = replacement.valid_from AND old.failed_at IS NULL AND old.cancelled_at IS NULL
+      RETURNING old.id`;
+
+    return rows[0]?.id ?? null;
+  }
+
+  /** Which of these rights a later right replaced (R-49): the ones the grant of a request ended the day it gave the new one. One statement. */
+  async replacedAmong(ids: readonly string[], tx?: DbTx): Promise<Set<string>> {
+    if (ids.length === 0) return new Set();
+    const rows = await (tx ?? this.prisma).licenseAssignment.findMany({
+      // A grant that failed or was cancelled gave the old right back (`reopenReplacedBy`): it replaced nothing.
+      where: { replacesAssignmentId: { in: [...ids] }, failedAt: null, cancelledAt: null },
+      select: { replacesAssignmentId: true },
+    });
+
+    return new Set(rows.flatMap((row) => (row.replacesAssignmentId === null ? [] : [row.replacesAssignmentId])));
   }
 
   /** How many seats each of these purchases has held as of `day` (`HOLDING`: a future start and a service account included), one statement. */
