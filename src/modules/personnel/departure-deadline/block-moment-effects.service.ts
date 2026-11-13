@@ -74,6 +74,7 @@ export class BlockMomentEffects {
       blockedOn: moment.blockedOn,
       revocationDueOn: moment.revocationDueOn,
       markLeft: superAdminToMarkLeft(departure.state),
+      accountLocked: departure.accountLocked,
     });
   }
 }

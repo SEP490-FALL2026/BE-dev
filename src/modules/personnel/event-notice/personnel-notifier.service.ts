@@ -189,11 +189,18 @@ export class PersonnelNotifier {
    * The access of a person who is leaving is blocked from today (`QĐ-110b`, `QĐ-110d`, R-1): the system has ended the machines and closed the
    * open requests. The Super Admin is asked to mark the person as left (only while `markLeft`, a person already marked has nothing to mark),
    * and the IT Admin to **block** the company account (item 1a of `BM-08`: reset the password of the mailbox and sign out every session; the
-   * mailbox itself is not locked yet) and to open the revocation by `revocationDueOn`. One notice for each audience, once for the case.
+   * mailbox itself is not locked yet) and to open the revocation by `revocationDueOn`. One notice for each audience, once for the case. The IT
+   * Admin is not asked to block an account they already blocked (`accountLocked`: a case that was already blocked when this release started).
    */
   async departureAccessBlocked(
     tx: DbTx,
-    input: Common & { caseId: string; blockedOn: BusinessDate; revocationDueOn: BusinessDate; markLeft: boolean },
+    input: Common & {
+      caseId: string;
+      blockedOn: BusinessDate;
+      revocationDueOn: BusinessDate;
+      markLeft: boolean;
+      accountLocked: boolean;
+    },
   ): Promise<void> {
     const notice = (audience: 'SUPER_ADMIN' | 'IT_ADMIN'): NoticeParts => ({
       subject: { type: 'OFFBOARDING_CASE', id: input.caseId },
@@ -208,7 +215,14 @@ export class PersonnelNotifier {
       eventKey: `DEPARTURE_ACCESS_BLOCKED:${input.caseId}:${audience}`,
     });
     if (input.markLeft)
-      await this.toSuperAdmin(tx, input.organizationId, 'DEPARTURE_ACCESS_BLOCKED', notice('SUPER_ADMIN'));
+      await this.toSuperAdmin(
+        tx,
+        input.organizationId,
+        'DEPARTURE_ACCESS_BLOCKED',
+        notice('SUPER_ADMIN'),
+        input.employeeId,
+      );
+    if (input.accountLocked) return;
     const itAdmin = await this.itAdminOfDeparture(tx, input);
     if (itAdmin) await this.tell(tx, input.organizationId, itAdmin, 'DEPARTURE_ACCESS_BLOCKED', notice('IT_ADMIN'));
   }

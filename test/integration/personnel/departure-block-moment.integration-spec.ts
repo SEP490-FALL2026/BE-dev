@@ -327,6 +327,19 @@ describe('the block moment of a departure (integration, real PostgreSQL)', () =>
       ]);
     }, 240_000);
 
+    it('does not ask the IT Admin to block an account they already blocked: a case locked before the pass is announced with no such notice', async () => {
+      const u = await example();
+      const wire = await h.recordedCase(u.leaver);
+      await h.leaveOnLastDay(wire.id).expect(200);
+      await h.lockAccount(wire.id, { note: 'Đã khóa tài khoản công ty' }).expect(200);
+      await h.ctx.sql.query(`UPDATE offboarding_cases SET block_announced_at = NULL WHERE id = $1`, [wire.id]);
+
+      expect(await announcement().announce()).toEqual({ announced: 1, failed: 0 });
+
+      expect(await noticesOf(wire.id, 'DEPARTURE_ACCESS_BLOCKED')).toEqual([]);
+      expect(await h.auditEventsOf('OFFBOARDING_CASE.ACCESS_BLOCKED', wire.id)).toHaveLength(1);
+    }, 240_000);
+
     it('closes every open request at once for a departure blocked now (K5 and a proposal of new software too) and gives the case its deadline', async () => {
       const u = await example();
       const open = await openRequestsOf(u, u.leaver);

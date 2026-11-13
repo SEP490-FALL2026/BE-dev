@@ -276,6 +276,7 @@ describe('who is told of an event of the personnel context (F17, spec B)', () =>
       blockedOn: '2026-10-01',
       revocationDueOn: '2026-10-02',
       markLeft: true,
+      accountLocked: false,
     };
     const audiences = (told: InAppNotificationInput[]) =>
       told.map((notice) => [notice.recipientEmployeeId, notice.params.audience, notice.eventKey]);
