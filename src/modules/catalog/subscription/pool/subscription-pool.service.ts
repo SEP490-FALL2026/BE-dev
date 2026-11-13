@@ -243,6 +243,7 @@ export class SubscriptionPoolService {
       organizationId: organization.id,
       subscriptionId: current.id,
       planProvisioningType: current.planProvisioningType,
+      status: current.status,
       responsibleItAdminEmployeeId: current.responsibleItAdminEmployeeId,
       from: current.purchasedQuantity,
       to: next,

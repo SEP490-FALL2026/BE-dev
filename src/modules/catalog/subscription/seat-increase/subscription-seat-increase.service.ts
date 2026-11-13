@@ -5,13 +5,15 @@ import type { AuthenticatedPrincipal } from '../../../../infrastructure/security
 import { IdentityAccessApi } from '../../../identity-access/public/identity-access.api';
 import { NotificationsApi } from '../../../notifications/public/notifications.api';
 import { seatIncreaseNoticeOwed, seatIncreaseRecipients } from './subscription-seat-increase.policy';
-import type { ProvisioningType } from '../subscription.types';
+import type { ProvisioningType, SubscriptionStatus } from '../subscription.types';
 
 /** What a rise of the seats bought of a subscription is told from: the subscription, the two numbers, the request it was bought for (if any) and who bought. */
 export interface SeatIncrease {
   organizationId: string;
   subscriptionId: string;
   planProvisioningType: ProvisioningType;
+  /** The status the subscription had before the change: only an active one has seats that are bought. */
+  status: SubscriptionStatus;
   responsibleItAdminEmployeeId: string | null;
   from: number | null;
   to: number | null;
@@ -34,7 +36,14 @@ export class SubscriptionSeatIncreaseService {
 
   /** Returns how many IT Admins were told. */
   async told(tx: DbTx, input: SeatIncrease): Promise<number> {
-    if (!seatIncreaseNoticeOwed({ planProvisioningType: input.planProvisioningType, from: input.from, to: input.to }))
+    if (
+      !seatIncreaseNoticeOwed({
+        planProvisioningType: input.planProvisioningType,
+        status: input.status,
+        from: input.from,
+        to: input.to,
+      })
+    )
       return 0;
     const usable = new Set(await this.identity.findAllUsableItAdminEmployeeIds(tx));
     const recipients = seatIncreaseRecipients({

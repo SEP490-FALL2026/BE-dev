@@ -1,18 +1,20 @@
-import type { ProvisioningType } from '../subscription.types';
+import type { ProvisioningType, SubscriptionStatus } from '../subscription.types';
 
 /**
  * Whether the seats bought of a subscription rose in a way the IT Admin who answers for it is told of (`QĐ-110v`, `S-4`): only the shared pool of a
  * `K2` or `K4` plan, and only a rise from a known number. A `K1` purchase buys one seat for one person each time and has no pool to count, so it
- * is never told; a fall, no change, or a quantity that was not known before is not a rise.
+ * is never told; a fall, no change, or a quantity that was not known before is not a rise; and a draft has bought nothing yet, so a change of its
+ * quantity is not a purchase either (`status` is the one the subscription had before the change).
  */
 export function seatIncreaseNoticeOwed(input: {
   planProvisioningType: ProvisioningType;
+  status: SubscriptionStatus;
   from: number | null;
   to: number | null;
 }): boolean {
   const pooled = input.planProvisioningType === 'K2' || input.planProvisioningType === 'K4';
 
-  return pooled && input.from !== null && input.to !== null && input.to > input.from;
+  return pooled && input.status === 'ACTIVE' && input.from !== null && input.to !== null && input.to > input.from;
 }
 
 /**

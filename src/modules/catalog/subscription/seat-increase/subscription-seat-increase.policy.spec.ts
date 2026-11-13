@@ -13,7 +13,11 @@ describe('subscription-seat-increase.policy (QĐ-110v, S-4: the IT Admin of a po
       ['K5', 10, 11, false],
       ['K3', 10, 11, false],
     ] as const)('a %s subscription going from %s to %s is told: %s', (type, from, to, owed) => {
-      expect(seatIncreaseNoticeOwed({ planProvisioningType: type, from, to })).toBe(owed);
+      expect(seatIncreaseNoticeOwed({ planProvisioningType: type, status: 'ACTIVE', from, to })).toBe(owed);
+    });
+
+    it('tells nothing of a draft: its seats are not bought yet, whatever number a change gives them', () => {
+      expect(seatIncreaseNoticeOwed({ planProvisioningType: 'K2', status: 'DRAFT', from: 10, to: 20 })).toBe(false);
     });
   });
 

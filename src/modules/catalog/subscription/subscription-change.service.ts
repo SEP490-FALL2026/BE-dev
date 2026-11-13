@@ -122,6 +122,7 @@ export class SubscriptionChangeService {
       organizationId,
       subscriptionId: id,
       planProvisioningType: current.planProvisioningType,
+      status: current.status,
       responsibleItAdminEmployeeId: updated.responsibleItAdminEmployeeId,
       from: current.purchasedQuantity,
       to: updated.purchasedQuantity,

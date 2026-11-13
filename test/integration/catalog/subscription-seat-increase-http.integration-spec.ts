@@ -91,6 +91,15 @@ describe('the notice of a rise of the seats bought of a subscription (X-IT.7)', 
     expect(notices[0].params).toMatchObject({ fromQuantity: 3, toQuantity: 5 });
   });
 
+  it('tells nobody when the quantity of a draft changes: a draft has bought nothing yet', async () => {
+    const subscriptionId = await h.draftSubscription('K2');
+    await answerFor(subscriptionId, it2);
+
+    await patch(h.it1, subscriptionId, { purchasedQuantity: 25 }).expect(200);
+
+    expect(await noticesOf(subscriptionId)).toEqual([]);
+  });
+
   it('S-4: a K1 purchase tells nobody, whoever answers for it', async () => {
     const subscriptionId = await h.subscription(5, 'K1');
     await answerFor(subscriptionId, it2);
