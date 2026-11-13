@@ -346,6 +346,8 @@ describe('the reads and the hook of a revocation (integration, real PostgreSQL)'
         // G9-02 (RV-07): the money held for the seat goes back by the day when the revocation is completed.
         'requests.seat-release',
         'requests.return-request',
+        // MF2-G (QĐ-110e): the last K1 revocation of a person who leaves locks the mailbox by itself, and any completed revocation may close the case.
+        'personnel.departure-closure',
         'optimization.ghost-seat',
       ]);
     });
