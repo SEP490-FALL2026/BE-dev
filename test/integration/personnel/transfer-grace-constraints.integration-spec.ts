@@ -23,12 +23,28 @@ describe('the grace of a transfer, as the database keeps it (integration, real P
     await h.stop();
   });
 
-  /** A transfer that took effect today (the day of a transfer recorded for today is its own). */
+  /**
+   * A transfer that took effect today, left as the old release left it — no grace and no snapshot, because the system opens them the day a
+   * transfer takes effect and these cases write them by hand. The guard of the table is off for this reset only, inside one transaction.
+   */
   const effective = async (): Promise<{ id: string; effectiveOn: string }> => {
     sequence += 1;
     const person = await h.veteran(des, `GD-E${sequence}`);
     const wire = await h.moveToday(person, fin);
     expect(wire.status).toBe('EFFECTIVE');
+    await h.ctx.sql.query('BEGIN');
+    try {
+      await h.ctx.sql.query('ALTER TABLE department_transfers DISABLE TRIGGER USER');
+      await h.ctx.sql.query(
+        `UPDATE department_transfers SET grace_ends_on = NULL, grace_reminder_on = NULL, reminded_at = NULL, snapshot_before = NULL WHERE id = $1`,
+        [wire.id],
+      );
+      await h.ctx.sql.query('ALTER TABLE department_transfers ENABLE TRIGGER USER');
+      await h.ctx.sql.query('COMMIT');
+    } catch (error) {
+      await h.ctx.sql.query('ROLLBACK');
+      throw error;
+    }
 
     return { id: wire.id, effectiveOn: wire.effectiveOn };
   };
@@ -62,7 +78,7 @@ describe('the grace of a transfer, as the database keeps it (integration, real P
       reminder,
     ]);
 
-  it('has no grace, no snapshot and no closing on a transfer that took effect, and the system did not close it', async () => {
+  it('has no grace, no snapshot and no closing on a transfer from before the grace, and the system did not close it', async () => {
     const { id } = await effective();
 
     expect(await row(id)).toMatchObject({

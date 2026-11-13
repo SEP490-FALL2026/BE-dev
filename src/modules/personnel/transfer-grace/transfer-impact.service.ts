@@ -4,7 +4,7 @@ import { LicensingApi } from '../../licensing/public/licensing.api';
 import { OperatingParametersApi } from '../../operating-parameters/public/operating-parameters.api';
 import { RequestsApi } from '../../requests/public/requests.api';
 import { commitmentToRelease, rightToRevokeOf } from '../departure-deadline/departure-impact.policy';
-import { graceOf, graceStartsOn, graceWindowEnd } from './transfer-grace.policy';
+import { graceOf, graceStartsOn, graceWindowEnd, heldOnOrBefore } from './transfer-grace.policy';
 import type { TransferImpact, TransferImpactInput } from './transfer-impact.types';
 
 /**
@@ -40,7 +40,7 @@ export class TransferImpactService {
     const grace = await this.graceDays(input.effectiveOn, input.today);
 
     return {
-      rightsToRevoke: seats.map(rightToRevokeOf),
+      rightsToRevoke: heldOnOrBefore(seats, input.effectiveOn).map(rightToRevokeOf),
       openRequestsToCancel: gone.wouldCancel.map(ofItem),
       provisioningInFlight: gone.needsItCheck.map(ofItem),
       commitmentToRelease: commitmentToRelease(gone.heldToRelease),

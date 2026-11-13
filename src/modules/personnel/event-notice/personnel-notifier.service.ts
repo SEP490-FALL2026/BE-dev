@@ -229,6 +229,46 @@ export class PersonnelNotifier {
   }
 
   /**
+   * The grace of the old rights of a person who moved has begun (`QĐ-110p`, `US-03-01` AC-26): the person is told the last day they keep
+   * them, and the head of each of the two departments and the IT Admin who answers for each know the rights will be taken back. One notice for
+   * each person, once for the transfer; a person who is more than one of these is told as the first of mover, head, IT Admin.
+   */
+  async transferGraceStarted(
+    tx: DbTx,
+    input: {
+      organizationId: string;
+      transferId: string;
+      employeeId: string;
+      fromDepartmentId: string;
+      toDepartmentId: string;
+      graceEndsOn: BusinessDate;
+      today: BusinessDate;
+    },
+  ): Promise<void> {
+    const audiences = new Map<string, 'MOVER' | 'HEAD' | 'IT_ADMIN'>([[input.employeeId, 'MOVER']]);
+    const departments = [input.fromDepartmentId, input.toDepartmentId];
+    for (const head of (await this.organizationReads.getDepartmentHeads(departments, input.today, tx)).values())
+      if (!audiences.has(head.employeeId)) audiences.set(head.employeeId, 'HEAD');
+    for (const departmentId of departments) {
+      const itAdmin = await this.itAdminOfDeparture(tx, { departmentId, employeeId: input.employeeId });
+      if (itAdmin !== null && !audiences.has(itAdmin)) audiences.set(itAdmin, 'IT_ADMIN');
+    }
+    for (const [recipient, audience] of audiences)
+      await this.tell(tx, input.organizationId, recipient, 'TRANSFER_GRACE_STARTED', {
+        subject: { type: 'DEPARTMENT_TRANSFER', id: input.transferId },
+        params: {
+          transferId: input.transferId,
+          employeeId: input.employeeId,
+          fromDepartmentId: input.fromDepartmentId,
+          toDepartmentId: input.toDepartmentId,
+          graceEndsOn: input.graceEndsOn,
+          audience,
+        },
+        eventKey: `TRANSFER_GRACE_STARTED:${input.transferId}`,
+      });
+  }
+
+  /**
    * A departure blocked now still has no lock of the company account at the end of the day it was blocked (`QĐ-94m`(12), R-1): the IT Admin
    * and the Super Admin are told once for the case. Returns whether a notice was written.
    */

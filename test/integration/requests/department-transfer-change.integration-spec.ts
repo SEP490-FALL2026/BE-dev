@@ -405,7 +405,7 @@ describe('moving, cancelling and telling a transfer (integration, real PostgreSQ
       expect((await h.stepOf(sent.id, 'NEED')).assignee_employee_id).toBe(to.head.employeeId);
     });
 
-    it('leaves the spend step and the need step that was decided as they were, and the grant with its task (AC-6)', async () => {
+    it('QĐ-110o: closes the paid request sent from the old department the day the transfer takes effect, as the system, and leaves the need step that was decided as it was (AC-6)', async () => {
       const unit = await h.departmentWithHead(code('P-RQ'));
       const other = await h.departmentWithHead(code('P-RQ'));
       await h.budgetFor(unit, { total: 100 * M });
@@ -415,17 +415,24 @@ describe('moving, cancelling and telling a transfer (integration, real PostgreSQ
       const spendBefore = await h.stepOf(waiting, 'SPEND_APPROVAL');
       expect(spendBefore).toMatchObject({ state: 'PENDING', assignee_employee_id: h.boss.employeeId });
       expect(needBefore.state).toBe('APPROVED');
-      const steps = async () =>
-        JSON.stringify((await h.ctx.sql.query(`SELECT * FROM access_request_steps ORDER BY id`)).rows);
-      const decided = await steps();
+      // A request of another department is not touched: it is not sent from the department the person leaves.
+      const bystander = await member(other, 'B');
+      const elsewhere = await h.sent(bystander, internal);
+      const elsewhereBefore = await h.stepOf(elsewhere.id, 'NEED');
 
       await h
         .recordTransfer(body(requester.employeeId, { toDepartmentId: other.department.id, effectiveOn: h.today() }))
         .expect(201);
 
+      // The decision that was made stays as it was; the step still open is closed with the request, which the system ends as cancelled.
       expect(await h.stepOf(waiting, 'NEED')).toEqual(needBefore);
-      expect(await h.stepOf(waiting, 'SPEND_APPROVAL')).toEqual(spendBefore);
-      expect(await steps()).toBe(decided);
+      expect(await h.stepOf(waiting, 'SPEND_APPROVAL')).toEqual({ ...spendBefore, state: 'CLOSED' });
+      const ended = await h.ctx.sql.query<{ state: string }>(
+        'SELECT state::text AS state FROM access_requests WHERE id = $1',
+        [waiting],
+      );
+      expect(ended.rows[0].state).toBe('CANCELLED');
+      expect(await h.stepOf(elsewhere.id, 'NEED')).toEqual(elsewhereBefore);
       expect(APPROVE.decision).toBe('APPROVE');
     });
   });

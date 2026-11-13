@@ -80,3 +80,15 @@ export function graceOf(input: GraceInput): TransferGrace {
     reminderOn: graceReminderOn(startsOn, endsOn, input.reminderWorkingDays, input.nonWorkingDates),
   };
 }
+
+/**
+ * The rights of the person that are rights of the old department (`QĐ-110p`, C.1): the ones held when the transfer takes effect, that is, that
+ * began on that day or before. A right that begins after was granted later, to a request of the new head, and is not taken back. A right
+ * granted on the day itself is the old department's: its request was sent from there and its grant completed before the system noticed the day.
+ */
+export function heldOnOrBefore<T extends { effectiveFrom: BusinessDate }>(
+  seats: readonly T[],
+  effectiveOn: BusinessDate,
+): T[] {
+  return seats.filter((seat) => seat.effectiveFrom <= effectiveOn);
+}

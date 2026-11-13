@@ -229,14 +229,23 @@ describe('the grace of the transfers that took effect before the release (integr
 
   it('writes one audit event of the system for each grace it gave, and none for a transfer it left alone', async () => {
     const old = await oldTransfer();
+    const migrationEvents = async (id: string) =>
+      (
+        await sql<{ actor_kind: string; actor_app_user_id: string | null; after: Record<string, unknown> }>(
+          `SELECT actor_kind::text, actor_app_user_id, after FROM audit_events
+            WHERE action = 'DEPARTMENT_TRANSFER.GRACE_OPENED' AND resource_id = $1
+              AND correlation_id = '20261113001900_personnel_transfer_grace_backfill'`,
+          [id],
+        )
+      ).rows;
 
     await sql(migration());
 
-    const events = await h.auditEventsOf('DEPARTMENT_TRANSFER.GRACE_OPENED', old.id);
+    const events = await migrationEvents(old.id);
     expect(events).toHaveLength(1);
     expect(events[0]).toMatchObject({ actor_kind: 'SYSTEM', actor_app_user_id: null });
     expect(events[0].after).toMatchObject({ graceEndsOn: policy(old.effectiveOn).endsOn });
     await sql(migration());
-    expect(await h.auditEventsOf('DEPARTMENT_TRANSFER.GRACE_OPENED', old.id)).toHaveLength(1);
+    expect(await migrationEvents(old.id)).toHaveLength(1);
   }, 120_000);
 });

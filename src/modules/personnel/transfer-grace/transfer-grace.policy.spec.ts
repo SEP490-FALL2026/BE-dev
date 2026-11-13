@@ -1,5 +1,12 @@
 import { addDays } from '../../../core/business-date';
-import { graceEndsOn, graceOf, graceReminderOn, graceStartsOn, graceWindowEnd } from './transfer-grace.policy';
+import {
+  graceEndsOn,
+  graceOf,
+  graceReminderOn,
+  graceStartsOn,
+  graceWindowEnd,
+  heldOnOrBefore,
+} from './transfer-grace.policy';
 
 const NONE: ReadonlySet<string> = new Set();
 
@@ -125,5 +132,28 @@ describe('the whole grace of a transfer (QĐ-110p, T-MF3, m-17)', () => {
       endsOn: '2026-11-23',
       reminderOn: '2026-11-18',
     });
+  });
+});
+
+describe('the rights that are old rights of a transfer (QĐ-110p: held when the day comes)', () => {
+  const seat = (assignmentId: string, effectiveFrom: string) => ({ assignmentId, effectiveFrom });
+
+  it('keeps a right that began before the day or on it, drops one that begins after (granted later, in the new department)', () => {
+    const seats = [
+      seat('before', '2026-11-13'),
+      seat('long-ago', '2026-01-05'),
+      seat('same-day', '2026-11-16'),
+      seat('after', '2026-11-18'),
+    ];
+
+    expect(heldOnOrBefore(seats, '2026-11-16').map((item) => item.assignmentId)).toEqual([
+      'before',
+      'long-ago',
+      'same-day',
+    ]);
+  });
+
+  it('keeps nothing of nobody', () => {
+    expect(heldOnOrBefore([], '2026-11-16')).toEqual([]);
   });
 });

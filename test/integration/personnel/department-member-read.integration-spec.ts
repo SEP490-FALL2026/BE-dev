@@ -98,7 +98,8 @@ describe('a head reads one person of the department (integration, real PostgreSQ
     e1 = await h.veteran(fin.department, 'E1-MD');
     await h.seatOf(e1, { subscriptionId: seatTools[0] }, 'E1-MD');
     await h.seatOf(e1, { subscriptionId: seatTools[1] }, 'E1-MD');
-    oldRequestId = (await h.sent(e1, requestPlans[0], { termMonths: 1 })).id;
+    // A free internal plan: the paid requests sent from the old department are closed by the system the day the transfer takes effect (QĐ-110o), the free ones stay open.
+    oldRequestId = (await h.sent(e1, await h.plan('K5'))).id;
     await h.moveToday(e1, des.department);
     newRequestId = (await h.sent(e1, requestPlans[1], { termMonths: 1 })).id;
   }, 300000);
