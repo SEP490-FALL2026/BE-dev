@@ -32,6 +32,9 @@ const standingOf = (late: OverdueCase): RevocationStanding => ({
  * keeps the case late as much as a task that waits, so silence cannot hide a right. The notice is written once for a case and a day
  * (`offboarding:<case>:<day>`), with an audit event of the system in the same transaction, so a pass that runs again or on another instance
  * writes nothing new. It only tells: no task is opened, no seat taken away, and the case is never changed.
+ *
+ * It judges **departures only**, on purpose (D-124): the tasks a transfer opens when its grace ends (`TRANSFER`) carry no `due_on` and no case, so
+ * no notice is written for them; their deadline is worked out for the report of the SLA (`GET /reports/revocation-sla`), which counts them overdue.
  */
 @Injectable()
 export class RevocationOverdueService {
