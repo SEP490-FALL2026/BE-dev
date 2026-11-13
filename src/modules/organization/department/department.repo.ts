@@ -412,6 +412,18 @@ export class DepartmentRepo {
     return rows.map((row) => row.id);
   }
 
+  /**
+   * How many active departments name this employee IT Admin in charge (`QĐ-110l`). Read after the employee row is locked `FOR UPDATE`, so two
+   * assignments of the same IT Admin count one after the other; whether the employee still works is not asked.
+   */
+  async countActiveInChargeOf(tx: DbTx, employeeId: string): Promise<number> {
+    const rows = await tx.$queryRaw<{ total: number }[]>`
+      SELECT count(*)::int AS total FROM departments d
+       WHERE d.it_admin_employee_id = ${employeeId}::uuid AND d.status = 'ACTIVE'`;
+
+    return rows[0].total;
+  }
+
   /** The active departments that name each of these employees IT Admin in charge, in code order; whether they still work is not asked. */
   inChargeOfMany(employeeIds: readonly string[], tx?: DbTx) {
     return (tx ?? this.prisma).department.findMany({

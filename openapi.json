@@ -2976,7 +2976,7 @@
             }
           },
           "409": {
-            "description": "The code is taken (DEPARTMENT.CODE_TAKEN), or the budget cycle of the next year is not open or was published, so a department made now would have no budget (DEPARTMENT.OUTSIDE_BUDGET_PERIOD).",
+            "description": "The code is taken (DEPARTMENT.CODE_TAKEN), the budget cycle of the next year is not open or was published, so a department made now would have no budget (DEPARTMENT.OUTSIDE_BUDGET_PERIOD), or the IT Admin named already answers for four departments (DEPARTMENT.IT_ADMIN_LIMIT_REACHED).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -2999,6 +2999,18 @@
                       "error": {
                         "code": "DEPARTMENT.OUTSIDE_BUDGET_PERIOD",
                         "message": "A department is made only while the budget cycle of the next year is open and was never published.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "DEPARTMENT.IT_ADMIN_LIMIT_REACHED": {
+                    "summary": "An IT Admin answers for at most 4 departments.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "DEPARTMENT.IT_ADMIN_LIMIT_REACHED",
+                        "message": "An IT Admin answers for at most 4 departments.",
+                        "details": { "limit": 4 },
                         "requestId": "req_example"
                       }
                     }
@@ -3456,7 +3468,7 @@
             }
           },
           "409": {
-            "description": "The department is retired (DEPARTMENT.INACTIVE).",
+            "description": "The department is retired (DEPARTMENT.INACTIVE), or the IT Admin named already answers for four departments (DEPARTMENT.IT_ADMIN_LIMIT_REACHED).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -3468,6 +3480,18 @@
                       "error": {
                         "code": "DEPARTMENT.INACTIVE",
                         "message": "The department is no longer in use.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "DEPARTMENT.IT_ADMIN_LIMIT_REACHED": {
+                    "summary": "An IT Admin answers for at most 4 departments.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "DEPARTMENT.IT_ADMIN_LIMIT_REACHED",
+                        "message": "An IT Admin answers for at most 4 departments.",
+                        "details": { "limit": 4 },
                         "requestId": "req_example"
                       }
                     }

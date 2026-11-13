@@ -35,7 +35,6 @@ import {
   QUERY_INVALID,
   READ_ROLES_ONLY,
   SUPER_ADMIN_ONLY,
-  DEPARTMENT_INACTIVE_RESPONSE,
   VALIDATION_ERROR,
   VALIDATION_ERROR_DESCRIPTION,
 } from './department.http-errors';
@@ -109,10 +108,11 @@ export class DepartmentsController {
   @ApiErrorResponses(...AUTH_ERRORS, SUPER_ADMIN_ONLY, CREATE_INVALID, {
     status: HttpStatus.CONFLICT,
     description:
-      'The code is taken (DEPARTMENT.CODE_TAKEN), or the budget cycle of the next year is not open or was published, so a department made now would have no budget (DEPARTMENT.OUTSIDE_BUDGET_PERIOD).',
+      'The code is taken (DEPARTMENT.CODE_TAKEN), the budget cycle of the next year is not open or was published, so a department made now would have no budget (DEPARTMENT.OUTSIDE_BUDGET_PERIOD), or the IT Admin named already answers for four departments (DEPARTMENT.IT_ADMIN_LIMIT_REACHED).',
     examples: [
       DEPARTMENT_ERROR_EXAMPLES.DEPARTMENT_CODE_TAKEN,
       DEPARTMENT_ERROR_EXAMPLES.DEPARTMENT_OUTSIDE_BUDGET_PERIOD,
+      DEPARTMENT_ERROR_EXAMPLES.DEPARTMENT_IT_ADMIN_LIMIT_REACHED,
     ],
   })
   async create(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Body() body: CreateDepartmentBodyDto) {
@@ -160,7 +160,15 @@ export class DepartmentsController {
     description:
       'The name, the description or the IT Admin in charge changed. The Cost Center and the people do not. A body that carries an HR basis is refused (VALIDATION_ERROR): the Audit Trail records who, when, before and after.',
   })
-  @ApiErrorResponses(...AUTH_ERRORS, SUPER_ADMIN_ONLY, UPDATE_INVALID, NOT_FOUND, DEPARTMENT_INACTIVE_RESPONSE)
+  @ApiErrorResponses(...AUTH_ERRORS, SUPER_ADMIN_ONLY, UPDATE_INVALID, NOT_FOUND, {
+    status: HttpStatus.CONFLICT,
+    description:
+      'The department is retired (DEPARTMENT.INACTIVE), or the IT Admin named already answers for four departments (DEPARTMENT.IT_ADMIN_LIMIT_REACHED).',
+    examples: [
+      DEPARTMENT_ERROR_EXAMPLES.DEPARTMENT_INACTIVE,
+      DEPARTMENT_ERROR_EXAMPLES.DEPARTMENT_IT_ADMIN_LIMIT_REACHED,
+    ],
+  })
   async update(
     @CurrentPrincipal() actor: AuthenticatedPrincipal,
     @Param() params: DepartmentIdParamDto,
