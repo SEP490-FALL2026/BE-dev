@@ -696,6 +696,14 @@ Không sửa code; SPEC không bị sửa trong lượt này (spec là của Own
 - **Kiểm đột biến.** `givenAtTransfer` luôn `false` ⟹ 6/12 ca đỏ (ba nguồn `DEPARTURE`/`ABRUPT_DEPARTURE`/`TIME_LIMITED_EXPIRY`, nguồn `TRANSFER`, BLK-3 cũ…); luôn `true` ⟹ 3/12 ca đỏ (các ca thu hồi không có release của điều chuyển). Đổi lại: thay `transferReleases` bằng `[]` hoặc trả `true` ở policy.
 - **Chạm:** `budgets/budget/commitment.repo.ts`, `budgets/public/budgets.types.ts`, `requests/grant/seat-release.{policy,policy.spec,service}.ts`, `test/integration/budgets/commitment-release-ledger-rule.integration-spec.ts`.
 
+### D-87 · MF3-B-R2 (review MF3-B, Critical 2) · Cam kết phòng cũ không bị kẹt: điều chuyển từ trước (m-17) và cam kết năm mới do lượt 01/01 giữ
+
+- **Lỗi.** Với luật theo nguồn của D-83 câu 2: (a) điều chuyển cũ do migration m-17 (`20261113001900`) được đặt ân hạn nhưng **không** được giải phóng ở ngày hiệu lực (không có đường nào chạy `releaseForTransfer` cho dữ liệu cũ); khi MF3-C thu hồi bằng nguồn `TRANSFER`, `afterRevocation` bỏ qua ⟹ cam kết phòng cũ không bao giờ được trả; (b) điều chuyển hiệu lực cuối tháng 12 có ân hạn vắt qua 01/01: lượt đầu năm (`year-start-commitments`, QĐ-109a) giữ cam kết **năm mới** cho Request của quyền cũ (khoản 12 tháng, sinh sau ngày hiệu lực), còn `afterTransferEffective` chỉ khóa các năm đang có lúc đó ⟹ khoản năm mới bị kẹt.
+- **Phương án.** (A) thêm bước giải phóng riêng cho dữ liệu m-17 trong migration và cho lượt 01/01 (hai đường mới, hai chỗ có thể sót); (B) cùng luật theo sổ cái của D-86, không thêm đường nào: khoản nào chưa có release `TRANSFER_EFFECTIVE` cho quyền đó thì được giải phóng lúc thu hồi, **bất kể nguồn** (kể cả `TRANSFER`), bằng `revocationShare` với ngày kết thúc thật của quyền. **ĐÃ CHỌN B.** Hệ quả: điều chuyển m-17 được trả đúng một lần lúc hết ân hạn (từ ngày kết thúc quyền, không từ ngày hiệu lực cũ: người chuyển đã giữ quyền trong ân hạn bằng cam kết phòng cũ, phù hợp việc không có số liệu ngày hiệu lực của dữ liệu cũ); khoản năm mới (`origin = YEAR_START`) được trả lúc thu hồi, trong khi khoản năm cũ đã trả ở ngày hiệu lực không trả lại (`lockSeatCommitments` chỉ lấy các năm từ năm của hôm nay, và khoản năm cũ có release `TRANSFER_EFFECTIVE`). Phần ngày đã dùng trong tháng 01 trước ngày kết thúc quyền giữ lại (đã dùng thật).
+- **Không đổi mã** ngoài D-86; R2 là các ca chứng minh hai trường hợp trên, đỏ trước khi có luật theo sổ cái (cả hai ca R2 đỏ ở HEAD `3c83bd0c`: không có release nào) và xanh sau D-86.
+- **Kiểm đột biến.** Luật luôn "bỏ qua" (`givenAtTransfer` luôn `true`) ⟹ ca R2 (a) và R2 (b) đỏ (3/12 ca của hai file đỏ); luật không bao giờ bỏ qua ⟹ các ca R1 và BLK-3 đỏ (xem D-86).
+- **Chạm:** `test/integration/budgets/commitment-release-ledger-rule.integration-spec.ts` (thêm hai ca R2).
+
 ## Bị chặn
 
 (chưa có)

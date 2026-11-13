@@ -1,8 +1,10 @@
 import { randomUUID } from 'node:crypto';
 import request from 'supertest';
 import { TransactionRunner } from '../../../src/infrastructure/database/transaction-runner';
+import { BudgetsApi } from '../../../src/modules/budgets/public/budgets.api';
 import { LicensingApi } from '../../../src/modules/licensing/public/licensing.api';
-import type { SystemActor } from '../../../src/modules/licensing/public/licensing.types';
+import type { RevocationTaskFacts, SystemActor } from '../../../src/modules/licensing/public/licensing.types';
+import { SeatReleaseService } from '../../../src/modules/requests/grant/seat-release.service';
 import { RequestsApi } from '../../../src/modules/requests/public/requests.api';
 import { SpendHarness, type Unit } from '../../support/spend-harness';
 
@@ -29,7 +31,7 @@ interface LedgerRow {
 }
 
 /**
- * `MF3-B-R1` (review of MF3-B, D-86): a commitment goes back once for each transfer, decided by the ledger of that commitment and not by who
+ * `MF3-B-R1`/`R2` (review of MF3-B, D-86, D-87): a commitment goes back once for each transfer, decided by the ledger of that commitment and not by who
  * asked for the revocation. The commitment that gave back for the right the day a transfer took effect (reason `TRANSFER_EFFECTIVE`, reference
  * `transfer:<id>:assignment:<id>`) gives nothing back again when that right is taken away, whatever the source; every other commitment of the right
  * (a transfer from before the release that has no such release, the commitment of a year that begins in the grace) goes back when it is taken away.
@@ -121,6 +123,13 @@ describe('a commitment goes back once for the transfer of its right, by its own 
         [requestId],
       )
     ).rows;
+  const endedOn = async (assignmentId: string): Promise<string> =>
+    (
+      await h.ctx.sql.query<{ valid_until: string }>(
+        `SELECT to_char(valid_until, 'YYYY-MM-DD') AS valid_until FROM license_assignments WHERE id = $1`,
+        [assignmentId],
+      )
+    ).rows[0].valid_until;
 
   it.each(['DEPARTURE', 'ABRUPT_DEPARTURE', 'TIME_LIMITED_EXPIRY', 'TRANSFER'])(
     'R1: the right is taken away for %s in the grace: the total given back is what the transfer gave, from its day, and nothing more',
@@ -145,4 +154,86 @@ describe('a commitment goes back once for the transfer of its right, by its own 
     },
     240_000,
   );
+
+  it('R2 (a): a transfer from before the release has no release of its own: the revocation by the transfer gives the commitment back, once', async () => {
+    const { requestId, assignmentId } = await seatOfNewRequest();
+    const transferId = randomUUID();
+
+    const taskId = await revokedFor(assignmentId, 'TRANSFER', transferId);
+
+    const rows = await ledger(requestId);
+    const ended = await endedOn(assignmentId);
+    expect(rows).toEqual([
+      {
+        year: h.year,
+        reason: 'REVOKED',
+        amount_minor: shareFrom(ended).toString(),
+        reason_text: `revocationTask:${taskId}`,
+      },
+    ]);
+    // Told again, the same task gives nothing back again.
+    const facts: RevocationTaskFacts = {
+      id: taskId,
+      assignmentId,
+      employeeId: randomUUID(),
+      planId: plan,
+      status: 'COMPLETED',
+      completed: {
+        grantRequestId: requestId,
+        chainAssignmentIds: [assignmentId],
+        provisioningType: 'K2',
+        endedOn: ended,
+        paidThroughOn: null,
+        sources: ['TRANSFER'],
+        k1Checklist: null,
+      },
+    };
+    await h.ctx.app
+      .get(TransactionRunner)
+      .run((tx) => h.ctx.app.get(SeatReleaseService, { strict: false }).afterRevocation(tx, facts, new Date()));
+    expect(await ledger(requestId)).toEqual(rows);
+  }, 240_000);
+
+  it('R2 (b): the commitment of the year that began in the grace goes back when the right is taken away; the year that gave back the day of the transfer does not again', async () => {
+    const { requestId, assignmentId } = await seatOfNewRequest();
+    const transferId = randomUUID();
+    await releasedForTransfer(transferId, assignmentId);
+    // The pass of 01/01 holds the commitment of the next year for the request of the right that is still there (`QĐ-109a`).
+    const held = (
+      await h.ctx.sql.query<{ organization_id: string; cost_center_id: string; currency: string }>(
+        'SELECT organization_id, cost_center_id, currency FROM budget_commitments WHERE request_id = $1',
+        [requestId],
+      )
+    ).rows[0];
+    const next = h.year + 1;
+    await h.ctx.app.get(TransactionRunner).run((tx) =>
+      h.ctx.app.get(BudgetsApi, { strict: false }).holdYearStart(tx, {
+        organizationId: held.organization_id,
+        year: next,
+        now: new Date(),
+        items: [
+          {
+            requestId,
+            costCenterId: held.cost_center_id,
+            currency: held.currency,
+            amountMinor: BigInt(12 * M),
+            seatMonthlyMinor: MONTHLY,
+          },
+        ],
+      }),
+    );
+    expect((await ledger(requestId)).map((row) => row.year)).toEqual([h.year]);
+
+    const taskId = await revokedFor(assignmentId, 'TRANSFER', transferId);
+
+    expect(await ledger(requestId)).toEqual([
+      {
+        year: h.year,
+        reason: 'TRANSFER_EFFECTIVE',
+        amount_minor: shareFrom(h.today()).toString(),
+        reason_text: `transfer:${transferId}:assignment:${assignmentId}`,
+      },
+      { year: next, reason: 'REVOKED', amount_minor: String(12 * M), reason_text: `revocationTask:${taskId}` },
+    ]);
+  }, 240_000);
 });
