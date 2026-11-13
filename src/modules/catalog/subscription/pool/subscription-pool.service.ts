@@ -114,8 +114,10 @@ export class SubscriptionPoolService {
 
   /**
    * The rules for a subscription that becomes active with the data it holds (a draft completed): the commitment, the K1 plan and the
-   * IT Admin it names, who must still work, hold the role and be able to sign in now, not only when the name was written (R-E03).
-   * Throws the errors of `assert` and SubscriptionResponsibleNotItAdminError.
+   * IT Admin it names, who must still work, hold the role and be able to sign in now, not only when the name was written (R-E03). A draft that is
+   * not the period of a renewal is a new subscription and also needs the vendor admins of its plan (`continuesPeriod` false); the period a renewal
+   * continues never does (`QĐ-110k`: a subscription older than the rule is only flagged, X-IT-R4). Throws the errors of `assert`,
+   * SubscriptionResponsibleNotItAdminError and SubscriptionVendorAdminsRequiredError.
    */
   async assertActivation(
     tx: DbTx,
@@ -126,10 +128,11 @@ export class SubscriptionPoolService {
       commitmentTermMonths: CommitmentTermMonths | null;
       responsibleItAdminEmployeeId: string | null;
     },
+    continuesPeriod: boolean,
   ): Promise<void> {
     this.assert(plan, kind, state, true);
     await this.requireItAdmin(state.responsibleItAdminEmployeeId as string, tx);
-    await this.assertVendorAdmins(tx, plan);
+    if (!continuesPeriod) await this.assertVendorAdmins(tx, plan);
   }
 
   /**
@@ -158,7 +161,7 @@ export class SubscriptionPoolService {
     const activating = current.status === 'DRAFT' && state.status === 'ACTIVE';
     // Changing only the person who answers does not judge a commitment and cycle the write did not touch (F-009).
     const touches = input.billingCycle !== undefined || input.commitmentTermMonths !== undefined;
-    if (activating) await this.assertActivation(tx, plan, current.kind, state);
+    if (activating) await this.assertActivation(tx, plan, current.kind, state, current.renewedFromId !== null);
     else if (touches) this.assert(plan, current.kind, state, false);
     if (input.isPrimaryForPlan) await this.makePrimary(tx, change);
   }
