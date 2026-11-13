@@ -19,6 +19,7 @@ const NONE: ReadonlySet<string> = new Set();
 describe('the deadline of the revocations of a departure (integration, real PostgreSQL)', () => {
   let des: Department;
   let subscriptions: string[];
+  let k1: string;
   let counter = 0;
 
   beforeAll(async () => {
@@ -26,6 +27,7 @@ describe('the deadline of the revocations of a departure (integration, real Post
     des = await h.departmentWithUnit('P-RD');
     await h.setItAdminInCharge(des, { employeeId: h.it1.employeeId, account: h.it1 });
     subscriptions = [await h.subscription(40, 'K2'), await h.subscription(40, 'K2')];
+    k1 = await h.subscription(40, 'K1');
   }, 300000);
 
   afterAll(async () => {
@@ -390,6 +392,51 @@ describe('the deadline of the revocations of a departure (integration, real Post
       expect(firstPage.items).toHaveLength(1);
       expect(firstPage.pagination.totalItems).toBe(others.pagination.totalItems);
     }, 180_000);
+
+    it('counts the rights without a completed task the same in the detail, the list and the pass that tells the late ones, for a seat whose completed task the seat listing does not show (MF2-D review a)', async () => {
+      const code = `E-RD-K${(counter += 1)}`;
+      const person = await h.worker(des, code);
+      const seats: string[] = [];
+      for (const subscriptionId of subscriptions) seats.push(await h.seatOf(person, { subscriptionId }, code));
+      const runsOn = await h.seatOf(person, { subscriptionId: k1 }, code);
+      const wire = await h.recordedCase(person, { accessBlockMode: 'BLOCK_NOW', lastWorkingDay: undefined });
+      await h.revokeRights(wire.id, { assignmentIds: [...seats, runsOn], accountLock: LOCK }).expect(200);
+      // A K1 seat whose renewal is cancelled keeps its access to the end of the paid period: its task is completed and the seat is still held.
+      const task = (await h.liveTaskOf(runsOn)) as string;
+      await h.claim(task).expect(200);
+      await h
+        .revoked(task, {
+          completion: 'RENEWAL_CANCELLED',
+          evidence: 'Đã hủy gia hạn',
+          paidThroughOn: h.day(36),
+          accessState: 'UNTIL_PAID_END',
+        })
+        .expect(200);
+      // The seat listing reads only a task whose reason was not withdrawn: here it does not see the completed one, the other two do not change.
+      await h.ctx.sql.query('BEGIN');
+      try {
+        await h.ctx.sql.query('ALTER TABLE provisioning_task_reasons DISABLE TRIGGER USER');
+        await h.ctx.sql.query(
+          `UPDATE provisioning_task_reasons SET withdrawn_at = now(), withdraw_cause = 'NO_LONGER_APPLIES' WHERE task_id = $1`,
+          [task],
+        );
+        await h.ctx.sql.query('ALTER TABLE provisioning_task_reasons ENABLE TRIGGER USER');
+        await h.ctx.sql.query('COMMIT');
+      } catch (error) {
+        await h.ctx.sql.query('ROLLBACK');
+        throw error;
+      }
+
+      const detail = h.dataOf<CaseWire>(await h.readCase(wire.id).expect(200)).revocation.rightsWithoutCompletedTask;
+      const listed = (await casePage('?pageSize=100')).items.find((item) => item.id === wire.id);
+      const late = await h.ctx.app
+        .get(RevocationOverdueService, { strict: false })
+        .overdueCases(addDays(dueAfter(h.today()), 1));
+
+      expect(detail).toBe(2);
+      expect(listed?.revocation.rightsWithoutCompletedTask).toBe(2);
+      expect(late.find((item) => item.id === wire.id)?.rightCount).toBe(2);
+    }, 240_000);
 
     it('lets the IT Admin in charge of the department read the departures past the deadline', async () => {
       const lateOne = await h.recordedCase((await holder()).person);

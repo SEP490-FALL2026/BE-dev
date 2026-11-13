@@ -1,4 +1,3 @@
-import { rightsWithoutCompletedTask } from '../../departure-deadline/departure-deadline.policy';
 import { blockersOf, checklistOf, type Checklist } from '../offboarding.policy';
 import type { OffboardingRecord } from '../offboarding.types';
 
@@ -11,6 +10,12 @@ export interface DepartureDetailReads {
   /** The case is not cancelled: only then are the rights, the steps and what keeps it open read at all. */
   live: boolean;
   seats: readonly { assignmentId: string; revocation: { status: string } | null }[];
+  /**
+   * How many of the personal seats have no task of revocation completed (`QĐ-110c`): the one count the list of departures and the pass that
+   * tells the late ones use (`LicensingApi.countPersonalSeatsWithoutCompletedTaskOf`), so the three never disagree. It is not derived from
+   * `seats`: the listing shows one task for a seat, which may not be the completed one.
+   */
+  withoutCompletedTask: number;
   /** The seats whose renewal is cancelled but whose access runs on to the end of the paid period. */
   terminating: ReadonlySet<string>;
   /** The seats this case asked to have revoked. */
@@ -36,7 +41,7 @@ export function departureDetailFacts(
 
   return {
     heldRights: seats.length,
-    rightsWithoutCompletedTask: rightsWithoutCompletedTask(seats),
+    rightsWithoutCompletedTask: reads.withoutCompletedTask,
     accessRunsOn,
     checklist: reads.live
       ? checklistOf({

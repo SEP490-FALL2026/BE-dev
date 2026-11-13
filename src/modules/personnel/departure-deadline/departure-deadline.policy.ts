@@ -23,15 +23,6 @@ export function deadlineWindowEnd(lastWorkingDay: BusinessDate): BusinessDate {
   return addDays(addDays(lastWorkingDay, 1), CALENDAR_WINDOW_DAYS);
 }
 
-/**
- * How many of the personal seats of a person have no task of revocation completed (`QĐ-110c`): the seats nobody has opened a task for and
- * those whose task still waits, runs or failed. A task completed is the end of the right (or of its renewal, with the access running on to
- * the end of the paid period: the person in charge of that is the warning of the access that runs on), so only these keep the case late.
- */
-export function rightsWithoutCompletedTask(seats: readonly { revocation: { status: string } | null }[]): number {
-  return seats.filter((seat) => seat.revocation?.status !== 'COMPLETED').length;
-}
-
 /** What a case is judged late by: where it stands, its deadline and how many rights are left without a completed task. */
 export interface RevocationStanding {
   state: 'HANDING_OVER' | 'LEFT' | 'CANCELLED';

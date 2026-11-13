@@ -14,6 +14,7 @@ describe('what the detail of a departure is read against (US-03-04 AC-7, AC-20, 
   const live = {
     live: true,
     seats: [seat('a'), seat('b', { status: 'QUEUED' }), seat('c')],
+    withoutCompletedTask: 3,
     terminating: new Set(['c']),
     opened: ['a', 'x'],
     registered: { WORKSPACE: 1 },
@@ -25,14 +26,20 @@ describe('what the detail of a departure is read against (US-03-04 AC-7, AC-20, 
     expect(facts).toMatchObject({ heldRights: 3, accessRunsOn: 1 });
   });
 
-  it('counts the rights left without a completed task: the seats with no task and the seats whose task still waits (QĐ-110c)', () => {
+  it('takes the rights left without a completed task from the one count the list and the late pass use, not from the seats it lists (QĐ-110c)', () => {
     expect(departureDetailFacts(record(), live).rightsWithoutCompletedTask).toBe(3);
+    // The seats show a task completed for every one, yet the count says one is left: the count is the source.
     expect(
       departureDetailFacts(record(), {
         ...live,
-        seats: [seat('a', { status: 'COMPLETED' }), seat('b', { status: 'IN_PROGRESS' }), seat('c')],
+        seats: [
+          seat('a', { status: 'COMPLETED' }),
+          seat('b', { status: 'COMPLETED' }),
+          seat('c', { status: 'COMPLETED' }),
+        ],
+        withoutCompletedTask: 1,
       }).rightsWithoutCompletedTask,
-    ).toBe(2);
+    ).toBe(1);
   });
 
   it('fills the checklist from the seats without a task and the seats given back; the handover step is always done (QĐ-110g)', () => {
@@ -58,6 +65,7 @@ describe('what the detail of a departure is read against (US-03-04 AC-7, AC-20, 
     const facts = departureDetailFacts(record({ state: 'CANCELLED' }), {
       live: false,
       seats: [],
+      withoutCompletedTask: 0,
       terminating: new Set<string>(),
       opened: [],
       registered: {},

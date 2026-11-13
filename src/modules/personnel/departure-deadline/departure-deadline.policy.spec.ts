@@ -4,7 +4,6 @@ import {
   isRevocationOverdue,
   overdueNoticeOwed,
   revocationDueOn,
-  rightsWithoutCompletedTask,
 } from './departure-deadline.policy';
 
 const NONE: ReadonlySet<string> = new Set();
@@ -43,26 +42,6 @@ describe('the day the IT Admin has until to take every right away (QĐ-110c, T-M
 
   it('asks for a window of days off that holds the working days of the deadline', () => {
     expect(deadlineWindowEnd('2026-11-12')).toBe(addDays('2026-11-13', 90));
-  });
-});
-
-describe('the rights a departure has not taken away yet', () => {
-  it('counts every seat that has no task completed, whether or not a task works on it', () => {
-    expect(
-      rightsWithoutCompletedTask([
-        { revocation: null },
-        { revocation: { status: 'QUEUED' } },
-        { revocation: { status: 'IN_PROGRESS' } },
-        { revocation: { status: 'FAILED' } },
-        { revocation: { status: 'RETRY_SCHEDULED' } },
-        { revocation: { status: 'COMPLETED' } },
-      ]),
-    ).toBe(5);
-  });
-
-  it('is zero when every seat has a completed task, or the person holds none', () => {
-    expect(rightsWithoutCompletedTask([{ revocation: { status: 'COMPLETED' } }])).toBe(0);
-    expect(rightsWithoutCompletedTask([])).toBe(0);
   });
 });
 

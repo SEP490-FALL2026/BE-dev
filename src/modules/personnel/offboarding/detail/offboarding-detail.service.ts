@@ -34,6 +34,11 @@ export class OffboardingDetailService {
     const today = await this.organizationReads.businessToday();
     const live = record.state !== 'CANCELLED';
     const seats = live ? await this.licensing.listPersonalSeatsOf(record.employeeId, today) : [];
+    const withoutCompletedTask = live
+      ? ((await this.licensing.countPersonalSeatsWithoutCompletedTaskOf([record.employeeId], today)).get(
+          record.employeeId,
+        ) ?? 0)
+      : 0;
     const terminating = new Set(
       live
         ? (await this.licensing.listTerminatingAccess([record.employeeId])).map((access) => access.assignmentId)
@@ -41,7 +46,7 @@ export class OffboardingDetailService {
     );
     const opened = live ? await this.repo.openedAssignmentIds(record.id) : [];
     const registered = live ? await this.sources.blockersOf(record.employeeId) : {};
-    const facts = departureDetailFacts(record, { live, seats, terminating, opened, registered });
+    const facts = departureDetailFacts(record, { live, seats, withoutCompletedTask, terminating, opened, registered });
 
     const roles = await this.rolesOf(record, live);
     const [employees, department, warnings] = await this.othersOf(record, live);

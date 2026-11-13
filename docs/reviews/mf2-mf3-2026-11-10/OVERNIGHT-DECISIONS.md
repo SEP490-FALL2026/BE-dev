@@ -376,6 +376,14 @@ Không sửa code; SPEC không bị sửa trong lượt này (spec là của Own
 - **Đổi lại:** muốn `ACCOUNT_LOCK_OVERDUE` chỉ tới IT: bỏ Super Admin ở `PersonnelNotifier.accountLockOverdue` (đổi `toItAdminAndSuperAdmin` thành chỉ IT); muốn mỗi ngày: thêm ngày vào `eventKey` và bỏ điều kiện một lần; muốn bỏ IT khỏi bản tin ghi/đổi/hủy: xóa `IT_ADMIN_TOLD_OF`.
 - **Chạm:** `event-notice/personnel-notifier.service.ts` (+spec), `notifications/inbox/inbox.policy.ts` (chú thích), `offboarding/offboarding-steps.controller.ts`, `openapi.json`; test `offboarding-cases.http-spec.ts`, `departure-block-moment.integration-spec.ts`.
 
+### D-51 · MF2-D review (a) · Chi tiết hồ sơ và danh sách/job đếm `rightsWithoutCompletedTask` khác nguồn
+
+- **Vấn đề:** chi tiết đếm từ danh sách ghế (`LicensingApi.listPersonalSeatsOf`, mỗi ghế chỉ mang MỘT tác vụ thu hồi, lấy `provisioningTasks[0]` trong số tác vụ chưa `CLOSED_FAILED`/`CANCELLED` còn lý do chưa rút), còn danh sách và job đếm bằng một câu `none { REVOKE, COMPLETED }`. Ghế có tác vụ `COMPLETED` mà danh sách ghế không hiện (K1 `UNTIL_PAID_END` cùng một tác vụ khác, lý do đã rút…) được chi tiết tính là "chưa xong" còn danh sách/job tính là "xong" ⟹ ba nơi lệch nhau (test kỳ vọng chi tiết 3, danh sách và job 2).
+- **A:** thêm `revocationCompleted` vào hàng ghế để chi tiết đếm trên đó. **B:** chi tiết gọi chính `LicensingApi.countPersonalSeatsWithoutCompletedTaskOf([người], hôm nay)` (một câu, cùng điều kiện ghế với danh sách và job). **ĐÃ CHỌN B**: một định nghĩa duy nhất của "chưa có tác vụ `COMPLETED`" (SQL), không phải hai cách lấy cho cùng một số; thêm đúng một truy vấn nhẹ cho chi tiết. `OffboardingDetailService` đọc số này, `departureDetailFacts` nhận qua `reads.withoutCompletedTask`; hàm thuần `rightsWithoutCompletedTask(seats)` không còn ai dùng nên **xóa** cùng spec của nó. Hồ sơ hủy ⟹ 0 như cũ.
+- **Test:** `departure-revocation-deadline.integration-spec` ca "counts the rights without a completed task the same in the detail, the list and the pass…": một người có hai ghế K2 (tác vụ chờ) và một ghế K1 `UNTIL_PAID_END` (xong, ghế còn giữ, lý do của tác vụ xong bị rút để danh sách ghế không thấy) ⟹ chi tiết = danh sách = `overdueCases` = 2 (đã kiểm đỏ: trước khi sửa chi tiết ra 3); spec đơn vị `offboarding-detail.policy.spec` ghim "lấy từ số đếm, không lấy từ danh sách ghế".
+- **Đổi lại:** muốn đếm từ hàng ghế: thêm cờ vào `PersonalSeatRow` và đếm trong `departureDetailFacts`, bỏ lời gọi facade ở `OffboardingDetailService`.
+- **Chạm:** `offboarding/detail/offboarding-detail.{policy,service}.ts` (+spec), `departure-deadline/departure-deadline.policy.ts` (+spec: bỏ `rightsWithoutCompletedTask`), test `departure-revocation-deadline.integration-spec.ts`.
+
 ## Bị chặn
 
 (chưa có)
