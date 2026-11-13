@@ -356,6 +356,17 @@ export class PlanRepo {
     return row ? toProfile(row) : null;
   }
 
+  /** The profiles of these plans in one read, by plan; a plan with none is absent. */
+  async findProfilesOf(planIds: readonly string[], tx?: DbTx): Promise<Map<string, WorkspaceProfileRecord>> {
+    if (planIds.length === 0) return new Map();
+    const rows = await (tx ?? this.prisma).planWorkspaceProfile.findMany({
+      where: { planId: { in: [...planIds] } },
+      include: { members: true },
+    });
+
+    return new Map(rows.map((row) => [row.planId, toProfile(row)]));
+  }
+
   /** The workspaces these people own or administer, one row for each person and plan, the primary owner first (one read, `US-03-04` AC-28). */
   async findWorkspaceDuties(employeeIds: readonly string[], tx?: DbTx): Promise<WorkspaceDuty[]> {
     if (employeeIds.length === 0) return [];

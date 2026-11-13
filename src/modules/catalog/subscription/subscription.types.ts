@@ -36,6 +36,9 @@ export interface SubscriptionRecord {
   planId: string;
   planName: string;
   planPricingModel: PlanPricingModel | null;
+  /** The kind of the plan and whether it is a `K4` plan with an admin console: which plans need admins at the vendor (`R-53`). */
+  planProvisioningType: ProvisioningType;
+  planHasAdminConsole: boolean;
   /** The department that owns the purchase; **Gói 9: nullable — kho dùng chung không gắn với phòng** (`QĐ-103d`). */
   ownerDepartmentId: string | null;
   applicationId: string;
@@ -121,6 +124,15 @@ export interface TaxEstimateSummary {
   estimatedCost: string;
 }
 
+/** An admin of a plan at the vendor as a subscription answers it. */
+export interface VendorAdminView {
+  employeeId: string;
+  employeeCode: string;
+  fullName: string;
+  role: 'OWNER' | 'ADMIN';
+  working: boolean;
+}
+
 /** A subscription as it is answered: the stored data and everything derived from it when it is read. */
 export interface SubscriptionView {
   id: string;
@@ -161,6 +173,12 @@ export interface SubscriptionView {
   warnings: SubscriptionWarning[];
   /** The other live subscriptions of the same K2 or K4 plan: set with the warning `SHOULD_MERGE`, empty otherwise (`QĐ-104k`(3)). */
   mergeCandidateIds: string[];
+  /** Who administers the plan at the vendor (`QĐ-110k`, `QĐ-110u`): empty for a plan that needs no admins; `working` says whether the person is an IT Admin who works now. */
+  vendorAdmins: VendorAdminView[];
+  ownerAccountEmail: string | null;
+  adminNote: string | null;
+  vendorAdminsBelowMinimum: boolean;
+  ownerAccountEmailMissing: boolean;
   taxProfile: { status: 'DECLARED' | 'MISSING'; group: 'T1' | 'T2' | 'T3' | null };
   taxEstimate: TaxEstimateSummary | null;
   createdAt: Date;

@@ -46,7 +46,7 @@ export const workspaceProfileBodySchema = z.strictObject({
   members: z
     .array(z.strictObject({ employeeId: z.uuid(), role: workspaceRole }))
     .min(1)
-    .max(100),
+    .max(20),
   ownerLimit: z.number().int().min(1).max(1000).nullable().optional(),
   adminLimit: z.number().int().min(1).max(1000).nullable().optional(),
   ownerTransferProcedure: note.nullable().optional(),

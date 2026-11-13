@@ -174,6 +174,7 @@ export class SubscriptionService {
     const priced = await this.pricing.priceToday(tx, money);
     const complete = subscriptionStatusOf(plan, input.kind, { ...state, ...priced });
     this.poolRules.assert(plan, input.kind, state, complete === 'ACTIVE');
+    if (complete === 'ACTIVE') await this.poolRules.assertVendorAdmins(tx, plan);
     const created = await this.subscriptions.insert(tx, {
       organizationId,
       planId: plan.id,

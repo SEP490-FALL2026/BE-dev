@@ -5,6 +5,7 @@ import {
   SubscriptionCommitmentTermRequiredError,
   SubscriptionK1MonthlyOnlyError,
   SubscriptionResponsibleRequiredError,
+  SubscriptionVendorAdminsRequiredError,
 } from '../subscription.errors';
 import type {
   BillingCycle,
@@ -75,6 +76,39 @@ export function assertPoolTerms(input: PoolTermsInput): void {
 /** An active subscription names the IT Admin who answers for it (`QĐ-103v`(4)). */
 export function assertResponsibleNamed(responsibleItAdminEmployeeId: string | null, activating: boolean): void {
   if (activating && responsibleItAdminEmployeeId === null) throw new SubscriptionResponsibleRequiredError();
+}
+
+/** The fewest different admins at the vendor a plan that needs them has recorded before it is activated (`QĐ-110k`). */
+const MIN_RECORDED_VENDOR_ADMINS = 2;
+
+/**
+ * A subscription of a plan that needs admins at the vendor (`K2`, or `K4` with an admin console) is not activated, nor a pool made, while the
+ * profile of the plan names fewer than two different ones (`QĐ-110k`, `R-53`, SPEC P19). What was recorded is judged, not who still works:
+ * a person who has left only lowers the flag a reader sees (`vendorAdminFlags`). Throws SubscriptionVendorAdminsRequiredError.
+ */
+export function assertVendorAdminsRecorded(input: { needs: boolean; given: number; planId: string }): void {
+  if (input.needs && input.given < MIN_RECORDED_VENDOR_ADMINS) {
+    throw new SubscriptionVendorAdminsRequiredError(input.planId, input.given, MIN_RECORDED_VENDOR_ADMINS);
+  }
+}
+
+/**
+ * What a reader sees of the vendor admins of a subscription, never a refusal (`QĐ-110k`, `QĐ-110u`): fewer than two of the admins recorded still
+ * work, and no email of the company account that owns the plan at the vendor is recorded. A plan that needs no admins raises neither; a
+ * subscription older than the rule has the flags and nothing blocks it.
+ */
+export function vendorAdminFlags(input: {
+  needs: boolean;
+  admins: ReadonlyArray<{ employeeId: string; working: boolean }>;
+  ownerAccountEmail: string | null;
+}): { vendorAdminsBelowMinimum: boolean; ownerAccountEmailMissing: boolean } {
+  if (!input.needs) return { vendorAdminsBelowMinimum: false, ownerAccountEmailMissing: false };
+  const working = new Set(input.admins.filter((admin) => admin.working).map((admin) => admin.employeeId)).size;
+
+  return {
+    vendorAdminsBelowMinimum: working < MIN_RECORDED_VENDOR_ADMINS,
+    ownerAccountEmailMissing: input.ownerAccountEmail === null,
+  };
 }
 
 /** The data-quality warnings of a stored subscription that come from data written before the shared-pool rules. */

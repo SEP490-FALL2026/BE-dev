@@ -174,6 +174,7 @@ export const ROUTE_ERROR_CODES_CATALOG: Readonly<Record<string, Partial<Record<R
         'SUBSCRIPTION.RESPONSIBLE_NOT_IT_ADMIN',
         'SUBSCRIPTION.RESPONSIBLE_REQUIRED',
         'SUBSCRIPTION.STILL_DRAFT',
+        'SUBSCRIPTION.VENDOR_ADMINS_REQUIRED',
       ],
     },
     subscriptionCreate: {
@@ -196,6 +197,7 @@ export const ROUTE_ERROR_CODES_CATALOG: Readonly<Record<string, Partial<Record<R
         'SUBSCRIPTION.PLAN_NOT_FOUND',
         'SUBSCRIPTION.RESPONSIBLE_NOT_IT_ADMIN',
         'SUBSCRIPTION.RESPONSIBLE_REQUIRED',
+        'SUBSCRIPTION.VENDOR_ADMINS_REQUIRED',
       ],
     },
     subscriptionGet: {
@@ -221,6 +223,7 @@ export const ROUTE_ERROR_CODES_CATALOG: Readonly<Record<string, Partial<Record<R
         'SUBSCRIPTION.RESPONSIBLE_REQUIRED',
         'SUBSCRIPTION.STILL_DRAFT',
         'SUBSCRIPTION.UPDATE_EMPTY',
+        'SUBSCRIPTION.VENDOR_ADMINS_REQUIRED',
       ],
     },
     vendorGroupCreate: {

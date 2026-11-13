@@ -6,7 +6,8 @@ import { IdentityAccessApi } from '../../../identity-access/public/identity-acce
 import { OrganizationReadApi } from '../../../organization/public/organization-read.api';
 import { catalogAuditEvent } from '../../catalog-audit-event.mapper';
 import { ApplicationFactsService } from '../../catalog-entry/application-facts.service';
-import type { LockedPlan } from '../../plan/plan-facts.service';
+import { PlanFactsService, type LockedPlan } from '../../plan/plan-facts.service';
+import { needsVendorAdmins } from '../../plan/plan-vendor-admins.policy';
 import { PoolSeatNotAddableError } from '../../public/catalog.errors';
 import { SeatBaselinePhaseHook } from '../../public/catalog.extension-points';
 import {
@@ -17,6 +18,7 @@ import {
 import {
   assertPoolTerms,
   assertResponsibleNamed,
+  assertVendorAdminsRecorded,
   defaultResponsibleOf,
   isPooledPlan,
   liveIdsByPlan,
@@ -64,6 +66,7 @@ export class SubscriptionPoolService {
     private readonly audit: AuditApi,
     private readonly baselinePhase: SeatBaselinePhaseHook,
     private readonly applications: ApplicationFactsService,
+    private readonly planFacts: PlanFactsService,
   ) {}
 
   /**
@@ -124,6 +127,22 @@ export class SubscriptionPoolService {
   ): Promise<void> {
     this.assert(plan, kind, state, true);
     await this.requireItAdmin(state.responsibleItAdminEmployeeId as string, tx);
+    await this.assertVendorAdmins(tx, plan);
+  }
+
+  /**
+   * A plan that needs admins at the vendor (`K2`, or `K4` with an admin console) is activated, or its pool made, only when its profile names at
+   * least two different ones (`QĐ-110k`, `R-53`): what was recorded is judged, the plan is locked by the caller. Throws SubscriptionVendorAdminsRequiredError.
+   */
+  async assertVendorAdmins(tx: DbTx, plan: LockedPlan): Promise<void> {
+    const needs = needsVendorAdmins(plan.provisioningType, plan.hasAdminConsole);
+    if (!needs) return;
+    const profile = (await this.planFacts.vendorAdminsOf([plan.id], tx)).get(plan.id);
+    assertVendorAdminsRecorded({
+      needs,
+      given: new Set(profile?.members.map((member) => member.employeeId) ?? []).size,
+      planId: plan.id,
+    });
   }
 
   /**
