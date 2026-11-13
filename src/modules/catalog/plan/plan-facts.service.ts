@@ -8,6 +8,7 @@ import type { PlanRevocationInfo, PlanSummary, PlanUsageRate, WorkspaceDuty } fr
 import { kpi3Percent } from './plan.policy';
 import { PlanRepo } from './plan.repo';
 import { PlanUsageRepo } from './plan-usage.repo';
+import { notYetBlocked } from './vendor-admin-roles.policy';
 import type { PlanLookup, WorkspaceMemberRecord } from './plan.types';
 
 export type LockedPlan = PlanLookup;
@@ -71,7 +72,11 @@ export class PlanFactsService implements ApplicationPlans {
     const blocks = await this.identity.findDepartureBlocks([...usable]);
     const today = await this.organizationReads.businessToday(new Date(), tx);
 
-    return new Set([...usable].filter((id) => (blocks.get(id)?.blockedFrom ?? today) > today));
+    return notYetBlocked(
+      usable,
+      new Map([...blocks].map(([employeeId, block]) => [employeeId, block.blockedFrom])),
+      today,
+    );
   }
 
   /** Who administers each of these plans at the vendor, in one read, by plan; a plan whose profile was never recorded is absent. */

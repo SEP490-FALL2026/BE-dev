@@ -1,4 +1,4 @@
-import { othersWorking } from './vendor-admin-roles.policy';
+import { notYetBlocked, othersWorking } from './vendor-admin-roles.policy';
 
 describe('vendor-admin-roles.policy (QĐ-110k: what is left of a plan at the vendor without one admin)', () => {
   const members = [{ employeeId: 'a' }, { employeeId: 'b' }, { employeeId: 'c' }];
@@ -17,5 +17,24 @@ describe('vendor-admin-roles.policy (QĐ-110k: what is left of a plan at the ven
     expect(othersWorking(members, new Set(['a']), 'a')).toBe(0);
     expect(othersWorking([{ employeeId: 'a' }], new Set(['a']), 'a')).toBe(0);
     expect(othersWorking([], new Set(['a']), 'a')).toBe(0);
+  });
+});
+
+describe('vendor-admin-roles.policy: who a departure has not blocked yet', () => {
+  const today = '2026-11-13';
+
+  it('keeps a person no departure blocks, and one whose block begins after today', () => {
+    const blocked = new Map([['b', '2026-11-14']]);
+
+    expect([...notYetBlocked(new Set(['a', 'b']), blocked, today)].sort()).toEqual(['a', 'b']);
+  });
+
+  it('drops a person whose block begins today or began before', () => {
+    const blocked = new Map([
+      ['a', today],
+      ['b', '2026-11-01'],
+    ]);
+
+    expect([...notYetBlocked(new Set(['a', 'b', 'c']), blocked, today)]).toEqual(['c']);
   });
 });
