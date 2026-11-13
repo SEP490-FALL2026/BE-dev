@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { Prisma } from '../../../../generated/prisma/client';
 import { PrismaService } from '../../../../infrastructure/database/prisma.service';
 import type { DbTx } from '../../../../infrastructure/database/transaction-runner';
+import { toDateColumn, type BusinessDate } from '../../../../core/business-date';
 import { k1ChecklistJson } from './provisioning-k1-checklist.json';
 import type { StoredK1Checklist } from './provisioning-k1-checklist.policy';
 
@@ -59,10 +60,39 @@ export class ProvisioningK1ChecklistRepo {
   }
 
   /**
+   * The personal seats of these people that are still theirs on `day` or later and have no revocation completed (not failed, not cancelled):
+   * the seats whose access at the vendor may still be open, whatever their task (none yet, under way, or closed as failed). The plan says
+   * which are K1 (read through the catalog by the caller).
+   */
+  async openPersonalSeatsOf(
+    employeeIds: readonly string[],
+    day: BusinessDate,
+    tx?: DbTx,
+  ): Promise<{ assignmentId: string; employeeId: string; planId: string }[]> {
+    if (employeeIds.length === 0) return [];
+    const rows = await (tx ?? this.prisma).licenseAssignment.findMany({
+      where: {
+        employeeId: { in: [...employeeIds] },
+        kind: 'PERSONAL',
+        failedAt: null,
+        cancelledAt: null,
+        OR: [{ validUntil: null }, { validUntil: { gt: toDateColumn(day) } }],
+        provisioningTasks: { none: { kind: 'REVOKE', status: 'COMPLETED' } },
+      },
+      select: { id: true, employeeId: true, planId: true },
+    });
+
+    return rows.map((row) => ({ assignmentId: row.id, employeeId: row.employeeId, planId: row.planId }));
+  }
+
+  /**
    * The checklists kept by the completed revocations of these people, in one read: only a K1 revocation keeps one, so a person with none is not
    * in the map. What the system reads to find the people whose last K1 revocation ticked the lock of the mailbox when it could not write it then.
    */
-  async completedOf(employeeIds: readonly string[], tx?: DbTx): Promise<Map<string, StoredK1Checklist[]>> {
+  async completedOf(
+    employeeIds: readonly string[],
+    tx?: DbTx,
+  ): Promise<Map<string, (StoredK1Checklist & { completedAt: Date })[]>> {
     if (employeeIds.length === 0) return new Map();
     const rows = await (tx ?? this.prisma).provisioningTask.findMany({
       where: {
@@ -71,12 +101,16 @@ export class ProvisioningK1ChecklistRepo {
         k1Checklist: { not: Prisma.DbNull },
         assignment: { employeeId: { in: [...employeeIds] } },
       },
-      select: { k1Checklist: true, assignment: { select: { employeeId: true } } },
+      select: { k1Checklist: true, completedAt: true, assignment: { select: { employeeId: true } } },
     });
-    const kept = new Map<string, StoredK1Checklist[]>();
+    const kept = new Map<string, (StoredK1Checklist & { completedAt: Date })[]>();
     for (const row of rows) {
       const checklist = k1ChecklistJson.decode(row.k1Checklist);
-      if (checklist) kept.set(row.assignment.employeeId, [...(kept.get(row.assignment.employeeId) ?? []), checklist]);
+      // A completed task always has its instant; a row without it is not read as a lock of this departure.
+      if (checklist && row.completedAt) {
+        const entry = { ...checklist, completedAt: row.completedAt };
+        kept.set(row.assignment.employeeId, [...(kept.get(row.assignment.employeeId) ?? []), entry]);
+      }
     }
 
     return kept;

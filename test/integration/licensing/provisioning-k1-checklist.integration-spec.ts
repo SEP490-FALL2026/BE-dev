@@ -259,22 +259,13 @@ describe('the checklist of a K1 revocation, over HTTP (integration, real Postgre
       },
     );
 
-    it('refuses a step ticked before the task was made: K1_CHECKLIST_OUT_OF_ORDER with the details, and nothing changes (review O2)', async () => {
-      const { assignmentId, taskId } = await taken('RETURN');
+    it('takes a step done before the task was made, as the reset of the mailbox at the block is (D-64, QĐ-110b, QĐ-110c)', async () => {
+      const { taskId } = await taken('RETURN');
       const anHourAgo = Date.now() - 3_600_000;
 
-      const refused = await complete(taskId, k1Checklist('STILL_EMPLOYED', 'đã hủy', { startAt: anHourAgo })).expect(
-        422,
-      );
+      await complete(taskId, k1Checklist('STILL_EMPLOYED', 'đã hủy', { startAt: anHourAgo })).expect(200);
 
-      expect(h.codeOf(refused)).toBe('REVOCATION.K1_CHECKLIST_OUT_OF_ORDER');
-      expect(detailsOf(refused)).toEqual({ variant: 'STILL_EMPLOYED', codes: [...K1_CODES.STILL_EMPLOYED] });
-      await unchanged(assignmentId, taskId);
-      // Only the first step before the task is just as out of order; the same steps ticked after the task are taken.
-      const first = k1Checklist('STILL_EMPLOYED', 'đã hủy', { startAt: Date.now() + 1000 });
-      first.items[0].doneAt = new Date(anHourAgo).toISOString();
-      expect(h.codeOf(await complete(taskId, first).expect(422))).toBe('REVOCATION.K1_CHECKLIST_OUT_OF_ORDER');
-      await complete(taskId, k1Checklist('STILL_EMPLOYED', 'đã hủy')).expect(200);
+      expect((await h.revocationOf(taskId)).k1Checklist?.items[0].doneAt).toBe(new Date(anHourAgo).toISOString());
     });
 
     it('refuses the renewal ticked after the evidence, and a step sent twice', async () => {
@@ -429,19 +420,25 @@ describe('the checklist of a K1 revocation, over HTTP (integration, real Postgre
       expect(Number(locks.rows[0].count)).toBe(1);
     });
 
-    it('asks the lock of a task whose other revocation was cancelled or closed as failed, and not while it is failed or still queued', async () => {
+    it('does not ask the lock while another K1 seat of the person is not revoked: no task yet, its revocation withdrawn, or closed as failed (D-62, QĐ-111az)', async () => {
+      const noTask = await seatsOf(1);
+      await h.seat({ subscriptionId: await h.subscription(1, 'K1') }, noTask.person);
+      expect(await stepsOf(noTask.seats[0].taskId)).toEqual(FIVE);
+      const lockRefused = await complete(noTask.seats[0].taskId, k1Checklist('DEPARTURE', 'đã khóa')).expect(422);
+      expect(h.codeOf(lockRefused)).toBe('REVOCATION.COMPLETION_NOT_ALLOWED');
+
       const cancelled = await seatsOf(1);
       const cancelledOther = await h.seat({ subscriptionId: await h.subscription(1, 'K1') }, cancelled.person);
       await h.open(cancelledOther, 'RETURN');
       expect(await stepsOf(cancelled.seats[0].taskId)).toEqual(FIVE);
       await h.withdraw(cancelledOther, 'RETURN', null);
-      expect(await stepsOf(cancelled.seats[0].taskId)).toEqual(K1_CODES.DEPARTURE);
+      expect(await stepsOf(cancelled.seats[0].taskId)).toEqual(FIVE);
 
       const failed = await seatsOf(2);
       await h.fail(failed.seats[1].taskId, { reason: 'nhà cung cấp từ chối' }).expect(200);
       expect(await stepsOf(failed.seats[0].taskId)).toEqual(FIVE);
       await h.closeFailed(failed.seats[1].taskId, { reason: 'đóng' }).expect(200);
-      expect(await stepsOf(failed.seats[0].taskId)).toEqual(K1_CODES.DEPARTURE);
+      expect(await stepsOf(failed.seats[0].taskId)).toEqual(FIVE);
 
       const queued = await seatsOf(2, 'DEPARTURE', false);
       await h.claim(queued.seats[0].taskId).expect(200);

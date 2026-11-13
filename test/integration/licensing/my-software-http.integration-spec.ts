@@ -173,7 +173,8 @@ describe('my software rights (integration, real PostgreSQL)', () => {
         evidence: 'đã hủy gia hạn',
         paidThroughOn: h.inDays(10),
         accessState: 'UNTIL_PAID_END',
-        k1Checklist: k1Checklist('DEPARTURE'),
+        // Another K1 seat of the person is still open, so this task does not carry the lock of the mailbox (D-62).
+        k1Checklist: k1Checklist('DEPARTURE', undefined, { withLock: false }),
       })
       .expect(200);
     const gone = await h.open(seats.gone, 'ABRUPT_DEPARTURE');

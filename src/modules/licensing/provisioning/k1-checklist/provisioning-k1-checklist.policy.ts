@@ -155,9 +155,9 @@ function instantsOf(
  * it was done, the instants not falling as the list goes (a step ticked before one that comes first in the list is out of order; the same
  * instant is in order, as a client may time to the second), and the evidence, which is the one written in the checklist or, when it has
  * none, the one written beside it. Another kind of provisioning has no checklist and refuses one. The variant is read from the sources, never
- * sent; the lock of the mailbox is asked, and accepted, only when this is the last K1 revocation of the person (`lastOfPerson`). A step is
- * not ticked before the task was made (`openedAt`): that is out of order as well; one ticked ahead of the clock is not refused, the clock of
- * the IT Admin being theirs (D-55). Throws RevocationCompletionError (`COMPLETION_NOT_ALLOWED`, `K1_CHECKLIST_INCOMPLETE`,
+ * sent; the lock of the mailbox is asked, and accepted, only when this is the last K1 revocation of the person (`lastOfPerson`). A step may
+ * be ticked before the task was made: the password of the mailbox is reset when access is blocked, before the IT Admin opens the revocation
+ * (`QĐ-110b`, `QĐ-110c`, D-64); one ticked ahead of the clock is not refused either, the clock of the IT Admin being theirs (D-55). Throws RevocationCompletionError (`COMPLETION_NOT_ALLOWED`, `K1_CHECKLIST_INCOMPLETE`,
  * `K1_CHECKLIST_OUT_OF_ORDER`).
  */
 export function planK1Checklist(input: {
@@ -165,8 +165,6 @@ export function planK1Checklist(input: {
   sources: readonly RevocationSource[];
   /** True when no other K1 revocation of the person is still to do: only then the mailbox is locked with this one. */
   lastOfPerson: boolean;
-  /** When the task was made: no step is ticked before it. */
-  openedAt: Date;
   claim: K1ChecklistClaim | undefined;
   /** The evidence written beside the checklist, in the body of the completion. */
   evidence: string;
@@ -183,8 +181,7 @@ export function planK1Checklist(input: {
   const instants = instantsOf(expected, input.lastOfPerson, input.claim);
   const evidence = input.claim.evidence?.trim() || input.evidence.trim();
   if (evidence.length === 0) fail('K1_CHECKLIST_INCOMPLETE', expected);
-  const opened = input.openedAt.getTime();
-  if (instants.some(({ time }, index) => time < opened || (index > 0 && time < instants[index - 1].time))) {
+  if (instants.some(({ time }, index) => index > 0 && time < instants[index - 1].time)) {
     fail('K1_CHECKLIST_OUT_OF_ORDER', expected);
   }
 

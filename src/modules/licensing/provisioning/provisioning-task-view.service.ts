@@ -182,6 +182,7 @@ export class ProvisioningTaskViewService {
         )
         .map((task) => ({
           id: task.id,
+          assignmentId: task.assignmentId,
           status: task.status,
           employeeId: task.assignment.employeeId,
           revocationSource: task.revocationSource,
