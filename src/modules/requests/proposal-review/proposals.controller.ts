@@ -84,7 +84,7 @@ export class ProposalsController {
     status: HttpStatus.CREATED,
     message: 'ACCESS_REQUEST.PROPOSED',
     description:
-      'The request takes the third branch (the need, the assessment of the IT Admin, the spend decision, the grant) with no plan, and the assessment is opened for the IT Admin. The price is missing until the IT Admin records a quote.',
+      'The request takes the third branch (the need, the assessment of the IT Admin, the spend decision, the grant) with no plan, and the assessment is opened for the IT Admin. The price is missing until the IT Admin records a quote. From a department with no effective head the proposal waits at the need step for a head (waitingReason NO_DEPARTMENT_HEAD) and does not reach the IT Admin before its need is decided, because it is not yet known whether the software will be free or paid; the head of a department sends it without a need step.',
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,

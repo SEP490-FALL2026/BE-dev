@@ -231,21 +231,6 @@ describe('a department with no head: paid requests and case B wait for one, over
   });
 
   describe('a request the earlier rule turned into one-step before this one (data of an earlier deploy)', () => {
-    /** What the earlier rule wrote when a head left: one-step, reason HEAD_LEFT, the need step closed and its lines confirmed. */
-    const markedByEarlierRule = async (id: string) => {
-      await h.ctx.sql.query(
-        `UPDATE access_requests SET routing_mode = 'ONE_STEP', one_step_reason = 'HEAD_LEFT' WHERE id = $1`,
-        [id],
-      );
-      await h.ctx.sql.query(
-        `UPDATE access_request_steps SET state = 'CLOSED', decided_at = now(), waiting_reason = NULL, waiting_since = NULL,
-                same_person_as_spend = false, no_independent_review = false
-          WHERE request_id = $1 AND kind = 'NEED' AND state IN ('PENDING', 'WAITING')`,
-        [id],
-      );
-      await h.ctx.sql.query(`UPDATE access_request_lines SET state = 'NEED_CONFIRMED' WHERE request_id = $1`, [id]);
-    };
-
     it('is still finished by the sweep, one request at a time, a failure of one not holding back the others, and not finished twice', async () => {
       n += 1;
       const first = await h.departmentWithHead(`P-XL${n}`);
@@ -253,8 +238,8 @@ describe('a department with no head: paid requests and case B wait for one, over
       const second = await h.departmentWithHead(`P-XL${n}`);
       const failed = await h.sent(first.member, paid);
       const completed = await h.sent(second.member, paid);
-      await markedByEarlierRule(failed.id);
-      await markedByEarlierRule(completed.id);
+      await h.markedOneStepByEarlierRule(failed.id);
+      await h.markedOneStepByEarlierRule(completed.id);
       const spending = h.ctx.app.get(SpendRoutingService, { strict: false });
       const finish = spending.finishConversion.bind(spending);
       let injected = false;

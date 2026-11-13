@@ -74,13 +74,15 @@ describe('BR-MF1-02 one-step reserve, supplementary files and missing rates', ()
     });
   });
 
-  it('BR-MF1-02 lets a one-step group requester remove a person through the supplementary API', async () => {
+  it('BR-MF1-02 lets the requester of a group the earlier rule turned into one-step remove a person through the supplementary API', async () => {
     const u = await unit();
     const people = await h.colleagues(u, 3);
-    await h.vacateHead(u.department.id).expect(200);
     const response = await h.submitGroup(h.groupBody(plan, people), people[0].account).expect(201);
     const sent = h.dataOf<{ request: AccessRequestWire }>(response).request;
-    expect(sent.state).toBe('AWAITING_REQUESTER_REVISION');
+    // QĐ-110i: a missing head no longer turns a group into one-step. This one stands for the data of an earlier deploy, which the sweep finishes.
+    await h.markedOneStepByEarlierRule(sent.id);
+    await h.sweep();
+    expect((await fetch(sent.id, people[0].account)).state).toBe('AWAITING_REQUESTER_REVISION');
     const file = await h
       .addSupplement(
         sent.id,
@@ -92,7 +94,6 @@ describe('BR-MF1-02 one-step reserve, supplementary files and missing rates', ()
       )
       .expect(201);
     expect(h.dataOf<{ supplement: { droppedCount: number } }>(file).supplement.droppedCount).toBe(1);
-    await h.makeHead(u.department, u.head);
     await h.budgetFor(u, { total: 100 * M });
     await resubmit(sent.id, people[0].account).expect(200);
     expect(await fetch(sent.id, people[0].account)).toMatchObject({

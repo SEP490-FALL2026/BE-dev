@@ -190,20 +190,33 @@ describe('requests over HTTP: the preview before sending (integration, real Post
       expect(sent.needStep).toMatchObject({ state: 'NOT_REQUIRED', assignee: null });
     });
 
-    it('MF1-D: a member of a department with no head goes one step: nobody takes the need step in place of a head', async () => {
+    it('QĐ-110i: a member of a department with no head waits at the need step: nobody takes it in place of a head, and the chain shown is the chain made', async () => {
       const preview = await h.previewed(newcomer, paidPlan);
       const sent = await h.sent(newcomer, paidPlan);
 
-      // One-step routing (BR-MF1-02): the chain begins with the spend step of the approver; no need step waits for a head.
+      // The need step stays in the chain, waiting for a head (R-43, MF1-X); no one-step route is offered to an employee.
+      expect(preview.chain.map((step) => step.kind)).toEqual([
+        'NEED',
+        'SPEND_SUBMISSION',
+        'SPEND_APPROVAL',
+        'IT_EXECUTION',
+      ]);
       expect(preview.chain[0]).toMatchObject({
-        kind: 'SPEND_APPROVAL',
-        role: 'SPENDING_APPROVER',
-        assignee: { employeeId: boss.employeeId },
-        waitingReason: null,
+        kind: 'NEED',
+        role: 'MANAGER',
+        assignee: null,
+        explanation: 'WAITS_FOR_DEPARTMENT_HEAD',
+        waitingReason: 'NO_DEPARTMENT_HEAD',
       });
       // The chain shown is the chain made (AC-11).
-      expect(sent.routing).toEqual({ mode: 'ONE_STEP', oneStepReason: 'NO_DEPARTMENT_HEAD' });
-      expect(sent.needStep).toMatchObject({ state: 'NOT_REQUIRED', assignee: null, routingRow: 4 });
+      expect(sent.routing).toEqual({ mode: 'VIA_HEAD', oneStepReason: null });
+      expect(sent.state).toBe('WAITING_CONTROLLED');
+      expect(sent.needStep).toMatchObject({
+        state: 'WAITING',
+        assignee: null,
+        routingRow: 4,
+        waitingReason: 'NO_DEPARTMENT_HEAD',
+      });
       expect(JSON.stringify(preview)).not.toMatch(/FALLBACK|DEPARTMENT_HAS_NO_HEAD|HEAD_IS_THE_APPROVER/);
     });
   });

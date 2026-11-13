@@ -54,7 +54,8 @@ export class GroupRequestWriter {
       type: 'GROUP_GRANT',
       organizationId,
       branch: policy.branch,
-      state: 'PENDING',
+      // The request begins waiting under control when every step open waits for a head (`QĐ-110i`); a step confirmed by sending moves it on below.
+      state: state === 'WAITING_CONTROLLED' ? 'WAITING_CONTROLLED' : 'PENDING',
       planId: body.planId,
       requesterEmployeeId: actor.employeeId,
       beneficiaryEmployeeIds: judged.lines.map((line) => line.employeeId),

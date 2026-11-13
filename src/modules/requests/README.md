@@ -256,7 +256,7 @@ mở bước chi; bị chặn hoặc thiếu giá thì lưu `AWAITING_REQUESTER_
 `POST /access-requests/{id}/resubmission`, hoặc rút. Người duyệt chi quyết một lần có dự phòng.
 
 Nhóm không chứa trưởng phòng (`HEAD_IN_GROUP`), trần hiện tại giữ 10/100. Nhóm do trưởng phòng gửi vẫn xác nhận nhu cầu và vào lô; nhóm nhân
-viên trả phí của phòng không có trưởng phòng chờ như ca 1, nhóm `K5` đi một bước. Không cần định tuyến DIRECT theo người quyết nhu cầu hoặc cờ
+viên của phòng không có trưởng phòng chờ như ca 1 (nhóm chỉ xin phần mềm trả phí, không có nhóm `K5`). Không cần định tuyến DIRECT theo người quyết nhu cầu hoặc cờ
 cùng người hai bước.
 
 Mất trưởng phòng: khi kỳ trưởng phòng kết thúc (`HEAD_PERIOD_END`), bước nhu cầu trưởng phòng đang giữ chuyển sang chờ; không còn đánh dấu hay

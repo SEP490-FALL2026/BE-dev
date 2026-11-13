@@ -60,7 +60,7 @@ export class AccessRequestsController {
     status: HttpStatus.CREATED,
     message: 'ACCESS_REQUEST.SUBMITTED',
     description:
-      'The request is fixed to its branch and chain of steps, charged to the Unit Cost Center of the department of the sender on the day, and its need step is given to the one person the routing table names. A requester who is the current head, or whose department has no effective head, skips the need step; paid requests are checked immediately and a blocked request stays saved for revision.',
+      'The request is fixed to its branch and chain of steps, charged to the Unit Cost Center of the department of the sender on the day, and its need step is given to the one person the routing table names. A requester who is the current head skips the need step, and so does a request for free internal software from a department with no effective head (it goes straight to the IT Admin and carries the audit flag NO_NEED_APPROVER); a paid request from a department with no effective head waits at the need step for a head (waitingReason NO_DEPARTMENT_HEAD) and keeps its deadline when one is named. Paid requests that skip the need step are checked immediately and a blocked request stays saved for revision.',
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,

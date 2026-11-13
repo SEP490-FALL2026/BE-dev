@@ -31,17 +31,4 @@ describe('BR-MF1-02: group need routing', () => {
         step: { state: 'WAITING', routingRow: 4, waitingReason: 'NO_DEPARTMENT_HEAD', assigneeEmployeeId: null },
       },
     ]));
-  it('QĐ-111bc: keeps a free internal employee group without an effective head one-step', () =>
-    expect(
-      planNeedSteps({
-        ...input,
-        headEmployeeId: null,
-        facts: { ...facts, departmentHeadEmployeeId: null, chainHasSpendStep: false },
-      }),
-    ).toMatchObject([
-      {
-        confirmedBySending: false,
-        step: { state: 'NOT_REQUIRED', routingRow: 4, waitingReason: null, assigneeEmployeeId: null },
-      },
-    ]));
 });

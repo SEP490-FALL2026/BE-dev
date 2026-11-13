@@ -133,6 +133,7 @@ export interface DemoNextYear {
 /** The states a scenario request is brought to, each by the actions of the people the routing names. */
 export type DemoRequestTarget =
   | 'PENDING'
+  | 'WAITING_CONTROLLED'
   | 'REJECTED'
   | 'WITHDRAWN'
   | 'AWAITING_SPEND_SUBMISSION'

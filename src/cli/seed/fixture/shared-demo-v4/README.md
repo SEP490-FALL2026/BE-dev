@@ -27,7 +27,7 @@ Super Admin đăng nhập bằng `--super-admin-email` (mặc định `system.ad
 | ITO  | Phòng Công nghệ thông tin | NV-ITOH | NV-ITA1  | CC-ITO      | Hai IT Admin; Request cá nhân của IT Admin đi qua NV-ITOH             |
 | MKT  | Phòng Marketing           | NV-MKTH | NV-ITA2  | CC-MKT      | Ngân sách 240.000: Request dùng dự phòng, đã xác nhận                 |
 | SAL  | Phòng Kinh doanh          | NV-SALH | NV-ITA1  | CC-SAL      | Ngân sách 290.000: Request vượt dự phòng, bị chặn                     |
-| LGL  | Phòng Pháp chế            | -       | NV-ITA1  | CC-LGL      | **Không có trưởng phòng**: Request đi một bước tới Người duyệt chi    |
+| LGL  | Phòng Pháp chế            | -       | NV-ITA1  | CC-LGL      | **Không có trưởng phòng**: Request trả phí chờ ở bước nhu cầu         |
 | OPS  | Phòng Vận hành            | NV-OPSH | NV-ITA2  | -           | **Không có Cost Center**: Request trả phí chỉ lưu nháp được           |
 
 ## People and accounts
@@ -70,7 +70,7 @@ Super Admin đăng nhập bằng `--super-admin-email` (mặc định `system.ad
 | NV-SALH  | Trương Văn Yên  | yen.truong@saoviet.example  | MANAGER           | SAL        | SAL   | Trưởng phòng Kinh doanh: ngân sách hẹp; phiên bản 2027 bị yêu cầu sửa                                   |
 | NV-SAL1  | Kiều Thị Ánh    | anh.kieu@saoviet.example    | EMPLOYEE          | SAL        | -     | Nhân viên: R11 Mailchimp bị chặn vì vượt dự phòng                                                       |
 | NV-SAL2  | Quách Văn Bảo   | bao.quach@saoviet.example   | EMPLOYEE          | SAL        | -     | Nhân viên Kinh doanh                                                                                    |
-| NV-LGL1  | Lý Thu Thủy     | thu.ly@saoviet.example      | EMPLOYEE          | LGL        | -     | Nhân viên Pháp chế (phòng không có trưởng phòng): R13 đi một bước thẳng tới Người duyệt chi             |
+| NV-LGL1  | Lý Thu Thủy     | thu.ly@saoviet.example      | EMPLOYEE          | LGL        | -     | Nhân viên Pháp chế (phòng không có trưởng phòng): R13 chờ trưởng phòng ở bước nhu cầu                   |
 | NV-OPSH  | Quan Thị Trang  | trang.quan@saoviet.example  | MANAGER           | OPS        | OPS   | Trưởng phòng Vận hành (phòng chưa có Cost Center)                                                       |
 | NV-OPS1  | Tạ Văn Sơn      | son.ta@saoviet.example      | EMPLOYEE          | OPS        | -     | Nhân viên Vận hành: Request trả phí chỉ lưu nháp được                                                   |
 | NV-NEW1  | Hồ Thị Tâm      | no account                  | -                 | OPS        | -     | Nhà thầu mới, chưa có tài khoản                                                                         |
@@ -150,7 +150,7 @@ Gửi theo thứ tự bảng (Request đã cấp trước, để ghế trong kho
 | R21 | NV-DES2                    | Postman (K2)      | chờ xác nhận dự phòng (`RESERVE_CONFIRMATION`) | Dùng dự phòng **chưa xác nhận**, chưa tới Người duyệt chi                         |
 | R11 | NV-SAL1                    | Mailchimp (K2)    | `BLOCKED` `OVER_RESERVE`                       | Vượt cả dự phòng khi trình lô                                                     |
 | R12 | NV-ENGH                    | Cursor Pro (K1)   | `AWAITING_SPEND_DECISION`, **một bước**        | Trưởng phòng tự gửi (`REQUESTER_IS_HEAD`)                                         |
-| R13 | NV-LGL1                    | Slack (K2)        | `AWAITING_SPEND_DECISION`, **một bước**        | Phòng không trưởng phòng (`NO_DEPARTMENT_HEAD`)                                   |
+| R13 | NV-LGL1                    | Slack (K2)        | `WAITING_CONTROLLED`, bước nhu cầu **chờ**     | Phòng không trưởng phòng (`NO_DEPARTMENT_HEAD`); Super Admin nhận cảnh báo        |
 | R24 | NV-ITA2                    | Slack (K2)        | `PENDING`                                      | Request cá nhân của IT Admin, chờ NV-ITOH                                         |
 
 Thêm: một **bản nháp** của NV-OPS1 (Jira, phòng không Cost Center nên không gửi được); **báo lỗi SaaS** trên ghế R01; **thông báo BM-09** NV-ENGH về NV-DEV3 (nghỉ dài, chờ Super Admin).
