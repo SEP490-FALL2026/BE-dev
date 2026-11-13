@@ -199,6 +199,33 @@ export class SubscriptionRepo {
     return this.find(id, tx);
   }
 
+  /**
+   * Hands every subscription that names `fromEmployeeId` responsible to `toEmployeeId` (`QĐ-111g`), in one statement: the rows are locked in
+   * id order first, so two handing overs of the same IT Admin queue up and the second finds none. Returns the ids it moved, in id order.
+   */
+  async reassignResponsible(tx: DbTx, fromEmployeeId: string, toEmployeeId: string): Promise<string[]> {
+    const rows = await tx.$queryRaw<{ id: string }[]>`
+      WITH held AS (
+        SELECT id FROM subscriptions WHERE responsible_it_admin_employee_id = ${fromEmployeeId}::uuid ORDER BY id FOR UPDATE)
+      UPDATE subscriptions s
+         SET responsible_it_admin_employee_id = ${toEmployeeId}::uuid, updated_at = now()
+        FROM held WHERE s.id = held.id
+      RETURNING s.id`;
+
+    return rows.map((row) => row.id).sort();
+  }
+
+  /** How many subscriptions name each of these IT Admins responsible (`QĐ-111g`); one who answers for none is absent. */
+  async countResponsibleOf(employeeIds: readonly string[], tx?: DbTx): Promise<Map<string, number>> {
+    if (employeeIds.length === 0) return new Map();
+    const rows = await (tx ?? this.prisma).$queryRaw<{ employee_id: string; total: number }[]>`
+      SELECT responsible_it_admin_employee_id AS employee_id, count(*)::int AS total
+        FROM subscriptions WHERE responsible_it_admin_employee_id = ANY(${[...employeeIds]}::uuid[])
+       GROUP BY responsible_it_admin_employee_id`;
+
+    return new Map(rows.map((row) => [row.employee_id, row.total]));
+  }
+
   /** The subscriptions and perpetual purchases of these plans: only what a rule about their term needs. */
   async findOfPlans(
     planIds: readonly string[],

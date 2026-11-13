@@ -8,11 +8,13 @@ import { IdentityAccessFacadeModule } from '../identity-access/identity-access-f
 import { OperatingParametersModule } from '../operating-parameters/operating-parameters.module';
 import { OrganizationModule } from '../organization/organization.module';
 import { CatalogApi } from './public/catalog.api';
+import { CatalogResponsibilityApi } from './public/catalog-responsibility.api';
 import { SeatBaselinePhaseHook, SeatOccupancyHook } from './public/catalog.extension-points';
 import { ApplicationFactsService } from './catalog-entry/application-facts.service';
 import { ApplicationRetirementController } from './application-retirement/application-retirement.controller';
 import { ApplicationResponsibilityController } from './application-responsibility/application-responsibility.controller';
 import { ApplicationResponsibilityService } from './application-responsibility/application-responsibility.service';
+import { ResponsibilityHandoverService } from './application-responsibility/responsibility-handover.service';
 import { ApplicationRetirementRepo } from './application-retirement/application-retirement.repo';
 import { ApplicationRetirementService } from './application-retirement/application-retirement.service';
 import { ApplicationRepo } from './catalog-entry/application.repo';
@@ -111,6 +113,7 @@ import { VendorRepo } from './vendor/vendor.repo';
   ],
   providers: [
     ApplicationResponsibilityService,
+    ResponsibilityHandoverService,
     PlanTermsService,
     PlanTermsRepo,
     VendorDictionaryService,
@@ -167,12 +170,14 @@ import { VendorRepo } from './vendor/vendor.repo';
     ApplicationRetirementRepo,
     ApplicationRetirementService,
     CatalogApi,
+    CatalogResponsibilityApi,
     SubscriptionPeriodApi,
     RequestableSoftwareRepo,
     RequestableSoftwareService,
   ],
   // The facade licensing reads the seat targets through (ADR-0013), and the hook licensing binds its reader of occupied seats to
-  // (`public/catalog.extension-points.ts`); the capability services and repos stay private.
-  exports: [CatalogApi, SubscriptionPeriodApi, SeatOccupancyHook, SeatBaselinePhaseHook],
+  // (`public/catalog.extension-points.ts`), and the facade the hand-over of an IT Admin who leaves moves their subscriptions and applications through
+  // (`public/catalog-responsibility.api.ts`); the capability services and repos stay private.
+  exports: [CatalogApi, CatalogResponsibilityApi, SubscriptionPeriodApi, SeatOccupancyHook, SeatBaselinePhaseHook],
 })
 export class CatalogModule {}

@@ -31,6 +31,7 @@ unitPrice, reportingUnitPrice, billingCycle }`, thuê bao `PERPETUAL` có giá �
 - `SubscriptionPeriodApi` ([public/subscription-period.api.ts](public/subscription-period.api.ts)) — kỳ subscription cho gia hạn
   (licensing): `getPeriods`, `lockPeriod`, `listRenewalSubjects`, `recordNextPeriod` (kỳ mới nối chuỗi `renewed_from_id`, một
   lần), `getRenewalAlertRecipient`; lỗi `public/subscription-period.errors.ts`, kiểu `public/subscription-period.types.ts`.
+- `CatalogResponsibilityApi` ([public/catalog-responsibility.api.ts](public/catalog-responsibility.api.ts)) — IT Admin phụ trách (`QĐ-111g`, R-8, R-26) cho bàn giao của IT Admin rời: `countResponsibilitiesOf` (số thuê bao + ứng dụng mỗi người phụ trách), `transferResponsibilities(tx, actor, from, to)` đổi MỌI thuê bao và ứng dụng sang IT Admin khác trong transaction của bên gọi, một Audit mỗi thứ; lỗi `public/catalog-responsibility.errors.ts` (`ResponsibilityHandoverRefusedError`: cùng một người / đích không phải IT Admin đang làm việc), kiểu `public/catalog-responsibility.types.ts`.
 - `SubscriptionOwnerAssignmentApi` (`public/subscription-owner-assignment.api.ts`) — `assign`: gán phòng ban sở hữu cho
   một subscription (`pnpm ops:assign-subscription-owner`).
 - `public/subscription-owner-assignment.errors.ts` — `AssignmentRefusedError`;
@@ -75,6 +76,7 @@ file thuần xuống tầng thấp, hoặc đưa dịch vụ điều phối lên
   `application-plans.types.ts` (`ApplicationPlans`) và `plan/plan-facts.service.ts` trả lời, `catalog.module.ts` nối hai bên.
 - `application-responsibility/` — chuyển IT Admin phụ trách ứng dụng (`POST /applications/{id}/responsibility-transfer`, khóa dòng ứng dụng,
   `QĐ-111g`, R-26); `application-responsibility.policy.ts` quyết ai chuyển cho ai.
+  `responsibility-handover.service.ts` (+ `.policy.ts`) chuyển MỘT LẦN mọi thuê bao và ứng dụng của một IT Admin (facade `CatalogResponsibilityApi`).
 - `application-retirement/` — retire ứng dụng (IT Admin quyết, không ai xác nhận; chặn bởi assignment/subscription); đọc ứng dụng,
   plan và subscription nên đứng trên cả ba; controller, dto, policy, repo, `ApplicationRetirementService`.
 - `internal-software-registration/` — đăng ký phần mềm nội bộ: tạo ứng dụng và plan trong một transaction; đứng trên
