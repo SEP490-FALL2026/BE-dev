@@ -334,4 +334,20 @@ describe('offboarding case routes (e2e, no database)', () => {
     },
     OPENAPI_DOCUMENT_BUDGET_MS,
   );
+
+  it(
+    'QĐ-110c: words the day of the deadline of the revocations as the Nth working day after the block moment, not the working day after the last working day',
+    () => {
+      const document = createOpenApiDocument(app);
+      const list = (
+        document.paths['/api/v1/offboarding-cases'] as { get: { responses: Record<string, { description?: string }> } }
+      ).get;
+      const text = list.responses['200']?.description ?? '';
+
+      expect(text).toMatch(/Nth working day after the block moment/);
+      expect(text).toMatch(/DEPARTURE_REVOCATION_WORKING_DAYS/);
+      expect(text).not.toMatch(/the working day after the last working day/);
+    },
+    OPENAPI_DOCUMENT_BUDGET_MS,
+  );
 });

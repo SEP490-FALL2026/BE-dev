@@ -392,6 +392,12 @@ Không sửa code; SPEC không bị sửa trong lượt này (spec là của Own
 - **Đổi lại:** `DROP INDEX offboarding_cases_open_idx` ở một migration sau (chỉ mất tốc độ, không mất dữ liệu).
 - **Chạm:** `prisma/migrations/20261113001300_personnel_open_cases_index/`, test `departure-revocation-deadline.integration-spec.ts`.
 
+### D-53 · MF2-D review (c) · Chữ mô tả `revocation.dueOn` của danh sách hồ sơ
+
+- Mô tả OpenAPI của `GET /offboarding-cases` (và chú thích DTO khối `revocation`) viết "`dueOn` là ngày làm việc sau ngày cuối" — chỉ đúng khi tham số `DEPARTURE_REVOCATION_WORKING_DAYS` = 1 và dễ hiểu nhầm với chặn ngay. **ĐÃ CHỌN:** viết "ngày làm việc thứ N sau mốc chặn, tính ngày sau ngày cuối là ngày 1, N là tham số `DEPARTURE_REVOCATION_WORKING_DAYS`" (khớp D-41: mốc chặn = hết ngày làm việc cuối cùng). Không đổi hình hay giá trị.
+- **Test:** `offboarding-cases.http-spec` ca "words the day of the deadline…" (đã kiểm đỏ khi trả controller về chữ cũ).
+- **Chạm:** `offboarding/offboarding.controller.ts`, `offboarding/offboarding.dto.ts` (chú thích), `openapi.json`. Mô tả `dueOn` của tác vụ thu hồi (`provisioning-tasks.controller.ts`) đã nói theo ngày do hồ sơ cấp, không đổi.
+
 ## Bị chặn
 
 (chưa có)

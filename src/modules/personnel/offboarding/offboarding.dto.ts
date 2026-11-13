@@ -95,9 +95,10 @@ export const offboardingSummarySchema = z.strictObject({
   accessBlockedFrom: z.string().nullable(),
   heldRights: z.number().int().nonnegative(),
   /**
-   * The deadline of the revocations is on the case (`QĐ-110c`, `M-09`): `dueOn` is the working day after the last working day (null for a case
-   * closed or cancelled before the rule), `rightsWithoutCompletedTask` the personal seats of the person that have no task of revocation completed
-   * (those nobody opened a task for included; 0 for a cancelled case) and `overdue` whether today is past `dueOn` with such a seat left.
+   * The deadline of the revocations is on the case (`QĐ-110c`, `M-09`): `dueOn` is the Nth working day after the block moment (N is
+   * `DEPARTURE_REVOCATION_WORKING_DAYS`; null for a case closed or cancelled before the rule), `rightsWithoutCompletedTask` the personal
+   * seats of the person that have no task of revocation completed (those nobody opened a task for included; 0 for a cancelled case) and
+   * `overdue` whether today is past `dueOn` with such a seat left.
    */
   revocation: z.strictObject({
     dueOn: z.string().nullable(),
