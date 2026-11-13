@@ -128,10 +128,16 @@ describe('previews of a departure and of a transfer (e2e, no database)', () => {
         .expect(200);
 
       expect(response.body).toEqual({ success: true, message: route.message, data: route.answer });
-      expect(service(route)).toHaveBeenCalledWith(
-        { kind: 'USER', principal: expect.objectContaining({ employeeId: 'sa-1', roles: ['SUPER_ADMIN'] }) },
+      const asked = service(route).mock.calls[0] as [
+        { kind: string; principal: { employeeId: string; roles: string[] } },
+        unknown,
+      ];
+      expect([asked[0].kind, asked[0].principal.employeeId, asked[0].principal.roles, asked[1]]).toEqual([
+        'USER',
+        'sa-1',
+        ['SUPER_ADMIN'],
         route.body,
-      );
+      ]);
     });
 
     it.each([
