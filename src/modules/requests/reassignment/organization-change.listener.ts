@@ -1,4 +1,3 @@
-import { OneStepConversionService } from './one-step-conversion.service';
 import { Injectable, OnModuleInit } from '@nestjs/common';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
@@ -10,6 +9,7 @@ import type { OrganizationChange } from '../../organization/public/organization.
 import { RequestDraftDepartureService } from '../draft/request-draft-departure.service';
 import type { ReassignmentTrigger } from '../step-routing/reassignment.policy';
 import { StepReassignmentRepo } from '../step-routing/step-reassignment.repo';
+import { DepartmentWithoutHeadNotice } from './department-without-head-notice.service';
 import { StepReassignmentService } from './step-reassignment.service';
 
 /**
@@ -26,11 +26,11 @@ export class RequestsOrganizationChangeListener implements OrganizationChangeLis
   static readonly binds = [OrganizationChangeListeners] as const;
 
   constructor(
-    private readonly oneStep: OneStepConversionService,
     private readonly repo: StepReassignmentRepo,
     private readonly reassignment: StepReassignmentService,
     private readonly organizationReads: OrganizationReadApi,
     private readonly drafts: RequestDraftDepartureService,
+    private readonly withoutHead: DepartmentWithoutHeadNotice,
     private readonly changes: OrganizationChangeListeners,
   ) {}
 
@@ -45,11 +45,8 @@ export class RequestsOrganizationChangeListener implements OrganizationChangeLis
     if (concerned === null) return;
 
     const waiting = await this.repo.waitingRequestIds(tx);
-    const conversionIds =
-      change.kind === 'HEAD_PERIOD_END' ? await this.repo.conversionIds(change.departmentId, tx) : [];
-    // Both operations below may take request locks. Take their union first, globally sorted, before either mutates a subset.
-    await this.repo.lockIds(tx, [...concerned.requestIds, ...waiting, ...conversionIds]);
-    if (change.kind === 'HEAD_PERIOD_END') await this.oneStep.markForDepartment(tx, change.departmentId, new Date());
+    // Both the requests the change concerns and the ones that wait may take locks: take their union first, globally sorted, before any mutates a subset.
+    await this.repo.lockIds(tx, [...concerned.requestIds, ...waiting]);
     await this.reassignment.reconcileRequests(
       tx,
       [...concerned.requestIds, ...waiting],
@@ -57,6 +54,8 @@ export class RequestsOrganizationChangeListener implements OrganizationChangeLis
       change.id,
       new Date(),
     );
+    // A department left without a head keeps its requests waiting for one (`QĐ-110i`): nothing turns them into one-step, and the Super Admin is told.
+    if (change.kind === 'HEAD_PERIOD_END') await this.withoutHead.tellIfLeftWithoutHead(tx, change, new Date());
   }
 
   /** The requests the change may concern and the event it is; null for a change that moves no step. */

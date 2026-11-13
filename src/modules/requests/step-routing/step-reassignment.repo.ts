@@ -105,62 +105,6 @@ export class StepReassignmentRepo {
     await tx.$queryRaw`SELECT id FROM access_requests WHERE id = ANY(${[...new Set(ids)].sort()}::uuid[]) ORDER BY id FOR UPDATE`;
   }
 
-  async hasOpenSpend(tx: DbTx, requestId: string): Promise<boolean> {
-    return (
-      (await tx.accessRequestStep.count({
-        where: { requestId, kind: 'SPEND_APPROVAL', state: { in: ['PENDING', 'WAITING'] } },
-      })) > 0
-    );
-  }
-
-  async conversionDepartmentIds(tx?: DbTx): Promise<string[]> {
-    const rows = await (tx ?? this.prisma).accessRequest.findMany({
-      where: {
-        routingMode: 'VIA_HEAD',
-        branch: { not: 'INTERNAL_FREE' },
-        state: { in: ['PENDING', 'WAITING_CONTROLLED', 'AWAITING_SPEND_SUBMISSION'] },
-      },
-      distinct: ['departmentId'],
-      select: { departmentId: true },
-      orderBy: { departmentId: 'asc' },
-    });
-    return rows.map((row) => row.departmentId);
-  }
-
-  async conversionIds(departmentId: string, tx: DbTx): Promise<string[]> {
-    const rows = await tx.accessRequest.findMany({
-      where: {
-        departmentId,
-        routingMode: 'VIA_HEAD',
-        branch: { not: 'INTERNAL_FREE' },
-        state: { in: ['PENDING', 'WAITING_CONTROLLED', 'AWAITING_SPEND_SUBMISSION'] },
-        steps: { none: { kind: 'SPEND_APPROVAL', state: { in: ['PENDING', 'WAITING'] } } },
-      },
-      select: { id: true },
-      orderBy: { id: 'asc' },
-    });
-    return rows.map((row) => row.id);
-  }
-
-  async markOneStep(tx: DbTx, id: string, now: Date): Promise<void> {
-    await tx.accessRequest.update({ where: { id }, data: { routingMode: 'ONE_STEP', oneStepReason: 'HEAD_LEFT' } });
-    await tx.accessRequestStep.updateMany({
-      where: { requestId: id, kind: 'NEED', state: { in: ['PENDING', 'WAITING'] } },
-      data: {
-        state: 'CLOSED',
-        decidedAt: now,
-        waitingReason: null,
-        waitingSince: null,
-        samePersonAsSpend: false,
-        noIndependentReview: false,
-      },
-    });
-    await tx.accessRequestLine.updateMany({
-      where: { requestId: id, state: 'AWAITING_NEED' },
-      data: { state: 'NEED_CONFIRMED' },
-    });
-  }
-
   async oneStepPendingIds(): Promise<string[]> {
     const rows = await this.prisma.accessRequest.findMany({
       where: {
@@ -172,6 +116,16 @@ export class StepReassignmentRepo {
       orderBy: { id: 'asc' },
     });
     return rows.map((row) => row.id);
+  }
+
+  /** How many requests sent for the department have their need step waiting for a head: what the Super Admin is told when the department is left without one. */
+  countWaitingForHead(tx: DbTx, departmentId: string): Promise<number> {
+    return tx.accessRequest.count({
+      where: {
+        departmentId,
+        steps: { some: { kind: 'NEED', state: 'WAITING', waitingReason: 'NO_DEPARTMENT_HEAD' } },
+      },
+    });
   }
 
   // --- which requests an event may concern ---------------------------------------------------------------

@@ -241,20 +241,31 @@ cùng cần; phần ghi nằm ở `assessment/assessment.repo.ts`.
   (`payment_schedule` không còn ghi hay đọc — một số tiền một năm, QĐ-109; cột còn đó, trigger chặn ghi mới), nên spec của nó nằm trong
   `access-request/access-request.policy.spec.ts` (thư mục đã đủ 25 file); `request-draft/request-draft-policy.json.ts` (`policy` của bản nháp) có spec cạnh file.
 
-## Request m?t b??c
+## Request một bước và phòng không có trưởng phòng
 
-??nh tuy?n ch?t l?c g?i: tr??ng ph?ng g?i cho ch?nh m?nh ho?c kh?ng c? tr??ng ph?ng hi?u l?c (k? c? ?? ghi k? nhi?m t??ng lai) d?ng
-`ONE_STEP`, b??c nhu c?u `NOT_REQUIRED` kh?ng c? ng??i gi?/SLA. Tr? ph? ki?m ng?n s?ch ngay khi g?i b?ng `BudgetCheckService`:
-?? c? s? ho?c d?ng d? ph?ng m? b??c chi; b? ch?n/thi?u gi?/t? gi? l?u `AWAITING_REQUESTER_REVISION`. Ng??i y?u c?u b? sung qua
-`accessRequestSupplementAdd`, g?i l?i qua `POST /access-requests/{id}/resubmission`, ho?c r?t. Ng??i duy?t chi quy?t m?t l?n c? d? ph?ng.
-N?i b? K5 ?i th?ng IT, audit `ACCESS_REQUEST.NO_NEED_APPROVER`.
+Định tuyến chốt lúc gửi (`access-request/routing.policy.ts`, năm ca; `QĐ-110i`, `QĐ-111bc`, R-43). Phòng không có trưởng phòng hiệu lực (kể cả
+khi đã ghi kế nhiệm cho ngày sau) thì: (1) Request trả phí của nhân viên **chờ** ở bước nhu cầu (`NO_DEPARTMENT_HEAD`, Request
+`WAITING_CONTROLLED`, Super Admin nhận cảnh báo), không đi một bước; (2) case B (đề xuất phần mềm ngoài danh mục) của nhân viên chờ như ca 1,
+không sang IT đánh giá vì chưa biết sẽ miễn phí hay trả phí; (3) trưởng phòng gửi cho chính mình đi `ONE_STEP` (`REQUESTER_IS_HEAD`), bước nhu
+cầu `NOT_REQUIRED` không có người giữ/SLA; (4) `K5` miễn phí đã có trong danh mục đi thẳng IT (`ONE_STEP`, `NO_DEPARTMENT_HEAD`), audit
+`ACCESS_REQUEST.NO_NEED_APPROVER` là cờ cho Super Admin; (5) phòng có trưởng phòng: bước nhu cầu giao cho trưởng phòng như cũ. Bảng chỉ cần biết
+chuỗi bước có bước chi hay không (trả phí và case B luôn có, `K5` không có).
 
-Nh?m kh?ng ch?a tr??ng ph?ng (`HEAD_IN_GROUP`), tr?n hi?n t?i gi? 10/100. Nh?m do tr??ng ph?ng g?i v?n x?c nh?n nhu c?u v? v?o l?;
-nh?m nh?n vi?n kh?ng c? tr??ng ph?ng l? m?t b??c. Kh?ng c?n ??nh tuy?n DIRECT theo ng??i quy?t nhu c?u ho?c c? c?ng ng??i hai b??c.
+Request một bước trả phí (trưởng phòng gửi cho chính mình) kiểm ngân sách ngay khi gửi bằng `BudgetCheckService`: đủ số cơ sở hoặc dùng dự phòng
+mở bước chi; bị chặn hoặc thiếu giá thì lưu `AWAITING_REQUESTER_REVISION`. Người yêu cầu bổ sung qua `accessRequestSupplementAdd`, gửi lại qua
+`POST /access-requests/{id}/resubmission`, hoặc rút. Người duyệt chi quyết một lần có dự phòng.
 
-M?t tr??ng ph?ng: listener ch? ??nh d?u Request tr? ph? ?ang ? ch? tr??ng ph?ng (kh?ng c? k? nhi?m ?? ghi), ??ng b??c nhu c?u.
-`OneStepConversionService` ho?n t?t trong sweep, m?i Request m?t transaction, d?ng l?i ki?m ng?n s?ch. Request n?i b? c? v?n ch? c? ki?m so?t.
-`requests-routing-facade.module.ts` gh?p c?ng h?m ??nh tuy?n/ki?m cho API v? worker. D? li?u l?ch s? gi? c?t/enum c?, ng?ng ghi h?nh vi c?.
+Nhóm không chứa trưởng phòng (`HEAD_IN_GROUP`), trần hiện tại giữ 10/100. Nhóm do trưởng phòng gửi vẫn xác nhận nhu cầu và vào lô; nhóm nhân
+viên trả phí của phòng không có trưởng phòng chờ như ca 1, nhóm `K5` đi một bước. Không cần định tuyến DIRECT theo người quyết nhu cầu hoặc cờ
+cùng người hai bước.
 
-T?m ??nh tuy?n: `access-request/routing.policy.ts`; g?i l?i: `request-intake/request-resubmission.service.ts`; chuy?n khi m?t tr??ng ph?ng:
-`reassignment/one-step-conversion.service.ts`; hi?n th? k?t qu?: `spend/spend-status.service.ts`.
+Mất trưởng phòng: khi kỳ trưởng phòng kết thúc (`HEAD_PERIOD_END`), bước nhu cầu trưởng phòng đang giữ chuyển sang chờ; không còn đánh dấu hay
+chuyển Request nào thành một bước, ở listener lẫn sweep. Nếu phòng không còn trưởng phòng làm việc và chưa ghi kế nhiệm, Super Admin nhận
+thông báo `DEPARTMENT_WITHOUT_HEAD { departmentId, waitingCount }` (`reassignment/department-without-head-notice.service.ts`, một lần cho mỗi
+thay đổi). Trưởng phòng mới bắt đầu (`HEAD_PERIOD_START`) nhận mọi bước chờ của phòng; hạn tính từ ngày tạo bước nên không đặt lại.
+`OneStepConversionService` chỉ còn hoàn tất trong sweep (mỗi Request một transaction, dùng lại kiểm ngân sách chuẩn) những Request mà luật cũ đã
+đánh dấu `ONE_STEP`/`HEAD_LEFT` trước đó. `requests-routing-facade.module.ts` ghép cổng hàm định tuyến/kiểm cho API và worker. Dữ liệu lịch sử giữ
+cột/enum cũ, ngừng ghi hành vi cũ.
+
+Tìm định tuyến: `access-request/routing.policy.ts`; gửi lại: `request-intake/request-resubmission.service.ts`; khi mất trưởng phòng:
+`reassignment/organization-change.listener.ts`; hiển thị kết quả: `spend/spend-status.service.ts`.
