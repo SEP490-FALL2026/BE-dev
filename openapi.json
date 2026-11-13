@@ -84096,7 +84096,7 @@
             "name": "departmentId",
             "required": false,
             "in": "query",
-            "description": "Only this department; a department outside the scope reads an empty page.",
+            "description": "Only the recommendations of this department: the department that owned the seat when it was recommended, not where the holder is placed now. A department outside the scope reads an empty page.",
             "schema": { "format": "uuid", "type": "string" }
           },
           {
@@ -84127,7 +84127,7 @@
         ],
         "responses": {
           "200": {
-            "description": "One page of recommendations (G1, G2), newest first, filtered by group, tier, state, application, department scope (MINE = the departments of the IT Admin, ALL = the organization), one department and one holder; a department or a holder outside the scope reads an empty page. A holder is shown by code, never by name.",
+            "description": "One page of recommendations (G1, G2), newest first, filtered by group, tier, state, application, one department (the one that owned the seat when it was recommended) and one holder; both values of the department scope read only the departments of the IT Admin, and a department or a holder outside the scope reads an empty page. A holder is shown by code, never by name.",
             "content": {
               "application/json": {
                 "schema": {
@@ -84433,7 +84433,7 @@
             "name": "departmentId",
             "required": false,
             "in": "query",
-            "description": "Only the holders placed in this department; one outside the scope reads an empty page.",
+            "description": "Only the seats whose holder is placed in this department today, not the department of a recommendation. A department outside the scope reads an empty page.",
             "schema": { "format": "uuid", "type": "string" }
           },
           {
@@ -84464,7 +84464,7 @@
         ],
         "responses": {
           "200": {
-            "description": "One page of seats, each with exactly one state (active, inactive, no data, identity not matched, insufficient evidence or excluded) and the gate that left it out; a seat with no data or an identity not matched has no days.",
+            "description": "One page of seats, each with exactly one state (active, inactive, no data, identity not matched, insufficient evidence or excluded) and the gate that left it out; a seat with no data or an identity not matched has no days. Filtered by application, status, one department (where the holder is placed today) and one holder; a department or a holder outside the scope reads an empty page.",
             "content": {
               "application/json": {
                 "schema": {

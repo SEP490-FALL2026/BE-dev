@@ -57,10 +57,10 @@ export const recommendationListQuerySchema = z.strictObject({
     description:
       'Kept for compatibility: both values read only the departments the IT Admin is in charge of, and those with no IT Admin; ALL no longer reads the whole organization.',
   }),
-  departmentId: z
-    .uuid()
-    .optional()
-    .meta({ description: 'Only this department; a department outside the scope reads an empty page.' }),
+  departmentId: z.uuid().optional().meta({
+    description:
+      'Only the recommendations of this department: the department that owned the seat when it was recommended, not where the holder is placed now. A department outside the scope reads an empty page.',
+  }),
   employeeId: z.uuid().optional().meta({ description: 'Only this holder; one outside the scope reads an empty page.' }),
   ...pageQuery,
 });
@@ -72,10 +72,10 @@ export const seatStateListQuerySchema = z.strictObject({
     description:
       'Kept for compatibility: both values read only the departments the IT Admin is in charge of, and those with no IT Admin; ALL no longer reads the whole organization.',
   }),
-  departmentId: z
-    .uuid()
-    .optional()
-    .meta({ description: 'Only the holders placed in this department; one outside the scope reads an empty page.' }),
+  departmentId: z.uuid().optional().meta({
+    description:
+      'Only the seats whose holder is placed in this department today, not the department of a recommendation. A department outside the scope reads an empty page.',
+  }),
   employeeId: z.uuid().optional().meta({ description: 'Only this holder; one outside the scope reads an empty page.' }),
   ...pageQuery,
 });

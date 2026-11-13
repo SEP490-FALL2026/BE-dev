@@ -296,6 +296,23 @@ describe('API inventory (e2e): openapi presentation and wire messages', () => {
       expect(routeHandlersOf(app).filter((handler) => skips(handler.target) || skips(handler.controller))).toEqual([]);
     });
 
+    it('says, on the two tables of wasted seats, which department the filter reads, with no internal code in the words', () => {
+      const departmentFilter = (path: string): string => {
+        const parameters = (document.paths[path]?.get?.parameters ?? []) as { name?: string; description?: string }[];
+
+        return parameters.find((parameter) => parameter.name === 'departmentId')?.description ?? '';
+      };
+      const recommendations = departmentFilter('/api/v1/ghost-seat-recommendations');
+      const seatStates = departmentFilter('/api/v1/ghost-seat-seat-states');
+
+      // The recommendations are filtered by the department that owned the seat when it was recommended, the seat states by where the holder is now.
+      expect(recommendations).toContain('owned the seat when it was recommended');
+      expect(recommendations).toContain('not where the holder is placed now');
+      expect(seatStates).toContain('placed in this department today');
+      expect(seatStates).toContain('not the department of a recommendation');
+      expect([recommendations, seatStates].filter((description) => INTERNAL_CODE.test(description))).toEqual([]);
+    });
+
     it('keeps the guard and unavailable codes the client already handles (Q8)', () => {
       const guard503 = operations.find((operation) => operation.operationId === 'meGet')?.responses['503'];
       const login503 = operations.find((operation) => operation.operationId === 'authLogin')?.responses['503'];
