@@ -80,6 +80,8 @@ export class ItHandoverService {
       if (refusal) throw new ItHandoverRefusedError(refusal);
 
       const moved = await this.move(tx, actor, source, employeeId, toEmployeeId);
+      // What was counted a moment ago can have been moved by a write of its own since: nothing moved is nothing to record (the item keeps no empty hand-over).
+      if (moved.subscriptions + moved.applications === 0) throw new ItHandoverRefusedError('NOTHING_TO_HAND_OVER');
       const at = new Date();
       await this.items.recordDone(tx, {
         organizationId: facts.organizationId,
