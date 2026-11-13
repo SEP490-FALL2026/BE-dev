@@ -153,8 +153,11 @@ anh em `event-notice` để báo, nên `event-notice` không được import l�
   thôi việc nằm ở `leave/`, `offboarding/` vì hai capability đó đứng trên `notice/`).
 - `role-duties/` — vai trò người sắp nghỉ đang giữ, vai trò Super Admin còn dùng được không;
   `me-departure-notice.controller.ts`, `super-admin-watch.controller.ts`; `RoleDutiesService`.
-- `dashboard-facts/` — số đếm cho trang tổng quan theo vai: review sau điều chuyển đang mở của một phòng, ca nghỉ việc đang
-  bàn giao của các phòng, thông báo của trưởng phòng chờ xử lý; cùng điều kiện với danh sách tương ứng. Không import capability nào.
+- `dashboard-facts/` — số đếm cho trang tổng quan theo vai: ca nghỉ việc đang bàn giao của các phòng, thông báo của trưởng phòng chờ
+  xử lý, tiến độ nghỉ việc/điều chuyển của IT Admin/Super Admin (`progress`: `departures`, `transfers`, lịch 10 ngày làm việc —
+  `departure-calendar.policy.ts`; RD.1) và các cửa sổ thu hồi cho báo cáo SLA (`revocationWindows`, `lateDepartures`, `graceWindowsOf`; RD.2: hạn của điều chuyển =
+  ngày làm việc đầu sau ân hạn, tính như hạn nghỉ việc vì tác vụ của nó không có `due_on`, D-99/D-124); cùng điều kiện với danh sách tương ứng. Đọc qua
+  `RevocationOverdueService` và `CatalogResponsibilityApi`; chỉ ra `PersonnelDashboardApi`.
 - `event-notice/` — `personnel-file-hooks.service.ts` (chạy file hook), `personnel-notifier.service.ts` (inbox, F17).
 - `super-admin-event/` — Nest module riêng của lệnh (`super-admin-event-cli.module.ts`), policy, repo ticket, ba service theo họ sự kiện (điều chuyển, nghỉ dài hạn,
   thôi việc) và `profile-correction`; tiến trình API và worker không load nó.

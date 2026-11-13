@@ -5,6 +5,7 @@ import type {
   DepartmentLicensingFacts,
   EmployeeLicensingFacts,
   ItAdminLicensingFacts,
+  RevocationTaskFacts,
   SeatsReturnedFacts,
 } from './licensing-dashboard.types';
 
@@ -37,5 +38,16 @@ export class LicensingDashboardApi {
    */
   seatsReturned(today: BusinessDate, responsibleEmployeeId?: string): Promise<SeatsReturnedFacts> {
     return this.facts.seatsReturned(today, responsibleEmployeeId);
+  }
+
+  /**
+   * The tasks of revocation that these departures (`OFFBOARDING_CASE`) or transfers (`DEPARTMENT_TRANSFER`) asked for, still to do, failed or completed (SPEC
+   * P22): one row for each task and reference, with the day it was completed and the IT Admin in charge. A task cancelled or closed as failed is left out.
+   */
+  revocationTasksOf(
+    referenceKind: 'OFFBOARDING_CASE' | 'DEPARTMENT_TRANSFER',
+    referenceIds: readonly string[],
+  ): Promise<RevocationTaskFacts[]> {
+    return this.facts.revocationTasksOf(referenceKind, referenceIds);
   }
 }

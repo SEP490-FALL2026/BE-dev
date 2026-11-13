@@ -305,6 +305,7 @@ export const API_COVERAGE_MANIFEST: readonly string[] = [
   'GET /api/v1/dashboards/manager',
   'GET /api/v1/dashboards/it-admin',
   'GET /api/v1/dashboards/super-admin',
+  'GET /api/v1/reports/revocation-sla',
   'GET /api/v1/non-working-dates',
   'POST /api/v1/non-working-dates',
   'PATCH /api/v1/non-working-dates/{date}',

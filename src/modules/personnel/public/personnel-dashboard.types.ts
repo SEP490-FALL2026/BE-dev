@@ -43,3 +43,41 @@ export interface PersonnelProgressFacts {
 export interface PersonnelProgressScope {
   departmentIds?: readonly string[] | undefined;
 }
+
+/** The source of a window of revocations: a departure (an offboarding case) or a transfer. */
+export type RevocationWindowSource = 'OFFBOARDING' | 'TRANSFER';
+
+/**
+ * A window in which the IT Admin takes the rights of a person away (SPEC P22): the first day it opens, the day the IT Admin has until (the first working day
+ * of it, `QĐ-110c`) and the department the work is in. A departure keeps its deadline on the case; a transfer has none, so it is worked out the same way
+ * from the day after its grace (D-99: its tasks carry no `due_on`).
+ */
+export interface RevocationWindowFacts {
+  source: RevocationWindowSource;
+  id: string;
+  employeeId: string;
+  departmentId: string;
+  startOn: BusinessDate;
+  dueOn: BusinessDate;
+}
+
+/** What the report of the revocations asks for the windows: the days they open on, the source, the departments of an IT Admin (absent: the whole company). */
+export interface RevocationWindowQuery {
+  from: BusinessDate;
+  to: BusinessDate;
+  source?: RevocationWindowSource | undefined;
+  departmentIds?: readonly string[] | undefined;
+}
+
+/** A departure past the deadline of its revocations with a right left without a completed task. */
+export interface LateDepartureFacts {
+  id: string;
+  departmentId: string | null;
+}
+
+/** The grace of a transfer that took effect: the days a person keeps the rights of the old department. */
+export interface GraceWindowFacts {
+  employeeId: string;
+  effectiveOn: BusinessDate;
+  graceEndsOn: BusinessDate;
+}

@@ -33,3 +33,13 @@ export interface SeatsReturnedFacts {
   returned: number;
   reused: number;
 }
+
+/** What a report of the revocations a departure or a transfer asked for reads of one task (SPEC P22): where it stands, the day it was completed, who it was given to. */
+export interface RevocationTaskFacts {
+  /** The id of the departure or the transfer that asked for it. */
+  referenceId: string;
+  status: 'QUEUED' | 'RETRY_SCHEDULED' | 'IN_PROGRESS' | 'FAILED' | 'COMPLETED';
+  completedOn: string | null;
+  /** The IT Admin in charge by default when the task was made. */
+  responsibleEmployeeId: string | null;
+}

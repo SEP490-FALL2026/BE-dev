@@ -1,8 +1,13 @@
 import { Injectable } from '@nestjs/common';
-import { toDateColumn, type BusinessDate } from '../../../core/business-date';
+import { addDays, fromDateColumn, toDateColumn, type BusinessDate } from '../../../core/business-date';
 import { Prisma } from '../../../generated/prisma/client';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
-import type { CalendarWindow, TransferDashboardFacts } from '../public/personnel-dashboard.types';
+import type {
+  CalendarWindow,
+  GraceWindowFacts,
+  RevocationWindowQuery,
+  TransferDashboardFacts,
+} from '../public/personnel-dashboard.types';
 
 /** What the counts of the departures are cut by: the scope, the calendar window, this month, the cases past their deadline (told apart by id). */
 export interface DepartureCountInput {
@@ -141,5 +146,94 @@ export class PersonnelDashboardFactsRepo {
 
       return employeeId ? [employeeId] : [];
     });
+  }
+
+  /**
+   * The departures whose window of revocations opens in a range of days (the day after the last working day), with the deadline kept on the case: the
+   * ones not cancelled that have one. `departmentIds` narrows to the departments of an IT Admin.
+   */
+  async departureWindows(
+    query: RevocationWindowQuery,
+  ): Promise<{ id: string; employeeId: string; departmentId: string; startOn: BusinessDate; dueOn: BusinessDate }[]> {
+    if (query.departmentIds?.length === 0) return [];
+    const rows = await this.prisma.offboardingCase.findMany({
+      where: {
+        state: { not: 'CANCELLED' },
+        revocationDueOn: { not: null },
+        departmentId: query.departmentIds ? { in: [...query.departmentIds] } : { not: null },
+        lastWorkingDay: { gte: toDateColumn(addDays(query.from, -1)), lte: toDateColumn(addDays(query.to, -1)) },
+      },
+      select: { id: true, employeeId: true, departmentId: true, lastWorkingDay: true, revocationDueOn: true },
+      orderBy: { id: 'asc' },
+    });
+
+    return rows.flatMap((row) =>
+      row.departmentId && row.revocationDueOn
+        ? [
+            {
+              id: row.id,
+              employeeId: row.employeeId,
+              departmentId: row.departmentId,
+              startOn: addDays(fromDateColumn(row.lastWorkingDay), 1),
+              dueOn: fromDateColumn(row.revocationDueOn),
+            },
+          ]
+        : [],
+    );
+  }
+
+  /**
+   * The transfers whose window of revocations opens in a range of days (the day after the grace): the ones that took effect with a grace, not taken over
+   * by a departure (its rights are the departure's to take back). `departmentIds` narrows to the departments they enter, where the tasks go.
+   */
+  async transferWindows(
+    query: RevocationWindowQuery,
+  ): Promise<{ id: string; employeeId: string; departmentId: string; graceEndsOn: BusinessDate }[]> {
+    if (query.departmentIds?.length === 0) return [];
+    const rows = await this.prisma.departmentTransfer.findMany({
+      where: {
+        status: 'EFFECTIVE',
+        supersededByCaseId: null,
+        graceEndsOn: { gte: toDateColumn(addDays(query.from, -1)), lte: toDateColumn(addDays(query.to, -1)) },
+        ...(query.departmentIds ? { toDepartmentId: { in: [...query.departmentIds] } } : {}),
+      },
+      select: { id: true, employeeId: true, toDepartmentId: true, graceEndsOn: true },
+      orderBy: { id: 'asc' },
+    });
+
+    return rows.flatMap((row) =>
+      row.graceEndsOn
+        ? [
+            {
+              id: row.id,
+              employeeId: row.employeeId,
+              departmentId: row.toDepartmentId,
+              graceEndsOn: fromDateColumn(row.graceEndsOn),
+            },
+          ]
+        : [],
+    );
+  }
+
+  /** The graces of the transfers of these people that took effect, newest first: the days they keep the rights of the old department. */
+  async graceWindowsOf(employeeIds: readonly string[]): Promise<GraceWindowFacts[]> {
+    if (employeeIds.length === 0) return [];
+    const rows = await this.prisma.departmentTransfer.findMany({
+      where: { employeeId: { in: [...employeeIds] }, status: 'EFFECTIVE', graceEndsOn: { not: null } },
+      select: { employeeId: true, effectiveOn: true, graceEndsOn: true },
+      orderBy: [{ effectiveOn: 'desc' }, { id: 'asc' }],
+    });
+
+    return rows.flatMap((row) =>
+      row.graceEndsOn
+        ? [
+            {
+              employeeId: row.employeeId,
+              effectiveOn: fromDateColumn(row.effectiveOn),
+              graceEndsOn: fromDateColumn(row.graceEndsOn),
+            },
+          ]
+        : [],
+    );
   }
 }

@@ -300,6 +300,7 @@ export const SUCCESS_MESSAGES: Readonly<Record<string, string>> = {
   returnRequestGet: 'RETURN_REQUEST.READ',
   returnRequestList: 'RETURN_REQUEST.LISTED',
   returnRequestSubmit: 'RETURN_REQUEST.SUBMITTED',
+  revocationSlaGet: 'REPORT.REVOCATION_SLA_RETRIEVED',
   saasIssueAddMessage: 'SAAS_ISSUE.MESSAGE_ADDED',
   saasIssueEntryList: 'SAAS_ISSUE.ENTRIES_LISTED',
   saasIssueFormOptions: 'SAAS_ISSUE.OPTIONS_READ',

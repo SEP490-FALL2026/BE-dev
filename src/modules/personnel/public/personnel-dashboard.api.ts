@@ -2,7 +2,14 @@ import { Injectable } from '@nestjs/common';
 import type { BusinessDate } from '../../../core/business-date';
 import { PersonnelDashboardFactsRepo } from '../dashboard-facts/dashboard-facts.repo';
 import { PersonnelDashboardFactsService } from '../dashboard-facts/dashboard-facts.service';
-import type { PersonnelProgressFacts, PersonnelProgressScope } from './personnel-dashboard.types';
+import type {
+  GraceWindowFacts,
+  LateDepartureFacts,
+  PersonnelProgressFacts,
+  PersonnelProgressScope,
+  RevocationWindowFacts,
+  RevocationWindowQuery,
+} from './personnel-dashboard.types';
 
 /**
  * What the role overviews read of personnel (`US-12-15` AC-3, AC-4, AC-7, SPEC P21): counts only, each the count of an existing list for the same
@@ -31,5 +38,20 @@ export class PersonnelDashboardApi {
    */
   progress(scope: PersonnelProgressScope, today: BusinessDate): Promise<PersonnelProgressFacts> {
     return this.progressFacts.progress(scope, today);
+  }
+
+  /** The windows of revocations of departures and transfers that open in a range of days, each with the deadline the IT Admin has (SPEC P22). */
+  revocationWindows(query: RevocationWindowQuery): Promise<RevocationWindowFacts[]> {
+    return this.progressFacts.revocationWindows(query);
+  }
+
+  /** The departures past the deadline of their revocations with a right left without a completed task, as the list of departures gives them for `revocationOverdue=true`. */
+  lateDepartures(today: BusinessDate, departmentIds?: readonly string[]): Promise<LateDepartureFacts[]> {
+    return this.progressFacts.lateDepartures(today, departmentIds);
+  }
+
+  /** The graces of the transfers of these people that took effect, newest first. */
+  graceWindowsOf(employeeIds: readonly string[]): Promise<GraceWindowFacts[]> {
+    return this.progressFacts.graceWindowsOf(employeeIds);
   }
 }

@@ -87171,6 +87171,205 @@
         "summary": "Read my overview as the Super Admin",
         "tags": ["dashboards"]
       }
+    },
+    "/api/v1/reports/revocation-sla": {
+      "get": {
+        "operationId": "revocationSlaGet",
+        "parameters": [
+          {
+            "name": "from",
+            "required": false,
+            "in": "query",
+            "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused). The first day the windows of revocations open on; the first of this month when left out.",
+            "schema": { "format": "date", "type": "string" }
+          },
+          {
+            "name": "to",
+            "required": false,
+            "in": "query",
+            "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused). The last day they open on; today when left out. At most 366 days after `from`.",
+            "schema": { "format": "date", "type": "string" }
+          },
+          {
+            "name": "source",
+            "required": false,
+            "in": "query",
+            "description": "Only the departures (`OFFBOARDING`) or only the transfers (`TRANSFER`); both when left out.",
+            "schema": { "type": "string", "enum": ["OFFBOARDING", "TRANSFER"] }
+          },
+          {
+            "name": "groupBy",
+            "required": false,
+            "in": "query",
+            "description": "What each row of the report is for: the IT Admin the tasks were given to, or the department.",
+            "schema": { "default": "department", "type": "string", "enum": ["itAdmin", "department"] }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maximum": 9007199254740991,
+              "exclusiveMinimum": true,
+              "default": 1,
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": { "maximum": 100, "exclusiveMinimum": true, "default": 20, "type": "integer", "minimum": 0 }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The report of the revocations of the departures and the transfers whose window of revocations opens from `from` to `to` (the day after the last working day, or the day after the end of the grace). The deadline of a window is its first working day: the IT Admin is on time when the last task of the departure or the transfer is completed by then. The figures are the departures or transfers completed, on time, open and overdue today, the median of the working days the completed ones took and the share on time; each row is one IT Admin or one department, those with the most overdue first. A departure is overdue as the list of departures says it (`revocationOverdue=true`), a right with no task opened included; a transfer, by a task still to do (its tasks carry no due date of their own). `transferReRequests` counts the requests sent again by a person in the grace of their transfer for software they already hold and those granted by the last day of the grace. It is an operational figure beside the overviews, not a KPI. The Super Admin reads the whole company, an IT Admin only the departments they are in charge of or stand in for.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/RevocationSlaResponseDto" },
+                    { "properties": { "message": { "example": "REPORT.REVOCATION_SLA_RETRIEVED" } } }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHENTICATION_REQUIRED": {
+                    "summary": "A Bearer access token is required.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHENTICATION_REQUIRED",
+                        "message": "A Bearer access token is required.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "INVALID_ACCESS_TOKEN": {
+                    "summary": "The access token is invalid.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "INVALID_ACCESS_TOKEN",
+                        "message": "The access token is invalid.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The caller is neither the Super Admin nor an IT Admin.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHORIZATION.FORBIDDEN": {
+                    "summary": "You do not have permission to perform this action.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHORIZATION.FORBIDDEN",
+                        "message": "You do not have permission to perform this action.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "A filter is invalid (VALIDATION_ERROR): a day that does not exist, a range that ends before it starts or lasts over 366 days, a source or a grouping that is not one of the values, a page size over 100.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "VALIDATION_ERROR": {
+                    "summary": "Request validation failed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "VALIDATION_ERROR",
+                        "message": "Request validation failed.",
+                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_TOO_MANY_REQUESTS": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_TOO_MANY_REQUESTS",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "TOKEN_VERIFICATION_UNAVAILABLE": {
+                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
+                        "message": "Authentication is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SERVICE_UNAVAILABLE": {
+                    "summary": "The service is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SERVICE_UNAVAILABLE",
+                        "message": "The service is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "bearer": [] }],
+        "summary": "Read the SLA of the revocations of leavers and movers",
+        "tags": ["reports"]
+      }
     }
   },
   "info": {
@@ -117564,6 +117763,167 @@
               }
             },
             "required": ["asOf", "calendar", "sections"],
+            "additionalProperties": false,
+            "nullable": true
+          }
+        },
+        "required": ["success", "message", "data"],
+        "additionalProperties": false
+      },
+      "RevocationSlaResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "enum": [true] },
+          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "from": { "type": "string", "format": "date", "description": "A calendar date as YYYY-MM-DD." },
+              "to": { "type": "string", "format": "date", "description": "A calendar date as YYYY-MM-DD." },
+              "source": { "type": "string", "enum": ["OFFBOARDING", "TRANSFER", null], "nullable": true },
+              "groupBy": { "type": "string", "enum": ["itAdmin", "department"] },
+              "completed": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991,
+                "description": "The departures or transfers whose every task of revocation is completed."
+              },
+              "onTime": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991,
+                "description": "Of those, the ones completed by the first working day of their window, the deadline of the IT Admin."
+              },
+              "overdueOpen": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991,
+                "description": "Open and past the deadline today. A departure is overdue as the list of departures says (`revocationOverdue=true`), a right with no task opened included; a transfer, by a task still to do."
+              },
+              "medianWorkingDays": {
+                "type": "number",
+                "minimum": 0,
+                "description": "The median of the working days of the window the completed ones took, the first working day counted as day 1; null when none was completed.",
+                "nullable": true
+              },
+              "onTimeRate": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1,
+                "description": "The share of those judged (completed, or open past the deadline) that were on time, from 0 to 1; null when none was judged. An operational figure, not a KPI.",
+                "nullable": true
+              },
+              "rows": {
+                "maxItems": 100,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "key": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "format": "uuid",
+                          "description": "The IT Admin or the department; null for the ones no task names an IT Admin for.",
+                          "nullable": true
+                        },
+                        "name": {
+                          "description": "The full name of the IT Admin or the name of the department.",
+                          "type": "string",
+                          "nullable": true
+                        }
+                      },
+                      "required": ["id", "name"],
+                      "additionalProperties": false
+                    },
+                    "completed": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991,
+                      "description": "The departures or transfers whose every task of revocation is completed."
+                    },
+                    "onTime": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991,
+                      "description": "Of those, the ones completed by the first working day of their window, the deadline of the IT Admin."
+                    },
+                    "overdueOpen": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991,
+                      "description": "Open and past the deadline today. A departure is overdue as the list of departures says (`revocationOverdue=true`), a right with no task opened included; a transfer, by a task still to do."
+                    },
+                    "medianWorkingDays": {
+                      "type": "number",
+                      "minimum": 0,
+                      "description": "The median of the working days of the window the completed ones took, the first working day counted as day 1; null when none was completed.",
+                      "nullable": true
+                    },
+                    "onTimeRate": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1,
+                      "description": "The share of those judged (completed, or open past the deadline) that were on time, from 0 to 1; null when none was judged. An operational figure, not a KPI.",
+                      "nullable": true
+                    }
+                  },
+                  "required": ["key", "completed", "onTime", "overdueOpen", "medianWorkingDays", "onTimeRate"],
+                  "additionalProperties": false
+                },
+                "description": "One row for each IT Admin or department, the ones with the most overdue first; a page of them (`page`, `pageSize` of at most 100)."
+              },
+              "pagination": {
+                "type": "object",
+                "properties": {
+                  "page": { "type": "integer", "exclusiveMinimum": true, "maximum": 9007199254740991, "minimum": 0 },
+                  "pageSize": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "maximum": 9007199254740991,
+                    "minimum": 0
+                  },
+                  "totalItems": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                  "totalPages": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+                },
+                "required": ["page", "pageSize", "totalItems", "totalPages"],
+                "additionalProperties": false
+              },
+              "transferReRequests": {
+                "type": "object",
+                "properties": {
+                  "total": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991,
+                    "description": "The requests sent from `from` to `to` by a person in the grace of their transfer for software they already hold (`limitExemption = TRANSFER_GRACE`)."
+                  },
+                  "provisionedWithinGrace": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991,
+                    "description": "Of those, the ones whose grant was completed by the last day of the grace of the transfer."
+                  }
+                },
+                "required": ["total", "provisionedWithinGrace"],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "from",
+              "to",
+              "source",
+              "groupBy",
+              "completed",
+              "onTime",
+              "overdueOpen",
+              "medianWorkingDays",
+              "onTimeRate",
+              "rows",
+              "pagination",
+              "transferReRequests"
+            ],
             "additionalProperties": false,
             "nullable": true
           }

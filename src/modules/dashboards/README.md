@@ -23,7 +23,7 @@ dùng bởi: không module nào; chỉ `app/app.module.ts` mount `DashboardsModu
 
 ## Hướng phụ thuộc giữa capability (R6)
 
-`section` ở dưới; `progress` chỉ import `section`; `employee`, `manager`, `it-admin`, `super-admin` chỉ import `section` (và `progress` với hai trang của IT Admin/Super Admin), không import nhau.
+`section` ở dưới; `progress` và `revocation-sla` chỉ import `section`; `employee`, `manager`, `it-admin`, `super-admin` chỉ import `section` (và `progress` với hai trang của IT Admin/Super Admin), không import nhau.
 
 ## Capability → file chính
 
@@ -34,6 +34,10 @@ dùng bởi: không module nào; chỉ `app/app.module.ts` mount `DashboardsModu
   `seatsReturned`, `plansBelowVendorAdminMinimum` + `calendar` (10 ngày làm việc tới); `dashboard-progress.policy.ts` (ánh xạ thuần),
   `dashboard-progress.service.ts` (đọc qua facade personnel/licensing/catalog), `dashboard-progress.dto.ts`. Mọi số `COUNTED`; chỉ
   `upcoming` và `revocationOverdue` nêu danh sách (`offboardingCaseList`), còn lại `sourceOperationId = null` vì không danh sách nào trả đúng số đó.
+- `revocation-sla/` — `GET /reports/revocation-sla` (SUPER_ADMIN toàn công ty; IT_ADMIN chỉ phòng phụ trách; SPEC P22, R5 E3/E7): trung vị ngày làm việc,
+  tỷ lệ đúng hạn (xong trước hết ngày làm việc đầu của cửa sổ thu hồi), quá hạn đang mở, theo IT Admin hoặc phòng, tách `OFFBOARDING`/`TRANSFER`, cấp lại kịp trong
+  ân hạn (`transferReRequests`). `revocation-sla.policy.ts` thuần (`outcomeOf`, `summaryOf`, `rowsOf`, `transferReRequestsOf`), `revocation-sla-query.service.ts` đọc
+  qua facade personnel/licensing/requests; chỉ số vận hành phụ, không phải KPI.
 - `employee/` — `GET /dashboards/employee` (mọi tài khoản đã đăng nhập, `QĐ-95d`): quyền đang giữ, quyền sắp hết, báo lỗi SaaS mình
   đã gửi (`saasIssueList` `scope=mine`); Request của tôi luôn `COUNTED` (0 khi không có, kể cả Super Admin).
 - `manager/` — `GET /dashboards/manager` (`MANAGER`, phòng đang làm trưởng): ghế phòng, review sau điều chuyển; hàng đợi trình

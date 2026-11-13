@@ -60,12 +60,13 @@ flowchart BT
   catalog -->|30| organization
   dashboards -->|2| catalog
   dashboards -->|2| devices
-  dashboards -->|3| identity_access
-  dashboards -->|6| licensing
+  dashboards -->|4| identity_access
+  dashboards -->|7| licensing
+  dashboards -->|2| operating_parameters
   dashboards -->|3| optimization
-  dashboards -->|5| organization
-  dashboards -->|5| personnel
-  dashboards -->|3| requests
+  dashboards -->|6| organization
+  dashboards -->|6| personnel
+  dashboards -->|4| requests
   dashboards -->|2| usage
   data_import -->|6| audit
   data_import -->|1| catalog
@@ -128,7 +129,7 @@ flowchart BT
   requests -->|51| licensing
   requests -->|10| notifications
   requests -->|11| operating_parameters
-  requests -->|82| organization
+  requests -->|83| organization
   usage -->|7| audit
   usage -->|7| catalog
   usage -->|15| devices
@@ -137,4 +138,4 @@ flowchart BT
   usage -->|10| organization
 ```
 
-95 module edges.
+96 module edges.

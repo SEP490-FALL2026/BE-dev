@@ -1,11 +1,19 @@
 import { Injectable } from '@nestjs/common';
-import { monthBoundsOf, type BusinessDate } from '../../../core/business-date';
+import { addDays, monthBoundsOf, type BusinessDate } from '../../../core/business-date';
 import { instantAtWallClock } from '../../../core/working-days';
 import { CatalogResponsibilityApi } from '../../catalog/public/catalog-responsibility.api';
 import { OperatingParametersApi } from '../../operating-parameters/public/operating-parameters.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { RevocationOverdueService } from '../departure-deadline/revocation-overdue.service';
-import type { PersonnelProgressFacts, PersonnelProgressScope } from '../public/personnel-dashboard.types';
+import { revocationDueOn } from '../departure-deadline/departure-deadline.policy';
+import type {
+  GraceWindowFacts,
+  LateDepartureFacts,
+  PersonnelProgressFacts,
+  PersonnelProgressScope,
+  RevocationWindowFacts,
+  RevocationWindowQuery,
+} from '../public/personnel-dashboard.types';
 import { PersonnelDashboardFactsRepo } from './dashboard-facts.repo';
 import { calendarLookAheadEnd, calendarWindowOf } from './departure-calendar.policy';
 
@@ -48,6 +56,48 @@ export class PersonnelDashboardFactsService {
       },
       transfers: await this.repo.transferCounts({ departmentIds: scope.departmentIds, today }),
     };
+  }
+
+  /**
+   * The windows of revocations that open in a range of days, of departures and of transfers (SPEC P22, R5 E3). A departure keeps its deadline; a
+   * transfer's is the first working day after its grace, counted the way the deadline of a departure is (`DEPARTURE_REVOCATION_WORKING_DAYS`), because the
+   * tasks the sweeper opens for it carry none (D-99).
+   */
+  async revocationWindows(query: RevocationWindowQuery): Promise<RevocationWindowFacts[]> {
+    const windows: RevocationWindowFacts[] = [];
+    if (query.source !== 'TRANSFER') {
+      for (const row of await this.repo.departureWindows(query)) windows.push({ source: 'OFFBOARDING', ...row });
+    }
+    if (query.source !== 'OFFBOARDING') {
+      const transfers = await this.repo.transferWindows(query);
+      if (transfers.length > 0) {
+        const workingDays = Number(await this.parameters.getValue('DEPARTURE_REVOCATION_WORKING_DAYS'));
+        const nonWorking = await this.parameters.getNonWorkingDates(query.from, addDays(query.to, 120));
+        for (const { graceEndsOn, ...row } of transfers) {
+          windows.push({
+            source: 'TRANSFER',
+            ...row,
+            startOn: addDays(graceEndsOn, 1),
+            dueOn: revocationDueOn(graceEndsOn, workingDays, nonWorking),
+          });
+        }
+      }
+    }
+
+    return windows;
+  }
+
+  /** The departures past the deadline of their revocations with a right left without a completed task: the very ones the list gives for `revocationOverdue=true`. */
+  async lateDepartures(today: BusinessDate, departmentIds?: readonly string[]): Promise<LateDepartureFacts[]> {
+    return (await this.overdue.overdueCases(today, departmentIds)).map((late) => ({
+      id: late.id,
+      departmentId: late.departmentId,
+    }));
+  }
+
+  /** The graces of the transfers of these people that took effect (SPEC P22, R5 E7). */
+  graceWindowsOf(employeeIds: readonly string[]): Promise<GraceWindowFacts[]> {
+    return this.repo.graceWindowsOf(employeeIds);
   }
 
   /** The first of the month of `today` and the first of the next, as the instants they begin at in the time zone of the organization. */

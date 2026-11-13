@@ -58,3 +58,8 @@ export type DashboardRole = 'MANAGER' | 'IT_ADMIN' | 'SUPER_ADMIN';
 export function assertHoldsRole(roles: readonly string[], role: DashboardRole): void {
   if (!roles.includes(role)) throw new DashboardRefusedError();
 }
+
+/** Throws DashboardRefusedError unless the caller holds one of the roles: for a report two roles read, each in their own scope. */
+export function assertHoldsOneOf(roles: readonly string[], allowed: readonly DashboardRole[]): void {
+  if (!allowed.some((role) => roles.includes(role))) throw new DashboardRefusedError();
+}

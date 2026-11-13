@@ -100,7 +100,9 @@
   is named) and to the Super Admin, with the audit event `OFFBOARDING_CASE.REVOCATION_OVERDUE` (actor `SYSTEM`) in the same transaction. The key
   `offboarding:<case>:<day>` is unique for a recipient, so a case is told once for each working day however many instances or passes run; no
   notice on a Saturday, a Sunday or a non-working date; a failed pass only logs. It only tells: no task is opened, no seat taken away, the case is
-  never changed. Run one by hand with `RevocationOverdueService.noticeOverdue(now)`.
+  never changed. It judges departures only: the tasks of revocation a transfer opens when its grace ends (`TRANSFER`) carry no `due_on` and have no case, so it
+  tells nothing about them; their deadline is worked out for the report of the SLA (`GET /reports/revocation-sla`, D-124), which counts them as overdue. Run one
+  by hand with `RevocationOverdueService.noticeOverdue(now)`.
   The API also runs `BlockMomentSweeper` once an hour (the first pass five minutes after start, unreferenced timer): for each departure that is
   not cancelled or closed, has `block_announced_at IS NULL` and whose person is refused from today or earlier (the block of the case, or the
   day they left) it announces the block once (`QĐ-110b`, `QĐ-110d`). Each case has a transaction of its own that locks the employee, then the case

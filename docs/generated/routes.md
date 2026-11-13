@@ -381,5 +381,6 @@ Find a route, open its controller, then the service it calls. Module of a file =
 | GET | `/dashboards/manager` | [dashboards/manager/manager-dashboard.controller.ts](../../src/modules/dashboards/manager/manager-dashboard.controller.ts) → `get` | [ManagerDashboardService](../../src/modules/dashboards/manager/manager-dashboard.service.ts) |
 | GET | `/dashboards/it-admin` | [dashboards/it-admin/it-admin-dashboard.controller.ts](../../src/modules/dashboards/it-admin/it-admin-dashboard.controller.ts) → `get` | [ItAdminDashboardService](../../src/modules/dashboards/it-admin/it-admin-dashboard.service.ts) |
 | GET | `/dashboards/super-admin` | [dashboards/super-admin/super-admin-dashboard.controller.ts](../../src/modules/dashboards/super-admin/super-admin-dashboard.controller.ts) → `get` | [SuperAdminDashboardService](../../src/modules/dashboards/super-admin/super-admin-dashboard.service.ts) |
+| GET | `/reports/revocation-sla` | [dashboards/revocation-sla/revocation-sla.controller.ts](../../src/modules/dashboards/revocation-sla/revocation-sla.controller.ts) → `get` | [RevocationSlaQueryService](../../src/modules/dashboards/revocation-sla/revocation-sla-query.service.ts) |
 
-376 operations.
+377 operations.

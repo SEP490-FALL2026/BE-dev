@@ -2,6 +2,7 @@ import type { RegistryEvent } from './api-collection-registry';
 import { G9_REGISTRY_EVENTS } from './api-collection-registry-events-g9';
 import { K1CL_REGISTRY_EVENTS } from './api-collection-registry-events-k1cl';
 import { MF3B_REGISTRY_EVENTS } from './api-collection-registry-events-mf3b';
+import { RD_REGISTRY_EVENTS } from './api-collection-registry-events-rd';
 import { W6_REGISTRY_EVENTS } from './api-collection-registry-events-w6';
 import { XIT_REGISTRY_EVENTS } from './api-collection-registry-events-xit';
 
@@ -35,4 +36,5 @@ export const W3_REGISTRY_EVENTS: readonly RegistryEvent[] = [
   ...K1CL_REGISTRY_EVENTS,
   ...MF3B_REGISTRY_EVENTS,
   ...XIT_REGISTRY_EVENTS,
+  ...RD_REGISTRY_EVENTS,
 ];
