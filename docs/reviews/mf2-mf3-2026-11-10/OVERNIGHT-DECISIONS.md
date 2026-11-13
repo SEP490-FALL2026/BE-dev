@@ -794,6 +794,14 @@ Không sửa code; SPEC không bị sửa trong lượt này (spec là của Own
 - **Test** (`transfer-grace-closure`, 11 ca, 4 ca mới): đầu-cuối chuyển → nghỉ việc trong ân hạn ⟹ `SUPERSEDED` → hủy hồ sơ ⟹ mở lại (cột đóng rỗng, phase `IN_GRACE`, một audit `REOPENED`, chưa tác vụ thu hồi nào, vẫn `TRANSFER_SETTLING`) → hết ân hạn ⟹ sweep mở đúng một tác vụ `TRANSFER` → hoàn tất ⟹ đóng với `REVOKED`; có điều chuyển mới hơn ⟹ không mở lại, không audit; hồ sơ nghỉ việc không thay điều chuyển nào ⟹ không đụng; guard: mở lại đủ thì được, nửa vời / đổi cột khác / điều chuyển đóng thường thì bị từ chối. Đột biến: bỏ `onCancelled` ⟹ ca đầu-cuối đỏ; bỏ kiểm tra `hasNewerThan` ⟹ ca "điều chuyển mới hơn" đỏ; nới guard (bỏ so sánh các cột khác) ⟹ ca guard đỏ.
 - **Chạm:** `prisma/migrations/20261113002000_personnel_transfer_superseded/migration.sql` (sửa tại chỗ), `personnel/transfer-grace/{transfer-closure.listener,transfer-closure.service,transfer-grace.repo}.ts`, `docs/rules/security-jobs.md`, `test/integration/personnel/transfer-grace-closure.integration-spec.ts`.
 
+### D-98 · MF3-C-R6 (review MF3-C, Optional) · `replaces_assignment_id` bất biến sau khi ghi
+
+- **Lỗi.** Cột `license_assignments.replaces_assignment_id` (D-91) chỉ được ghi một lần lúc cấp, nhưng trigger `license_assignments_immutable` (hàm `license_assignment_reject_change`) không liệt kê nó: một câu UPDATE có thể xóa hoặc đổi quyền được thay, làm sai `regranted`/ảnh chụp lúc đóng và việc mở lại quyền cũ (`reopenReplacedBy`).
+- **Phương án.** (A) để ở tầng ứng dụng (không có đường UPDATE nào, nhưng DB không bảo vệ lịch sử); (B) thêm cột vào danh sách bất biến của hàm trigger. **ĐÃ CHỌN B**, sửa tại chỗ migration `20261113002200_licensing_assignment_replaces` (chưa từng triển khai, đúng phép coordinator): `CREATE OR REPLACE FUNCTION` giữ nguyên định nghĩa mới nhất (`20261109130000`) và thêm `replaces_assignment_id` vào hai bộ giá trị so sánh. Không đổi lược đồ Prisma (`prisma migrate diff` trên DB tạm: *No difference detected*).
+- **Quyền cũ vẫn mở lại được.** Việc mở lại (`reopenReplacedBy`) đổi `valid_until` của **quyền cũ** về rỗng, một cột mà hàm không khóa (chỉ khóa khi quyền cũ đã `failed`/`cancelled`, mà `reopenReplacedBy` loại trừ sẵn). Kiểm chứng bằng test (`valid_until` về NULL sau khi quyền mới hỏng) và bằng ca `transfer-grace-regrant` "cấp hỏng trả quyền cũ".
+- **Test** (`license-assignment-constraints`, 2 ca mới, 34 ca): xóa / đổi sang quyền khác / thêm vào ghế chưa có `replaces_assignment_id` đều bị từ chối `55000` với constraint `license_assignments_immutable`; quyền cũ mở lại được sau khi quyền mới hỏng. Đỏ trước khi sửa (ca đầu nhận `null`); đột biến: làm `valid_until` bất biến ⟹ 6 ca đỏ (gồm ca mở lại).
+- **Chạm:** `prisma/migrations/20261113002200_licensing_assignment_replaces/migration.sql` (sửa tại chỗ), `test/integration/licensing/license-assignment-constraints.integration-spec.ts` (helper `replacesId`).
+
 ## Bị chặn
 
 (chưa có)

@@ -40,6 +40,8 @@ interface AssignmentInput {
   validUntil?: string | null;
   expectedEnd?: string | null;
   predecessorId?: string | null;
+  /** The older right this one replaced the day it was given (R-49); a request writes one. */
+  replacesId?: string | null;
   importId?: string | null;
   /** A personal seat of an IT Admin flagged as a machine account carries the reason (QĐ-110m); left out, the seat is not flagged. */
   machineNote?: string | null;
@@ -139,9 +141,9 @@ describe('license assignments (integration, PostgreSQL constraints)', () => {
       `INSERT INTO license_assignments (id, organization_id, kind, source, plan_id, subscription_id, employee_id,
          account_identifier, normalized_account_identifier, reason, cost_center_id, owning_department_id, valid_from,
          valid_from_basis, valid_until, expected_end_date, predecessor_id, baseline_import_id, created_by_app_user_id,
-         is_machine_account, machine_account_note)
+         is_machine_account, machine_account_note, replaces_assignment_id)
        VALUES ($1, $2, $3::"AssignmentKind", $4::"AssignmentSource", $5, $6, $7, $8, $9, $10, $11, $12, $13,
-         $14::"AssignmentDateBasis", $15, $16, $17, $18, $19, $20, $21)`,
+         $14::"AssignmentDateBasis", $15, $16, $17, $18, $19, $20, $21, $22)`,
       [
         input.id ?? randomUUID(),
         organizationId,
@@ -168,6 +170,7 @@ describe('license assignments (integration, PostgreSQL constraints)', () => {
         randomUUID(),
         input.machineFlag ?? (input.machineNote !== undefined && input.machineNote !== null),
         input.machineNote === undefined ? null : input.machineNote,
+        input.replacesId === undefined ? null : input.replacesId,
       ],
     );
   const personal = (subscriptionId: string, extra: AssignmentInput = {}) =>
@@ -693,6 +696,55 @@ describe('license assignments (integration, PostgreSQL constraints)', () => {
       expect(
         await sqlState(sql, `UPDATE license_assignments SET expected_end_date = '2027-01-01' WHERE id = $1`, [id]),
       ).toBeNull();
+    });
+  });
+
+  describe('R-49, MF3-C-R6: the right a seat replaced', () => {
+    /** The old right, ended the day the new one is given, and the new one that names it. */
+    const replaced = async (): Promise<{ old: string; next: string; subscriptionId: string }> => {
+      const subscriptionId = await fresh(10);
+      const [old, next] = [randomUUID(), randomUUID()];
+      await personal(subscriptionId, { employeeId: staff, id: old, validFrom: '2026-10-01', validUntil: '2026-11-01' });
+      await personal(subscriptionId, {
+        employeeId: staff,
+        id: next,
+        source: 'REQUEST',
+        validFrom: '2026-11-01',
+        replacesId: old,
+      });
+
+      return { old, next, subscriptionId };
+    };
+
+    it('is written when the seat is, and is never edited after: not erased, not pointed at another right, not added to a seat that had none', async () => {
+      const { old, next, subscriptionId } = await replaced();
+      const plain = randomUUID();
+      await personal(subscriptionId, { employeeId: other, id: plain, source: 'REQUEST' });
+
+      expect(
+        await sqlState(sql, `UPDATE license_assignments SET replaces_assignment_id = NULL WHERE id = $1`, [next]),
+      ).toBe('55000');
+      expect(lastViolatedConstraint).toBe('license_assignments_immutable');
+      expect(
+        await sqlState(sql, `UPDATE license_assignments SET replaces_assignment_id = $2 WHERE id = $1`, [next, plain]),
+      ).toBe('55000');
+      expect(
+        await sqlState(sql, `UPDATE license_assignments SET replaces_assignment_id = $2 WHERE id = $1`, [plain, old]),
+      ).toBe('55000');
+    });
+
+    it('still lets the old right be opened again when the new one failed: the end is the one column of the old right that moves', async () => {
+      const { old, next } = await replaced();
+
+      // The grant failed: the new seat is closed with an empty period, then the old right has no end.
+      expect(
+        await sqlState(
+          sql,
+          `UPDATE license_assignments SET failed_at = now(), valid_until = valid_from WHERE id = $1`,
+          [next],
+        ),
+      ).toBeNull();
+      expect(await sqlState(sql, `UPDATE license_assignments SET valid_until = NULL WHERE id = $1`, [old])).toBeNull();
     });
   });
 
