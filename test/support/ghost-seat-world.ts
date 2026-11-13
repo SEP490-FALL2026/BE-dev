@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { ownSeatBy } from './fixture-sql';
 import request from 'supertest';
 import type { ApiAccount } from './api-accounts';
+import { IT_ADMIN_DEPARTMENT_LIMIT } from '../../src/modules/organization/department/department.policy';
 import { DecisionFollowUpService } from '../../src/modules/optimization/decision/decision-follow-up.service';
 import { InternalRulesService } from '../../src/modules/optimization/internal-rules/internal-rules.service';
 import type { RuleRunRecord } from '../../src/modules/optimization/rule-run/rule-run.repo';
@@ -45,15 +46,30 @@ export class GhostSeatWorld extends RevocationHarness {
   private bulk = 0;
   worldDepartment = '';
   worldItAdmin = { employeeId: '', account: this.it1 };
+  /** How many departments were made in the name of the IT Admin of the world: an IT Admin answers for at most four (`IT_ADMIN_DEPARTMENT_LIMIT`). */
+  private ownedByWorldItAdmin = 0;
 
   /** Boots the application and an IT Admin in charge of a department that owns the subscriptions of the world. */
   async startWorld(): Promise<void> {
     await this.start();
     const itAdminEmployee = await this.person('E-WORLD-IT');
     const account = await this.account('E-WORLD-IT', itAdminEmployee, 'IT_ADMIN');
+    // Named before its first department is made, so that department counts among the four it answers for.
+    this.worldItAdmin = { employeeId: itAdminEmployee, account };
     const department = await this.department('P-WORLD', itAdminEmployee);
     this.worldDepartment = department.id;
-    this.worldItAdmin = { employeeId: itAdminEmployee, account };
+  }
+
+  /**
+   * A department, owned by the IT Admin asked for. The IT Admin of the world has room for four: a department beyond that names no IT Admin, which
+   * the IT Admin reads all the same (a department with none is in the scope of every IT Admin), so the suites that make many departments go on.
+   */
+  override async department(code: string, itAdminEmployeeId?: string): Promise<{ id: string; code: string }> {
+    const ofTheWorld = itAdminEmployeeId !== undefined && itAdminEmployeeId === this.worldItAdmin.employeeId;
+    if (ofTheWorld) this.ownedByWorldItAdmin += 1;
+    const full = ofTheWorld && this.ownedByWorldItAdmin > IT_ADMIN_DEPARTMENT_LIMIT;
+
+    return super.department(code, full ? undefined : itAdminEmployeeId);
   }
 
   /** A day not used before: one more than the last, counted from tomorrow, as an instant at noon of the organization's calendar. */
