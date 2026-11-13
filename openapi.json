@@ -24080,7 +24080,7 @@
             }
           },
           "409": {
-            "description": "The plan is a K2 or K4 plan, another subscription of it is live (a draft, or active and not continued by a later period, not ended) and the seat baseline is closed: add seats to that one or renew it instead (SUBSCRIPTION.DUPLICATE_PLAN, details.subscriptionIds, nothing is written). While the baseline is open the write is accepted and the answer says SHOULD_MERGE in warnings. A price was to be converted, but the reporting currency of the installation is not in the currency table (REPORTING_CURRENCY_NOT_SUPPORTED, details.currency): a fault of the configuration, not of the request.",
+            "description": "The plan is a K2 or K4 plan, another subscription of it is live (a draft, or active and not continued by a later period, not ended) and the seat baseline is closed: add seats to that one or renew it instead (SUBSCRIPTION.DUPLICATE_PLAN, details.subscriptionIds, nothing is written). While the baseline is open the write is accepted and the answer says SHOULD_MERGE in warnings.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -24093,18 +24093,6 @@
                         "code": "SUBSCRIPTION.DUPLICATE_PLAN",
                         "message": "The plan already has a live subscription: add seats to it or renew it instead of declaring another.",
                         "details": { "subscriptionIds": ["<subscription-id>"] },
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "REPORTING_CURRENCY_NOT_SUPPORTED": {
-                    "summary": "The reporting currency XYZ is not in the currency table.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "REPORTING_CURRENCY_NOT_SUPPORTED",
-                        "message": "The reporting currency XYZ is not in the currency table.",
-                        "details": { "currency": "XYZ" },
                         "requestId": "req_example"
                       }
                     }
@@ -24156,7 +24144,7 @@
             }
           },
           "422": {
-            "description": "The request is invalid (VALIDATION_ERROR) or a rule refuses it: SUBSCRIPTION.PLAN_NOT_FOUND, OWNER_DEPARTMENT_INACTIVE and APPLICATION_RETIRED (declaring only), PLAN_HAS_NO_SUBSCRIPTION, PERPETUAL_NEEDS_LICENSED_APPLICATION, PERPETUAL_HAS_NO_TERM, DATES_INVALID or UPDATE_EMPTY; the shared-pool rules refuse COMMITMENT_TERM_REQUIRED (a term that becomes active names 1 or 12 months), COMMITMENT_TERM_NOT_ALLOWED (a perpetual purchase), K1_MONTHLY_ONLY (R-E01), BILLING_LONGER_THAN_COMMITMENT (R-G01), BILLING_CYCLE_UNSUPPORTED (only MONTHLY and ANNUAL are written; QUARTERLY and OTHER stay readable on older data), RESPONSIBLE_REQUIRED (an active subscription names the IT Admin who answers for it), RESPONSIBLE_NOT_IT_ADMIN and VENDOR_ADMINS_REQUIRED (a plan that needs admins at the vendor, a K2 plan or a K4 plan with an admin console, is not activated as a new subscription, nor its pool made, while its workspace profile names fewer than two different IT Admins; the period a renewal continues is never asked, it only carries the flag vendorAdminsBelowMinimum), and an update may also be refused with PRIMARY_NOT_ELIGIBLE (details.reason); the price is refused with MONEY_SCALE_EXCEEDED, MONEY_OUT_OF_RANGE or CURRENCY_NOT_SUPPORTED.",
+            "description": "The request is invalid (VALIDATION_ERROR) or a rule refuses it: SUBSCRIPTION.PLAN_NOT_FOUND, OWNER_DEPARTMENT_INACTIVE and APPLICATION_RETIRED (declaring only), PLAN_HAS_NO_SUBSCRIPTION, PERPETUAL_NEEDS_LICENSED_APPLICATION, PERPETUAL_HAS_NO_TERM, DATES_INVALID or UPDATE_EMPTY; the shared-pool rules refuse COMMITMENT_TERM_REQUIRED (a term that becomes active names 1 or 12 months), COMMITMENT_TERM_NOT_ALLOWED (a perpetual purchase), K1_MONTHLY_ONLY (R-E01), BILLING_LONGER_THAN_COMMITMENT (R-G01), BILLING_CYCLE_UNSUPPORTED (only MONTHLY and ANNUAL are written; QUARTERLY and OTHER stay readable on older data), RESPONSIBLE_REQUIRED (an active subscription names the IT Admin who answers for it), RESPONSIBLE_NOT_IT_ADMIN and VENDOR_ADMINS_REQUIRED (a plan that needs admins at the vendor, a K2 plan or a K4 plan with an admin console, is not activated as a new subscription, nor its pool made, while its workspace profile names fewer than two different IT Admins; the period a renewal continues is never asked, it only carries the flag vendorAdminsBelowMinimum), and an update may also be refused with PRIMARY_NOT_ELIGIBLE (details.reason); the unit price is refused with PRICE_NOT_VND (it is entered in dong only, details.currency), and the unit price and the original price with MONEY_SCALE_EXCEEDED, MONEY_OUT_OF_RANGE or CURRENCY_NOT_SUPPORTED (the currency of the original price).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -24338,6 +24326,18 @@
                       "error": {
                         "code": "SUBSCRIPTION.RESPONSIBLE_NOT_IT_ADMIN",
                         "message": "The person who answers for the subscription must be an IT Admin who works and can sign in.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SUBSCRIPTION.PRICE_NOT_VND": {
+                    "summary": "The unit price is entered in dong (VND). Convert it first and keep the price quoted by the vendor as the original price.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SUBSCRIPTION.PRICE_NOT_VND",
+                        "message": "The unit price is entered in dong (VND). Convert it first and keep the price quoted by the vendor as the original price.",
+                        "details": { "currency": "USD" },
                         "requestId": "req_example"
                       }
                     }
@@ -24733,7 +24733,7 @@
             }
           },
           "409": {
-            "description": "The department that owns the subscription has no Cost Center in use yet and the change creates, raises or extends what is owed: a higher quantity, a later end or renewal date (or one where there was none), auto renewal switched on or a higher unit price (FINANCE.SETUP_INCOMPLETE, nothing is written). A price was to be converted, but the reporting currency of the installation is not in the currency table (REPORTING_CURRENCY_NOT_SUPPORTED, details.currency): a fault of the configuration, not of the request. The unique index of the flag that makes a subscription the primary one of its plan refuses the loser of a race (SUBSCRIPTION.PRIMARY_CONFLICT); the plan is locked for the write, so it normally does not fire.",
+            "description": "The department that owns the subscription has no Cost Center in use yet and the change creates, raises or extends what is owed: a higher quantity, a later end or renewal date (or one where there was none), auto renewal switched on or a higher unit price (FINANCE.SETUP_INCOMPLETE, nothing is written). The unique index of the flag that makes a subscription the primary one of its plan refuses the loser of a race (SUBSCRIPTION.PRIMARY_CONFLICT); the plan is locked for the write, so it normally does not fire.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -24745,18 +24745,6 @@
                       "error": {
                         "code": "FINANCE.SETUP_INCOMPLETE",
                         "message": "The department has no Cost Center in use yet: Finance has to create one for it first.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "REPORTING_CURRENCY_NOT_SUPPORTED": {
-                    "summary": "The reporting currency XYZ is not in the currency table.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "REPORTING_CURRENCY_NOT_SUPPORTED",
-                        "message": "The reporting currency XYZ is not in the currency table.",
-                        "details": { "currency": "XYZ" },
                         "requestId": "req_example"
                       }
                     }
@@ -24819,7 +24807,7 @@
             }
           },
           "422": {
-            "description": "The request is invalid (VALIDATION_ERROR) or a rule refuses it: SUBSCRIPTION.PLAN_NOT_FOUND, OWNER_DEPARTMENT_INACTIVE and APPLICATION_RETIRED (declaring only), PLAN_HAS_NO_SUBSCRIPTION, PERPETUAL_NEEDS_LICENSED_APPLICATION, PERPETUAL_HAS_NO_TERM, DATES_INVALID or UPDATE_EMPTY; the shared-pool rules refuse COMMITMENT_TERM_REQUIRED (a term that becomes active names 1 or 12 months), COMMITMENT_TERM_NOT_ALLOWED (a perpetual purchase), K1_MONTHLY_ONLY (R-E01), BILLING_LONGER_THAN_COMMITMENT (R-G01), BILLING_CYCLE_UNSUPPORTED (only MONTHLY and ANNUAL are written; QUARTERLY and OTHER stay readable on older data), RESPONSIBLE_REQUIRED (an active subscription names the IT Admin who answers for it), RESPONSIBLE_NOT_IT_ADMIN and VENDOR_ADMINS_REQUIRED (a plan that needs admins at the vendor, a K2 plan or a K4 plan with an admin console, is not activated as a new subscription, nor its pool made, while its workspace profile names fewer than two different IT Admins; the period a renewal continues is never asked, it only carries the flag vendorAdminsBelowMinimum), and an update may also be refused with PRIMARY_NOT_ELIGIBLE (details.reason); the price is refused with MONEY_SCALE_EXCEEDED, MONEY_OUT_OF_RANGE or CURRENCY_NOT_SUPPORTED. An update that would put the seats bought under the seats taken is refused with SUBSCRIPTION.QUANTITY_BELOW_OCCUPIED (details.occupied, details.requested).",
+            "description": "The request is invalid (VALIDATION_ERROR) or a rule refuses it: SUBSCRIPTION.PLAN_NOT_FOUND, OWNER_DEPARTMENT_INACTIVE and APPLICATION_RETIRED (declaring only), PLAN_HAS_NO_SUBSCRIPTION, PERPETUAL_NEEDS_LICENSED_APPLICATION, PERPETUAL_HAS_NO_TERM, DATES_INVALID or UPDATE_EMPTY; the shared-pool rules refuse COMMITMENT_TERM_REQUIRED (a term that becomes active names 1 or 12 months), COMMITMENT_TERM_NOT_ALLOWED (a perpetual purchase), K1_MONTHLY_ONLY (R-E01), BILLING_LONGER_THAN_COMMITMENT (R-G01), BILLING_CYCLE_UNSUPPORTED (only MONTHLY and ANNUAL are written; QUARTERLY and OTHER stay readable on older data), RESPONSIBLE_REQUIRED (an active subscription names the IT Admin who answers for it), RESPONSIBLE_NOT_IT_ADMIN and VENDOR_ADMINS_REQUIRED (a plan that needs admins at the vendor, a K2 plan or a K4 plan with an admin console, is not activated as a new subscription, nor its pool made, while its workspace profile names fewer than two different IT Admins; the period a renewal continues is never asked, it only carries the flag vendorAdminsBelowMinimum), and an update may also be refused with PRIMARY_NOT_ELIGIBLE (details.reason); the unit price is refused with PRICE_NOT_VND (it is entered in dong only, details.currency), and the unit price and the original price with MONEY_SCALE_EXCEEDED, MONEY_OUT_OF_RANGE or CURRENCY_NOT_SUPPORTED (the currency of the original price). An update that would put the seats bought under the seats taken is refused with SUBSCRIPTION.QUANTITY_BELOW_OCCUPIED (details.occupied, details.requested).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -24890,7 +24878,7 @@
                       "error": {
                         "code": "SUBSCRIPTION.STILL_DRAFT",
                         "message": "The subscription still lacks data to be complete.",
-                        "details": { "missing": ["EXCHANGE_RATE"] },
+                        "details": { "missing": ["UNIT_PRICE"] },
                         "requestId": "req_example"
                       }
                     }
@@ -24993,6 +24981,18 @@
                         "code": "SUBSCRIPTION.PRIMARY_NOT_ELIGIBLE",
                         "message": "Only an active subscription that is not renewed can price its plan.",
                         "details": { "reason": "NOT_ACTIVE" },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SUBSCRIPTION.PRICE_NOT_VND": {
+                    "summary": "The unit price is entered in dong (VND). Convert it first and keep the price quoted by the vendor as the original price.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SUBSCRIPTION.PRICE_NOT_VND",
+                        "message": "The unit price is entered in dong (VND). Convert it first and keep the price quoted by the vendor as the original price.",
+                        "details": { "currency": "USD" },
                         "requestId": "req_example"
                       }
                     }
@@ -25190,7 +25190,7 @@
             }
           },
           "409": {
-            "description": "The plan is a K2 or K4 plan, another subscription of it is live (a draft, or active and not continued by a later period, not ended) and the seat baseline is closed: add seats to that one or renew it instead (SUBSCRIPTION.DUPLICATE_PLAN, details.subscriptionIds, nothing is written). While the baseline is open the write is accepted and the answer says SHOULD_MERGE in warnings. A price was to be converted, but the reporting currency of the installation is not in the currency table (REPORTING_CURRENCY_NOT_SUPPORTED, details.currency): a fault of the configuration, not of the request.",
+            "description": "The plan is a K2 or K4 plan, another subscription of it is live (a draft, or active and not continued by a later period, not ended) and the seat baseline is closed: add seats to that one or renew it instead (SUBSCRIPTION.DUPLICATE_PLAN, details.subscriptionIds, nothing is written). While the baseline is open the write is accepted and the answer says SHOULD_MERGE in warnings.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -25206,25 +25206,13 @@
                         "requestId": "req_example"
                       }
                     }
-                  },
-                  "REPORTING_CURRENCY_NOT_SUPPORTED": {
-                    "summary": "The reporting currency XYZ is not in the currency table.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "REPORTING_CURRENCY_NOT_SUPPORTED",
-                        "message": "The reporting currency XYZ is not in the currency table.",
-                        "details": { "currency": "XYZ" },
-                        "requestId": "req_example"
-                      }
-                    }
                   }
                 }
               }
             }
           },
           "422": {
-            "description": "The id is invalid (VALIDATION_ERROR) or the subscription still lacks data or the rate of its price day (SUBSCRIPTION.STILL_DRAFT, details.missing), or the shared-pool rules refuse it: COMMITMENT_TERM_REQUIRED, K1_MONTHLY_ONLY, RESPONSIBLE_REQUIRED, RESPONSIBLE_NOT_IT_ADMIN, VENDOR_ADMINS_REQUIRED.",
+            "description": "The id is invalid (VALIDATION_ERROR) or the subscription still lacks data (SUBSCRIPTION.STILL_DRAFT, details.missing; a price an earlier release left in another currency counts as missing until it is entered again in dong), or the shared-pool rules refuse it: COMMITMENT_TERM_REQUIRED, K1_MONTHLY_ONLY, RESPONSIBLE_REQUIRED, RESPONSIBLE_NOT_IT_ADMIN, VENDOR_ADMINS_REQUIRED.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -25248,7 +25236,7 @@
                       "error": {
                         "code": "SUBSCRIPTION.STILL_DRAFT",
                         "message": "The subscription still lacks data to be complete.",
-                        "details": { "missing": ["EXCHANGE_RATE"] },
+                        "details": { "missing": ["UNIT_PRICE"] },
                         "requestId": "req_example"
                       }
                     }
@@ -44099,7 +44087,7 @@
             }
           },
           "422": {
-            "description": "A field is invalid (VALIDATION_ERROR), a vendor, plan or person it names does not exist (ASSESSMENT.REFERENCE_NOT_FOUND), or the quote runs backwards (ASSESSMENT.QUOTE_PERIOD_INVALID).",
+            "description": "A field is invalid (VALIDATION_ERROR), a vendor, plan or person it names does not exist (ASSESSMENT.REFERENCE_NOT_FOUND), or the quote runs backwards (ASSESSMENT.QUOTE_PERIOD_INVALID) or is not in dong (ASSESSMENT.QUOTE_PRICE_NOT_VND; the price the vendor quoted in another currency goes in quote.originalPrice).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -44135,6 +44123,17 @@
                       "error": {
                         "code": "ASSESSMENT.QUOTE_PERIOD_INVALID",
                         "message": "The quote cannot price the request: QUOTE_PERIOD_INVALID.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "ASSESSMENT.QUOTE_PRICE_NOT_VND": {
+                    "summary": "The quote cannot price the request: QUOTE_PRICE_NOT_VND.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "ASSESSMENT.QUOTE_PRICE_NOT_VND",
+                        "message": "The quote cannot price the request: QUOTE_PRICE_NOT_VND.",
                         "requestId": "req_example"
                       }
                     }
@@ -45004,7 +45003,7 @@
             }
           },
           "422": {
-            "description": "The data sensitivity is not known (ASSESSMENT.INCOMPLETE), the quote cannot price the request (ASSESSMENT.QUOTE_NOT_IN_FORCE and the others), or the body is invalid (VALIDATION_ERROR). Nothing is registered and the request stays with the IT Admin.",
+            "description": "The data sensitivity is not known (ASSESSMENT.INCOMPLETE), the quote cannot price the request (ASSESSMENT.QUOTE_NOT_IN_FORCE and the others, ASSESSMENT.QUOTE_PRICE_NOT_VND when it is not in dong), or the body is invalid (VALIDATION_ERROR). Nothing is registered and the request stays with the IT Admin.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -45040,6 +45039,17 @@
                       "error": {
                         "code": "ASSESSMENT.QUOTE_PERIOD_INVALID",
                         "message": "The quote cannot price the request: QUOTE_PERIOD_INVALID.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "ASSESSMENT.QUOTE_PRICE_NOT_VND": {
+                    "summary": "The quote cannot price the request: QUOTE_PRICE_NOT_VND.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "ASSESSMENT.QUOTE_PRICE_NOT_VND",
+                        "message": "The quote cannot price the request: QUOTE_PRICE_NOT_VND.",
                         "requestId": "req_example"
                       }
                     }
@@ -94369,10 +94379,7 @@
                     "missingFinancialData": { "type": "boolean" },
                     "missing": {
                       "type": "array",
-                      "items": {
-                        "type": "string",
-                        "enum": ["QUANTITY", "START_DATE", "BILLING_CYCLE", "UNIT_PRICE", "EXCHANGE_RATE"]
-                      }
+                      "items": { "type": "string", "enum": ["QUANTITY", "START_DATE", "BILLING_CYCLE", "UNIT_PRICE"] }
                     },
                     "purchasedQuantity": {
                       "type": "integer",
@@ -94387,26 +94394,10 @@
                       "additionalProperties": false,
                       "nullable": true
                     },
-                    "priceSnapshot": {
+                    "originalPrice": {
                       "type": "object",
-                      "properties": {
-                        "recordedOn": { "type": "string" },
-                        "rate": { "type": "string" },
-                        "rateDate": { "type": "string" },
-                        "rateSource": { "type": "string", "enum": ["MANUAL", "SAME_CURRENCY"] },
-                        "reportingAmount": { "type": "string" },
-                        "reportingCurrency": { "type": "string" },
-                        "exchangeRateId": { "type": "string", "format": "uuid", "nullable": true }
-                      },
-                      "required": [
-                        "recordedOn",
-                        "rate",
-                        "rateDate",
-                        "rateSource",
-                        "reportingAmount",
-                        "reportingCurrency",
-                        "exchangeRateId"
-                      ],
+                      "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                      "required": ["amount", "currency"],
                       "additionalProperties": false,
                       "nullable": true
                     },
@@ -94539,7 +94530,7 @@
                     "missing",
                     "purchasedQuantity",
                     "unitPrice",
-                    "priceSnapshot",
+                    "originalPrice",
                     "billingCycle",
                     "commitmentTermMonths",
                     "startDate",
@@ -94625,7 +94616,18 @@
               "currency": { "type": "string", "pattern": "^[A-Z]{3}$" }
             },
             "required": ["amount", "currency"],
-            "additionalProperties": false
+            "additionalProperties": false,
+            "description": "The unit price in dong: a decimal string in major units, currency VND. Another currency is refused (SUBSCRIPTION.PRICE_NOT_VND)."
+          },
+          "originalPrice": {
+            "type": "object",
+            "properties": {
+              "amount": { "type": "string", "maxLength": 40 },
+              "currency": { "type": "string", "pattern": "^[A-Z]{3}$" }
+            },
+            "required": ["amount", "currency"],
+            "additionalProperties": false,
+            "description": "The price the vendor quoted in another currency, kept beside the price in dong so an invoice can be matched against it: a decimal string in major units of its currency. It is only kept, never converted."
           },
           "billingCycle": { "type": "string", "enum": ["MONTHLY", "QUARTERLY", "ANNUAL", "OTHER"] },
           "commitmentTermMonths": {
@@ -94692,10 +94694,7 @@
               "missingFinancialData": { "type": "boolean" },
               "missing": {
                 "type": "array",
-                "items": {
-                  "type": "string",
-                  "enum": ["QUANTITY", "START_DATE", "BILLING_CYCLE", "UNIT_PRICE", "EXCHANGE_RATE"]
-                }
+                "items": { "type": "string", "enum": ["QUANTITY", "START_DATE", "BILLING_CYCLE", "UNIT_PRICE"] }
               },
               "purchasedQuantity": {
                 "type": "integer",
@@ -94710,26 +94709,10 @@
                 "additionalProperties": false,
                 "nullable": true
               },
-              "priceSnapshot": {
+              "originalPrice": {
                 "type": "object",
-                "properties": {
-                  "recordedOn": { "type": "string" },
-                  "rate": { "type": "string" },
-                  "rateDate": { "type": "string" },
-                  "rateSource": { "type": "string", "enum": ["MANUAL", "SAME_CURRENCY"] },
-                  "reportingAmount": { "type": "string" },
-                  "reportingCurrency": { "type": "string" },
-                  "exchangeRateId": { "type": "string", "format": "uuid", "nullable": true }
-                },
-                "required": [
-                  "recordedOn",
-                  "rate",
-                  "rateDate",
-                  "rateSource",
-                  "reportingAmount",
-                  "reportingCurrency",
-                  "exchangeRateId"
-                ],
+                "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                "required": ["amount", "currency"],
                 "additionalProperties": false,
                 "nullable": true
               },
@@ -94862,7 +94845,7 @@
               "missing",
               "purchasedQuantity",
               "unitPrice",
-              "priceSnapshot",
+              "originalPrice",
               "billingCycle",
               "commitmentTermMonths",
               "startDate",
@@ -94906,7 +94889,19 @@
               "currency": { "type": "string", "pattern": "^[A-Z]{3}$" }
             },
             "required": ["amount", "currency"],
-            "additionalProperties": false
+            "additionalProperties": false,
+            "description": "The unit price in dong: a decimal string in major units, currency VND. Another currency is refused (SUBSCRIPTION.PRICE_NOT_VND)."
+          },
+          "originalPrice": {
+            "type": "object",
+            "properties": {
+              "amount": { "type": "string", "maxLength": 40 },
+              "currency": { "type": "string", "pattern": "^[A-Z]{3}$" }
+            },
+            "required": ["amount", "currency"],
+            "additionalProperties": false,
+            "description": "The original price the vendor quoted; null takes the recorded one away.",
+            "nullable": true
           },
           "billingCycle": { "type": "string", "enum": ["MONTHLY", "QUARTERLY", "ANNUAL", "OTHER"] },
           "commitmentTermMonths": {
@@ -101445,11 +101440,18 @@
                         "required": ["amount", "currency"],
                         "additionalProperties": false
                       },
+                      "originalPrice": {
+                        "type": "object",
+                        "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                        "required": ["amount", "currency"],
+                        "additionalProperties": false,
+                        "nullable": true
+                      },
                       "billingCycle": { "type": "string", "enum": ["MONTHLY", "QUARTERLY", "ANNUAL"] },
                       "validFrom": { "type": "string" },
                       "validUntil": { "type": "string", "nullable": true }
                     },
-                    "required": ["unitPrice", "billingCycle", "validFrom", "validUntil"],
+                    "required": ["unitPrice", "originalPrice", "billingCycle", "validFrom", "validUntil"],
                     "additionalProperties": false,
                     "nullable": true
                   },
@@ -101699,7 +101701,18 @@
                   "currency": { "type": "string", "pattern": "^[A-Z]{3}$" }
                 },
                 "required": ["amount", "currency"],
-                "additionalProperties": false
+                "additionalProperties": false,
+                "description": "What one person costs for one billing cycle, in dong: a decimal string in major units, currency VND. Another currency is refused (ASSESSMENT.QUOTE_PRICE_NOT_VND)."
+              },
+              "originalPrice": {
+                "type": "object",
+                "properties": {
+                  "amount": { "type": "string", "maxLength": 40 },
+                  "currency": { "type": "string", "pattern": "^[A-Z]{3}$" }
+                },
+                "required": ["amount", "currency"],
+                "additionalProperties": false,
+                "description": "The price the vendor quoted in another currency, kept beside the quote in dong for matching an invoice later: a decimal string in major units of its currency. It is only kept, never converted."
               },
               "billingCycle": { "type": "string", "enum": ["MONTHLY", "QUARTERLY", "ANNUAL"] },
               "validFrom": {
@@ -101753,7 +101766,18 @@
                       "currency": { "type": "string", "pattern": "^[A-Z]{3}$" }
                     },
                     "required": ["amount", "currency"],
-                    "additionalProperties": false
+                    "additionalProperties": false,
+                    "description": "What one person costs for one billing cycle, in dong: a decimal string in major units, currency VND. Another currency is refused (ASSESSMENT.QUOTE_PRICE_NOT_VND)."
+                  },
+                  "originalPrice": {
+                    "type": "object",
+                    "properties": {
+                      "amount": { "type": "string", "maxLength": 40 },
+                      "currency": { "type": "string", "pattern": "^[A-Z]{3}$" }
+                    },
+                    "required": ["amount", "currency"],
+                    "additionalProperties": false,
+                    "description": "The price the vendor quoted in another currency, kept beside the quote in dong for matching an invoice later: a decimal string in major units of its currency. It is only kept, never converted."
                   },
                   "billingCycle": { "type": "string", "enum": ["MONTHLY", "QUARTERLY", "ANNUAL"] },
                   "validFrom": {
