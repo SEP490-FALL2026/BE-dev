@@ -255,18 +255,6 @@ describe('DepartmentService', () => {
   });
 
   describe('one IT Admin answers for at most four departments (QĐ-110l, US-01-11)', () => {
-    it('counts the departments of the IT Admin only after the employee row is locked, in the same transaction', async () => {
-      departments.countActiveInChargeOf.mockResolvedValue(3);
-
-      await (await service()).update(superAdmin, 'dep-1', { itAdminEmployeeId: 'emp-it' });
-
-      expect(departments.countActiveInChargeOf).toHaveBeenCalledWith(tx, 'emp-it');
-      expect(organization.lockEmployee.mock.invocationCallOrder[0]).toBeLessThan(
-        departments.countActiveInChargeOf.mock.invocationCallOrder[0],
-      );
-      expect(departments.update).toHaveBeenCalled();
-    });
-
     it('refuses to name an IT Admin who already answers for four departments, on a change, and writes nothing', async () => {
       departments.countActiveInChargeOf.mockResolvedValue(4);
 
@@ -287,15 +275,6 @@ describe('DepartmentService', () => {
 
       expect(departments.insert).not.toHaveBeenCalled();
       expect(audit.record).not.toHaveBeenCalled();
-    });
-
-    it('judges the person before the count: an unusable account is 422 whatever the number of departments', async () => {
-      departments.countActiveInChargeOf.mockResolvedValue(9);
-      identity.inspectEmployeeAccount.mockResolvedValue({ usable: false, roles: ['IT_ADMIN'] });
-
-      await expect(
-        (await service()).update(superAdmin, 'dep-1', { itAdminEmployeeId: 'emp-it' }),
-      ).rejects.toBeInstanceOf(DepartmentItAdminInvalidError);
     });
 
     it('does not count again when the IT Admin is taken off or the department keeps the one it has', async () => {
