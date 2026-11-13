@@ -17,11 +17,12 @@ import type { LimitVerdict } from '../request-limits/request-limits.policy';
 
 /** The request can be sent as it is: nobody holds it already, nothing blocks the parties, and the end date fits (`FR-2.8`, `US-05-23` AC-9). */
 const canSubmitOf = (
-  assessed: { heldAccess: unknown; endDateOutOfRange: boolean; termRequired: boolean },
+  assessed: { heldAccess: unknown; graceHold: unknown; endDateOutOfRange: boolean; termRequired: boolean },
   blockedBy: unknown,
   limits: Pick<LimitVerdict, 'refusal'>,
 ): boolean =>
-  assessed.heldAccess === null &&
+  // A right held from before a transfer in its grace does not stop the person asking for it again (`QĐ-110q`).
+  (assessed.heldAccess === null || assessed.graceHold !== null) &&
   blockedBy === null &&
   !assessed.endDateOutOfRange &&
   !assessed.termRequired &&
@@ -93,6 +94,7 @@ export class RequestPreviewService {
         refusal: limits.refusal,
         openRequestId: limits.openRequestId,
       },
+      limitExemption: assessed.graceHold ? ('TRANSFER_GRACE' as const) : null,
       canSubmit: canSubmitOf(assessed, blockedBy, limits),
       budgetYear: pricing.budgetYear,
       pricing: priceView,
@@ -140,6 +142,7 @@ export class RequestPreviewService {
         applicationId: assessed.target.applicationId,
         today: assessed.today,
         settings: limitSettings,
+        exemptions: assessed.graceHold ? new Map([[actor.employeeId, 'TRANSFER_GRACE' as const]]) : undefined,
       });
 
       return {

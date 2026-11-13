@@ -29,7 +29,7 @@ import { RequestCommitmentFacts } from './spend/commitment-request-facts.listene
 import { RequestDraftService } from './draft/request-draft.service';
 import { RequestDraftSubmitService } from './draft/request-draft-submit.service';
 import { RequestDraftsController } from './draft/request-drafts.controller';
-import { RequestOutcomeListeners } from './public/requests.extension-points';
+import { RequestOutcomeListeners, TransferGraceHoldContributions } from './public/requests.extension-points';
 import { RequestOutcomeService } from './outcome/request-outcome.service';
 import { AssessmentRepo } from './assessment/assessment.repo';
 import { AssessmentCompletionService } from './assessment/assessment-completion.service';
@@ -242,6 +242,8 @@ import { MyRequestsService } from './my-requests/my-requests.service';
     AccessRequestService,
     RequestLimitsRepo,
     RequestLimitsService,
+    // The grace of a transfer, the extension point this module opens for personnel (`QĐ-110q`, R-49).
+    TransferGraceHoldContributions,
     RequestResubmissionService,
     RequestSenderService,
     RequestDraftService,
@@ -380,6 +382,12 @@ import { MyRequestsService } from './my-requests/my-requests.service';
     YearStartCommitmentsService,
     YearStartCommitmentsSweeper,
   ],
-  exports: [RequestsApi, RequestOutcomeListeners, RequestsDashboardApi, RequestsAiSourceApi],
+  exports: [
+    RequestsApi,
+    RequestOutcomeListeners,
+    TransferGraceHoldContributions,
+    RequestsDashboardApi,
+    RequestsAiSourceApi,
+  ],
 })
 export class RequestsModule {}

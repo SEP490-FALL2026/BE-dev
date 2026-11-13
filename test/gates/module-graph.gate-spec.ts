@@ -199,6 +199,8 @@ const PUBLIC_CONTRACT_EXPORTS: ReadonlySet<string> = new Set([
   'RequestsModule: RequestsAiSourceApi',
   // F43: the extension point the personnel context adds its listener of the outcome of a request to (public/requests.extension-points.ts).
   'RequestsModule: RequestOutcomeListeners',
+  // MF3-C.3 (QĐ-110q, R-49): the extension point the personnel context adds its answer to — a person in the grace of a transfer who holds the software asked for (public/requests.extension-points.ts).
+  'RequestsModule: TransferGraceHoldContributions',
   // The two entry services of `pnpm ops:recover` (Q6; E7): the holder's own account, and the role transfer.
   'IdentityAccessRecoveryCliModule: HolderRecoveryApi',
   'IdentityAccessRecoveryCliModule: RoleTransferRecoveryApi',

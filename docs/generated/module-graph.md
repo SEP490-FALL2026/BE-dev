@@ -117,7 +117,7 @@ flowchart BT
   personnel -->|6| notifications
   personnel -->|7| operating_parameters
   personnel -->|91| organization
-  personnel -->|7| requests
+  personnel -->|8| requests
   requests -->|58| audit
   requests -->|23| budgets
   requests -->|29| catalog

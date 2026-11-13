@@ -3,6 +3,7 @@ import type { SubmitBodyDto } from '../access-request/access-request.dto';
 import { hasSpendStep } from '../access-request/access-request.policy';
 import type { ManyPaidSoftwareFlag, NewAccessRequest } from '../access-request/access-request.types';
 import type { Assessment } from '../access-request/request-facts.service';
+import type { TransferGraceHolding } from '../public/requests.extension-points';
 
 /** What a request that is sent is made of: who sent it, what they asked for, what it was judged by, and the day. */
 export interface SubmittedRequest {
@@ -15,6 +16,8 @@ export interface SubmittedRequest {
   draftId?: string;
   /** GH-3 of the person, when the request is flagged (`BR-MF1-01g`). */
   manyPaidSoftware?: ManyPaidSoftwareFlag | null;
+  /** The grace of a transfer in which the person asks again for a right they hold from before it: left out of GH-1/GH-2, and the old right it replaces (`QĐ-110q`, R-49). */
+  graceHold?: TransferGraceHolding | null;
 }
 
 /** The state the request starts in: pending with the person the table named, or waiting under control when nobody valid exists. */
@@ -53,6 +56,9 @@ export function newRequestOf(facts: SubmittedRequest): NewAccessRequest {
     },
     draftId: facts.draftId ?? null,
     manyPaidSoftware: facts.manyPaidSoftware ?? null,
+    ...(facts.graceHold
+      ? { limitExemption: 'TRANSFER_GRACE' as const, replacesAssignmentId: facts.graceHold.assignmentId }
+      : {}),
   };
 }
 
@@ -78,6 +84,14 @@ export function submittedAuditDetail(facts: SubmittedRequest): { [key: string]: 
     amountCurrency: pricing.amount?.currency ?? null,
     budgetYear: pricing.budgetYear,
     manyPaidSoftwareCount: facts.manyPaidSoftware?.count ?? null,
+    // The grace of a transfer (`QĐ-110q`, R-49): the request is left out of GH-1/GH-2 and replaces the right the person holds from before it.
+    ...(facts.graceHold
+      ? {
+          limitExemption: 'TRANSFER_GRACE',
+          replacesAssignmentId: facts.graceHold.assignmentId,
+          transferId: facts.graceHold.transferId,
+        }
+      : {}),
   };
 }
 

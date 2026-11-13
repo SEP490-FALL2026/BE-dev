@@ -95,6 +95,7 @@ import { MyTransferService } from './transfer-grace/my-transfer.service';
 import { TransferClosureListener } from './transfer-grace/transfer-closure.listener';
 import { TransferClosureService } from './transfer-grace/transfer-closure.service';
 import { TransferEffectsService } from './transfer-grace/transfer-effects.service';
+import { TransferGraceHoldListener } from './transfer-grace/transfer-grace-hold.listener';
 import { TransferGraceSweeper } from './transfer-grace/transfer-grace.job';
 import { TransferGraceRepo } from './transfer-grace/transfer-grace.repo';
 import { TransferGraceService } from './transfer-grace/transfer-grace.service';
@@ -187,6 +188,7 @@ import { TransfersController } from './transfer/transfers.controller';
     TransferGraceSweeper,
     TransferClosureService,
     TransferClosureListener,
+    TransferGraceHoldListener,
     TransferTellingService,
     TransferRevocationService,
     TransferOldRightsService,

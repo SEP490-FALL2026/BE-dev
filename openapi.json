@@ -95225,6 +95225,11 @@
                     "additionalProperties": false,
                     "nullable": true
                   },
+                  "limitExemption": {
+                    "type": "string",
+                    "enum": ["TRANSFER_GRACE", "ROLE_ENDED", null],
+                    "nullable": true
+                  },
                   "flags": {
                     "type": "object",
                     "properties": {
@@ -95543,6 +95548,7 @@
                   "termMonths",
                   "expectedEndDate",
                   "serviceAccount",
+                  "limitExemption",
                   "flags",
                   "renewal",
                   "spend",
@@ -95753,6 +95759,11 @@
                     "additionalProperties": false,
                     "nullable": true
                   },
+                  "limitExemption": {
+                    "type": "string",
+                    "enum": ["TRANSFER_GRACE", "ROLE_ENDED", null],
+                    "nullable": true
+                  },
                   "flags": {
                     "type": "object",
                     "properties": {
@@ -96071,6 +96082,7 @@
                   "termMonths",
                   "expectedEndDate",
                   "serviceAccount",
+                  "limitExemption",
                   "flags",
                   "renewal",
                   "spend",
@@ -96218,6 +96230,11 @@
                       "openRequestId"
                     ],
                     "additionalProperties": false
+                  },
+                  "limitExemption": {
+                    "type": "string",
+                    "enum": ["TRANSFER_GRACE", "ROLE_ENDED", null],
+                    "nullable": true
                   },
                   "canSubmit": { "type": "boolean" },
                   "budgetYear": {
@@ -96423,6 +96440,7 @@
                   "existingAccess",
                   "blockedBy",
                   "limits",
+                  "limitExemption",
                   "canSubmit",
                   "budgetYear",
                   "pricing",
@@ -96614,6 +96632,11 @@
                         },
                         "required": ["purpose", "expectedIdentifier", "responsible", "boundary"],
                         "additionalProperties": false,
+                        "nullable": true
+                      },
+                      "limitExemption": {
+                        "type": "string",
+                        "enum": ["TRANSFER_GRACE", "ROLE_ENDED", null],
                         "nullable": true
                       },
                       "flags": {
@@ -96940,6 +96963,7 @@
                       "termMonths",
                       "expectedEndDate",
                       "serviceAccount",
+                      "limitExemption",
                       "flags",
                       "renewal",
                       "spend",
@@ -99978,6 +100002,11 @@
                     "additionalProperties": false,
                     "nullable": true
                   },
+                  "limitExemption": {
+                    "type": "string",
+                    "enum": ["TRANSFER_GRACE", "ROLE_ENDED", null],
+                    "nullable": true
+                  },
                   "flags": {
                     "type": "object",
                     "properties": {
@@ -100296,6 +100325,7 @@
                   "termMonths",
                   "expectedEndDate",
                   "serviceAccount",
+                  "limitExemption",
                   "flags",
                   "renewal",
                   "spend",
@@ -101126,6 +101156,11 @@
                     "additionalProperties": false,
                     "nullable": true
                   },
+                  "limitExemption": {
+                    "type": "string",
+                    "enum": ["TRANSFER_GRACE", "ROLE_ENDED", null],
+                    "nullable": true
+                  },
                   "flags": {
                     "type": "object",
                     "properties": {
@@ -101444,6 +101479,7 @@
                   "termMonths",
                   "expectedEndDate",
                   "serviceAccount",
+                  "limitExemption",
                   "flags",
                   "renewal",
                   "spend",

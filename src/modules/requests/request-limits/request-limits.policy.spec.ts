@@ -75,8 +75,8 @@ describe('judgeNewRequestLimits (BR-MF1-01)', () => {
     });
   });
 
-  describe('QĐ-108c / QĐ-103t: an exempt request (ROLE_ENDED, TRANSFER_OVERLAP)', () => {
-    it.each(['ROLE_ENDED', 'TRANSFER_OVERLAP'] as const)('%s skips GH-1 and GH-2 but not GH-3', (exemption) => {
+  describe('QĐ-108c / QĐ-110q: an exempt request (ROLE_ENDED, TRANSFER_GRACE)', () => {
+    it.each(['ROLE_ENDED', 'TRANSFER_GRACE'] as const)('%s skips GH-1 and GH-2 but not GH-3', (exemption) => {
       const open = ['r-1', 'r-2', 'r-3'].map((requestId) => ({ requestId, planId: 'plan-figma-pro' }));
 
       const verdict = judgeNewRequestLimits(

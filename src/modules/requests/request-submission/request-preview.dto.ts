@@ -4,6 +4,7 @@ import { successEnvelopeSchema } from '../../../infrastructure/http/dto/success-
 import {
   costEstimateSchema,
   employeeRef,
+  limitExemptionSchema,
   moneySchema,
   pricingSchema,
   submitBodySchema,
@@ -82,6 +83,11 @@ const previewSchema = z.strictObject({
     refusal: z.enum(['HAS_OPEN_REQUEST', 'OPEN_LIMIT_REACHED']).nullable(),
     openRequestId: z.uuid().nullable(),
   }),
+  /**
+   * Set when the person holds the software asked for from before a transfer whose grace still lasts: the request is then let through the check of the seat
+   * held and left out of GH-1/GH-2 (`QĐ-110q`, P10), and the grant ends the old right if it is given on the same subscription (R-49). Null otherwise.
+   */
+  limitExemption: limitExemptionSchema.nullable(),
   canSubmit: z.boolean(),
   budgetYear: z.number().int().nullable(),
   pricing: pricingSchema,

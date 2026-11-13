@@ -112,6 +112,8 @@ describe('requests over HTTP: the preview before sending (integration, real Post
           'totalExpectedWorkingDays',
           // GH-1/2/3 (BR-MF1-01): how many requests are open, how many paid applications, whether a reason is needed.
           'limits',
+          // P10 (QĐ-110q): `TRANSFER_GRACE` when the person holds the software from before a transfer in its grace; null otherwise.
+          'limitExemption',
         ].sort(),
       );
     });

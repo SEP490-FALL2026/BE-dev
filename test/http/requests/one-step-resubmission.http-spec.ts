@@ -33,6 +33,7 @@ const view = {
   serviceAccount: null,
   renewal: null,
   flags: { manyPaidSoftware: null },
+  limitExemption: null,
   spend: { stage: 'RETURNED_TO_REQUESTER', blockedReasons: ['PRICE_MISSING'], overBy: null, refusalReason: null },
   budgetYear: 2026,
   pricing: {

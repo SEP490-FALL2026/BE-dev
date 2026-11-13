@@ -98,6 +98,25 @@ describe('the row, and the audit entries, of a request that is sent (US-05-02, U
     });
   });
 
+  it('QĐ-110q, R-49: a request let through for the grace of a transfer carries the exemption and the old right it replaces, and the first entry says so', () => {
+    const facts = base(assigned, { graceHold: { transferId: 'tr-1', assignmentId: 'seat-old' } });
+
+    expect(newRequestOf(facts)).toMatchObject({ limitExemption: 'TRANSFER_GRACE', replacesAssignmentId: 'seat-old' });
+    expect(submittedAuditDetail(facts)).toMatchObject({
+      limitExemption: 'TRANSFER_GRACE',
+      replacesAssignmentId: 'seat-old',
+      transferId: 'tr-1',
+    });
+  });
+
+  it('writes no exemption and no old right for a request that is not in the grace of a transfer', () => {
+    const row = newRequestOf(base(assigned));
+
+    expect(row.limitExemption ?? null).toBeNull();
+    expect(row.replacesAssignmentId ?? null).toBeNull();
+    expect(submittedAuditDetail(base(assigned))).not.toHaveProperty('limitExemption');
+  });
+
   it('says in the second entry who was named and in which role, or why nobody was', () => {
     expect(routedAuditDetail(base(assigned), 'req-1')).toEqual({
       requestId: 'req-1',

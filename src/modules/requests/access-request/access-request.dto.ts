@@ -3,6 +3,10 @@ import { z } from 'zod';
 import { successEnvelopeSchema } from '../../../infrastructure/http/dto/success-envelope.dto';
 import { businessDate } from '../../../infrastructure/http/dto/business-date.dto';
 import { READABLE_CANCEL_CAUSES } from './group-request.types';
+import { LIMIT_EXEMPTIONS } from './access-request.types';
+
+/** Why a request was left out of GH-1/GH-2 (`QĐ-110q`: `TRANSFER_GRACE`, the person asked again in the grace of a transfer for software they hold; `QĐ-108c`: `ROLE_ENDED`). */
+export const limitExemptionSchema = z.enum(LIMIT_EXEMPTIONS);
 
 /** The longest note of a reason or a label a request keeps; the DTO bounds the request with them. */
 export const REASON_MAX_LENGTH = 1000;
@@ -180,6 +184,8 @@ export const requestSchema = z.strictObject({
       }),
     })
     .nullable(),
+  /** Why the request was left out of GH-1/GH-2 when it was sent; null for every other request (P10, `QĐ-110q`). */
+  limitExemption: limitExemptionSchema.nullable(),
   /** GH-3 (`BR-MF1-01g`): the person uses many paid applications, how many and why they ask for more; null when not flagged. */
   flags: z.strictObject({
     manyPaidSoftware: z.strictObject({ count: z.number().int().nonnegative(), reason: z.string() }).nullable(),

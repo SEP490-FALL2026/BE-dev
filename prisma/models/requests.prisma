@@ -166,6 +166,8 @@ model AccessRequest {
   manyPaidSoftwareReason String? @map("many_paid_software_reason")
   // Why the request is left out of GH-1/GH-2 (TRANSFER_OVERLAP, ROLE_ENDED; QĐ-108c); null for every other.
   limitExemption         String? @map("limit_exemption")
+  // The old right of the person this request is for, held from before a transfer, that a request left out of the limits for the grace of that transfer replaces (R-49, MF3-C.3): internal, never in the body.
+  replacesAssignmentId   String? @map("replaces_assignment_id") @db.Uuid
   id                    String                     @id @default(uuid()) @db.Uuid
   organizationId        String                     @map("organization_id") @db.Uuid
   type                  AccessRequestType          @default(GRANT)
@@ -263,6 +265,7 @@ model AccessRequest {
   serviceAccount       AccessRequestServiceAccount?
   renewal              AccessRequestRenewal?
   returnsFromHere      ReturnRequest[]              @relation("ReturnRequestOrigin")
+  replacesAssignment   LicenseAssignment?           @relation("RequestReplacesAssignment", fields: [replacesAssignmentId], references: [id], onDelete: Restrict)
 
   @@index([requesterEmployeeId, submittedAt])
   @@index([state, submittedAt])

@@ -32,7 +32,7 @@ controller) và `requests-work-facade.module.ts` (phần worker chạy, API dùn
   `RequestStatusProjectorApi.project` — chiếu audit event của request thành thông báo inbox (US-05-15). File:
   `public/step-redetermination-sweep.api.ts`, `public/step-sla-sweep.api.ts`, `public/request-status-projector.api.ts`.
 - `public/requests.types.ts` — `OpenRequestOfBeneficiary`, `AiSourceStep`; `public/requests.extension-points.ts` —
-  `RequestOutcomeListeners`, `RequestOutcomeEvent`.
+  `RequestOutcomeListeners`, `RequestOutcomeEvent`, `TransferGraceHoldContributions`, `TransferGraceHoldContribution`, `TransferGraceHolding`.
 
 ## Bảng sở hữu
 
@@ -52,6 +52,10 @@ controller) và `requests-work-facade.module.ts` (phần worker chạy, API dùn
 
 - Mở: `RequestOutcomeListeners` (`requests.outcome`, Listeners) — chưa có bên đăng ký (rà soát của trưởng phòng mới, bên đăng ký duy nhất, đã gỡ ở MF3-A);
   phát qua `outcome/request-outcome.service.ts`.
+- Mở: `TransferGraceHoldContributions` (`requests.transfer-grace-hold`, Contributions 0..n, MF3-C.3, P10) — `personnel` bind ở `personnel/transfer-grace/transfer-grace-hold.listener.ts`:
+  quyền đang giữ có phải quyền cũ của điều chuyển còn ân hạn không. `access-request/request-facts.service.ts` hỏi nó (`Assessment.graceHold`); có ⟹ `request-intake/access-request.service.ts` không ném
+  `ALREADY_HOLDS_ACCESS`, `request-limits` bỏ GH-1/GH-2 (`limitExemption = TRANSFER_GRACE`, GH-3 vẫn áp) và Request lưu `access_requests.replaces_assignment_id` (nội bộ, R-49);
+  preview trả `limitExemption`, Request trả `limitExemption`. Không `Hook` vì worker nạp requests mà không nạp personnel. Chỉ Request cá nhân (không dòng nhóm, không gia hạn).
 - Đăng ký vào licensing: `licensing.grant-request-gate` ← `grant/access-request-grant.listener.ts`;
   `licensing.revocation` ← `return-request/return-revocation.listener.ts` và `grant/seat-revocation.listener.ts` (G9-02: hoàn tất
   thu hồi `K1`/`K2` ⟹ giải phóng theo ngày khoản của Request cấp và Request tiếp tục của chuỗi, `grant/seat-release.*`; cấp `K2` muộn

@@ -66,6 +66,9 @@ export class AccessRequestRepo {
       businessReason: input.businessReason,
       termMonths: input.termMonths,
       ...manyPaidSoftwareColumns(input.manyPaidSoftware),
+      ...(input.limitExemption
+        ? { limitExemption: input.limitExemption, replacesAssignmentId: input.replacesAssignmentId ?? null }
+        : {}),
       ...pricingColumns(input.pricing),
       // The end the request names itself (a free request, a renewal) wins over the one its pricing carries.
       ...(input.expectedEndDate === undefined

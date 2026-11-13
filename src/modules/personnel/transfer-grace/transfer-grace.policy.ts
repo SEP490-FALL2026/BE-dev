@@ -93,6 +93,19 @@ export function heldOnOrBefore<T extends { effectiveFrom: BusinessDate }>(
   return seats.filter((seat) => seat.effectiveFrom <= effectiveOn);
 }
 
+/**
+ * Whether a right a person holds is a right of the old department of their transfer (`QĐ-110q`, P10): one the picture of the day the transfer took effect
+ * names; for a transfer that took effect before the grace existed, which has none, one begun on that day or before (the same rule as {@link heldOnOrBefore}).
+ */
+export function isOldRightOf(
+  transfer: { effectiveOn: BusinessDate; pictureIds: readonly string[] | null },
+  right: { assignmentId: string; effectiveFrom: BusinessDate },
+): boolean {
+  return transfer.pictureIds === null
+    ? right.effectiveFrom <= transfer.effectiveOn
+    : transfer.pictureIds.includes(right.assignmentId);
+}
+
 /** Where a transfer stands (P7). `SUPERSEDED`: a departure recorded in the grace took the rights over and closed the transfer (`QĐ-110r`). */
 export type TransferPhase = 'PENDING' | 'IN_GRACE' | 'REVOKING' | 'CLOSED' | 'CANCELLED' | 'SUPERSEDED';
 

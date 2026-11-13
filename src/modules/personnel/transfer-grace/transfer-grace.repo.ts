@@ -32,8 +32,8 @@ export class TransferGraceRepo {
   constructor(private readonly prisma: PrismaService) {}
 
   /** The transfer that took effect and whose grace has not ended (the last day is still the grace), if the person has one; the latest if more. */
-  async findInGraceOf(employeeId: string, today: BusinessDate): Promise<TransferInGrace | null> {
-    const row = await this.prisma.departmentTransfer.findFirst({
+  async findInGraceOf(employeeId: string, today: BusinessDate, tx?: DbTx): Promise<TransferInGrace | null> {
+    const row = await (tx ?? this.prisma).departmentTransfer.findFirst({
       where: { employeeId, status: 'EFFECTIVE', closedAt: null, graceEndsOn: { gte: toDateColumn(today) } },
       orderBy: [{ effectiveOn: 'desc' }, { id: 'desc' }],
     });

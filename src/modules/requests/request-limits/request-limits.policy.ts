@@ -8,13 +8,14 @@
  * - GH-3 (`BR-MF1-01g`): a person who already uses `paidThreshold` paid applications or more may still ask, with a reason, and the
  *   request is flagged; asking for another plan of an application they already use adds nothing, so it is not flagged (M-16).
  *
- * A request for a renewal, for a service account, or a request again exempt by `QĐ-108c` or the overlap of a transfer is not judged
+ * A request for a renewal, for a service account, or a request again exempt by `QĐ-108c` or the grace of a transfer is not judged
  * by GH-1/GH-2.
  */
 
-/** Why a request is left out of GH-1/GH-2: a request again in the overlap of a transfer, or after a role ended (`QĐ-108c`). */
-export const LIMIT_EXEMPTIONS = ['TRANSFER_OVERLAP', 'ROLE_ENDED'] as const;
-export type LimitExemption = (typeof LIMIT_EXEMPTIONS)[number];
+// Why a request is left out of GH-1/GH-2 (`TRANSFER_GRACE`, `ROLE_ENDED`) is kept with the request, in the core: `access-request.types.ts`.
+import type { LimitExemption } from '../access-request/access-request.types';
+
+export type { LimitExemption };
 
 export type LimitRefusal = 'HAS_OPEN_REQUEST' | 'OPEN_LIMIT_REACHED';
 

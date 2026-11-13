@@ -4,6 +4,7 @@ import { toPricing } from './access-request-pricing.mapper';
 import type { NeedStepState, AccessRequestRecord, ReadableNeedWaitingReason } from './access-request.types';
 import { requestPolicyJson } from './access-request.json';
 import { currentStateOf } from './access-request.policy';
+import { LIMIT_EXEMPTIONS, type LimitExemption } from './access-request.types';
 
 /** What a request is read as: the columns, the people it is for, its need steps with their decisions, and the lines of a group. */
 export const SELECT_REQUEST = {
@@ -17,6 +18,8 @@ export const SELECT_REQUEST = {
   oneStepBlockedReason: true,
   manyPaidSoftwareCount: true,
   manyPaidSoftwareReason: true,
+  limitExemption: true,
+  replacesAssignmentId: true,
   planId: true,
   requesterEmployeeId: true,
   departmentId: true,
@@ -140,6 +143,11 @@ export function manyPaidSoftwareOf(row: {
     : null;
 }
 
+/** The exemption a request carries, as the policy knows it; a value the policy does not know (the overlap of a transfer of the old rule) reads as none. */
+export function limitExemptionOf(value: string | null): LimitExemption | null {
+  return (LIMIT_EXEMPTIONS as readonly string[]).includes(value ?? '') ? (value as LimitExemption) : null;
+}
+
 /** The columns GH-3 writes on a request or a line (`BR-MF1-01g`): none when it is not flagged. */
 export function manyPaidSoftwareColumns(flag: { count: number; reason: string } | null | undefined) {
   return flag ? { manyPaidSoftware: true, manyPaidSoftwareCount: flag.count, manyPaidSoftwareReason: flag.reason } : {};
@@ -172,6 +180,8 @@ export function toRecord(row: RequestRow): AccessRequestRecord {
   return {
     oneStepBlockedReason: row.oneStepBlockedReason as 'PRICE_MISSING' | 'RATE_MISSING' | null,
     manyPaidSoftware: manyPaidSoftwareOf(row),
+    limitExemption: limitExemptionOf(row.limitExemption),
+    replacesAssignmentId: row.replacesAssignmentId,
     id: row.id,
     organizationId: row.organizationId,
     type: row.type,

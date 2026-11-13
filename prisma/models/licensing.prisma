@@ -81,6 +81,7 @@ model LicenseAssignment {
   transferReviewItems TransferReviewItem[]
   renewalRequests     AccessRequestRenewal[]            @relation("RenewalOf")
   renewalOfRequest    AccessRequestRenewal?             @relation("RenewalSuccessor")
+  replacedByRequests  AccessRequest[]                   @relation("RequestReplacesAssignment")
 
   @@index([subscriptionId])
   @@index([planId])

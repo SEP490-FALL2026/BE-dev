@@ -6,6 +6,7 @@ import {
   graceStartsOn,
   graceWindowEnd,
   heldOnOrBefore,
+  isOldRightOf,
   transferPhase,
 } from './transfer-grace.policy';
 
@@ -199,5 +200,35 @@ describe('where a transfer stands (P7, QĐ-110p)', () => {
     ['a transfer that took effect and has no grace yet is in grace', { graceEndsOn: null }, '2026-11-16', 'IN_GRACE'],
   ] as const)('%s', (_name, over, today, expected) => {
     expect(transferPhase(transfer(over), today)).toBe(expected);
+  });
+});
+
+describe('whether a right held is a right of the old department (QĐ-110q, P10)', () => {
+  const picture = ['seat-1', 'seat-2'];
+
+  it('is one the picture of the day the transfer took effect names, whatever day it began', () => {
+    expect(
+      isOldRightOf(
+        { effectiveOn: '2026-11-16', pictureIds: picture },
+        { assignmentId: 'seat-2', effectiveFrom: '2026-09-01' },
+      ),
+    ).toBe(true);
+  });
+
+  it('is not one the picture does not name: a right granted afterwards is the new department’s, even if it began before', () => {
+    expect(
+      isOldRightOf(
+        { effectiveOn: '2026-11-16', pictureIds: picture },
+        { assignmentId: 'seat-9', effectiveFrom: '2026-09-01' },
+      ),
+    ).toBe(false);
+  });
+
+  it('with no picture (a transfer from before the grace) is one that began on the day it took effect or before', () => {
+    const transfer = { effectiveOn: '2026-11-16', pictureIds: null };
+
+    expect(isOldRightOf(transfer, { assignmentId: 'a', effectiveFrom: '2026-11-16' })).toBe(true);
+    expect(isOldRightOf(transfer, { assignmentId: 'a', effectiveFrom: '2026-10-01' })).toBe(true);
+    expect(isOldRightOf(transfer, { assignmentId: 'a', effectiveFrom: '2026-11-17' })).toBe(false);
   });
 });
