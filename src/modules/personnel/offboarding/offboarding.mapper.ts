@@ -177,6 +177,14 @@ export function toDetail(
             note: record.accountLockNote,
           }
         : null,
+    mailboxLock: record.mailboxLockAt
+      ? {
+          recordedAt: record.mailboxLockAt.toISOString(),
+          recordedByAppUserId: record.mailboxLockByAppUserId,
+          recordedBySystem: record.mailboxLockByAppUserId === null,
+          note: record.mailboxLockNote,
+        }
+      : null,
     closure:
       record.closedAt && record.closedByAppUserId
         ? { closedAt: record.closedAt.toISOString(), closedByAppUserId: record.closedByAppUserId }

@@ -9,6 +9,9 @@ import { OperatingParametersModule } from '../operating-parameters/operating-par
 import { OrganizationModule } from '../organization/organization.module';
 import { RequestsModule } from '../requests/requests.module';
 import { DepartmentMemberController } from './department-member/department-member.controller';
+import { DepartureClosureRepo } from './departure-closure/departure-closure.repo';
+import { MailboxLockController } from './departure-closure/mailbox-lock.controller';
+import { MailboxLockService } from './departure-closure/mailbox-lock.service';
 import { AccountLockOverdueService } from './departure-deadline/account-lock-overdue.service';
 import { BlockAnnouncementService } from './departure-deadline/block-announcement.service';
 import { BlockMomentSweeper } from './departure-deadline/block-moment.job';
@@ -154,6 +157,7 @@ import { TransferReviewsController } from './transfer-review/transfer-reviews.co
     LongLeavesController,
     OffboardingController,
     OffboardingStepsController,
+    MailboxLockController,
     OpenRequestsController,
     DepartmentMemberController,
     MeDepartureNoticeController,
@@ -161,6 +165,8 @@ import { TransferReviewsController } from './transfer-review/transfer-reviews.co
     NoticesController,
   ],
   providers: [
+    DepartureClosureRepo,
+    MailboxLockService,
     AccountLockOverdueService,
     BlockAnnouncementService,
     BlockMomentEffects,

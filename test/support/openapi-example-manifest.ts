@@ -250,6 +250,7 @@ export const SUCCESS_MESSAGES: Readonly<Record<string, string>> = {
   offboardingCaseOpenRevocations: 'OFFBOARDING_CASE.REVOCATIONS_OPENED',
   offboardingCaseRecord: 'OFFBOARDING_CASE.RECORDED',
   offboardingCaseRecordAccountLock: 'OFFBOARDING_CASE.ACCOUNT_LOCK_RECORDED',
+  offboardingCaseRecordMailboxLock: 'OFFBOARDING_CASE.MAILBOX_LOCK_RECORDED',
   offboardingCaseRightList: 'OFFBOARDING_CASE.RIGHTS_LISTED',
   onboardingChecklistGet: 'ONBOARDING.CHECKLIST_FETCHED',
   operatingParameterHistory: 'PARAMETER.HISTORY_LISTED',

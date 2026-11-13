@@ -20,7 +20,7 @@ import { OffboardingRefusedError } from './offboarding.errors';
 import { toChange, toRight, toSummary } from './offboarding.mapper';
 import { OffboardingListRepo } from './offboarding-list.repo';
 import { OffboardingRepo } from './offboarding.repo';
-import type { OffboardingListFilter } from './offboarding.types';
+import type { OffboardingListFilter, OffboardingRecord } from './offboarding.types';
 
 export interface Paged<T> {
   items: T[];
@@ -117,6 +117,14 @@ export class OffboardingViewService {
       throw new OffboardingRefusedError('NOT_FOUND');
 
     return this.detail.detailOf(record, access);
+  }
+
+  /**
+   * The case as the IT Admin sees it after a step they took (the answer of the commands of the steps that follow the departure): the minimal
+   * projection, for a case the caller has just read under its locks, so no scope is judged again.
+   */
+  stepResult(record: OffboardingRecord): Promise<OffboardingDetailWire> {
+    return this.detail.detailOf(record, 'MINIMAL');
   }
 
   /** One page of the rights the person still holds, oldest first, each with its task. */

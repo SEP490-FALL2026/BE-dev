@@ -291,6 +291,7 @@ export const API_COVERAGE_MANIFEST: readonly string[] = [
   'POST /api/v1/offboarding-cases/{id}/cancellation',
   'POST /api/v1/offboarding-cases/{id}/departure',
   'POST /api/v1/offboarding-cases/{id}/account-lock',
+  'POST /api/v1/offboarding-cases/{id}/mailbox-lock',
   'POST /api/v1/offboarding-cases/{id}/revocations',
   'POST /api/v1/offboarding-cases/{id}/closure',
   'GET /api/v1/offboarding-cases/{id}/open-requests',

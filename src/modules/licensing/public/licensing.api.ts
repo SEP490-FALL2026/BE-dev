@@ -21,6 +21,7 @@ import type {
   OpenRevocationInput,
   PersonalSeat,
   ProvisioningFailureKind,
+  ProvisioningKind,
   SeatHolding,
   RevocationSource,
   SelfExecutionMode,
@@ -143,6 +144,20 @@ export class LicensingApi {
     tx?: DbTx,
   ): Promise<Map<string, number>> {
     return this.revocationView.countPersonalSeatsWithoutCompletedTask(employeeIds, onDate, tx);
+  }
+
+  /**
+   * How many personal seats of one kind of provisioning (K1: the mailbox) a person holds on `onDate` or will **without a completed task of
+   * revocation**: what a departure asks before it locks the mailbox for good (`B-1`, `QĐ-110e`), the same seats
+   * {@link LicensingApi.countPersonalSeatsWithoutCompletedTaskOf} counts, narrowed to the kind. One statement.
+   */
+  countPersonalSeatsOfKindWithoutCompletedTask(
+    employeeId: string,
+    kind: ProvisioningKind,
+    onDate: BusinessDate,
+    tx?: DbTx,
+  ): Promise<number> {
+    return this.revocationView.countPersonalSeatsOfKindWithoutCompletedTask(employeeId, kind, onDate, tx);
   }
 
   /**

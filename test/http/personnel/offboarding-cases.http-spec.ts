@@ -51,6 +51,10 @@ const ROUTES: Array<[string, Call]> = [
     (server) => request(server).post(`/api/v1/offboarding-cases/${ID}/account-lock`).send({ note: 'khóa' }),
   ],
   [
+    'POST /offboarding-cases/{id}/mailbox-lock',
+    (server) => request(server).post(`/api/v1/offboarding-cases/${ID}/mailbox-lock`).send({ note: 'khóa hẳn' }),
+  ],
+  [
     'POST /offboarding-cases/{id}/revocations',
     (server) => request(server).post(`/api/v1/offboarding-cases/${ID}/revocations`).send({ count: 1, reason: 'x' }),
   ],
@@ -70,6 +74,7 @@ const ALLOWED: Record<string, readonly string[]> = {
   'POST /offboarding-cases/{id}/cancellation': ['SUPER_ADMIN'],
   'POST /offboarding-cases/{id}/departure': ['SUPER_ADMIN'],
   'POST /offboarding-cases/{id}/account-lock': ['IT_ADMIN'],
+  'POST /offboarding-cases/{id}/mailbox-lock': ['IT_ADMIN'],
   'POST /offboarding-cases/{id}/revocations': ['IT_ADMIN'],
   'POST /offboarding-cases/{id}/closure': ['IT_ADMIN'],
 };
@@ -272,6 +277,16 @@ describe('offboarding case routes (e2e, no database)', () => {
         (server: App) => request(server).post(`/api/v1/offboarding-cases/${ID}/account-lock`).send({ note: '  ' }),
       ],
       [
+        'a lock of the mailbox with an empty note',
+        'POST /offboarding-cases/{id}/mailbox-lock',
+        (server: App) => request(server).post(`/api/v1/offboarding-cases/${ID}/mailbox-lock`).send({ note: '  ' }),
+      ],
+      [
+        'a lock of the mailbox with a field the route does not know',
+        'POST /offboarding-cases/{id}/mailbox-lock',
+        (server: App) => request(server).post(`/api/v1/offboarding-cases/${ID}/mailbox-lock`).send({ reason: 'x' }),
+      ],
+      [
         'a departure with the day it happened',
         'POST /offboarding-cases/{id}/departure',
         (server: App) =>
@@ -331,6 +346,25 @@ describe('offboarding case routes (e2e, no database)', () => {
       expect(text).toMatch(/reset the password of the mailbox/i);
       expect(text).toMatch(/sign(ed)? out every session/i);
       expect(text).toMatch(/mailbox is not locked/i);
+    },
+    OPENAPI_DOCUMENT_BUDGET_MS,
+  );
+
+  it(
+    'B-1: documents the lock of the mailbox for good as item (1b) of BM-08, after (1a), and the codes that refuse it',
+    () => {
+      const document = createOpenApiDocument(app);
+      const operation = (
+        document.paths['/api/v1/offboarding-cases/{id}/mailbox-lock'] as {
+          post: { summary: string; responses: Record<string, { description?: string }> };
+        }
+      ).post;
+      const text = `${operation.summary} ${operation.responses['200']?.description ?? ''} ${operation.responses['409']?.description ?? ''}`;
+
+      expect(text).toContain('(1b)');
+      expect(text).toMatch(/after \(1a\)/);
+      expect(text).toMatch(/closes by itself/i);
+      for (const code of ['ACCOUNT_LOCK_FIRST', 'MAILBOX_LOCK_BEFORE_K1']) expect(text).toContain(code);
     },
     OPENAPI_DOCUMENT_BUDGET_MS,
   );

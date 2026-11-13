@@ -3,7 +3,13 @@ import type { BusinessDate } from '../../../core/business-date';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { CatalogApi } from '../../catalog/public/catalog.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
-import type { HeldSoftware, PersonalSeat, RevocationSource, TerminatingAccess } from '../public/licensing.types';
+import type {
+  HeldSoftware,
+  PersonalSeat,
+  ProvisioningKind,
+  RevocationSource,
+  TerminatingAccess,
+} from '../public/licensing.types';
 import { RevocationReadRepo } from './revocation-read.repo';
 
 /**
@@ -102,6 +108,16 @@ export class RevocationViewService {
     tx?: DbTx,
   ): Promise<Map<string, number>> {
     return this.reads.countPersonalSeatsWithoutCompletedTask(employeeIds, onDate, tx);
+  }
+
+  /** How many personal seats of one kind of provisioning a person holds on `onDate` or will without a completed task of revocation. */
+  countPersonalSeatsOfKindWithoutCompletedTask(
+    employeeId: string,
+    kind: ProvisioningKind,
+    onDate: BusinessDate,
+    tx?: DbTx,
+  ): Promise<number> {
+    return this.reads.countPersonalSeatsOfKindWithoutCompletedTask(employeeId, kind, onDate, tx);
   }
 
   /** The paid applications each of these people uses on `onDate` or will (GH-3), in one statement. */

@@ -190,6 +190,19 @@ export const offboardingDetailSchema = offboardingSummarySchema.extend({
   accountLock: z
     .strictObject({ recordedAt: z.iso.datetime(), recordedByAppUserId: z.uuid(), note: z.string() })
     .nullable(),
+  /**
+   * Item (1b) of `BM-08`, the lock of the mailbox for good (`B-1`): written once after (1a), by an IT Admin or by the system when the IT Admin
+   * ticked the last step of the checklist of the last K1 revocation of the person (`recordedBySystem`, no account). The note is the IT Admin's own
+   * words and may be missing.
+   */
+  mailboxLock: z
+    .strictObject({
+      recordedAt: z.iso.datetime(),
+      recordedByAppUserId: z.uuid().nullable(),
+      recordedBySystem: z.boolean(),
+      note: z.string().nullable(),
+    })
+    .nullable(),
   closure: z.strictObject({ closedAt: z.iso.datetime(), closedByAppUserId: z.uuid() }).nullable(),
   checklist: checklistSchema.nullable(),
   /** What keeps the case open, by code with how many (a finite set of codes); empty when it may be closed. */

@@ -325,7 +325,12 @@ model OffboardingCase {
   accountLockByAppUserId String?               @map("account_lock_by_app_user_id") @db.Uuid
   accountLockAt          DateTime?             @map("account_lock_at") @db.Timestamptz(3)
   accountLockNote        String?               @map("account_lock_note")
+  // Item (1b) of BM-08, the lock of the mailbox for good (B-1): written once after (1a), by an IT Admin or, with no account, by the system when the last K1 revocation is ticked (MF2-G).
+  mailboxLockAt          DateTime?             @map("mailbox_lock_at") @db.Timestamptz(3)
+  mailboxLockByAppUserId String?               @map("mailbox_lock_by_app_user_id") @db.Uuid
+  mailboxLockNote        String?               @map("mailbox_lock_note")
   closedAt               DateTime?             @map("closed_at") @db.Timestamptz(3)
+  // Null when the system closed the case (QĐ-110e): every revocation done and (1b) written.
   closedByAppUserId      String?               @map("closed_by_app_user_id") @db.Uuid
   selfExecuted           Boolean               @default(false) @map("self_executed") @ignore
   recordedByAppUserId    String?               @map("recorded_by_app_user_id") @db.Uuid

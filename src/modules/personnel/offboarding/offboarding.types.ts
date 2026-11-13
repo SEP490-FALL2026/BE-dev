@@ -63,7 +63,12 @@ export interface OffboardingRecord {
   accountLockByAppUserId: string | null;
   accountLockAt: Date | null;
   accountLockNote: string | null;
+  /** Item (1b) of `BM-08`, the lock of the mailbox for good (`B-1`); the account is null when the system wrote it (the last K1 revocation ticked it). */
+  mailboxLockAt: Date | null;
+  mailboxLockByAppUserId: string | null;
+  mailboxLockNote: string | null;
   closedAt: Date | null;
+  /** Null when the system closed the case (`QĐ-110e`). */
   closedByAppUserId: string | null;
   /** Who recorded it: an account, or the ticket of the controlled procedure: exactly one of the two is set. */
   recordedByAppUserId: string | null;

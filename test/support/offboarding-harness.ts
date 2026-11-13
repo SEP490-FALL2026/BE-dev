@@ -29,6 +29,12 @@ export interface CaseWire {
   left?: { leftOn: string; leftAt: string; leftByAppUserId: string | null; leftByProcedure: boolean } | null;
   cancellation?: { cancelledAt: string; cancelledByProcedure: boolean; reason: string } | null;
   accountLock?: { recordedAt: string; recordedByAppUserId: string; note: string } | null;
+  mailboxLock?: {
+    recordedAt: string;
+    recordedByAppUserId: string | null;
+    recordedBySystem: boolean;
+    note: string | null;
+  } | null;
   closure?: { closedAt: string } | null;
   checklist?: {
     dataHandover: { state: string; pendingDuties: number };
@@ -78,7 +84,10 @@ export interface CaseRow {
   placement_closed_id: string | null;
   left_on: string | null;
   account_lock_at: Date | null;
+  mailbox_lock_at: Date | null;
+  mailbox_lock_by_app_user_id: string | null;
   closed_at: Date | null;
+  closed_by_app_user_id: string | null;
   self_executed: boolean;
 }
 
@@ -147,6 +156,9 @@ export class OffboardingHarness extends SeatRevocationHarness {
   };
   lockAccount = (id: string, body: object, account: ApiAccount = this.it1) =>
     request(this.server()).post(`/api/v1/offboarding-cases/${id}/account-lock`).set(this.as(account)).send(body);
+  /** Item (1b) of `BM-08`, the lock of the mailbox for good. */
+  lockMailbox = (id: string, body: object = {}, account: ApiAccount = this.it1) =>
+    request(this.server()).post(`/api/v1/offboarding-cases/${id}/mailbox-lock`).set(this.as(account)).send(body);
   revokeRights = (id: string, body: object, account: ApiAccount = this.it1) =>
     request(this.server()).post(`/api/v1/offboarding-cases/${id}/revocations`).set(this.as(account)).send(body);
   closeCase = (id: string, account: ApiAccount = this.it1) =>
@@ -222,7 +234,8 @@ export class OffboardingHarness extends SeatRevocationHarness {
               to_char(last_working_day, 'YYYY-MM-DD') AS last_working_day,
               to_char(departure_effective_on, 'YYYY-MM-DD') AS departure_effective_on,
               to_char(handover_due_on, 'YYYY-MM-DD') AS handover_due_on, placement_closed_id,
-              to_char(left_on, 'YYYY-MM-DD') AS left_on, account_lock_at, closed_at, self_executed
+              to_char(left_on, 'YYYY-MM-DD') AS left_on, account_lock_at, mailbox_lock_at, mailbox_lock_by_app_user_id,
+              closed_at, closed_by_app_user_id, self_executed
          FROM offboarding_cases WHERE id = $1`,
       [id],
     );

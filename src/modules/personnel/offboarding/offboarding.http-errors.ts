@@ -32,6 +32,8 @@ const STATUS: Readonly<Record<string, HttpStatus>> = {
   NOTHING_TO_REVOKE: HttpStatus.CONFLICT,
   ASSIGNMENT_NOT_AVAILABLE: HttpStatus.UNPROCESSABLE_ENTITY,
   ACCOUNT_LOCK_NOT_RECORDED: HttpStatus.CONFLICT,
+  ACCOUNT_LOCK_FIRST: HttpStatus.CONFLICT,
+  MAILBOX_LOCK_BEFORE_K1: HttpStatus.CONFLICT,
   ALREADY_RECORDED: HttpStatus.CONFLICT,
   REVOCATION_NOT_SUPPORTED: HttpStatus.CONFLICT,
   CASE_NOT_CLOSEABLE: HttpStatus.CONFLICT,
@@ -68,6 +70,10 @@ const MESSAGES: Readonly<Record<string, string>> = {
   NOTHING_TO_REVOKE: 'There is no right left to take away.',
   ASSIGNMENT_NOT_AVAILABLE: 'The seat is not held by the person or already has a revocation under way.',
   ACCOUNT_LOCK_NOT_RECORDED: 'The lock of the company account must be recorded before or with the revocations.',
+  ACCOUNT_LOCK_FIRST:
+    'The lock of the company account (1a) must be recorded before the lock of the mailbox for good (1b).',
+  MAILBOX_LOCK_BEFORE_K1:
+    'The person still holds a K1 seat whose revocation is not completed: the mailbox is locked for good after the last one.',
   ALREADY_RECORDED: 'The lock of the company account was recorded already.',
   REVOCATION_NOT_SUPPORTED: 'The kind of provisioning of the seat has no revocation yet.',
   CASE_NOT_CLOSEABLE: 'Something still keeps the case open.',
@@ -140,6 +146,8 @@ export const OFFBOARDING_ERROR_EXAMPLES = {
     new OffboardingRefusedError('ASSIGNMENT_NOT_AVAILABLE', { assignmentId: '<assignment-id>' }),
   ),
   ACCOUNT_LOCK_NOT_RECORDED: example(new OffboardingRefusedError('ACCOUNT_LOCK_NOT_RECORDED')),
+  ACCOUNT_LOCK_FIRST: example(new OffboardingRefusedError('ACCOUNT_LOCK_FIRST')),
+  MAILBOX_LOCK_BEFORE_K1: example(new OffboardingRefusedError('MAILBOX_LOCK_BEFORE_K1', { k1RightsOpen: 1 })),
   ALREADY_RECORDED: example(new OffboardingRefusedError('ALREADY_RECORDED')),
   REVOCATION_NOT_SUPPORTED: example(
     new OffboardingRefusedError('REVOCATION_NOT_SUPPORTED', {
