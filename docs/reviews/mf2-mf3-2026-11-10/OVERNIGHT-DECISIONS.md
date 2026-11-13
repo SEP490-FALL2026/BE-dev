@@ -533,6 +533,16 @@ Không sửa code; SPEC không bị sửa trong lượt này (spec là của Own
 - **Đổi lại:** bỏ trường: xóa khỏi `changeSchema` và `toChange` (một test mapper + một ca integration đọc nó).
 - **Chạm:** `offboarding/offboarding.dto.ts`, `offboarding.mapper.ts`, `openapi.json`; test mới `offboarding/detail/offboarding-change.mapper.spec.ts` (3 ca, đã kiểm đỏ), ca log trong `departure-closure.integration-spec.ts`.
 
+### D-70 · MF2-G review MF2-E (f) · Chỉ mục một phần `offboarding_cases_open_idx` (D-52) không được SQL Prisma dùng: đổi vị từ
+
+- **Đo đúng câu Prisma sinh ra:** bật log truy vấn Prisma (`log: [{ emit: 'event', level: 'query' }]`), gọi chính `DepartureDeadlineRepo.pageLate`, `BlockMomentRepo.pageUnannounced` / `pageLockMissing` và `DepartureClosureRepo.pageClosable`, rồi `EXPLAIN (ANALYZE, BUFFERS)` từng câu với đúng tham số, trên database tạm (300 000 hồ sơ đã **đóng** — `LEFT` có `closed_at` — và 150 hồ sơ mở; chỉ mục cũ và bốn chỉ mục có sẵn; `ANALYZE` trước). **Kết quả: cả bốn câu dùng Parallel Seq Scan** (`Workers Launched: 2`, ~12 600 buffer, **22–27 ms**), không một câu dùng `offboarding_cases_open_idx`. Gốc: vị từ chỉ mục có `state IN ('HANDING_OVER','LEFT')` bằng hằng; câu của Prisma so sánh `state IN (CAST($1::text AS "OffboardingState"), CAST($2::text AS "OffboardingState"))` — phép ép kiểu từ tham số không phải hằng nên planner không chứng minh được câu suy ra vị từ. Phép đo D-52 trước đó chạy SQL tay viết với hằng enum nên đúng trên bảng thay thế mà sai trên SQL thật (dữ liệu đo lần đó cũng thiếu tham số hóa).
+- **Phương án:** A. **bỏ `state` khỏi vị từ**: `WHERE closed_at IS NULL` — mọi câu đọc hồ sơ mở đều tự viết `closed_at IS NULL` nên planner khớp được; chỉ mục chứa hồ sơ mở **và hồ sơ hủy** (hồ sơ hủy luôn có `closed_at` NULL, ít), `state` thành bộ lọc trong lúc duyệt theo `id`. B. viết lại bốn đọc thành `$queryRaw` với hằng enum (giữ vị từ cũ): thêm bốn câu SQL tay, mapper thủ công, mất kiểu Prisma. C. đổi tên enum thành cột text: đổi mô hình lớn. **ĐÃ CHỌN A** (một migration, không đổi mã đọc).
+- **Sau khi đổi** (cùng dữ liệu, cùng câu): cả bốn câu dùng **Bitmap Index Scan trên `offboarding_cases_open_idx`**, 1 buffer chỉ mục + 7 buffer heap, **0.07–0.29 ms** (từ 22–27 ms). Câu khóa theo nhân viên của `DepartureClosureRepo.lockOpenOfEmployee` dùng `offboarding_cases_employee_id_idx` (0.06 ms) — SQL tay có hằng nên không phụ thuộc chỉ mục này.
+- **Migration:** `20261113001700_personnel_open_cases_index_predicate` (`DROP INDEX IF EXISTS` rồi `CREATE INDEX IF NOT EXISTS … WHERE closed_at IS NULL`), thêm mới thay vì sửa `20261113001300` tại chỗ để database cục bộ đã chạy bản cũ cũng được sửa. Chỉ mục này mới có trong đợt này (chưa vào dev/main) nên việc bỏ nó không mất gì.
+- **Test:** `departure-revocation-deadline` ghim vị từ đúng `(id) WHERE (closed_at IS NULL)` (đã kiểm đỏ với vị từ cũ). Không ghim kế hoạch `EXPLAIN` vì kế hoạch phụ thuộc thống kê; số đo nằm ở đây.
+- **Đổi lại:** muốn chỉ mục chỉ có hồ sơ mở: cần câu đọc dùng hằng enum (B) rồi mới thêm `state` lại vào vị từ.
+- **Chạm:** `prisma/migrations/20261113001700_personnel_open_cases_index_predicate/`, test `departure-revocation-deadline.integration-spec.ts`; D-52 vẫn đúng về lý do chọn chỉ mục `(id)` theo `id` nhưng vị từ của nó nay là D-70.
+
 ## Bị chặn
 
 (chưa có)

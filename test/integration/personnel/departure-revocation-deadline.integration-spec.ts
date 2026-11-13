@@ -169,16 +169,13 @@ describe('the deadline of the revocations of a departure (integration, real Post
     }, 120_000);
   });
 
-  it('keeps a partial index of the departures that are open, which the reads of the late and of the block moment walk in id order (MF2-D review b)', async () => {
+  it('keeps a partial index of the departures that are not closed, with no state in its predicate: the SQL Prisma sends compares the state with a parameter cast, which the planner cannot match to a constant (MF2-D review b, D-52, D-70)', async () => {
     const { rows } = await h.ctx.sql.query<{ indexdef: string }>(
       `SELECT indexdef FROM pg_indexes WHERE tablename = 'offboarding_cases' AND indexname = 'offboarding_cases_open_idx'`,
     );
 
     expect(rows).toHaveLength(1);
-    expect(rows[0].indexdef).toMatch(/\(id\)/);
-    expect(rows[0].indexdef).toMatch(/closed_at IS NULL/);
-    expect(rows[0].indexdef).toMatch(/HANDING_OVER/);
-    expect(rows[0].indexdef).toMatch(/LEFT/);
+    expect(rows[0].indexdef).toMatch(/\(id\) WHERE \(closed_at IS NULL\)$/);
   });
 
   describe('the telling that the rights are past the deadline (T-MF2 case 1)', () => {
