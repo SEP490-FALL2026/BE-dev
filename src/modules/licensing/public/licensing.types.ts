@@ -304,6 +304,15 @@ export const K1_CHECKLIST_CODES = [
 ] as const;
 export type K1ChecklistCode = (typeof K1_CHECKLIST_CODES)[number];
 
+/**
+ * What the server expects of the checklist of one K1 revocation, told to a client whose checklist was refused: the variant it worked out and
+ * the steps this task has, in order (`MAILBOX_LOCKED` is among them only for the last K1 revocation of the person).
+ */
+export interface K1ChecklistExpectation {
+  variant: K1ChecklistVariant;
+  codes: K1ChecklistCode[];
+}
+
 /** What a completed K1 revocation tells its listeners of the checklist: the variant and the steps that were ticked (`MAILBOX_LOCKED` among them). */
 export interface K1ChecklistFacts {
   variant: K1ChecklistVariant;

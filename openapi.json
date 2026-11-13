@@ -31810,7 +31810,7 @@
             }
           },
           "422": {
-            "description": "The request is invalid (VALIDATION_ERROR), or the completion is refused and nothing is stored: REVOCATION.COMPLETION_NOT_ALLOWED (the way does not fit the kind of grant), NOTE_REQUIRED, PAID_THROUGH_REQUIRED, ACCESS_STATE_REQUIRED, ACCESS_STATE_INVALID, KEY_DISPOSITION_REQUIRED (a K4 completion without keyDisposition), WITHDRAWAL_REASON_REQUIRED (a K4 key withdrawn with no reason; keyDisposition or withdrawalReason on another kind is COMPLETION_NOT_ALLOWED), no evidence (PROVISIONING_TASK.EVIDENCE_REQUIRED), or a K1 checklist that is not valid: a step missing, not ticked or ticked with no time, or no evidence (K1_CHECKLIST_INCOMPLETE), steps ticked out of their order, such as the lock of the mailbox before the sign-out of the sessions (K1_CHECKLIST_OUT_OF_ORDER), or a step the variant does not have, sent twice or sent for a kind that has no checklist (COMPLETION_NOT_ALLOWED).",
+            "description": "The request is invalid (VALIDATION_ERROR), or the completion is refused and nothing is stored: REVOCATION.COMPLETION_NOT_ALLOWED (the way does not fit the kind of grant), NOTE_REQUIRED, PAID_THROUGH_REQUIRED, ACCESS_STATE_REQUIRED, ACCESS_STATE_INVALID, KEY_DISPOSITION_REQUIRED (a K4 completion without keyDisposition), WITHDRAWAL_REASON_REQUIRED (a K4 key withdrawn with no reason; keyDisposition or withdrawalReason on another kind is COMPLETION_NOT_ALLOWED), no evidence (PROVISIONING_TASK.EVIDENCE_REQUIRED), or a K1 checklist that is not valid: a step missing, not ticked or ticked with no time, or no evidence (K1_CHECKLIST_INCOMPLETE), steps ticked out of their order, such as the lock of the mailbox before the sign-out of the sessions (K1_CHECKLIST_OUT_OF_ORDER), or a step the variant does not have, sent twice or sent for a kind that has no checklist (COMPLETION_NOT_ALLOWED). A refusal of the checklist of a K1 task carries details { variant, codes }: the variant the server worked out and the steps it expects of this task, in order; MAILBOX_LOCKED is among them only when no other K1 revocation of the person is still to do.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -31922,6 +31922,17 @@
                       "error": {
                         "code": "REVOCATION.K1_CHECKLIST_INCOMPLETE",
                         "message": "The completion of the revocation is not valid: K1_CHECKLIST_INCOMPLETE.",
+                        "details": {
+                          "variant": "DEPARTURE",
+                          "codes": [
+                            "MAILBOX_PASSWORD_RESET",
+                            "SOFTWARE_FORGOT_PASSWORD",
+                            "SESSIONS_SIGNED_OUT",
+                            "RENEWAL_DISABLED",
+                            "EVIDENCE_RECORDED",
+                            "MAILBOX_LOCKED"
+                          ]
+                        },
                         "requestId": "req_example"
                       }
                     }
@@ -31933,6 +31944,17 @@
                       "error": {
                         "code": "REVOCATION.K1_CHECKLIST_OUT_OF_ORDER",
                         "message": "The completion of the revocation is not valid: K1_CHECKLIST_OUT_OF_ORDER.",
+                        "details": {
+                          "variant": "DEPARTURE",
+                          "codes": [
+                            "MAILBOX_PASSWORD_RESET",
+                            "SOFTWARE_FORGOT_PASSWORD",
+                            "SESSIONS_SIGNED_OUT",
+                            "RENEWAL_DISABLED",
+                            "EVIDENCE_RECORDED",
+                            "MAILBOX_LOCKED"
+                          ]
+                        },
                         "requestId": "req_example"
                       }
                     }

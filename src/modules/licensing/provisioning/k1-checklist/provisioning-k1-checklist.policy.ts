@@ -1,6 +1,7 @@
 import { RevocationCompletionError } from '../../public/licensing.errors';
 import type {
   K1ChecklistCode,
+  K1ChecklistExpectation,
   K1ChecklistFacts,
   K1ChecklistVariant,
   ProvisioningKind,
@@ -110,8 +111,12 @@ export function k1ChecklistItems(variant: K1ChecklistVariant, lastOfPerson: bool
   }));
 }
 
-function fail(problem: 'COMPLETION_NOT_ALLOWED' | 'K1_CHECKLIST_INCOMPLETE' | 'K1_CHECKLIST_OUT_OF_ORDER'): never {
-  throw new RevocationCompletionError(problem);
+/** Refuses the checklist, telling the variant and the steps this task expects (nothing is told when the kind of grant has no checklist). */
+function fail(
+  problem: 'COMPLETION_NOT_ALLOWED' | 'K1_CHECKLIST_INCOMPLETE' | 'K1_CHECKLIST_OUT_OF_ORDER',
+  expected?: K1ChecklistExpectation,
+): never {
+  throw new RevocationCompletionError(problem, expected);
 }
 
 /** The instant of a ticked step, or null when it is not ticked or has no instant. */
@@ -128,17 +133,18 @@ function tickedAt(item: K1ChecklistClaimItem | undefined): number | null {
  * (`K1_CHECKLIST_INCOMPLETE`). Returns the instants in the order of the list.
  */
 function instantsOf(
-  variant: K1ChecklistVariant,
+  expected: K1ChecklistExpectation,
   lastOfPerson: boolean,
   claim: K1ChecklistClaim,
 ): { item: K1ChecklistItem; time: number }[] {
-  const codes = k1ChecklistCodes(variant, lastOfPerson);
   const sent = claim.items.map((item) => item.code);
-  if (sent.some((code, index) => !codes.includes(code) || sent.indexOf(code) !== index)) fail('COMPLETION_NOT_ALLOWED');
+  if (sent.some((code, index) => !expected.codes.includes(code) || sent.indexOf(code) !== index)) {
+    fail('COMPLETION_NOT_ALLOWED', expected);
+  }
 
-  return k1ChecklistItems(variant, lastOfPerson).map((item) => {
+  return k1ChecklistItems(expected.variant, lastOfPerson).map((item) => {
     const time = tickedAt(claim.items.find((sentItem) => sentItem.code === item.code));
-    if (time === null) fail('K1_CHECKLIST_INCOMPLETE');
+    if (time === null) fail('K1_CHECKLIST_INCOMPLETE', expected);
 
     return { item, time };
   });
@@ -166,14 +172,16 @@ export function planK1Checklist(input: {
 
     return null;
   }
-  if (input.claim === undefined) fail('K1_CHECKLIST_INCOMPLETE');
-
   const variant = k1VariantOf(input.sources);
-  const instants = instantsOf(variant, input.lastOfPerson, input.claim);
+  const expected: K1ChecklistExpectation = { variant, codes: [...k1ChecklistCodes(variant, input.lastOfPerson)] };
+  if (input.claim === undefined) fail('K1_CHECKLIST_INCOMPLETE', expected);
+
+  const instants = instantsOf(expected, input.lastOfPerson, input.claim);
   const evidence = input.claim.evidence?.trim() || input.evidence.trim();
-  if (evidence.length === 0) fail('K1_CHECKLIST_INCOMPLETE');
-  if (instants.some(({ time }, index) => index > 0 && time < instants[index - 1].time))
-    fail('K1_CHECKLIST_OUT_OF_ORDER');
+  if (evidence.length === 0) fail('K1_CHECKLIST_INCOMPLETE', expected);
+  if (instants.some(({ time }, index) => index > 0 && time < instants[index - 1].time)) {
+    fail('K1_CHECKLIST_OUT_OF_ORDER', expected);
+  }
 
   const items = instants.map(({ item, time }) => ({
     code: item.code,

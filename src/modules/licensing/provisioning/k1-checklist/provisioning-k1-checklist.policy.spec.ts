@@ -350,20 +350,50 @@ describe('the mailbox lock belongs to the last K1 revocation of the person (R-1,
   });
 });
 
-describe('k1ChecklistShown', () => {
-  it.each(['QUEUED', 'RETRY_SCHEDULED', 'IN_PROGRESS', 'FAILED'] as const)(
-    'a %s task shows the list to tick',
-    (status) => {
-      expect(k1ChecklistShown(status, false)).toBe(true);
-    },
-  );
+describe('what a refused K1 checklist tells the client (review O1)', () => {
+  const expectedOf = (run: () => unknown): unknown => {
+    try {
+      run();
+    } catch (error) {
+      return error instanceof RevocationCompletionError ? error.expected : 'not a completion error';
+    }
 
-  it('a completed task shows the checklist it was completed with, and none when it was completed before the checklist', () => {
-    expect(k1ChecklistShown('COMPLETED', true)).toBe(true);
-    expect(k1ChecklistShown('COMPLETED', false)).toBe(false);
+    return 'no error';
+  };
+  const SIX = { variant: 'DEPARTURE', codes: DEPARTURE_CODES };
+  const FIVE = { variant: 'DEPARTURE', codes: DEPARTURE_CODES.slice(0, 5) };
+  const TWO = { variant: 'STILL_EMPLOYED', codes: STILL_EMPLOYED_CODES };
+
+  it('names the variant and the steps the server expects when the checklist is missing, incomplete or out of order', () => {
+    const sent = claimOf('DEPARTURE');
+    const swapped = { ...sent, items: sent.items.map((item, index) => ({ ...item, doneAt: at(5 - index) })) };
+
+    for (const claim of [undefined, { ...sent, items: [] }, claimOf('DEPARTURE', null), swapped]) {
+      expect(expectedOf(() => plan(claim))).toEqual(SIX);
+    }
+    expect(expectedOf(() => plan(undefined, { sources: ['RETURN'] }))).toEqual(TWO);
   });
 
-  it.each(['CANCELLED', 'CLOSED_FAILED'] as const)('a %s task shows none: nothing is left to tick', (status) => {
-    expect(k1ChecklistShown(status, false)).toBe(false);
+  it('tells a step the variant does not have by the steps it has: the lock is among them only for the last K1 revocation', () => {
+    expect(expectedOf(() => plan(claimOf('DEPARTURE'), { lastOfPerson: false }))).toEqual(FIVE);
+    expect(expectedOf(() => plan(undefined, { lastOfPerson: false }))).toEqual(FIVE);
+    expect(expectedOf(() => plan(claimOf('DEPARTURE'), { sources: ['TIME_LIMITED_EXPIRY'] }))).toEqual(TWO);
+    // A kind of grant that has no checklist has no variant to tell.
+    expect(expectedOf(() => plan(claimOf('DEPARTURE'), { type: 'K2' }))).toBeUndefined();
+  });
+});
+
+describe('k1ChecklistShown (the list to tick while open, the one kept once completed, none otherwise)', () => {
+  it.each([
+    ['QUEUED', false, true],
+    ['RETRY_SCHEDULED', false, true],
+    ['IN_PROGRESS', false, true],
+    ['FAILED', false, true],
+    ['COMPLETED', true, true],
+    ['COMPLETED', false, false],
+    ['CANCELLED', false, false],
+    ['CLOSED_FAILED', false, false],
+  ] as const)('a %s task (checklist kept: %s) shows it: %s', (status, kept, shown) => {
+    expect(k1ChecklistShown(status, kept)).toBe(shown);
   });
 });

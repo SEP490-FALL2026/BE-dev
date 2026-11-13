@@ -309,6 +309,25 @@ describe('provisioning queue routes (e2e, no database)', () => {
       const unprocessable = JSON.stringify(post(`${BASE}/{id}/revocation-completion`).responses['422']);
       expect(unprocessable).toContain('REVOCATION.K1_CHECKLIST_INCOMPLETE');
       expect(unprocessable).toContain('REVOCATION.K1_CHECKLIST_OUT_OF_ORDER');
+      // The two refusals of the checklist tell the variant the server worked out and the steps it expects (review O1).
+      const examples = (
+        post(`${BASE}/{id}/revocation-completion`).responses['422'] as {
+          content: { 'application/json': { examples: Record<string, { value: { error: { details?: unknown } } }> } };
+        }
+      ).content['application/json'].examples;
+      for (const code of ['REVOCATION.K1_CHECKLIST_INCOMPLETE', 'REVOCATION.K1_CHECKLIST_OUT_OF_ORDER']) {
+        expect(examples[code].value.error.details).toEqual({
+          variant: 'DEPARTURE',
+          codes: [
+            'MAILBOX_PASSWORD_RESET',
+            'SOFTWARE_FORGOT_PASSWORD',
+            'SESSIONS_SIGNED_OUT',
+            'RENEWAL_DISABLED',
+            'EVIDENCE_RECORDED',
+            'MAILBOX_LOCKED',
+          ],
+        });
+      }
       expect(JSON.stringify(post(`${BASE}/{id}/revocation-completion`).requestBody)).toContain(
         'RevocationCompletionBodyDto',
       );

@@ -1,3 +1,5 @@
+import type { K1ChecklistExpectation } from './licensing.types';
+
 /** The seat baseline is closed: an assignment without a request is no longer taken (`US-02-05` AC-6, `OI-10`). */
 export class SeatBaselineClosedError extends Error {
   constructor() {
@@ -349,9 +351,15 @@ export type RevocationCompletionProblem =
   /** The steps of a K1 checklist were not ticked in their order: a step is timed before one that comes first (`QĐ-111az`, m-09). */
   | 'K1_CHECKLIST_OUT_OF_ORDER';
 
-/** The way a revocation is completed does not fit its kind of provisioning, or lacks what the kind needs to be stored. */
+/**
+ * The way a revocation is completed does not fit its kind of provisioning, or lacks what the kind needs to be stored. A refusal of the checklist
+ * of a K1 revocation also carries what the server expects of it (`expected`, the `details` of the answer).
+ */
 export class RevocationCompletionError extends Error {
-  constructor(readonly problem: RevocationCompletionProblem) {
+  constructor(
+    readonly problem: RevocationCompletionProblem,
+    readonly expected?: K1ChecklistExpectation,
+  ) {
     super(`The completion of the revocation is not valid: ${problem}.`);
     this.name = 'RevocationCompletionError';
   }

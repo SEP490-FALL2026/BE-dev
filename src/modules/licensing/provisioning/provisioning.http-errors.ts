@@ -35,6 +35,7 @@ import {
   SeatTargetNotFoundError,
   LicenseKeyNotFoundError,
 } from '../public/licensing.errors';
+import type { K1ChecklistExpectation } from '../public/licensing.types';
 import { toLicensingApiException } from '../licensing.http-errors';
 import {
   PurchaseNotAllowedError,
@@ -135,7 +136,13 @@ export function toProvisioningApiException(error: unknown): unknown {
     return refuse(UNPROCESSABLE, 'PROVISIONING_TASK.REASON_REQUIRED', error.message);
   }
   if (error instanceof RevocationCompletionError) {
-    return refuse(UNPROCESSABLE, `REVOCATION.${error.problem}`, error.message);
+    // A refused K1 checklist tells the variant the server worked out and the steps it expects of this task.
+    return refuse(
+      UNPROCESSABLE,
+      `REVOCATION.${error.problem}`,
+      error.message,
+      error.expected ? { variant: error.expected.variant, codes: error.expected.codes } : undefined,
+    );
   }
   if (error instanceof RevocationRefusedError) {
     if (error.problem === 'SOURCE_REQUIRED') return refuse(UNPROCESSABLE, 'REVOCATION.SOURCE_REQUIRED', error.message);
@@ -176,6 +183,19 @@ export function toProvisioningApiException(error: unknown): unknown {
 
 const example = (error: Error) => errorExampleOf(toProvisioningApiException(error));
 
+/** What a refused K1 checklist of a person who leaves tells the client: the variant and the six steps, the lock of the mailbox last. */
+const K1_DEPARTURE_EXPECTED: K1ChecklistExpectation = {
+  variant: 'DEPARTURE',
+  codes: [
+    'MAILBOX_PASSWORD_RESET',
+    'SOFTWARE_FORGOT_PASSWORD',
+    'SESSIONS_SIGNED_OUT',
+    'RENEWAL_DISABLED',
+    'EVIDENCE_RECORDED',
+    'MAILBOX_LOCKED',
+  ],
+};
+
 /**
  * The answers above as OpenAPI examples, each produced by the mapper that gives it at runtime (OPENAPI-EXAMPLE.1). Since G5
  * binds the request gate of the module of requests, a grant reaches every check after the gate and its tasks exist, so the
@@ -205,8 +225,8 @@ export const PROVISIONING_ERROR_EXAMPLES = {
   ACCESS_STATE_INVALID: example(new RevocationCompletionError('ACCESS_STATE_INVALID')),
   WITHDRAWAL_REASON_REQUIRED: example(new RevocationCompletionError('WITHDRAWAL_REASON_REQUIRED')),
   KEY_DISPOSITION_REQUIRED: example(new RevocationCompletionError('KEY_DISPOSITION_REQUIRED')),
-  K1_CHECKLIST_INCOMPLETE: example(new RevocationCompletionError('K1_CHECKLIST_INCOMPLETE')),
-  K1_CHECKLIST_OUT_OF_ORDER: example(new RevocationCompletionError('K1_CHECKLIST_OUT_OF_ORDER')),
+  K1_CHECKLIST_INCOMPLETE: example(new RevocationCompletionError('K1_CHECKLIST_INCOMPLETE', K1_DEPARTURE_EXPECTED)),
+  K1_CHECKLIST_OUT_OF_ORDER: example(new RevocationCompletionError('K1_CHECKLIST_OUT_OF_ORDER', K1_DEPARTURE_EXPECTED)),
   KEY_REQUIRED: example(new ProvisioningKeyError('KEY_REQUIRED')),
   KEY_NOT_APPLICABLE: example(new ProvisioningKeyError('KEY_NOT_APPLICABLE')),
   KEY_NOT_FOUND: example(new LicenseKeyNotFoundError()),

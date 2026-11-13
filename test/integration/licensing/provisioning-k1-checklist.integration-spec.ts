@@ -40,6 +40,9 @@ describe('the checklist of a K1 revocation, over HTTP (integration, real Postgre
       ...(checklist ? { k1Checklist: checklist } : {}),
       ...extra,
     });
+  /** The `details` of a refusal: the variant the server worked out and the steps it expects of the task. */
+  const detailsOf = (response: { body: unknown }) =>
+    (response.body as { error: { details?: { variant: string; codes: string[] } } }).error.details;
   const storedOf = async (taskId: string) =>
     (
       await h.ctx.sql.query<{ k1_checklist: unknown }>(`SELECT k1_checklist FROM provisioning_tasks WHERE id = $1`, [
@@ -193,16 +196,21 @@ describe('the checklist of a K1 revocation, over HTTP (integration, real Postgre
       const { assignmentId, taskId } = await taken('DEPARTURE');
       const sent = mutate(k1Checklist('DEPARTURE', 'đã khóa'));
 
-      expect(h.codeOf(await complete(taskId, sent).expect(422))).toBe('REVOCATION.K1_CHECKLIST_INCOMPLETE');
+      const refused = await complete(taskId, sent).expect(422);
+
+      expect(h.codeOf(refused)).toBe('REVOCATION.K1_CHECKLIST_INCOMPLETE');
+      // The refusal tells the variant the server worked out and the steps it expects.
+      expect(detailsOf(refused)).toEqual({ variant: 'DEPARTURE', codes: [...K1_CODES.DEPARTURE] });
       await unchanged(assignmentId, taskId);
     });
 
     it('refuses the mailbox lock (6) ticked before the sign-out of the sessions (3): K1_CHECKLIST_OUT_OF_ORDER, and nothing changes', async () => {
       const { assignmentId, taskId } = await taken('DEPARTURE');
 
-      expect(
-        h.codeOf(await complete(taskId, swapped('DEPARTURE', 'SESSIONS_SIGNED_OUT', 'MAILBOX_LOCKED')).expect(422)),
-      ).toBe('REVOCATION.K1_CHECKLIST_OUT_OF_ORDER');
+      const refused = await complete(taskId, swapped('DEPARTURE', 'SESSIONS_SIGNED_OUT', 'MAILBOX_LOCKED')).expect(422);
+
+      expect(h.codeOf(refused)).toBe('REVOCATION.K1_CHECKLIST_OUT_OF_ORDER');
+      expect(detailsOf(refused)).toEqual({ variant: 'DEPARTURE', codes: [...K1_CODES.DEPARTURE] });
       await unchanged(assignmentId, taskId);
       // The same steps in their order are taken at once: the refusal changed nothing.
       await complete(taskId, k1Checklist('DEPARTURE', 'đã khóa')).expect(200);
@@ -243,9 +251,10 @@ describe('the checklist of a K1 revocation, over HTTP (integration, real Postgre
         const sent = k1Checklist('STILL_EMPLOYED', 'đã hủy');
         const extra = { code: step, done: true, doneAt: new Date(Date.now() - 1000).toISOString() };
 
-        expect(h.codeOf(await complete(taskId, { ...sent, items: [...sent.items, extra] }).expect(422))).toBe(
-          'REVOCATION.COMPLETION_NOT_ALLOWED',
-        );
+        const refused = await complete(taskId, { ...sent, items: [...sent.items, extra] }).expect(422);
+
+        expect(h.codeOf(refused)).toBe('REVOCATION.COMPLETION_NOT_ALLOWED');
+        expect(detailsOf(refused)).toEqual({ variant: 'STILL_EMPLOYED', codes: [...K1_CODES.STILL_EMPLOYED] });
         await unchanged(assignmentId, taskId);
       },
     );
@@ -289,17 +298,16 @@ describe('the checklist of a K1 revocation, over HTTP (integration, real Postgre
       expect(h.codeOf(await h.revoked(k1.taskId, { completion: 'ACCOUNT_REMOVED', evidence: 'x' }).expect(422))).toBe(
         'REVOCATION.COMPLETION_NOT_ALLOWED',
       );
-      expect(
-        h.codeOf(
-          await h
-            .revoked(k2Task, {
-              completion: 'ACCOUNT_REMOVED',
-              evidence: 'x',
-              k1Checklist: k1Checklist('STILL_EMPLOYED', 'x'),
-            })
-            .expect(422),
-        ),
-      ).toBe('REVOCATION.COMPLETION_NOT_ALLOWED');
+      const refusedK2 = await h
+        .revoked(k2Task, {
+          completion: 'ACCOUNT_REMOVED',
+          evidence: 'x',
+          k1Checklist: k1Checklist('STILL_EMPLOYED', 'x'),
+        })
+        .expect(422);
+      expect(h.codeOf(refusedK2)).toBe('REVOCATION.COMPLETION_NOT_ALLOWED');
+      // A kind of grant that has no checklist has no variant to tell.
+      expect(detailsOf(refusedK2)).toBeUndefined();
       expect(await storedOf(k2Task)).toBeNull();
       await h.revoked(k2Task, { completion: 'ACCOUNT_REMOVED', evidence: 'x' }).expect(200);
       expect(await storedOf(k2Task)).toBeNull();
@@ -369,14 +377,15 @@ describe('the checklist of a K1 revocation, over HTTP (integration, real Postgre
       const { seats } = await seatsOf(2);
       const [first, second] = seats;
 
-      expect(h.codeOf(await complete(first.taskId, k1Checklist('DEPARTURE', 'đã khóa')).expect(422))).toBe(
-        'REVOCATION.COMPLETION_NOT_ALLOWED',
-      );
+      const lockRefused = await complete(first.taskId, k1Checklist('DEPARTURE', 'đã khóa')).expect(422);
+      expect(h.codeOf(lockRefused)).toBe('REVOCATION.COMPLETION_NOT_ALLOWED');
+      // The refusal tells the client that the steps of this task are the five before the lock.
+      expect(detailsOf(lockRefused)).toEqual({ variant: 'DEPARTURE', codes: FIVE });
       await unchanged(first.assignmentId, first.taskId);
       await complete(first.taskId, withoutLock()).expect(200);
-      expect(h.codeOf(await complete(second.taskId, withoutLock()).expect(422))).toBe(
-        'REVOCATION.K1_CHECKLIST_INCOMPLETE',
-      );
+      const lockAsked = await complete(second.taskId, withoutLock()).expect(422);
+      expect(h.codeOf(lockAsked)).toBe('REVOCATION.K1_CHECKLIST_INCOMPLETE');
+      expect(detailsOf(lockAsked)).toEqual({ variant: 'DEPARTURE', codes: [...K1_CODES.DEPARTURE] });
       await unchanged(second.assignmentId, second.taskId);
     });
 
