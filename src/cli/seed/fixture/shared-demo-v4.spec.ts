@@ -29,6 +29,18 @@ describe('shared dataset v4: the organization', () => {
     expect(F.departments.filter((d) => d.head === null).map((d) => d.code)).toEqual(['LGL']);
   });
 
+  it('puts at most four departments in the charge of one IT Admin (QĐ-110l): the API refuses a fifth', () => {
+    const inCharge = new Map<string, number>();
+    for (const d of F.departments) inCharge.set(d.itAdmin!, (inCharge.get(d.itAdmin!) ?? 0) + 1);
+
+    expect(Math.max(...inCharge.values())).toBeLessThanOrEqual(4);
+    expect(F.people.filter((p) => p.account === 'IT_ADMIN').map((p) => p.code)).toEqual([
+      'NV-ITA1',
+      'NV-ITA2',
+      'NV-ITA3',
+    ]);
+  });
+
   it('has exactly one Finance, one spending approver prepared as EMPLOYEE for the role step, and a Cost Center for all but Operations', () => {
     expect(F.people.filter((p) => p.account === 'FINANCE')).toHaveLength(1);
     expect(person(F.approvalRoles.SPENDING_APPROVER).account).toBe('EMPLOYEE');

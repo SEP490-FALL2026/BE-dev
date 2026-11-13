@@ -112,6 +112,64 @@ async function plans(ctx: DemoRunContext): Promise<StepOutcome> {
   return summarize(results);
 }
 
+/**
+ * The workspace profile of a plan the company administers at the vendor (a K2 plan, `QĐ-110k`, R-53), or null for a plan that has none: the IT Admin
+ * who answers for the plan's subscription owns it and another IT Admin of the fixture administers it, so two different ones are recorded before the
+ * subscription is made. The email is the company account that owns the workspace at the vendor (never a password).
+ */
+export function workspaceProfileBody(
+  ctx: DemoRunContext,
+  plan: DemoPlan,
+): {
+  primaryOwnerEmployeeId: string;
+  members: Array<{ employeeId: string; role: 'OWNER' | 'ADMIN' }>;
+  ownerAccountEmail: string;
+} | null {
+  if (plan.provisioningType !== 'K2') return null;
+  const owner = ctx.fixture.subscriptions.find((subscription) => subscription.plan === plan.key)?.responsible;
+  const other = ctx.fixture.people.find((person) => person.account === 'IT_ADMIN' && person.code !== owner)?.code;
+  if (!owner || !other) return null;
+  const ownerId = ctx.ids.employees.get(owner) ?? '';
+  const adminId = ctx.ids.employees.get(other) ?? '';
+
+  return {
+    primaryOwnerEmployeeId: ownerId,
+    members: [
+      { employeeId: ownerId, role: 'OWNER' },
+      { employeeId: adminId, role: 'ADMIN' },
+    ],
+    ownerAccountEmail: `it-${plan.key}@saoviet.example`,
+  };
+}
+
+async function workspaceProfiles(ctx: DemoRunContext): Promise<StepOutcome> {
+  const admin = await as(ctx, catalogAdmin(ctx));
+  const results: Result[] = [];
+  for (const plan of ctx.fixture.applications.flatMap((application) => application.plans)) {
+    if (workspaceProfileBody(ctx, plan) === null) continue;
+    const label = `${plan.name} (hồ sơ admin ở nhà cung cấp)`;
+    const planId = ctx.ids.plans.get(plan.key);
+    if (!planId) {
+      results.push({ status: 'planned', label });
+      continue;
+    }
+    // A profile an earlier run (or the IT Admin by hand) made is left as it is.
+    const detail = await ctx.api.call<{ workspaceProfile: unknown }>(admin, 'GET', `/plans/${planId}`);
+    if (detail.workspaceProfile) {
+      results.push({ status: 'present', label });
+      continue;
+    }
+    if (ctx.mode === 'plan') {
+      results.push({ status: 'planned', label });
+      continue;
+    }
+    await ctx.api.call(admin, 'PUT', `/plans/${planId}/workspace-profile`, workspaceProfileBody(ctx, plan));
+    results.push({ status: 'done', label });
+  }
+
+  return summarize(results);
+}
+
 interface SubscriptionRow {
   id: string;
   status: string;
@@ -210,9 +268,15 @@ export const CATALOG_STEPS: readonly DemoStep[] = [
   { key: 'catalog.applications', title: 'Ứng dụng (IT Admin)', needs: ['org.accounts'], run: applications },
   { key: 'catalog.plans', title: 'Gói (IT Admin)', needs: ['catalog.applications'], run: plans },
   {
+    key: 'catalog.workspace-profiles',
+    title: 'Hồ sơ admin ở nhà cung cấp của gói K2: hai IT Admin (IT Admin)',
+    needs: ['catalog.plans'],
+    run: workspaceProfiles,
+  },
+  {
     key: 'catalog.subscriptions',
     title: 'Một thuê bao cho mỗi gói: kho dùng chung (IT Admin)',
-    needs: ['catalog.plans', 'finance.exchange-rates'],
+    needs: ['catalog.plans', 'catalog.workspace-profiles', 'finance.exchange-rates'],
     run: subscriptions,
   },
 ];

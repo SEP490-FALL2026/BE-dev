@@ -24,15 +24,15 @@ Super Admin đăng nhập bằng `--super-admin-email` (mặc định `system.ad
 | ENG  | Phòng Kỹ thuật            | NV-ENGH | NV-ITA1  | CC-ENG      | Ngân sách rộng; hầu hết Request MF-1; đủ người cho nhóm               |
 | DES  | Phòng Thiết kế            | NV-DESH | NV-ITA2  | CC-DES      | Ngân sách sát mức (dùng dự phòng chưa xác nhận); toàn bộ dữ liệu MF-5 |
 | FIN  | Phòng Tài chính - Kế toán | NV-FINH | NV-ITA2  | CC-FIN      | Finance (NV-FIN1) thuộc phòng này                                     |
-| ITO  | Phòng Công nghệ thông tin | NV-ITOH | NV-ITA1  | CC-ITO      | Hai IT Admin; Request cá nhân của IT Admin đi qua NV-ITOH             |
+| ITO  | Phòng Công nghệ thông tin | NV-ITOH | NV-ITA1  | CC-ITO      | Ba IT Admin; Request cá nhân của IT Admin đi qua NV-ITOH              |
 | MKT  | Phòng Marketing           | NV-MKTH | NV-ITA2  | CC-MKT      | Ngân sách 240.000: Request dùng dự phòng, đã xác nhận                 |
 | SAL  | Phòng Kinh doanh          | NV-SALH | NV-ITA1  | CC-SAL      | Ngân sách 290.000: Request vượt dự phòng, bị chặn                     |
 | LGL  | Phòng Pháp chế            | -       | NV-ITA1  | CC-LGL      | **Không có trưởng phòng**: Request trả phí chờ ở bước nhu cầu         |
-| OPS  | Phòng Vận hành            | NV-OPSH | NV-ITA2  | -           | **Không có Cost Center**: Request trả phí chỉ lưu nháp được           |
+| OPS  | Phòng Vận hành            | NV-OPSH | NV-ITA3  | -           | **Không có Cost Center**: Request trả phí chỉ lưu nháp được           |
 
 ## People and accounts
 
-38 người, 27 tài khoản đăng nhập; cài đặt thêm một Super Admin riêng và phòng gốc `ADMIN`. Mỗi tài khoản đúng một vai. NV-CEO tạo ra là EMPLOYEE rồi bước vai đổi thành SPENDING_APPROVER (đúng một Người duyệt chi, đúng một Finance). Tất cả vào làm cách đây 400 ngày. Cột cuối là vai trong demo.
+39 người, 28 tài khoản đăng nhập; cài đặt thêm một Super Admin riêng và phòng gốc `ADMIN`. Mỗi tài khoản đúng một vai. NV-CEO tạo ra là EMPLOYEE rồi bước vai đổi thành SPENDING_APPROVER (đúng một Người duyệt chi, đúng một Finance). Tất cả vào làm cách đây 400 ngày. Cột cuối là vai trong demo.
 
 | Employee | Name            | Login email (or no account) | Final role        | Department | Heads | Vai trong demo                                                                                          |
 | -------- | --------------- | --------------------------- | ----------------- | ---------- | ----- | ------------------------------------------------------------------------------------------------------- |
@@ -64,6 +64,7 @@ Super Admin đăng nhập bằng `--super-admin-email` (mặc định `system.ad
 | NV-ITOH  | Trần Minh Thanh | thanh.tran@saoviet.example  | MANAGER           | ITO        | ITO   | Trưởng phòng CNTT: duyệt nhu cầu R24 của IT Admin; đề xuất ngân sách 2027 chờ Finance                   |
 | NV-ITA1  | Lý Minh Quân    | quan.ly@saoviet.example     | IT_ADMIN          | ITO        | -     | IT Admin: Jira, GitHub, Slack, Postman, 1Password, JetBrains; hàng chờ cấp; chạy luật                   |
 | NV-ITA2  | Mai Thị Rạng    | rang.mai@saoviet.example    | IT_ADMIN          | ITO        | -     | IT Admin: Figma, Canva, Mailchimp; thẩm định phần mềm mới; nguồn usage Figma/Canva                      |
+| NV-ITA3  | Đoàn Văn Sáng   | sang.doan@saoviet.example   | IT_ADMIN          | ITO        | -     | IT Admin thứ ba: phụ trách Phòng Vận hành (mỗi IT Admin chỉ phụ trách tối đa 4 phòng, `QĐ-110l`)        |
 | NV-MKTH  | Đinh Thị Uyên   | uyen.dinh@saoviet.example   | MANAGER           | MKT        | MKT   | Trưởng phòng Marketing: xác nhận dùng dự phòng R10 (đã xác nhận); ngân sách sát mức                     |
 | NV-MKT1  | Lâm Văn Vinh    | vinh.lam@saoviet.example    | EMPLOYEE          | MKT        | -     | Nhân viên: R10 Canva dùng dự phòng, đang chờ Người duyệt chi                                            |
 | NV-MKT2  | Châu Thị Xuân   | xuan.chau@saoviet.example   | EMPLOYEE          | MKT        | -     | Nhân viên Marketing                                                                                     |
@@ -77,7 +78,7 @@ Super Admin đăng nhập bằng `--super-admin-email` (mặc định `system.ad
 
 ## Danh mục và kho dùng chung
 
-12 ứng dụng, 13 gói. Mỗi (ứng dụng, gói) có **một** thuê bao: kho ghế của cả công ty, không thuộc phòng nào (`QĐ-103d`). Ghế nền được nạp bằng tệp CSV của IT Admin (`seatBaselineImport`), cấp từ 130 ngày trước, rồi đóng baseline.
+12 ứng dụng, 13 gói. Mỗi (ứng dụng, gói) có **một** thuê bao: kho ghế của cả công ty, không thuộc phòng nào (`QĐ-103d`). Mỗi gói K2 có **hồ sơ workspace** hai IT Admin khác nhau (chủ = IT Admin phụ trách thuê bao, admin = một IT Admin khác, kèm email tài khoản công ty `it-<gói>@saoviet.example`) được ghi bằng `PUT /plans/{id}/workspace-profile` **trước** khi tạo thuê bao: thuê bao của gói cần admin ở nhà cung cấp không kích hoạt khi hồ sơ thiếu (`QĐ-110k`, R-53); gói K1, K4 không có admin console và K5 không cần. Ghế nền được nạp bằng tệp CSV của IT Admin (`seatBaselineImport`), cấp từ 130 ngày trước, rồi đóng baseline.
 
 | Ứng dụng · gói         | Kiểu | Giá / ghế                           | Mua | Đang giữ | Trống | Vai trong demo                                          |
 | ---------------------- | ---- | ----------------------------------- | --- | -------- | ----- | ------------------------------------------------------- |
