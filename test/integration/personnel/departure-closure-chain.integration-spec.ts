@@ -1,3 +1,4 @@
+import { MailboxLockSettlement } from '../../../src/modules/personnel/departure-closure/mailbox-lock-settlement.service';
 import { BlockMomentSweeper } from '../../../src/modules/personnel/departure-deadline/block-moment.job';
 import { DepartureClosureSweeper } from '../../../src/modules/personnel/departure-closure/departure-closure.job';
 import { OffboardingHarness, type CaseWire, type RightWire } from '../../support/offboarding-harness';
@@ -220,5 +221,34 @@ describe('a departure from the record to the closing, with the real sweepers (in
     // The last revocation is completed: the closing needs no pass and no click.
     await removeK2(task);
     expect(await wireOf(wire.id)).toMatchObject({ closed: true, blockers: {} });
+  }, 240_000);
+  it('lets the Super Admin cancel a handover that is blocked after (1a) and (1b) were written: both stay on the cancelled case, which nothing closes (D-73)', async () => {
+    const { person } = await leaver([k2]);
+    const wire = await h.recordedCase(person);
+    await timePasses(wire, person);
+    await blockMoment();
+    await h.lockAccount(wire.id, LOCK).expect(200);
+    await h.lockMailbox(wire.id, MAILBOX).expect(200);
+
+    const cancelled = h.dataOf<CaseWire>(await h.cancelCase(wire.id, { reason: 'Người ở lại làm việc' }).expect(200));
+
+    // The locks were done outside the system and it does not undo them: they stay on the case, and the case is not closed.
+    expect(cancelled).toMatchObject({
+      state: 'CANCELLED',
+      closed: false,
+      blockers: {},
+      accountLock: { note: LOCK.note },
+      mailboxLock: { note: MAILBOX.note, recordedBySystem: false },
+    });
+    const kinds = await h.changeKinds(wire.id);
+    await h.ctx.app.get(MailboxLockSettlement, { strict: false }).settle();
+    await closing();
+    expect(await h.changeKinds(wire.id)).toEqual(kinds);
+    expect(kinds.at(-1)).toBe('CANCELLED');
+    expect((await h.caseRow(wire.id)).closed_at).toBeNull();
+    // (1b) is written once: asking again answers as it was, whatever the case has become.
+    const again = await h.lockMailbox(wire.id, {});
+    expect(again.status).toBe(200);
+    expect(h.dataOf<CaseWire>(again).mailboxLock).toEqual(cancelled.mailboxLock);
   }, 240_000);
 });

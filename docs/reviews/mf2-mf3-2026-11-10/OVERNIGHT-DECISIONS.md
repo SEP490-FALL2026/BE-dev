@@ -340,7 +340,7 @@ Không sửa code; SPEC không bị sửa trong lượt này (spec là của Own
 
 ### D-46 · MF2-C review (d) · Đề xuất sửa SPEC/PLAN: mã lỗi hủy hồ sơ đã `LEFT`
 
-- SPEC §4 P2 và dòng `MF2-C.1` của PLAN ghi `OFFBOARDING.ALREADY_LEFT`; code giữ `OFFBOARDING_CASE.CASE_LEFT` (D-37, đã có từ trước, FE đã biết). **Đề xuất sửa SPEC/PLAN:** thay `OFFBOARDING.ALREADY_LEFT` bằng `OFFBOARDING_CASE.CASE_LEFT` ở hai chỗ đó. Không sửa SPEC trong gói này.
+- SPEC §4 P2 và dòng `MF2-C.1` của PLAN ghi `OFFBOARDING.ALREADY_LEFT`; code giữ `OFFBOARDING_CASE.CASE_LEFT` (D-37, đã có từ trước, FE đã biết). **Đề xuất sửa SPEC/PLAN:** thay `OFFBOARDING.ALREADY_LEFT` bằng `OFFBOARDING_CASE.CASE_LEFT` ở hai chỗ đó. Không sửa SPEC trong gói này. **Cập nhật (D-73):** cùng đề xuất cho P28 (`OFFBOARDING.ACCOUNT_LOCK_FIRST`/`MAILBOX_LOCK_BEFORE_K1` ⟹ `OFFBOARDING_CASE.*`).
 
 ### D-47 · MF2-E.1 · `revocation_due_on` khi sweeper chặn: giữ hạn đã ghi hay ghi lại "cùng quy tắc" (chữ D-41 đã sửa)
 
@@ -561,6 +561,16 @@ Không sửa code; SPEC không bị sửa trong lượt này (spec là của Own
 - **Test:** `departure-closure.integration-spec` — ca "hồ sơ bị giữ lúc tác vụ `K1` cuối hoàn tất" đổi kỳ vọng có chủ đích (trước: (1b) vẫn rỗng sau khi quét và IT phải ghi; nay: lượt quét ghi (1b) bằng hệ thống và đóng; thêm ca IT nhanh hơn lượt quét); ca D-71 thêm "lượt quét không ghi khi còn ghế `K1`"; spec mới `departure-closure.job.spec.ts` (thứ tự, cô lập lỗi). Kiểm đột biến: lượt quét không ghi ⟹ 2 ca đỏ.
 - **Đổi lại:** muốn như D-66: bỏ `MailboxLockSettlement` khỏi `DepartureClosureSweeper` (và khỏi `personnel.module.ts`); `LicensingApi.listPeopleWithMailboxLockTicked` là hàm đọc, không ảnh hưởng nếu để lại.
 - **Chạm:** `departure-closure/{mailbox-lock-settlement.service,departure-closure.job(+spec),departure-closure.repo}.ts`, `personnel.module.ts`, `licensing/provisioning/k1-checklist/provisioning-k1-checklist.{repo,service}.ts`, `licensing/provisioning/revocation-view.service.ts`, `licensing/public/licensing.api.ts`, mô tả OpenAPI P28 (`mailbox-lock.controller.ts`), README `personnel`, `docs/rules/security-jobs.md`; test `departure-closure.integration-spec.ts`.
+
+### D-73 · MF2-G review O1 (Optional) · Hủy hồ sơ đang bàn giao khi đã ghi (1a)/(1b): cho phép, giữ trên hồ sơ hủy
+
+- **Hiện trạng:** `cancelRefusal` chỉ xét trạng thái, lý do và căn cứ; hồ sơ `HANDING_OVER` đã bị chặn và đã ghi (1a) và/hoặc (1b) vẫn hủy được. SPEC S3 không nói về (1b).
+- **Phương án:** A. **cho phép hủy** và để (1a)/(1b) nằm trên hồ sơ hủy. B. cho phép hủy kèm thông báo mới cho IT "mở lại hộp thư" (thêm mã thông báo, đổi bảng tham số `inbox.policy.ts`, hợp đồng thông báo). C. chặn hủy khi đã ghi (1b) (409 mã mới). **ĐÃ CHỌN A**: (1) cùng cách (1a) đã sống sót sau hủy từ M3 (`offboarding_cases_account_lock_check` bỏ ràng buộc trạng thái); (2) chặn (C) kẹt một hồ sơ ghi nhầm — Super Admin không có đường lùi, và (1b) là việc IT đã làm **ngoài** hệ thống nên hệ thống không hoàn tác được dù hủy hay không; (3) IT phụ trách đã nhận thông báo `DEPARTURE_CANCELLED` từ MF2-E.2 và đọc được hồ sơ hủy (`mailboxLock`, `accountLock` còn nguyên trong chi tiết), đủ để tự mở lại hộp thư; mở khóa truy cập vẫn là việc của Super Admin (có sẵn từ Đợt 1). Không thêm thông báo hay mã mới (đơn giản nhất, dễ đổi lại).
+- **Hệ quả:** hồ sơ hủy giữ `mailboxLock`/`accountLock`, không bao giờ đóng (lượt quét chỉ chọn `HANDING_OVER`/`LEFT`); P28 trên hồ sơ hủy đã có (1b) trả 200 như cũ (ghi một lần), chưa có (1b) trả 409 `CASE_NOT_BLOCKED`. Tài liệu API FE ghi rõ ở mục hủy hồ sơ.
+- **Test:** `departure-closure-chain.integration-spec` ca 4 (hủy sau khi chặn, (1a) và (1b): 200 `CANCELLED`, hai khối khóa còn trên hồ sơ, hai lượt quét không đổi gì, dòng nhật ký cuối là `CANCELLED`).
+- **Đổi lại:** muốn chặn hủy khi đã ghi (1b): thêm điều kiện vào `cancelRefusal` (`offboarding.policy.ts`, cần truyền `mailboxLocked`) với mã 409 mới; muốn báo IT: thêm tham số vào thông báo `DEPARTURE_CANCELLED` hoặc mã mới.
+- **Đề xuất sửa SPEC (gộp với D-46):** SPEC §4 P2 (`OFFBOARDING.ALREADY_LEFT`) và **P28** (`OFFBOARDING.ACCOUNT_LOCK_FIRST`, `OFFBOARDING.MAILBOX_LOCK_BEFORE_K1`) ghi tiền tố `OFFBOARDING.`; code và FE dùng `OFFBOARDING_CASE.` (D-37, D-46, D-65). **Đề xuất:** thay `OFFBOARDING.ALREADY_LEFT` bằng `OFFBOARDING_CASE.CASE_LEFT`, `OFFBOARDING.ACCOUNT_LOCK_FIRST` bằng `OFFBOARDING_CASE.ACCOUNT_LOCK_FIRST`, `OFFBOARDING.MAILBOX_LOCK_BEFORE_K1` bằng `OFFBOARDING_CASE.MAILBOX_LOCK_BEFORE_K1` ở SPEC §4 P2/P28 và PLAN dòng MF2-C.1/MF2-G.1. Không sửa SPEC trong gói này (D-46 vẫn là mục gốc của đề xuất).
+- **Chạm:** chỉ test (`departure-closure-chain.integration-spec.ts`) và tài liệu; không đổi mã.
 
 ## Bị chặn
 
