@@ -19,6 +19,7 @@ import {
   PlanTermsBlockTypeChangeError,
   PlanUpdateEmptyError,
   PlanAdminConsoleNotApplicableError,
+  PlanVendorAdminsInvalidError,
   PlanWorkspaceProfileNotApplicableError,
   PlanWorkspacePersonInvalidError,
   PlanPrimaryOwnerNotListedError,
@@ -60,6 +61,11 @@ export function toPlanApiException(error: unknown): unknown {
     return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'PLAN.UPDATE_EMPTY', error.message);
   if (error instanceof PlanAdminConsoleNotApplicableError)
     return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'PLAN.ADMIN_CONSOLE_NOT_APPLICABLE', error.message);
+  if (error instanceof PlanVendorAdminsInvalidError)
+    return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'PLAN.VENDOR_ADMINS_INVALID', error.message, {
+      given: error.given,
+      required: error.required,
+    });
   if (error instanceof PlanWorkspaceProfileNotApplicableError)
     return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'PLAN.WORKSPACE_PROFILE_NOT_APPLICABLE', error.message);
   if (error instanceof PlanWorkspacePersonInvalidError)
@@ -108,6 +114,7 @@ export const PLAN_ERROR_EXAMPLES = {
   DATA_LOSS_NOTE_REQUIRED: example(new PlanDataLossNoteRequiredError()),
   UPDATE_EMPTY: example(new PlanUpdateEmptyError()),
   ADMIN_CONSOLE_NOT_APPLICABLE: example(new PlanAdminConsoleNotApplicableError()),
+  VENDOR_ADMINS_INVALID: example(new PlanVendorAdminsInvalidError(1, 2)),
   WORKSPACE_PROFILE_NOT_APPLICABLE: example(new PlanWorkspaceProfileNotApplicableError()),
   WORKSPACE_PERSON_INVALID: example(new PlanWorkspacePersonInvalidError('<employee-id>')),
   PRIMARY_OWNER_NOT_LISTED: example(new PlanPrimaryOwnerNotListedError()),

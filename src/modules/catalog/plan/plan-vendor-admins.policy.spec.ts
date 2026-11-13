@@ -1,5 +1,10 @@
-import { PlanAdminConsoleNotApplicableError } from './plan.errors';
-import { assertAdminConsoleApplicable, needsVendorAdmins } from './plan-vendor-admins.policy';
+import { PlanAdminConsoleNotApplicableError, PlanVendorAdminsInvalidError } from './plan.errors';
+import {
+  MIN_VENDOR_ADMINS,
+  assertAdminConsoleApplicable,
+  assertVendorAdminsEnough,
+  needsVendorAdmins,
+} from './plan-vendor-admins.policy';
 
 describe('plan-vendor-admins.policy (QĐ-110k, QĐ-110u, R-53: which plans need admins at the vendor)', () => {
   describe('assertAdminConsoleApplicable: the flag "has an admin console" is a K4 plan’s alone', () => {
@@ -33,6 +38,32 @@ describe('plan-vendor-admins.policy (QĐ-110k, QĐ-110u, R-53: which plans need 
       ['K3', false, false],
     ] as const)('a %s plan with the flag %s needs them: %s', (type, hasAdminConsole, needs) => {
       expect(needsVendorAdmins(type, hasAdminConsole)).toBe(needs);
+    });
+  });
+
+  describe('assertVendorAdminsEnough: at least two different IT Admins administer the plan at the vendor', () => {
+    it('keeps the minimum at two', () => {
+      expect(MIN_VENDOR_ADMINS).toBe(2);
+    });
+
+    it.each([[['a', 'b']], [['a', 'b', 'c']]])('accepts %j', (people) => {
+      expect(() => assertVendorAdminsEnough(people)).not.toThrow();
+    });
+
+    it.each([[['a']], [[]], [['a', 'a']]])('refuses %j: fewer than two different people', (people) => {
+      expect(() => assertVendorAdminsEnough(people)).toThrow(PlanVendorAdminsInvalidError);
+    });
+
+    it('says how many different people it was given and how many it needs', () => {
+      let thrown: unknown;
+      try {
+        assertVendorAdminsEnough(['a', 'a']);
+      } catch (error) {
+        thrown = error;
+      }
+
+      expect(thrown).toBeInstanceOf(PlanVendorAdminsInvalidError);
+      expect(thrown).toMatchObject({ given: 1, required: 2 });
     });
   });
 });

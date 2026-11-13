@@ -74,6 +74,7 @@ file thuần xuống tầng thấp, hoặc đưa dịch vụ điều phối lên
   `ApplicationWriteGuards`, phần đổi trạng thái là hàm thuần trong `application-state.policy.ts`). Gốc của module: `plan/` và
   `subscription/` đọc ứng dụng qua `ApplicationFactsService`; ứng dụng muốn biết plan của mình để gợi ý K2 thì khai
   `application-plans.types.ts` (`ApplicationPlans`) và `plan/plan-facts.service.ts` trả lời, `catalog.module.ts` nối hai bên.
+- `plan/` (X-IT.4): cờ `plans.has_admin_console` (chỉ gói `K4`, `plan-vendor-admins.policy.ts`: `needsVendorAdmins` = `K2` hoặc `K4` có cờ, `assertAdminConsoleApplicable`); hồ sơ workspace (`PUT /plans/{id}/workspace-profile`) chỉ cho gói cần admin, thêm `ownerAccountEmail`/`adminNote`, `primaryOwner` + `members` ≥ 2 IT Admin khác nhau đang làm việc (`PLAN.VENDOR_ADMINS_INVALID`).
 - `application-responsibility/` — chuyển IT Admin phụ trách ứng dụng (`POST /applications/{id}/responsibility-transfer`, khóa dòng ứng dụng,
   `QĐ-111g`, R-26); `application-responsibility.policy.ts` quyết ai chuyển cho ai.
   `responsibility-handover.service.ts` (+ `.policy.ts`) chuyển MỘT LẦN mọi thuê bao và ứng dụng của một IT Admin (facade `CatalogResponsibilityApi`).

@@ -20969,7 +20969,7 @@
         },
         "responses": {
           "200": {
-            "description": "The workspace profile replaces the previous one as a whole; it names the owners, the admins and the emergency account, and takes no password.",
+            "description": "The workspace profile replaces the previous one as a whole; it names the owners, the admins and the emergency account, the email of the company account that owns the plan at the vendor (optional) and a free note, and takes no password. Only a plan that needs admins at the vendor has one: a K2 plan, or a K4 plan with an admin console. The owners and admins are at least two different IT Admins who work now.",
             "content": {
               "application/json": {
                 "schema": {
@@ -21119,7 +21119,7 @@
             }
           },
           "422": {
-            "description": "The request is invalid (VALIDATION_ERROR) or a rule refuses it: PLAN.WORKSPACE_PROFILE_NOT_APPLICABLE, WORKSPACE_PERSON_INVALID, PRIMARY_OWNER_NOT_LISTED, WORKSPACE_MEMBER_DUPLICATE, WORKSPACE_LIMIT_EXCEEDED or WORKSPACE_TEXT_INVALID.",
+            "description": "The request is invalid (VALIDATION_ERROR) or a rule refuses it: PLAN.WORKSPACE_PROFILE_NOT_APPLICABLE, WORKSPACE_PERSON_INVALID, PRIMARY_OWNER_NOT_LISTED, WORKSPACE_MEMBER_DUPLICATE, WORKSPACE_LIMIT_EXCEEDED, WORKSPACE_TEXT_INVALID or VENDOR_ADMINS_INVALID (fewer than two different IT Admins).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -21137,12 +21137,12 @@
                     }
                   },
                   "PLAN.WORKSPACE_PROFILE_NOT_APPLICABLE": {
-                    "summary": "Only a K2 plan has a workspace profile.",
+                    "summary": "Only a plan that needs admins at the vendor (K2, or K4 with an admin console) has a workspace profile.",
                     "value": {
                       "success": false,
                       "error": {
                         "code": "PLAN.WORKSPACE_PROFILE_NOT_APPLICABLE",
-                        "message": "Only a K2 plan has a workspace profile.",
+                        "message": "Only a plan that needs admins at the vendor (K2, or K4 with an admin console) has a workspace profile.",
                         "requestId": "req_example"
                       }
                     }
@@ -21201,6 +21201,18 @@
                       "error": {
                         "code": "PLAN.WORKSPACE_TEXT_INVALID",
                         "message": "A workspace text field is too long.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "PLAN.VENDOR_ADMINS_INVALID": {
+                    "summary": "At least 2 different IT Admins must administer the plan at the vendor.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "PLAN.VENDOR_ADMINS_INVALID",
+                        "message": "At least 2 different IT Admins must administer the plan at the vendor.",
+                        "details": { "given": 1, "required": 2 },
                         "requestId": "req_example"
                       }
                     }
@@ -21264,7 +21276,7 @@
           }
         },
         "security": [{ "bearer": [] }],
-        "summary": "Record the workspace profile of a K2 plan",
+        "summary": "Record who administers a plan at the vendor",
         "tags": ["plans"]
       }
     },
@@ -90649,6 +90661,8 @@
                     "additionalProperties": false,
                     "nullable": true
                   },
+                  "ownerAccountEmail": { "type": "string", "nullable": true },
+                  "adminNote": { "type": "string", "nullable": true },
                   "updatedAt": { "type": "string", "format": "date-time" }
                 },
                 "required": [
@@ -90658,6 +90672,8 @@
                   "adminLimit",
                   "ownerTransferProcedure",
                   "emergencyAccount",
+                  "ownerAccountEmail",
+                  "adminNote",
                   "updatedAt"
                 ],
                 "additionalProperties": false,
@@ -90742,7 +90758,9 @@
             "required": ["identity", "occupiesSeat", "holderEmployeeId", "lastReviewedOn"],
             "additionalProperties": false,
             "nullable": true
-          }
+          },
+          "ownerAccountEmail": { "type": "string", "minLength": 1, "maxLength": 320, "nullable": true },
+          "adminNote": { "type": "string", "maxLength": 2000, "nullable": true }
         },
         "required": ["primaryOwnerEmployeeId", "members"],
         "additionalProperties": false
@@ -90813,6 +90831,8 @@
                 "additionalProperties": false,
                 "nullable": true
               },
+              "ownerAccountEmail": { "type": "string", "nullable": true },
+              "adminNote": { "type": "string", "nullable": true },
               "updatedAt": { "type": "string", "format": "date-time" }
             },
             "required": [
@@ -90822,6 +90842,8 @@
               "adminLimit",
               "ownerTransferProcedure",
               "emergencyAccount",
+              "ownerAccountEmail",
+              "adminNote",
               "updatedAt"
             ],
             "additionalProperties": false,

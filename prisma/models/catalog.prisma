@@ -274,6 +274,9 @@ model PlanWorkspaceProfile {
   emergencyOccupiesSeat     Boolean?  @map("emergency_occupies_seat")
   emergencyHolderEmployeeId String?   @map("emergency_holder_employee_id") @db.Uuid
   emergencyLastReviewedOn   DateTime? @map("emergency_last_reviewed_on") @db.Date
+  // QĐ-110u: the email of the company account that stands as owner of the plan at the vendor (never a password), and a free note.
+  ownerAccountEmail         String?   @map("owner_account_email")
+  adminNote                 String?   @map("admin_note")
   createdAt                 DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt                 DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
 

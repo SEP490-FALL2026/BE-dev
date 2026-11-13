@@ -576,7 +576,11 @@ describe('plans and workspace profiles over HTTP (integration, real PostgreSQL)'
       await putProfile(k2Plan.id, profileBody()).expect(200);
       const next = profileBody({
         primaryOwnerEmployeeId: it2.employeeId,
-        members: [{ employeeId: it2.employeeId, role: 'OWNER' }],
+        // Two different IT Admins at least (X-IT.4b, QĐ-110k): the owner changes and the other becomes an admin.
+        members: [
+          { employeeId: it2.employeeId, role: 'OWNER' },
+          { employeeId: it1.employeeId, role: 'ADMIN' },
+        ],
         ownerLimit: null,
         ownerTransferProcedure: null,
         emergencyAccount: null,
@@ -584,7 +588,9 @@ describe('plans and workspace profiles over HTTP (integration, real PostgreSQL)'
 
       const replaced = dataOf<ProfileWire>(await putProfile(k2Plan.id, next).expect(200));
 
-      expect(replaced.members).toEqual([expect.objectContaining({ employeeId: it2.employeeId, role: 'OWNER' })]);
+      expect(replaced.members.map((member) => `${member.employeeId}:${member.role}`).sort()).toEqual(
+        [`${it2.employeeId}:OWNER`, `${it1.employeeId}:ADMIN`].sort(),
+      );
       expect(replaced.emergencyAccount).toBeNull();
       const events = await auditOf(k2Plan.id);
       expect(events.map((event) => event.action)).toEqual([
@@ -596,7 +602,7 @@ describe('plans and workspace profiles over HTTP (integration, real PostgreSQL)'
       expect(events[2].after).toMatchObject({ primaryOwnerEmployeeId: it2.employeeId, emergencyIdentity: null });
       expect(
         (await ctx.sql.query(`SELECT 1 FROM plan_workspace_admins WHERE plan_id = $1`, [k2Plan.id])).rowCount,
-      ).toBe(1);
+      ).toBe(2);
     });
 
     it('is only for a K2 plan: 422 on any other kind, 404 on a missing plan', async () => {

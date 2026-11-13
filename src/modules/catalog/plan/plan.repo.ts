@@ -53,6 +53,8 @@ const toProfile = (row: ProfileRow): WorkspaceProfileRecord => ({
           holderEmployeeId: row.emergencyHolderEmployeeId as string,
           lastReviewedOn: fromDateColumn(row.emergencyLastReviewedOn as Date),
         },
+  ownerAccountEmail: row.ownerAccountEmail,
+  adminNote: row.adminNote,
   updatedAt: row.updatedAt,
 });
 
@@ -398,6 +400,8 @@ export class PlanRepo {
       emergencyOccupiesSeat: profile.emergencyAccount?.occupiesSeat ?? null,
       emergencyHolderEmployeeId: profile.emergencyAccount?.holderEmployeeId ?? null,
       emergencyLastReviewedOn: profile.emergencyAccount ? toDateColumn(profile.emergencyAccount.lastReviewedOn) : null,
+      ownerAccountEmail: profile.ownerAccountEmail,
+      adminNote: profile.adminNote,
     };
     await tx.planWorkspaceProfile.upsert({
       where: { planId: profile.planId },

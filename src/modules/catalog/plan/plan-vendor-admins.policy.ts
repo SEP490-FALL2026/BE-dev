@@ -1,4 +1,4 @@
-import { PlanAdminConsoleNotApplicableError } from './plan.errors';
+import { PlanAdminConsoleNotApplicableError, PlanVendorAdminsInvalidError } from './plan.errors';
 import type { ProvisioningType } from './plan.types';
 
 /**
@@ -16,4 +16,13 @@ export function assertAdminConsoleApplicable(provisioningType: ProvisioningType,
  */
 export function needsVendorAdmins(provisioningType: ProvisioningType, hasAdminConsole: boolean): boolean {
   return provisioningType === 'K2' || (provisioningType === 'K4' && hasAdminConsole);
+}
+
+/** The fewest different IT Admins who administer a plan at the vendor (`QĐ-110k`): one may leave and the plan is still reachable. */
+export const MIN_VENDOR_ADMINS = 2;
+
+/** At least two different people administer the plan (`QĐ-110k`, SPEC P19). Throws PlanVendorAdminsInvalidError. */
+export function assertVendorAdminsEnough(employeeIds: readonly string[]): void {
+  const given = new Set(employeeIds).size;
+  if (given < MIN_VENDOR_ADMINS) throw new PlanVendorAdminsInvalidError(given, MIN_VENDOR_ADMINS);
 }

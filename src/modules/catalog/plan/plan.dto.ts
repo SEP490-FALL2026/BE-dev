@@ -59,6 +59,9 @@ export const workspaceProfileBodySchema = z.strictObject({
     })
     .nullable()
     .optional(),
+  /** The email of the company account that stands as owner at the vendor (`QĐ-110u`): never a password. Missing means the subscription is flagged, not refused. */
+  ownerAccountEmail: z.string().trim().min(1).max(320).pipe(z.email()).nullable().optional(),
+  adminNote: z.string().max(2000).nullable().optional(),
 });
 
 export const listPlansQuerySchema = z.strictObject({
@@ -84,6 +87,8 @@ const workspaceProfileSchema = z.strictObject({
       lastReviewedOn: z.string(),
     })
     .nullable(),
+  ownerAccountEmail: z.string().nullable(),
+  adminNote: z.string().nullable(),
   updatedAt: z.iso.datetime(),
 });
 /** A row of the list; the plan as a detail or a write answers it is this and the revocation note. */

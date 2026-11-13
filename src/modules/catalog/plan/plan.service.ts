@@ -190,6 +190,7 @@ export class PlanService {
         if (
           next.provisioningType !== current.provisioningType &&
           next.provisioningType !== 'K2' &&
+          next.provisioningType !== 'K4' &&
           (await this.plans.findProfile(id, tx))
         ) {
           throw new PlanWorkspaceProfileBlocksTypeChangeError();

@@ -45,6 +45,9 @@ export interface WorkspaceProfileRecord {
     holderEmployeeId: string;
     lastReviewedOn: string;
   } | null;
+  /** The email of the company account that stands as owner of the plan at the vendor; no password (`QĐ-110u`). */
+  ownerAccountEmail: string | null;
+  adminNote: string | null;
   updatedAt: Date;
 }
 
@@ -67,6 +70,8 @@ export interface WorkspaceProfileView {
     holder: PersonView;
     lastReviewedOn: string;
   } | null;
+  ownerAccountEmail: string | null;
+  adminNote: string | null;
   updatedAt: Date;
 }
 

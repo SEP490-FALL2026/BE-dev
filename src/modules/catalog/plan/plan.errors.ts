@@ -97,9 +97,20 @@ export class PlanAdminConsoleNotApplicableError extends Error {
   }
 }
 
+/** The people who administer the plan at the vendor are fewer than two (`QĐ-110k`). */
+export class PlanVendorAdminsInvalidError extends Error {
+  constructor(
+    readonly given: number,
+    readonly required: number,
+  ) {
+    super(`At least ${required} different IT Admins must administer the plan at the vendor.`);
+    this.name = 'PlanVendorAdminsInvalidError';
+  }
+}
+
 export class PlanWorkspaceProfileNotApplicableError extends Error {
   constructor() {
-    super('Only a K2 plan has a workspace profile.');
+    super('Only a plan that needs admins at the vendor (K2, or K4 with an admin console) has a workspace profile.');
     this.name = 'PlanWorkspaceProfileNotApplicableError';
   }
 }
