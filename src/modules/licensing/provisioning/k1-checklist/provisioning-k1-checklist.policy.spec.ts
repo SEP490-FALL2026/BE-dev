@@ -43,13 +43,14 @@ function claimOf(
 
 function plan(
   claim: K1ChecklistClaim | undefined,
-  options: { sources?: RevocationSource[]; type?: ProvisioningKind; evidence?: string } = {},
+  options: { sources?: RevocationSource[]; type?: ProvisioningKind; evidence?: string; lastOfPerson?: boolean } = {},
 ) {
   return planK1Checklist({
     type: options.type ?? 'K1',
     sources: options.sources ?? ['DEPARTURE'],
     claim,
     evidence: options.evidence ?? '',
+    lastOfPerson: options.lastOfPerson ?? true,
   });
 }
 
@@ -82,7 +83,7 @@ describe("k1VariantOf (the variant is the server's, from the sources of the revo
 
 describe('k1ChecklistItems (the list of each variant)', () => {
   it('DEPARTURE has six steps in order, the mailbox lock last', () => {
-    const items = k1ChecklistItems('DEPARTURE');
+    const items = k1ChecklistItems('DEPARTURE', true);
 
     expect(items.map((item) => [item.order, item.code])).toEqual(
       DEPARTURE_CODES.map((code, index) => [index + 1, code]),
@@ -91,7 +92,7 @@ describe('k1ChecklistItems (the list of each variant)', () => {
   });
 
   it('STILL_EMPLOYED has the renewal and the evidence only: no mailbox reset, no lock', () => {
-    const items = k1ChecklistItems('STILL_EMPLOYED');
+    const items = k1ChecklistItems('STILL_EMPLOYED', true);
 
     expect(items.map((item) => [item.order, item.code])).toEqual([
       [1, 'RENEWAL_DISABLED'],
@@ -282,7 +283,7 @@ describe('planK1Checklist', () => {
 
 describe('k1ChecklistCard (what the card of the task shows)', () => {
   it('an open task shows the list of its variant with nothing ticked', () => {
-    const card = k1ChecklistCard('STILL_EMPLOYED', null);
+    const card = k1ChecklistCard('STILL_EMPLOYED', null, true);
 
     expect(card.variant).toBe('STILL_EMPLOYED');
     expect(card.items.map((item) => [item.code, item.order, item.doneAt])).toEqual([
@@ -295,11 +296,57 @@ describe('k1ChecklistCard (what the card of the task shows)', () => {
   it('a completed task shows what was ticked and when, as it was stored', () => {
     const stored = plan(claimOf('DEPARTURE'));
     if (!stored) throw new Error('the checklist was not planned');
-    const card = k1ChecklistCard(stored.variant, { variant: stored.variant, items: stored.items });
+    const card = k1ChecklistCard(stored.variant, { variant: stored.variant, items: stored.items }, true);
 
     expect(card.items.map((item) => [item.code, item.order, item.doneAt])).toEqual(
       DEPARTURE_CODES.map((code, index) => [code, index + 1, at(index)]),
     );
+  });
+});
+
+describe('the mailbox lock belongs to the last K1 revocation of the person (R-1, S17, P28)', () => {
+  const FIVE = DEPARTURE_CODES.slice(0, 5);
+  const withoutLock = (claim: K1ChecklistClaim): K1ChecklistClaim => ({
+    ...claim,
+    items: claim.items.filter((item) => item.code !== 'MAILBOX_LOCKED'),
+  });
+
+  it('a departure that is not the last has the five steps before the lock; the last has the six; a person who still works has two either way', () => {
+    expect(k1ChecklistItems('DEPARTURE', false).map((item) => [item.order, item.code])).toEqual(
+      FIVE.map((step, index) => [index + 1, step]),
+    );
+    expect(k1ChecklistItems('DEPARTURE', true)).toHaveLength(6);
+    expect(k1ChecklistItems('STILL_EMPLOYED', false)).toEqual(k1ChecklistItems('STILL_EMPLOYED', true));
+  });
+
+  it('is completed with the five steps when another K1 revocation of the person is to do, and the listeners are not told of a lock', () => {
+    const done = plan(withoutLock(claimOf('DEPARTURE')), { lastOfPerson: false });
+
+    expect(done?.items.map((item) => item.code)).toEqual(FIVE);
+    expect(done?.facts).toEqual({ variant: 'DEPARTURE', doneCodes: FIVE });
+  });
+
+  it('refuses the lock on a task that is not the last: COMPLETION_NOT_ALLOWED, whatever the other steps', () => {
+    expect(problemOf(() => plan(claimOf('DEPARTURE'), { lastOfPerson: false }))).toBe('COMPLETION_NOT_ALLOWED');
+  });
+
+  it('asks the lock of the last: five steps are incomplete, and the lock ticked before the sign-out of the sessions is out of order', () => {
+    expect(problemOf(() => plan(withoutLock(claimOf('DEPARTURE')), { lastOfPerson: true }))).toBe(
+      'K1_CHECKLIST_INCOMPLETE',
+    );
+  });
+
+  it('a person who still works is not asked for a lock whether or not another revocation is to do', () => {
+    for (const lastOfPerson of [true, false]) {
+      expect(plan(claimOf('STILL_EMPLOYED'), { sources: ['RETURN'], lastOfPerson })?.facts.doneCodes).toEqual(
+        STILL_EMPLOYED_CODES,
+      );
+    }
+  });
+
+  it('the card of a departure that is not the last lists the five steps to tick', () => {
+    expect(k1ChecklistCard('DEPARTURE', null, false).items.map((item) => item.code)).toEqual(FIVE);
+    expect(k1ChecklistCard('DEPARTURE', null, true).items).toHaveLength(6);
   });
 });
 

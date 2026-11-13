@@ -23,6 +23,40 @@ export class ProvisioningK1ChecklistRepo {
     });
   }
 
+  /**
+   * One advisory lock per person, held to the end of the transaction: two K1 revocations of the same person that are completed at once meet
+   * one after the other, so exactly one of them is the last and takes the lock of the mailbox (`QĐ-111az`, R-1). It is taken after the
+   * lock of the task and of the assignment, and nothing that holds it waits for a task of another transaction.
+   */
+  async lockPerson(tx: DbTx, employeeId: string): Promise<void> {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`k1-checklist:${employeeId}`}, 0))`;
+  }
+
+  /**
+   * The revocations of these people that are not over (neither completed, nor cancelled, nor closed as failed; a failed one is still to do),
+   * with the plan of the seat. The caller keeps those of a K1 plan: the kind of a plan is the catalog's.
+   */
+  async liveRevocationsOf(
+    employeeIds: readonly string[],
+    tx?: DbTx,
+  ): Promise<{ taskId: string; employeeId: string; planId: string }[]> {
+    if (employeeIds.length === 0) return [];
+    const rows = await (tx ?? this.prisma).provisioningTask.findMany({
+      where: {
+        kind: 'REVOKE',
+        status: { notIn: ['COMPLETED', 'CANCELLED', 'CLOSED_FAILED'] },
+        assignment: { employeeId: { in: [...employeeIds] } },
+      },
+      select: { id: true, assignment: { select: { employeeId: true, planId: true } } },
+    });
+
+    return rows.map((row) => ({
+      taskId: row.id,
+      employeeId: row.assignment.employeeId,
+      planId: row.assignment.planId,
+    }));
+  }
+
   /** The checklists kept by these tasks, in one read; a task that keeps none is not in the map. */
   async readOf(taskIds: readonly string[], tx?: DbTx): Promise<Map<string, StoredK1Checklist>> {
     if (taskIds.length === 0) return new Map();

@@ -183,6 +183,7 @@ export class ProvisioningTaskViewService {
         .map((task) => ({
           id: task.id,
           status: task.status,
+          employeeId: task.assignment.employeeId,
           revocationSource: task.revocationSource,
           reasons: (context.reasons.get(task.id) ?? []).filter((reason) => reason.withdrawnAt === null),
         })),

@@ -183,7 +183,10 @@ dịch vụ nào đọc cả ghế lẫn thu hồi thì đứng trên cả hai (
   ⟹ `DEPARTURE`). Thiếu mục/tick/thời điểm/bằng chứng ⟹ 422 `REVOCATION.K1_CHECKLIST_INCOMPLETE`; `doneAt` giảm theo `order` (vd khóa hộp thư trước đăng xuất
   mọi phiên) ⟹ 422 `K1_CHECKLIST_OUT_OF_ORDER`; mục ngoài biến thể, trùng, hoặc `k1Checklist` cho loại ghế khác ⟹ `COMPLETION_NOT_ALLOWED`. Hệ thống không điều
   khiển Google/M365. Checklist ghi cùng transaction hoàn tất (trước khi tác vụ `COMPLETED`); sự kiện `AFTER_WORK` mang `completed.k1Checklist { variant, doneCodes }`
-  để listener của `personnel` đọc `MAILBOX_LOCKED`.
+  để listener của `personnel` đọc `MAILBOX_LOCKED`. **Khóa hộp thư (mục 6) chỉ thuộc tác vụ thu hồi `K1` sống cuối cùng của người đó** (R-1, S17, P28):
+  khi người đó còn tác vụ thu hồi `K1` khác chưa `COMPLETED`/`CANCELLED`/`CLOSED_FAILED` (kể cả `FAILED`), thẻ chỉ có 5 mục và gửi mục 6 ⟹ `COMPLETION_NOT_ALLOWED`;
+  tác vụ cuối có 6 mục và `doneCodes` chứa `MAILBOX_LOCKED` chỉ khi đã tick. Hai tác vụ của một người hoàn tất cùng lúc được xét lần lượt bằng khóa advisory
+  theo người (`k1-checklist:<employeeId>`, lấy sau khóa task và khóa ghế): đúng một tác vụ là cuối.
 - **Lý do đã gỡ không được đọc ở đâu** (chỉ `listAllOf` cho lịch sử trên thẻ tác vụ): `find`, `listOf`, `countOf`,
   `listRevocationsOpenedFor`, `listPersonalSeatsOf` (đang thu hồi) đều lọc `withdrawn_at IS NULL`; index
   duy nhất lý do là partial `WHERE withdrawn_at IS NULL` nên mở lại cùng `(source, reference)` trên cùng tác vụ được.

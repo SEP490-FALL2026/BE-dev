@@ -68,7 +68,8 @@ const LABELS: Record<K1ChecklistCode, string> = {
  * The steps of each variant, in the order they are done. A person who leaves has the mailbox reset, the software's own password reset,
  * the sessions signed out, the renewal turned off, the evidence kept and, last, the mailbox locked. A person who still works (a transfer,
  * an expiry, a return, a ghost seat...) has only the renewal turned off and the evidence kept: the mailbox is theirs (`R-35`). The system
- * controls neither Google nor Microsoft 365: the IT Admin does the steps there and ticks them here.
+ * controls neither Google nor Microsoft 365: the IT Admin does the steps there and ticks them here. The lock of the mailbox is a step of
+ * the last K1 revocation of the person only (see `k1ChecklistCodes`).
  */
 const CODES_OF: Record<K1ChecklistVariant, readonly K1ChecklistCode[]> = {
   DEPARTURE: [
@@ -91,9 +92,22 @@ export function k1VariantOf(sources: readonly RevocationSource[]): K1ChecklistVa
   return sources.some((source) => DEPARTURE_SOURCES.has(source)) ? 'DEPARTURE' : 'STILL_EMPLOYED';
 }
 
-/** The steps of a variant with their text and place, in order. */
-export function k1ChecklistItems(variant: K1ChecklistVariant): K1ChecklistItem[] {
-  return CODES_OF[variant].map((code, index) => ({ code, label: LABELS[code], order: index + 1 }));
+/**
+ * The steps a task of this variant has. The lock of the mailbox is the step of the **last** K1 revocation of the person (R-1, S17, P28): a
+ * person with two K1 seats has two tasks, and the later seats still need the mailbox open for their first steps, so a task that is not the
+ * last has the steps before the lock only and does not take it. Another variant has no lock.
+ */
+export function k1ChecklistCodes(variant: K1ChecklistVariant, lastOfPerson: boolean): readonly K1ChecklistCode[] {
+  return CODES_OF[variant].filter((code) => code !== 'MAILBOX_LOCKED' || lastOfPerson);
+}
+
+/** The steps of a variant with their text and place, in order (from 1, so the five steps of a task that is not the last are 1 to 5). */
+export function k1ChecklistItems(variant: K1ChecklistVariant, lastOfPerson: boolean): K1ChecklistItem[] {
+  return k1ChecklistCodes(variant, lastOfPerson).map((code, index) => ({
+    code,
+    label: LABELS[code],
+    order: index + 1,
+  }));
 }
 
 function fail(problem: 'COMPLETION_NOT_ALLOWED' | 'K1_CHECKLIST_INCOMPLETE' | 'K1_CHECKLIST_OUT_OF_ORDER'): never {
@@ -113,12 +127,16 @@ function tickedAt(item: K1ChecklistClaimItem | undefined): number | null {
  * this checklist (`COMPLETION_NOT_ALLOWED`); a step of the variant that is not sent, not ticked, or ticked with no instant is missing
  * (`K1_CHECKLIST_INCOMPLETE`). Returns the instants in the order of the list.
  */
-function instantsOf(variant: K1ChecklistVariant, claim: K1ChecklistClaim): { item: K1ChecklistItem; time: number }[] {
-  const codes = CODES_OF[variant];
+function instantsOf(
+  variant: K1ChecklistVariant,
+  lastOfPerson: boolean,
+  claim: K1ChecklistClaim,
+): { item: K1ChecklistItem; time: number }[] {
+  const codes = k1ChecklistCodes(variant, lastOfPerson);
   const sent = claim.items.map((item) => item.code);
   if (sent.some((code, index) => !codes.includes(code) || sent.indexOf(code) !== index)) fail('COMPLETION_NOT_ALLOWED');
 
-  return k1ChecklistItems(variant).map((item) => {
+  return k1ChecklistItems(variant, lastOfPerson).map((item) => {
     const time = tickedAt(claim.items.find((sentItem) => sentItem.code === item.code));
     if (time === null) fail('K1_CHECKLIST_INCOMPLETE');
 
@@ -131,11 +149,14 @@ function instantsOf(variant: K1ChecklistVariant, claim: K1ChecklistClaim): { ite
  * it was done, the instants not falling as the list goes (a step ticked before one that comes first in the list is out of order; the same
  * instant is in order, as a client may time to the second), and the evidence, which is the one written in the checklist or, when it has
  * none, the one written beside it. Another kind of provisioning has no checklist and refuses one. The variant is read from the sources, never
- * sent. Throws RevocationCompletionError (`COMPLETION_NOT_ALLOWED`, `K1_CHECKLIST_INCOMPLETE`, `K1_CHECKLIST_OUT_OF_ORDER`).
+ * sent; the lock of the mailbox is asked, and accepted, only when this is the last K1 revocation of the person (`lastOfPerson`). Throws
+ * RevocationCompletionError (`COMPLETION_NOT_ALLOWED`, `K1_CHECKLIST_INCOMPLETE`, `K1_CHECKLIST_OUT_OF_ORDER`).
  */
 export function planK1Checklist(input: {
   type: ProvisioningKind;
   sources: readonly RevocationSource[];
+  /** True when no other K1 revocation of the person is still to do: only then the mailbox is locked with this one. */
+  lastOfPerson: boolean;
   claim: K1ChecklistClaim | undefined;
   /** The evidence written beside the checklist, in the body of the completion. */
   evidence: string;
@@ -148,7 +169,7 @@ export function planK1Checklist(input: {
   if (input.claim === undefined) fail('K1_CHECKLIST_INCOMPLETE');
 
   const variant = k1VariantOf(input.sources);
-  const instants = instantsOf(variant, input.claim);
+  const instants = instantsOf(variant, input.lastOfPerson, input.claim);
   const evidence = input.claim.evidence?.trim() || input.evidence.trim();
   if (evidence.length === 0) fail('K1_CHECKLIST_INCOMPLETE');
   if (instants.some(({ time }, index) => index > 0 && time < instants[index - 1].time))
@@ -167,7 +188,11 @@ export function planK1Checklist(input: {
  * The checklist on the card of a task: what was ticked and when for a task that was completed (as it was kept, whatever the list is now),
  * the list of the variant with nothing ticked for one that is not.
  */
-export function k1ChecklistCard(variant: K1ChecklistVariant, stored: StoredK1Checklist | null): K1ChecklistCard {
+export function k1ChecklistCard(
+  variant: K1ChecklistVariant,
+  stored: StoredK1Checklist | null,
+  lastOfPerson: boolean,
+): K1ChecklistCard {
   if (stored) {
     return {
       variant: stored.variant,
@@ -180,7 +205,7 @@ export function k1ChecklistCard(variant: K1ChecklistVariant, stored: StoredK1Che
     };
   }
 
-  return { variant, items: k1ChecklistItems(variant).map((item) => ({ ...item, doneAt: null })) };
+  return { variant, items: k1ChecklistItems(variant, lastOfPerson).map((item) => ({ ...item, doneAt: null })) };
 }
 
 /**

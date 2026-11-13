@@ -323,4 +323,121 @@ describe('the checklist of a K1 revocation, over HTTP (integration, real Postgre
       expect((await h.revocationOf(withdrawn.taskId)).k1Checklist).toBeNull();
     });
   });
+
+  describe('a person with two K1 seats: the mailbox is locked by the last revocation only (R-1, S17, P28)', () => {
+    const FIVE = K1_CODES.DEPARTURE.slice(0, 5);
+    /** The K1 seats of one person on separate subscriptions, each with a revocation for the source, taken by the IT Admin unless said. */
+    const seatsOf = async (count: number, source = 'DEPARTURE', claim = true) => {
+      const person = code();
+      const seats: { assignmentId: string; taskId: string }[] = [];
+      for (let index = 0; index < count; index += 1) {
+        const assignmentId = await h.seat({ subscriptionId: await h.subscription(1, 'K1') }, person);
+        const { taskId } = await h.open(assignmentId, source);
+        if (claim) await h.claim(taskId).expect(200);
+        seats.push({ assignmentId, taskId });
+      }
+
+      return { person, seats };
+    };
+    const stepsOf = async (taskId: string) =>
+      (await h.revocationOf(taskId)).k1Checklist?.items.map((item) => item.code);
+    const withoutLock = (evidence = 'đã tắt gia hạn') => k1Checklist('DEPARTURE', evidence, { withLock: false });
+    const toldOf = (taskId: string) => told.filter((task) => task.id === taskId);
+
+    it('shows five steps on both cards while both are to do; the first is completed without the lock, and the second then shows six', async () => {
+      const { seats } = await seatsOf(2);
+      const [first, second] = seats;
+      expect(await stepsOf(first.taskId)).toEqual(FIVE);
+      expect(await stepsOf(second.taskId)).toEqual(FIVE);
+      told.length = 0;
+
+      await complete(first.taskId, withoutLock()).expect(200);
+
+      expect(await stepsOf(first.taskId)).toEqual(FIVE);
+      expect(toldOf(first.taskId)[0].completed?.k1Checklist).toEqual({ variant: 'DEPARTURE', doneCodes: FIVE });
+      expect(await stepsOf(second.taskId)).toEqual(K1_CODES.DEPARTURE);
+
+      await complete(second.taskId, k1Checklist('DEPARTURE', 'đã khóa hộp thư')).expect(200);
+
+      expect(toldOf(second.taskId)[0].completed?.k1Checklist).toEqual({
+        variant: 'DEPARTURE',
+        doneCodes: [...K1_CODES.DEPARTURE],
+      });
+    });
+
+    it('refuses the lock on the first and the five steps on the last', async () => {
+      const { seats } = await seatsOf(2);
+      const [first, second] = seats;
+
+      expect(h.codeOf(await complete(first.taskId, k1Checklist('DEPARTURE', 'đã khóa')).expect(422))).toBe(
+        'REVOCATION.COMPLETION_NOT_ALLOWED',
+      );
+      await unchanged(first.assignmentId, first.taskId);
+      await complete(first.taskId, withoutLock()).expect(200);
+      expect(h.codeOf(await complete(second.taskId, withoutLock()).expect(422))).toBe(
+        'REVOCATION.K1_CHECKLIST_INCOMPLETE',
+      );
+      await unchanged(second.assignmentId, second.taskId);
+    });
+
+    it('lets exactly one of two completions made at once take the lock: the one that comes second is the last and is asked for it', async () => {
+      const { seats } = await seatsOf(2);
+      const [first, second] = seats;
+
+      const answers = await Promise.all([
+        complete(first.taskId, withoutLock()),
+        complete(second.taskId, withoutLock()),
+      ]);
+
+      expect(answers.map((answer) => answer.status).sort()).toEqual([200, 422]);
+      const firstWon = answers[0].status === 200;
+      const left = firstWon ? second : first;
+      expect(h.codeOf(answers[firstWon ? 1 : 0])).toBe('REVOCATION.K1_CHECKLIST_INCOMPLETE');
+      expect(await stepsOf(left.taskId)).toEqual(K1_CODES.DEPARTURE);
+      await complete(left.taskId, k1Checklist('DEPARTURE', 'đã khóa hộp thư')).expect(200);
+      const locks = await h.ctx.sql.query<{ count: string }>(
+        `SELECT count(*) FROM provisioning_tasks WHERE id = ANY($1) AND k1_checklist::text LIKE '%MAILBOX_LOCKED%'`,
+        [[first.taskId, second.taskId]],
+      );
+      expect(Number(locks.rows[0].count)).toBe(1);
+    });
+
+    it('asks the lock of a task whose other revocation was cancelled or closed as failed, and not while it is failed or still queued', async () => {
+      const cancelled = await seatsOf(1);
+      const cancelledOther = await h.seat({ subscriptionId: await h.subscription(1, 'K1') }, cancelled.person);
+      await h.open(cancelledOther, 'RETURN');
+      expect(await stepsOf(cancelled.seats[0].taskId)).toEqual(FIVE);
+      await h.withdraw(cancelledOther, 'RETURN', null);
+      expect(await stepsOf(cancelled.seats[0].taskId)).toEqual(K1_CODES.DEPARTURE);
+
+      const failed = await seatsOf(2);
+      await h.fail(failed.seats[1].taskId, { reason: 'nhà cung cấp từ chối' }).expect(200);
+      expect(await stepsOf(failed.seats[0].taskId)).toEqual(FIVE);
+      await h.closeFailed(failed.seats[1].taskId, { reason: 'đóng' }).expect(200);
+      expect(await stepsOf(failed.seats[0].taskId)).toEqual(K1_CODES.DEPARTURE);
+
+      const queued = await seatsOf(2, 'DEPARTURE', false);
+      await h.claim(queued.seats[0].taskId).expect(200);
+      expect(await stepsOf(queued.seats[0].taskId)).toEqual(FIVE);
+    });
+
+    it('does not count the revocations of another person or of another kind of grant', async () => {
+      const { person, seats } = await seatsOf(1);
+      const k2 = await h.seat({ subscriptionId: await h.subscription(2, 'K2') }, person);
+      await h.open(k2, 'DEPARTURE');
+      await seatsOf(1);
+
+      expect(await stepsOf(seats[0].taskId)).toEqual(K1_CODES.DEPARTURE);
+      await complete(seats[0].taskId, k1Checklist('DEPARTURE', 'đã khóa hộp thư')).expect(200);
+    });
+
+    it('does not ask the lock of a person who still works, with one seat or two: two steps each', async () => {
+      const { seats } = await seatsOf(2, 'RETURN');
+
+      expect(await stepsOf(seats[0].taskId)).toEqual(K1_CODES.STILL_EMPLOYED);
+      await complete(seats[0].taskId, k1Checklist('STILL_EMPLOYED', 'đã hủy')).expect(200);
+      expect(await stepsOf(seats[1].taskId)).toEqual(K1_CODES.STILL_EMPLOYED);
+      await complete(seats[1].taskId, k1Checklist('STILL_EMPLOYED', 'đã hủy')).expect(200);
+    });
+  });
 });
