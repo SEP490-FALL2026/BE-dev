@@ -1,6 +1,10 @@
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
-import { DepartmentSoftwareNotInCatalogError, ToolsDepartmentNotFoundError } from '../public/licensing.errors';
+import {
+  DepartmentSoftwareNoteInvalidError,
+  DepartmentSoftwareNotInCatalogError,
+  ToolsDepartmentNotFoundError,
+} from '../public/licensing.errors';
 import { DepartmentSoftwareChangesService } from './department-software-changes.service';
 import type { SoftwareEntry } from './department-software.types';
 
@@ -86,6 +90,45 @@ describe('DepartmentSoftwareChangesService.addFromCatalogLink (the tick "add to 
       expect.objectContaining({ items: [{ applicationId: APPLICATION, planId: PLAN, note: 'linked from a request' }] }),
     );
   });
+
+  it('trims the note, and keeps no note when nothing is left of it (DS-R2)', async () => {
+    const { service, repo } = build();
+    repo.insertEntries.mockResolvedValue([entry('entry-1')]);
+
+    await service.addFromCatalogLink(TX, IT_ADMIN, { ...input, note: '  linked from a request  ' });
+    await service.addFromCatalogLink(TX, IT_ADMIN, { ...input, note: '   ' });
+
+    expect(repo.insertEntries).toHaveBeenNthCalledWith(
+      1,
+      TX,
+      expect.objectContaining({ items: [{ applicationId: APPLICATION, planId: PLAN, note: 'linked from a request' }] }),
+    );
+    expect(repo.insertEntries).toHaveBeenNthCalledWith(
+      2,
+      TX,
+      expect.objectContaining({ items: [{ applicationId: APPLICATION, planId: PLAN, note: null }] }),
+    );
+  });
+
+  it.each([
+    ['one over the limit', 'x'.repeat(501), 'TOO_LONG'],
+    ['a NUL no text column keeps', 'a\u0000b', 'ILLEGAL_CHARACTER'],
+  ])(
+    'refuses a note with %s before any statement, so the transaction of the caller stays alive (DS-R2)',
+    async (_name, note, reason) => {
+      const { service, repo, view, organizationReads } = build();
+
+      const refused = await service
+        .addFromCatalogLink(TX, IT_ADMIN, { ...input, note })
+        .catch((error: unknown) => error);
+
+      expect(refused).toBeInstanceOf(DepartmentSoftwareNoteInvalidError);
+      expect((refused as DepartmentSoftwareNoteInvalidError).reason).toBe(reason);
+      expect(repo.insertEntries).not.toHaveBeenCalled();
+      expect(view.assertInCatalog).not.toHaveBeenCalled();
+      expect(organizationReads.lockDepartmentShared).not.toHaveBeenCalled();
+    },
+  );
 
   it('answers the entry that is there when the place is listed already, and writes and audits nothing more', async () => {
     const { service, repo, audit } = build();

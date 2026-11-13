@@ -77,6 +77,7 @@ describe('the proposals to add to the list of software of a department (e2e, no 
     ['no reason', { applicationId: APP }],
     ['a blank reason', { applicationId: APP, reason: '   ' }],
     ['a reason of 501 characters', { applicationId: APP, reason: 'x'.repeat(501) }],
+    ['a NUL in the reason, which no text column keeps', { applicationId: APP, reason: 'a\u0000b' }],
     ['an application that is not a UUID', { applicationId: 'excel', reason: 'The team needs it' }],
     ['a plan that is not a UUID', { applicationId: APP, planId: 'pro', reason: 'The team needs it' }],
     [
@@ -99,6 +100,7 @@ describe('the proposals to add to the list of software of a department (e2e, no 
     ['no reason', {}],
     ['a blank reason', { reason: '  ' }],
     ['a reason of 501 characters', { reason: 'x'.repeat(501) }],
+    ['a NUL in the reason, which no text column keeps', { reason: 'a\u0000b' }],
     ['a field it does not know', { reason: 'No need', accept: true }],
   ])('turns away a rejection with %s, 422', async (_name, body) => {
     const response = await request(app.getHttpServer())

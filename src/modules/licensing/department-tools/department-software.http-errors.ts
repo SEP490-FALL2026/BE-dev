@@ -2,7 +2,7 @@ import { HttpStatus } from '@nestjs/common';
 import { ApiException } from '../../../infrastructure/http/errors/api.exception';
 import { errorExampleOf } from '../../../infrastructure/http/openapi-error-examples';
 import { toLicensingApiException } from '../licensing.http-errors';
-import { DepartmentSoftwareNotInCatalogError } from '../public/licensing.errors';
+import { DepartmentSoftwareNoteInvalidError, DepartmentSoftwareNotInCatalogError } from '../public/licensing.errors';
 import {
   DepartmentSoftwareAlreadyListedError,
   DepartmentSoftwareEntryNotFoundError,
@@ -23,6 +23,13 @@ export function toDepartmentSoftwareApiException(error: unknown): unknown {
       code: 'DEPARTMENT_SOFTWARE.NOT_IN_CATALOG',
       message: error.message,
       details: { places: error.places.map((place) => ({ ...place })) },
+    });
+  }
+  if (error instanceof DepartmentSoftwareNoteInvalidError) {
+    return new ApiException(HttpStatus.UNPROCESSABLE_ENTITY, {
+      code: 'DEPARTMENT_SOFTWARE.NOTE_INVALID',
+      message: error.message,
+      details: { reason: error.reason },
     });
   }
   if (error instanceof DepartmentSoftwareAlreadyListedError) {

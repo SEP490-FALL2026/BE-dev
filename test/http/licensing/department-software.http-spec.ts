@@ -89,6 +89,7 @@ describe('the list of software of a department (e2e, no database)', () => {
     ['an application that is not a UUID', { add: [{ applicationId: 'excel' }] }],
     ['a blank note', { add: [{ applicationId: OTHER, note: '   ' }] }],
     ['a note of 501 characters', { add: [{ applicationId: OTHER, note: 'x'.repeat(501) }] }],
+    ['a NUL in the note, which no text column keeps', { add: [{ applicationId: OTHER, note: 'a\u0000b' }] }],
     ['a field it does not know', { add: [{ applicationId: OTHER, price: 1 }] }],
     ['an unknown key', { add: [{ applicationId: OTHER }], extra: true }],
   ])('turns away %s, 422', async (_name, body) => {

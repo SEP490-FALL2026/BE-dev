@@ -3,6 +3,7 @@ import { TransactionRunner, type DbTx } from '../../../src/infrastructure/databa
 import type { AuthenticatedPrincipal } from '../../../src/infrastructure/security/tokens/access-token-verifier.port';
 import { LicensingDepartmentToolsApi } from '../../../src/modules/licensing/public/licensing-department-tools.api';
 import {
+  DepartmentSoftwareNoteInvalidError,
   DepartmentSoftwareNotInCatalogError,
   ToolsDepartmentNotFoundError,
 } from '../../../src/modules/licensing/public/licensing.errors';
@@ -170,6 +171,24 @@ describe('the facade that adds software to the list of a department from the lin
 
     expect(result.added).toBe(true);
     expect((await entries(existing.applicationId)).map((row) => row.plan_id)).toEqual([planId]);
+  });
+
+  it('refuses a note the table would refuse as a business answer: the transaction of the caller goes on (DS-R2)', async () => {
+    const bad = await place();
+    const good = await place();
+
+    const outcome = await run(async (tx) => {
+      const refused = await link(tx, bad, { note: 'x'.repeat(501) }).catch((error: unknown) => error);
+      // A statement the CHECK refused would leave this transaction aborted (25P02): the next link would fail.
+      const next = await link(tx, good, { note: '  kept, trimmed  ' });
+
+      return { refused, next };
+    });
+
+    expect(outcome.refused).toBeInstanceOf(DepartmentSoftwareNoteInvalidError);
+    expect(outcome.next.added).toBe(true);
+    expect(await entries(bad.applicationId)).toEqual([]);
+    expect((await entries(good.applicationId)).map((row) => row.note)).toEqual(['kept, trimmed']);
   });
 
   it('refuses a department that does not exist', async () => {

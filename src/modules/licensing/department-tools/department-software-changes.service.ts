@@ -4,7 +4,7 @@ import type { AuthenticatedPrincipal } from '../../../infrastructure/security/to
 import { AuditApi } from '../../audit/public/audit.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { licensingAuditEvent } from '../licensing-audit-event.mapper';
-import { ToolsDepartmentNotFoundError } from '../public/licensing.errors';
+import { DepartmentSoftwareNoteInvalidError, ToolsDepartmentNotFoundError } from '../public/licensing.errors';
 import { DepartmentSoftwareAccessService } from './department-software-access.service';
 import type { SoftwareEntryWire } from './department-software.dto';
 import { DepartmentSoftwareViewService } from './department-software-view.service';
@@ -12,7 +12,7 @@ import {
   DepartmentSoftwareAlreadyListedError,
   DepartmentSoftwareEntryNotFoundError,
 } from './department-software.errors';
-import { entryKey, type DepartmentSoftwareItem } from './department-software.policy';
+import { entryKey, normalizedNote, type DepartmentSoftwareItem } from './department-software.policy';
 import { DepartmentSoftwareRepo } from './department-software.repo';
 import type { SoftwareEntry, SoftwareEntryDraft } from './department-software.types';
 
@@ -106,7 +106,7 @@ export class DepartmentSoftwareChangesService {
    * caller: the place goes in the list if it is not there, and the answer says which (`added`) and the entry either way. A place already listed is not
    * an error here (the caller links software that may be listed), and it does not abort the transaction of the caller. What the catalog does not
    * offer is refused. The caller has authorized the IT Admin on the request, whose department this is; this does not judge the scope again.
-   * Throws DepartmentSoftwareNotInCatalogError and ToolsDepartmentNotFoundError.
+   * Throws DepartmentSoftwareNoteInvalidError, DepartmentSoftwareNotInCatalogError and ToolsDepartmentNotFoundError.
    */
   async addFromCatalogLink(
     tx: DbTx,
@@ -114,12 +114,15 @@ export class DepartmentSoftwareChangesService {
     input: { departmentId: string; applicationId: string; planId: string | null; note: string | null },
   ): Promise<{ entryId: string; added: boolean }> {
     const item = { applicationId: input.applicationId, planId: input.planId };
+    // The note is judged before any statement: one the table refuses would abort the transaction of the caller (DS-R2).
+    const note = normalizedNote(input.note);
+    if ('refusal' in note) throw new DepartmentSoftwareNoteInvalidError(note.refusal);
     await this.view.assertInCatalog([item], tx);
     const organization = await this.organizationReads.getOrganization(tx);
     if (!organization) throw new Error('The list of software of a department was changed before installation');
     if (!(await this.organizationReads.lockDepartmentShared(tx, input.departmentId)))
       throw new ToolsDepartmentNotFoundError();
-    const { entry, created } = await this.ensureEntry(tx, actor, organization.id, input.departmentId, item, input.note);
+    const { entry, created } = await this.ensureEntry(tx, actor, organization.id, input.departmentId, item, note.note);
 
     return { entryId: entry.id, added: created };
   }

@@ -75,3 +75,22 @@ export type DecisionRefusal = 'NOT_PENDING';
 export function decisionRefusal(state: 'PENDING' | 'ACCEPTED' | 'REJECTED'): DecisionRefusal | null {
   return state === 'PENDING' ? null : 'NOT_PENDING';
 }
+
+/** The longest note a place of the list keeps (the CHECK of `department_software_entries`, and the schema of the routes). */
+export const SOFTWARE_NOTE_MAX = 500;
+
+export type NoteRefusal = 'TOO_LONG' | 'ILLEGAL_CHARACTER';
+
+/**
+ * A note as the table keeps it, judged before the insert: trimmed, no note when nothing is left, and refused when the database would refuse it
+ * (over `SOFTWARE_NOTE_MAX` characters, or a NUL no text column keeps). A statement the CHECK or the column refuses aborts the whole transaction
+ * of whoever called the facade, so the refusal is a business answer here, never a database error.
+ */
+export function normalizedNote(note: string | null | undefined): { note: string | null } | { refusal: NoteRefusal } {
+  if (note === null || note === undefined) return { note: null };
+  if (note.includes('\u0000')) return { refusal: 'ILLEGAL_CHARACTER' };
+  const trimmed = note.trim();
+  if (trimmed.length > SOFTWARE_NOTE_MAX) return { refusal: 'TOO_LONG' };
+
+  return { note: trimmed === '' ? null : trimmed };
+}

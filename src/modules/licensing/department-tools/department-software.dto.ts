@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { successEnvelopeSchema } from '../../../infrastructure/http/dto/success-envelope.dto';
 import { createZodDto } from '../../../infrastructure/http/dto/zod-dto';
-import { repeatedItem } from './department-software.policy';
+import { repeatedItem, SOFTWARE_NOTE_MAX } from './department-software.policy';
 
 /** At most this many places are added, and as many taken out, by one call (SPEC P16). */
 export const SOFTWARE_LIST_CHANGES_MAX = 50;
@@ -14,7 +14,15 @@ const pageQuery = {
 };
 const pageQuerySchema = z.strictObject(pageQuery);
 
-const noteSchema = z.string().trim().min(1).max(500);
+/** A text of one to `SOFTWARE_NOTE_MAX` characters once trimmed, with no NUL: no text column keeps one, so the statement would fail and answer 500. */
+const plainText = z
+  .string()
+  .trim()
+  .min(1)
+  .max(SOFTWARE_NOTE_MAX)
+  .refine((value) => !value.includes('\u0000'), 'The text holds a character no text keeps.');
+
+const noteSchema = plainText;
 
 /** A place of the catalog the IT Admin adds: an application, alone or with one of its plans, and a note for the people who read the list. */
 const placeToAddSchema = z.strictObject({
@@ -47,7 +55,7 @@ export const softwareListChangesBodySchema = z
     }
   });
 
-const reasonSchema = z.string().trim().min(1).max(500);
+const reasonSchema = plainText;
 
 /** The proposal of the head: a place of the catalog and why. The department is the one the head leads (SPEC P18). */
 export const softwareProposalBodySchema = z.strictObject({

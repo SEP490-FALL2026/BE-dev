@@ -4,6 +4,7 @@ import {
   entryKey,
   mayChangeList,
   mayReadList,
+  normalizedNote,
   proposerDepartment,
   repeatedItem,
   type CatalogFacts,
@@ -132,5 +133,24 @@ describe('decisionRefusal (an open proposal is decided once)', () => {
 
   it.each(['ACCEPTED', 'REJECTED'] as const)('refuses one already %s', (state) => {
     expect(decisionRefusal(state)).toBe('NOT_PENDING');
+  });
+});
+
+describe('normalizedNote (what the database accepts, said before the insert so a bad note never aborts the transaction of the caller)', () => {
+  it('trims the note and keeps what is left', () => {
+    expect(normalizedNote('  for the designers  ')).toEqual({ note: 'for the designers' });
+  });
+
+  it.each([undefined, null, '', '   ', '\t\n', '\u00a0'])('turns %j into no note', (given) => {
+    expect(normalizedNote(given)).toEqual({ note: null });
+  });
+
+  it('accepts exactly 500 characters once trimmed and refuses 501', () => {
+    expect(normalizedNote(`  ${'x'.repeat(500)}  `)).toEqual({ note: 'x'.repeat(500) });
+    expect(normalizedNote('x'.repeat(501))).toEqual({ refusal: 'TOO_LONG' });
+  });
+
+  it('refuses a character no text column keeps (NUL)', () => {
+    expect(normalizedNote('a\u0000b')).toEqual({ refusal: 'ILLEGAL_CHARACTER' });
   });
 });

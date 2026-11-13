@@ -19,7 +19,7 @@ export class LicensingDepartmentToolsApi {
   /**
    * Puts the application, alone or with its plan, in the list of the department, in the transaction of the caller: it is written once, a place
    * already listed is answered with its entry and `added: false` (and does not abort the transaction), and the Audit Trail records an entry that
-   * was written. The caller has authorized the IT Admin on the request this department is of. Throws DepartmentSoftwareNotInCatalogError for
+   * was written. The note is trimmed (nothing left: no note). The caller has authorized the IT Admin on the request this department is of. Throws DepartmentSoftwareNoteInvalidError for a note over 500 characters or holding a NUL (judged before any statement), DepartmentSoftwareNotInCatalogError for
    * what the catalog does not offer (an application that is retired or not there, a plan of another application) and ToolsDepartmentNotFoundError.
    */
   addDepartmentSoftwareFromCatalogLink(

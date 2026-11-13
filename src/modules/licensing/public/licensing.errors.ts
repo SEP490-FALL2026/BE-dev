@@ -101,6 +101,21 @@ export class DepartmentSoftwareNotInCatalogError extends Error {
 }
 
 /**
+ * The note given with a place of the list of software of a department is one the table would refuse: longer than 500 characters, or holding a
+ * NUL. It is judged before any statement, so the transaction of the caller is not aborted; the caller answers it as a 422.
+ */
+export class DepartmentSoftwareNoteInvalidError extends Error {
+  constructor(readonly reason: 'TOO_LONG' | 'ILLEGAL_CHARACTER') {
+    super(
+      reason === 'TOO_LONG'
+        ? 'The note of a place of the list is at most 500 characters.'
+        : 'The note of a place of the list holds a character no text keeps.',
+    );
+    this.name = 'DepartmentSoftwareNoteInvalidError';
+  }
+}
+
+/**
  * The request cannot be granted: the gate that answers for requests does not know it, has not seen it approved, has ended
  * it, it asks for software that is not in the catalog yet (`US-05-06` AC-8), or it is for a service account whose boundary
  * the IT Admin has not accepted (`US-05-21` AC-3).
