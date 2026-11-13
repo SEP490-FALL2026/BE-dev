@@ -168,6 +168,18 @@ describe('the deadline of the revocations of a departure (integration, real Post
     }, 120_000);
   });
 
+  it('keeps a partial index of the departures that are open, which the reads of the late and of the block moment walk in id order (MF2-D review b)', async () => {
+    const { rows } = await h.ctx.sql.query<{ indexdef: string }>(
+      `SELECT indexdef FROM pg_indexes WHERE tablename = 'offboarding_cases' AND indexname = 'offboarding_cases_open_idx'`,
+    );
+
+    expect(rows).toHaveLength(1);
+    expect(rows[0].indexdef).toMatch(/\(id\)/);
+    expect(rows[0].indexdef).toMatch(/closed_at IS NULL/);
+    expect(rows[0].indexdef).toMatch(/HANDING_OVER/);
+    expect(rows[0].indexdef).toMatch(/LEFT/);
+  });
+
   describe('the telling that the rights are past the deadline (T-MF2 case 1)', () => {
     const LOCK = { note: 'Đã khóa tài khoản công ty' };
     /** The pass looks at every open case, so the deadlines the tests before left are cleared: a case with none is never late. */

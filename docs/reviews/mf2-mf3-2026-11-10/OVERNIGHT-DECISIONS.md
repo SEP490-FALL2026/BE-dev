@@ -384,6 +384,14 @@ Không sửa code; SPEC không bị sửa trong lượt này (spec là của Own
 - **Đổi lại:** muốn đếm từ hàng ghế: thêm cờ vào `PersonalSeatRow` và đếm trong `departureDetailFacts`, bỏ lời gọi facade ở `OffboardingDetailService`.
 - **Chạm:** `offboarding/detail/offboarding-detail.{policy,service}.ts` (+spec), `departure-deadline/departure-deadline.policy.ts` (+spec: bỏ `rightsWithoutCompletedTask`), test `departure-revocation-deadline.integration-spec.ts`.
 
+### D-52 · MF2-D review (b) · Có cần chỉ mục cho `overdueCases` / sweeper mốc chặn, và chỉ mục nào
+
+- **Đo, không đoán:** dựng bảng thay thế (cùng cột lọc/sắp xếp, cùng bốn chỉ mục của `offboarding_cases`) trong một database tạm trên `slm-test-db` với 300 000 hồ sơ đã đóng/hủy và 150 hồ sơ mở, rồi `EXPLAIN (ANALYZE, BUFFERS)` câu của `DepartureDeadlineRepo.pageLate` (`state IN (…) AND closed_at IS NULL AND revocation_due_on < hôm nay ORDER BY id LIMIT 200`). **Trước:** quét toàn bộ khóa chính theo `id`, loại 300 063 hàng, **301 523 buffer, 113 ms**. Bốn chỉ mục có sẵn không giúp được vì câu phải trả theo thứ tự `id` (khóa phân trang) còn `(state, last_working_day, id)` không có `closed_at`/`revocation_due_on`. Câu của sweeper mốc chặn (`pageUnannounced`) trước đó là quét tuần tự song song (16 ms, 4 175 buffer).
+- **Phương án:** A. `(state, closed_at, revocation_due_on)` như gợi ý: giúp lọc theo hạn nhưng câu vẫn phải sắp xếp lại theo `id` ở mỗi trang, và không giúp hai câu của sweeper. B. **chỉ mục một phần `offboarding_cases_open_idx ON (id) WHERE closed_at IS NULL AND state IN ('HANDING_OVER','LEFT')`.** **ĐÃ CHỌN B:** chỉ chứa hồ sơ mở (vài trăm), đúng thứ tự `id` mà cả ba đọc cần (`pageLate`, `pageUnannounced`, `pageLockMissing`). **Sau:** `pageLate` **98 buffer, 0.06 ms** (index scan `oc_open`), `pageUnannounced` và `pageLockMissing` 4 buffer (bitmap trên chỉ mục một phần). Chỉ mục nhỏ, ghi thêm chỉ khi hồ sơ mở/đóng.
+- **Cách làm:** migration mới `20261113001300_personnel_open_cases_index` (`CREATE INDEX IF NOT EXISTS`, expand-only, chạy lại an toàn). Chỉ mục một phần không biểu diễn được trong `schema.prisma` (cùng thông lệ `ghost_seat_recommendations_task`), nên không đổi mô hình. Test integration kiểm chỉ mục có đủ vị từ (đã kiểm đỏ khi bỏ migration); không ghim kế hoạch `EXPLAIN` vì kế hoạch phụ thuộc thống kê.
+- **Đổi lại:** `DROP INDEX offboarding_cases_open_idx` ở một migration sau (chỉ mất tốc độ, không mất dữ liệu).
+- **Chạm:** `prisma/migrations/20261113001300_personnel_open_cases_index/`, test `departure-revocation-deadline.integration-spec.ts`.
+
 ## Bị chặn
 
 (chưa có)
