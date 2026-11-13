@@ -45,6 +45,11 @@ dashboards; gốc `src/app/app.module.ts`.
   - `LicensingSeatBaselineApi` ([public/licensing-seat-baseline.api.ts](public/licensing-seat-baseline.api.ts)) — seat
     baseline (data-import, onboarding): `seatTargetRef`, `resolveBaselineTarget`, `lockBaselineTarget`, `baselineFacts`,
     `createBaselineAssignments`, `getBaselineProgress`, `openSeatHolders`.
+  - `LicensingDepartmentToolsApi` ([public/licensing-department-tools.api.ts](public/licensing-department-tools.api.ts)) — danh sách phần mềm của phòng
+    (DS.4, `QĐ-111c`; một facade riêng vì `LicensingApi` đã 8 phụ thuộc): `addDepartmentSoftwareFromCatalogLink(tx, actor, { departmentId, applicationId, planId, note? })` →
+    `{ entryId, added }` cho tick "thêm vào danh sách phòng" của `POST /access-requests/{id}/catalog-link` (SPEC FE IN-1; `requests` gọi trong transaction của nó, ở
+    gói IN-1). Idempotent: chỗ đã có ⟹ `added: false`, không Audit, không làm hỏng transaction của người gọi; ngoài danh mục ⟹ `DepartmentSoftwareNotInCatalogError`,
+    phòng không có ⟹ `ToolsDepartmentNotFoundError` (cả hai ở `licensing.errors.ts`). Không xét lại phạm vi IT Admin: người gọi đã xét trên Request; type ở `licensing-department-tools.types.ts`.
 - `public/licensing.types.ts` — input/output của facade; `public/licensing-*.types.ts` — type theo nhóm việc.
 - `public/licensing.errors.ts` — lỗi nghiệp vụ (`SeatBaselineClosedError`, `RevocationRefusedError`, `Provisioning*`…).
 - `public/licensing.extension-points.ts` — bảy point dưới đây, contract và union sự kiện `RevocationEvent`.

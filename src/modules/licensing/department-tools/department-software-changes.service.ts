@@ -101,6 +101,73 @@ export class DepartmentSoftwareChangesService {
     return { added: await this.view.entries(result.added), removed: result.removed };
   }
 
+  /**
+   * The tick "add to the list of the department" of the link of a request to the catalog (`QĐ-111c`, SPEC FE IN-1), in the transaction of the
+   * caller: the place goes in the list if it is not there, and the answer says which (`added`) and the entry either way. A place already listed is not
+   * an error here (the caller links software that may be listed), and it does not abort the transaction of the caller. What the catalog does not
+   * offer is refused. The caller has authorized the IT Admin on the request, whose department this is; this does not judge the scope again.
+   * Throws DepartmentSoftwareNotInCatalogError and ToolsDepartmentNotFoundError.
+   */
+  async addFromCatalogLink(
+    tx: DbTx,
+    actor: AuthenticatedPrincipal,
+    input: { departmentId: string; applicationId: string; planId: string | null; note: string | null },
+  ): Promise<{ entryId: string; added: boolean }> {
+    const item = { applicationId: input.applicationId, planId: input.planId };
+    await this.view.assertInCatalog([item], tx);
+    const organization = await this.organizationReads.getOrganization(tx);
+    if (!organization) throw new Error('The list of software of a department was changed before installation');
+    if (!(await this.organizationReads.lockDepartmentShared(tx, input.departmentId)))
+      throw new ToolsDepartmentNotFoundError();
+    const { entry, created } = await this.ensureEntry(tx, actor, organization.id, input.departmentId, item, input.note);
+
+    return { entryId: entry.id, added: created };
+  }
+
+  /**
+   * The entry of the place in the list, written now (and audited) or already there. It is read again once when the entry it found beside the
+   * insert was taken out meanwhile: a second miss is a fault of timing that is reported, not hidden. Used by the acceptance of a proposal and the link.
+   */
+  async ensureEntry(
+    tx: DbTx,
+    actor: AuthenticatedPrincipal,
+    organizationId: string,
+    departmentId: string,
+    item: DepartmentSoftwareItem,
+    note: string | null,
+  ): Promise<{ entry: SoftwareEntry; created: boolean }> {
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      const [written] = await this.repo.insertEntries(tx, {
+        organizationId,
+        departmentId,
+        addedByAppUserId: actor.appUserId,
+        items: [{ ...item, note }],
+      });
+      if (written) {
+        await this.audit.record(
+          tx,
+          licensingAuditEvent(
+            actor,
+            organizationId,
+            'DEPARTMENT_SOFTWARE.ENTRY_ADDED',
+            'DepartmentSoftwareEntry',
+            written.id,
+            null,
+            {
+              departmentId,
+              ...place(item),
+            },
+          ),
+        );
+
+        return { entry: written, created: true };
+      }
+      const existing = await this.repo.findEntryByPlace(tx, departmentId, item);
+      if (existing) return { entry: existing, created: false };
+    }
+    throw new Error('The place of the list of software could be neither written nor found in it.');
+  }
+
   private async takeOut(tx: DbTx, departmentId: string, ids: readonly string[]): Promise<SoftwareEntry[]> {
     if (ids.length === 0) return [];
     const found = await this.repo.findEntries(tx, departmentId, ids);

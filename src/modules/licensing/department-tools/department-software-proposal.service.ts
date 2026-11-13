@@ -6,6 +6,7 @@ import { OrganizationReadApi } from '../../organization/public/organization-read
 import { licensingAuditEvent } from '../licensing-audit-event.mapper';
 import { ToolsDepartmentNotFoundError, ToolsDepartmentOutOfScopeError } from '../public/licensing.errors';
 import { DepartmentSoftwareAccessService } from './department-software-access.service';
+import { DepartmentSoftwareChangesService } from './department-software-changes.service';
 import { DepartmentSoftwareNotice } from './department-software-notice.service';
 import { DepartmentSoftwareViewService } from './department-software-view.service';
 import type { SoftwareProposalWire } from './department-software.dto';
@@ -22,7 +23,7 @@ import {
   type DepartmentSoftwareItem,
 } from './department-software.policy';
 import { DepartmentSoftwareRepo } from './department-software.repo';
-import type { SoftwareEntry, SoftwareProposal } from './department-software.types';
+import type { SoftwareProposal } from './department-software.types';
 
 const place = (item: DepartmentSoftwareItem) => ({ applicationId: item.applicationId, planId: item.planId });
 
@@ -39,6 +40,7 @@ export class DepartmentSoftwareProposalService {
     private readonly runner: TransactionRunner,
     private readonly repo: DepartmentSoftwareRepo,
     private readonly access: DepartmentSoftwareAccessService,
+    private readonly changes: DepartmentSoftwareChangesService,
     private readonly view: DepartmentSoftwareViewService,
     private readonly notice: DepartmentSoftwareNotice,
     private readonly organizationReads: OrganizationReadApi,
@@ -112,25 +114,8 @@ export class DepartmentSoftwareProposalService {
     const done = await this.runner.run(async (tx) => {
       await this.lockDepartment(tx, proposal.departmentId);
       const decided = await this.decide(tx, actor, proposal, { state: 'ACCEPTED', reason: null });
-      const { entry, created } = await this.listed(tx, organization, actor.appUserId, proposal.departmentId, item);
+      const { entry } = await this.changes.ensureEntry(tx, actor, organization, proposal.departmentId, item, null);
       await this.recordDecision(tx, actor, organization, proposal, 'ACCEPTED');
-      if (created) {
-        await this.audit.record(
-          tx,
-          licensingAuditEvent(
-            actor,
-            organization,
-            'DEPARTMENT_SOFTWARE.ENTRY_ADDED',
-            'DepartmentSoftwareEntry',
-            entry.id,
-            null,
-            {
-              departmentId: proposal.departmentId,
-              ...place(item),
-            },
-          ),
-        );
-      }
       await this.notice.decided(tx, decided, { state: 'ACCEPTED', reason: null });
 
       return { decided, entryId: entry.id };
@@ -180,28 +165,6 @@ export class DepartmentSoftwareProposalService {
     if (!after) throw new DepartmentSoftwareProposalNotFoundError();
 
     return after;
-  }
-
-  /** The entry of the place in the list, written now or already there; twice at most, as an entry taken out between the two reads is a fault of timing, not of data. */
-  private async listed(
-    tx: DbTx,
-    organizationId: string,
-    addedByAppUserId: string,
-    departmentId: string,
-    item: DepartmentSoftwareItem,
-  ): Promise<{ entry: SoftwareEntry; created: boolean }> {
-    for (let attempt = 0; attempt < 2; attempt += 1) {
-      const [written] = await this.repo.insertEntries(tx, {
-        organizationId,
-        departmentId,
-        addedByAppUserId,
-        items: [{ ...item, note: null }],
-      });
-      if (written) return { entry: written, created: true };
-      const existing = await this.repo.findEntryByPlace(tx, departmentId, item);
-      if (existing) return { entry: existing, created: false };
-    }
-    throw new Error('The place of an accepted proposal could be neither written nor found in the list.');
   }
 
   private async recordDecision(

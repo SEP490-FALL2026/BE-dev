@@ -73,6 +73,7 @@ import { LicensingApi } from './public/licensing.api';
 import { LicensingDashboardApi } from './public/licensing-dashboard.api';
 import { LicensingGhostSeatApi } from './public/licensing-ghost-seat.api';
 import { LicensingUsageApi } from './public/licensing-usage.api';
+import { LicensingDepartmentToolsApi } from './public/licensing-department-tools.api';
 import { LicensingOpenGrantsApi } from './public/licensing-open-grants.api';
 import { LicensingPoolStockApi } from './public/licensing-pool-stock.api';
 import { LicensingRenewalApi } from './public/licensing-renewal.api';
@@ -303,6 +304,7 @@ import { SubscriptionRenewalsController } from './subscription-renewal/subscript
     SharedPoolVacancyService,
     LicensingOpenGrantsApi,
     LicensingPoolStockApi,
+    LicensingDepartmentToolsApi,
     LicensingRenewalApi,
     LicensingSeatBaselineApi,
   ],
@@ -314,6 +316,7 @@ import { SubscriptionRenewalsController } from './subscription-renewal/subscript
     LicensingUsageApi,
     LicensingOpenGrantsApi,
     LicensingPoolStockApi,
+    LicensingDepartmentToolsApi,
     LicensingRenewalApi,
     LicensingSeatBaselineApi,
     GrantRequestGateHook,
