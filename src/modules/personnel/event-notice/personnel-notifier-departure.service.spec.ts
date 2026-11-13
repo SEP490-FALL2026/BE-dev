@@ -37,7 +37,7 @@ const recipients = (told: InAppNotificationInput[], code: string) =>
 
 const facts = { organizationId: ORGANIZATION, employeeId: 'leaver', departmentId: 'd1', caseId: 'c1' };
 
-describe('what a departure tells the IT Admin and the Super Admin (QĐ-110b, QĐ-110d, R-1)', () => {
+describe('what a departure tells the IT Admin and the Super Admin, and not the person who left (QĐ-110b, QĐ-110d, R-1)', () => {
   const blocked = { ...facts, blockedOn: '2026-10-01', revocationDueOn: '2026-10-02', markLeft: true };
 
   it('tells the IT Admin to block the company account only while it is not blocked yet: a case that already has the lock gets no such notice', async () => {
@@ -50,5 +50,17 @@ describe('what a departure tells the IT Admin and the Super Admin (QĐ-110b, QĐ
     expect(recipients(open.told, 'DEPARTURE_ACCESS_BLOCKED')).toEqual(['it1:IT_ADMIN', 'sa:SUPER_ADMIN']);
     // The Super Admin still marks the person as left; the IT Admin has nothing to block.
     expect(recipients(locked.told, 'DEPARTURE_ACCESS_BLOCKED')).toEqual(['sa:SUPER_ADMIN']);
+  });
+
+  it('does not tell the person who left when they are the Super Admin: their account is blocked, so the notice would reach nobody who can act', async () => {
+    const { notifier, told } = notifierOf({ superAdmin: 'leaver', itAdminOfDepartment: 'it1' });
+
+    await notifier.departureAccessBlocked(TX, { ...blocked, accountLocked: false });
+    await notifier.revocationOverdue(TX, { ...facts, dueOn: '2026-10-01', rightCount: 1, today: '2026-10-02' });
+    await notifier.accountLockOverdue(TX, { ...facts, blockedOn: '2026-10-01' });
+
+    expect(recipients(told, 'DEPARTURE_ACCESS_BLOCKED')).toEqual(['it1:IT_ADMIN']);
+    expect(recipients(told, 'REVOCATION_OVERDUE')).toEqual(['it1:-']);
+    expect(recipients(told, 'ACCOUNT_LOCK_OVERDUE')).toEqual(['it1:-']);
   });
 });

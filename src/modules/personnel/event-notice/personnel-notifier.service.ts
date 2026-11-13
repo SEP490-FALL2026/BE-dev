@@ -190,7 +190,8 @@ export class PersonnelNotifier {
    * open requests. The Super Admin is asked to mark the person as left (only while `markLeft`, a person already marked has nothing to mark),
    * and the IT Admin to **block** the company account (item 1a of `BM-08`: reset the password of the mailbox and sign out every session; the
    * mailbox itself is not locked yet) and to open the revocation by `revocationDueOn`. One notice for each audience, once for the case. The IT
-   * Admin is not asked to block an account they already blocked (`accountLocked`: a case that was already blocked when this release started).
+   * Admin is not asked to block an account they already blocked (`accountLocked`: a case that was already blocked when this release started),
+   * and the person who left is never told as the Super Admin: their account is blocked.
    */
   async departureAccessBlocked(
     tx: DbTx,
@@ -286,7 +287,7 @@ export class PersonnelNotifier {
     }
   }
 
-  /** The IT Admin of the departure and the Super Admin, a person who is both once; true when a notice was written. */
+  /** The IT Admin of the departure and the Super Admin, a person who is both once and never the person who left; true when a notice was written. */
   private async toItAdminAndSuperAdmin(
     tx: DbTx,
     input: Common,
@@ -295,7 +296,9 @@ export class PersonnelNotifier {
   ): Promise<boolean> {
     const itAdmin = await this.itAdminOfDeparture(tx, input);
     const superAdmin = (await this.identity.getSuperAdminHolder(tx))?.employeeId ?? null;
-    const recipients = new Set([itAdmin, superAdmin].filter((id): id is string => id !== null));
+    const recipients = new Set(
+      [itAdmin, superAdmin].filter((id): id is string => id !== null && id !== input.employeeId),
+    );
     let written = false;
     for (const recipient of recipients) {
       written = (await this.tell(tx, input.organizationId, recipient, code, notice)) || written;
@@ -304,14 +307,17 @@ export class PersonnelNotifier {
     return written;
   }
 
+  /** The Super Admin, unless they are `exceptEmployeeId` (the person a departure is about: their account is blocked). */
   private async toSuperAdmin(
     tx: DbTx,
     organizationId: string,
     code: InAppNotificationCode,
     notice: NoticeParts,
+    exceptEmployeeId?: string,
   ): Promise<void> {
     const holder = await this.identity.getSuperAdminHolder(tx);
-    if (holder) await this.tell(tx, organizationId, holder.employeeId, code, notice);
+    if (holder && holder.employeeId !== exceptEmployeeId)
+      await this.tell(tx, organizationId, holder.employeeId, code, notice);
   }
 
   /** True when the notice was written, false when the recipient already has one for this event key. */
