@@ -310,8 +310,8 @@ export class CommitmentService {
   }
 
   /** What each of the requests was committed for (one entry for each commitment), in one read. */
-  committedBy(requestIds: readonly string[]): Promise<CommittedAmount[]> {
-    return this.commitments.amountsOfRequests(requestIds);
+  committedBy(requestIds: readonly string[], tx?: DbTx): Promise<CommittedAmount[]> {
+    return this.commitments.amountsOfRequests(requestIds, tx);
   }
 
   /** What each of the requests still holds and has not spent or given back, in one read that locks nothing (a preview of a release). */

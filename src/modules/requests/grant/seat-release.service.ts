@@ -94,7 +94,7 @@ export class SeatReleaseService {
         byRequest.set(requestId, (byRequest.get(requestId) ?? 0n) + amountMinor);
     }
 
-    return { released: await this.byCurrency(byRequest) };
+    return { released: await this.byCurrency(tx, byRequest) };
   }
 
   /** The grant of `requestId` was completed: a K2 right granted after its commitment began gives back the days before it. */
@@ -110,10 +110,16 @@ export class SeatReleaseService {
   }
 
   /** The amounts that went back, added up by the currency their request is committed in. */
-  private async byCurrency(byRequest: ReadonlyMap<string, bigint>): Promise<TransferReleaseResult['released']> {
+  private async byCurrency(
+    tx: DbTx,
+    byRequest: ReadonlyMap<string, bigint>,
+  ): Promise<TransferReleaseResult['released']> {
     if (byRequest.size === 0) return [];
     const currencies = new Map(
-      (await this.budgets.committedByRequests([...byRequest.keys()])).map((item) => [item.requestId, item.currency]),
+      (await this.budgets.committedByRequests([...byRequest.keys()], tx)).map((item) => [
+        item.requestId,
+        item.currency,
+      ]),
     );
     const totals = new Map<string, bigint>();
     for (const [requestId, amountMinor] of byRequest) {

@@ -435,5 +435,30 @@ describe('moving, cancelling and telling a transfer (integration, real PostgreSQ
       expect(await h.stepOf(elsewhere.id, 'NEED')).toEqual(elsewhereBefore);
       expect(APPROVE.decision).toBe('APPROVE');
     });
+
+    it('QĐ-110o: the money held for an approved paid request of the old department that the system closes goes back to the budget the day the transfer takes effect', async () => {
+      const unit = await h.departmentWithHead(code('P-RQ'));
+      const other = await h.departmentWithHead(code('P-RQ'));
+      await h.budgetFor(unit, { total: 100 * M });
+      const requester = await member(unit, 'R');
+      const approved = await h.waitingForApprover({ ...unit, member: requester }, paid, { amount: 5 * M });
+      await h.decideSpend(approved, APPROVE, h.boss.account).expect(200);
+      const held = await h.ctx.sql.query<{ amount_minor: string; released_minor: string; state: string }>(
+        'SELECT amount_minor::text, released_minor::text, state::text FROM budget_commitments WHERE request_id = $1',
+        [approved],
+      );
+      expect(held.rows).toEqual([{ amount_minor: String(5 * M), released_minor: '0', state: 'HELD' }]);
+
+      await h
+        .recordTransfer(body(requester.employeeId, { toDepartmentId: other.department.id, effectiveOn: h.today() }))
+        .expect(201);
+
+      const ended = await h.ctx.sql.query<{ state: string; released_minor: string; reason: string }>(
+        `SELECT c.state::text AS state, c.released_minor::text, r.reason::text AS reason FROM budget_commitments c
+           JOIN budget_commitment_releases r ON r.commitment_id = c.id WHERE c.request_id = $1`,
+        [approved],
+      );
+      expect(ended.rows).toEqual([{ state: 'RELEASED', released_minor: String(5 * M), reason: 'REQUEST_CANCELLED' }]);
+    });
   });
 });

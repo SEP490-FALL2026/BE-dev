@@ -389,11 +389,11 @@ export class CommitmentRepo {
     return rows.map((row) => row.year);
   }
 
-  /** What each of the requests was committed for, one entry for each commitment, in one read. */
-  async amountsOfRequests(requestIds: readonly string[]): Promise<CommittedAmount[]> {
+  /** What each of the requests was committed for, one entry for each commitment, in one read (in `tx` when given: a commitment made in it is seen). */
+  async amountsOfRequests(requestIds: readonly string[], tx?: DbTx): Promise<CommittedAmount[]> {
     if (requestIds.length === 0) return [];
 
-    return this.prisma.budgetCommitment.findMany({
+    return (tx ?? this.prisma).budgetCommitment.findMany({
       where: { requestId: { in: [...requestIds] } },
       select: { requestId: true, amountMinor: true, currency: true },
       orderBy: [{ requestId: 'asc' }, { year: 'asc' }],

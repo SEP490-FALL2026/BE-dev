@@ -76,9 +76,9 @@ export class BudgetsApi {
     return this.commitments.requestsHoldingYear(tx, requestIds, year);
   }
 
-  /** What each of the requests was committed for, one entry for each commitment, in one read: for a list that counts and adds them. */
-  committedByRequests(requestIds: readonly string[]): Promise<CommittedAmount[]> {
-    return this.commitments.committedBy(requestIds);
+  /** What each of the requests was committed for, one entry for each commitment, in one read (in the caller's transaction when it has one): for a list that counts and adds them. */
+  committedByRequests(requestIds: readonly string[], tx?: DbTx): Promise<CommittedAmount[]> {
+    return this.commitments.committedBy(requestIds, tx);
   }
 
   /**
