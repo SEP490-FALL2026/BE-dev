@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import request from 'supertest';
 import { pretendBusinessToday } from '../../support/pretend-today';
+import { ensureVendorAdmins } from '../../support/builders/catalog.builder';
 import { ApiAccount, adminToken, createActivatedAccount } from '../../support/api-accounts';
 import { HttpTestApp, SeededInstallation, createHttpTestApp, seedInstallation } from '../../support/http-test-app';
 
@@ -121,6 +122,9 @@ describe('plan terms and review alerts over HTTP (integration, real PostgreSQL)'
         })
         .expect(201),
     );
+
+    // A plan that needs admins at the vendor gets the two-person profile an active subscription asks for (X-IT.5).
+    await ensureVendorAdmins(ctx, created.id, it1.employeeId);
 
     return { planId: created.id, applicationId: application.id };
   };

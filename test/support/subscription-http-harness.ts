@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import request from 'supertest';
 import { OperatingParametersApi } from '../../src/modules/operating-parameters/public/operating-parameters.api';
+import { ensureVendorAdmins } from './builders/catalog.builder';
 import { pretendBusinessToday } from './pretend-today';
 import { ApiAccount, adminToken, createActivatedAccount } from './api-accounts';
 import {
@@ -145,6 +146,9 @@ export class SubscriptionHttpHarness {
         })
         .expect(201),
     );
+
+    // A plan that needs admins at the vendor gets the two-person profile an active subscription asks for (X-IT.5); the rule itself is proved in its own suites.
+    await ensureVendorAdmins(this.ctx, created.id, this.it1.employeeId);
 
     return { planId: created.id, vendorId: application.vendor?.id ?? null, applicationId: application.id };
   };
