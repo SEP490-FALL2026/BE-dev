@@ -398,6 +398,32 @@ Không sửa code; SPEC không bị sửa trong lượt này (spec là của Own
 - **Test:** `offboarding-cases.http-spec` ca "words the day of the deadline…" (đã kiểm đỏ khi trả controller về chữ cũ).
 - **Chạm:** `offboarding/offboarding.controller.ts`, `offboarding/offboarding.dto.ts` (chú thích), `openapi.json`. Mô tả `dueOn` của tác vụ thu hồi (`provisioning-tasks.controller.ts`) đã nói theo ngày do hồ sơ cấp, không đổi.
 
+### D-54 · K1-CL.1 · Biến thể checklist `K1` suy từ đâu: chỉ `revocationSource` của tác vụ hay mọi lý do còn đứng
+
+- SPEC P25 nói "biến thể suy từ nguồn thu hồi". Một ghế chỉ có **một** tác vụ thu hồi sống và nhiều lý do (`QĐ-64a`); cột `provisioning_tasks.revocation_source` chỉ là lý do đã mở tác vụ và không đổi khi lý do đó bị rút. Phương án: A. chỉ `revocation_source` (đơn giản, nhưng người nghỉ việc sau khi ghế đã bị thu hồi vì hết hạn sẽ nhận checklist `STILL_EMPLOYED`: hộp thư không bị đặt lại/khóa; ngược lại lý do `DEPARTURE` đã rút vẫn ép `DEPARTURE`). B. **mọi lý do còn đứng (`withdrawn_at IS NULL`): có một lý do `DEPARTURE`/`ABRUPT_DEPARTURE` ⟹ `DEPARTURE`, còn lại ⟹ `STILL_EMPLOYED`; không có lý do nào (không xảy ra với tác vụ sống) mới dùng `revocation_source`.** **ĐÃ CHỌN B** (an toàn nghiệp vụ: hộp thư người nghỉ luôn được đặt lại và khóa; cùng cách `RevocationLeaverAlert` đã dùng cho dòng 38 của `US-12-15`). Bảng nguồn → biến thể có test cho cả 14 nguồn.
+- Dùng lại `DEPARTURE_SOURCES` của `licensing-alerts.policy.ts` (đổi thành `export`), không lặp danh sách.
+- **Đổi lại:** A: trong `ProvisioningK1Checklist` (`sourcesOf`) chỉ truyền `[task.revocationSource]`.
+- **Chạm:** `licensing/provisioning/k1-checklist/provisioning-k1-checklist.policy.ts` (`k1VariantOf`) + `.service.ts`, `licensing/licensing-alerts.policy.ts`.
+
+### D-55 · K1-CL.1 · Mã mục, nhãn, cách đánh số `order`, độ chặt của thứ tự `doneAt`
+
+- **Mã mục** (SPEC chỉ đặt tên mục 6 là `MAILBOX_LOCKED`): `MAILBOX_PASSWORD_RESET` (1), `SOFTWARE_FORGOT_PASSWORD` (2, _Quên mật khẩu_ trên phần mềm), `SESSIONS_SIGNED_OUT` (3), `RENEWAL_DISABLED` (4), `EVIDENCE_RECORDED` (5), `MAILBOX_LOCKED` (6). `STILL_EMPLOYED` = `RENEWAL_DISABLED` + `EVIDENCE_RECORDED`. Danh sách mã nằm ở `licensing/public/licensing.types.ts` (`K1_CHECKLIST_CODES`) vì listener của `personnel` (MF2-G.2) đọc `MAILBOX_LOCKED` qua kiểu công khai.
+- **`order` đánh lại từ 1 theo từng biến thể** (`STILL_EMPLOYED`: 1, 2; không giữ số 4, 5 của biến thể kia) để FE hiển thị số thứ tự liền nhau; thứ tự kiểm theo `order` của biến thể.
+- **`label`:** P25 yêu cầu `label`; BE viết tiếng Anh như mọi chữ khác của API (FE dịch theo `code`, như `steps[].code` của thẻ tác vụ không có nhãn). Không dịch tiếng Việt ở BE.
+- **Thứ tự `doneAt`:** "tăng dần theo `order`" hiểu là **không giảm** (`doneAt[i] >= doneAt[i-1]`). Phương án A: tăng ngặt (từ chối hai mục cùng giây — client đo theo giây sẽ bị 422 oan). B. **không giảm: mục tick sau mục đứng trước một thời điểm sớm hơn mới sai thứ tự.** **ĐÃ CHỌN B.** So sánh theo thời điểm (đã quy về UTC), không so chuỗi: `+07:00` và `Z` cùng một lúc là đúng thứ tự. Thiếu mục/chưa tick/`doneAt` không đọc được ⟹ `K1_CHECKLIST_INCOMPLETE` được báo **trước** `K1_CHECKLIST_OUT_OF_ORDER`.
+- **Mục không thuộc biến thể** (vd `MAILBOX_LOCKED` gửi cho `STILL_EMPLOYED`) hoặc gửi hai lần ⟹ 422 `REVOCATION.COMPLETION_NOT_ALLOWED` (mã có sẵn: "cách hoàn tất không khớp tác vụ"), không phải `K1_CHECKLIST_INCOMPLETE` (không phải thiếu) — và cũng là mã khi gửi `k1Checklist` cho tác vụ không phải `K1`. Mã mục lạ (ngoài sáu mã) bị zod chặn ở tầng DTO (`VALIDATION_ERROR`).
+- **Không kiểm `doneAt` ở tương lai:** SPEC không nói, độ lệch đồng hồ của máy IT có thể làm 422 oan; chống gian là việc của bằng chứng và audit, không của checklist.
+- **Đổi lại:** tăng ngặt: đổi `time < trước` thành `time <= trước` ở `planK1Checklist`; nhãn: sửa `LABELS` (không đổi hợp đồng).
+- **Chạm:** `licensing/public/licensing.types.ts`, `licensing/public/licensing.errors.ts` (hai `RevocationCompletionProblem` mới), `k1-checklist/provisioning-k1-checklist.policy.ts` (+spec 48 ca).
+
+### D-56 · K1-CL.1 · Lưu checklist ở đâu và ghi lúc nào
+
+- Cột `provisioning_tasks.k1_checklist jsonb` nullable (migration `20261113001400_licensing_k1_checklist`, expand-only, không backfill: tác vụ `K1` đã hoàn tất trước đó không có checklist và thẻ không hiện checklist), hình `{ variant, items: [{ code, order, doneAt }] }` (codec `provisioning-k1-checklist.json.ts` + spec). **Bằng chứng không lưu hai lần:** nó là cột `evidence` có sẵn của tác vụ.
+- **Ghi trước khi đánh dấu `COMPLETED`, cùng transaction:** trigger `provisioning_task_guard` cấm sửa tác vụ đã `COMPLETED` (chỉ cho đúng một ngoại lệ cắt truy cập), nên một `UPDATE` thứ hai sau khi hoàn tất bị từ chối. CHECK `provisioning_tasks_k1_checklist_check` vì thế chỉ đòi "thuộc tác vụ `REVOKE` và là object JSON" (không đòi `status = COMPLETED`/`completion = RENEWAL_CANCELLED` — lúc ghi tác vụ còn `IN_PROGRESS`); mỗi cột trong CHECK có `IS NOT NULL` riêng. Test: `provisioning-revocation-constraints.integration-spec.ts`.
+- **Repo/service trong nhóm mới `licensing/provisioning/k1-checklist/`** (thư mục `provisioning/` đã đủ 25 file): `ProvisioningK1ChecklistRepo` là nơi duy nhất đọc/ghi cột này (codec riêng của nhóm; `ProvisioningTaskRepo` không đọc cột, chỉ đặt `k1Checklist: null` ở hàng danh sách để khớp kiểu Prisma). Điểm vào của nhóm: `…-k1-checklist.service.ts` và `….policy.ts`; kiểu dùng chung qua `.policy.ts` (gate cấm re-export).
+- **Đổi lại:** bỏ cột bằng migration sau (mất checklist đã lưu, không mất việc đã hoàn tất).
+- **Chạm:** `prisma/models/licensing.prisma`, `prisma/migrations/20261113001400_licensing_k1_checklist/`, `licensing/provisioning/k1-checklist/*`, `licensing.module.ts`, `provisioning-task.repo.ts`.
+
 ## Bị chặn
 
 (chưa có)

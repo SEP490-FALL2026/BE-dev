@@ -448,6 +448,8 @@ export class ProvisioningTaskRepo {
               closeReason: null,
               accessEvidence: null,
               completionNote: null,
+              // Not part of the record: the checklist of a K1 revocation is read by its own group, for the card of a detail only.
+              k1Checklist: null,
             }),
           ),
           total: await tx.provisioningTask.count({ where }),

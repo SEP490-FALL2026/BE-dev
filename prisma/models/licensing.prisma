@@ -187,6 +187,8 @@ model ProvisioningTask {
   accessCutOn                  DateTime?                @map("access_cut_on") @db.Date
   accessEvidence               String?                  @map("access_evidence")
   completionNote               String?                  @map("completion_note")
+  // The checklist the IT Admin ticked to complete a K1 revocation (variant and steps with their instants, QĐ-111az); NULL otherwise.
+  k1Checklist                  Json?                    @map("k1_checklist")
   // A revocation asked not to be done before a day, and due by a day: read from the reasons that still stand (null: none asked).
   dueOn                        DateTime?                @map("due_on") @db.Date
   notBefore                    DateTime?                @map("not_before") @db.Date

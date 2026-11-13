@@ -343,7 +343,11 @@ export type RevocationCompletionProblem =
   | 'ACCESS_STATE_INVALID'
   | 'WITHDRAWAL_REASON_REQUIRED'
   /** A K4 completion must say where the key goes (`QĐ-111p`). */
-  | 'KEY_DISPOSITION_REQUIRED';
+  | 'KEY_DISPOSITION_REQUIRED'
+  /** A K1 completion lacks a step of its checklist (not ticked, or ticked with no time) or the evidence (`QĐ-111az`). */
+  | 'K1_CHECKLIST_INCOMPLETE'
+  /** The steps of a K1 checklist were not ticked in their order: a step is timed before one that comes first (`QĐ-111az`, m-09). */
+  | 'K1_CHECKLIST_OUT_OF_ORDER';
 
 /** The way a revocation is completed does not fit its kind of provisioning, or lacks what the kind needs to be stored. */
 export class RevocationCompletionError extends Error {

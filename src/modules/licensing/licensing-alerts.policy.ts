@@ -16,7 +16,7 @@ export interface LicensingAlert {
 }
 
 /** The sources of a revocation that a person who leaves opens. */
-const DEPARTURE_SOURCES: ReadonlySet<RevocationSource> = new Set(['DEPARTURE', 'ABRUPT_DEPARTURE']);
+export const DEPARTURE_SOURCES: ReadonlySet<RevocationSource> = new Set(['DEPARTURE', 'ABRUPT_DEPARTURE']);
 
 /** The people to tell, each once and in the order given; a missing person (nobody holds the role) is left out, never replaced. */
 export function recipientsOf(people: readonly (string | null | undefined)[]): string[] {

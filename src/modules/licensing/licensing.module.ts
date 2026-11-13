@@ -85,6 +85,8 @@ import { ProvisioningTasksController } from './provisioning/tasks/provisioning-t
 import { RevocationTasksController } from './provisioning/revocation-completion/revocation-tasks.controller';
 import { DepartmentOpenWorkReader } from './provisioning/department-use/department-open-work.listener';
 import { ProvisioningDepartmentUseRepo } from './provisioning/department-use/provisioning-department-use.repo';
+import { ProvisioningK1ChecklistRepo } from './provisioning/k1-checklist/provisioning-k1-checklist.repo';
+import { ProvisioningK1Checklist } from './provisioning/k1-checklist/provisioning-k1-checklist.service';
 import { RevocationCompletionService } from './provisioning/revocation-completion/revocation-completion.service';
 import { RevocationLeaverAlert } from './provisioning/revocation-completion/revocation-leaver-alert.service';
 import { RevocationAftermath } from './provisioning/revocation-completion/revocation-aftermath.service';
@@ -206,6 +208,8 @@ import { SubscriptionRenewalsController } from './subscription-renewal/subscript
     RevocationService,
     RevocationWithdrawalService,
     RevocationCompletionService,
+    ProvisioningK1ChecklistRepo,
+    ProvisioningK1Checklist,
     RevocationLeaverAlert,
     RevocationAftermath,
     RevocationReadRepo,

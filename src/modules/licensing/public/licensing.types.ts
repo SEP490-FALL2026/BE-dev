@@ -285,6 +285,31 @@ export type KeyDisposition = 'RETURN_TO_STORE' | 'WITHDRAW';
 /** What is known of the access of a K1 seat once its renewal is cancelled: cut already, or running to the end of the paid period. */
 export type AccessState = 'CUT' | 'UNTIL_PAID_END';
 
+/**
+ * Which list of steps the IT Admin ticks to complete the revocation of a K1 seat (`QĐ-111az`, `US-07-05` AC-19): the server decides it from why the
+ * seat is revoked. `DEPARTURE` is for a person who leaves (the mailbox is reset and locked); `STILL_EMPLOYED` is for any other source, where the
+ * person still works and only the renewal is turned off.
+ */
+export const K1_CHECKLIST_VARIANTS = ['DEPARTURE', 'STILL_EMPLOYED'] as const;
+export type K1ChecklistVariant = (typeof K1_CHECKLIST_VARIANTS)[number];
+
+/** Every step a K1 revocation checklist can hold; which of them a task has depends on its variant. */
+export const K1_CHECKLIST_CODES = [
+  'MAILBOX_PASSWORD_RESET',
+  'SOFTWARE_FORGOT_PASSWORD',
+  'SESSIONS_SIGNED_OUT',
+  'RENEWAL_DISABLED',
+  'EVIDENCE_RECORDED',
+  'MAILBOX_LOCKED',
+] as const;
+export type K1ChecklistCode = (typeof K1_CHECKLIST_CODES)[number];
+
+/** What a completed K1 revocation tells its listeners of the checklist: the variant and the steps that were ticked (`MAILBOX_LOCKED` among them). */
+export interface K1ChecklistFacts {
+  variant: K1ChecklistVariant;
+  doneCodes: K1ChecklistCode[];
+}
+
 /** Who decided that a seat is revoked, and on what: the source module's own record of it, never a secret. */
 export interface RevocationDecision {
   decidedByEmployeeId?: string | null;
