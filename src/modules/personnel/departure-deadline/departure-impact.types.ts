@@ -31,7 +31,7 @@ export interface CommitmentToRelease {
 
 /**
  * What a departure does to a person, read and never written (`P23`, `MIN-7`). The record of the departure and the preview share it.
- * `responsibilities` is what an IT Admin who leaves answers for in the catalog (0 and 0 for anyone else); `vendorAdminRoles` is empty until it is counted.
+ * `responsibilities` is what an IT Admin who leaves answers for in the catalog (0 and 0 for anyone else); `vendorAdminRoles` lists the plans the person administers at the vendor.
  */
 export interface DepartureImpact {
   rightsToRevoke: RightToRevoke[];

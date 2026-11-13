@@ -1,5 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
+import { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { ApplicationPlans } from '../catalog-entry/application-plans.types';
 import type { BusinessDate } from '../../../core/business-date';
 import type { PlanRevocationInfo, PlanSummary, PlanUsageRate, WorkspaceDuty } from '../public/catalog.types';
@@ -23,6 +25,8 @@ export class PlanFactsService implements ApplicationPlans {
   constructor(
     private readonly plans: PlanRepo,
     private readonly usage: PlanUsageRepo,
+    private readonly identity: IdentityAccessApi,
+    private readonly organizationReads: OrganizationReadApi,
   ) {}
 
   /** Replaces what is known of the usage of the plans of the organization with what one pass of the usage rules found (`KPI-3`). */
@@ -54,6 +58,20 @@ export class PlanFactsService implements ApplicationPlans {
   /** The plan, locked `FOR UPDATE` until the transaction ends; null if absent. */
   lockExclusive(tx: DbTx, id: string): Promise<LockedPlan | null> {
     return this.plans.lockExclusiveLookup(tx, id);
+  }
+
+  /**
+   * Which of these people work now as IT Admins at the vendor (`QĐ-110k`): an account that can act whose person a departure does not already refuse
+   * (the flag of a plan falls "from the block", before the person has left). One read of the accounts and one of the blocks, whatever the number.
+   */
+  async workingAdminsAmong(employeeIds: readonly string[], tx?: DbTx): Promise<Set<string>> {
+    if (employeeIds.length === 0) return new Set();
+    const usable = await this.identity.findUsableItAdminEmployeeIds(employeeIds, tx);
+    if (usable.size === 0) return usable;
+    const blocks = await this.identity.findDepartureBlocks([...usable]);
+    const today = await this.organizationReads.businessToday(new Date(), tx);
+
+    return new Set([...usable].filter((id) => (blocks.get(id)?.blockedFrom ?? today) > today));
   }
 
   /** Who administers each of these plans at the vendor, in one read, by plan; a plan whose profile was never recorded is absent. */

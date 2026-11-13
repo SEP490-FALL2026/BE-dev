@@ -16,6 +16,8 @@ const billingCycle = z.enum(['MONTHLY', 'QUARTERLY', 'ANNUAL', 'OTHER']);
 const commitmentTermMonths = z.union([z.literal(1), z.literal(12)]);
 const vendorMinimumSeats = z.number().int().min(1).max(1_000_000_000);
 const quantity = z.number().int().min(0).max(1_000_000_000);
+/** The vendor admins a subscription lists: the members of the workspace profile of its plan, at most this many (X-IT.5, QĐ-110k). */
+export const VENDOR_ADMINS_MAX = 20;
 const noticeDays = z.number().int().min(0).max(3650);
 const money = z.strictObject({ amount: z.string().max(40), currency: z.string().regex(/^[A-Z]{3}$/) });
 
@@ -139,7 +141,7 @@ const subscriptionSchema = z.strictObject({
         working: z.boolean(),
       }),
     )
-    .max(20),
+    .max(VENDOR_ADMINS_MAX),
   /** The email of the company account that owns the plan at the vendor (no password); null when none is recorded. */
   ownerAccountEmail: z.string().nullable(),
   adminNote: z.string().nullable(),

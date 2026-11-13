@@ -4,7 +4,6 @@ import { formatRate } from '../../../core/money/rate';
 import { FinanceApi } from '../../finance/public/finance.api';
 import type { TaxEstimateResult } from '../../finance/public/finance.types';
 import { OperatingParametersApi } from '../../operating-parameters/public/operating-parameters.api';
-import { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { PlanFactsService } from '../plan/plan-facts.service';
 import { needsVendorAdmins } from '../plan/plan-vendor-admins.policy';
@@ -37,7 +36,6 @@ export class SubscriptionViewService {
     private readonly subscriptions: SubscriptionRepo,
     private readonly organizationReads: OrganizationReadApi,
     private readonly planFacts: PlanFactsService,
-    private readonly identity: IdentityAccessApi,
   ) {}
 
   /** The records as they are answered, with the derived notice, alerts, warnings, tax profile and estimate. */
@@ -187,7 +185,7 @@ export class SubscriptionViewService {
     const ids = [
       ...new Set([...profiles.values()].flatMap((profile) => profile.members.map((member) => member.employeeId))),
     ];
-    const usable = ids.length === 0 ? new Set<string>() : await this.identity.findUsableItAdminEmployeeIds(ids);
+    const usable = await this.planFacts.workingAdminsAmong(ids);
     const people = new Map((await this.organizationReads.getEmployees(ids)).map((employee) => [employee.id, employee]));
 
     return (record: SubscriptionRecord) => {

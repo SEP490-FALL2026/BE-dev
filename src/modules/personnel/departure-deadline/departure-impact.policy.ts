@@ -33,6 +33,15 @@ export interface SeatFacts {
   revocation: { taskId: string; status: string; source: string } | null;
 }
 
+/** A plan the person administers at the vendor as the impact lists it: the application, the plan and the role (`QĐ-110k`, SPEC P23). */
+export function vendorAdminRoleLabel(role: {
+  applicationName: string;
+  planName: string;
+  role: 'OWNER' | 'ADMIN';
+}): string {
+  return `${role.applicationName} / ${role.planName} (${role.role})`;
+}
+
 /** A seat as the departure would take it away: what it is, how it is removed, and whether a task already works on it. */
 export function rightToRevokeOf(seat: SeatFacts): RightToRevoke {
   return {

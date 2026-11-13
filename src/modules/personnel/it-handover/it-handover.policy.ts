@@ -49,6 +49,14 @@ export function handoverState(facts: { remaining: number }): ItHandoverState {
   return facts.remaining > 0 ? 'PENDING' : 'DONE';
 }
 
+/**
+ * The plans an admin at the vendor who leaves puts out of reach (`QĐ-110k`, SPEC T-IT, X-IT.6): those that nobody else who still works as an IT Admin
+ * administers. Two or more left is fine and one left is only the flag a reader of the subscription sees; none left is work for every IT Admin.
+ */
+export function plansLeftWithoutAdmin<T extends { othersWorking: number }>(roles: readonly T[]): T[] {
+  return roles.filter((role) => role.othersWorking === 0);
+}
+
 /** At the milestone of a file that was not cancelled, the IT Admins are told when the person still answers for something (`R-26`); it never blocks the file. */
 export function pendingNoticeOwed(facts: {
   milestoneReached: boolean;

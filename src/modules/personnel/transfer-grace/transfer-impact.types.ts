@@ -10,8 +10,8 @@ import type {
  * (`P6`) and the preview before it share it, as the departure does (`DepartureImpact`); the shape is the same so the screen reads both
  * alike, with the day the grace ends in place of the day the revocations are due.
  *
- * `responsibilities` is what an IT Admin who is moved answers for in the catalog (subscriptions and applications, `R-8`). Not yet counted: the
- * vendor admin roles they hold (`vendorAdminRoles`, empty), and the commitment that the seats of the old department give back the day the
+ * `responsibilities` is what an IT Admin who is moved answers for in the catalog (subscriptions and applications, `R-8`). `vendorAdminRoles` lists the plans they administer at the vendor (`QĐ-110k`). Not yet counted: the
+ * commitment that the seats of the old department give back the day the
  * transfer takes effect (MF3-B.3 adds it to `commitmentToRelease`).
  */
 export interface TransferImpact {

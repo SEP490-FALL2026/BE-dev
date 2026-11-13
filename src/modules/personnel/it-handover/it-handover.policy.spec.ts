@@ -4,6 +4,7 @@ import {
   milestoneDay,
   milestoneReached,
   pendingNoticeOwed,
+  plansLeftWithoutAdmin,
 } from './it-handover.policy';
 
 describe('it-handover.policy (QĐ-110j, QĐ-111g, R-8, R-26: one hand-over of an IT Admin who leaves, no blocker)', () => {
@@ -90,6 +91,19 @@ describe('it-handover.policy (QĐ-110j, QĐ-111g, R-8, R-26: one hand-over of an
       expect(pendingNoticeOwed({ milestoneReached: false, cancelled: false, remaining: 2 })).toBe(false);
       expect(pendingNoticeOwed({ milestoneReached: true, cancelled: false, remaining: 0 })).toBe(false);
       expect(pendingNoticeOwed({ milestoneReached: true, cancelled: true, remaining: 2 })).toBe(false);
+    });
+  });
+
+  describe('plansLeftWithoutAdmin: the plans nobody else who works administers', () => {
+    it('keeps only the roles with no other admin working: one left is a flag, not work', () => {
+      const roles = [
+        { planId: 'figma', othersWorking: 1 },
+        { planId: 'miro', othersWorking: 0 },
+        { planId: 'canva', othersWorking: 2 },
+      ];
+
+      expect(plansLeftWithoutAdmin(roles)).toEqual([{ planId: 'miro', othersWorking: 0 }]);
+      expect(plansLeftWithoutAdmin([])).toEqual([]);
     });
   });
 });

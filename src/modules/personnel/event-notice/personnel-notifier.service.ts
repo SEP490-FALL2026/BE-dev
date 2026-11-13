@@ -356,6 +356,27 @@ export class PersonnelNotifier {
     return told;
   }
 
+  /**
+   * The last admin a plan had at the vendor is leaving and nobody else who works administers it (`QĐ-110k`, SPEC T-IT): every IT Admin is told, once
+   * each for the plan and the file, because the plan can no longer be reached at the vendor and the work is the common queue's. Returns how many were told.
+   */
+  async vendorAdminsGone(
+    tx: DbTx,
+    input: { organizationId: string; planId: string; applicationId: string; sourceId: string },
+  ): Promise<number> {
+    let told = 0;
+    for (const recipient of await this.identity.findAllUsableItAdminEmployeeIds(tx)) {
+      const written = await this.tell(tx, input.organizationId, recipient, 'VENDOR_ADMINS_BELOW_MINIMUM', {
+        subject: { type: 'PLAN', id: input.planId },
+        params: { planId: input.planId, applicationId: input.applicationId, adminCount: 0 },
+        eventKey: `VENDOR_ADMINS_BELOW_MINIMUM:${input.planId}:${input.sourceId}`,
+      });
+      if (written) told += 1;
+    }
+
+    return told;
+  }
+
   /** The IT Admin who took everything a leaving IT Admin answered for is told how many of each are theirs now (SPEC P5). */
   async itHandoverReceived(
     tx: DbTx,

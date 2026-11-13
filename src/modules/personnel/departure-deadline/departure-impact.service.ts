@@ -4,7 +4,7 @@ import { CatalogResponsibilityApi } from '../../catalog/public/catalog-responsib
 import { LicensingApi } from '../../licensing/public/licensing.api';
 import { RequestsApi } from '../../requests/public/requests.api';
 import { DepartureDeadlineService } from './departure-deadline.service';
-import { commitmentToRelease, rightToRevokeOf } from './departure-impact.policy';
+import { commitmentToRelease, rightToRevokeOf, vendorAdminRoleLabel } from './departure-impact.policy';
 import type { DepartureImpact, DepartureImpactInput } from './departure-impact.types';
 
 /**
@@ -15,8 +15,8 @@ import type { DepartureImpact, DepartureImpactInput } from './departure-impact.t
  * nothing: the caller has already judged whether the person may leave, and says whether a head needs a successor. Everything is read in the
  * transaction of the caller and no lock is taken.
  *
- * `responsibilities` is what an IT Admin who leaves answers for in the catalog (subscriptions and applications, `R-8`); the vendor admin roles
- * they hold (`vendorAdminRoles`) are not counted yet and stay empty.
+ * `responsibilities` is what an IT Admin who leaves answers for in the catalog (subscriptions and applications, `R-8`); `vendorAdminRoles` lists the
+ * plans they administer at the vendor (`QĐ-110k`), as `<application> / <plan> (OWNER|ADMIN)`.
  */
 @Injectable()
 export class DepartureImpactService {
@@ -49,7 +49,9 @@ export class DepartureImpactService {
       provisioningInFlight: gone.needsItCheck.map(ofItem),
       commitmentToRelease: commitmentToRelease(gone.heldToRelease),
       responsibilities: { subscriptions: answersFor?.subscriptions ?? 0, applications: answersFor?.applications ?? 0 },
-      vendorAdminRoles: [],
+      vendorAdminRoles: (await this.responsibilities.vendorAdminRolesOf(input.employeeId, tx)).map(
+        vendorAdminRoleLabel,
+      ),
       headSuccessorRequired: input.headSuccessorRequired,
       revocationDueOn: await this.deadlines.revocationDueOn(input.lastWorkingDay),
     };

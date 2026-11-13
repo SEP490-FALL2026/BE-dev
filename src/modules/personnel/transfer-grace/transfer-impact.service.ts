@@ -4,7 +4,11 @@ import { CatalogResponsibilityApi } from '../../catalog/public/catalog-responsib
 import { LicensingApi } from '../../licensing/public/licensing.api';
 import { OperatingParametersApi } from '../../operating-parameters/public/operating-parameters.api';
 import { RequestsApi } from '../../requests/public/requests.api';
-import { commitmentToRelease, rightToRevokeOf } from '../departure-deadline/departure-impact.policy';
+import {
+  commitmentToRelease,
+  rightToRevokeOf,
+  vendorAdminRoleLabel,
+} from '../departure-deadline/departure-impact.policy';
 import { graceOf, graceStartsOn, graceWindowEnd, heldOnOrBefore } from './transfer-grace.policy';
 import type { TransferImpact, TransferImpactInput } from './transfer-impact.types';
 
@@ -50,7 +54,9 @@ export class TransferImpactService {
       provisioningInFlight: gone.needsItCheck.map(ofItem),
       commitmentToRelease: commitmentToRelease(gone.heldToRelease),
       responsibilities: { subscriptions: answersFor?.subscriptions ?? 0, applications: answersFor?.applications ?? 0 },
-      vendorAdminRoles: [],
+      vendorAdminRoles: (await this.responsibilities.vendorAdminRolesOf(input.employeeId, tx)).map(
+        vendorAdminRoleLabel,
+      ),
       headSuccessorRequired: input.headSuccessorRequired,
       ...grace,
     };
