@@ -112,6 +112,7 @@ export class BlockMomentRepo {
         closedAt: null,
         accessBlockMode: 'BLOCK_NOW',
         accountLockAt: null,
+        accountLockOverdueAt: null,
         ...(page.afterId ? { id: { gt: page.afterId } } : {}),
       },
       orderBy: { id: 'asc' },
@@ -149,6 +150,16 @@ export class BlockMomentRepo {
     });
 
     return true;
+  }
+
+  /** Marks that the lock of the account was told as late, once for the case whoever was told; false when it was marked meanwhile. */
+  async markLockOverdueTold(tx: DbTx, id: string, at: Date): Promise<boolean> {
+    const done = await tx.offboardingCase.updateMany({
+      where: { id, accountLockOverdueAt: null },
+      data: { accountLockOverdueAt: at },
+    });
+
+    return done.count === 1;
   }
 
   /** The line of the log of the case that says the system blocked the access: no account and no ticket wrote it. */

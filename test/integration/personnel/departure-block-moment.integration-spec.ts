@@ -4,6 +4,7 @@ import { addDays } from '../../../src/core/business-date';
 import { nthWorkingDayFrom } from '../../../src/core/working-days';
 import { AccountLockOverdueService } from '../../../src/modules/personnel/departure-deadline/account-lock-overdue.service';
 import { BlockAnnouncementService } from '../../../src/modules/personnel/departure-deadline/block-announcement.service';
+import { handOthersToSecondItAdmin } from '../../support/second-it-admin';
 import { OffboardingHarness, type CaseWire } from '../../support/offboarding-harness';
 import type { Person } from '../../support/request-harness';
 import type { Unit } from '../../support/spend-harness';
@@ -391,6 +392,22 @@ describe('the block moment of a departure (integration, real PostgreSQL)', () =>
       expect(
         (await auditOf(wire.id, 'OFFBOARDING_CASE.ACCOUNT_LOCK_OVERDUE')).map((event) => event.actor_kind),
       ).toEqual(['SYSTEM']);
+    }, 240_000);
+
+    it('tells a case once however the IT Admin in charge changes between two passes: no second notice for the new one, no second audit event', async () => {
+      const u = await example();
+      const wire = await h.recordedCase(u.leaver, { accessBlockMode: 'BLOCK_NOW', lastWorkingDay: undefined });
+      await h.ctx.sql.query('UPDATE offboarding_cases SET block_announced_at = now() WHERE id = $1', [wire.id]);
+      await lockPassAt(h.day(1));
+      const other = await handOthersToSecondItAdmin(h);
+      await h.setItAdminInCharge(u.department, { employeeId: other.employeeId, account: other });
+
+      const second = await lockPassAt(h.day(2));
+
+      expect(second).toEqual({ told: 0, failed: 0 });
+      const told = await noticesOf(wire.id, 'ACCOUNT_LOCK_OVERDUE');
+      expect(told.map((notice) => notice.recipient).sort()).toEqual([h.it1.employeeId, h.sa.employeeId].sort());
+      expect(await auditOf(wire.id, 'OFFBOARDING_CASE.ACCOUNT_LOCK_OVERDUE')).toHaveLength(1);
     }, 240_000);
 
     it('tells nothing when the lock is written on the day, and nothing for a handover with a last working day', async () => {

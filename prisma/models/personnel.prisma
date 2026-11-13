@@ -309,6 +309,8 @@ model OffboardingCase {
   revocationDueOn        DateTime?             @map("revocation_due_on") @db.Date
   // The moment the system announced that the access of the person is blocked (QĐ-110b, QĐ-110d): set once by the sweeper of the block moment, which is what keeps it from telling twice.
   blockAnnouncedAt       DateTime?             @map("block_announced_at") @db.Timestamptz(3)
+  // The moment the system told that the lock of the company account of a departure blocked now is late (QĐ-94m(12), R-1): set once, so the telling is once for the case whoever the recipients are.
+  accountLockOverdueAt   DateTime?             @map("account_lock_overdue_at") @db.Timestamptz(3)
   groundsType            String?                @map("grounds_type")
   groundsReference       String                @map("grounds_reference")
   groundsIssuer          String?                @map("grounds_issuer")
