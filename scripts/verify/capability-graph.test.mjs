@@ -444,7 +444,12 @@ describe('the layers of requests, as the command prints them and as the module c
   test('has no capability below L3 that imports a capability with a controller, and names the importers of each L3 that is imported', () => {
     const imported = lines.filter(([, layer, , , by]) => layer === 'L3' && Number(by) > 0);
     // the four exceptions of the card (the list itself is in the gate capability-graph)
-    assert.deepEqual(imported.map(([, , name]) => name).sort(), ['draft', 'group-request-submission', 'line-closure', 'sla']);
+    assert.deepEqual(imported.map(([, , name]) => name).sort(), [
+      'draft',
+      'group-request-submission',
+      'line-closure',
+      'sla',
+    ]);
     for (const [, , name, , , importers] of imported) assert.ok(importers, name);
     const graph = capabilityGraph(join(projectRoot, 'src')).get('requests');
     const l3 = new Set(printedLayers.L3);

@@ -31,7 +31,7 @@ describe('a write path of G6 runs as the runtime role: a long leave recorded by 
       employeeId: person.employeeId,
       startedOn: h.day(-30),
       approvedReturnOn: h.day(60),
-      grounds: h.approval,
+      groundsNote: h.approval,
     });
 
     expect(leave).toMatchObject({ status: 'ACTIVE', employee: { id: person.employeeId } });
