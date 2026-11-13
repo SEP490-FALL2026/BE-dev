@@ -1,7 +1,9 @@
 import { createHash } from 'node:crypto';
-import { groundsRefusal } from '../personnel-grounds.policy';
+import { groundsNoteRefusal, groundsRefusal } from '../personnel-grounds.policy';
 import { SuperAdminEventRefusedError } from '../public/super-admin-event.errors';
 import type {
+  EventBasis,
+  EventBasisDocument,
   SuperAdminEventContext,
   SuperAdminEventModeName,
   SuperAdminEventParameters,
@@ -26,7 +28,7 @@ export function assertContext(context: SuperAdminEventContext): void {
   if (!FREE_TEXT_REFERENCE.test(context.approvedBy) || !FREE_TEXT_REFERENCE.test(context.operator)) {
     throw new SuperAdminEventRefusedError('TICKET_REFERENCE_INVALID');
   }
-  const basis = groundsRefusal(context.basis);
+  const basis = 'note' in context.basis ? groundsNoteRefusal(context.basis.note) : groundsRefusal(context.basis);
   if (basis && basis.reason !== 'GROUNDS_IS_NOTICE') throw new SuperAdminEventRefusedError('BASIS_INVALID');
   if (context.environment === 'SHARED' && squash(context.approvedBy) === squash(context.operator)) {
     throw new SuperAdminEventRefusedError('APPROVER_IS_OPERATOR');
@@ -90,4 +92,14 @@ export function parametersDigest(
   return createHash('sha256')
     .update(canonical({ subject: squash(context.subjectCode), basis: context.basis, parameters }))
     .digest('hex');
+}
+
+/**
+ * The four parts of the basis an event from a notice of a head needs (`--from-notice`): the notice is recorded with the document it was
+ * checked against, in the form the notice takes. A basis given as one box is refused there (`BASIS_INVALID`).
+ */
+export function documentBasisOf(basis: EventBasis): EventBasisDocument {
+  if ('note' in basis) throw new SuperAdminEventRefusedError('BASIS_INVALID');
+
+  return basis;
 }

@@ -6,6 +6,7 @@ import type { EmploymentType } from '../../modules/organization/public/organizat
 import {
   SUPER_ADMIN_EVENT_MODES,
   VERIFICATION_METHODS,
+  type EventBasis,
   type EventSuccessor,
   type NoticeSource,
   type ParsedSuperAdminEventArguments,
@@ -67,8 +68,11 @@ Required for every mode
                                person the event is about (by employee code, login email or work email).
   --environment <name>         LOCAL_TEST or SHARED (recorded in the Audit Trail).
   --subject-code <code>        The employee code of the person who holds the Super Admin role.
+  --basis <text>               The authoritative document outside the system the event rests on, in one box, as written on the document
+                               (for example "QĐ nghỉ việc số 12/2026 của Giám đốc, 20/10/2026").
   --basis-type <text> --basis-reference <text> --basis-issuer <text> --basis-issued-on <YYYY-MM-DD>
-                               The authoritative document outside the system the event rests on.
+                               The same document in four parts: the form --from-notice takes (the notice is checked against it).
+                               Give --basis or the four parts, never both; --from-notice takes only the four parts.
   --help
 
 Runs like \`pnpm ops:recover\`: the full environment of the application and the runtime database role. One transaction: the ticket, the event,
@@ -82,6 +86,7 @@ const OPTIONS = {
   operator: { type: 'string' },
   environment: { type: 'string' },
   'subject-code': { type: 'string' },
+  basis: { type: 'string' },
   'basis-type': { type: 'string' },
   'basis-reference': { type: 'string' },
   'basis-issuer': { type: 'string' },
@@ -121,6 +126,7 @@ const COMMON: readonly OptionName[] = [
   'operator',
   'environment',
   'subject-code',
+  'basis',
   'basis-type',
   'basis-reference',
   'basis-issuer',
@@ -246,13 +252,34 @@ function contextOf(values: Values): SuperAdminEventContext {
     operator: text(values, 'operator'),
     environment,
     subjectCode: text(values, 'subject-code'),
-    basis: {
+    basis: basisOf(values),
+  };
+}
+
+const BASIS_PARTS = ['basis-type', 'basis-reference', 'basis-issuer', 'basis-issued-on'] as const;
+
+/**
+ * The basis as one box (`--basis`, `QĐ-110a`, `QĐ-111bd`) or, for an event from a notice of a head, as the four parts the notice is
+ * checked against. One form only.
+ */
+function basisOf(values: Values): EventBasis {
+  if (values.basis === undefined) {
+    return {
       type: basisType(values),
       reference: text(values, 'basis-reference'),
       issuer: text(values, 'basis-issuer'),
       issuedOn: day(values, 'basis-issued-on'),
-    },
-  };
+    };
+  }
+  if (values['from-notice'] !== undefined) {
+    throw new SuperAdminEventArgumentError(
+      '--from-notice takes the basis in four parts (--basis-type, --basis-reference, --basis-issuer, --basis-issued-on), not --basis.',
+    );
+  }
+  const part = BASIS_PARTS.find((name) => values[name] !== undefined);
+  if (part) throw new SuperAdminEventArgumentError(`Give --basis or the four --basis-* parts, not both (--${part}).`);
+
+  return { note: text(values, 'basis') };
 }
 
 /** The kind of the basis is one of the closed list every personnel operation takes (`BM-04`). */

@@ -18,12 +18,25 @@ export type SuperAdminEventModeName = (typeof SUPER_ADMIN_EVENT_MODES)[number];
 
 export type SuperAdminEventEnvironment = 'LOCAL_TEST' | 'SHARED';
 
-/** The authoritative document outside the system the event rests on: the same four parts as the basis of an HTTP write. */
-export interface EventBasis {
+/**
+ * The authoritative document outside the system the event rests on, in four parts: the form a notice of a head (`BM-09`) still takes, so
+ * the event recorded from a notice (`--from-notice`) gives it this way.
+ */
+export interface EventBasisDocument {
   type: string;
   reference: string;
   issuer: string;
   issuedOn: string;
+}
+
+/**
+ * The basis of the event: one box of text written as the operator reads the document (`QĐ-110a`, `QĐ-111bd`), or the four parts of a
+ * document where that form is still the input (an event from a notice). The box is stored as written; the parts become one sentence.
+ */
+export type EventBasis = { note: string } | EventBasisDocument;
+
+export function isBasisNote(basis: EventBasis): basis is { note: string } {
+  return 'note' in basis;
 }
 
 /** What the operator typed for every mode, parsed and trimmed. Nothing in it is a secret. */
