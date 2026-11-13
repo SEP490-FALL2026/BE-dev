@@ -190,19 +190,12 @@ const SEATS: DemoSeat[] = [
     'NV-DES11',
     'NV-OFF1',
   ]),
-  // The traps of the optimization rules: a new seat, one outside the coverage, rights that end, a service account.
+  // The traps of the optimization rules: a new seat, one outside the coverage, rights that end. The baseline import takes personal
+  // seats only (`QĐ-110m`), so the service account of the earlier datasets is gone.
   ...seat('figma', ['NV-DES6'], { grantedDaysAgo: 5 }),
   ...seat('figma', ['NV-DES9'], { grantedDaysAgo: 30 }),
   ...seat('figma', ['NV-DES10'], { endInDays: 20 }),
   ...seat('figma', ['NV-DES12'], { endInDays: 35 }),
-  {
-    subscription: 'figma',
-    holder: {
-      serviceAccount: 'design-bot@saoviet.example',
-      responsible: 'NV-DESH',
-      reason: 'Tài khoản dịch vụ xuất ảnh tự động của phòng Thiết kế',
-    },
-  },
   ...seat('slack', ['NV-ENGH', 'NV-FINH']),
   // Legal has no head, so its budget is built from the baseline: the seats its people hold are what that baseline is made of.
   ...seat('github', ['NV-ENGH', 'NV-DEV1', 'NV-OFF1', 'NV-LGL1']),

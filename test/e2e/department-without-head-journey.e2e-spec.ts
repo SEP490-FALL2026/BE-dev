@@ -79,6 +79,9 @@ describe('QĐ-110i a headless department keeps a paid request waiting for a head
     await w.budgetFor({ department, head: newHead, member }, { total: 100_000_000, year: w.year });
     const batch = w.dataOf<{ batch: { id: string } }>(await w.sendOn([requestId], newHead.account).expect(201)).batch;
     expect((await requestOf()).state).toBe('AWAITING_SPEND_DECISION');
+    // P1-09/P1-10: the head of today reads the requests of the department, so a spend decision they do not hold is refused, 403, not hidden.
+    await w.decideSpend(requestId, { decision: 'APPROVE' }, newHead.account).expect(403);
+    expect((await requestOf()).state).toBe('AWAITING_SPEND_DECISION');
 
     await w.decideBatch(batch.id, { decision: 'APPROVE', requestIds: [requestId] }, w.boss.account).expect(200);
 

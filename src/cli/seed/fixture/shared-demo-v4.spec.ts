@@ -68,11 +68,9 @@ describe('shared dataset v4: the catalog and the shared pool', () => {
     const held = new Set<string>();
     for (const seat of F.seats) {
       expect(F.subscriptions.map((s) => s.key)).toContain(seat.subscription);
-      if (typeof seat.holder === 'string') {
-        expect(person(seat.holder)).toBeDefined();
-        expect(held.has(`${seat.subscription}:${seat.holder}`)).toBe(false);
-        held.add(`${seat.subscription}:${seat.holder}`);
-      } else expect(person(seat.holder.responsible)).toBeDefined();
+      expect(person(seat.holder)).toBeDefined();
+      expect(held.has(`${seat.subscription}:${seat.holder}`)).toBe(false);
+      held.add(`${seat.subscription}:${seat.holder}`);
     }
   });
 
@@ -276,7 +274,6 @@ describe('shared dataset v4: the usage and the people of MF-5', () => {
     expect(grantedAgo('NV-DES6')).toBeLessThan(14);
     expect(grantedAgo('NV-DES9')).toBeLessThan(60);
     expect(F.seats.find((s) => s.subscription === 'figma' && s.holder === 'NV-DES10')?.endInDays).toBeLessThan(31);
-    expect(F.seats.some((s) => typeof s.holder === 'object')).toBe(true);
     expect(source('figma').rows.some((r) => r.identifier === 'vo.thi.old@saoviet-old.example')).toBe(true);
     expect(source('figma').rows.some((r) => r.identifier === emailOf('NV-DES8'))).toBe(false);
   });

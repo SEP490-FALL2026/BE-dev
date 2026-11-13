@@ -76,8 +76,8 @@ export interface DemoSubscription {
 /** A seat the baseline file puts in the pool before the dataset starts, granted in the past. */
 export interface DemoSeat {
   subscription: string;
-  /** A person code, or a service account answered for by a person. */
-  holder: string | { serviceAccount: string; responsible: string; reason: string };
+  /** A person code: the baseline import takes personal seats only (`QĐ-110m`), a machine account is flagged after the grant. */
+  holder: string;
   /** Days before today the seat was granted; the default is 130, past the 90-day tier of the optimization rules. */
   grantedDaysAgo?: number;
   /** The seat ends this many days from today. */

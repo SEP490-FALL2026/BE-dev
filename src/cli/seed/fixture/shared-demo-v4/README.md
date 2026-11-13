@@ -82,7 +82,7 @@ Super Admin đăng nhập bằng `--super-admin-email` (mặc định `system.ad
 | Ứng dụng · gói         | Kiểu | Giá / ghế                           | Mua | Đang giữ | Trống | Vai trong demo                                          |
 | ---------------------- | ---- | ----------------------------------- | --- | -------- | ----- | ------------------------------------------------------- |
 | Jira · Standard        | K2   | 200.000 / tháng                     | 10  | 6        | 4     | R16 (nhà thầu, quyền 20 ngày); G3 NV-DES3               |
-| Figma · Professional   | K2   | 4.500.000 / năm (= 375.000 / tháng) | 20  | 16       | 4     | **Gói năm** cam kết 12 tháng, gia hạn sau 50 ngày; MF-5 |
+| Figma · Professional   | K2   | 4.500.000 / năm (= 375.000 / tháng) | 18  | 14       | 4     | **Gói năm** cam kết 12 tháng, gia hạn sau 50 ngày; MF-5 |
 | Slack · Pro            | K2   | 180.000 / tháng                     | 8   | 2        | 6     | R14 (nhóm), R13, R24                                    |
 | GitHub · Team          | K2   | 100.000 / tháng                     | 9   | 4        | 5     | R02 chờ duyệt chi, R22 chờ IT cấp từ kho                |
 | 1Password · Business   | K2   | 200.000 / tháng                     | 3   | 3        | **0** | **Kho hết ghế**: R15 IT phải mua thêm                   |
@@ -173,7 +173,6 @@ Ba nguồn usage nhập bằng tệp CSV theo mẫu (cột `email`, `last_activi
 | NV-DES4              | 40 ngày                                                | Dưới ngưỡng xem xét: chỉ ghi nhận, không khuyến nghị                                                 |
 | NV-DES6              | Ghế mới 5 ngày                                         | Bỏ qua `NEW_ASSIGNMENT` (bẫy)                                                                        |
 | NV-DES7              | Nghỉ dài từ hôm nay                                    | Bỏ qua `LEAVE_OR_HANDOVER` (bẫy)                                                                     |
-| `design-bot@…`       | Tài khoản dịch vụ                                      | Bỏ qua `SERVICE_ACCOUNT` (bẫy)                                                                       |
 | NV-DES8              | Không có dòng; một định danh lạ `vo.thi.old@…`         | `UNMATCHED_IDENTITY` + hàng đợi định danh chưa khớp (bẫy)                                            |
 | NV-DES9              | Ghế cấp 30 ngày trước                                  | Bỏ qua `COVERAGE` (bẫy)                                                                              |
 | NV-DES10             | Quyền hết hạn sau 20 ngày (≤ 1 tháng)                  | Bỏ qua `TIME_BOUND_ENDING`, không đề xuất thu hồi (bẫy)                                              |

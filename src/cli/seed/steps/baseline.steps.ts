@@ -11,16 +11,12 @@ const HEADER = 'employee_code,account_identifier,kind,granted_on,expected_end_da
 
 const cell = (value: string): string => (/[",\n]/.test(value) ? `"${value.replace(/"/g, '""')}"` : value);
 
-/** One line of the seat file for a seat of the fixture. */
-function lineOf(ctx: DemoRunContext, seat: DemoSeat): string {
+/** One line of the seat file for a seat of the fixture: the import takes personal seats only (`QĐ-110m`). */
+export function lineOf(ctx: DemoRunContext, seat: DemoSeat): string {
   const grantedOn = dayOffset(ctx.today, -(seat.grantedDaysAgo ?? DEFAULT_GRANTED_DAYS_AGO));
   const end = seat.endInDays === undefined ? '' : dayOffset(ctx.today, seat.endInDays);
-  if (typeof seat.holder === 'string') {
-    return [seat.holder, emailOf(ctx, seat.holder), 'personal', grantedOn, end, ''].map(cell).join(',');
-  }
-  const { serviceAccount, responsible, reason } = seat.holder;
 
-  return [responsible, serviceAccount, 'service', grantedOn, end, reason].map(cell).join(',');
+  return [seat.holder, emailOf(ctx, seat.holder), 'personal', grantedOn, end, ''].map(cell).join(',');
 }
 
 interface ImportPreview {

@@ -18,8 +18,8 @@ const row = (code: string, lastActivityDaysAgo: number | null) => ({ identifier:
  * - NV-DES1 79 days → G4 Review; NV-DES2 109 days (an alias of the account) → G4 Action; NV-DESH 70 → G4 Review on the head's own seat;
  *   NV-DES11 74 and NV-DES12 65 → G4 Review; NV-DES4 40 → G4 Monitor (IT only);
  * - NV-DES3 has no Jira row at all → G3 (never used);
- * - the traps that must give nothing: NV-DES6 (a new seat), NV-DES7 (long leave), the design bot (a service account), NV-DES8 (an
- *   identity nobody could tie), NV-DES9 (granted 30 days ago: outside the coverage), NV-DES10 (the right ends within a month);
+ * - the traps that must give nothing: NV-DES6 (a new seat), NV-DES7 (long leave), NV-DES8 (an identity nobody could tie), NV-DES9
+ *   (granted 30 days ago: outside the coverage), NV-DES10 (the right ends within a month);
  * - NV-OFF1 has left today and still holds three seats → G2.
  */
 const FIGMA: DemoUsageSource = {
