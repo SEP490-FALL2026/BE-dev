@@ -108,6 +108,8 @@ model Organization {
   personnelNotices                   PersonnelNotice[]
   planUsageRates                     PlanUsageRate[]
   itAdminHandovers                   ItAdminHandover[]
+  departmentSoftwareEntries          DepartmentSoftwareEntry[]
+  departmentSoftwareProposals        DepartmentSoftwareProposal[]
 
   @@map("organizations")
 }
@@ -168,6 +170,8 @@ model Department {
   returnRequests          ReturnRequest[]
   handoverDuties          HandoverDuty[]
   accessRequests          AccessRequest[]
+  softwareEntries         DepartmentSoftwareEntry[]
+  softwareProposals       DepartmentSoftwareProposal[]
   approvalRecords         ApprovalRecord[]
   spendBatches            SpendBatch[]
   transfersFrom           DepartmentTransfer[]          @relation("TransferFromDepartment")
@@ -273,6 +277,7 @@ model Employee {
   workspaceEmergencyHolderOf      PlanWorkspaceProfile[]              @relation("WorkspaceEmergencyHolder")
   workspaceMemberships            PlanWorkspaceAdmin[]                @relation("WorkspaceMember")
   itAdminHandoversReceived        ItAdminHandover[]                   @relation("ItAdminHandoverReceiver")
+  departmentSoftwareProposals     DepartmentSoftwareProposal[]        @relation("DepartmentSoftwareProposer")
   subscriptionsInCharge           Subscription[]                      @relation("SubscriptionResponsibleItAdmin")
   planTermOpinions                PlanTermOpinion[]
   applicationBusinessOwners       ApplicationBusinessOwner[]

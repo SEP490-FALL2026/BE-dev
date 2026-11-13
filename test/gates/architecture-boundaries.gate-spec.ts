@@ -92,6 +92,8 @@ const PRISMA_MODEL_OWNER: Readonly<Record<string, string>> = {
   SubscriptionRenewal: 'licensing',
   SubscriptionRenewalReleasedSeat: 'licensing',
   SubscriptionDeadlineEvent: 'licensing',
+  DepartmentSoftwareEntry: 'licensing',
+  DepartmentSoftwareProposal: 'licensing',
   SaasIssue: 'licensing',
   SaasIssueEntry: 'licensing',
   SaasIssueCounter: 'licensing',

@@ -28,6 +28,7 @@ import { AssignmentsController } from './assignment/assignments.controller';
 import { DashboardFactsRepo } from './dashboard-facts/dashboard-facts.repo';
 import { DashboardFactsService } from './dashboard-facts/dashboard-facts.service';
 import { DepartmentToolsController } from './department-tools/department-tools.controller';
+import { DepartmentSoftwareRepo } from './department-tools/department-software.repo';
 import { DepartmentToolsService } from './department-tools/department-tools.service';
 import { SubscriptionSeatsController } from './assignment/subscription-seats.controller';
 import { MachineAccountController } from './machine-account/machine-account.controller';
@@ -181,6 +182,7 @@ import { SubscriptionRenewalsController } from './subscription-renewal/subscript
     MachineAccountService,
     AssignmentListService,
     DepartmentToolsService,
+    DepartmentSoftwareRepo,
     SeatBaselineRepo,
     SeatBaselineService,
     SeatBaselinePhaseListener,

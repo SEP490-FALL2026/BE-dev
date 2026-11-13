@@ -164,6 +164,8 @@ model Application {
   applicationBusinessOwners ApplicationBusinessOwner[]
   retirementConfirmation    ApplicationRetirementConfirmation?  @relation("ApplicationRetiredOn", fields: [retirementConfirmationId], references: [id], onDelete: Restrict)
   retirementConfirmations   ApplicationRetirementConfirmation[] @relation("ApplicationConfirmed")
+  departmentSoftwareEntries   DepartmentSoftwareEntry[]
+  departmentSoftwareProposals DepartmentSoftwareProposal[]
 
   @@unique([organizationId, dictionaryLineId])
   @@index([functionalGroupId])
@@ -238,6 +240,8 @@ model Plan {
   assessmentsAlternative AccessRequestAssessment[] @relation("AssessmentAlternativePlan")
   budgetProposalLines    BudgetProposalLine[]      @relation("BudgetProposalLinePlan")
   budgetVersionLines     BudgetVersionLine[]       @relation("BudgetVersionLinePlan")
+  departmentSoftwareEntries   DepartmentSoftwareEntry[]
+  departmentSoftwareProposals DepartmentSoftwareProposal[]
 
   @@unique([organizationId, applicationId, normalizedName])
   @@index([applicationId])

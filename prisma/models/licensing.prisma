@@ -732,3 +732,70 @@ model PoolGrantAvoidedCost {
   @@index([recordedOn], map: "pool_grant_avoided_costs_recorded_on")
   @@map("pool_grant_avoided_costs")
 }
+
+enum DepartmentSoftwareProposalState {
+  PENDING
+  ACCEPTED
+  REJECTED
+}
+
+// The software of a department (QĐ-110s, QĐ-111c, DS.1): an application of the catalog, alone or with one of its plans, that the IT Admin in
+// charge lists so that the person who asks for software sees it first. It only guides, it grants nothing. One row for each place: the unique
+// index of the migration is NULLS NOT DISTINCT (an application alone counts once), which the model cannot say. A row is removed when the IT
+// Admin takes a place out; the audit trail keeps what was.
+model DepartmentSoftwareEntry {
+  id               String   @id @default(uuid(7)) @db.Uuid
+  organizationId   String   @map("organization_id") @db.Uuid
+  departmentId     String   @map("department_id") @db.Uuid
+  applicationId    String   @map("application_id") @db.Uuid
+  planId           String?  @map("plan_id") @db.Uuid
+  note             String?
+  // A value, not a foreign key: the history outlives the account.
+  addedByAppUserId String   @map("added_by_app_user_id") @db.Uuid
+  addedAt          DateTime @default(now()) @map("added_at") @db.Timestamptz(3)
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  department   Department   @relation(fields: [departmentId], references: [id], onDelete: Restrict)
+  application  Application  @relation(fields: [applicationId], references: [id], onDelete: Restrict)
+  plan         Plan?        @relation(fields: [planId], references: [id], onDelete: Restrict)
+
+  // NULLS NOT DISTINCT in the migration: the clause the model cannot say, so the migration and this line agree on the columns and the name.
+  @@unique([departmentId, applicationId, planId], map: "department_software_entries_place_key")
+  @@index([departmentId, addedAt(sort: Desc), id(sort: Desc)])
+  @@index([organizationId])
+  @@index([applicationId])
+  @@index([planId])
+  @@map("department_software_entries")
+}
+
+// The proposal of the head of a department to add a place of the catalog to its list (QĐ-110t): decided once by the IT Admin in charge, accepted
+// (the place goes in the list) or rejected with a reason, and kept. At most one is PENDING for a place: a partial unique index of the migration
+// (NULLS NOT DISTINCT, state = 'PENDING') that the model cannot say, so two proposals sent together leave one and a conflict for the other.
+model DepartmentSoftwareProposal {
+  id                   String                          @id @default(uuid(7)) @db.Uuid
+  organizationId       String                          @map("organization_id") @db.Uuid
+  departmentId         String                          @map("department_id") @db.Uuid
+  applicationId        String                          @map("application_id") @db.Uuid
+  planId               String?                         @map("plan_id") @db.Uuid
+  reason               String
+  state                DepartmentSoftwareProposalState @default(PENDING)
+  proposedByEmployeeId String                          @map("proposed_by_employee_id") @db.Uuid
+  proposedAt           DateTime                        @default(now()) @map("proposed_at") @db.Timestamptz(3)
+  // Set together when the IT Admin decides: who (a value, not a foreign key), when and, for a rejection, why.
+  decidedByAppUserId   String?                         @map("decided_by_app_user_id") @db.Uuid
+  decidedAt            DateTime?                       @map("decided_at") @db.Timestamptz(3)
+  decisionReason       String?                         @map("decision_reason")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  department   Department   @relation(fields: [departmentId], references: [id], onDelete: Restrict)
+  application  Application  @relation(fields: [applicationId], references: [id], onDelete: Restrict)
+  plan         Plan?        @relation(fields: [planId], references: [id], onDelete: Restrict)
+  proposedBy   Employee     @relation("DepartmentSoftwareProposer", fields: [proposedByEmployeeId], references: [id], onDelete: Restrict)
+
+  @@index([departmentId, proposedAt(sort: Desc), id(sort: Desc)])
+  @@index([organizationId])
+  @@index([applicationId])
+  @@index([planId])
+  @@index([proposedByEmployeeId])
+  @@map("department_software_proposals")
+}
