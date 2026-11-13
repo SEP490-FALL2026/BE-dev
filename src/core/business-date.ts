@@ -48,3 +48,15 @@ export function addDays(date: BusinessDate, days: number): BusinessDate {
 
   return shifted.toISOString().slice(0, 10);
 }
+
+/**
+ * The first day of the month `date` is in and of the month after it: "this month" is `[start, nextStart)`, the days of the month up to `date`
+ * included. Whole days of the calendar, no time zone involved.
+ */
+export function monthBoundsOf(date: BusinessDate): { start: BusinessDate; nextStart: BusinessDate } {
+  const year = Number(date.slice(0, 4));
+  const month = Number(date.slice(5, 7));
+  const nextStart = month === 12 ? `${year + 1}-01-01` : `${year}-${String(month + 1).padStart(2, '0')}-01`;
+
+  return { start: `${date.slice(0, 8)}01`, nextStart };
+}

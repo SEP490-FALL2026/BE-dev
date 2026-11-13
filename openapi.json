@@ -6184,6 +6184,13 @@
             "schema": { "format": "date", "type": "string" }
           },
           {
+            "name": "graceEndsFrom",
+            "required": false,
+            "in": "query",
+            "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused).",
+            "schema": { "format": "date", "type": "string" }
+          },
+          {
             "name": "page",
             "required": false,
             "in": "query",
@@ -6204,7 +6211,7 @@
         ],
         "responses": {
           "200": {
-            "description": "A page of transfers, the latest day first, optionally of one person, one state or a range of days. Each row says who, what changes, from where to where, the day, where it stands (phase: PENDING, IN_GRACE while the person keeps the rights of the old department, REVOKING once the grace is over, CLOSED when the system closed it with nothing left to take back, SUPERSEDED when a departure recorded in the grace took the rights over, CANCELLED) and the grace (the last day the person keeps those rights and the day they are told once more; graceEndsBefore keeps the transfers whose grace ends before a day); the basis, the head handover and the old rights are in the detail. An IT Admin reads only the transfers that leave or enter a department they are in charge of.",
+            "description": "A page of transfers, the latest day first, optionally of one person, one state or a range of days. Each row says who, what changes, from where to where, the day, where it stands (phase: PENDING, IN_GRACE while the person keeps the rights of the old department, REVOKING once the grace is over, CLOSED when the system closed it with nothing left to take back, SUPERSEDED when a departure recorded in the grace took the rights over, CANCELLED) and the grace (the last day the person keeps those rights and the day they are told once more; graceEndsBefore keeps the transfers whose grace ends before a day and graceEndsFrom those whose grace ends on or after one, so both give the graces that end in a range of days, as the calendar of the next working days of the overview reads them); the basis, the head handover and the old rights are in the detail. An IT Admin reads only the transfers that leave or enter a department they are in charge of.",
             "content": {
               "application/json": {
                 "schema": {
@@ -9374,6 +9381,20 @@
             }
           },
           {
+            "name": "lastWorkingDayFrom",
+            "required": false,
+            "in": "query",
+            "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused).",
+            "schema": { "format": "date", "type": "string" }
+          },
+          {
+            "name": "lastWorkingDayTo",
+            "required": false,
+            "in": "query",
+            "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused).",
+            "schema": { "format": "date", "type": "string" }
+          },
+          {
             "name": "page",
             "required": false,
             "in": "query",
@@ -9394,7 +9415,7 @@
         ],
         "responses": {
           "200": {
-            "description": "A page of departures, by last working day, optionally of one person, one state, those handing over whose last working day has passed, or those whose company account is not recorded as locked, or those whose person held one of the roles that need someone to take over when the departure was recorded (the Super Admin, Finance, an approval role, the IT Admin in charge of a department, the head of a department, the owner or administrator of a workspace). Each row says who, where the case stands, the days, how many rights the person still holds and which of those roles they hold now. `revocation` is the deadline of the revocations, kept on the case: its day (`dueOn`, the Nth working day after the block moment, counting the day after the last working day as day 1, N being the parameter DEPARTURE_REVOCATION_WORKING_DAYS), how many personal seats have no task of revocation completed (those nobody opened a task for included) and whether the case is `overdue` (today is past the day with such a seat left). revocationOverdue=true lists only the late departures, false all the others.",
+            "description": "A page of departures, by last working day, optionally of one person, one state, those handing over whose last working day has passed, or those whose company account is not recorded as locked, or those whose person held one of the roles that need someone to take over when the departure was recorded (the Super Admin, Finance, an approval role, the IT Admin in charge of a department, the head of a department, the owner or administrator of a workspace). Each row says who, where the case stands, the days, how many rights the person still holds and which of those roles they hold now. `revocation` is the deadline of the revocations, kept on the case: its day (`dueOn`, the Nth working day after the block moment, counting the day after the last working day as day 1, N being the parameter DEPARTURE_REVOCATION_WORKING_DAYS), how many personal seats have no task of revocation completed (those nobody opened a task for included) and whether the case is `overdue` (today is past the day with such a seat left). revocationOverdue=true lists only the late departures, false all the others. lastWorkingDayFrom and lastWorkingDayTo keep the departures whose last working day is in that range, both days included: the calendar of the next working days of the overview.",
             "content": {
               "application/json": {
                 "schema": {
@@ -115979,9 +116000,481 @@
                 "required": ["departments"],
                 "additionalProperties": false
               },
+              "calendar": {
+                "type": "object",
+                "properties": {
+                  "from": {
+                    "type": "string",
+                    "format": "date",
+                    "description": "Today: the first day of the calendar of the next working days."
+                  },
+                  "to": {
+                    "type": "string",
+                    "format": "date",
+                    "description": "The tenth working day after today. The rows of `upcoming` are the departures handing over with the last working day from `from` to `to` (`offboardingCaseList`: `state=HANDING_OVER&lastWorkingDayFrom&lastWorkingDayTo`); the transfers whose grace ends in the same days are read from `departmentTransferList` with `graceEndsFrom=from` and `graceEndsBefore` the day after `to`."
+                  }
+                },
+                "required": ["from", "to"],
+                "additionalProperties": false
+              },
               "sections": {
                 "type": "object",
                 "properties": {
+                  "departures": {
+                    "type": "object",
+                    "properties": {
+                      "upcoming": {
+                        "type": "object",
+                        "properties": {
+                          "state": {
+                            "type": "string",
+                            "enum": ["COUNTED", "AT_SOURCE", "NOT_AVAILABLE"],
+                            "description": "COUNTED: count is how many, in the scope of the caller. AT_SOURCE: the rows are listed by sourceOperationId in the same scope and are not counted here. NOT_AVAILABLE: the data has no source yet; reason says why. A section that is not counted is never shown as zero."
+                          },
+                          "count": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991,
+                            "description": "Set only when state is COUNTED.",
+                            "nullable": true
+                          },
+                          "sourceOperationId": {
+                            "description": "The operation that lists the rows of the section; null when there is none yet.",
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "reason": {
+                            "type": "string",
+                            "enum": [
+                              "FINANCE_FIGURES_NOT_DELIVERED",
+                              "USAGE_DATA_NOT_DELIVERED",
+                              "NO_DATA_SOURCE",
+                              null
+                            ],
+                            "description": "Set only when state is NOT_AVAILABLE: the source of the data that is not delivered yet.",
+                            "nullable": true
+                          }
+                        },
+                        "required": ["state", "count", "sourceOperationId", "reason"],
+                        "additionalProperties": false,
+                        "description": "The departures handing over whose last working day is in the calendar of the next working days (`calendar`): the total of `offboardingCaseList` for `state=HANDING_OVER` and those days, in the scope of the caller."
+                      },
+                      "awaitingRevocation": {
+                        "type": "object",
+                        "properties": {
+                          "state": {
+                            "type": "string",
+                            "enum": ["COUNTED", "AT_SOURCE", "NOT_AVAILABLE"],
+                            "description": "COUNTED: count is how many, in the scope of the caller. AT_SOURCE: the rows are listed by sourceOperationId in the same scope and are not counted here. NOT_AVAILABLE: the data has no source yet; reason says why. A section that is not counted is never shown as zero."
+                          },
+                          "count": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991,
+                            "description": "Set only when state is COUNTED.",
+                            "nullable": true
+                          },
+                          "sourceOperationId": {
+                            "description": "The operation that lists the rows of the section; null when there is none yet.",
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "reason": {
+                            "type": "string",
+                            "enum": [
+                              "FINANCE_FIGURES_NOT_DELIVERED",
+                              "USAGE_DATA_NOT_DELIVERED",
+                              "NO_DATA_SOURCE",
+                              null
+                            ],
+                            "description": "Set only when state is NOT_AVAILABLE: the source of the data that is not delivered yet.",
+                            "nullable": true
+                          }
+                        },
+                        "required": ["state", "count", "sourceOperationId", "reason"],
+                        "additionalProperties": false,
+                        "description": "The departures whose access is blocked, not closed and not past the deadline of their revocations: the IT Admin has until `revocation.dueOn` of the case."
+                      },
+                      "revocationOverdue": {
+                        "type": "object",
+                        "properties": {
+                          "state": {
+                            "type": "string",
+                            "enum": ["COUNTED", "AT_SOURCE", "NOT_AVAILABLE"],
+                            "description": "COUNTED: count is how many, in the scope of the caller. AT_SOURCE: the rows are listed by sourceOperationId in the same scope and are not counted here. NOT_AVAILABLE: the data has no source yet; reason says why. A section that is not counted is never shown as zero."
+                          },
+                          "count": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991,
+                            "description": "Set only when state is COUNTED.",
+                            "nullable": true
+                          },
+                          "sourceOperationId": {
+                            "description": "The operation that lists the rows of the section; null when there is none yet.",
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "reason": {
+                            "type": "string",
+                            "enum": [
+                              "FINANCE_FIGURES_NOT_DELIVERED",
+                              "USAGE_DATA_NOT_DELIVERED",
+                              "NO_DATA_SOURCE",
+                              null
+                            ],
+                            "description": "Set only when state is NOT_AVAILABLE: the source of the data that is not delivered yet.",
+                            "nullable": true
+                          }
+                        },
+                        "required": ["state", "count", "sourceOperationId", "reason"],
+                        "additionalProperties": false,
+                        "description": "The departures past the deadline of their revocations with a right left without a completed task: the total of `offboardingCaseList` for `revocationOverdue=true`."
+                      },
+                      "closedThisMonth": {
+                        "type": "object",
+                        "properties": {
+                          "state": {
+                            "type": "string",
+                            "enum": ["COUNTED", "AT_SOURCE", "NOT_AVAILABLE"],
+                            "description": "COUNTED: count is how many, in the scope of the caller. AT_SOURCE: the rows are listed by sourceOperationId in the same scope and are not counted here. NOT_AVAILABLE: the data has no source yet; reason says why. A section that is not counted is never shown as zero."
+                          },
+                          "count": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991,
+                            "description": "Set only when state is COUNTED.",
+                            "nullable": true
+                          },
+                          "sourceOperationId": {
+                            "description": "The operation that lists the rows of the section; null when there is none yet.",
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "reason": {
+                            "type": "string",
+                            "enum": [
+                              "FINANCE_FIGURES_NOT_DELIVERED",
+                              "USAGE_DATA_NOT_DELIVERED",
+                              "NO_DATA_SOURCE",
+                              null
+                            ],
+                            "description": "Set only when state is NOT_AVAILABLE: the source of the data that is not delivered yet.",
+                            "nullable": true
+                          }
+                        },
+                        "required": ["state", "count", "sourceOperationId", "reason"],
+                        "additionalProperties": false,
+                        "description": "The departures the system closed from the first of this month to today."
+                      },
+                      "itHandoverPending": {
+                        "type": "object",
+                        "properties": {
+                          "state": {
+                            "type": "string",
+                            "enum": ["COUNTED", "AT_SOURCE", "NOT_AVAILABLE"],
+                            "description": "COUNTED: count is how many, in the scope of the caller. AT_SOURCE: the rows are listed by sourceOperationId in the same scope and are not counted here. NOT_AVAILABLE: the data has no source yet; reason says why. A section that is not counted is never shown as zero."
+                          },
+                          "count": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991,
+                            "description": "Set only when state is COUNTED.",
+                            "nullable": true
+                          },
+                          "sourceOperationId": {
+                            "description": "The operation that lists the rows of the section; null when there is none yet.",
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "reason": {
+                            "type": "string",
+                            "enum": [
+                              "FINANCE_FIGURES_NOT_DELIVERED",
+                              "USAGE_DATA_NOT_DELIVERED",
+                              "NO_DATA_SOURCE",
+                              null
+                            ],
+                            "description": "Set only when state is NOT_AVAILABLE: the source of the data that is not delivered yet.",
+                            "nullable": true
+                          }
+                        },
+                        "required": ["state", "count", "sourceOperationId", "reason"],
+                        "additionalProperties": false,
+                        "description": "The departures and transfers of an IT Admin who still answers for subscriptions or applications nobody has handed over, across the company: the shared queue of the IT Admins."
+                      },
+                      "mailboxLockPending": {
+                        "type": "object",
+                        "properties": {
+                          "state": {
+                            "type": "string",
+                            "enum": ["COUNTED", "AT_SOURCE", "NOT_AVAILABLE"],
+                            "description": "COUNTED: count is how many, in the scope of the caller. AT_SOURCE: the rows are listed by sourceOperationId in the same scope and are not counted here. NOT_AVAILABLE: the data has no source yet; reason says why. A section that is not counted is never shown as zero."
+                          },
+                          "count": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991,
+                            "description": "Set only when state is COUNTED.",
+                            "nullable": true
+                          },
+                          "sourceOperationId": {
+                            "description": "The operation that lists the rows of the section; null when there is none yet.",
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "reason": {
+                            "type": "string",
+                            "enum": [
+                              "FINANCE_FIGURES_NOT_DELIVERED",
+                              "USAGE_DATA_NOT_DELIVERED",
+                              "NO_DATA_SOURCE",
+                              null
+                            ],
+                            "description": "Set only when state is NOT_AVAILABLE: the source of the data that is not delivered yet.",
+                            "nullable": true
+                          }
+                        },
+                        "required": ["state", "count", "sourceOperationId", "reason"],
+                        "additionalProperties": false,
+                        "description": "The departures not closed whose lock of the company account (1a) is recorded and whose lock of the mailbox for good (1b) is not."
+                      }
+                    },
+                    "required": [
+                      "upcoming",
+                      "awaitingRevocation",
+                      "revocationOverdue",
+                      "closedThisMonth",
+                      "itHandoverPending",
+                      "mailboxLockPending"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "transfers": {
+                    "type": "object",
+                    "properties": {
+                      "inGrace": {
+                        "type": "object",
+                        "properties": {
+                          "state": {
+                            "type": "string",
+                            "enum": ["COUNTED", "AT_SOURCE", "NOT_AVAILABLE"],
+                            "description": "COUNTED: count is how many, in the scope of the caller. AT_SOURCE: the rows are listed by sourceOperationId in the same scope and are not counted here. NOT_AVAILABLE: the data has no source yet; reason says why. A section that is not counted is never shown as zero."
+                          },
+                          "count": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991,
+                            "description": "Set only when state is COUNTED.",
+                            "nullable": true
+                          },
+                          "sourceOperationId": {
+                            "description": "The operation that lists the rows of the section; null when there is none yet.",
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "reason": {
+                            "type": "string",
+                            "enum": [
+                              "FINANCE_FIGURES_NOT_DELIVERED",
+                              "USAGE_DATA_NOT_DELIVERED",
+                              "NO_DATA_SOURCE",
+                              null
+                            ],
+                            "description": "Set only when state is NOT_AVAILABLE: the source of the data that is not delivered yet.",
+                            "nullable": true
+                          }
+                        },
+                        "required": ["state", "count", "sourceOperationId", "reason"],
+                        "additionalProperties": false,
+                        "description": "The transfers that took effect and are not closed, the grace of the old rights still lasting (its last day included)."
+                      },
+                      "graceEndingSoon": {
+                        "type": "object",
+                        "properties": {
+                          "state": {
+                            "type": "string",
+                            "enum": ["COUNTED", "AT_SOURCE", "NOT_AVAILABLE"],
+                            "description": "COUNTED: count is how many, in the scope of the caller. AT_SOURCE: the rows are listed by sourceOperationId in the same scope and are not counted here. NOT_AVAILABLE: the data has no source yet; reason says why. A section that is not counted is never shown as zero."
+                          },
+                          "count": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991,
+                            "description": "Set only when state is COUNTED.",
+                            "nullable": true
+                          },
+                          "sourceOperationId": {
+                            "description": "The operation that lists the rows of the section; null when there is none yet.",
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "reason": {
+                            "type": "string",
+                            "enum": [
+                              "FINANCE_FIGURES_NOT_DELIVERED",
+                              "USAGE_DATA_NOT_DELIVERED",
+                              "NO_DATA_SOURCE",
+                              null
+                            ],
+                            "description": "Set only when state is NOT_AVAILABLE: the source of the data that is not delivered yet.",
+                            "nullable": true
+                          }
+                        },
+                        "required": ["state", "count", "sourceOperationId", "reason"],
+                        "additionalProperties": false,
+                        "description": "Of those in the grace, the ones from the day of the reminder on: the grace ends within the reminder days (the parameter TRANSFER_GRACE_REMINDER_WORKING_DAYS)."
+                      },
+                      "revoking": {
+                        "type": "object",
+                        "properties": {
+                          "state": {
+                            "type": "string",
+                            "enum": ["COUNTED", "AT_SOURCE", "NOT_AVAILABLE"],
+                            "description": "COUNTED: count is how many, in the scope of the caller. AT_SOURCE: the rows are listed by sourceOperationId in the same scope and are not counted here. NOT_AVAILABLE: the data has no source yet; reason says why. A section that is not counted is never shown as zero."
+                          },
+                          "count": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991,
+                            "description": "Set only when state is COUNTED.",
+                            "nullable": true
+                          },
+                          "sourceOperationId": {
+                            "description": "The operation that lists the rows of the section; null when there is none yet.",
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "reason": {
+                            "type": "string",
+                            "enum": [
+                              "FINANCE_FIGURES_NOT_DELIVERED",
+                              "USAGE_DATA_NOT_DELIVERED",
+                              "NO_DATA_SOURCE",
+                              null
+                            ],
+                            "description": "Set only when state is NOT_AVAILABLE: the source of the data that is not delivered yet.",
+                            "nullable": true
+                          }
+                        },
+                        "required": ["state", "count", "sourceOperationId", "reason"],
+                        "additionalProperties": false,
+                        "description": "The transfers whose grace is over and whose old rights are being taken back."
+                      }
+                    },
+                    "required": ["inGrace", "graceEndingSoon", "revoking"],
+                    "additionalProperties": false
+                  },
+                  "seatsReturned": {
+                    "type": "object",
+                    "properties": {
+                      "thisMonth": {
+                        "type": "object",
+                        "properties": {
+                          "state": {
+                            "type": "string",
+                            "enum": ["COUNTED", "AT_SOURCE", "NOT_AVAILABLE"],
+                            "description": "COUNTED: count is how many, in the scope of the caller. AT_SOURCE: the rows are listed by sourceOperationId in the same scope and are not counted here. NOT_AVAILABLE: the data has no source yet; reason says why. A section that is not counted is never shown as zero."
+                          },
+                          "count": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991,
+                            "description": "Set only when state is COUNTED.",
+                            "nullable": true
+                          },
+                          "sourceOperationId": {
+                            "description": "The operation that lists the rows of the section; null when there is none yet.",
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "reason": {
+                            "type": "string",
+                            "enum": [
+                              "FINANCE_FIGURES_NOT_DELIVERED",
+                              "USAGE_DATA_NOT_DELIVERED",
+                              "NO_DATA_SOURCE",
+                              null
+                            ],
+                            "description": "Set only when state is NOT_AVAILABLE: the source of the data that is not delivered yet.",
+                            "nullable": true
+                          }
+                        },
+                        "required": ["state", "count", "sourceOperationId", "reason"],
+                        "additionalProperties": false,
+                        "description": "The seats of the shared pools (`K2`) whose revocation for a departure or a transfer was completed from the first of this month to today. An IT Admin counts the tasks they are in charge of by default."
+                      },
+                      "reusedThisMonth": {
+                        "type": "object",
+                        "properties": {
+                          "state": {
+                            "type": "string",
+                            "enum": ["COUNTED", "AT_SOURCE", "NOT_AVAILABLE"],
+                            "description": "COUNTED: count is how many, in the scope of the caller. AT_SOURCE: the rows are listed by sourceOperationId in the same scope and are not counted here. NOT_AVAILABLE: the data has no source yet; reason says why. A section that is not counted is never shown as zero."
+                          },
+                          "count": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991,
+                            "description": "Set only when state is COUNTED.",
+                            "nullable": true
+                          },
+                          "sourceOperationId": {
+                            "description": "The operation that lists the rows of the section; null when there is none yet.",
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "reason": {
+                            "type": "string",
+                            "enum": [
+                              "FINANCE_FIGURES_NOT_DELIVERED",
+                              "USAGE_DATA_NOT_DELIVERED",
+                              "NO_DATA_SOURCE",
+                              null
+                            ],
+                            "description": "Set only when state is NOT_AVAILABLE: the source of the data that is not delivered yet.",
+                            "nullable": true
+                          }
+                        },
+                        "required": ["state", "count", "sourceOperationId", "reason"],
+                        "additionalProperties": false,
+                        "description": "The seats of the shared pools (`K2`) handed out again in the same days. Seats of a pool are not told apart one by one, so this is the stock given out in the time, whatever freed it. An IT Admin counts the tasks they are in charge of by default."
+                      }
+                    },
+                    "required": ["thisMonth", "reusedThisMonth"],
+                    "additionalProperties": false
+                  },
+                  "plansBelowVendorAdminMinimum": {
+                    "type": "object",
+                    "properties": {
+                      "state": {
+                        "type": "string",
+                        "enum": ["COUNTED", "AT_SOURCE", "NOT_AVAILABLE"],
+                        "description": "COUNTED: count is how many, in the scope of the caller. AT_SOURCE: the rows are listed by sourceOperationId in the same scope and are not counted here. NOT_AVAILABLE: the data has no source yet; reason says why. A section that is not counted is never shown as zero."
+                      },
+                      "count": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991,
+                        "description": "Set only when state is COUNTED.",
+                        "nullable": true
+                      },
+                      "sourceOperationId": {
+                        "description": "The operation that lists the rows of the section; null when there is none yet.",
+                        "type": "string",
+                        "nullable": true
+                      },
+                      "reason": {
+                        "type": "string",
+                        "enum": ["FINANCE_FIGURES_NOT_DELIVERED", "USAGE_DATA_NOT_DELIVERED", "NO_DATA_SOURCE", null],
+                        "description": "Set only when state is NOT_AVAILABLE: the source of the data that is not delivered yet.",
+                        "nullable": true
+                      }
+                    },
+                    "required": ["state", "count", "sourceOperationId", "reason"],
+                    "additionalProperties": false,
+                    "description": "The plans in use that need admins at the vendor (`K2`, or `K4` with an admin console) with fewer than two of the recorded ones still working as IT Admins, or none recorded: the plans whose subscriptions raise `vendorAdminsBelowMinimum` in `subscriptionList`. Across the company."
+                  },
                   "grantTasks": {
                     "type": "object",
                     "properties": {
@@ -116197,7 +116690,7 @@
                     },
                     "required": ["state", "count", "sourceOperationId", "reason"],
                     "additionalProperties": false,
-                    "description": "The departures still handing over in the departments of the caller."
+                    "description": "The departures still handing over in the departments of the caller. Kept one release beside `departures`, which says where every departure stands; dropped after."
                   },
                   "unconfirmedDevices": {
                     "type": "object",
@@ -116294,6 +116787,10 @@
                   }
                 },
                 "required": [
+                  "departures",
+                  "transfers",
+                  "seatsReturned",
+                  "plansBelowVendorAdminMinimum",
                   "grantTasks",
                   "revocationTasks",
                   "discrepancies",
@@ -116308,7 +116805,7 @@
                 "additionalProperties": false
               }
             },
-            "required": ["asOf", "scope", "sections"],
+            "required": ["asOf", "scope", "calendar", "sections"],
             "additionalProperties": false,
             "nullable": true
           }
@@ -116325,9 +116822,481 @@
             "type": "object",
             "properties": {
               "asOf": { "type": "string", "format": "date", "description": "A calendar date as YYYY-MM-DD." },
+              "calendar": {
+                "type": "object",
+                "properties": {
+                  "from": {
+                    "type": "string",
+                    "format": "date",
+                    "description": "Today: the first day of the calendar of the next working days."
+                  },
+                  "to": {
+                    "type": "string",
+                    "format": "date",
+                    "description": "The tenth working day after today. The rows of `upcoming` are the departures handing over with the last working day from `from` to `to` (`offboardingCaseList`: `state=HANDING_OVER&lastWorkingDayFrom&lastWorkingDayTo`); the transfers whose grace ends in the same days are read from `departmentTransferList` with `graceEndsFrom=from` and `graceEndsBefore` the day after `to`."
+                  }
+                },
+                "required": ["from", "to"],
+                "additionalProperties": false
+              },
               "sections": {
                 "type": "object",
                 "properties": {
+                  "departures": {
+                    "type": "object",
+                    "properties": {
+                      "upcoming": {
+                        "type": "object",
+                        "properties": {
+                          "state": {
+                            "type": "string",
+                            "enum": ["COUNTED", "AT_SOURCE", "NOT_AVAILABLE"],
+                            "description": "COUNTED: count is how many, in the scope of the caller. AT_SOURCE: the rows are listed by sourceOperationId in the same scope and are not counted here. NOT_AVAILABLE: the data has no source yet; reason says why. A section that is not counted is never shown as zero."
+                          },
+                          "count": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991,
+                            "description": "Set only when state is COUNTED.",
+                            "nullable": true
+                          },
+                          "sourceOperationId": {
+                            "description": "The operation that lists the rows of the section; null when there is none yet.",
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "reason": {
+                            "type": "string",
+                            "enum": [
+                              "FINANCE_FIGURES_NOT_DELIVERED",
+                              "USAGE_DATA_NOT_DELIVERED",
+                              "NO_DATA_SOURCE",
+                              null
+                            ],
+                            "description": "Set only when state is NOT_AVAILABLE: the source of the data that is not delivered yet.",
+                            "nullable": true
+                          }
+                        },
+                        "required": ["state", "count", "sourceOperationId", "reason"],
+                        "additionalProperties": false,
+                        "description": "The departures handing over whose last working day is in the calendar of the next working days (`calendar`): the total of `offboardingCaseList` for `state=HANDING_OVER` and those days, in the scope of the caller."
+                      },
+                      "awaitingRevocation": {
+                        "type": "object",
+                        "properties": {
+                          "state": {
+                            "type": "string",
+                            "enum": ["COUNTED", "AT_SOURCE", "NOT_AVAILABLE"],
+                            "description": "COUNTED: count is how many, in the scope of the caller. AT_SOURCE: the rows are listed by sourceOperationId in the same scope and are not counted here. NOT_AVAILABLE: the data has no source yet; reason says why. A section that is not counted is never shown as zero."
+                          },
+                          "count": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991,
+                            "description": "Set only when state is COUNTED.",
+                            "nullable": true
+                          },
+                          "sourceOperationId": {
+                            "description": "The operation that lists the rows of the section; null when there is none yet.",
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "reason": {
+                            "type": "string",
+                            "enum": [
+                              "FINANCE_FIGURES_NOT_DELIVERED",
+                              "USAGE_DATA_NOT_DELIVERED",
+                              "NO_DATA_SOURCE",
+                              null
+                            ],
+                            "description": "Set only when state is NOT_AVAILABLE: the source of the data that is not delivered yet.",
+                            "nullable": true
+                          }
+                        },
+                        "required": ["state", "count", "sourceOperationId", "reason"],
+                        "additionalProperties": false,
+                        "description": "The departures whose access is blocked, not closed and not past the deadline of their revocations: the IT Admin has until `revocation.dueOn` of the case."
+                      },
+                      "revocationOverdue": {
+                        "type": "object",
+                        "properties": {
+                          "state": {
+                            "type": "string",
+                            "enum": ["COUNTED", "AT_SOURCE", "NOT_AVAILABLE"],
+                            "description": "COUNTED: count is how many, in the scope of the caller. AT_SOURCE: the rows are listed by sourceOperationId in the same scope and are not counted here. NOT_AVAILABLE: the data has no source yet; reason says why. A section that is not counted is never shown as zero."
+                          },
+                          "count": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991,
+                            "description": "Set only when state is COUNTED.",
+                            "nullable": true
+                          },
+                          "sourceOperationId": {
+                            "description": "The operation that lists the rows of the section; null when there is none yet.",
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "reason": {
+                            "type": "string",
+                            "enum": [
+                              "FINANCE_FIGURES_NOT_DELIVERED",
+                              "USAGE_DATA_NOT_DELIVERED",
+                              "NO_DATA_SOURCE",
+                              null
+                            ],
+                            "description": "Set only when state is NOT_AVAILABLE: the source of the data that is not delivered yet.",
+                            "nullable": true
+                          }
+                        },
+                        "required": ["state", "count", "sourceOperationId", "reason"],
+                        "additionalProperties": false,
+                        "description": "The departures past the deadline of their revocations with a right left without a completed task: the total of `offboardingCaseList` for `revocationOverdue=true`."
+                      },
+                      "closedThisMonth": {
+                        "type": "object",
+                        "properties": {
+                          "state": {
+                            "type": "string",
+                            "enum": ["COUNTED", "AT_SOURCE", "NOT_AVAILABLE"],
+                            "description": "COUNTED: count is how many, in the scope of the caller. AT_SOURCE: the rows are listed by sourceOperationId in the same scope and are not counted here. NOT_AVAILABLE: the data has no source yet; reason says why. A section that is not counted is never shown as zero."
+                          },
+                          "count": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991,
+                            "description": "Set only when state is COUNTED.",
+                            "nullable": true
+                          },
+                          "sourceOperationId": {
+                            "description": "The operation that lists the rows of the section; null when there is none yet.",
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "reason": {
+                            "type": "string",
+                            "enum": [
+                              "FINANCE_FIGURES_NOT_DELIVERED",
+                              "USAGE_DATA_NOT_DELIVERED",
+                              "NO_DATA_SOURCE",
+                              null
+                            ],
+                            "description": "Set only when state is NOT_AVAILABLE: the source of the data that is not delivered yet.",
+                            "nullable": true
+                          }
+                        },
+                        "required": ["state", "count", "sourceOperationId", "reason"],
+                        "additionalProperties": false,
+                        "description": "The departures the system closed from the first of this month to today."
+                      },
+                      "itHandoverPending": {
+                        "type": "object",
+                        "properties": {
+                          "state": {
+                            "type": "string",
+                            "enum": ["COUNTED", "AT_SOURCE", "NOT_AVAILABLE"],
+                            "description": "COUNTED: count is how many, in the scope of the caller. AT_SOURCE: the rows are listed by sourceOperationId in the same scope and are not counted here. NOT_AVAILABLE: the data has no source yet; reason says why. A section that is not counted is never shown as zero."
+                          },
+                          "count": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991,
+                            "description": "Set only when state is COUNTED.",
+                            "nullable": true
+                          },
+                          "sourceOperationId": {
+                            "description": "The operation that lists the rows of the section; null when there is none yet.",
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "reason": {
+                            "type": "string",
+                            "enum": [
+                              "FINANCE_FIGURES_NOT_DELIVERED",
+                              "USAGE_DATA_NOT_DELIVERED",
+                              "NO_DATA_SOURCE",
+                              null
+                            ],
+                            "description": "Set only when state is NOT_AVAILABLE: the source of the data that is not delivered yet.",
+                            "nullable": true
+                          }
+                        },
+                        "required": ["state", "count", "sourceOperationId", "reason"],
+                        "additionalProperties": false,
+                        "description": "The departures and transfers of an IT Admin who still answers for subscriptions or applications nobody has handed over, across the company: the shared queue of the IT Admins."
+                      },
+                      "mailboxLockPending": {
+                        "type": "object",
+                        "properties": {
+                          "state": {
+                            "type": "string",
+                            "enum": ["COUNTED", "AT_SOURCE", "NOT_AVAILABLE"],
+                            "description": "COUNTED: count is how many, in the scope of the caller. AT_SOURCE: the rows are listed by sourceOperationId in the same scope and are not counted here. NOT_AVAILABLE: the data has no source yet; reason says why. A section that is not counted is never shown as zero."
+                          },
+                          "count": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991,
+                            "description": "Set only when state is COUNTED.",
+                            "nullable": true
+                          },
+                          "sourceOperationId": {
+                            "description": "The operation that lists the rows of the section; null when there is none yet.",
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "reason": {
+                            "type": "string",
+                            "enum": [
+                              "FINANCE_FIGURES_NOT_DELIVERED",
+                              "USAGE_DATA_NOT_DELIVERED",
+                              "NO_DATA_SOURCE",
+                              null
+                            ],
+                            "description": "Set only when state is NOT_AVAILABLE: the source of the data that is not delivered yet.",
+                            "nullable": true
+                          }
+                        },
+                        "required": ["state", "count", "sourceOperationId", "reason"],
+                        "additionalProperties": false,
+                        "description": "The departures not closed whose lock of the company account (1a) is recorded and whose lock of the mailbox for good (1b) is not."
+                      }
+                    },
+                    "required": [
+                      "upcoming",
+                      "awaitingRevocation",
+                      "revocationOverdue",
+                      "closedThisMonth",
+                      "itHandoverPending",
+                      "mailboxLockPending"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "transfers": {
+                    "type": "object",
+                    "properties": {
+                      "inGrace": {
+                        "type": "object",
+                        "properties": {
+                          "state": {
+                            "type": "string",
+                            "enum": ["COUNTED", "AT_SOURCE", "NOT_AVAILABLE"],
+                            "description": "COUNTED: count is how many, in the scope of the caller. AT_SOURCE: the rows are listed by sourceOperationId in the same scope and are not counted here. NOT_AVAILABLE: the data has no source yet; reason says why. A section that is not counted is never shown as zero."
+                          },
+                          "count": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991,
+                            "description": "Set only when state is COUNTED.",
+                            "nullable": true
+                          },
+                          "sourceOperationId": {
+                            "description": "The operation that lists the rows of the section; null when there is none yet.",
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "reason": {
+                            "type": "string",
+                            "enum": [
+                              "FINANCE_FIGURES_NOT_DELIVERED",
+                              "USAGE_DATA_NOT_DELIVERED",
+                              "NO_DATA_SOURCE",
+                              null
+                            ],
+                            "description": "Set only when state is NOT_AVAILABLE: the source of the data that is not delivered yet.",
+                            "nullable": true
+                          }
+                        },
+                        "required": ["state", "count", "sourceOperationId", "reason"],
+                        "additionalProperties": false,
+                        "description": "The transfers that took effect and are not closed, the grace of the old rights still lasting (its last day included)."
+                      },
+                      "graceEndingSoon": {
+                        "type": "object",
+                        "properties": {
+                          "state": {
+                            "type": "string",
+                            "enum": ["COUNTED", "AT_SOURCE", "NOT_AVAILABLE"],
+                            "description": "COUNTED: count is how many, in the scope of the caller. AT_SOURCE: the rows are listed by sourceOperationId in the same scope and are not counted here. NOT_AVAILABLE: the data has no source yet; reason says why. A section that is not counted is never shown as zero."
+                          },
+                          "count": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991,
+                            "description": "Set only when state is COUNTED.",
+                            "nullable": true
+                          },
+                          "sourceOperationId": {
+                            "description": "The operation that lists the rows of the section; null when there is none yet.",
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "reason": {
+                            "type": "string",
+                            "enum": [
+                              "FINANCE_FIGURES_NOT_DELIVERED",
+                              "USAGE_DATA_NOT_DELIVERED",
+                              "NO_DATA_SOURCE",
+                              null
+                            ],
+                            "description": "Set only when state is NOT_AVAILABLE: the source of the data that is not delivered yet.",
+                            "nullable": true
+                          }
+                        },
+                        "required": ["state", "count", "sourceOperationId", "reason"],
+                        "additionalProperties": false,
+                        "description": "Of those in the grace, the ones from the day of the reminder on: the grace ends within the reminder days (the parameter TRANSFER_GRACE_REMINDER_WORKING_DAYS)."
+                      },
+                      "revoking": {
+                        "type": "object",
+                        "properties": {
+                          "state": {
+                            "type": "string",
+                            "enum": ["COUNTED", "AT_SOURCE", "NOT_AVAILABLE"],
+                            "description": "COUNTED: count is how many, in the scope of the caller. AT_SOURCE: the rows are listed by sourceOperationId in the same scope and are not counted here. NOT_AVAILABLE: the data has no source yet; reason says why. A section that is not counted is never shown as zero."
+                          },
+                          "count": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991,
+                            "description": "Set only when state is COUNTED.",
+                            "nullable": true
+                          },
+                          "sourceOperationId": {
+                            "description": "The operation that lists the rows of the section; null when there is none yet.",
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "reason": {
+                            "type": "string",
+                            "enum": [
+                              "FINANCE_FIGURES_NOT_DELIVERED",
+                              "USAGE_DATA_NOT_DELIVERED",
+                              "NO_DATA_SOURCE",
+                              null
+                            ],
+                            "description": "Set only when state is NOT_AVAILABLE: the source of the data that is not delivered yet.",
+                            "nullable": true
+                          }
+                        },
+                        "required": ["state", "count", "sourceOperationId", "reason"],
+                        "additionalProperties": false,
+                        "description": "The transfers whose grace is over and whose old rights are being taken back."
+                      }
+                    },
+                    "required": ["inGrace", "graceEndingSoon", "revoking"],
+                    "additionalProperties": false
+                  },
+                  "seatsReturned": {
+                    "type": "object",
+                    "properties": {
+                      "thisMonth": {
+                        "type": "object",
+                        "properties": {
+                          "state": {
+                            "type": "string",
+                            "enum": ["COUNTED", "AT_SOURCE", "NOT_AVAILABLE"],
+                            "description": "COUNTED: count is how many, in the scope of the caller. AT_SOURCE: the rows are listed by sourceOperationId in the same scope and are not counted here. NOT_AVAILABLE: the data has no source yet; reason says why. A section that is not counted is never shown as zero."
+                          },
+                          "count": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991,
+                            "description": "Set only when state is COUNTED.",
+                            "nullable": true
+                          },
+                          "sourceOperationId": {
+                            "description": "The operation that lists the rows of the section; null when there is none yet.",
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "reason": {
+                            "type": "string",
+                            "enum": [
+                              "FINANCE_FIGURES_NOT_DELIVERED",
+                              "USAGE_DATA_NOT_DELIVERED",
+                              "NO_DATA_SOURCE",
+                              null
+                            ],
+                            "description": "Set only when state is NOT_AVAILABLE: the source of the data that is not delivered yet.",
+                            "nullable": true
+                          }
+                        },
+                        "required": ["state", "count", "sourceOperationId", "reason"],
+                        "additionalProperties": false,
+                        "description": "The seats of the shared pools (`K2`) whose revocation for a departure or a transfer was completed from the first of this month to today. An IT Admin counts the tasks they are in charge of by default."
+                      },
+                      "reusedThisMonth": {
+                        "type": "object",
+                        "properties": {
+                          "state": {
+                            "type": "string",
+                            "enum": ["COUNTED", "AT_SOURCE", "NOT_AVAILABLE"],
+                            "description": "COUNTED: count is how many, in the scope of the caller. AT_SOURCE: the rows are listed by sourceOperationId in the same scope and are not counted here. NOT_AVAILABLE: the data has no source yet; reason says why. A section that is not counted is never shown as zero."
+                          },
+                          "count": {
+                            "type": "integer",
+                            "minimum": 0,
+                            "maximum": 9007199254740991,
+                            "description": "Set only when state is COUNTED.",
+                            "nullable": true
+                          },
+                          "sourceOperationId": {
+                            "description": "The operation that lists the rows of the section; null when there is none yet.",
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "reason": {
+                            "type": "string",
+                            "enum": [
+                              "FINANCE_FIGURES_NOT_DELIVERED",
+                              "USAGE_DATA_NOT_DELIVERED",
+                              "NO_DATA_SOURCE",
+                              null
+                            ],
+                            "description": "Set only when state is NOT_AVAILABLE: the source of the data that is not delivered yet.",
+                            "nullable": true
+                          }
+                        },
+                        "required": ["state", "count", "sourceOperationId", "reason"],
+                        "additionalProperties": false,
+                        "description": "The seats of the shared pools (`K2`) handed out again in the same days. Seats of a pool are not told apart one by one, so this is the stock given out in the time, whatever freed it. An IT Admin counts the tasks they are in charge of by default."
+                      }
+                    },
+                    "required": ["thisMonth", "reusedThisMonth"],
+                    "additionalProperties": false
+                  },
+                  "plansBelowVendorAdminMinimum": {
+                    "type": "object",
+                    "properties": {
+                      "state": {
+                        "type": "string",
+                        "enum": ["COUNTED", "AT_SOURCE", "NOT_AVAILABLE"],
+                        "description": "COUNTED: count is how many, in the scope of the caller. AT_SOURCE: the rows are listed by sourceOperationId in the same scope and are not counted here. NOT_AVAILABLE: the data has no source yet; reason says why. A section that is not counted is never shown as zero."
+                      },
+                      "count": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991,
+                        "description": "Set only when state is COUNTED.",
+                        "nullable": true
+                      },
+                      "sourceOperationId": {
+                        "description": "The operation that lists the rows of the section; null when there is none yet.",
+                        "type": "string",
+                        "nullable": true
+                      },
+                      "reason": {
+                        "type": "string",
+                        "enum": ["FINANCE_FIGURES_NOT_DELIVERED", "USAGE_DATA_NOT_DELIVERED", "NO_DATA_SOURCE", null],
+                        "description": "Set only when state is NOT_AVAILABLE: the source of the data that is not delivered yet.",
+                        "nullable": true
+                      }
+                    },
+                    "required": ["state", "count", "sourceOperationId", "reason"],
+                    "additionalProperties": false,
+                    "description": "The plans in use that need admins at the vendor (`K2`, or `K4` with an admin console) with fewer than two of the recorded ones still working as IT Admins, or none recorded: the plans whose subscriptions raise `vendorAdminsBelowMinimum` in `subscriptionList`. Across the company."
+                  },
                   "congestion": {
                     "type": "object",
                     "properties": {
@@ -116578,6 +117547,10 @@
                   }
                 },
                 "required": [
+                  "departures",
+                  "transfers",
+                  "seatsReturned",
+                  "plansBelowVendorAdminMinimum",
                   "congestion",
                   "backgroundJobs",
                   "approverConfiguration",
@@ -116590,7 +117563,7 @@
                 "additionalProperties": false
               }
             },
-            "required": ["asOf", "sections"],
+            "required": ["asOf", "calendar", "sections"],
             "additionalProperties": false,
             "nullable": true
           }

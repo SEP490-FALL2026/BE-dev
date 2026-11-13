@@ -88,6 +88,8 @@ export interface TransferListFilter {
   effectiveTo?: BusinessDate;
   /** Only the transfers whose grace ends before this day (the ones about to end, or already over and not closed). */
   graceEndsBefore?: BusinessDate;
+  /** Only the transfers whose grace ends on or after this day: with `graceEndsBefore` the graces that end in a range of days. */
+  graceEndsFrom?: BusinessDate;
   page: number;
   pageSize: number;
 }

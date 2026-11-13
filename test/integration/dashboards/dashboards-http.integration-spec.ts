@@ -19,14 +19,18 @@ const SECTION_KEYS = {
   ],
   itAdmin: [
     'cancellationDeadlines',
+    'departures',
     'discrepancies',
     'ghostSeats',
     'grantTasks',
     'licenseKeys',
     'offboardingHandovers',
+    'plansBelowVendorAdminMinimum',
     'revocationTasks',
     'saasIssues',
+    'seatsReturned',
     'termsToReview',
+    'transfers',
     'unconfirmedDevices',
   ],
   superAdmin: [
@@ -36,9 +40,22 @@ const SECTION_KEYS = {
     'congestion',
     'departmentsWithoutHead',
     'departmentsWithoutItAdmin',
+    'departures',
     'personnelNotices',
+    'plansBelowVendorAdminMinimum',
+    'seatsReturned',
     'superAdminRole',
+    'transfers',
   ],
+};
+
+/** Every operation a section names, however deep the sections are grouped (the progress of the departures is a group of sections). */
+const operationsNamedBy = (node: unknown): string[] => {
+  if (typeof node !== 'object' || node === null) return [];
+  const { sourceOperationId } = node as { sourceOperationId?: unknown };
+  if (typeof sourceOperationId === 'string') return [sourceOperationId];
+
+  return Object.values(node).flatMap(operationsNamedBy);
 };
 
 const missing = (reason: string): SectionWire => ({
@@ -364,7 +381,7 @@ describe('role overviews (integration, real PostgreSQL)', () => {
       await overviewOf(OVERVIEW_PATHS.manager, des.head.account),
       await overviewOf(OVERVIEW_PATHS.itAdmin, it1),
       await overviewOf(OVERVIEW_PATHS.superAdmin, h.sa),
-    ].flatMap((overview) => Object.values(overview.sections).flatMap((section) => section.sourceOperationId ?? []));
+    ].flatMap((overview) => operationsNamedBy(overview.sections));
 
     expect(named.length).toBeGreaterThan(20);
     expect(named.filter((id) => !documented.has(id))).toEqual([]);

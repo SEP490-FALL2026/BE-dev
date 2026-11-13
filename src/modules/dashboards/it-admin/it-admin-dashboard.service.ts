@@ -8,12 +8,15 @@ import { OptimizationApi } from '../../optimization/public/optimization.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { PersonnelDashboardApi } from '../../personnel/public/personnel-dashboard.api';
 import { UsageEvidenceApi } from '../../usage/public/usage-evidence.api';
+import type { DashboardProgress } from '../progress/dashboard-progress.policy';
+import { DashboardProgressService } from '../progress/dashboard-progress.service';
 import { assertHoldsRole, atSource, counted, type DashboardSection } from '../section/dashboard-section.policy';
 
 export interface ItAdminDashboard {
   asOf: BusinessDate;
   scope: { departments: number };
-  sections: {
+  calendar: DashboardProgress['calendar'];
+  sections: Omit<DashboardProgress, 'calendar'> & {
     grantTasks: DashboardSection;
     revocationTasks: DashboardSection;
     discrepancies: DashboardSection;
@@ -36,6 +39,9 @@ export interface ItAdminDashboard {
  * `a10-it-admin-dashboard`); `subscriptionRenewalList` lists only the cases already proposed, so it is not the source either. The discrepancies
  * (people active in a vendor with no seat to cover the day, `FR-4.8`) are the open findings of the vendor usage import; the company machines whose holder has not
  * acknowledged the notice are counted from the register of the organization (`unconfirmedDevices`, the total `deviceList` answers for that state). The recommendations of wasted seats are counted as the `G2` not closed plus the `G1` open of the whole organization (`ghostSeats`).
+ * The progress of the departures and the transfers of those departments (`departures`, `transfers`), the seats of the shared pools got back in the tasks
+ * the IT Admin is in charge of (`seatsReturned`) and the plans short of admins at the vendor (`plansBelowVendorAdminMinimum`) come from `DashboardProgressService`
+ * (SPEC P21); `offboardingHandovers` stays one release beside them (the cases still handing over, as before) and is dropped after.
  */
 @Injectable()
 export class ItAdminDashboardService {
@@ -47,6 +53,7 @@ export class ItAdminDashboardService {
     private readonly optimization: OptimizationApi,
     private readonly usage: UsageEvidenceApi,
     private readonly devices: DevicesApi,
+    private readonly progress: DashboardProgressService,
   ) {}
 
   /** Throws DashboardRefusedError for a caller without the IT Admin role. */
@@ -58,6 +65,11 @@ export class ItAdminDashboardService {
     );
     const work = await this.licensing.itAdminFacts(actor.employeeId);
     const handovers = await this.personnel.handingOverCases(departmentIds);
+    // The progress of the departures and the transfers of the departments in scope; the seats counted are the tasks this IT Admin is in charge of (SPEC P21).
+    const { calendar, ...progress } = await this.progress.read(today, {
+      departmentIds,
+      responsibleEmployeeId: actor.employeeId,
+    });
     const wastedSeats = await this.optimization.getSummary();
     const withoutSeat = await this.usage.openFindingCount();
     // US-09-01 AC-2: the machines whose holder has not acknowledged the notice, the same number `GET /devices?state=AWAITING_ACKNOWLEDGEMENT` lists.
@@ -69,7 +81,9 @@ export class ItAdminDashboardService {
     return {
       asOf: today,
       scope: { departments: departmentIds.length },
+      calendar,
       sections: {
+        ...progress,
         grantTasks: counted(work.openGrantTasks, 'provisioningTaskList'),
         revocationTasks: counted(work.openRevocationTasks, 'provisioningTaskList'),
         discrepancies: counted(withoutSeat, 'usageNoAssignmentFindingList'),

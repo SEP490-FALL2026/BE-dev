@@ -23,3 +23,13 @@ export interface ItAdminLicensingFacts {
   openSaasIssues: number;
   keysInStore: number;
 }
+
+/**
+ * What the overviews of an IT Admin and of the Super Admin count of the seats of the shared pools this month (SPEC P21, R5 E6): `returned` are the seats of
+ * `K2` plans whose revocation for a departure or a transfer was completed, `reused` the seats of `K2` pools given out again (the grants of the shared stock
+ * completed). Seats of a pool are not told apart one by one, so `reused` is the stock handed out in the same time, whatever freed it.
+ */
+export interface SeatsReturnedFacts {
+  returned: number;
+  reused: number;
+}

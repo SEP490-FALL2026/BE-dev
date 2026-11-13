@@ -356,6 +356,23 @@ export class PlanRepo {
     return row ? toProfile(row) : null;
   }
 
+  /**
+   * The plans that need at least two admins at the vendor (a `K2` plan, or a `K4` plan with an admin console, `QĐ-110k`, `R-53`) and have a subscription
+   * in use: the ones whose flag a reader of the subscriptions sees. One read.
+   */
+  async findIdsNeedingVendorAdminsInUse(tx?: DbTx): Promise<string[]> {
+    const rows = await (tx ?? this.prisma).plan.findMany({
+      where: {
+        OR: [{ provisioningType: 'K2' }, { provisioningType: 'K4', hasAdminConsole: true }],
+        subscriptions: { some: { status: 'ACTIVE' } },
+      },
+      select: { id: true },
+      orderBy: { id: 'asc' },
+    });
+
+    return rows.map((row) => row.id);
+  }
+
   /** The profiles of these plans in one read, by plan; a plan with none is absent. */
   async findProfilesOf(planIds: readonly string[], tx?: DbTx): Promise<Map<string, WorkspaceProfileRecord>> {
     if (planIds.length === 0) return new Map();

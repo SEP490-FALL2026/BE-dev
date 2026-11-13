@@ -19,6 +19,23 @@ const MISSING = {
   reason: 'FINANCE_FIGURES_NOT_DELIVERED',
 };
 
+const NO_LIST = { state: 'COUNTED', count: 2, sourceOperationId: null, reason: null };
+/** The calendar and the sections of the progress of the departures and the transfers (SPEC P21), the same in the overviews of an IT Admin and of the Super Admin. */
+const CALENDAR = { from: '2026-10-23', to: '2026-11-06' };
+const PROGRESS = {
+  departures: {
+    upcoming: { ...COUNTED, sourceOperationId: 'offboardingCaseList' },
+    awaitingRevocation: NO_LIST,
+    revocationOverdue: { ...COUNTED, sourceOperationId: 'offboardingCaseList' },
+    closedThisMonth: NO_LIST,
+    itHandoverPending: NO_LIST,
+    mailboxLockPending: NO_LIST,
+  },
+  transfers: { inGrace: NO_LIST, graceEndingSoon: NO_LIST, revoking: NO_LIST },
+  seatsReturned: { thisMonth: NO_LIST, reusedThisMonth: NO_LIST },
+  plansBelowVendorAdminMinimum: NO_LIST,
+};
+
 interface Route {
   name: string;
   path: string;
@@ -69,7 +86,9 @@ const ROUTES: Route[] = [
     answer: {
       asOf: '2026-10-23',
       scope: { departments: 2 },
+      calendar: CALENDAR,
       sections: {
+        ...PROGRESS,
         grantTasks: COUNTED,
         revocationTasks: COUNTED,
         discrepancies: COUNTED,
@@ -91,7 +110,9 @@ const ROUTES: Route[] = [
     message: 'DASHBOARD.SUPER_ADMIN_RETRIEVED',
     answer: {
       asOf: '2026-10-23',
+      calendar: CALENDAR,
       sections: {
+        ...PROGRESS,
         congestion: AT_SOURCE,
         backgroundJobs: MISSING,
         approverConfiguration: AT_SOURCE,

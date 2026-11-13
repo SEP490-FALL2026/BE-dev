@@ -46,6 +46,8 @@ const listQuerySchema = z.strictObject({
   effectiveTo: businessDay.optional(),
   /** The transfers whose grace ends before this day (P7): the ones about to end, or over and not closed. */
   graceEndsBefore: businessDay.optional(),
+  /** The transfers whose grace ends on or after this day (P7): with `graceEndsBefore` the calendar of the graces that end in the next working days. */
+  graceEndsFrom: businessDay.optional(),
   page: z.coerce.number().int().positive().default(1),
   pageSize: z.coerce.number().int().positive().max(100).default(20),
 });

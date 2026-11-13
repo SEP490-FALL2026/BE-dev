@@ -116,6 +116,9 @@ export interface OffboardingListFilter {
   roleFlag?: RoleFlag;
   /** `true`: only the departures past the deadline of their revocations that still have a right without a completed task; `false`: all the others (`QĐ-110c`). */
   revocationOverdue?: boolean;
+  /** Only the cases whose last working day is on or after / on or before these days, both included (the calendar of the next working days, R5 E2). */
+  lastWorkingDayFrom?: BusinessDate;
+  lastWorkingDayTo?: BusinessDate;
   /** The ids the service worked out from `revocationOverdue`: only these cases, or every case but these. */
   onlyIds?: readonly string[];
   exceptIds?: readonly string[];

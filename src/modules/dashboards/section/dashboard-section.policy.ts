@@ -28,8 +28,11 @@ export interface DashboardSection {
   reason: MissingSourceReason | null;
 }
 
-/** A section this overview counted. Throws a RangeError for a count that is not a whole number of at least zero. */
-export function counted(count: number, sourceOperationId: string): DashboardSection {
+/**
+ * A section this overview counted. `sourceOperationId` is null when no list gives exactly these rows (never a list that would answer another number).
+ * Throws a RangeError for a count that is not a whole number of at least zero.
+ */
+export function counted(count: number, sourceOperationId: string | null): DashboardSection {
   if (!Number.isInteger(count) || count < 0) throw new RangeError(`A section counts whole items, not ${count}.`);
 
   return { state: 'COUNTED', count, sourceOperationId, reason: null };

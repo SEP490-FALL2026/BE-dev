@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { ResponsibilityHandoverService } from '../application-responsibility/responsibility-handover.service';
+import { VendorAdminMinimumService } from '../plan/vendor-admin-minimum.service';
 import { VendorAdminRolesService } from '../plan/vendor-admin-roles.service';
 import type {
   ResponsibilitiesTransferred,
@@ -19,6 +20,7 @@ export class CatalogResponsibilityApi {
   constructor(
     private readonly handover: ResponsibilityHandoverService,
     private readonly roles: VendorAdminRolesService,
+    private readonly minimum: VendorAdminMinimumService,
   ) {}
 
   /** How many subscriptions and applications each of these employees answers for; an employee with none is counted zero. */
@@ -32,6 +34,14 @@ export class CatalogResponsibilityApi {
    */
   vendorAdminRolesOf(employeeId: string, tx?: DbTx): Promise<VendorAdminRole[]> {
     return this.roles.of(employeeId, tx);
+  }
+
+  /**
+   * How many plans in use that need admins at the vendor have fewer than two recorded who still work as IT Admins now: the number the overviews show
+   * beside the flag `vendorAdminsBelowMinimum` of the subscriptions (SPEC P21).
+   */
+  countPlansBelowVendorAdminMinimum(tx?: DbTx): Promise<number> {
+    return this.minimum.countPlansBelowMinimum(tx);
   }
 
   /**

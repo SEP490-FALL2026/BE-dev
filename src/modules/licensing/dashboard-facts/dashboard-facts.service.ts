@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import type { BusinessDate } from '../../../core/business-date';
+import { monthBoundsOf, type BusinessDate } from '../../../core/business-date';
+import { instantAtWallClock } from '../../../core/working-days';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { AssignmentDepartmentRepo } from '../assignment/assignment-department.repo';
 import { isExpiringSoon, rightStatusOf } from '../my-software/my-software.policy';
@@ -7,6 +8,7 @@ import type {
   DepartmentLicensingFacts,
   EmployeeLicensingFacts,
   ItAdminLicensingFacts,
+  SeatsReturnedFacts,
 } from '../public/licensing-dashboard.types';
 import { DashboardFactsRepo } from './dashboard-facts.repo';
 
@@ -41,5 +43,19 @@ export class DashboardFactsService {
 
   itAdmin(employeeId: string): Promise<ItAdminLicensingFacts> {
     return this.repo.itAdmin(employeeId);
+  }
+
+  /** The seats of the shared pools taken back for a departure or a transfer and handed out again from the first of this month to `today` (SPEC P21). */
+  async seatsReturned(today: BusinessDate, responsibleEmployeeId?: string): Promise<SeatsReturnedFacts> {
+    const zone = (await this.organizationReads.getOrganization())?.timeZone ?? 'UTC';
+    const { start, nextStart } = monthBoundsOf(today);
+
+    return this.repo.seatsReturned({
+      from: instantAtWallClock({ date: start, msOfDay: 0 }, zone),
+      to: instantAtWallClock({ date: nextStart, msOfDay: 0 }, zone),
+      fromDay: start,
+      toDay: nextStart,
+      responsibleEmployeeId,
+    });
   }
 }

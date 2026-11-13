@@ -17,6 +17,25 @@ const SUMMARY = {
   roleFlags: true,
 } as const;
 
+/**
+ * The last working day in a range of days, both ends included: the calendar of the next working days (R5 E2). Put in an AND of its own so it adds to
+ * `pastLastDay`, which also speaks of the last working day.
+ */
+function lastWorkingDayRange(filter: OffboardingListFilter): Prisma.OffboardingCaseWhereInput {
+  if (!filter.lastWorkingDayFrom && !filter.lastWorkingDayTo) return {};
+
+  return {
+    AND: [
+      {
+        lastWorkingDay: {
+          ...(filter.lastWorkingDayFrom ? { gte: toDateColumn(filter.lastWorkingDayFrom) } : {}),
+          ...(filter.lastWorkingDayTo ? { lte: toDateColumn(filter.lastWorkingDayTo) } : {}),
+        },
+      },
+    ],
+  };
+}
+
 /** The reader of the list of cases: the page and the total from one snapshot, ordered by the last working day and the id. */
 @Injectable()
 export class OffboardingListRepo {
@@ -36,6 +55,7 @@ export class OffboardingListRepo {
       // The cases the service worked out as past the deadline of their revocations (the seats are `licensing`'s, so the table cannot say), or all the others.
       ...(filter.onlyIds ? { id: { in: [...filter.onlyIds] } } : {}),
       ...(filter.exceptIds && filter.exceptIds.length > 0 ? { id: { notIn: [...filter.exceptIds] } } : {}),
+      ...lastWorkingDayRange(filter),
       // The roles the person held when the departure was recorded or its day moved (`US-03-04` AC-12): a snapshot to find the cases by.
       ...(filter.roleFlag ? { roleFlags: { has: filter.roleFlag } } : {}),
     };

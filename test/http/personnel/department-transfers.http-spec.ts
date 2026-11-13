@@ -139,6 +139,10 @@ describe('department transfer routes (e2e, no database)', () => {
         (server: App) => request(server).get('/api/v1/department-transfers?graceEndsBefore=soon'),
       ],
       [
+        'a day the grace ends from that is not a date',
+        (server: App) => request(server).get('/api/v1/department-transfers?graceEndsFrom=2026-02-30x'),
+      ],
+      [
         'a new day that is not a date',
         (server: App) =>
           request(server).post(`/api/v1/department-transfers/${ID}/rescheduling`).send({ newEffectiveOn: 'tomorrow' }),

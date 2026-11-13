@@ -63,6 +63,9 @@ const listQuerySchema = z.strictObject({
   /** `true`: the departures past the deadline of their revocations with a right still without a completed task; `false`: the others (`QĐ-110c`). */
   revocationOverdue: flag.optional(),
   roleFlag: z.enum(ROLE_FLAGS).optional(),
+  /** The cases whose last working day is on or after / on or before this day (P3, the calendar of the next working days, R5 E2). */
+  lastWorkingDayFrom: businessDay.optional(),
+  lastWorkingDayTo: businessDay.optional(),
   ...pageQuery,
 });
 

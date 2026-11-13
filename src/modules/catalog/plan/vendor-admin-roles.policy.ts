@@ -22,3 +22,8 @@ export function othersWorking(
   return new Set(members.map((member) => member.employeeId).filter((id) => id !== leavingEmployeeId && usable.has(id)))
     .size;
 }
+
+/** How many different admins recorded for a plan still work as IT Admins (`QĐ-110k`): the number the flag `vendorAdminsBelowMinimum` is judged by. */
+export function workingAdminCount(members: ReadonlyArray<{ employeeId: string }>, usable: ReadonlySet<string>): number {
+  return new Set(members.map((member) => member.employeeId).filter((id) => usable.has(id))).size;
+}

@@ -337,7 +337,14 @@ export class TransferRepo {
         : {}),
       ...(filter.employeeId ? { employeeId: filter.employeeId } : {}),
       ...(filter.status ? { status: filter.status } : {}),
-      ...(filter.graceEndsBefore ? { graceEndsOn: { lt: toDateColumn(filter.graceEndsBefore) } } : {}),
+      ...(filter.graceEndsBefore || filter.graceEndsFrom
+        ? {
+            graceEndsOn: {
+              ...(filter.graceEndsBefore ? { lt: toDateColumn(filter.graceEndsBefore) } : {}),
+              ...(filter.graceEndsFrom ? { gte: toDateColumn(filter.graceEndsFrom) } : {}),
+            },
+          }
+        : {}),
       ...(filter.effectiveFrom || filter.effectiveTo
         ? {
             effectiveOn: {

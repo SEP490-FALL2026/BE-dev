@@ -5,7 +5,7 @@ import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { REMINDER_LEAD_DAYS } from '../expiry/expiry.policy';
 import type { RightFacts } from '../my-software/my-software.policy';
 import { OPEN_GRANT_TASK_STATUSES } from '../public/licensing-open-grants.types';
-import type { ItAdminLicensingFacts } from '../public/licensing-dashboard.types';
+import type { ItAdminLicensingFacts, SeatsReturnedFacts } from '../public/licensing-dashboard.types';
 
 /** A task that is not finished: to be done, being done, or failed and waiting for a decision. The same for a grant and a revocation. */
 const OPEN_TASK = [...OPEN_GRANT_TASK_STATUSES];
@@ -96,7 +96,50 @@ export class DashboardFactsRepo {
       { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead },
     );
   }
+
+  /**
+   * The seats of the shared pools taken back for a departure or a transfer and handed out again in a stretch of time (`[from, to)`; the days of the
+   * grants are the days `[fromDay, toDay)`): `K2` only, since a key (K4) is deactivated and a personal seat (K1) is bought for one person. With
+   * `responsibleEmployeeId` only the tasks that IT Admin is in charge of by default (the queues call them "mine"); without it the whole company.
+   */
+  async seatsReturned(input: {
+    from: Date;
+    to: Date;
+    fromDay: BusinessDate;
+    toDay: BusinessDate;
+    responsibleEmployeeId?: string | undefined;
+  }): Promise<SeatsReturnedFacts> {
+    const responsible = input.responsibleEmployeeId
+      ? { defaultResponsibleEmployeeId: input.responsibleEmployeeId }
+      : {};
+
+    return this.prisma.$transaction(
+      async (tx) => ({
+        returned: await tx.provisioningTask.count({
+          where: {
+            ...responsible,
+            kind: 'REVOKE',
+            status: 'COMPLETED',
+            completedAt: { gte: input.from, lt: input.to },
+            reasons: { some: { source: { in: [...LEAVING_SOURCES] } } },
+            assignment: { plan: { provisioningType: 'K2' } },
+          },
+        }),
+        reused: await tx.poolGrantAvoidedCost.count({
+          where: {
+            provisioningType: 'K2',
+            recordedOn: { gte: toDateColumn(input.fromDay), lt: toDateColumn(input.toDay) },
+            ...(input.responsibleEmployeeId ? { provisioningTask: responsible } : {}),
+          },
+        }),
+      }),
+      { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead },
+    );
+  }
 }
+
+/** The reasons of a revocation that come from a departure or a transfer of the holder (`QĐ-110c`, `QĐ-110p`). */
+const LEAVING_SOURCES = ['DEPARTURE', 'ABRUPT_DEPARTURE', 'TRANSFER'] as const;
 
 function toFacts(row: {
   validFrom: Date;

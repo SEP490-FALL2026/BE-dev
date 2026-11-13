@@ -1,4 +1,4 @@
-import { notYetBlocked, othersWorking } from './vendor-admin-roles.policy';
+import { notYetBlocked, othersWorking, workingAdminCount } from './vendor-admin-roles.policy';
 
 describe('vendor-admin-roles.policy (QĐ-110k: what is left of a plan at the vendor without one admin)', () => {
   const members = [{ employeeId: 'a' }, { employeeId: 'b' }, { employeeId: 'c' }];
@@ -36,5 +36,19 @@ describe('vendor-admin-roles.policy: who a departure has not blocked yet', () =>
     ]);
 
     expect([...notYetBlocked(new Set(['a', 'b', 'c']), blocked, today)]).toEqual(['c']);
+  });
+});
+
+describe('vendor-admin-roles.policy: how many admins of a plan work (the count behind the flag of the overviews)', () => {
+  const members = [{ employeeId: 'a' }, { employeeId: 'b' }, { employeeId: 'a' }];
+
+  it('counts each person once and only the ones who work', () => {
+    expect(workingAdminCount(members, new Set(['a', 'b']))).toBe(2);
+    expect(workingAdminCount(members, new Set(['a']))).toBe(1);
+    expect(workingAdminCount(members, new Set())).toBe(0);
+  });
+
+  it('is zero for a plan with no profile', () => {
+    expect(workingAdminCount([], new Set(['a']))).toBe(0);
   });
 });

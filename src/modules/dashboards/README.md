@@ -23,19 +23,23 @@ dùng bởi: không module nào; chỉ `app/app.module.ts` mount `DashboardsModu
 
 ## Hướng phụ thuộc giữa capability (R6)
 
-`section` ở dưới; `employee`, `manager`, `it-admin`, `super-admin` chỉ import `section`, không import nhau.
+`section` ở dưới; `progress` chỉ import `section`; `employee`, `manager`, `it-admin`, `super-admin` chỉ import `section` (và `progress` với hai trang của IT Admin/Super Admin), không import nhau.
 
 ## Capability → file chính
 
 - `section/` — một mục của trang: `dashboard-section.policy.ts` (`counted`, `atSource`, `notAvailable`, `assertHoldsRole`; ba
   trạng thái `COUNTED`/`AT_SOURCE`/`NOT_AVAILABLE` và lý do thiếu nguồn), `dashboard-section.dto.ts` (schema chung bốn trường),
   `dashboard-section.errors.ts` (`DashboardRefusedError`), `dashboard-section.http-errors.ts` (403 như guard, 503).
+- `progress/` — tiến độ nghỉ việc/điều chuyển dùng chung hai trang IT Admin và Super Admin (SPEC P21, `QĐ-110` G2): `departures`, `transfers`,
+  `seatsReturned`, `plansBelowVendorAdminMinimum` + `calendar` (10 ngày làm việc tới); `dashboard-progress.policy.ts` (ánh xạ thuần),
+  `dashboard-progress.service.ts` (đọc qua facade personnel/licensing/catalog), `dashboard-progress.dto.ts`. Mọi số `COUNTED`; chỉ
+  `upcoming` và `revocationOverdue` nêu danh sách (`offboardingCaseList`), còn lại `sourceOperationId = null` vì không danh sách nào trả đúng số đó.
 - `employee/` — `GET /dashboards/employee` (mọi tài khoản đã đăng nhập, `QĐ-95d`): quyền đang giữ, quyền sắp hết, báo lỗi SaaS mình
   đã gửi (`saasIssueList` `scope=mine`); Request của tôi luôn `COUNTED` (0 khi không có, kể cả Super Admin).
 - `manager/` — `GET /dashboards/manager` (`MANAGER`, phòng đang làm trưởng): ghế phòng, review sau điều chuyển; hàng đợi trình
   chi, đề xuất ngân sách, dòng phiên bản đã duyệt `AT_SOURCE`; chờ quyết nhu cầu `COUNTED`; ghost seat, thực chi + cam kết `NOT_AVAILABLE`.
 - `it-admin/` — `GET /dashboards/it-admin` (`IT_ADMIN`, phạm vi phụ trách): task cấp/thu hồi, báo lỗi SaaS, ca nghỉ việc đang bàn
-  giao, key trong kho; thuê bao sắp tới hạn báo hủy, điều khoản cần rà soát `AT_SOURCE`; sai lệch, máy chưa xác nhận
+  giao (khóa `offboardingHandovers` giữ một bản cạnh `departures`), key trong kho; thuê bao sắp tới hạn báo hủy, điều khoản cần rà soát `AT_SOURCE`; sai lệch, máy chưa xác nhận
   `NOT_AVAILABLE`.
 - `super-admin/` — `GET /dashboards/super-admin` (`SUPER_ADMIN`): phòng thiếu trưởng phòng/IT Admin, thông báo biến động chờ xử
   lý; nghẽn, cấu hình người duyệt, vai Super Admin, hồ sơ có thể cấp tài khoản `AT_SOURCE`; tác vụ nền `NOT_AVAILABLE`.

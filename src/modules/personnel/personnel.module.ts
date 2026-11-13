@@ -90,6 +90,7 @@ import { SuperAdminWatchController } from './role-duties/super-admin-watch.contr
 import { PersonnelApi } from './public/personnel.api';
 import { PersonnelDashboardApi } from './public/personnel-dashboard.api';
 import { PersonnelDashboardFactsRepo } from './dashboard-facts/dashboard-facts.repo';
+import { PersonnelDashboardFactsService } from './dashboard-facts/dashboard-facts.service';
 import { MeDepartmentTransferController } from './transfer-grace/me-department-transfer.controller';
 import { MyTransferService } from './transfer-grace/my-transfer.service';
 import { TransferClosureListener } from './transfer-grace/transfer-closure.listener';
@@ -276,6 +277,7 @@ import { ItHandoverViewService } from './it-handover/it-handover-view.service';
     OffboardingNoticeRecorder,
     PersonnelApi,
     PersonnelDashboardFactsRepo,
+    PersonnelDashboardFactsService,
     PersonnelDashboardApi,
   ],
   // The facade and the extension point of the file hooks, and the services of the writes the controlled procedure runs with an operator

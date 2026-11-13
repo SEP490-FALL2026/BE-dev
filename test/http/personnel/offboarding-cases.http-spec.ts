@@ -181,6 +181,16 @@ describe('offboarding case routes (e2e, no database)', () => {
         (server: App) => request(server).get('/api/v1/offboarding-cases?revocationOverdue=maybe'),
       ],
       [
+        'a last working day that is not a day',
+        'GET /offboarding-cases',
+        (server: App) => request(server).get('/api/v1/offboarding-cases?lastWorkingDayFrom=soon'),
+      ],
+      [
+        'a last working day that is not a day (the other end)',
+        'GET /offboarding-cases',
+        (server: App) => request(server).get('/api/v1/offboarding-cases?lastWorkingDayTo=2026-13-45'),
+      ],
+      [
         'a page size over the limit',
         'GET /offboarding-cases',
         (server: App) => request(server).get('/api/v1/offboarding-cases?pageSize=101'),
@@ -323,6 +333,9 @@ describe('offboarding case routes (e2e, no database)', () => {
       const schemas = JSON.stringify(document.components?.schemas ?? {});
 
       expect(list).toContain('revocationOverdue');
+      // RD.1 (P3): the calendar of the next working days filters by the last working day.
+      expect(list).toContain('lastWorkingDayFrom');
+      expect(list).toContain('lastWorkingDayTo');
       for (const field of ['"rightsWithoutCompletedTask"', '"revocation"']) expect(schemas).toContain(field);
     },
     OPENAPI_DOCUMENT_BUDGET_MS,
