@@ -231,6 +231,32 @@ describe('the vendor admins of a subscription: the gate and the read (integratio
         .expect(200);
     });
 
+    it('X-IT-O4 (SPEC P19): shows Finance neither who administers the plan nor the email and the note, only the two flags', async () => {
+      const planId = await planOf('K2');
+      await putProfile(planId, { ownerAccountEmail: 'it-saas@acme.vn', adminNote: 'Hóa đơn gửi về kế toán' }).expect(
+        200,
+      );
+      const created = h.dataOf<SubscriptionWire>(await declare(complete(planId)).expect(201));
+      const asFinance = (path: string) => request(h.server()).get(path).set(h.as(h.finance)).expect(200);
+
+      const one = h.dataOf<SubscriptionWire>(await asFinance(`/api/v1/subscriptions/${created.id}`));
+      const page = h.dataOf<{ items: SubscriptionWire[] }>(await asFinance(`/api/v1/subscriptions?planId=${planId}`));
+
+      for (const view of [one, page.items.find((item) => item.id === created.id) as SubscriptionWire]) {
+        expect(view).toMatchObject({
+          vendorAdmins: [],
+          ownerAccountEmail: null,
+          adminNote: null,
+          vendorAdminsBelowMinimum: false,
+          ownerAccountEmailMissing: false,
+        });
+      }
+      // The IT Admin still sees all of it.
+      const mine = await read(created.id);
+      expect(mine.vendorAdmins).toHaveLength(2);
+      expect(mine.ownerAccountEmail).toBe('it-saas@acme.vn');
+    });
+
     it('is quiet for a plan that needs no admins: empty list, no email, no flag', async () => {
       const planId = await planOf('K1');
       const created = h.dataOf<SubscriptionWire>(

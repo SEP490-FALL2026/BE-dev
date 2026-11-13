@@ -111,6 +111,16 @@ export function vendorAdminFlags(input: {
   };
 }
 
+/**
+ * A subscription as someone who is not an IT Admin reads it (Finance reads subscriptions too, SPEC P19): who administers the plan at the vendor, the email
+ * of the company account that owns it there and the note are the IT Admin's alone, so they are emptied; the shape and the two flags stay.
+ */
+export function withoutVendorAdminDetail<
+  T extends { vendorAdmins: unknown[]; ownerAccountEmail: string | null; adminNote: string | null },
+>(view: T): T {
+  return { ...view, vendorAdmins: [], ownerAccountEmail: null, adminNote: null };
+}
+
 /** The data-quality warnings of a stored subscription that come from data written before the shared-pool rules. */
 export function poolWarnings(record: {
   status: 'DRAFT' | 'ACTIVE';

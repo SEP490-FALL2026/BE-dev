@@ -54,7 +54,7 @@ flowchart BT
   budgets -->|18| organization
   catalog -->|21| audit
   catalog -->|11| finance
-  catalog -->|9| identity_access
+  catalog -->|8| identity_access
   catalog -->|2| notifications
   catalog -->|4| operating_parameters
   catalog -->|30| organization

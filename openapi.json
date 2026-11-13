@@ -23019,7 +23019,7 @@
         ],
         "responses": {
           "200": {
-            "description": "A page of subscriptions by application, plan and creation, optionally filtered; warning=NO_ALERT_ANCHOR lists those with no date to alert from.",
+            "description": "A page of subscriptions by application, plan and creation, optionally filtered; warning=NO_ALERT_ANCHOR lists those with no date to alert from. Who administers the plan at the vendor (vendorAdmins), the email of the company account that owns it there (ownerAccountEmail) and the note (adminNote) are for the IT Admin: Finance reads them empty, with the two flags.",
             "content": {
               "application/json": {
                 "schema": {
@@ -23628,7 +23628,7 @@
         ],
         "responses": {
           "200": {
-            "description": "The subscription with its derived notice deadline and source, alert dates, warning, tax profile and tax estimate.",
+            "description": "The subscription with its derived notice deadline and source, alert dates, warning, tax profile and tax estimate. Who administers the plan at the vendor (vendorAdmins), the email of the company account that owns it there (ownerAccountEmail) and the note (adminNote) are for the IT Admin: Finance reads them empty, with the two flags.",
             "content": {
               "application/json": {
                 "schema": {

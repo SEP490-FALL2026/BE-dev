@@ -21,6 +21,7 @@ import {
   pickPriceSource,
   poolWarnings,
   vendorAdminFlags,
+  withoutVendorAdminDetail,
   type LivenessFacts,
   type PriceSource,
 } from './subscription-pool.policy';
@@ -312,5 +313,32 @@ describe('the vendor admins of a plan that needs them (QĐ-110k, QĐ-110u, R-53)
         ownerAccountEmailMissing: false,
       });
     });
+  });
+});
+
+describe('withoutVendorAdminDetail: only an IT Admin reads who administers a plan at the vendor (SPEC P19)', () => {
+  const view = {
+    id: 's1',
+    vendorAdmins: [{ employeeId: 'a', employeeCode: 'E-A', fullName: 'A', role: 'OWNER' as const, working: true }],
+    ownerAccountEmail: 'it@acme.vn',
+    adminNote: 'a note',
+    vendorAdminsBelowMinimum: true,
+    ownerAccountEmailMissing: false,
+  };
+
+  it('empties the people, the email and the note, and keeps everything else, the two flags included', () => {
+    expect(withoutVendorAdminDetail(view)).toEqual({
+      ...view,
+      vendorAdmins: [],
+      ownerAccountEmail: null,
+      adminNote: null,
+    });
+  });
+
+  it('does not change the view it was given', () => {
+    withoutVendorAdminDetail(view);
+
+    expect(view.vendorAdmins).toHaveLength(1);
+    expect(view.ownerAccountEmail).toBe('it@acme.vn');
   });
 });
