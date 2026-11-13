@@ -184,3 +184,76 @@ describe('DepartmentSoftwareChangesService.addFromCatalogLink (the tick "add to 
     expect(organizationReads.lockDepartmentShared).toHaveBeenCalledWith(TX, DEPARTMENT);
   });
 });
+
+describe('DepartmentSoftwareChangesService.change: the catalog is read in the transaction that writes (DS-R3)', () => {
+  function buildChange() {
+    let inside = false;
+    const inTransaction: boolean[] = [];
+    const runner = {
+      run: jest.fn(async <T>(work: (tx: DbTx) => Promise<T>): Promise<T> => {
+        inside = true;
+        try {
+          return await work(TX);
+        } finally {
+          inside = false;
+        }
+      }),
+    };
+    const repo = {
+      insertEntries: jest.fn().mockResolvedValue([entry('entry-1')]),
+      findEntries: jest.fn().mockResolvedValue([]),
+      deleteEntries: jest.fn().mockResolvedValue(0),
+    };
+    const access = { assertMayChange: jest.fn().mockResolvedValue(undefined) };
+    const view = {
+      assertInCatalog: jest.fn((): Promise<void> => {
+        inTransaction.push(inside);
+
+        return Promise.resolve();
+      }),
+      entries: jest.fn().mockResolvedValue([]),
+    };
+    const organizationReads = {
+      getOrganization: jest.fn().mockResolvedValue({ id: ORGANIZATION }),
+      lockDepartmentShared: jest.fn().mockResolvedValue({ id: DEPARTMENT }),
+    };
+    const audit = { record: jest.fn().mockResolvedValue(undefined) };
+    const service = new DepartmentSoftwareChangesService(
+      runner as never,
+      repo as never,
+      access as never,
+      view as never,
+      organizationReads as never,
+      audit as never,
+    );
+
+    return { service, repo, view, inTransaction, organizationReads };
+  }
+  const add = [{ applicationId: APPLICATION, planId: PLAN, note: null }];
+
+  it('judges the places to add inside the transaction, with the transaction, after the department is held', async () => {
+    const { service, view, inTransaction, organizationReads } = buildChange();
+
+    await service.change(IT_ADMIN, DEPARTMENT, { add, remove: [] });
+
+    expect(view.assertInCatalog).toHaveBeenCalledWith(add, TX);
+    expect(inTransaction).toEqual([true]);
+    expect(organizationReads.lockDepartmentShared.mock.invocationCallOrder[0]).toBeLessThan(
+      view.assertInCatalog.mock.invocationCallOrder[0],
+    );
+  });
+
+  it('writes nothing when a place is not in the catalog', async () => {
+    const { service, view, repo } = buildChange();
+    view.assertInCatalog.mockRejectedValue(
+      new DepartmentSoftwareNotInCatalogError([{ applicationId: APPLICATION, planId: PLAN }]),
+    );
+
+    await expect(service.change(IT_ADMIN, DEPARTMENT, { add, remove: [] })).rejects.toBeInstanceOf(
+      DepartmentSoftwareNotInCatalogError,
+    );
+
+    expect(repo.insertEntries).not.toHaveBeenCalled();
+    expect(repo.deleteEntries).not.toHaveBeenCalled();
+  });
+});

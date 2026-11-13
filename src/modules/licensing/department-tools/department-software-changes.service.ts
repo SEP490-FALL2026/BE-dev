@@ -51,13 +51,14 @@ export class DepartmentSoftwareChangesService {
     change: SoftwareListChange,
   ): Promise<{ added: SoftwareEntryWire[]; removed: string[] }> {
     await this.access.assertMayChange(actor, departmentId);
-    await this.view.assertInCatalog(change.add);
     const organization = await this.organizationReads.getOrganization();
     if (!organization) throw new Error('The list of software of a department was changed before installation');
 
     const result = await this.runner.run(async (tx) => {
       if (!(await this.organizationReads.lockDepartmentShared(tx, departmentId)))
         throw new ToolsDepartmentNotFoundError();
+      // What the catalog offers is read in the transaction that writes, once the department is held (DS-R3).
+      await this.view.assertInCatalog(change.add, tx);
       const removed = await this.takeOut(tx, departmentId, change.remove);
       const added = await this.putIn(tx, organization.id, departmentId, actor.appUserId, change.add);
       for (const entry of removed) {

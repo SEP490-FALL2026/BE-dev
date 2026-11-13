@@ -58,12 +58,13 @@ export class DepartmentSoftwareProposalService {
     const departmentId = proposerDepartment({ headedDepartmentId: await this.access.headedDepartment(actor) });
     if (departmentId === null) throw new ToolsDepartmentOutOfScopeError();
     const item = { applicationId: input.applicationId, planId: input.planId };
-    await this.view.assertInCatalog([item]);
     const organization = await this.requireOrganization();
 
     const made = await this.runner.run(async (tx) => {
       if (!(await this.organizationReads.lockDepartmentShared(tx, departmentId)))
         throw new ToolsDepartmentNotFoundError();
+      // What the catalog offers is read in the transaction that writes, once the department is held (DS-R3).
+      await this.view.assertInCatalog([item], tx);
       if (await this.repo.findEntryByPlace(tx, departmentId, item))
         throw new DepartmentSoftwareAlreadyListedError([item]);
       const proposal = await this.repo.insertProposal(tx, {
@@ -108,11 +109,12 @@ export class DepartmentSoftwareProposalService {
   ): Promise<{ proposal: SoftwareProposalWire; entryId: string }> {
     const proposal = await this.inCharge(actor, proposalId);
     const item = { applicationId: proposal.applicationId, planId: proposal.planId };
-    await this.view.assertInCatalog([item]);
     const organization = await this.requireOrganization();
 
     const done = await this.runner.run(async (tx) => {
       await this.lockDepartment(tx, proposal.departmentId);
+      // What the catalog offers is read in the transaction that decides, so a place that stops being offered leaves the proposal open (DS-R3).
+      await this.view.assertInCatalog([item], tx);
       const decided = await this.decide(tx, actor, proposal, { state: 'ACCEPTED', reason: null });
       const { entry } = await this.changes.ensureEntry(tx, actor, organization, proposal.departmentId, item, null);
       await this.recordDecision(tx, actor, organization, proposal, 'ACCEPTED');
