@@ -154,7 +154,7 @@ export class ProvisioningGrantWriter {
   ): Promise<string | null> {
     if (claimed.seat !== 'PERSONAL' || !claimed.replacesAssignmentId) return null;
 
-    return this.assignments.endReplacedByGrant(tx, actor, {
+    const ended = await this.assignments.endReplacedByGrant(tx, actor, {
       organizationId,
       requestId,
       employeeId: claimed.employeeId,
@@ -163,6 +163,17 @@ export class ProvisioningGrantWriter {
       today,
       revocationUnderWay: await this.repo.hasLiveRevocation(tx, claimed.replacesAssignmentId),
     });
+    // The money the old right still holds for the department they came from goes back from this day (the module of requests holds it).
+    if (ended !== null) {
+      await this.gate.get().reportRightReplaced(tx, {
+        assignmentId: ended,
+        provisioningType: target.provisioningType,
+        endedOn: today,
+        now: new Date(),
+      });
+    }
+
+    return ended;
   }
 
   /**

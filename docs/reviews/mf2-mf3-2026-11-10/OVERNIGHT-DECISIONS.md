@@ -758,6 +758,14 @@ Không sửa code; SPEC không bị sửa trong lượt này (spec là của Own
 - **Thay D-91 câu 5.** Câu "Quyền K1 cấp lại: … mua thêm một ghế (ghi nhận, không đổi)" **hết hiệu lực**, thay bằng quyết định trên.
 - **Chạm:** `licensing/provisioning/tasks/{provisioning-grant.policy(.spec),provisioning-grant-writer.service}.ts` (tách `reserveSeat` để `write` ≤ 60 dòng), `test/integration/personnel/transfer-grace-regrant.integration-spec.ts`.
 
+### D-94 · MF3-C-R3 (review MF3-C, Required) · Cấp lại trong ân hạn giải phóng cam kết của quyền cũ một lần theo sổ cái
+
+- **Lỗi.** `endReplacedByGrant` kết thúc quyền cũ ở sổ nhưng không có thu hồi hoàn tất, nên `SeatReleaseService.afterRevocation` không chạy; cam kết của quyền cũ chỉ được giải phóng ở `afterTransferEffective` (ngày hiệu lực) hoặc `afterRevocation`. Điều chuyển kiểu m-17 (không có release ngày hiệu lực) và khoản năm mới do lượt 01/01 giữ sau ngày hiệu lực **không bao giờ** được trả về ngân sách phòng cũ khi quyền được cấp lại.
+- **Phương án.** (A) để `afterRevocation` tự chạy bằng một sự kiện thu hồi giả (sai: không có tác vụ); (B) cổng cấp (`GrantRequestGate`, đã là điểm mở rộng requests↔licensing) thêm `reportRightReplaced`, `ProvisioningGrantWriter` gọi ngay sau `endReplacedByGrant` thành công, `requests` chạy `SeatReleaseService.afterRightReplaced` cùng giao dịch. **ĐÃ CHỌN B.** Luật sổ cái giữ nguyên: dùng `revocationShare` với ngày kết thúc = ngày cấp (`transferReleaseEndsOn`: chỉ K1/K2 tính theo tháng), khoản nào đã có release `TRANSFER_EFFECTIVE` cho quyền (hoặc chuỗi của nó) thì `givenAtTransfer` ⟹ 0, khoản khác trả. Không đụng luật ở MF3-B.
+- **Lý do và tham chiếu.** Dùng lý do có sẵn `TRANSFER_EFFECTIVE` (không thêm giá trị enum) với tham chiếu `transfer:regrant:assignment:<quyền cũ>`: token giữa đứng chỗ id điều chuyển (licensing/requests không biết điều chuyển), regex của `givenAtTransfer` đọc đúng, và nhờ đó nếu quyền cũ về sau lại bị thu hồi (cấp hỏng ⟹ mở lại, D-91 câu 3) `afterRevocation` không trả lần hai. Idempotent theo cặp (lý do, tham chiếu) của sổ cái.
+- **Test** (`transfer-grace-sweep-ledger`, thêm 3 ca, tổng 5): (a) điều chuyển thường: cấp lại không trả thêm khoản đã trả ngày hiệu lực; (b) m-17 + cấp lại: đúng một dòng `TRANSFER_EFFECTIVE` `transfer:regrant:assignment:…` = phần từ ngày cấp, sweeper sau đó không đổi sổ cái; (c) khoản năm mới do `holdYearStart` giữ sau ngày hiệu lực trả đủ 12.000.000, khoản năm hiện tại không trả lại. Đột biến: bỏ `givenAtTransfer` ⟹ ca (a) và (c) đỏ; bỏ việc giải phóng ⟹ ca (b) và (c) đỏ.
+- **Chạm:** `licensing/public/licensing.extension-points.ts` (`reportRightReplaced`), `licensing/provisioning/tasks/provisioning-grant-writer.service.ts`, `requests/grant/{access-request-grant.listener,seat-release.service}.ts`, hai stand-in test (`grant-gate-stand-in`, `provisioning-harness`), `test/integration/budgets/transfer-grace-sweep-ledger.integration-spec.ts`.
+
 ## Bị chặn
 
 (chưa có)

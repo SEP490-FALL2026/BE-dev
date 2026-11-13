@@ -27,4 +27,5 @@ export const GATE_THAT_KNOWS_NO_REQUEST: GrantRequestGate = {
   reportCancelled: () => Promise.resolve(false),
   reportExtended: () => Promise.resolve(),
   reportExtensionFailed: () => Promise.resolve(),
+  reportRightReplaced: () => Promise.resolve(),
 };

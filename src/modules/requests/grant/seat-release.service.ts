@@ -5,7 +5,7 @@ import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { BudgetsApi } from '../../budgets/public/budgets.api';
 import type { CommitmentReleaseReason, SeatCommitment } from '../../budgets/public/budgets.types';
 import { LicensingApi } from '../../licensing/public/licensing.api';
-import type { GrantOutcomeFacts, RevocationTaskFacts } from '../../licensing/public/licensing.types';
+import type { GrantOutcomeFacts, ProvisioningKind, RevocationTaskFacts } from '../../licensing/public/licensing.types';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import type { TransferReleaseInput, TransferReleaseResult } from '../public/requests.types';
 import {
@@ -19,6 +19,9 @@ import {
   type SeatCoverage,
 } from './seat-release.policy';
 import { SeatReleaseRepo } from './seat-release.repo';
+
+/** Where the reference of the release of a transfer has its id, the release of a right given again (R-49) says `regrant`. */
+const REGRANT_REFERENCE = 'regrant';
 
 /**
  * Gives back by the day what a request holds for one seat (`RV-07`, `M-06`, `M-10`), in the transaction of the event: when the revocation of
@@ -95,6 +98,35 @@ export class SeatReleaseService {
     }
 
     return { released: await this.byCurrency(tx, byRequest) };
+  }
+
+  /**
+   * The grant of a request ended the old right of the person the day it was given (R-49): the money the department they came from still holds for
+   * that right goes back from that day, once (the reference names the right), by the share a revocation on that day would give. A commitment that
+   * gave back the day the transfer took effect (its ledger says so) gives nothing again; one that did not (a transfer from before the release) or
+   * that was held after it (the pass of 01/01) gives now. The reason is that of the transfer and the reference carries `regrant` where a transfer
+   * has its id, which the rule of the ledger (`givenAtTransfer`) reads the same. A right whose kind is not priced by the month gives nothing.
+   */
+  async afterRightReplaced(
+    tx: DbTx,
+    input: { assignmentId: string; provisioningType: ProvisioningKind; endedOn: BusinessDate; now: Date },
+  ): Promise<void> {
+    const endsOn = transferReleaseEndsOn(input.provisioningType, input.endedOn);
+    if (endsOn === null) return;
+    const [chain] = await this.licensing.listRightChainsOf(tx, [input.assignmentId]);
+    if (chain === undefined) return;
+    const coverages = await this.repo.coverageOf(tx, {
+      requestIds: chain.grantRequestId === null ? [] : [chain.grantRequestId],
+      assignmentIds: chain.chainAssignmentIds,
+    });
+    await this.give(tx, coverages, input.now, {
+      reason: 'TRANSFER_EFFECTIVE',
+      reference: transferReleaseReference(REGRANT_REFERENCE, input.assignmentId),
+      shareOf: (commitment, coverage, currentYear) =>
+        givenAtTransfer(commitment, chain.chainAssignmentIds)
+          ? 0n
+          : revocationShare({ commitment, coverage, endsOn, currentYear }),
+    });
   }
 
   /** The grant of `requestId` was completed: a K2 right granted after its commitment began gives back the days before it. */

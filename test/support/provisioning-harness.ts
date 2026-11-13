@@ -62,6 +62,10 @@ export class FakeGrantGate implements GrantRequestGate {
     return Promise.resolve();
   }
 
+  reportRightReplaced(): Promise<void> {
+    return Promise.resolve();
+  }
+
   reportCancelled(): Promise<boolean> {
     return Promise.resolve(false);
   }

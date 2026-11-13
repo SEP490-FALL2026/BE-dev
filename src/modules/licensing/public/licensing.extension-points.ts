@@ -14,6 +14,7 @@ import type {
   RevocationContext,
   RevocationReasonFacts,
   GrantOutcomeFacts,
+  ProvisioningKind,
   RevocationTaskFacts,
 } from './licensing.types';
 
@@ -55,6 +56,15 @@ export interface GrantRequestGate {
    * that is not a renewal waiting for the task changes nothing. `actor` is the IT Admin who closed it.
    */
   reportExtensionFailed(tx: DbTx, actor: AuthenticatedPrincipal, requestId: string, now: Date): Promise<void>;
+  /**
+   * Inside the transaction of a grant that ended the right the request replaces (R-49): the money the old right still holds for the department
+   * they came from goes back from that day, the way a revocation gives it back (a commitment that gave back the day of the transfer gives nothing
+   * again). Nothing is revoked: the right was ended by the grant itself.
+   */
+  reportRightReplaced(
+    tx: DbTx,
+    input: { assignmentId: string; provisioningType: ProvisioningKind; endedOn: BusinessDate; now: Date },
+  ): Promise<void>;
   /** Whether the request waits for the IT Admin to close the task of its grant as cancelled: nothing else is decided on it. */
   isWithdrawing(tx: DbTx, requestId: string, employeeId?: string): Promise<boolean>;
   /**
