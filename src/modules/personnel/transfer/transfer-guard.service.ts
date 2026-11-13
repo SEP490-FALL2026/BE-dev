@@ -154,8 +154,12 @@ export class TransferGuardService {
     }
   }
 
-  /** Throws the refusal the policy gave, naming the department that would be left without a head when that is the reason. */
-  refuse(refusal: { code: string; details?: Record<string, unknown> }, extra?: Record<string, unknown>): never {
-    throw new TransferRefusedError(refusal.code, { ...refusal.details, ...extra });
+  /**
+   * Throws the refusal the policy gave. A head who is moved with nobody named to follow them (`SUCCESSOR_REQUIRED`) is told which department
+   * `oldDepartmentId` would be left without a head (`QĐ-110h`), as the departure tells it.
+   */
+  refuse(refusal: { code: string; details?: Record<string, unknown> }, oldDepartmentId?: string): never {
+    const named = refusal.code === 'SUCCESSOR_REQUIRED' && oldDepartmentId ? { departmentId: oldDepartmentId } : {};
+    throw new TransferRefusedError(refusal.code, { ...refusal.details, ...named });
   }
 }

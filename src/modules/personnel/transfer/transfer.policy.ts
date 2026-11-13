@@ -1,7 +1,7 @@
 import { type BusinessDate } from '../../../core/business-date';
 import { placementReasons } from '../../organization/public/employee-placement.policy';
 import { groundsNoteRefusal } from '../personnel-grounds.policy';
-import { successorCandidateRefusal, type SuccessorFacts } from '../personnel-successor.policy';
+import { successorRequiredRefusal, type SuccessorFacts } from '../personnel-successor.policy';
 
 /**
  * What the policy of a transfer refuses, as a semantic code (`DEPARTMENT_TRANSFER.<code>` on the wire) and the facts a person
@@ -24,6 +24,8 @@ export interface NewTransferFacts {
   destinationDepartment: { active: boolean; effectiveFrom: BusinessDate } | null;
   groundsNote: string | undefined;
   pending: { effectiveOn: BusinessDate } | null;
+  /** The transfer before took effect and is not closed: its grace still runs, or rights of the old department wait to be taken back (`QĐ-110r`, `US-03-01` AC-28). */
+  unclosed: { effectiveOn: BusinessDate } | null;
   /** Another waiting transfer names this person to follow the head of its department: they stay until it is settled. */
   namedAsSuccessor: boolean;
   successor: SuccessorFacts;
@@ -48,16 +50,12 @@ function reasonAndGrounds(reason: string, groundsNote: string | undefined): Tran
 }
 
 /**
- * Who the head of the old department is to be, or that nobody is (`US-03-01` AC-8, `QĐ-66a`). A transfer still lets a head choose that
- * nobody follows; `QĐ-110h` withdraws that choice for it too, and the transfer then judges with `successorRequiredRefusal` of the shared
- * policy (`MF3-A.2`), which the departure uses already.
+ * Who the head of the old department is to be (`US-03-01` AC-8, `QĐ-110h`): a head who is moved always names an employee to follow, and
+ * "nobody" is refused like nothing said. It is the policy of the departure (`successorRequiredRefusal`), so a departure and a transfer
+ * give the same answer, `SUCCESSOR_REQUIRED`, which the wire names `PERSONNEL.SUCCESSOR_REQUIRED` for both.
  */
 export function successorRefusal(successor: SuccessorFacts): TransferRefusal | null {
-  if (!successor.required) return null;
-  if (successor.chosen === undefined) return { code: 'HEAD_SUCCESSOR_REQUIRED' };
-  if (successor.chosen.kind === 'NONE') return null;
-
-  return successorCandidateRefusal(successor.candidate);
+  return successorRequiredRefusal(successor);
 }
 
 /** The day a change takes effect must be today or later and after the first day of the placement it ends. */
@@ -94,8 +92,8 @@ function destinationRefusal(
 }
 
 /**
- * Whether a transfer may be recorded (`US-03-01` AC-14 -> AC-18, AC-21, AC-22): the person works for the organization and has no
- * other event waiting, the department changes, the day is today or later, the destination can take people, the basis is whole,
+ * Whether a transfer may be recorded (`US-03-01` AC-14 -> AC-18, AC-21, AC-22, AC-28): the person works for the organization and has no
+ * other event waiting and no transfer before that is not closed, the department changes, the day is today or later, the destination can take people, the basis is whole,
  * nobody else has to act in their place, and the head of the department they leave is provided for.
  */
 export function newTransferRefusal(facts: NewTransferFacts): TransferRefusal | null {
@@ -112,6 +110,11 @@ export function newTransferRefusal(facts: NewTransferFacts): TransferRefusal | n
 
   if (facts.pending)
     return { code: 'PENDING_EVENT_EXISTS', details: { kind: 'TRANSFER', effectiveOn: facts.pending.effectiveOn } };
+  if (facts.unclosed)
+    return {
+      code: 'PENDING_EVENT_EXISTS',
+      details: { kind: 'TRANSFER_SETTLING', effectiveOn: facts.unclosed.effectiveOn },
+    };
   if (facts.namedAsSuccessor) return { code: 'PENDING_EVENT_EXISTS', details: { kind: 'HEAD_HANDOVER' } };
   if (employee.workState === 'HANDING_OVER') return { code: 'PENDING_EVENT_EXISTS', details: { kind: 'OFFBOARDING' } };
 

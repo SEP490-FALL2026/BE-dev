@@ -77,7 +77,7 @@ export class TransferChangeWriter {
         day: newEffectiveOn,
       }),
     });
-    if (refusal) this.guard.refuse(refusal);
+    if (refusal) this.guard.refuse(refusal, held.fromDepartmentId);
 
     const { moved, record } = await this.rewritePeriods(tx, held, { newEffectiveOn, chosen });
     const grounds = normalizedGroundsNote(input.groundsNote ?? '');

@@ -87,10 +87,12 @@ describe('the arguments of ops:record-super-admin-event', () => {
     for (const mode of SUPER_ADMIN_EVENT_MODES) expect(SUPER_ADMIN_EVENT_USAGE).toContain(mode);
   });
 
-  it('says in the usage that a head who departs cannot be recorded with --successor-none, and that an abrupt departure is of today', () => {
+  it('says in the usage that a head who departs or is moved cannot be recorded with --successor-none, and that an abrupt departure is of today', () => {
     expect(SUPER_ADMIN_EVENT_USAGE).toContain(
       '--successor-none, or none at all, is refused with PERSONNEL.SUCCESSOR_REQUIRED',
     );
+    expect(SUPER_ADMIN_EVENT_USAGE).toContain('for a transfer (transfer-record, transfer-reschedule)');
+    expect(SUPER_ADMIN_EVENT_USAGE).not.toContain('A transfer still accepts --successor-none');
     expect(SUPER_ADMIN_EVENT_USAGE).toContain('its --last-working-day must be today');
   });
 

@@ -26,6 +26,7 @@ const facts = (patch: Partial<NewTransferFacts> = {}): NewTransferFacts => ({
   destinationDepartment: { active: true, effectiveFrom: '2026-01-01' },
   groundsNote: NOTE,
   pending: null,
+  unclosed: null,
   successor: NO_SUCCESSOR,
   ...patch,
 });
@@ -67,12 +68,28 @@ describe('whether a transfer may be recorded (US-03-01)', () => {
     ['another transfer waits (AC-21)', { pending: { effectiveOn: '2026-12-01' } }, 'PENDING_EVENT_EXISTS'],
     ['another transfer names the person to follow its head', { namedAsSuccessor: true }, 'PENDING_EVENT_EXISTS'],
     [
+      'the transfer before took effect and is not closed (AC-28, QĐ-110r)',
+      { unclosed: { effectiveOn: '2026-10-05' } },
+      'PENDING_EVENT_EXISTS',
+    ],
+    [
       'the person is handing over to leave',
       { employee: { status: 'ACTIVE' as const, workState: 'HANDING_OVER' as const } },
       'PENDING_EVENT_EXISTS',
     ],
   ])('refuses when %s', (_name, patch, expected) => {
     expect(code(patch)).toBe(expected);
+  });
+
+  it('says that the transfer before is still settling, with the day it took effect, and not that another one waits', () => {
+    expect(newTransferRefusal(facts({ unclosed: { effectiveOn: '2026-10-05' } }))).toEqual({
+      code: 'PENDING_EVENT_EXISTS',
+      details: { kind: 'TRANSFER_SETTLING', effectiveOn: '2026-10-05' },
+    });
+    expect(newTransferRefusal(facts({ pending: { effectiveOn: '2026-12-01' } }))?.details).toEqual({
+      kind: 'TRANSFER',
+      effectiveOn: '2026-12-01',
+    });
   });
 
   it('records a transfer into a department that has no Cost Center like any other (QĐ-87d(3), F44)', () => {
@@ -116,10 +133,29 @@ describe('who follows the head of the department a person leaves (US-03-01 AC-8,
     expect(successorRefusal(NO_SUCCESSOR)).toBeNull();
   });
 
-  // QĐ-110h withdraws "nobody follows" for a transfer too; MF3-A.2 moves this wrapper onto `successorRequiredRefusal`.
-  it('asks for a choice, and still accepts that nobody follows until MF3-A.2', () => {
-    expect(successorRefusal(required({}))?.code).toBe('HEAD_SUCCESSOR_REQUIRED');
-    expect(successorRefusal(required({ chosen: { kind: 'NONE' } }))).toBeNull();
+  // QĐ-110h: a head who is moved always names who follows; "nobody" is refused like a departure does (`successorRequiredRefusal`).
+  it('asks for an employee to follow, and refuses both nothing said and "nobody follows"', () => {
+    expect(successorRefusal(required({}))).toEqual({ code: 'SUCCESSOR_REQUIRED' });
+    expect(successorRefusal(required({ chosen: { kind: 'NONE' } }))).toEqual({ code: 'SUCCESSOR_REQUIRED' });
+  });
+
+  it('refuses a head who moves with nobody to follow when the transfer is recorded and when its day is moved', () => {
+    const successor = required({ chosen: { kind: 'NONE' } });
+
+    expect(newTransferRefusal(facts({ successor }))?.code).toBe('SUCCESSOR_REQUIRED');
+    expect(
+      rescheduleRefusal({
+        status: 'PENDING',
+        effectiveOn: '2026-12-01',
+        today: '2026-10-15',
+        periodStart: '2026-01-01',
+        reason: 'Later',
+        groundsNote: NOTE,
+        newEffectiveOn: '2026-12-15',
+        successor,
+        destinationEffectiveFrom: null,
+      })?.code,
+    ).toBe('SUCCESSOR_REQUIRED');
   });
 
   it('judges a person chosen by the shared policy of the successor (every refusal of it is in personnel-successor.policy.spec)', () => {

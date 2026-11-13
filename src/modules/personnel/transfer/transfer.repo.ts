@@ -165,6 +165,19 @@ export class TransferRepo {
     return row && toRecord(row);
   }
 
+  /**
+   * The transfer of the employee that took effect and is not closed yet (`QĐ-110r`: the system closes it once every right of the old
+   * department is taken back); the latest if there are more. A day that has come but was not settled yet is settled by the caller first.
+   */
+  async findUnclosedOf(tx: DbTx, employeeId: string): Promise<TransferRecord | null> {
+    const row = await tx.departmentTransfer.findFirst({
+      where: { employeeId, status: 'EFFECTIVE', closedAt: null },
+      orderBy: [{ effectiveOn: 'desc' }, { id: 'desc' }],
+    });
+
+    return row && toRecord(row);
+  }
+
   /** Whether a transfer that waits names this person to follow the head of the department it leaves. */
   async isNamedSuccessorOfPending(tx: DbTx, employeeId: string): Promise<boolean> {
     const rows = await tx.$queryRaw<{ id: string }[]>`

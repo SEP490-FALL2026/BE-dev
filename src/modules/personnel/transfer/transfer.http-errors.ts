@@ -2,7 +2,7 @@ import { HttpStatus } from '@nestjs/common';
 import { ApiException } from '../../../infrastructure/http/errors/api.exception';
 import { toUnavailableApiException } from '../../../infrastructure/http/errors/service-unavailable';
 import { errorExampleOf } from '../../../infrastructure/http/openapi-error-examples';
-import { toPersonnelAccessApiException } from '../personnel-access.http-errors';
+import { successorRequiredException, toPersonnelAccessApiException } from '../personnel-access.http-errors';
 import { TransferRefusedError } from './transfer.errors';
 import { newTransferRefusal, type NewTransferFacts } from './transfer.policy';
 
@@ -19,7 +19,6 @@ const STATUS: Readonly<Record<string, HttpStatus>> = {
   GROUNDS_TOO_LONG: HttpStatus.UNPROCESSABLE_ENTITY,
   GROUNDS_IS_NOTICE: HttpStatus.UNPROCESSABLE_ENTITY,
   REASON_REQUIRED: HttpStatus.UNPROCESSABLE_ENTITY,
-  HEAD_SUCCESSOR_REQUIRED: HttpStatus.UNPROCESSABLE_ENTITY,
   SUCCESSOR_NOT_A_MEMBER_ON_DATE: HttpStatus.UNPROCESSABLE_ENTITY,
   PENDING_EVENT_EXISTS: HttpStatus.CONFLICT,
   PLACEMENT_OVERLAP: HttpStatus.CONFLICT,
@@ -53,9 +52,8 @@ const MESSAGES: Readonly<Record<string, string>> = {
   GROUNDS_TOO_LONG: 'The basis is longer than 500 characters.',
   GROUNDS_IS_NOTICE: 'The code of a notice is not the document the change rests on.',
   REASON_REQUIRED: 'A reason is required.',
-  HEAD_SUCCESSOR_REQUIRED: 'The person heads the department they leave: name who follows, or that nobody does.',
   SUCCESSOR_NOT_A_MEMBER_ON_DATE: 'The person named cannot head the department on that day.',
-  PENDING_EVENT_EXISTS: 'The person has another event waiting.',
+  PENDING_EVENT_EXISTS: 'The person has another event waiting, or a transfer before that is not closed.',
   PLACEMENT_OVERLAP: 'The placements of the person cannot take this change.',
   CONCURRENT_CHANGE: 'The person was changed by someone else meanwhile; read them again.',
   ALREADY_EFFECTIVE: 'The transfer has taken effect; only a new transfer can change it.',
@@ -71,6 +69,8 @@ export function toTransferApiException(error: unknown): unknown {
   const refused = toPersonnelAccessApiException(error);
   if (refused) return refused;
   if (!(error instanceof TransferRefusedError)) return toUnavailableApiException(error) ?? error;
+  // A head who is moved must name an employee to follow them, with the same word as a departure (`QĐ-110h`).
+  if (error.code === 'SUCCESSOR_REQUIRED') return successorRequiredException(error.details);
   const status = statusOf(error.code);
   if (status === undefined) return error;
 
@@ -94,6 +94,7 @@ const ACCEPTED_TRANSFER: NewTransferFacts = {
   destinationDepartment: { active: true, effectiveFrom: '2025-01-01' },
   groundsNote: undefined,
   pending: null,
+  unclosed: null,
   namedAsSuccessor: false,
   successor: { required: false, chosen: undefined, candidate: null },
 };
@@ -132,9 +133,6 @@ export const TRANSFER_ERROR_EXAMPLES = {
   GROUNDS_TOO_LONG: example(new TransferRefusedError('GROUNDS_TOO_LONG')),
   GROUNDS_IS_NOTICE: example(new TransferRefusedError('GROUNDS_IS_NOTICE')),
   REASON_REQUIRED: example(new TransferRefusedError('REASON_REQUIRED')),
-  HEAD_SUCCESSOR_REQUIRED: example(
-    new TransferRefusedError('HEAD_SUCCESSOR_REQUIRED', { departmentName: '<department-name>' }),
-  ),
   SUCCESSOR_NOT_A_MEMBER_ON_DATE: example(
     new TransferRefusedError('SUCCESSOR_NOT_A_MEMBER_ON_DATE', { reason: 'NOT_A_MEMBER_ON_DATE' }),
   ),

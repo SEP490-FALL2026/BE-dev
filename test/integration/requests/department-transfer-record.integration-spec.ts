@@ -163,15 +163,15 @@ describe('recording a transfer of a person (integration, real PostgreSQL)', () =
       return { department, head };
     };
 
-    it('wants to know who follows: refuses with the name of the department and writes nothing', async () => {
+    it('wants to know who follows: refuses with the word of a departure and the id of the department, and writes nothing (QĐ-110h)', async () => {
       const { department, head } = await headOf('P-HEAD1');
       const before = await state(head);
 
       const response = await h.recordTransfer(body(head.employeeId));
 
       expect(response.status).toBe(422);
-      expect(codeOf(response)).toBe('DEPARTMENT_TRANSFER.HEAD_SUCCESSOR_REQUIRED');
-      expect(h.detailsOf(response)).toMatchObject({ departmentName: `Department ${department.code}` });
+      expect(codeOf(response)).toBe('PERSONNEL.SUCCESSOR_REQUIRED');
+      expect(h.detailsOf(response)).toEqual({ departmentId: department.id });
       expect(await state(head)).toEqual(before);
     });
 
@@ -220,14 +220,20 @@ describe('recording a transfer of a person (integration, real PostgreSQL)', () =
       await clearSpendingApprover(h.ctx, h.admin);
     });
 
-    it('lets the department be left without a head when that is chosen', async () => {
+    it('does not let the department be left without a head any more: "nobody follows" is refused like nothing said, and nothing is written (QĐ-110h)', async () => {
       const { department, head } = await headOf('P-HEAD3');
+      const before = await state(head);
 
-      const wire = await h.recorded(body(head.employeeId, { successor: { kind: 'NONE' } }));
+      const response = await h.recordTransfer(body(head.employeeId, { successor: { kind: 'NONE' } }));
 
-      expect(wire.headSuccessor).toEqual({ kind: 'NONE', employee: null });
+      expect([response.status, codeOf(response), h.detailsOf(response)]).toEqual([
+        422,
+        'PERSONNEL.SUCCESSOR_REQUIRED',
+        { departmentId: department.id },
+      ]);
+      expect(await state(head)).toEqual(before);
       expect(await h.headPeriods(department.id)).toEqual([
-        { employee_id: head.employeeId, valid_from: h.today(), valid_to: h.day(30) },
+        expect.objectContaining({ employee_id: head.employeeId, valid_to: null }),
       ]);
     });
 
@@ -244,6 +250,47 @@ describe('recording a transfer of a person (integration, real PostgreSQL)', () =
       expect(codeOf(response)).toBe('DEPARTMENT_TRANSFER.SUCCESSOR_NOT_A_MEMBER_ON_DATE');
       expect(h.detailsOf(response)).toMatchObject({ reason: 'NOT_A_MEMBER_ON_DATE' });
       expect(await state(head)).toEqual(before);
+    });
+  });
+
+  describe('a transfer before that is not closed (US-03-01 AC-28, QĐ-110r)', () => {
+    it('refuses a new transfer while the one before took effect and is not closed, says since when, and accepts it once the system closed that one', async () => {
+      const person = await h.veteran(des, code('E'));
+      const first = await h.recorded(body(person.employeeId, { effectiveOn: h.today() }));
+      expect(first.status).toBe('EFFECTIVE');
+      const before = await state(person);
+
+      const refused = await h.recordTransfer(body(person.employeeId, { toDepartmentId: des.id }));
+
+      expect([refused.status, codeOf(refused), h.detailsOf(refused)]).toEqual([
+        409,
+        'DEPARTMENT_TRANSFER.PENDING_EVENT_EXISTS',
+        { kind: 'TRANSFER_SETTLING', effectiveOn: h.today() },
+      ]);
+      expect(await state(person)).toEqual(before);
+
+      // The system closes a transfer once every right of the old department is taken back (MF3-C.2): the column is what the check reads.
+      await h.ctx.sql.query(
+        `UPDATE department_transfers SET closed_at = now(), closed_by_app_user_id = gen_random_uuid() WHERE id = $1`,
+        [first.id],
+      );
+
+      const accepted = await h.recordTransfer(body(person.employeeId, { toDepartmentId: des.id }));
+
+      expect(accepted.status).toBe(201);
+    });
+
+    it('does not mix it up with a transfer that waits, and a cancelled one does not hold the person', async () => {
+      const waiting = await h.veteran(des, code('E'));
+      await h.recorded(body(waiting.employeeId));
+      const second = await h.recordTransfer(body(waiting.employeeId, { effectiveOn: h.day(40) }));
+      expect([second.status, h.detailsOf(second)]).toEqual([409, { kind: 'TRANSFER', effectiveOn: h.day(30) }]);
+
+      const cancelled = await h.veteran(des, code('E'));
+      const wire = await h.recorded(body(cancelled.employeeId));
+      await h.cancelTransfer(wire.id, { reason: 'The move is not needed', groundsNote: h.groundsNote }).expect(200);
+
+      expect((await h.recordTransfer(body(cancelled.employeeId))).status).toBe(201);
     });
   });
 

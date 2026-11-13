@@ -5846,7 +5846,7 @@
             }
           },
           "409": {
-            "description": "The person has left (DEPARTMENT_TRANSFER.EMPLOYEE_LEFT) or has another event waiting (PENDING_EVENT_EXISTS), the destination department cannot take people (DEPARTMENT_INACTIVE; a department with no Cost Center takes people like any other), or the placements cannot take it (PLACEMENT_OVERLAP, CONCURRENT_CHANGE).",
+            "description": "The person has left (DEPARTMENT_TRANSFER.EMPLOYEE_LEFT) or has another event waiting (PENDING_EVENT_EXISTS: details.kind is TRANSFER for a transfer that waits, HEAD_HANDOVER, OFFBOARDING, or TRANSFER_SETTLING for a transfer before that took effect and is not closed yet), the destination department cannot take people (DEPARTMENT_INACTIVE; a department with no Cost Center takes people like any other), or the placements cannot take it (PLACEMENT_OVERLAP, CONCURRENT_CHANGE).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -5863,12 +5863,12 @@
                     }
                   },
                   "DEPARTMENT_TRANSFER.PENDING_EVENT_EXISTS": {
-                    "summary": "The person has another event waiting.",
+                    "summary": "The person has another event waiting, or a transfer before that is not closed.",
                     "value": {
                       "success": false,
                       "error": {
                         "code": "DEPARTMENT_TRANSFER.PENDING_EVENT_EXISTS",
-                        "message": "The person has another event waiting.",
+                        "message": "The person has another event waiting, or a transfer before that is not closed.",
                         "details": { "kind": "TRANSFER", "effectiveOn": "2026-01-01" },
                         "requestId": "req_example"
                       }
@@ -5955,7 +5955,7 @@
             }
           },
           "422": {
-            "description": "The body is invalid (VALIDATION_ERROR), the day is in the past or not after the first day of the current placement (DEPARTMENT_TRANSFER.EFFECTIVE_DATE_IN_PAST, EFFECTIVE_DATE_NOT_AFTER_CURRENT_PERIOD), the department does not change (NO_CHANGE), the department is unknown (DEPARTMENT_NOT_FOUND), the destination takes effect later than the day (DEPARTMENT_NOT_YET_EFFECTIVE), the basis (groundsNote) is only the code of a notice and not a document (DEPARTMENT_TRANSFER.GROUNDS_IS_NOTICE); a basis that is missing, blank or over 500 characters is a VALIDATION_ERROR, or the head of the department they leave is not provided for (HEAD_SUCCESSOR_REQUIRED, SUCCESSOR_NOT_A_MEMBER_ON_DATE).",
+            "description": "The body is invalid (VALIDATION_ERROR), the day is in the past or not after the first day of the current placement (DEPARTMENT_TRANSFER.EFFECTIVE_DATE_IN_PAST, EFFECTIVE_DATE_NOT_AFTER_CURRENT_PERIOD), the department does not change (NO_CHANGE), the department is unknown (DEPARTMENT_NOT_FOUND), the destination takes effect later than the day (DEPARTMENT_NOT_YET_EFFECTIVE), the basis (groundsNote) is only the code of a notice and not a document (DEPARTMENT_TRANSFER.GROUNDS_IS_NOTICE); a basis that is missing, blank or over 500 characters is a VALIDATION_ERROR, or the head of the department they leave is not provided for (PERSONNEL.SUCCESSOR_REQUIRED: a head who is moved names an employee to follow them, \"nobody\" is refused; DEPARTMENT_TRANSFER.SUCCESSOR_NOT_A_MEMBER_ON_DATE).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -6042,14 +6042,14 @@
                       }
                     }
                   },
-                  "DEPARTMENT_TRANSFER.HEAD_SUCCESSOR_REQUIRED": {
-                    "summary": "The person heads the department they leave: name who follows, or that nobody does.",
+                  "PERSONNEL.SUCCESSOR_REQUIRED": {
+                    "summary": "The person heads the department they leave: name an employee of it who follows them as head.",
                     "value": {
                       "success": false,
                       "error": {
-                        "code": "DEPARTMENT_TRANSFER.HEAD_SUCCESSOR_REQUIRED",
-                        "message": "The person heads the department they leave: name who follows, or that nobody does.",
-                        "details": { "departmentName": "<department-name>" },
+                        "code": "PERSONNEL.SUCCESSOR_REQUIRED",
+                        "message": "The person heads the department they leave: name an employee of it who follows them as head.",
+                        "details": { "departmentId": "<department-id>" },
                         "requestId": "req_example"
                       }
                     }
@@ -6915,7 +6915,7 @@
             }
           },
           "422": {
-            "description": "The body is invalid, such as one without a reason or a basis (VALIDATION_ERROR), the basis (groundsNote) is only the code of a notice and not a document (DEPARTMENT_TRANSFER.GROUNDS_IS_NOTICE); a basis that is missing, blank or over 500 characters is a VALIDATION_ERROR, the day is the same, in the past or not after the current placement (NO_CHANGE, EFFECTIVE_DATE_IN_PAST, EFFECTIVE_DATE_NOT_AFTER_CURRENT_PERIOD), or the head of the department cannot be handed over on the new day (HEAD_SUCCESSOR_REQUIRED, SUCCESSOR_NOT_A_MEMBER_ON_DATE): nothing is saved.",
+            "description": "The body is invalid, such as one without a reason or a basis (VALIDATION_ERROR), the basis (groundsNote) is only the code of a notice and not a document (DEPARTMENT_TRANSFER.GROUNDS_IS_NOTICE); a basis that is missing, blank or over 500 characters is a VALIDATION_ERROR, the day is the same, in the past or not after the current placement (NO_CHANGE, EFFECTIVE_DATE_IN_PAST, EFFECTIVE_DATE_NOT_AFTER_CURRENT_PERIOD), or the head of the department cannot be handed over on the new day (PERSONNEL.SUCCESSOR_REQUIRED, DEPARTMENT_TRANSFER.SUCCESSOR_NOT_A_MEMBER_ON_DATE): nothing is saved.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -6974,6 +6974,18 @@
                         "code": "DEPARTMENT_TRANSFER.EFFECTIVE_DATE_NOT_AFTER_CURRENT_PERIOD",
                         "message": "The day must come after the first day of the placement the person has now.",
                         "details": { "currentPeriodFrom": "2026-01-01" },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "PERSONNEL.SUCCESSOR_REQUIRED": {
+                    "summary": "The person heads the department they leave: name an employee of it who follows them as head.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "PERSONNEL.SUCCESSOR_REQUIRED",
+                        "message": "The person heads the department they leave: name an employee of it who follows them as head.",
+                        "details": { "departmentId": "<department-id>" },
                         "requestId": "req_example"
                       }
                     }

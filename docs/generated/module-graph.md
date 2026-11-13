@@ -113,11 +113,11 @@ flowchart BT
   personnel -->|3| catalog
   personnel -->|3| devices
   personnel -->|20| identity_access
-  personnel -->|19| licensing
+  personnel -->|20| licensing
   personnel -->|6| notifications
-  personnel -->|5| operating_parameters
+  personnel -->|6| operating_parameters
   personnel -->|84| organization
-  personnel -->|5| requests
+  personnel -->|6| requests
   requests -->|58| audit
   requests -->|23| budgets
   requests -->|29| catalog

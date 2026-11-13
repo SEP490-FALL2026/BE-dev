@@ -99,7 +99,7 @@ export class TransfersController {
     {
       status: HttpStatus.CONFLICT,
       description:
-        'The person has left (DEPARTMENT_TRANSFER.EMPLOYEE_LEFT) or has another event waiting (PENDING_EVENT_EXISTS), the destination department cannot take people (DEPARTMENT_INACTIVE; a department with no Cost Center takes people like any other), or the placements cannot take it (PLACEMENT_OVERLAP, CONCURRENT_CHANGE).',
+        'The person has left (DEPARTMENT_TRANSFER.EMPLOYEE_LEFT) or has another event waiting (PENDING_EVENT_EXISTS: details.kind is TRANSFER for a transfer that waits, HEAD_HANDOVER, OFFBOARDING, or TRANSFER_SETTLING for a transfer before that took effect and is not closed yet), the destination department cannot take people (DEPARTMENT_INACTIVE; a department with no Cost Center takes people like any other), or the placements cannot take it (PLACEMENT_OVERLAP, CONCURRENT_CHANGE).',
       examples: [
         EXAMPLES.EMPLOYEE_LEFT,
         EXAMPLES.PENDING_EVENT_EXISTS,
@@ -110,14 +110,14 @@ export class TransfersController {
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
-      description: `The body is invalid (VALIDATION_ERROR), the day is in the past or not after the first day of the current placement (DEPARTMENT_TRANSFER.EFFECTIVE_DATE_IN_PAST, EFFECTIVE_DATE_NOT_AFTER_CURRENT_PERIOD), the department does not change (NO_CHANGE), the department is unknown (DEPARTMENT_NOT_FOUND), the destination takes effect later than the day (DEPARTMENT_NOT_YET_EFFECTIVE), ${GROUNDS_REFUSALS}, or the head of the department they leave is not provided for (HEAD_SUCCESSOR_REQUIRED, SUCCESSOR_NOT_A_MEMBER_ON_DATE).`,
+      description: `The body is invalid (VALIDATION_ERROR), the day is in the past or not after the first day of the current placement (DEPARTMENT_TRANSFER.EFFECTIVE_DATE_IN_PAST, EFFECTIVE_DATE_NOT_AFTER_CURRENT_PERIOD), the department does not change (NO_CHANGE), the department is unknown (DEPARTMENT_NOT_FOUND), the destination takes effect later than the day (DEPARTMENT_NOT_YET_EFFECTIVE), ${GROUNDS_REFUSALS}, or the head of the department they leave is not provided for (PERSONNEL.SUCCESSOR_REQUIRED: a head who is moved names an employee to follow them, "nobody" is refused; DEPARTMENT_TRANSFER.SUCCESSOR_NOT_A_MEMBER_ON_DATE).`,
       examples: [
         VALIDATION_EXAMPLE,
         ...DAY_EXAMPLES,
         EXAMPLES.DEPARTMENT_NOT_FOUND,
         EXAMPLES.DEPARTMENT_NOT_YET_EFFECTIVE,
         ...GROUNDS_EXAMPLES,
-        EXAMPLES.HEAD_SUCCESSOR_REQUIRED,
+        PERSONNEL_ACCESS_ERROR_EXAMPLES.SUCCESSOR_REQUIRED,
         EXAMPLES.SUCCESSOR_NOT_A_MEMBER_ON_DATE,
       ],
     },
@@ -216,8 +216,14 @@ export class TransfersController {
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
-      description: `The body is invalid, such as one without a reason or a basis (VALIDATION_ERROR), ${GROUNDS_REFUSALS}, the day is the same, in the past or not after the current placement (NO_CHANGE, EFFECTIVE_DATE_IN_PAST, EFFECTIVE_DATE_NOT_AFTER_CURRENT_PERIOD), or the head of the department cannot be handed over on the new day (HEAD_SUCCESSOR_REQUIRED, SUCCESSOR_NOT_A_MEMBER_ON_DATE): nothing is saved.`,
-      examples: [VALIDATION_EXAMPLE, ...GROUNDS_EXAMPLES, ...DAY_EXAMPLES, EXAMPLES.SUCCESSOR_NOT_A_MEMBER_ON_DATE],
+      description: `The body is invalid, such as one without a reason or a basis (VALIDATION_ERROR), ${GROUNDS_REFUSALS}, the day is the same, in the past or not after the current placement (NO_CHANGE, EFFECTIVE_DATE_IN_PAST, EFFECTIVE_DATE_NOT_AFTER_CURRENT_PERIOD), or the head of the department cannot be handed over on the new day (PERSONNEL.SUCCESSOR_REQUIRED, DEPARTMENT_TRANSFER.SUCCESSOR_NOT_A_MEMBER_ON_DATE): nothing is saved.`,
+      examples: [
+        VALIDATION_EXAMPLE,
+        ...GROUNDS_EXAMPLES,
+        ...DAY_EXAMPLES,
+        PERSONNEL_ACCESS_ERROR_EXAMPLES.SUCCESSOR_REQUIRED,
+        EXAMPLES.SUCCESSOR_NOT_A_MEMBER_ON_DATE,
+      ],
     },
   )
   async reschedule(

@@ -90,6 +90,7 @@ import { SuperAdminWatchController } from './role-duties/super-admin-watch.contr
 import { PersonnelApi } from './public/personnel.api';
 import { PersonnelDashboardApi } from './public/personnel-dashboard.api';
 import { PersonnelDashboardFactsRepo } from './dashboard-facts/dashboard-facts.repo';
+import { TransferImpactService } from './transfer-grace/transfer-impact.service';
 import { TransferChangeWriter } from './transfer/transfer-change-writer.service';
 import { TransferChangeService } from './transfer/transfer-change.service';
 import { TransferEffectiveListener } from './transfer/transfer-effective.listener';
@@ -167,6 +168,7 @@ import { TransfersController } from './transfer/transfers.controller';
     DepartureDeadlineRepo,
     DepartureDeadlineService,
     DepartureImpactService,
+    TransferImpactService,
     RevocationOverdueService,
     RevocationOverdueSweeper,
     PersonnelFileHookContributions,

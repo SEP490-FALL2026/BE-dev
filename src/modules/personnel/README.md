@@ -82,6 +82,12 @@ anh em `event-notice` để báo, nên `event-notice` không được import l�
   giữ nguyên nhưng rút lý do nghỉ việc khỏi tác vụ thu hồi qua `LicensingApi.withdrawRevocationReason` (đếm `revocationsWithdrawn`, báo IT phụ trách
   `DEPARTURE_REVOCATION_IT_CLOSE` khi còn tác vụ đang làm) và, qua hook `onCancelled` (`accessBlockInForce`), kết thúc đăng ký thiết bị;
   `offboarding-change.policy.ts`). Hồ sơ đã `LEFT` không hủy được (409 `CASE_LEFT`, R-41).
+- `transfer-grace/` — ân hạn quyền cũ sau điều chuyển (`QĐ-110p`, `QĐ-110r`; MF3-A.2 mở thư mục, MF3-B/C thêm sweeper): `TransferImpactService.impactOf(tx, …)`
+  **chỉ đọc**, cùng khuôn với `DepartureImpactService` (quyền cá nhân sẽ thu hồi khi hết ân hạn, Request trả phí phòng cũ sẽ hủy / tác vụ cấp đang chạy / cam kết
+  của Request đó qua `RequestsApi.previewBeneficiaryGone` phạm vi `PAID_OLD_DEPARTMENT`, ngày hết ân hạn và ngày nhắc); `responsibilities` null, `vendorAdminRoles`
+  rỗng tới X-IT, cam kết của chính ghế cũ thêm ở MF3-B.3. Chưa ai gọi ngoài test: route xem trước `P23` thêm ở RD.3, ảnh chụp lúc có hiệu lực ở MF3-B.4.
+  `transfer-grace.policy.ts` giữ ngày thuần (`graceEndsOn` = `nthWorkingDayFrom(ngày hiệu lực, N)`, `graceReminderOn`, `graceWindowEnd`); dùng lại
+  `rightToRevokeOf`/`commitmentToRelease` của `departure-impact.policy.ts`.
 - `departure-deadline/` — hạn thu hồi và tác động của nghỉ việc (MF2-B.3, MF2-D…): `DepartureImpactService.impactOf(tx, …)` **chỉ đọc** (quyền sẽ thu hồi qua
   `LicensingApi.listPersonalSeatsOf`, Request sẽ hủy / tác vụ cấp đang chạy / cam kết sẽ giải phóng qua `RequestsApi.previewBeneficiaryGone`, hạn thu hồi;
   `responsibilities` null và `vendorAdminRoles` rỗng tới X-IT). `OffboardingService` đọc nó trước khi ghi và lưu số đếm vào thay đổi `RECORDED`; route xem
