@@ -5,7 +5,7 @@ import type { AuthenticatedPrincipal } from '../../../infrastructure/security/to
 import { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { renewalDeciderOf } from './decision/renewal-decision.policy';
-import { renewalItAdminOf } from './renewal-it-admin.policy';
+import { renewalNamedItAdminOf } from './renewal-it-admin.policy';
 import type { DeciderRole } from './subscription-renewal.types';
 
 /** The people a renewal concerns, as they hold their roles now (an unlocked read unless a transaction is given). */
@@ -21,7 +21,7 @@ export type RenewalReadScope = { kind: 'ALL'; itAdmin: boolean } | { kind: 'DEPA
 
 /**
  * Who a renewal concerns (`US-11-01`, `US-11-05`, `QĐ-94d`(2)): the IT Admin in charge of the department that owns the subscription
- * (any usable IT Admin while that department names none), Finance, the head of the owner department — who
+ * (any usable IT Admin while that department names none or theirs is not usable), Finance, the head of the owner department — who
  * confirms the proposal on the day of the decision, whatever role their account holds, and nobody in their place — and the Super
  * Admin. The person who decides spending is no longer among those who decide a renewal, but still hears of an incident
  * (`QĐ-98f`).
@@ -35,23 +35,24 @@ export class RenewalPartiesService {
 
   /**
    * The IT Admin of the period (`QĐ-111g`, `BB-9`): the one responsible for the subscription while they are a usable IT Admin, else the IT
-   * Admin in charge of the owner department, else the first usable IT Admin; null when there is none.
+   * Admin in charge of the owner department while they are one too, else the first usable IT Admin; null when there is none. The
+   * department is read first and both named are tested in ONE read; the first usable IT Admin is read only when neither is usable.
    */
   async itAdminOf(
     period: { ownerDepartmentId: string; responsibleItAdminEmployeeId: string | null },
     tx?: DbTx,
   ): Promise<string | null> {
-    const responsible = period.responsibleItAdminEmployeeId;
-    const usable =
-      responsible === null ? new Set<string>() : await this.identity.findUsableItAdminEmployeeIds([responsible], tx);
+    const inCharge = await this.organizationReads.getItAdminInChargeOfDepartment(period.ownerDepartmentId, tx);
+    const named = [...new Set([period.responsibleItAdminEmployeeId, inCharge].filter((id) => id !== null))];
+    const usable = await this.identity.findUsableItAdminEmployeeIds(named, tx);
 
-    return renewalItAdminOf({
-      responsibleItAdminEmployeeId: responsible,
-      responsibleIsUsable: responsible !== null && usable.has(responsible),
-      departmentFallback:
-        (await this.organizationReads.getItAdminInChargeOfDepartment(period.ownerDepartmentId, tx)) ??
-        (await this.identity.findFirstUsableItAdminEmployeeId(tx)),
-    });
+    return (
+      renewalNamedItAdminOf({
+        responsibleItAdminEmployeeId: period.responsibleItAdminEmployeeId,
+        departmentItAdminEmployeeId: inCharge,
+        usableItAdminEmployeeIds: usable,
+      }) ?? (await this.identity.findFirstUsableItAdminEmployeeId(tx))
+    );
   }
 
   /** The person assigned head of the department on `today`, or null: the department names none, or its head period has not begun. */
