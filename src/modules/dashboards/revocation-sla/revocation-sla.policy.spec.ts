@@ -19,6 +19,7 @@ const unit = (startOn: BusinessDate, dueOn: BusinessDate, over: Partial<SlaUnit>
   departmentId: 'd-des',
   startOn,
   dueOn,
+  rightsLeft: false,
   ...over,
 });
 const done = (completedOn: BusinessDate, responsible: string | null = 'it-1'): SlaTask => ({
@@ -119,6 +120,54 @@ describe('outcomeOf: a departure past its deadline is the same reading as the li
     expect(
       outcomeOf(unit('2026-11-13', '2026-11-13'), [done('2026-11-13')], context(new Set(['case-1']))),
     ).toMatchObject({ state: 'OVERDUE_OPEN' });
+  });
+});
+
+describe('outcomeOf: a right left without a completed task keeps the departure open before its deadline too (RD-R2, QĐ-110c)', () => {
+  // One task done, another right never got a task: the case is not finished, whatever day it is judged on.
+  const withRightLeft = unit('2026-11-17', '2026-11-17', { rightsLeft: true });
+
+  it('is open, not finished and not on time, while the deadline has not come', () => {
+    const result = outcomeOf(withRightLeft, [done('2026-11-13')], {
+      today: '2026-11-16',
+      nonWorking: none,
+      lateCaseIds: noLate,
+    });
+
+    expect(result).toMatchObject({ state: 'OPEN', completedOn: null, onTime: null, workingDays: null });
+  });
+
+  it('is overdue once the deadline has passed (the case is then in the set), so the same departure never goes from finished to overdue by the passing of a day', () => {
+    const before = outcomeOf(withRightLeft, [done('2026-11-13')], {
+      today: '2026-11-17',
+      nonWorking: none,
+      lateCaseIds: noLate,
+    });
+    const after = outcomeOf(withRightLeft, [done('2026-11-13')], {
+      today: '2026-11-18',
+      nonWorking: none,
+      lateCaseIds: new Set(['case-1']),
+    });
+
+    expect([before.state, after.state]).toEqual(['OPEN', 'OVERDUE_OPEN']);
+  });
+
+  it('is finished, on time or late, when no right is left: the flag is the only thing that held it back', () => {
+    expect(
+      outcomeOf(unit('2026-11-17', '2026-11-17'), [done('2026-11-17')], {
+        today: '2026-11-16',
+        nonWorking: none,
+        lateCaseIds: noLate,
+      }),
+    ).toMatchObject({ state: 'FINISHED', onTime: true });
+  });
+
+  it('does not count a departure with a right left among those that finished, in any figure', () => {
+    const outcomes = [
+      outcomeOf(withRightLeft, [done('2026-11-13')], { today: '2026-11-16', nonWorking: none, lateCaseIds: noLate }),
+    ];
+
+    expect(summaryOf(outcomes)).toMatchObject({ completed: 0, onTime: 0, overdueOpen: 0, onTimeRate: null });
   });
 });
 

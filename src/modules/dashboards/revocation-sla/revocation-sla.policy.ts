@@ -17,6 +17,8 @@ export interface SlaUnit {
   startOn: BusinessDate;
   /** The day the IT Admin has until: the stored deadline of a departure, or the one worked out the same way for a transfer (its tasks have none, D-99). */
   dueOn: BusinessDate;
+  /** A right of the person is left with no completed task, whether or not a task was opened for it and whatever the day (`QĐ-110c`); always false for a transfer. */
+  rightsLeft: boolean;
 }
 
 export type SlaTaskStatus = 'QUEUED' | 'RETRY_SCHEDULED' | 'IN_PROGRESS' | 'FAILED' | 'COMPLETED';
@@ -55,7 +57,8 @@ export function outcomeOf(unit: SlaUnit, tasks: readonly SlaTask[], context: Sla
   const itAdminId = tasks.map((task) => task.responsibleEmployeeId).find((id) => id !== null) ?? null;
   const base = { unit, itAdminId };
 
-  if (completed.length > 0 && stillOpen === 0 && !late) {
+  // Finished only when no right is left, before the deadline as after it: a day that passes must never turn a finished unit into an overdue one.
+  if (completed.length > 0 && stillOpen === 0 && !late && !unit.rightsLeft) {
     const completedOn = completed.reduce(
       (last, task) => (task.completedOn !== null && task.completedOn > last ? task.completedOn : last),
       '0000-00-00',

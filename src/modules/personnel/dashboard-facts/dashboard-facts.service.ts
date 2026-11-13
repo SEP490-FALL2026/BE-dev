@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { addDays, monthBoundsOf, type BusinessDate } from '../../../core/business-date';
 import { instantAtWallClock } from '../../../core/working-days';
 import { CatalogResponsibilityApi } from '../../catalog/public/catalog-responsibility.api';
+import { LicensingApi } from '../../licensing/public/licensing.api';
 import { OperatingParametersApi } from '../../operating-parameters/public/operating-parameters.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { RevocationOverdueService } from '../departure-deadline/revocation-overdue.service';
@@ -32,6 +33,7 @@ export class PersonnelDashboardFactsService {
     private readonly parameters: OperatingParametersApi,
     private readonly organizationReads: OrganizationReadApi,
     private readonly responsibilities: CatalogResponsibilityApi,
+    private readonly licensing: LicensingApi,
   ) {}
 
   async progress(scope: PersonnelProgressScope, today: BusinessDate): Promise<PersonnelProgressFacts> {
@@ -66,7 +68,18 @@ export class PersonnelDashboardFactsService {
   async revocationWindows(query: RevocationWindowQuery): Promise<RevocationWindowFacts[]> {
     const windows: RevocationWindowFacts[] = [];
     if (query.source !== 'TRANSFER') {
-      for (const row of await this.repo.departureWindows(query)) windows.push({ source: 'OFFBOARDING', ...row });
+      const departures = await this.repo.departureWindows(query);
+      // The rights left are read as of today, like the cases past their deadline: one statement for all the people of the windows.
+      const left =
+        departures.length === 0
+          ? new Map<string, number>()
+          : await this.licensing.countPersonalSeatsWithoutCompletedTaskOf(
+              [...new Set(departures.map((row) => row.employeeId))],
+              query.today,
+            );
+      for (const row of departures) {
+        windows.push({ source: 'OFFBOARDING', ...row, rightsLeft: (left.get(row.employeeId) ?? 0) > 0 });
+      }
     }
     if (query.source !== 'OFFBOARDING') {
       const transfers = await this.repo.transferWindows(query);
@@ -79,6 +92,7 @@ export class PersonnelDashboardFactsService {
             ...row,
             startOn: addDays(graceEndsOn, 1),
             dueOn: revocationDueOn(graceEndsOn, workingDays, nonWorking),
+            rightsLeft: false,
           });
         }
       }

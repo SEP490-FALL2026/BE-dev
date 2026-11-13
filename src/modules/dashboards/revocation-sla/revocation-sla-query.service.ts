@@ -46,7 +46,7 @@ export class RevocationSlaQueryService {
       : await this.organizationReads.getItAdminScope(actor.employeeId, (ids) =>
           this.identity.findUsableItAdminEmployeeIds(ids),
         );
-    const windows = await this.personnel.revocationWindows({ from, to, source: query.source, departmentIds });
+    const windows = await this.personnel.revocationWindows({ from, to, today, source: query.source, departmentIds });
     const outcomes = await this.outcomesOf(windows, { today, from, departmentIds });
     const rows = rowsOf(outcomes, query.groupBy);
     const page = rows.slice((query.page - 1) * query.pageSize, query.page * query.pageSize);

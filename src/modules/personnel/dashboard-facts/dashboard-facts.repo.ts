@@ -9,6 +9,9 @@ import type {
   TransferDashboardFacts,
 } from '../public/personnel-dashboard.types';
 
+/** The days, the source and the departments the windows are read for: what a statement needs of the query (the day it is judged on is the service's). */
+type WindowRange = Omit<RevocationWindowQuery, 'today'>;
+
 /** What the counts of the departures are cut by: the scope, the calendar window, this month, the cases past their deadline (told apart by id). */
 export interface DepartureCountInput {
   departmentIds?: readonly string[] | undefined;
@@ -154,7 +157,7 @@ export class PersonnelDashboardFactsRepo {
    * never placed in a department included (their `departmentId` is null).
    */
   async departureWindows(
-    query: RevocationWindowQuery,
+    query: WindowRange,
   ): Promise<
     { id: string; employeeId: string; departmentId: string | null; startOn: BusinessDate; dueOn: BusinessDate }[]
   > {
@@ -190,7 +193,7 @@ export class PersonnelDashboardFactsRepo {
    * by a departure (its rights are the departure's to take back). `departmentIds` narrows to the departments they enter, where the tasks go.
    */
   async transferWindows(
-    query: RevocationWindowQuery,
+    query: WindowRange,
   ): Promise<{ id: string; employeeId: string; departmentId: string; graceEndsOn: BusinessDate }[]> {
     if (query.departmentIds?.length === 0) return [];
     const rows = await this.prisma.departmentTransfer.findMany({

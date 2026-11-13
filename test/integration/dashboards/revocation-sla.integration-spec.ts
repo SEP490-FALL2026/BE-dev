@@ -353,4 +353,47 @@ describe('the report of the SLA of the revocations (integration, real PostgreSQL
     expect(await report(it1)).toEqual(before.asIt1);
     expect(await report(it2.account)).toEqual(before.asIt2);
   });
+
+  it('RD-R2: a departure with one task done and a right that never got a task is not finished before its deadline either; the day the deadline passes it is overdue, never finished and then overdue', async () => {
+    const secondPool = await h.subscription(40, 'K2', des.department.id);
+    const leaver = await person(des.department);
+    const first = await h.rightOf(leaver, leaver.code, { subscriptionId: desPool });
+    await h.rightOf(leaver, leaver.code, { subscriptionId: secondPool });
+    const before = await report(h.sa);
+    const wire = await h.recordedCase(leaver, { accessBlockMode: 'BLOCK_NOW', lastWorkingDay: today() });
+    await h.lockAccount(wire.id, LOCK).expect(200);
+    // The IT Admin opens a task for one of the two rights only, and completes it.
+    await h.revokeRights(wire.id, { assignmentIds: [first] }).expect(200);
+    const firstTasks = await taskIdsOf(wire.id);
+    for (const task of firstTasks) await finish(task, it1);
+
+    const inTime = await report(h.sa);
+
+    // Not finished, not on time, not overdue yet: the figures are the ones before the departure was recorded.
+    expect([inTime.completed, inTime.onTime, inTime.overdueOpen]).toEqual([
+      before.completed,
+      before.onTime,
+      before.overdueOpen,
+    ]);
+
+    await age(wire.id, 8);
+    const late = await report(h.sa);
+
+    expect([late.completed, late.onTime, late.overdueOpen]).toEqual([
+      before.completed,
+      before.onTime,
+      before.overdueOpen + 1,
+    ]);
+
+    // The IT Admin takes the other right away too: the departure is finished, late.
+    await h.revokeRights(wire.id, {}).expect(200);
+    for (const task of (await taskIdsOf(wire.id)).filter((id) => !firstTasks.includes(id))) await finish(task, it1);
+    const done = await report(h.sa);
+
+    expect([done.completed, done.onTime, done.overdueOpen]).toEqual([
+      before.completed + 1,
+      before.onTime,
+      before.overdueOpen,
+    ]);
+  });
 });

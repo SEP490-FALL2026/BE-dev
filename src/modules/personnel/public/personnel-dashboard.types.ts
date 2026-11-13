@@ -60,12 +60,18 @@ export interface RevocationWindowFacts {
   departmentId: string | null;
   startOn: BusinessDate;
   dueOn: BusinessDate;
+  /**
+   * A right of the person is left with no completed task of revocation on `today`, whether or not a task was opened for it and whether or not the deadline has
+   * passed (`QĐ-110c`): the departure is not finished while it holds. Always false for a transfer, whose tasks the sweeper opens for every right.
+   */
+  rightsLeft: boolean;
 }
 
-/** What the report of the revocations asks for the windows: the days they open on, the source, the departments of an IT Admin (absent: the whole company). */
+/** What the report of the revocations asks for the windows: the days they open on, the source, the departments of an IT Admin (absent: the whole company), and the day it is judged on. */
 export interface RevocationWindowQuery {
   from: BusinessDate;
   to: BusinessDate;
+  today: BusinessDate;
   source?: RevocationWindowSource | undefined;
   departmentIds?: readonly string[] | undefined;
 }

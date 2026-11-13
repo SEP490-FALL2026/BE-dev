@@ -116,7 +116,7 @@ flowchart BT
   personnel -->|11| catalog
   personnel -->|3| devices
   personnel -->|21| identity_access
-  personnel -->|30| licensing
+  personnel -->|31| licensing
   personnel -->|6| notifications
   personnel -->|8| operating_parameters
   personnel -->|97| organization
