@@ -20,11 +20,13 @@ import { assertDeclarableCycle, isPooledPlan } from './pool/subscription-pool.po
 import { SubscriptionRepo } from './subscription.repo';
 import { snapshotOf, stateOf } from './subscription.mapper';
 import { SubscriptionPoolService } from './pool/subscription-pool.service';
+import { isPricedInDong } from './price/subscription-price.policy';
 import { SubscriptionPricingService } from './subscription-pricing.service';
 import { SubscriptionViewService } from './subscription-view.service';
 import type {
   BillingCycle,
   CommitmentTermMonths,
+  OriginalPriceRecord,
   SubscriptionRecord,
   SubscriptionKind,
   SubscriptionListFilter,
@@ -42,7 +44,10 @@ export interface DeclareSubscriptionInput {
   ownerDepartmentId?: string;
   kind: SubscriptionKind;
   purchasedQuantity?: number;
+  /** The unit price in dong (`QĐ-111an`); another currency is refused with SubscriptionPriceNotVndError. */
   unitPrice?: { amount: string; currency: string };
+  /** The price the vendor quoted in another currency, only kept beside the price in dong (R-44). */
+  originalPrice?: { amount: string; currency: string };
   billingCycle?: BillingCycle;
   commitmentTermMonths?: CommitmentTermMonths;
   startDate?: BusinessDate;
@@ -60,6 +65,8 @@ export interface DeclareSubscriptionInput {
 export interface UpdateSubscriptionInput {
   purchasedQuantity?: number;
   unitPrice?: { amount: string; currency: string };
+  /** `null` takes the recorded original price away. */
+  originalPrice?: { amount: string; currency: string } | null;
   billingCycle?: BillingCycle;
   commitmentTermMonths?: CommitmentTermMonths;
   startDate?: BusinessDate;
@@ -76,8 +83,8 @@ export interface UpdateSubscriptionInput {
 
 /**
  * The subscriptions and perpetual purchases of the plans, declared by the IT Admin (`US-04-03`, `US-04-05`). A write is
- * one transaction: the plan is locked `FOR SHARE`, the price is converted by the finance facade at the rate of the day it
- * is recorded (frozen, never recomputed), the status is computed from what is complete, the audit event commits with the
+ * one transaction: the plan is locked `FOR SHARE`, the price is entered in dong and recorded with the snapshot of the same
+ * currency (`QĐ-111an`: no exchange rate is read), the status is computed from what is complete, the audit event commits with the
  * row. The notice deadline, its source, the alert dates and the data-quality warning are derived when a subscription is read.
  */
 @Injectable()
@@ -133,15 +140,19 @@ export class SubscriptionService {
 
   /**
    * Declares a subscription or a perpetual purchase. Throws SubscriptionPlanNotFoundError, the shape errors of
-   * `assertSubscriptionShape`, and the money errors of the finance facade for the unit price.
+   * `assertSubscriptionShape`, SubscriptionPriceNotVndError for a unit price that is not in dong, and the money errors of the
+   * finance facade for the unit price and the original price.
    */
   async declare(actor: AuthenticatedPrincipal, input: DeclareSubscriptionInput): Promise<SubscriptionView> {
     assertDeclarableCycle(input.billingCycle);
     const money = input.unitPrice ? await this.pricing.read(input.unitPrice) : null;
+    const originalPrice = input.originalPrice ? await this.pricing.readOriginal(input.originalPrice) : null;
     const organizationId = await this.requireOrganizationId();
     if (input.responsibleItAdminEmployeeId) await this.poolRules.requireItAdmin(input.responsibleItAdminEmployeeId);
 
-    const record = await this.runner.run((tx) => this.declareIn(tx, actor, input, { money, organizationId }));
+    const record = await this.runner.run((tx) =>
+      this.declareIn(tx, actor, input, { money, originalPrice, organizationId }),
+    );
 
     return (await this.views.viewAll([record]))[0];
   }
@@ -150,9 +161,13 @@ export class SubscriptionService {
     tx: DbTx,
     actor: AuthenticatedPrincipal,
     input: DeclareSubscriptionInput,
-    ctx: { money: { amountMinor: bigint; currency: string } | null; organizationId: string },
+    ctx: {
+      money: { amountMinor: bigint; currency: string } | null;
+      originalPrice: OriginalPriceRecord | null;
+      organizationId: string;
+    },
   ): Promise<SubscriptionRecord> {
-    const { money, organizationId } = ctx;
+    const { money, originalPrice, organizationId } = ctx;
     // The plan is locked `FOR UPDATE` before anything else: no row of this subscription exists yet to lock, so the plan is what two
     // declarations of the same K2 or K4 plan take turns on (R-E02); every other writer locks a subscription first, then its plan.
     const plan = await this.plans.lockExclusive(tx, input.planId);
@@ -182,6 +197,7 @@ export class SubscriptionService {
       kind: input.kind,
       ...state,
       ...priced,
+      originalPrice,
       status: complete,
     });
     await this.audit.record(
@@ -222,9 +238,9 @@ export class SubscriptionService {
   }
 
   /**
-   * Completes a draft once its data is whole: a price recorded with no rate for its day is converted at the rate now
-   * entered for that very day, the day it was recorded on, not today's. Throws SubscriptionNotFoundError and
-   * SubscriptionStillDraftError naming what is still missing. An active subscription is answered unchanged.
+   * Completes a draft once its data is whole. A price an earlier release left in another currency is no price: the draft is
+   * completed once it is entered again in dong. Throws SubscriptionNotFoundError and SubscriptionStillDraftError naming
+   * what is still missing. An active subscription is answered unchanged.
    */
   async complete(actor: AuthenticatedPrincipal, id: string): Promise<SubscriptionView> {
     const organizationId = await this.requireOrganizationId();
@@ -237,11 +253,7 @@ export class SubscriptionService {
       const plan = await this.plans.lockExclusive(tx, current.planId);
       if (!plan) throw new SubscriptionPlanNotFoundError();
 
-      const priceSnapshot =
-        current.unitPrice && !current.priceSnapshot
-          ? await this.pricing.snapshotOfRecorded(tx, current.unitPrice)
-          : current.priceSnapshot;
-      const state = { ...stateOf(current), priceSnapshot };
+      const state = stateOf(current);
       const missing = this.missingOf(plan, current.kind, state);
       if (missing.length > 0) throw new SubscriptionStillDraftError(missing);
       await this.poolRules.assertActivation(tx, plan, current.kind, state, current.renewedFromId !== null);
@@ -303,8 +315,7 @@ export class SubscriptionService {
       quantity: state.purchasedQuantity,
       startDate: state.startDate,
       billingCycle: state.billingCycle,
-      hasPrice: state.unitPrice !== null,
-      hasSnapshot: state.priceSnapshot !== null,
+      hasPrice: isPricedInDong(state),
     });
   }
 

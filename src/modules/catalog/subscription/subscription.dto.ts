@@ -20,6 +20,14 @@ const quantity = z.number().int().min(0).max(1_000_000_000);
 export const VENDOR_ADMINS_MAX = 20;
 const noticeDays = z.number().int().min(0).max(3650);
 const money = z.strictObject({ amount: z.string().max(40), currency: z.string().regex(/^[A-Z]{3}$/) });
+const unitPrice = money.meta({
+  description:
+    'The unit price in dong: a decimal string in major units, currency VND. Another currency is refused (SUBSCRIPTION.PRICE_NOT_VND).',
+});
+const originalPrice = money.meta({
+  description:
+    'The price the vendor quoted in another currency, kept beside the price in dong so an invoice can be matched against it: a decimal string in major units of its currency. It is only kept, never converted.',
+});
 
 export const declareSubscriptionBodySchema = z.strictObject({
   planId: z.uuid(),
@@ -28,7 +36,8 @@ export const declareSubscriptionBodySchema = z.strictObject({
   ownerDepartmentId: z.uuid().optional(),
   kind,
   purchasedQuantity: quantity.optional(),
-  unitPrice: money.optional(),
+  unitPrice: unitPrice.optional(),
+  originalPrice: originalPrice.optional(),
   billingCycle: billingCycle.optional(),
   commitmentTermMonths: commitmentTermMonths.optional(),
   startDate: businessDate.optional(),
@@ -48,7 +57,10 @@ export const declareSubscriptionBodySchema = z.strictObject({
 
 export const updateSubscriptionBodySchema = z.strictObject({
   purchasedQuantity: quantity.optional(),
-  unitPrice: money.optional(),
+  unitPrice: unitPrice.optional(),
+  originalPrice: originalPrice.nullable().optional().meta({
+    description: 'The original price the vendor quoted; null takes the recorded one away.',
+  }),
   billingCycle: billingCycle.optional(),
   commitmentTermMonths: commitmentTermMonths.optional(),
   startDate: businessDate.optional(),
@@ -96,20 +108,10 @@ const subscriptionSchema = z.strictObject({
   kind,
   status,
   missingFinancialData: z.boolean(),
-  missing: z.array(z.enum(['QUANTITY', 'START_DATE', 'BILLING_CYCLE', 'UNIT_PRICE', 'EXCHANGE_RATE'])),
+  missing: z.array(z.enum(['QUANTITY', 'START_DATE', 'BILLING_CYCLE', 'UNIT_PRICE'])),
   purchasedQuantity: z.number().int().nullable(),
   unitPrice: z.strictObject({ amount: z.string(), currency: z.string() }).nullable(),
-  priceSnapshot: z
-    .strictObject({
-      recordedOn: z.string(),
-      rate: z.string(),
-      rateDate: z.string(),
-      rateSource: z.enum(['MANUAL', 'SAME_CURRENCY']),
-      reportingAmount: z.string(),
-      reportingCurrency: z.string(),
-      exchangeRateId: z.uuid().nullable(),
-    })
-    .nullable(),
+  originalPrice: z.strictObject({ amount: z.string(), currency: z.string() }).nullable(),
   billingCycle: billingCycle.nullable(),
   commitmentTermMonths: commitmentTermMonths.nullable(),
   startDate: z.string().nullable(),

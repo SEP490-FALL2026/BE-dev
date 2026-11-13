@@ -24,15 +24,7 @@ export interface SubscriptionWire {
   missing: string[];
   purchasedQuantity: number | null;
   unitPrice: { amount: string; currency: string } | null;
-  priceSnapshot: {
-    recordedOn: string;
-    rate: string;
-    rateDate: string;
-    rateSource: string;
-    reportingAmount: string;
-    reportingCurrency: string;
-    exchangeRateId: string | null;
-  } | null;
+  originalPrice: { amount: string; currency: string } | null;
   billingCycle: string | null;
   startDate: string | null;
   endDate: string | null;
@@ -57,6 +49,9 @@ export interface SubscriptionWire {
 
 export const NO = { personToPersonMessaging: false, callsOrMeetings: false, mailbox: false };
 
+/** The unit price of a subscription is entered in dong (`QĐ-111an`); the price a vendor quoted in dollars is `originalPrice`. */
+export const VND_30M = { amount: '30000000', currency: 'VND' };
+export const VND_1_2M = { amount: '1200000', currency: 'VND' };
 export const USD_1200 = { amount: '1200.00', currency: 'USD' };
 
 export interface PlanSetup {
@@ -115,6 +110,37 @@ export class SubscriptionHttpHarness {
     );
 
     return row.rows[0].id;
+  };
+
+  /**
+   * A stored draft whose data is whole: the price in dong with the snapshot of the same currency, five seats, a year paid by the year, the day
+   * it was recorded and the IT Admin named (none for `responsible: null`). The routes no longer leave such a draft (a price in dong needs no
+   * rate to wait for), so the rows an earlier release stored, which only `complete` or a change of the person can still move, are written by SQL.
+   */
+  wholeDraft = async (
+    planId: string,
+    over: { responsible?: string | null; day?: string; ownerDepartmentId?: string } = {},
+  ): Promise<string> => {
+    const id = randomUUID();
+    const day = over.day ?? '2026-03-15';
+    await this.ctx.sql.query(
+      `INSERT INTO subscriptions (id, organization_id, plan_id, owner_department_id, kind, status, purchased_quantity,
+         unit_price_minor, unit_price_currency, price_recorded_on, price_rate, price_rate_date, price_rate_source,
+         price_reporting_minor, price_reporting_currency, billing_cycle, commitment_term_months, start_date, end_date,
+         responsible_it_admin_employee_id)
+       VALUES ($1, $2, $3, $4, 'TERM', 'DRAFT', 5, 250000, 'VND', $5, 1, $5, 'SAME_CURRENCY', 250000, 'VND', 'ANNUAL', 12, $5,
+         '2027-03-14', $6)`,
+      [
+        id,
+        this.seed.organizationId,
+        planId,
+        over.ownerDepartmentId ?? this.seed.departmentId,
+        day,
+        over.responsible === undefined ? this.it1.employeeId : over.responsible,
+      ],
+    );
+
+    return id;
   };
 
   /** A vendor, an application and a plan, made the way the catalog makes them. */

@@ -9,7 +9,7 @@ export type PriceRateSource = 'MANUAL' | 'SAME_CURRENCY';
 export type NoticeSource = 'DECLARED' | 'INFERRED_UNCONFIRMED' | 'BY_END_DATE' | 'MISSING' | 'NOT_APPLICABLE';
 /** The months a purchase commits to (`QĐ-103e`): a month or a year. */
 export type CommitmentTermMonths = 1 | 12;
-export type MissingItem = 'QUANTITY' | 'START_DATE' | 'BILLING_CYCLE' | 'UNIT_PRICE' | 'EXCHANGE_RATE';
+export type MissingItem = 'QUANTITY' | 'START_DATE' | 'BILLING_CYCLE' | 'UNIT_PRICE';
 export type SubscriptionWarning = 'NO_ALERT_ANCHOR' | 'RESPONSIBLE_MISSING' | 'BILLING_CYCLE_LEGACY' | 'SHOULD_MERGE';
 export type PlanPricingModel = 'PER_SEAT' | 'FLAT_RATE' | 'CONCURRENT' | 'CONSUMPTION' | 'PER_HOST';
 export type ApplicationKind = 'SAAS' | 'LICENSED' | 'INTERNAL';
@@ -31,6 +31,12 @@ export interface UnitPriceRecord {
   recordedOn: BusinessDate;
 }
 
+/** The price a vendor quoted in another currency, kept beside the price in dong so that an invoice can be matched against it (`QĐ-111an`, R-44). */
+export interface OriginalPriceRecord {
+  amountMinor: bigint;
+  currency: string;
+}
+
 export interface SubscriptionRecord {
   id: string;
   planId: string;
@@ -50,6 +56,7 @@ export interface SubscriptionRecord {
   purchasedQuantity: number | null;
   unitPrice: UnitPriceRecord | null;
   priceSnapshot: PriceSnapshotRecord | null;
+  originalPrice: OriginalPriceRecord | null;
   billingCycle: BillingCycle | null;
   commitmentTermMonths: CommitmentTermMonths | null;
   startDate: BusinessDate | null;
@@ -81,6 +88,7 @@ export interface NewSubscription {
   purchasedQuantity: number | null;
   unitPrice: UnitPriceRecord | null;
   priceSnapshot: PriceSnapshotRecord | null;
+  originalPrice: OriginalPriceRecord | null;
   billingCycle: BillingCycle | null;
   commitmentTermMonths: CommitmentTermMonths | null;
   startDate: BusinessDate | null;
@@ -148,15 +156,8 @@ export interface SubscriptionView {
   missing: MissingItem[];
   purchasedQuantity: number | null;
   unitPrice: { amount: string; currency: string } | null;
-  priceSnapshot: {
-    recordedOn: BusinessDate;
-    rate: string;
-    rateDate: BusinessDate;
-    rateSource: PriceRateSource;
-    reportingAmount: string;
-    reportingCurrency: string;
-    exchangeRateId: string | null;
-  } | null;
+  /** The price a vendor quoted in another currency, when one is recorded (`QĐ-111an`): beside the price in dong, never converted again. */
+  originalPrice: { amount: string; currency: string } | null;
   billingCycle: BillingCycle | null;
   commitmentTermMonths: CommitmentTermMonths | null;
   startDate: BusinessDate | null;

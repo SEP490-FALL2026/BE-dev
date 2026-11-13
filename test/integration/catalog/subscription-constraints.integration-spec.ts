@@ -268,6 +268,39 @@ describe('subscriptions (integration, PostgreSQL constraints)', () => {
     expect(await insert({ price: null, planId: randomUUID() })).toBe('23503');
   });
 
+  it('QĐ-111an: holds the original price (amount and currency) together or none of it, from 0 to 10^15, in a currency of the table', async () => {
+    const withOriginal = (minor: unknown, currency: unknown) =>
+      sqlState(
+        sql,
+        `INSERT INTO subscriptions (id, organization_id, plan_id, owner_department_id, kind, status, original_unit_price_minor, original_currency)
+         VALUES ($1, $2, $3, (SELECT id FROM departments WHERE organization_id = $2 LIMIT 1), 'TERM', 'DRAFT', $4, $5)`,
+        [randomUUID(), organizationId, perSeatPlan, minor, currency],
+      );
+
+    expect(await withOriginal(4800, 'USD')).toBeNull();
+    expect(await withOriginal(0, 'USD')).toBeNull();
+    expect(await withOriginal(null, null)).toBeNull();
+    expect(await withOriginal(4800, null)).toBe('23514');
+    expect(await withOriginal(null, 'USD')).toBe('23514');
+    expect(await withOriginal(-1, 'USD')).toBe('23514');
+    expect(await withOriginal(10n ** 15n + 1n, 'USD')).toBe('23514');
+    expect(await withOriginal(4800, 'XYZ')).toBe('23503');
+  });
+
+  it('QĐ-111an: an active subscription priced in dong with the snapshot of the same currency (rate 1, SAME_CURRENCY, no exchange rate) satisfies every constraint', async () => {
+    const state = await sqlState(
+      sql,
+      `INSERT INTO subscriptions (id, organization_id, plan_id, owner_department_id, kind, status, purchased_quantity,
+         unit_price_minor, unit_price_currency, price_recorded_on, price_rate, price_rate_date, price_rate_source,
+         price_reporting_minor, price_reporting_currency, price_exchange_rate_id, billing_cycle, start_date, original_unit_price_minor, original_currency)
+       VALUES ($1, $2, $3, (SELECT id FROM departments WHERE organization_id = $2 LIMIT 1), 'TERM', 'ACTIVE', 10,
+         600000, 'VND', '2026-11-14', 1, '2026-11-14', 'SAME_CURRENCY', 600000, 'VND', NULL, 'MONTHLY', '2026-11-14', 2400, 'USD')`,
+      [randomUUID(), organizationId, perSeatPlan],
+    );
+
+    expect(state).toBeNull();
+  });
+
   it('refuses a quantity below zero', async () => {
     expect(await insert({ price: null, quantity: -1 })).toBe('23514');
     expect(await insert({ price: null, quantity: 0 })).toBeNull();

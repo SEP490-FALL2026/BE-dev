@@ -18,6 +18,7 @@ import {
   noticeInputOf,
   subscriptionStatusOf,
 } from './subscription.policy';
+import { SubscriptionPriceNotVndError } from './subscription.errors';
 import { SubscriptionRepo } from './subscription.repo';
 import { SubscriptionPricingService } from './subscription-pricing.service';
 import type { ApplicationKind, BillingCycle, ProvisioningType, SubscriptionRecord } from './subscription.types';
@@ -140,7 +141,11 @@ export class SubscriptionPeriodService {
       vendorMinimumSeats: previous.vendorMinimumSeats,
     };
     this.assertNextPeriod(plan, state, input.billingCycle, previous);
-    const money = await this.pricing.read(input.unitPrice);
+    // A price is entered in dong only (`QĐ-111an`): the continuation of a period is refused for one in another currency, nothing written.
+    const money = await this.pricing.read(input.unitPrice).catch((error: unknown) => {
+      if (error instanceof SubscriptionPriceNotVndError) throw new SubscriptionPeriodRefusedError('PRICE_NOT_VND');
+      throw error;
+    });
     const priced = await this.pricing.priceToday(tx, money);
     const organization = await this.organizationReads.getOrganization(tx);
     if (!organization) throw new Error('A renewal was recorded before installation');
@@ -158,6 +163,7 @@ export class SubscriptionPeriodService {
       renewedFromId: previous.id,
       ...state,
       ...priced,
+      originalPrice: null,
       isPrimaryForPlan: takesPrimary,
       status,
     });

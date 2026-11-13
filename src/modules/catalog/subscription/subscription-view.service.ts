@@ -1,6 +1,5 @@
 import { Injectable } from '@nestjs/common';
 import { formatAmount } from '../../../core/money/money';
-import { formatRate } from '../../../core/money/rate';
 import { FinanceApi } from '../../finance/public/finance.api';
 import type { TaxEstimateResult } from '../../finance/public/finance.types';
 import { OperatingParametersApi } from '../../operating-parameters/public/operating-parameters.api';
@@ -8,6 +7,7 @@ import { OrganizationReadApi } from '../../organization/public/organization-read
 import { PlanFactsService } from '../plan/plan-facts.service';
 import { needsVendorAdmins } from '../plan/plan-vendor-admins.policy';
 import { alertDates, deriveNotice, missingData, noticeInputOf, noticeWarnings } from './subscription.policy';
+import { isPricedInDong } from './price/subscription-price.policy';
 import { liveIdsByPlan, liveSiblingsOf, poolWarnings, vendorAdminFlags } from './pool/subscription-pool.policy';
 import { SubscriptionRepo } from './subscription.repo';
 import type { SubscriptionRecord, SubscriptionView, TaxEstimateSummary, VendorAdminView } from './subscription.types';
@@ -85,13 +85,12 @@ export class SubscriptionViewService {
         quantity: record.purchasedQuantity,
         startDate: record.startDate,
         billingCycle: record.billingCycle,
-        hasPrice: record.unitPrice !== null,
-        hasSnapshot: record.priceSnapshot !== null,
+        hasPrice: isPricedInDong(record),
       });
       let group: TaxEstimateResult['group'] | null = groups.get(record.vendor.id)?.group ?? null;
       let taxEstimate: TaxEstimateSummary | null = null;
       let unitPrice: SubscriptionView['unitPrice'] = null;
-      let priceSnapshot: SubscriptionView['priceSnapshot'] = null;
+      let originalPrice: SubscriptionView['originalPrice'] = null;
       if (record.unitPrice) {
         const units = await minorUnitOf(record.unitPrice.currency);
         unitPrice = { amount: formatAmount(record.unitPrice.amountMinor, units), currency: record.unitPrice.currency };
@@ -107,16 +106,11 @@ export class SubscriptionViewService {
           estimatedCost: formatAmount(estimate.estimatedCostMinor, units),
         };
       }
-      if (record.unitPrice && record.priceSnapshot) {
-        const reportingUnits = await minorUnitOf(record.priceSnapshot.reportingCurrency);
-        priceSnapshot = {
-          recordedOn: record.unitPrice.recordedOn,
-          rate: formatRate(record.priceSnapshot.rate),
-          rateDate: record.priceSnapshot.rateDate,
-          rateSource: record.priceSnapshot.rateSource,
-          reportingAmount: formatAmount(record.priceSnapshot.reportingMinor, reportingUnits),
-          reportingCurrency: record.priceSnapshot.reportingCurrency,
-          exchangeRateId: record.priceSnapshot.exchangeRateId,
+      if (record.originalPrice) {
+        const originalUnits = await minorUnitOf(record.originalPrice.currency);
+        originalPrice = {
+          amount: formatAmount(record.originalPrice.amountMinor, originalUnits),
+          currency: record.originalPrice.currency,
         };
       }
 
@@ -134,7 +128,7 @@ export class SubscriptionViewService {
         missing,
         purchasedQuantity: record.purchasedQuantity,
         unitPrice,
-        priceSnapshot,
+        originalPrice,
         billingCycle: record.billingCycle,
         commitmentTermMonths: record.commitmentTermMonths,
         startDate: record.startDate,

@@ -10,6 +10,7 @@ import { livePricedOf, PLAN_KIND, PRICE_FIELDS, pricedOn, withPriceSource } from
 import { notTakenOverOn } from './subscription-granting.repo';
 import type {
   NewSubscription,
+  OriginalPriceRecord,
   PriceSnapshotRecord,
   SubscriptionKind,
   SubscriptionListFilter,
@@ -64,6 +65,12 @@ function priceSnapshotOf(row: Row): PriceSnapshotRecord | null {
     : null;
 }
 
+function originalPriceOf(row: Row): OriginalPriceRecord | null {
+  return row.originalUnitPriceMinor !== null && row.originalCurrency !== null
+    ? { amountMinor: row.originalUnitPriceMinor, currency: row.originalCurrency }
+    : null;
+}
+
 function toRecord(row: Row): SubscriptionRecord {
   const { application } = row.plan;
   if (!application.vendor) throw new Error('A subscription belongs to an application with a vendor');
@@ -85,6 +92,7 @@ function toRecord(row: Row): SubscriptionRecord {
     purchasedQuantity: row.purchasedQuantity,
     unitPrice: unitPriceOf(row),
     priceSnapshot: priceSnapshotOf(row),
+    originalPrice: originalPriceOf(row),
     billingCycle: row.billingCycle,
     commitmentTermMonths:
       row.commitmentTermMonths === 1 || row.commitmentTermMonths === 12 ? row.commitmentTermMonths : null,
@@ -118,6 +126,8 @@ function columnsOf(state: SubscriptionState) {
     priceReportingMinor: state.priceSnapshot?.reportingMinor ?? null,
     priceReportingCurrency: state.priceSnapshot?.reportingCurrency ?? null,
     priceExchangeRateId: state.priceSnapshot?.exchangeRateId ?? null,
+    originalUnitPriceMinor: state.originalPrice?.amountMinor ?? null,
+    originalCurrency: state.originalPrice?.currency ?? null,
     billingCycle: state.billingCycle,
     commitmentTermMonths: state.commitmentTermMonths,
     startDate: column(state.startDate),

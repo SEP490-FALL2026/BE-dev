@@ -127,7 +127,6 @@ describe('missingData (what keeps a subscription a draft)', () => {
     startDate: '2026-01-01',
     billingCycle: 'ANNUAL',
     hasPrice: true,
-    hasSnapshot: true,
   };
 
   it('is empty when everything a per-seat term subscription needs is there', () => {
@@ -143,13 +142,12 @@ describe('missingData (what keeps a subscription a draft)', () => {
         startDate: null,
         billingCycle: null,
         hasPrice: false,
-        hasSnapshot: false,
       }),
     ).toEqual(['QUANTITY', 'START_DATE', 'BILLING_CYCLE', 'UNIT_PRICE']);
   });
 
-  it('US-04-05 AC-5: a price with no snapshot lacks the exchange rate, not the price', () => {
-    expect(missingData({ ...complete, hasSnapshot: false })).toEqual(['EXCHANGE_RATE']);
+  it('QĐ-111an: no exchange rate is asked for, so none can be missing: a price that is not usable (not in dong, or with no snapshot) lacks the price', () => {
+    expect(missingData({ ...complete, hasPrice: false })).toEqual(['UNIT_PRICE']);
   });
 
   it('a flat-rate plan does not need a quantity', () => {
@@ -324,7 +322,7 @@ describe('what an update of a subscription makes of its state, and when it is a 
     purchasedQuantity: 5,
     startDate: '2026-01-01',
     billingCycle: 'ANNUAL',
-    unitPrice: {},
+    unitPrice: { currency: 'VND' },
     priceSnapshot: {},
   };
 
@@ -339,6 +337,12 @@ describe('what an update of a subscription makes of its state, and when it is a 
     expect(subscriptionStatusOf({ pricingModel: 'FLAT_RATE' }, 'TERM', { ...whole, priceSnapshot: null })).toBe(
       'DRAFT',
     );
+  });
+
+  it('QĐ-111an: stays a draft while the price is one an earlier release left in dollars', () => {
+    expect(
+      subscriptionStatusOf({ pricingModel: 'PER_SEAT' }, 'TERM', { ...whole, unitPrice: { currency: 'USD' } }),
+    ).toBe('DRAFT');
   });
 });
 

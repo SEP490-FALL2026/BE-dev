@@ -59,4 +59,6 @@ export type PeriodRefusal =
   | 'STARTS_TOO_EARLY'
   | 'INVALID_DATES'
   | 'INVALID_TERMS'
-  | 'NO_OWNER_DEPARTMENT';
+  | 'NO_OWNER_DEPARTMENT'
+  /** The price of the new period is not in dong: a price is entered in dong only (`QĐ-111an`). */
+  | 'PRICE_NOT_VND';

@@ -1,4 +1,5 @@
 import { addDays, type BusinessDate } from '../../../core/business-date';
+import { isPricedInDong } from './price/subscription-price.policy';
 import {
   SubscriptionDatesInvalidError,
   SubscriptionPerpetualHasNoTermError,
@@ -74,14 +75,14 @@ export interface CompletenessInput {
   quantity: number | null;
   startDate: BusinessDate | null;
   billingCycle: string | null;
+  /** The unit price is entered in dong with its snapshot (`isPricedInDong`): a price left in another currency is no price. */
   hasPrice: boolean;
-  hasSnapshot: boolean;
 }
 
 /**
  * What keeps a subscription a draft, in a fixed order. A per-seat plan and a perpetual purchase need a quantity; a
- * term subscription needs a billing cycle; any needs a start (purchase) date and a price. A price with no snapshot is
- * missing the exchange rate of its day, not the price.
+ * term subscription needs a billing cycle; any needs a start (purchase) date and a price in dong (`QĐ-111an`: no exchange rate is
+ * asked for, so none can be missing).
  */
 export function missingData(input: CompletenessInput): MissingItem[] {
   const missing: MissingItem[] = [];
@@ -91,7 +92,6 @@ export function missingData(input: CompletenessInput): MissingItem[] {
   if (input.startDate === null) missing.push('START_DATE');
   if (input.kind === 'TERM' && input.billingCycle === null) missing.push('BILLING_CYCLE');
   if (!input.hasPrice) missing.push('UNIT_PRICE');
-  else if (!input.hasSnapshot) missing.push('EXCHANGE_RATE');
 
   return missing;
 }
@@ -228,7 +228,7 @@ export function subscriptionStatusOf(
     purchasedQuantity: number | null;
     startDate: BusinessDate | null;
     billingCycle: string | null;
-    unitPrice: unknown;
+    unitPrice: { currency: string } | null;
     priceSnapshot: unknown;
   },
 ): 'ACTIVE' | 'DRAFT' {
@@ -238,8 +238,7 @@ export function subscriptionStatusOf(
     quantity: state.purchasedQuantity,
     startDate: state.startDate,
     billingCycle: state.billingCycle,
-    hasPrice: state.unitPrice !== null,
-    hasSnapshot: state.priceSnapshot !== null,
+    hasPrice: isPricedInDong(state),
   });
 
   return missing.length === 0 ? 'ACTIVE' : 'DRAFT';

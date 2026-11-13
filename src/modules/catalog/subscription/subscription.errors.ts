@@ -74,6 +74,16 @@ export class SubscriptionQuantityBelowOccupiedError extends Error {
   }
 }
 
+/** A unit price is entered in dong only: the system has no exchange rate to turn another currency into it (`QĐ-111an`). */
+export class SubscriptionPriceNotVndError extends Error {
+  constructor(readonly currency: string) {
+    super(
+      'The unit price is entered in dong (VND). Convert it first and keep the price quoted by the vendor as the original price.',
+    );
+    this.name = 'SubscriptionPriceNotVndError';
+  }
+}
+
 export class SubscriptionStillDraftError extends Error {
   constructor(readonly missing: string[]) {
     super('The subscription still lacks data to be complete.');

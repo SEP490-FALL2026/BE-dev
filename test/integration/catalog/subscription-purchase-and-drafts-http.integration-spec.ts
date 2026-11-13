@@ -1,8 +1,13 @@
-import { SubscriptionHttpHarness, type SubscriptionWire, USD_1200 } from '../../support/subscription-http-harness';
+import {
+  SubscriptionHttpHarness,
+  type SubscriptionWire,
+  USD_1200,
+  VND_30M,
+} from '../../support/subscription-http-harness';
 
-describe('subscriptions and perpetual purchases over HTTP (integration, real PostgreSQL): a perpetual purchase, drafts and the price with its frozen conversion', () => {
+describe('subscriptions and perpetual purchases over HTTP (integration, real PostgreSQL): a perpetual purchase, drafts and the price in dong with its snapshot of the same currency', () => {
   const h = new SubscriptionHttpHarness();
-  const { dataOf, codeOf, detailsOf, today, rate, plan, create, patch, get, complete, subscription, n, auditOf } = h;
+  const { dataOf, codeOf, detailsOf, today, plan, create, patch, get, complete, subscription, n, auditOf } = h;
 
   beforeAll(async () => {
     await h.start();
@@ -15,17 +20,16 @@ describe('subscriptions and perpetual purchases over HTTP (integration, real Pos
   });
 
   describe('a perpetual purchase (AC-8)', () => {
-    it('stores 50 licenses at 500 USD bought 15/03/2026, with no term, no milestone and no warning', async () => {
+    it('stores 50 licenses at 12.500.000 đ bought 15/03/2026, with no term, no milestone and no warning', async () => {
       const { planId } = await plan({ kind: 'LICENSED', type: 'K4' });
       today('2026-03-15');
-      await rate('USD', '2026-03-15', '25000');
 
       const created = dataOf<SubscriptionWire>(
         await create({
           planId,
           kind: 'PERPETUAL',
           purchasedQuantity: 50,
-          unitPrice: { amount: '500.00', currency: 'USD' },
+          unitPrice: { amount: '12500000', currency: 'VND' },
           startDate: '2026-03-15',
         }).expect(201),
       );
@@ -34,7 +38,8 @@ describe('subscriptions and perpetual purchases over HTTP (integration, real Pos
         kind: 'PERPETUAL',
         status: 'ACTIVE',
         purchasedQuantity: 50,
-        unitPrice: { amount: '500.00', currency: 'USD' },
+        unitPrice: { amount: '12500000', currency: 'VND' },
+        originalPrice: null,
         endDate: null,
         renewalDate: null,
         autoRenew: false,
@@ -42,11 +47,6 @@ describe('subscriptions and perpetual purchases over HTTP (integration, real Pos
         noticeDeadline: { value: null, source: 'NOT_APPLICABLE' },
         alerts: { baseDate: null, dates: [] },
         warnings: [],
-      });
-      expect(created.priceSnapshot).toMatchObject({
-        rate: '25000',
-        reportingAmount: '12500000',
-        reportingCurrency: 'VND',
       });
     });
 
@@ -90,7 +90,32 @@ describe('subscriptions and perpetual purchases over HTTP (integration, real Pos
     });
   });
 
-  describe('drafts, and the price with its frozen conversion (US-04-05)', () => {
+  describe('drafts, and the price in dong with its snapshot of the same currency (US-04-05, QĐ-111an)', () => {
+    /** The snapshot a price is stored with, read from the table: the response no longer carries it. */
+    const snapshotOf = async (id: string) =>
+      (
+        await h.ctx.sql.query<{
+          unit_price_minor: string;
+          unit_price_currency: string;
+          price_recorded_on: string;
+          price_rate: string;
+          price_rate_date: string;
+          price_rate_source: string;
+          price_reporting_minor: string;
+          price_reporting_currency: string;
+          price_exchange_rate_id: string | null;
+          original_unit_price_minor: string | null;
+          original_currency: string | null;
+        }>(
+          `SELECT unit_price_minor::text, unit_price_currency, to_char(price_recorded_on, 'YYYY-MM-DD') AS price_recorded_on,
+                  price_rate::text, to_char(price_rate_date, 'YYYY-MM-DD') AS price_rate_date, price_rate_source::text,
+                  price_reporting_minor::text, price_reporting_currency, price_exchange_rate_id,
+                  original_unit_price_minor::text, original_currency
+             FROM subscriptions WHERE id = $1`,
+          [id],
+        )
+      ).rows[0];
+
     it('AC-4: Notion, only known to be in use: a draft that says it lacks financial data and what', async () => {
       const { planId } = await plan({ vendorName: 'Notion Labs' });
 
@@ -101,172 +126,194 @@ describe('subscriptions and perpetual purchases over HTTP (integration, real Pos
         missingFinancialData: true,
         missing: ['QUANTITY', 'START_DATE', 'BILLING_CYCLE', 'UNIT_PRICE'],
         unitPrice: null,
-        priceSnapshot: null,
+        originalPrice: null,
       });
     });
 
-    it('US-04-05 AC-1: 1,200 USD recorded on 01/09 at 25,000 is stored as 1,200.00 USD, rate 25,000, 01/09, 30,000,000 VND', async () => {
+    it('QĐ-111an: 30.000.000 đ recorded on 01/09 is stored as 30.000.000 đ, active, with the snapshot of the same currency: rate 1, 01/09, no exchange rate behind it', async () => {
       const { planId } = await plan();
       today('2026-09-01');
-      const rateId = await rate('USD', '2026-09-01', '25000');
 
       const created = await subscription(planId, {
         purchasedQuantity: 10,
-        unitPrice: USD_1200,
+        unitPrice: VND_30M,
         billingCycle: 'ANNUAL',
         startDate: '2026-09-01',
       });
 
-      expect(created.unitPrice).toEqual(USD_1200);
-      expect(created.priceSnapshot).toEqual({
-        recordedOn: '2026-09-01',
-        rate: '25000',
-        rateDate: '2026-09-01',
-        rateSource: 'MANUAL',
-        reportingAmount: '30000000',
-        reportingCurrency: 'VND',
-        exchangeRateId: rateId,
+      expect(created).toMatchObject({ status: 'ACTIVE', missing: [], unitPrice: VND_30M, originalPrice: null });
+      expect(created).not.toHaveProperty('priceSnapshot');
+      expect(await snapshotOf(created.id)).toEqual({
+        unit_price_minor: '30000000',
+        unit_price_currency: 'VND',
+        price_recorded_on: '2026-09-01',
+        price_rate: '1.0000000000',
+        price_rate_date: '2026-09-01',
+        price_rate_source: 'SAME_CURRENCY',
+        price_reporting_minor: '30000000',
+        price_reporting_currency: 'VND',
+        price_exchange_rate_id: null,
+        original_unit_price_minor: null,
+        original_currency: null,
       });
     });
 
-    it('US-04-05 AC-1: a price in the reporting currency converts at 1 and needs no rate', async () => {
-      const { planId } = await plan();
-
-      const created = await subscription(planId, {
-        purchasedQuantity: 3,
-        unitPrice: { amount: '1500000', currency: 'VND' },
-        billingCycle: 'MONTHLY',
-        startDate: '2026-09-01',
-      });
-
-      expect(created.status).toBe('ACTIVE');
-      expect(created.priceSnapshot).toMatchObject({
-        rate: '1',
-        rateSource: 'SAME_CURRENCY',
-        reportingAmount: '1500000',
-        exchangeRateId: null,
-      });
-    });
-
-    it('US-04-05 AC-2: a later rate does not change what was stored, however often it is read', async () => {
+    it('needs no exchange rate: a priced subscription is active at once whatever rates are entered, and an edit of the price takes the day of the edit', async () => {
       const { planId } = await plan();
       today('2026-09-01');
-      await rate('USD', '2026-09-01', '25000');
+
       const created = await subscription(planId, {
         purchasedQuantity: 10,
-        unitPrice: USD_1200,
-        billingCycle: 'ANNUAL',
-        startDate: '2026-09-01',
-      });
-      await rate('USD', '2026-10-01', '26000');
-
-      const first = dataOf<SubscriptionWire>(await get(created.id).expect(200));
-      const second = dataOf<SubscriptionWire>(await get(created.id).expect(200));
-
-      expect(first.priceSnapshot?.reportingAmount).toBe('30000000');
-      expect(second.priceSnapshot).toEqual(first.priceSnapshot);
-      expect(second.updatedAt).toBe(created.updatedAt);
-    });
-
-    it('US-04-05 AC-5: with no rate for the day the price is stored but not converted, the subscription is a draft, and completing it needs the rate', async () => {
-      const { planId } = await plan();
-      today('2026-08-15');
-      const created = await subscription(planId, {
-        purchasedQuantity: 10,
-        unitPrice: USD_1200,
-        billingCycle: 'ANNUAL',
-        startDate: '2026-08-01',
-      });
-
-      expect(created).toMatchObject({
-        status: 'DRAFT',
-        missingFinancialData: true,
-        missing: ['EXCHANGE_RATE'],
-        unitPrice: USD_1200,
-        priceSnapshot: null,
-      });
-      const early = await complete(created.id).expect(422);
-      expect(codeOf(early)).toBe('SUBSCRIPTION.STILL_DRAFT');
-      expect(detailsOf(early)).toEqual({ missing: ['EXCHANGE_RATE'] });
-
-      await rate('USD', '2026-08-15', '25100');
-      jest.restoreAllMocks();
-      const completed = dataOf<SubscriptionWire>(await complete(created.id).expect(200));
-
-      expect(completed.status).toBe('ACTIVE');
-      expect(completed.priceSnapshot).toMatchObject({
-        recordedOn: '2026-08-15',
-        rateDate: '2026-08-15',
-        rate: '25100',
-        reportingAmount: '30120000',
-      });
-      expect((await auditOf(created.id)).map((event) => event.action)).toEqual([
-        'SUBSCRIPTION.CREATED',
-        'SUBSCRIPTION.COMPLETED',
-      ]);
-      expect(dataOf<SubscriptionWire>(await complete(created.id).expect(200)).updatedAt).toBe(completed.updatedAt);
-    });
-
-    it('US-04-05 AC-7: priced on 01/10/2026 with only the rate of 01/01/2025, it waits for the rate of 01/10 and never uses the other; a later edit uses the rate of its day', async () => {
-      const { planId } = await plan();
-      await rate('USD', '2025-01-01', '24000');
-      today('2026-11-03');
-      const created = await subscription(planId, {
-        purchasedQuantity: 10,
-        unitPrice: USD_1200,
-        billingCycle: 'ANNUAL',
-        startDate: '2025-01-01',
-      });
-      expect(created).toMatchObject({ status: 'DRAFT', priceSnapshot: null, missing: ['EXCHANGE_RATE'] });
-
-      await rate('USD', '2026-11-03', '26000');
-      const completed = dataOf<SubscriptionWire>(await complete(created.id).expect(200));
-      expect(completed.priceSnapshot).toMatchObject({
-        rateDate: '2026-11-03',
-        rate: '26000',
-        reportingAmount: '31200000',
-      });
-
-      today('2026-11-09');
-      await rate('USD', '2026-11-09', '27000');
-      const edited = dataOf<SubscriptionWire>(
-        await patch(created.id, { unitPrice: { amount: '1300.00', currency: 'USD' } }).expect(200),
-      );
-      expect(edited.priceSnapshot).toMatchObject({
-        recordedOn: '2026-11-09',
-        rateDate: '2026-11-09',
-        rate: '27000',
-        reportingAmount: '35100000',
-      });
-      const events = await auditOf(created.id);
-      const last = events[events.length - 1];
-      expect(last.action).toBe('SUBSCRIPTION.UPDATED');
-      expect(JSON.stringify(last.before)).toContain('31200000 VND at 26000');
-      expect(JSON.stringify(last.after)).toContain('35100000 VND at 27000');
-
-      const before = events.length;
-      await patch(created.id, { unitPrice: { amount: '1300.00', currency: 'USD' } }).expect(200);
-      expect(await auditOf(created.id)).toHaveLength(before);
-    });
-
-    it('does not turn an active subscription back into a draft: a price edit on a day with no rate is refused and changes nothing', async () => {
-      const { planId } = await plan();
-      today('2026-09-01');
-      await rate('USD', '2026-09-01', '25000');
-      const created = await subscription(planId, {
-        purchasedQuantity: 10,
-        unitPrice: USD_1200,
+        unitPrice: VND_30M,
         billingCycle: 'ANNUAL',
         startDate: '2026-09-01',
       });
       today('2026-09-02');
+      const edited = dataOf<SubscriptionWire>(
+        await patch(created.id, { unitPrice: { amount: '31000000', currency: 'VND' } }).expect(200),
+      );
 
-      const response = await patch(created.id, { unitPrice: { amount: '1300.00', currency: 'USD' } }).expect(422);
+      expect(created.status).toBe('ACTIVE');
+      expect(edited).toMatchObject({ status: 'ACTIVE', unitPrice: { amount: '31000000', currency: 'VND' } });
+      expect(await snapshotOf(created.id)).toMatchObject({
+        price_recorded_on: '2026-09-02',
+        price_rate_date: '2026-09-02',
+        price_reporting_minor: '31000000',
+        price_rate_source: 'SAME_CURRENCY',
+      });
+    });
 
-      expect(codeOf(response)).toBe('SUBSCRIPTION.STILL_DRAFT');
+    it('US-04-05 AC-2: what was stored does not change, however often it is read', async () => {
+      const { planId } = await plan();
+      today('2026-09-01');
+      const created = await subscription(planId, {
+        purchasedQuantity: 10,
+        unitPrice: VND_30M,
+        billingCycle: 'ANNUAL',
+        startDate: '2026-09-01',
+      });
+      today('2026-10-01');
+
+      const first = dataOf<SubscriptionWire>(await get(created.id).expect(200));
+      const second = dataOf<SubscriptionWire>(await get(created.id).expect(200));
+
+      expect(first.unitPrice).toEqual(VND_30M);
+      expect(second).toEqual(first);
+      expect(second.updatedAt).toBe(created.updatedAt);
+      expect((await snapshotOf(created.id)).price_rate_date).toBe('2026-09-01');
+    });
+
+    it.each([
+      ['USD', { amount: '1200.00', currency: 'USD' }],
+      ['an unknown currency', { amount: '10', currency: 'XYZ' }],
+    ])(
+      'refuses a unit price in %s: 422 SUBSCRIPTION.PRICE_NOT_VND naming the currency, and stores nothing',
+      async (_name, unitPrice) => {
+        const { planId } = await plan();
+        const before = { subscriptions: await n('subscriptions'), audit: await n('audit_events') };
+
+        const response = await create({ planId, kind: 'TERM', unitPrice }).expect(422);
+
+        expect(codeOf(response)).toBe('SUBSCRIPTION.PRICE_NOT_VND');
+        expect(detailsOf(response)).toEqual({ currency: unitPrice.currency });
+        expect({ subscriptions: await n('subscriptions'), audit: await n('audit_events') }).toEqual(before);
+      },
+    );
+
+    it('refuses a price edit in dollars with 422 SUBSCRIPTION.PRICE_NOT_VND and changes nothing', async () => {
+      const { planId } = await plan();
+      today('2026-09-01');
+      const created = await subscription(planId, {
+        purchasedQuantity: 10,
+        unitPrice: VND_30M,
+        billingCycle: 'ANNUAL',
+        startDate: '2026-09-01',
+      });
+
+      const response = await patch(created.id, { unitPrice: USD_1200 }).expect(422);
+
+      expect(codeOf(response)).toBe('SUBSCRIPTION.PRICE_NOT_VND');
       const after = dataOf<SubscriptionWire>(await get(created.id).expect(200));
-      expect(after).toMatchObject({ status: 'ACTIVE', unitPrice: USD_1200 });
+      expect(after).toMatchObject({ status: 'ACTIVE', unitPrice: VND_30M });
       expect(after.updatedAt).toBe(created.updatedAt);
+      expect(await auditOf(created.id)).toHaveLength(1);
+    });
+
+    it('R-44: keeps the price the vendor quoted beside the price in dong, and an edit can change it, leave it alone or take it away', async () => {
+      const { planId } = await plan();
+      today('2026-09-01');
+      const created = await subscription(planId, {
+        purchasedQuantity: 10,
+        unitPrice: { amount: '1200000', currency: 'VND' },
+        originalPrice: { amount: '48.00', currency: 'USD' },
+        billingCycle: 'ANNUAL',
+        startDate: '2026-09-01',
+      });
+
+      expect(created).toMatchObject({
+        status: 'ACTIVE',
+        unitPrice: { amount: '1200000', currency: 'VND' },
+        originalPrice: { amount: '48.00', currency: 'USD' },
+      });
+      expect(await snapshotOf(created.id)).toMatchObject({
+        original_unit_price_minor: '4800',
+        original_currency: 'USD',
+        price_reporting_minor: '1200000',
+      });
+
+      const changed = dataOf<SubscriptionWire>(
+        await patch(created.id, { originalPrice: { amount: '50.00', currency: 'USD' } }).expect(200),
+      );
+      expect(changed.originalPrice).toEqual({ amount: '50.00', currency: 'USD' });
+      const kept = dataOf<SubscriptionWire>(await patch(created.id, { purchasedQuantity: 11 }).expect(200));
+      expect(kept.originalPrice).toEqual({ amount: '50.00', currency: 'USD' });
+      const cleared = dataOf<SubscriptionWire>(await patch(created.id, { originalPrice: null }).expect(200));
+      expect(cleared.originalPrice).toBeNull();
+      const events = await auditOf(created.id);
+      expect(JSON.stringify(events[1].after)).toContain('5000 USD');
+      expect(await snapshotOf(created.id)).toMatchObject({ original_unit_price_minor: null, original_currency: null });
+    });
+
+    it('refuses an original price that is negative, over-precise or in a currency the system does not know', async () => {
+      const { planId } = await plan();
+      const before = await n('subscriptions');
+      const body = { planId, kind: 'TERM', unitPrice: VND_30M };
+
+      expect(codeOf(await create({ ...body, originalPrice: { amount: '-1.00', currency: 'USD' } }).expect(422))).toBe(
+        'MONEY_OUT_OF_RANGE',
+      );
+      expect(codeOf(await create({ ...body, originalPrice: { amount: '1.005', currency: 'USD' } }).expect(422))).toBe(
+        'MONEY_SCALE_EXCEEDED',
+      );
+      expect(codeOf(await create({ ...body, originalPrice: { amount: '10', currency: 'XYZ' } }).expect(422))).toBe(
+        'CURRENCY_NOT_SUPPORTED',
+      );
+      expect(await n('subscriptions')).toBe(before);
+    });
+
+    it('a draft an earlier release left in dollars lacks its price: it cannot be completed until the price is entered again in dong', async () => {
+      const { planId } = await plan();
+      const draftId = await h.wholeDraft(planId);
+      await h.ctx.sql.query(
+        `UPDATE subscriptions SET unit_price_minor = 1000, unit_price_currency = 'USD', price_rate = NULL, price_rate_date = NULL,
+                price_rate_source = NULL, price_reporting_minor = NULL, price_reporting_currency = NULL WHERE id = $1`,
+        [draftId],
+      );
+
+      const stored = dataOf<SubscriptionWire>(await get(draftId).expect(200));
+      expect(stored).toMatchObject({
+        status: 'DRAFT',
+        missing: ['UNIT_PRICE'],
+        unitPrice: { amount: '10.00', currency: 'USD' },
+      });
+      const early = await complete(draftId).expect(422);
+      expect(codeOf(early)).toBe('SUBSCRIPTION.STILL_DRAFT');
+      expect(detailsOf(early)).toEqual({ missing: ['UNIT_PRICE'] });
+
+      const entered = dataOf<SubscriptionWire>(
+        await patch(draftId, { unitPrice: { amount: '250000', currency: 'VND' } }).expect(200),
+      );
+      expect(entered).toMatchObject({ status: 'ACTIVE', unitPrice: { amount: '250000', currency: 'VND' } });
     });
 
     it('is complete only when a per-seat plan has its quantity, and a flat-rate plan needs none; supplying the rest makes it active', async () => {
@@ -286,31 +333,28 @@ describe('subscriptions and perpetual purchases over HTTP (integration, real Pos
       expect(done).toMatchObject({ status: 'ACTIVE', missing: [], purchasedQuantity: 25 });
     });
 
-    it('refuses a price that is negative, too large, over-precise or in a currency the system does not know', async () => {
+    it('refuses a price that is negative, too large or over-precise in dong, in another currency, or not an amount', async () => {
       const { planId } = await plan();
       const before = await n('subscriptions');
 
       expect(
-        codeOf(await create({ planId, kind: 'TERM', unitPrice: { amount: '-1.00', currency: 'USD' } }).expect(422)),
+        codeOf(await create({ planId, kind: 'TERM', unitPrice: { amount: '-1', currency: 'VND' } }).expect(422)),
       ).toBe('MONEY_OUT_OF_RANGE');
       expect(
         codeOf(
-          await create({ planId, kind: 'TERM', unitPrice: { amount: '10000000000000.01', currency: 'USD' } }).expect(
+          await create({ planId, kind: 'TERM', unitPrice: { amount: '1000000000000001', currency: 'VND' } }).expect(
             422,
           ),
         ),
       ).toBe('MONEY_OUT_OF_RANGE');
       expect(
-        codeOf(await create({ planId, kind: 'TERM', unitPrice: { amount: '1.005', currency: 'USD' } }).expect(422)),
-      ).toBe('MONEY_SCALE_EXCEEDED');
-      expect(
         codeOf(await create({ planId, kind: 'TERM', unitPrice: { amount: '1.5', currency: 'VND' } }).expect(422)),
       ).toBe('MONEY_SCALE_EXCEEDED');
       expect(
-        codeOf(await create({ planId, kind: 'TERM', unitPrice: { amount: '10', currency: 'XYZ' } }).expect(422)),
-      ).toBe('CURRENCY_NOT_SUPPORTED');
+        codeOf(await create({ planId, kind: 'TERM', unitPrice: { amount: '1.005', currency: 'USD' } }).expect(422)),
+      ).toBe('SUBSCRIPTION.PRICE_NOT_VND');
       expect(
-        codeOf(await create({ planId, kind: 'TERM', unitPrice: { amount: 'abc', currency: 'USD' } }).expect(422)),
+        codeOf(await create({ planId, kind: 'TERM', unitPrice: { amount: 'abc', currency: 'VND' } }).expect(422)),
       ).toBe('VALIDATION_ERROR');
       expect(await n('subscriptions')).toBe(before);
     });
