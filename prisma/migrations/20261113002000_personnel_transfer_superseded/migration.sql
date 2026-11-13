@@ -28,7 +28,9 @@ ALTER TABLE "department_transfers" ADD CONSTRAINT "department_transfers_supersed
 
 -- The guard of 20261113001800 with the column of the closing added: until a transfer that took effect closes, only the columns the settlement
 -- writes change (the grace, the reminder, the snapshots, the closing, and the departure that took it over); the grace and the snapshots are
--- written once. A closed transfer, like a cancelled one, never changes again. A transfer that waits changes as before.
+-- written once. A closed transfer, like a cancelled one, never changes again, with one exception: a transfer a departure superseded opens again,
+-- whole, when that departure is cancelled (`QĐ-110r`, MF3-C-R5) -- the closing is undone and nothing else changes. A transfer that waits changes as
+-- before.
 CREATE OR REPLACE FUNCTION department_transfers_guard() RETURNS trigger
 LANGUAGE plpgsql AS $$
 BEGIN
@@ -54,6 +56,13 @@ BEGIN
         USING ERRCODE = 'restrict_violation';
     END IF;
 
+    RETURN NEW;
+  END IF;
+  IF OLD."status" = 'EFFECTIVE' AND OLD."superseded_by_case_id" IS NOT NULL AND NEW."superseded_by_case_id" IS NULL
+     AND NEW."closed_at" IS NULL AND NOT NEW."closed_by_system" AND NEW."closed_by_app_user_id" IS NULL AND NEW."snapshot_after" IS NULL
+     AND (to_jsonb(NEW) - 'snapshot_after' - 'closed_at' - 'closed_by_app_user_id' - 'closed_by_system' - 'superseded_by_case_id')
+         IS NOT DISTINCT FROM
+         (to_jsonb(OLD) - 'snapshot_after' - 'closed_at' - 'closed_by_app_user_id' - 'closed_by_system' - 'superseded_by_case_id') THEN
     RETURN NEW;
   END IF;
   IF OLD."status" <> 'PENDING' THEN

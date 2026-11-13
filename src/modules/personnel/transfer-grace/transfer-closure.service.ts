@@ -80,6 +80,32 @@ export class TransferClosureService {
     return this.finish(tx, held, { seats, today, now, supersededByCaseId: input.caseId });
   }
 
+  /**
+   * The departure that superseded a transfer was cancelled: the transfer opens again, as it was before the departure (`QĐ-110r`, MF3-C-R5) -- in force, its
+   * grace and its picture before untouched, no closing and no picture after. Nothing is taken back here: the grace goes on if it lasts, and the sweep opens the
+   * revocation of the old rights when it is over, as for any transfer. Not done when the person was moved again since (a newer transfer exists): the older
+   * one is history. False when that departure superseded none, or nothing was left to open. The caller holds the employee.
+   */
+  async reopenSuperseded(tx: DbTx, input: { caseId: string }): Promise<boolean> {
+    const held = await this.graces.lockSupersededBy(tx, input.caseId);
+    if (!held || (await this.graces.hasNewerThan(tx, held))) return false;
+    if (!(await this.graces.reopen(tx, held.id, input.caseId))) return false;
+    await this.audit.record(
+      tx,
+      personnelSystemAuditEvent(
+        held.organizationId,
+        'DEPARTMENT_TRANSFER.REOPENED',
+        'DepartmentTransfer',
+        held.id,
+        `offboarding:${input.caseId}`,
+        { closed: true, supersededByCaseId: input.caseId },
+        { closed: false, employeeId: held.employeeId, reopenedByCaseId: input.caseId },
+      ),
+    );
+
+    return true;
+  }
+
   private async finish(tx: DbTx, held: HeldTransfer, how: Finish): Promise<boolean> {
     const rights: SnapshotRight[] =
       held.snapshotBefore?.rights ?? heldOnOrBefore(how.seats, held.effectiveOn).map(snapshotRightOf);

@@ -149,7 +149,10 @@
   the rights ended another way) the system closes the transfer (`closed_at`, `closed_by_system`, no account, `snapshot_after`, the audit event
   `DEPARTMENT_TRANSFER.CLOSED`, actor `SYSTEM`), so a person whose transfer had nothing to revoke can be moved again (`QĐ-110r`). The same closing is asked
   the moment a task of revocation of the person is completed (a listener of `RevocationListeners`), and a departure recorded while the grace lasts
-  closes the transfer as superseded (`DEPARTMENT_TRANSFER.SUPERSEDED`, `superseded_by_case_id`) so the sweep opens nothing for it.
+  closes the transfer as superseded (`DEPARTMENT_TRANSFER.SUPERSEDED`, `superseded_by_case_id`) so the sweep opens nothing for it. When that departure is
+  cancelled the transfer opens again, whole (`DEPARTMENT_TRANSFER.REOPENED`: no closing, no `snapshot_after`, no `superseded_by_case_id`), unless the person was moved
+  again since; nothing is taken back at the cancellation, the sweep does it when the grace is over. A transfer is not closed while a grant of a right the person
+  asked for again (R-49) still waits, because a grant that fails gives its old right back.
   The API also runs `SaasIssueSweeper` once an hour (the first pass five minutes after start, unreferenced timer): it closes each resolved
   report of an error in a SaaS right whose last day to reopen (`saas_issues.reopen_until`, fixed when it was resolved from
   `SAAS_ISSUE_REOPEN_WORKING_DAYS`) has passed (state `CLOSED`, a `SYSTEM` entry and the audit event `SAAS_ISSUE.CLOSED`, under the row lock),

@@ -18,6 +18,8 @@ const TRANSFER_CLOSURE_LISTENER = 'personnel.transfer-closure';
  *   command holds: the hourly pass of the sweep then closes it.
  * - the record of a departure (`PersonnelFileHookContributions`, `onRecorded` of an `OFFBOARDING` file): a transfer still in its grace is closed as
  *   superseded by that case, and the departure's own revocations take the old rights back (`TransferClosureService.supersede`).
+ * - the cancellation of that departure (`onCancelled`): the transfer it superseded opens again, unless the person was moved again since
+ *   (`TransferClosureService.reopenSuperseded`); nothing is taken back, the sweep does it when the grace is over.
  */
 @Injectable()
 export class TransferClosureListener implements OnModuleInit {
@@ -37,6 +39,10 @@ export class TransferClosureListener implements OnModuleInit {
       onRecorded: async (tx, event) => {
         if (event.fileKind !== 'OFFBOARDING') return;
         await this.closing.supersede(tx, { employeeId: event.employeeId, caseId: event.fileId });
+      },
+      onCancelled: async (tx, event) => {
+        if (event.fileKind !== 'OFFBOARDING') return;
+        await this.closing.reopenSuperseded(tx, { caseId: event.fileId });
       },
     });
   }

@@ -126,6 +126,49 @@ export class TransferGraceRepo {
   }
 
   /**
+   * The transfer a departure superseded, held `FOR UPDATE` until the transaction ends (the caller holds the employee first); null when that departure
+   * superseded none.
+   */
+  async lockSupersededBy(tx: DbTx, caseId: string): Promise<HeldTransfer | null> {
+    const locked = await tx.$queryRaw<{ id: string }[]>`
+      SELECT id FROM department_transfers WHERE superseded_by_case_id = ${caseId}::uuid FOR UPDATE`;
+    if (locked.length === 0) return null;
+    const row = await tx.departmentTransfer.findUnique({ where: { id: locked[0].id } });
+
+    return row && toHeld(row);
+  }
+
+  /** Whether the person has a transfer after this one (waiting or taken effect, not cancelled): the order the person is read by, `effective_on` then id. */
+  async hasNewerThan(tx: DbTx, held: HeldTransfer): Promise<boolean> {
+    const rows = await tx.$queryRaw<{ one: number }[]>`
+      SELECT 1 AS one FROM department_transfers
+       WHERE employee_id = ${held.employeeId}::uuid AND id <> ${held.id}::uuid AND status <> 'CANCELLED'
+         AND (effective_on, id) > (${toDateColumn(held.effectiveOn)}::date, ${held.id}::uuid)
+       LIMIT 1`;
+
+    return rows.length > 0;
+  }
+
+  /**
+   * Opens a transfer again that a departure had superseded: the closing and the picture after are undone, nothing else changes (the guard of the table
+   * allows exactly this). False when it was not superseded by that case any more.
+   */
+  async reopen(tx: DbTx, id: string, caseId: string): Promise<boolean> {
+    const { count } = await tx.departmentTransfer.updateMany({
+      where: { id, status: 'EFFECTIVE', supersededByCaseId: caseId },
+      data: {
+        closedAt: null,
+        closedBySystem: false,
+        closedByAppUserId: null,
+        supersededByCaseId: null,
+        snapshotAfter: Prisma.DbNull,
+      },
+    });
+
+    return count === 1;
+  }
+
+  /**
    * The system closes the transfer, once, with no account (`closed_by_system`) and the picture of what became of the rights; `supersededByCaseId`
    * names the departure that took them over. False when it was closed meanwhile.
    */

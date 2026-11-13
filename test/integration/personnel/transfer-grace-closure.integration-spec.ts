@@ -292,6 +292,156 @@ describe('the system closes the transfer of a person who moved (integration, rea
     expect(await taskOf(seat)).toBeTruthy();
   }, 240_000);
 
+  it('QĐ-110r: cancelling the departure that superseded the transfer opens it again — nothing is taken back at the cancellation, the grace goes on, and the sweep takes the old rights back when it is over', async () => {
+    const { dest, person, code } = await example();
+    const seat = await h.seatOf(person, { subscriptionId: k2a }, code);
+    const wire = await h.moveToday(person, dest.department);
+    const departure = await h.recordedCase(person);
+    expect((await detailOf(wire.id)).phase).toBe('SUPERSEDED');
+
+    await h.cancelCase(departure.id, { reason: 'Người ở lại làm việc' }).expect(200);
+
+    // The transfer is as it was before the departure: in force, with its grace and its picture before, and no closing, no departure, no picture after.
+    expect(await rowOf(wire.id)).toMatchObject({
+      closed: false,
+      closed_by_system: false,
+      closed_by_app_user_id: null,
+      superseded_by_case_id: null,
+      snapshot_after: null,
+    });
+    const reopened = await detailOf(wire.id);
+    expect(reopened.phase).toBe('IN_GRACE');
+    expect(reopened.closure).toBeNull();
+    const events = await h.auditEventsOf('DEPARTMENT_TRANSFER.REOPENED', wire.id);
+    expect(events).toHaveLength(1);
+    expect(events[0]).toMatchObject({ actor_kind: 'SYSTEM', actor_app_user_id: null });
+    expect(events[0].after).toMatchObject({ closed: false, reopenedByCaseId: departure.id });
+    // Nothing was taken back at the cancellation, and the person still cannot be moved again until the transfer closes.
+    expect((await h.assignmentRow(seat)).valid_until).toBeNull();
+    const none = await h.ctx.sql.query(
+      `SELECT 1 FROM provisioning_tasks WHERE assignment_id = $1 AND kind = 'REVOKE'`,
+      [seat],
+    );
+    expect(none.rowCount).toBe(0);
+    const again = await h.recordTransfer({
+      employeeId: person.employeeId,
+      toDepartmentId: (await another()).department.id,
+      effectiveOn: h.day(30),
+      groundsNote: h.groundsNote,
+    });
+    expect([again.status, h.codeOf(again), (h.detailsOf(again) as { kind: string }).kind]).toEqual([
+      409,
+      'DEPARTMENT_TRANSFER.PENDING_EVENT_EXISTS',
+      'TRANSFER_SETTLING',
+    ]);
+
+    // The grace is over: the transfer opens the revocation of its old right as it does for any transfer, and closes when it is done.
+    await graceOverNow(wire.id);
+    const pass = await revocation().sweep();
+
+    expect(pass).toMatchObject({ transfers: 1, rights: 1 });
+    await complete(seat);
+    expect(await rowOf(wire.id)).toMatchObject({
+      closed: true,
+      closed_by_system: true,
+      superseded_by_case_id: null,
+      snapshot_after: { rights: [{ assignmentId: seat, outcome: 'REVOKED' }] },
+    });
+  }, 240_000);
+
+  it('a transfer superseded by a departure is not opened again when the person was moved again meanwhile', async () => {
+    const { dest, person, code } = await example();
+    await h.seatOf(person, { subscriptionId: k2a }, code);
+    const wire = await h.moveToday(person, dest.department);
+    const departure = await h.recordedCase(person);
+    const next = await another();
+    // A newer transfer of the same person (recorded under the departure): the older one is history and stays closed.
+    await h.ctx.sql.query('BEGIN');
+    try {
+      await h.ctx.sql.query('ALTER TABLE department_transfers DISABLE TRIGGER USER');
+      await h.ctx.sql.query(
+        `INSERT INTO department_transfers (id, organization_id, employee_id, from_department_id, to_department_id, effective_on, status,
+                                           closes_placement_id, opens_placement_id, grounds_reference, recorded_by_app_user_id)
+         SELECT gen_random_uuid(), organization_id, employee_id, to_department_id, $2::uuid, effective_on + 40, 'PENDING',
+                gen_random_uuid(), gen_random_uuid(), grounds_reference, recorded_by_app_user_id
+           FROM department_transfers WHERE id = $1`,
+        [wire.id, next.department.id],
+      );
+      await h.ctx.sql.query('ALTER TABLE department_transfers ENABLE TRIGGER USER');
+      await h.ctx.sql.query('COMMIT');
+    } catch (error) {
+      await h.ctx.sql.query('ROLLBACK');
+      throw error;
+    }
+
+    await h.cancelCase(departure.id, { reason: 'Người ở lại làm việc' }).expect(200);
+
+    expect(await rowOf(wire.id)).toMatchObject({ closed: true, superseded_by_case_id: departure.id });
+    expect(await h.auditEventsOf('DEPARTMENT_TRANSFER.REOPENED', wire.id)).toHaveLength(0);
+  }, 240_000);
+
+  it('cancelling a departure that superseded nothing leaves the transfers alone', async () => {
+    const { dest, person, code } = await example();
+    await h.seatOf(person, { subscriptionId: k2a }, code);
+    const wire = await h.moveToday(person, dest.department);
+    await graceOverNow(wire.id);
+    await revocation().sweep();
+    const departure = await h.recordedCase(person);
+
+    await h.cancelCase(departure.id, { reason: 'Người ở lại làm việc' }).expect(200);
+
+    expect(await rowOf(wire.id)).toMatchObject({ closed: false, superseded_by_case_id: null });
+    expect(await h.auditEventsOf('DEPARTMENT_TRANSFER.REOPENED', wire.id)).toHaveLength(0);
+  }, 240_000);
+
+  it('the guard of the table lets a superseded transfer open again, whole, and nothing else of a closed transfer change', async () => {
+    const { dest, person } = await example();
+    const wire = await h.moveToday(person, dest.department);
+    const departure = await h.recordedCase(person);
+    const statement = (sql: string) => h.ctx.sql.query(sql, [wire.id]);
+    const refused = async (sql: string): Promise<string> => {
+      try {
+        await statement(sql);
+      } catch (error) {
+        return (error as Error).message;
+      }
+
+      return 'accepted';
+    };
+
+    // Half a reopening, or a reopening that touches another column, is refused.
+    expect(await refused('UPDATE department_transfers SET closed_at = NULL WHERE id = $1')).toMatch(
+      /cannot change again|closure|check/i,
+    );
+    expect(
+      await refused(
+        `UPDATE department_transfers SET closed_at = NULL, closed_by_system = false, superseded_by_case_id = NULL, snapshot_after = NULL,
+                grace_ends_on = grace_ends_on + 1 WHERE id = $1`,
+      ),
+    ).toMatch(/cannot change again|reopen|restrict/i);
+    // The whole reopening is accepted, and only once: the transfer is then in force again and closes as any other.
+    await statement(
+      `UPDATE department_transfers SET closed_at = NULL, closed_by_system = false, closed_by_app_user_id = NULL, superseded_by_case_id = NULL,
+              snapshot_after = NULL WHERE id = $1`,
+    );
+    expect(await rowOf(wire.id)).toMatchObject({ closed: false, superseded_by_case_id: null });
+    expect(departure.id).toBeTruthy();
+
+    // A transfer closed the ordinary way (every right taken back) never opens again.
+    const plain = await example();
+    const closedWire = await h.moveToday(plain.person, plain.dest.department);
+    await revocation().sweep(at(afterGrace()));
+    expect((await rowOf(closedWire.id)).closed).toBe(true);
+    const plainReopen = await h.ctx.sql
+      .query(
+        `UPDATE department_transfers SET closed_at = NULL, closed_by_system = false, closed_by_app_user_id = NULL, snapshot_after = NULL WHERE id = $1`,
+        [closedWire.id],
+      )
+      .then(() => 'accepted')
+      .catch((error: Error) => error.message);
+    expect(plainReopen).toMatch(/cannot change again/i);
+  }, 240_000);
+
   it('a departure of a person with no transfer, or whose transfer waits, supersedes nothing', async () => {
     const plain = await example();
     const waiting = await example();
