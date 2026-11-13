@@ -43,11 +43,16 @@ export class MailboxLockSettlement {
     const pass: SettlementPass = { written: 0, failed: 0 };
     let afterId: string | null = null;
     for (;;) {
-      const page: { id: string; employeeId: string }[] = await this.cases.pageAwaitingMailboxLock({
-        afterId,
-        take: PAGE,
-      });
-      const ticked = await this.licensing.listPeopleWithMailboxLockTicked(page.map((ref) => ref.employeeId));
+      const page: { id: string; employeeId: string; accountLockAt: Date | null }[] =
+        await this.cases.pageAwaitingMailboxLock({
+          afterId,
+          take: PAGE,
+        });
+      // Only a lock ticked by a revocation completed since this departure blocked access counts: one of an earlier departure that was
+      // cancelled is not this one's (audit B-4).
+      const ticked = await this.licensing.listPeopleWithMailboxLockTicked(
+        page.flatMap((ref) => (ref.accountLockAt ? [{ employeeId: ref.employeeId, since: ref.accountLockAt }] : [])),
+      );
       for (const ref of page.filter((candidate) => ticked.has(candidate.employeeId))) {
         try {
           if (await this.settleOne(ref, now)) pass.written += 1;

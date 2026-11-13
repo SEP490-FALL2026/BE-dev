@@ -220,6 +220,7 @@ describe('the departure of a person, the revocations and the closing (integratio
         seatsReleased: { state: 'DONE', opened: 3, released: 3 },
       });
 
+      await h.blockPass();
       const closed = h.dataOf<CaseWire>(await h.lockMailbox(wire.id, {}).expect(200));
 
       expect(closed).toMatchObject({ closed: true, blockers: {} });
@@ -229,6 +230,7 @@ describe('the departure of a person, the revocations and the closing (integratio
         'MARKED_LEFT',
         'ACCOUNT_LOCK_RECORDED',
         'REVOCATIONS_OPENED',
+        'ACCESS_BLOCKED',
         'MAILBOX_LOCKED',
         'CLOSED_BY_SYSTEM',
       ]);

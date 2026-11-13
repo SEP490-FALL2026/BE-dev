@@ -1,5 +1,6 @@
 import request from 'supertest';
 import { subtractWorkingDays } from '../../src/core/working-days';
+import { BlockMomentSweeper } from '../../src/modules/personnel/departure-deadline/block-moment.job';
 import type { ApiAccount } from './api-accounts';
 import { SeatRevocationHarness } from './seat-revocation-harness';
 import type { Department, Person } from './request-harness';
@@ -126,6 +127,14 @@ export class OffboardingHarness extends SeatRevocationHarness {
       .send({ groundsNote: this.groundsNote, ...body });
   markLeft = (id: string, body: object = {}, account: ApiAccount = this.sa) =>
     request(this.server()).post(`/api/v1/offboarding-cases/${id}/departure`).set(this.as(account)).send(body);
+  /**
+   * One hourly pass of the block moment, as the timer runs it: what the block does (cancel the open requests, tell IT) happens there, and the
+   * system closes no case before it (audit A-1).
+   */
+  blockPass = async (): Promise<void> => {
+    const sweeper: BlockMomentSweeper = this.ctx.app.get(BlockMomentSweeper, { strict: false });
+    await (sweeper as unknown as { sweep: () => Promise<void> }).sweep();
+  };
   /**
    * The Super Admin marks the person left on their last working day (Q-04 B): a handover that has its last day ahead is first brought to
    * today, since the person cannot leave before it. Awaited, or chained with `.expect(status)` like a request.

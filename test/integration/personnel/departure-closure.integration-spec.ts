@@ -47,6 +47,8 @@ describe('the end of a departure: the lock of the mailbox and the closing of the
     const { person, seats } = await leaver(subscriptions);
     const wire = await h.recordedCase(person);
     await h.leaveOnLastDay(wire.id).expect(200);
+    // The hourly pass of the block moment runs before anything closes the case (audit A-1).
+    await h.blockPass();
     await h.lockAccount(wire.id, LOCK).expect(200);
 
     return { person, seats, wire };
@@ -94,6 +96,7 @@ describe('the end of a departure: the lock of the mailbox and the closing of the
       expect(await h.changeKinds(wire.id)).toEqual([
         'RECORDED',
         'MARKED_LEFT',
+        'ACCESS_BLOCKED',
         'ACCOUNT_LOCK_RECORDED',
         'MAILBOX_LOCKED',
       ]);
@@ -267,15 +270,15 @@ describe('the end of a departure: the lock of the mailbox and the closing of the
       });
     });
 
-    it('does not write it while a K1 seat of the person has no completed revocation, although the task that ticked the lock was the last one opened (D-71)', async () => {
+    it('does not write it while a K1 seat of the person has no completed revocation: the task of the only seat opened does not carry the lock step (D-71, D-62)', async () => {
       const other = await h.subscription(60, 'K1');
       const { seats, wire } = await lockedLeaver([k1, other]);
-      // The IT Admin opens the revocation of one of the two K1 seats only: its task is the last live K1 revocation, so it carries the lock step.
+      // The IT Admin opens the revocation of one of the two K1 seats only: the other seat is still the person's, so this task has five steps (D-62).
       await h.revokeRights(wire.id, { assignmentIds: [seats[0]] }).expect(200);
       const first =
         (await rightsOf(wire.id)).find((right) => right.assignmentId === seats[0])?.revocation?.taskId ?? '';
 
-      await completeK1(first);
+      await completeK1(first, false);
 
       expect((await h.caseRow(wire.id)).mailbox_lock_at).toBeNull();
       const route = await h.lockMailbox(wire.id);
@@ -361,6 +364,7 @@ describe('the end of a departure: the lock of the mailbox and the closing of the
       expect(await h.changeKinds(wire.id)).toEqual([
         'RECORDED',
         'MARKED_LEFT',
+        'ACCESS_BLOCKED',
         'ACCOUNT_LOCK_RECORDED',
         'REVOCATIONS_OPENED',
         'MAILBOX_LOCKED',
@@ -372,7 +376,10 @@ describe('the end of a departure: the lock of the mailbox and the closing of the
       const log = h.dataOf<{ items: { kind: string; changedByAppUserId: string | null; changedBySystem: boolean }[] }>(
         await h.caseChanges(wire.id, '?pageSize=100').expect(200),
       );
-      expect(log.items.filter((line) => line.changedBySystem).map((line) => line.kind)).toEqual(['CLOSED_BY_SYSTEM']);
+      expect(log.items.filter((line) => line.changedBySystem).map((line) => line.kind)).toEqual([
+        'ACCESS_BLOCKED',
+        'CLOSED_BY_SYSTEM',
+      ]);
       expect(log.items.find((line) => line.kind === 'MAILBOX_LOCKED')).toMatchObject({
         changedByAppUserId: h.it1.appUserId,
         changedBySystem: false,
@@ -488,6 +495,9 @@ describe('the end of a departure: the lock of the mailbox and the closing of the
 
       await h.markLeft(wire.id).expect(200);
       expect(await wireOf(wire.id)).toMatchObject({ state: 'LEFT', closed: false, blockers: {} });
+      // Nothing closes the case before the hourly pass of the block moment has done what the block does (audit A-1).
+      expect(await closing().sweep()).toMatchObject({ closed: 0 });
+      await h.blockPass();
       const pass = await closing().sweep();
 
       expect(pass).toMatchObject({ failed: 0 });

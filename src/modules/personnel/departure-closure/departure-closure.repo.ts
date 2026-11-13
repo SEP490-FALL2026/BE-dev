@@ -37,7 +37,7 @@ export class DepartureClosureRepo {
   async pageAwaitingMailboxLock(page: {
     afterId: string | null;
     take: number;
-  }): Promise<{ id: string; employeeId: string }[]> {
+  }): Promise<{ id: string; employeeId: string; accountLockAt: Date | null }[]> {
     return this.prisma.offboardingCase.findMany({
       where: {
         state: { in: ['HANDING_OVER', 'LEFT'] },
@@ -48,7 +48,7 @@ export class DepartureClosureRepo {
       },
       orderBy: { id: 'asc' },
       take: page.take,
-      select: { id: true, employeeId: true },
+      select: { id: true, employeeId: true, accountLockAt: true },
     });
   }
 
@@ -77,13 +77,18 @@ export class DepartureClosureRepo {
     return row && toRecord(row);
   }
 
-  /** Closes the case once, for the system (no account): false when it was closed meanwhile or still lacks a lock. */
+  /**
+   * Closes the case once, for the system (no account): false when it was closed meanwhile, still lacks a lock, or the hourly pass of the block
+   * moment has not yet done what the block does (cancel the open requests, tell IT and the vendor admins — `QĐ-110d`, audit A-1): that pass
+   * skips a closed case, so a case closed before it would never get it. The case closes at the next pass after.
+   */
   async closeBySystem(tx: DbTx, id: string, at: Date): Promise<boolean> {
     const done = await tx.offboardingCase.updateMany({
       where: {
         id,
         state: 'LEFT',
         closedAt: null,
+        blockAnnouncedAt: { not: null },
         accountLockAt: { not: null },
         mailboxLockAt: { not: null },
       },

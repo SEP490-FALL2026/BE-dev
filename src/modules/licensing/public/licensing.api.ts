@@ -192,8 +192,11 @@ export class LicensingApi {
    * revocation of a person carries): what the personnel module settles the lock of the mailbox from when it could not write it as the
    * revocation completed (`P28`). One statement for any number of people; the people with none are absent.
    */
-  listPeopleWithMailboxLockTicked(employeeIds: readonly string[], tx?: DbTx): Promise<Set<string>> {
-    return this.revocationView.mailboxLockTickedAmong(employeeIds, tx);
+  listPeopleWithMailboxLockTicked(
+    people: readonly { employeeId: string; since: Date }[],
+    tx?: DbTx,
+  ): Promise<Set<string>> {
+    return this.revocationView.mailboxLockTickedAmong(people, tx);
   }
 
   /**

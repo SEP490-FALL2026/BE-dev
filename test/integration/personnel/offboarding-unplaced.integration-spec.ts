@@ -422,7 +422,9 @@ describe('unplaced employee offboarding and first placement (integration, real P
       await h.revoked(taskId, { completion: 'ACCOUNT_REMOVED', evidence: 'đã xóa tài khoản' }).expect(200);
       expect(await h.count('handover_duties')).toBe(0);
 
-      // Every revocation is completed; the system closes the case when the lock of the mailbox is written (QĐ-110e).
+      // Every revocation is completed; the system closes the case when the lock of the mailbox is written (QĐ-110e), once the hourly
+      // pass of the block moment has run (audit A-1).
+      await h.blockPass();
       const closed = h.dataOf<CaseWire>(await h.lockMailbox(wire.id, {}).expect(200));
       expect(closed.closed).toBe(true);
       expect(await h.workState(person.employeeId)).toBe('TERMINATED/LEFT');
@@ -443,6 +445,7 @@ describe('unplaced employee offboarding and first placement (integration, real P
       const taskId = right.revocation?.taskId ?? '';
       await h.claim(taskId).expect(200);
       await h.revoked(taskId, { completion: 'ACCOUNT_REMOVED', evidence: 'đã xóa tài khoản' }).expect(200);
+      await h.blockPass();
       expect(h.dataOf<CaseWire>(await h.lockMailbox(wire.id, {}).expect(200)).closed).toBe(true);
     });
 

@@ -354,6 +354,7 @@ describe('the roles of a person who leaves and the duties of a workspace (integr
       expect(left.blockers).toEqual({ MAILBOX_LOCK_NOT_RECORDED: 1 });
       expect(Object.keys(left.warnings.workspaces)).toEqual([planId]);
 
+      await h.blockPass();
       const closed = h.dataOf<FlaggedCase>(await h.lockMailbox(wire.id, {}).expect(200));
       expect(closed).toMatchObject({ closed: true, blockers: {} });
       expect(Object.keys(closed.warnings.workspaces)).toEqual([planId]);
@@ -414,6 +415,7 @@ describe('the roles of a person who leaves and the duties of a workspace (integr
       for (const wire of [financeCase, bossCase]) {
         await h.leaveOnLastDay(wire.id).expect(200);
         await h.lockAccount(wire.id, { note: 'Đã khóa tài khoản công ty' }).expect(200);
+        await h.blockPass();
         const closed = h.dataOf<FlaggedCase>(await h.lockMailbox(wire.id, {}).expect(200));
         expect(closed.closed).toBe(true);
         expect((await flaggedEvents(wire.id)).map((event) => event.after.stage)).toEqual(['RECORDED']);

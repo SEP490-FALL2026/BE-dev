@@ -179,6 +179,7 @@ describe('progress of the departures and the transfers on the overviews (integra
       const waiting = (await progressOf(OVERVIEW_PATHS.superAdmin, h.sa)).sections.departures;
       expect(waiting.mailboxLockPending.count).toBe((before.mailboxLockPending.count ?? 0) + 1);
 
+      await announce();
       await h.lockMailbox(gone.id, {}).expect(200);
       await closing().sweep();
       const closed = (await progressOf(OVERVIEW_PATHS.superAdmin, h.sa)).sections.departures;
