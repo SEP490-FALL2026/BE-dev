@@ -538,6 +538,28 @@ describe('the migration that takes service accounts out of the scope (integratio
       expect(release.rows).toEqual([{ reason: 'REQUEST_CANCELLED', amount_minor: held }]);
       await migrate();
       expect((await commitmentOf(id)).releases).toBe(1);
+
+      // The migration after it writes the audit events of what was closed and given back, once (audit B-2).
+      const audit = readFileSync(
+        join(PROJECT_ROOT, 'prisma', 'migrations', '20261113002700_requests_scope_removed_audit', 'migration.sql'),
+        'utf8',
+      );
+      const events = async () =>
+        (
+          await h.ctx.sql.query<{ action: string; actor_kind: string }>(
+            `SELECT action, actor_kind::text FROM audit_events
+              WHERE (resource_type = 'ACCESS_REQUEST' AND resource_id = $1)
+                 OR (resource_type = 'BUDGET_COMMITMENT' AND resource_id IN (SELECT id::text FROM budget_commitments WHERE request_id = $1::uuid))
+              AND action IN ('ACCESS_REQUEST.CANCELLED', 'BUDGET_COMMITMENT.RELEASED') ORDER BY action`,
+            [id],
+          )
+        ).rows.filter((row) => ['ACCESS_REQUEST.CANCELLED', 'BUDGET_COMMITMENT.RELEASED'].includes(row.action));
+      await h.ctx.sql.query(audit);
+      await h.ctx.sql.query(audit);
+      expect(await events()).toEqual([
+        { action: 'ACCESS_REQUEST.CANCELLED', actor_kind: 'SYSTEM' },
+        { action: 'BUDGET_COMMITMENT.RELEASED', actor_kind: 'SYSTEM' },
+      ]);
     }, 240_000);
 
     it('leaves a request whose grant is under way, or whose money became an expense, and lists it', async () => {
