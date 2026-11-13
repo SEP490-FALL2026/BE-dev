@@ -165,7 +165,7 @@ export class SubscriptionService {
       // QĐ-111g: a declaration that names nobody takes the IT Admin responsible for the application, when they still work as one.
       responsibleItAdminEmployeeId: await this.poolRules.responsibleOfDeclaration(
         tx,
-        plan.applicationId,
+        plan.id,
         input.responsibleItAdminEmployeeId,
       ),
     };
