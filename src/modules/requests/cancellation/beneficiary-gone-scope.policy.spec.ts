@@ -77,10 +77,23 @@ describe('what the system does to the request of a person who is gone', () => {
       );
     });
 
-    it('leaves a request of the new department, a free one (K5) and a proposal of new software', () => {
+    it('leaves a request of the new department, a free one (K5) and a proposal of new software not priced yet', () => {
       expect(verdictOf(OLD_DEPARTMENT, paid('PENDING', NEW), null)).toBe('SKIP');
       expect(verdictOf(OLD_DEPARTMENT, free('AWAITING_EXECUTION'), null)).toBe('SKIP');
+      expect(verdictOf(OLD_DEPARTMENT, proposal('PENDING'), null)).toBe('SKIP');
+      expect(verdictOf(OLD_DEPARTMENT, proposal('WAITING_CONTROLLED'), null)).toBe('SKIP');
       expect(verdictOf(OLD_DEPARTMENT, proposal('AWAITING_IT_ASSESSMENT'), null)).toBe('SKIP');
+    });
+
+    it('cancels a proposal of new software (case B) the IT Admin priced with a payment: it is a paid request of the old department (QĐ-110o, BR-MF3-03)', () => {
+      expect(verdictOf(OLD_DEPARTMENT, proposal('AWAITING_SPEND_SUBMISSION'), null)).toBe('CANCEL');
+      expect(verdictOf(OLD_DEPARTMENT, proposal('AWAITING_SPEND_DECISION'), null)).toBe('CANCEL');
+      expect(verdictOf(OLD_DEPARTMENT, proposal('AWAITING_EXECUTION'), null)).toBe('CANCEL');
+      expect(verdictOf(OLD_DEPARTMENT, proposal('EXECUTING'), null)).toBe('NEEDS_IT_CHECK');
+      expect(verdictOf(OLD_DEPARTMENT, proposal('AWAITING_IT_CLOSE'), null)).toBe('NEEDS_IT_CHECK');
+      expect(verdictOf(OLD_DEPARTMENT, { ...proposal('AWAITING_SPEND_DECISION'), departmentId: NEW }, null)).toBe(
+        'SKIP',
+      );
     });
 
     it('leaves the request of a service account: it follows the department that owns it, not the person', () => {
