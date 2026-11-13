@@ -366,33 +366,26 @@ export interface BlockerFacts {
   state: OffboardingState;
   closed: boolean;
   lockRecorded: boolean;
-  /** Personal seats still held that nothing says are running on to the end of a paid period. */
+  /** Item (1b) of `BM-08`, the lock of the mailbox for good, is written (`B-1`). */
+  mailboxLocked: boolean;
+  /** The personal seats of the person that have no task of revocation completed (`QĐ-110c`): those nobody opened a task for included. */
   openRights: number;
-  /** Seats whose renewal is cancelled and whose access runs on to the end of the paid period. */
-  accessRunsOn: number;
-  /** What the flows that come after register, each with how many things it still waits on. */
-  registered: Readonly<Record<string, number>>;
 }
 
-/** What still keeps a departure open, by code with how many (`US-03-04` AC-20, `QĐ-62i`, `QĐ-75e`); empty when it may be closed. */
+/**
+ * What still keeps a departure from closing, by code with how many (`QĐ-110e`, `B-1`); empty when the system may close it. A person who has left
+ * waits for the lock of the company account (1a), the lock of the mailbox for good (1b) and a completed task of revocation for each personal seat
+ * they hold. Nothing else keeps it: the responsibilities that are not handed over (workspaces, subscriptions, roles) are warnings, never a blocker
+ * (`QĐ-110j`), and a K1 seat whose access runs on to the end of the paid period has its task completed.
+ */
 export function blockersOf(facts: BlockerFacts): Record<string, number> {
   if (facts.state !== 'LEFT' || facts.closed) return {};
   const blockers: Record<string, number> = {};
   if (!facts.lockRecorded) blockers.ACCOUNT_LOCK_NOT_RECORDED = 1;
+  if (!facts.mailboxLocked) blockers.MAILBOX_LOCK_NOT_RECORDED = 1;
   if (facts.openRights > 0) blockers.PERSONAL_RIGHTS_OPEN = facts.openRights;
-  if (facts.accessRunsOn > 0) blockers.ACCESS_RUNS_ON = facts.accessRunsOn;
-  for (const [code, count] of Object.entries(facts.registered)) if (count > 0) blockers[code] = count;
 
   return blockers;
-}
-
-/** Whether the case may be closed now: it is not the state, a closed one, or one with a blocker. */
-export function closeRefusal(facts: BlockerFacts): OffboardingRefusal | null {
-  if (facts.state !== 'LEFT') return { code: 'CASE_NOT_LEFT' };
-  if (facts.closed) return { code: 'CASE_NOT_CLOSEABLE', details: { blockers: ['ALREADY_CLOSED'] } };
-  const blockers = Object.keys(blockersOf(facts));
-
-  return blockers.length > 0 ? { code: 'CASE_NOT_CLOSEABLE', details: { blockers } } : null;
 }
 
 export type StepState = 'PENDING' | 'IN_PROGRESS' | 'DONE';

@@ -4,7 +4,7 @@ import type { OffboardingRecord } from '../offboarding.types';
 /**
  * What the detail of a departure is read against (`US-03-04` AC-7, AC-20, `QĐ-62i`), as a pure assembly of what was read: the rights the
  * person still holds, those whose access runs on to the end of the paid period, the four steps of the checklist for a case that is not
- * cancelled, and what keeps the case open.
+ * cancelled, and what keeps the case open (`QĐ-110e`).
  */
 export interface DepartureDetailReads {
   /** The case is not cancelled: only then are the rights, the steps and what keeps it open read at all. */
@@ -20,12 +20,10 @@ export interface DepartureDetailReads {
   terminating: ReadonlySet<string>;
   /** The seats this case asked to have revoked. */
   opened: readonly string[];
-  /** What the flows that come after the record registered, each with how many things it still waits on. */
-  registered: Readonly<Record<string, number>>;
 }
 
 export function departureDetailFacts(
-  record: Pick<OffboardingRecord, 'accessBlockMode' | 'state' | 'accountLockAt' | 'closedAt'>,
+  record: Pick<OffboardingRecord, 'accessBlockMode' | 'state' | 'accountLockAt' | 'mailboxLockAt' | 'closedAt'>,
   reads: DepartureDetailReads,
 ): {
   heldRights: number;
@@ -58,9 +56,8 @@ export function departureDetailFacts(
       state: record.state,
       closed: record.closedAt !== null,
       lockRecorded,
-      openRights: seats.length - accessRunsOn,
-      accessRunsOn,
-      registered: reads.registered,
+      mailboxLocked: record.mailboxLockAt !== null,
+      openRights: reads.withoutCompletedTask,
     }),
   };
 }

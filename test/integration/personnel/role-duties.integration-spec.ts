@@ -349,19 +349,14 @@ describe('the roles of a person who leaves and the duties of a workspace (integr
       ]);
       expect(JSON.stringify(events)).not.toMatch(/password|secret|token|credential|figma-breakglass/i);
 
-      const refused = await h.closeCase(wire.id);
-      expect([refused.status, h.codeOf(refused)]).toEqual([409, 'OFFBOARDING_CASE.CASE_NOT_CLOSEABLE']);
-      expect(h.detailsOf(refused).blockers).toEqual(['WORKSPACE_OWNER_NOT_TRANSFERRED']);
+      // A workspace whose owner is not changed is a warning, never a blocker: the system closes the case all the same (QĐ-110e, QĐ-110j).
       const left = h.dataOf<FlaggedCase>(await h.readCase(wire.id).expect(200));
-      expect(left.blockers).toEqual({ WORKSPACE_OWNER_NOT_TRANSFERRED: 1 });
+      expect(left.blockers).toEqual({ MAILBOX_LOCK_NOT_RECORDED: 1 });
+      expect(Object.keys(left.warnings.workspaces)).toEqual([planId]);
 
-      await putProfile(planId, {
-        primaryOwnerEmployeeId: h.it1.employeeId,
-        members: [{ employeeId: h.it1.employeeId, role: 'OWNER' }],
-        ownerLimit: 1,
-      }).expect(200);
-      expect(h.dataOf<FlaggedCase>(await h.readCase(wire.id).expect(200)).blockers).toEqual({});
-      await h.closeCase(wire.id).expect(200);
+      const closed = h.dataOf<FlaggedCase>(await h.lockMailbox(wire.id, {}).expect(200));
+      expect(closed).toMatchObject({ closed: true, blockers: {} });
+      expect(Object.keys(closed.warnings.workspaces)).toEqual([planId]);
     });
   });
 
@@ -419,7 +414,7 @@ describe('the roles of a person who leaves and the duties of a workspace (integr
       for (const wire of [financeCase, bossCase]) {
         await h.leaveOnLastDay(wire.id).expect(200);
         await h.lockAccount(wire.id, { note: 'Đã khóa tài khoản công ty' }).expect(200);
-        const closed = h.dataOf<FlaggedCase>(await h.closeCase(wire.id).expect(200));
+        const closed = h.dataOf<FlaggedCase>(await h.lockMailbox(wire.id, {}).expect(200));
         expect(closed.closed).toBe(true);
         expect((await flaggedEvents(wire.id)).map((event) => event.after.stage)).toEqual(['RECORDED']);
       }

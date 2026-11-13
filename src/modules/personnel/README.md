@@ -37,16 +37,16 @@ và lệnh `src/cli/record-super-admin-event/`.
 
 ## Extension point
 
-Bốn point mở, cả bốn đều do listener trong chính module đăng ký:
+Bốn point mở của module (cả bốn do listener trong chính module đăng ký), cộng điểm mở của `licensing` mà `personnel` gắn vào:
 
 - `PersonnelFileHookContributions` (`personnel.file-hook`) — `offboarding/open-requests/open-requests.listener.ts`,
   `role-duties/role-duties.listener.ts`.
-- `OffboardingBlockerContributions` (`personnel.offboarding-blocker`) — `workspace-blocker.listener.ts`; `OffboardingWarningContributions` (`personnel.offboarding-warning`) —
-  `open-requests.listener.ts`, `role-warning.listener.ts`.
+- `OffboardingWarningContributions` (`personnel.offboarding-warning`) — `open-requests.listener.ts`, `role-warning.listener.ts`. Không còn điểm mở
+  _blocker_: trách nhiệm chưa chuyển (workspace, thuê bao, vai trò) chỉ là cảnh báo, không chặn đóng hồ sơ (`QĐ-110e`, `QĐ-110j`).
 - `NoticeRecorderContributions` (`personnel.notice-recorder`) — `notice/transfer-notice.listener.ts`,
   `leave/leave-notice.listener.ts`, `offboarding/offboarding-notice.listener.ts`.
 
-Đăng ký vào: `organization.change-listeners` — `transfer/transfer-effective.listener.ts`,
+Đăng ký vào: `licensing.revocation` (`RevocationListeners`) — `departure-closure/mailbox-lock-revocation.listener.ts`; `organization.change-listeners` — `transfer/transfer-effective.listener.ts`,
 `transfer-review/transfer-review.listener.ts`; `organization.department-use-readers` —
 `event-notice/department-open-work.listener.ts`; `licensing.seat-baseline-closed` —
 `transfer-review/post-setup-review.listener.ts`; `requests.outcome` —
@@ -58,7 +58,7 @@ Không vòng (`pnpm arch:capabilities --module personnel`, gate `capability-grap
 `department-member` → `departure-deadline` (gọi facade của `organization`, `licensing`, `requests`, `operating-parameters`, `audit`; chỉ import capability
 anh em `event-notice` để báo, nên `event-notice` không được import lại nó) → `role-duties`, `transfer`, `transfer-review` → `notice` → `leave` → `offboarding` →
 `super-admin-event`. Recorder điều chuyển nằm ở `notice/` (đứng trên `transfer/`); recorder nghỉ dài hạn và thôi việc nằm ở
-`leave/`, `offboarding/` (đứng trên `notice/`).
+`leave/`, `offboarding/` (đứng trên `notice/`). `departure-closure/` đứng trên `offboarding/` (dùng khung khóa, repo và câu trả lời chi tiết của nó; `offboarding/` không import lại).
 
 ## Capability → file chính
 
@@ -70,7 +70,7 @@ anh em `event-notice` để báo, nên `event-notice` không được import l�
   `transfer-reviews.controller.ts`; `TransferReviewDecisionService`; `transfer-review.job.ts` báo quá hạn mỗi giờ.
 - `leave/` — nghỉ dài hạn, đổi ngày về, xác nhận về (US-03-03); `long-leaves.controller.ts`; `LeaveService`;
   `leave-return.job.ts` báo về trễ mỗi giờ.
-- `offboarding/` — nghỉ việc: ghi, đổi ngày làm cuối, hủy, đã nghỉ, khóa tài khoản, mở thu hồi, đóng (US-03-04);
+- `offboarding/` — nghỉ việc: ghi, đổi ngày làm cuối, hủy, đã nghỉ, khóa tài khoản (1a), mở thu hồi (US-03-04); không còn route đóng hồ sơ (hệ thống đóng, `departure-closure/`);
   `offboarding.controller.ts`, `offboarding-steps.controller.ts`; `OffboardingService` điều phối ba bước ghi nghỉ việc:
   `OffboardingPreconditions` (đọc, khóa, kiểm lại sau khóa), `OffboardingEndings` (hủy điều chuyển đang chờ, kết thúc nghỉ dài
   hạn, kỳ trưởng phòng và placement), `OffboardingCaseWriter` (ca, thay đổi đầu tiên, audit, hook, chặn đăng nhập, thông báo);
@@ -104,6 +104,17 @@ anh em `event-notice` để báo, nên `event-notice` không được import l�
   khoản, không ticket), báo Super Admin (chỉ khi chưa `LEFT`) và IT (`DEPARTURE_ACCESS_BLOCKED`, audience `SUPER_ADMIN`/`IT_ADMIN`); hạn thu hồi đã có trên
   hồ sơ **không đổi**, chỉ ghi khi còn NULL. `AccountLockOverdueService.notice(now)` (cùng job) báo IT + Super Admin `ACCOUNT_LOCK_OVERDUE` một lần mỗi hồ sơ khi
   hồ sơ chặn ngay chưa ghi `account-lock` tới hết ngày ghi. Hồ sơ hủy trước mốc không bao giờ được báo. Capability này không import `offboarding/`.
+- `departure-closure/` — mục **(1b) khóa hẳn hộp thư** của `BM-08` và hệ thống **tự đóng** hồ sơ nghỉ việc (MF2-G, `QĐ-110e`, `B-1`, SPEC P28):
+  `POST /offboarding-cases/{id}/mailbox-lock` (`mailbox-lock.controller.ts`, IT Admin, `{ note? }`) → `MailboxLockService` (khung `OffboardingFrame`;
+  `departure-closure.policy.ts`: `mailboxLockRefusal` — hồ sơ đóng, chưa chặn, chưa có (1a) ⟹ 409 `ACCOUNT_LOCK_FIRST`, còn ghế `K1` chưa có tác vụ thu hồi
+  `COMPLETED` ⟹ 409 `MAILBOX_LOCK_BEFORE_K1`; ghi lần hai 200 không đổi). `MailboxLockRevocationListener` gắn `RevocationListeners` (`AFTER_WORK`, tác vụ
+  `COMPLETED`): tác vụ thu hồi `K1` cuối của người nghỉ tick `MAILBOX_LOCKED` ⟹ hệ thống tự ghi (1b) (actor `SYSTEM`, không tài khoản), khóa hồ sơ bằng
+  `FOR UPDATE SKIP LOCKED` (không chờ, D-66). `DepartureClosureService.closeIfDue` đóng hồ sơ khi đã `LEFT`, mọi ghế cá nhân có tác vụ thu hồi `COMPLETED`
+  (`LicensingApi.countPersonalSeatsWithoutCompletedTaskOf`) và có (1a) + (1b) (`closureDue` ở `departure-closure.policy.ts`, cùng `blockersOf` của
+  `offboarding.policy.ts` mà chi tiết hồ sơ hiện trong `blockers`): dòng nhật ký `CLOSED_BY_SYSTEM`, audit `OFFBOARDING_CASE.CLOSED` (SYSTEM),
+  `closed_by_app_user_id` NULL. Được hỏi ngay khi sự kiện đóng được ghi (tác vụ thu hồi hoàn tất, P28), và mỗi giờ bởi `DepartureClosureSweeper`
+  (`DepartureClosureService.sweep`) cho phần còn lại (người được ghi _đã nghỉ việc_ sau cùng, hồ sơ bị giữ lúc listener hỏi). Cột
+  `offboarding_cases.mailbox_lock_at/by_app_user_id/note`. Tác vụ `FAILED` giữ hồ sơ mở; IT mở tác vụ mới.
 - `department-member/` — trưởng phòng đọc một người đang ở phòng mình hôm nay (`QĐ-41c`(2)); `department-member.controller.ts`
   (`GET /departments/{id}/employees/{employeeId}` + `…/software-rights` + `…/open-requests`, `@RequireRoles('MANAGER')`),
   `DepartmentMemberQueryService` (hồ sơ không email/hợp đồng + hai số đếm; hai danh sách phân trang ≤ 100),

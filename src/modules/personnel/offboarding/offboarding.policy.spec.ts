@@ -3,7 +3,6 @@ import {
   cancelRefusal,
   changeLastDayRefusal,
   checklistOf,
-  closeRefusal,
   departmentWithoutHeadFrom,
   departureEffectiveOn,
   departureRevocationSource,
@@ -245,36 +244,27 @@ describe('what keeps a case open and the four steps', () => {
     state: 'LEFT' as const,
     closed: false,
     lockRecorded: true,
+    mailboxLocked: true,
     openRights: 0,
-    accessRunsOn: 0,
-    registered: {},
   };
 
-  it('closes only when the account is locked, nothing is held, no access runs on and nothing registered waits', () => {
-    expect(closeRefusal(blockerFacts)).toBeNull();
-    expect(
-      blockersOf({
-        ...blockerFacts,
-        lockRecorded: false,
-        openRights: 2,
-        accessRunsOn: 1,
-        registered: { SERVICE_ACCOUNTS: 3, WORKSPACES: 0 },
-      }),
-    ).toEqual({
+  it('keeps a person who has left open only on the lock of the account, the lock of the mailbox and the rights with no completed task (QĐ-110e)', () => {
+    expect(blockersOf(blockerFacts)).toEqual({});
+    expect(blockersOf({ ...blockerFacts, lockRecorded: false, mailboxLocked: false, openRights: 2 })).toEqual({
       ACCOUNT_LOCK_NOT_RECORDED: 1,
+      MAILBOX_LOCK_NOT_RECORDED: 1,
       PERSONAL_RIGHTS_OPEN: 2,
-      ACCESS_RUNS_ON: 1,
-      SERVICE_ACCOUNTS: 3,
     });
-    expect(closeRefusal({ ...blockerFacts, openRights: 1 })).toEqual({
-      code: 'CASE_NOT_CLOSEABLE',
-      details: { blockers: ['PERSONAL_RIGHTS_OPEN'] },
-    });
-    expect(code(closeRefusal({ ...blockerFacts, state: 'HANDING_OVER' }))).toBe('CASE_NOT_LEFT');
-    expect(closeRefusal({ ...blockerFacts, closed: true })).toEqual({
-      code: 'CASE_NOT_CLOSEABLE',
-      details: { blockers: ['ALREADY_CLOSED'] },
-    });
+    expect(blockersOf({ ...blockerFacts, mailboxLocked: false })).toEqual({ MAILBOX_LOCK_NOT_RECORDED: 1 });
+    expect(blockersOf({ ...blockerFacts, openRights: 1 })).toEqual({ PERSONAL_RIGHTS_OPEN: 1 });
+  });
+
+  it('shows nothing for a handover under way, a case that was cancelled or a case that is closed', () => {
+    const everythingOpen = { ...blockerFacts, lockRecorded: false, mailboxLocked: false, openRights: 2 };
+
+    expect(blockersOf({ ...everythingOpen, state: 'HANDING_OVER' })).toEqual({});
+    expect(blockersOf({ ...everythingOpen, state: 'CANCELLED' })).toEqual({});
+    expect(blockersOf({ ...everythingOpen, closed: true })).toEqual({});
   });
 
   it('puts the steps in the order they are done, marks the lock urgent only for a departure nobody planned, and never waits on a handover (QĐ-110g)', () => {

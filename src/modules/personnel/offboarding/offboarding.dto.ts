@@ -203,7 +203,14 @@ export const offboardingDetailSchema = offboardingSummarySchema.extend({
       note: z.string().nullable(),
     })
     .nullable(),
-  closure: z.strictObject({ closedAt: z.iso.datetime(), closedByAppUserId: z.uuid() }).nullable(),
+  /**
+   * How the case was closed; null while it is open. The system closes it (`QĐ-110e`) when the person has left, every revocation is completed and
+   * the lock of the mailbox (1b) is written: `closedBySystem` is then true and `closedByAppUserId` null. A case an IT Admin closed before the system
+   * did has their account and `closedBySystem` false.
+   */
+  closure: z
+    .strictObject({ closedAt: z.iso.datetime(), closedByAppUserId: z.uuid().nullable(), closedBySystem: z.boolean() })
+    .nullable(),
   checklist: checklistSchema.nullable(),
   /** What keeps the case open, by code with how many (a finite set of codes); empty when it may be closed. */
   blockers: z.record(z.string(), z.number().int().nonnegative()),

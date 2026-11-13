@@ -77,9 +77,4 @@ export class RoleDutiesService {
 
     return new Map([...roles].map(([employeeId, view]) => [employeeId, view.map]));
   }
-
-  /** How many workspaces of K2 plans the person still owns or administers: what keeps their departure from closing. */
-  async workspaceCountOf(employeeId: string, tx?: DbTx): Promise<number> {
-    return (await this.catalog.getWorkspaceDutiesOf([employeeId], tx)).length;
-  }
 }

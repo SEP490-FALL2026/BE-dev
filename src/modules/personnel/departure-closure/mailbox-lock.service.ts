@@ -12,6 +12,7 @@ import type { OffboardingRecord } from '../offboarding/offboarding.types';
 import { userActor } from '../public/personnel.types';
 import { mailboxLockRefusal } from './departure-closure.policy';
 import { DepartureClosureRepo } from './departure-closure.repo';
+import { DepartureClosureService } from './departure-closure.service';
 
 /** Who wrote item (1b): an IT Admin with their words, or the system when the last K1 revocation of the person ticked the lock of the mailbox. */
 export type MailboxLockWriter =
@@ -21,7 +22,7 @@ export type MailboxLockWriter =
  * Item (1b) of `BM-08`, the lock of the mailbox for good (`QĐ-110e`, `B-1`, SPEC P28). The IT Admin writes it after (1a) and, when the person
  * holds a K1 seat, only once every revocation of a K1 seat is completed; the system writes it by itself when the last K1 revocation is
  * completed with the lock ticked (`MailboxLockRevocationListener`). It is written once: asking again answers as it was. It is one of the
- * things the system waits for before it closes the case.
+ * things the system waits for before it closes the case, which it does in the same transaction when (1b) was the last (`DepartureClosureService`).
  */
 @Injectable()
 export class MailboxLockService {
@@ -32,6 +33,7 @@ export class MailboxLockService {
     private readonly identity: IdentityAccessApi,
     private readonly licensing: LicensingApi,
     private readonly audit: OffboardingAuditService,
+    private readonly closing: DepartureClosureService,
   ) {}
 
   /** The IT Admin writes (1b). Throws OffboardingRefusedError and PersonnelAccessRefusedError. */
@@ -49,21 +51,28 @@ export class MailboxLockService {
           : 0;
       const refusal = mailboxLockRefusal({ closed, blocked, accountLocked, k1RightsOpen });
       if (refusal) throw new OffboardingRefusedError(refusal.code, refusal.details);
-      if (!(await this.write(tx, held, { kind: 'IT_ADMIN', principal: actor, note: input.note ?? null })))
-        throw new OffboardingRefusedError('CONCURRENT_CHANGE');
+      const written = await this.write(tx, held, { kind: 'IT_ADMIN', principal: actor, note: input.note ?? null });
+      if (!written) throw new OffboardingRefusedError('CONCURRENT_CHANGE');
+      await this.closing.closeIfDue(tx, written);
 
-      return (await this.cases.find(held.id, tx)) ?? held;
+      return (await this.cases.find(held.id, tx)) ?? written;
     });
   }
 
   /**
-   * Writes (1b) in the transaction of the caller, which holds the case (the frame, or the listener of the last K1 revocation); false when it
-   * could not be written (written meanwhile, or the case does not take it). The log of the case and the Audit Trail say who.
+   * Writes (1b) in the transaction of the caller, which holds the case (the frame, or the listener of the last K1 revocation), and returns the case
+   * as it is then; null when it could not be written (written meanwhile, or the case does not take it). The log of the case and the Audit Trail
+   * say who.
    */
-  async write(tx: DbTx, held: OffboardingRecord, by: MailboxLockWriter, at: Date = new Date()): Promise<boolean> {
+  async write(
+    tx: DbTx,
+    held: OffboardingRecord,
+    by: MailboxLockWriter,
+    at: Date = new Date(),
+  ): Promise<OffboardingRecord | null> {
     const note = by.kind === 'IT_ADMIN' ? by.note : null;
     const appUserId = by.kind === 'IT_ADMIN' ? by.principal.appUserId : null;
-    if (!(await this.closure.recordMailboxLock(tx, held.id, { appUserId, note, at }))) return false;
+    if (!(await this.closure.recordMailboxLock(tx, held.id, { appUserId, note, at }))) return null;
     await this.cases.insertChange(tx, {
       caseId: held.id,
       kind: 'MAILBOX_LOCKED',
@@ -83,6 +92,6 @@ export class MailboxLockService {
       );
     else await this.audit.systemChanged(tx, held, 'OFFBOARDING_CASE.MAILBOX_LOCK_RECORDED', null, after);
 
-    return true;
+    return (await this.cases.find(held.id, tx)) ?? held;
   }
 }

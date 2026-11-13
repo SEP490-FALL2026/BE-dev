@@ -45,8 +45,7 @@ export class OffboardingDetailService {
         : [],
     );
     const opened = live ? await this.repo.openedAssignmentIds(record.id) : [];
-    const registered = live ? await this.sources.blockersOf(record.employeeId) : {};
-    const facts = departureDetailFacts(record, { live, seats, withoutCompletedTask, terminating, opened, registered });
+    const facts = departureDetailFacts(record, { live, seats, withoutCompletedTask, terminating, opened });
 
     const roles = await this.rolesOf(record, live);
     const [employees, department, warnings] = await this.othersOf(record, live);

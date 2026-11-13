@@ -1,5 +1,5 @@
 import type { K1ChecklistFacts } from '../../licensing/public/licensing.types';
-import type { OffboardingRefusal } from '../offboarding/offboarding.policy';
+import { blockersOf, type BlockerFacts, type OffboardingRefusal } from '../offboarding/offboarding.policy';
 
 /** What the lock of the mailbox for good, item (1b) of `BM-08`, is judged on. */
 export interface MailboxLockFacts {
@@ -45,4 +45,13 @@ export function systemMailboxLockDue(facts: {
   mailboxLocked: boolean;
 }): boolean {
   return facts.ticked && facts.accountLocked && !facts.mailboxLocked;
+}
+
+/**
+ * Whether the system closes the departure now (`QĐ-110e`, `B-1`): the person has left and nothing keeps the case open, which is to say the lock of the
+ * company account (1a) and of the mailbox for good (1b) are written and every personal seat of the person has a completed task of revocation (a task
+ * that failed keeps it open: the IT Admin opens a new one). The responsibilities that are not handed over never keep it (`QĐ-110j`).
+ */
+export function closureDue(facts: BlockerFacts): boolean {
+  return facts.state === 'LEFT' && !facts.closed && Object.keys(blockersOf(facts)).length === 0;
 }

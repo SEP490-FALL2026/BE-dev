@@ -17,7 +17,6 @@ const STATUS: Readonly<Record<string, HttpStatus>> = {
   BLOCK_NOW_LAST_DAY_FIXED: HttpStatus.CONFLICT,
   NO_CHANGE: HttpStatus.UNPROCESSABLE_ENTITY,
   CASE_LEFT: HttpStatus.CONFLICT,
-  CASE_NOT_LEFT: HttpStatus.CONFLICT,
   CASE_NOT_BLOCKED: HttpStatus.CONFLICT,
   CASE_CLOSED: HttpStatus.CONFLICT,
   NOT_HANDING_OVER: HttpStatus.CONFLICT,
@@ -36,7 +35,6 @@ const STATUS: Readonly<Record<string, HttpStatus>> = {
   MAILBOX_LOCK_BEFORE_K1: HttpStatus.CONFLICT,
   ALREADY_RECORDED: HttpStatus.CONFLICT,
   REVOCATION_NOT_SUPPORTED: HttpStatus.CONFLICT,
-  CASE_NOT_CLOSEABLE: HttpStatus.CONFLICT,
   PLACEMENT_OVERLAP: HttpStatus.CONFLICT,
   CONCURRENT_CHANGE: HttpStatus.CONFLICT,
 };
@@ -53,7 +51,6 @@ const MESSAGES: Readonly<Record<string, string>> = {
     'The access of the person was blocked at once: their last working day is the day it was recorded and does not move.',
   NO_CHANGE: 'The last working day is the same.',
   CASE_LEFT: 'The employee has already left; the handover cannot change.',
-  CASE_NOT_LEFT: 'The employee has not left yet.',
   CASE_NOT_BLOCKED: 'The employee is not blocked yet: the last working day has not passed and they have not left.',
   CASE_CLOSED: 'The case is closed.',
   NOT_HANDING_OVER: 'The case is not a handover under way.',
@@ -76,7 +73,6 @@ const MESSAGES: Readonly<Record<string, string>> = {
     'The person still holds a K1 seat whose revocation is not completed: the mailbox is locked for good after the last one.',
   ALREADY_RECORDED: 'The lock of the company account was recorded already.',
   REVOCATION_NOT_SUPPORTED: 'The kind of provisioning of the seat has no revocation yet.',
-  CASE_NOT_CLOSEABLE: 'Something still keeps the case open.',
   PLACEMENT_OVERLAP: 'The placements of the person cannot take this change.',
   CONCURRENT_CHANGE: 'The person was changed by someone else meanwhile; read the case again.',
 };
@@ -123,7 +119,6 @@ export const OFFBOARDING_ERROR_EXAMPLES = {
   BLOCK_NOW_LAST_DAY_FIXED: example(new OffboardingRefusedError('BLOCK_NOW_LAST_DAY_FIXED')),
   NO_CHANGE: example(new OffboardingRefusedError('NO_CHANGE')),
   CASE_LEFT: example(new OffboardingRefusedError('CASE_LEFT')),
-  CASE_NOT_LEFT: example(new OffboardingRefusedError('CASE_NOT_LEFT')),
   CASE_NOT_BLOCKED: example(new OffboardingRefusedError('CASE_NOT_BLOCKED')),
   CASE_CLOSED: example(new OffboardingRefusedError('CASE_CLOSED')),
   NOT_HANDING_OVER: example(new OffboardingRefusedError('NOT_HANDING_OVER')),
@@ -153,11 +148,6 @@ export const OFFBOARDING_ERROR_EXAMPLES = {
     new OffboardingRefusedError('REVOCATION_NOT_SUPPORTED', {
       assignmentId: '<assignment-id>',
       provisioningType: 'K3',
-    }),
-  ),
-  CASE_NOT_CLOSEABLE: example(
-    new OffboardingRefusedError('CASE_NOT_CLOSEABLE', {
-      blockers: ['ACCOUNT_LOCK_NOT_RECORDED', 'PERSONAL_RIGHTS_OPEN'],
     }),
   ),
   // One example per code in a response: the reason a caller has to act on (`D-S28`); `NO_OPEN_PLACEMENT` is in the descriptions.

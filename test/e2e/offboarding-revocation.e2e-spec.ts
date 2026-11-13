@@ -84,12 +84,12 @@ describe('the departure of a person and the revocation of their seats (e2e, D-3)
     });
   });
 
-  it('the IT Admin closes the case', async () => {
-    const closed = h.dataOf<CaseWire>(await h.closeCase(caseId).expect(200));
+  it('the IT Admin records the lock of the mailbox and the system closes the case (QĐ-110e)', async () => {
+    const closed = h.dataOf<CaseWire>(await h.lockMailbox(caseId, {}).expect(200));
 
     expect(closed).toMatchObject({ closed: true, blockers: {} });
     expect(await h.changeKinds(caseId)).toEqual(
-      expect.arrayContaining(['RECORDED', 'MARKED_LEFT', 'REVOCATIONS_OPENED', 'CLOSED']),
+      expect.arrayContaining(['RECORDED', 'MARKED_LEFT', 'REVOCATIONS_OPENED', 'MAILBOX_LOCKED', 'CLOSED_BY_SYSTEM']),
     );
   });
 });

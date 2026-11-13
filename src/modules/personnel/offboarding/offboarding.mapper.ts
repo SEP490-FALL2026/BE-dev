@@ -185,10 +185,13 @@ export function toDetail(
           note: record.mailboxLockNote,
         }
       : null,
-    closure:
-      record.closedAt && record.closedByAppUserId
-        ? { closedAt: record.closedAt.toISOString(), closedByAppUserId: record.closedByAppUserId }
-        : null,
+    closure: record.closedAt
+      ? {
+          closedAt: record.closedAt.toISOString(),
+          closedByAppUserId: record.closedByAppUserId,
+          closedBySystem: record.closedByAppUserId === null,
+        }
+      : null,
     checklist: facts.checklist,
     blockers: facts.blockers,
     warnings: {

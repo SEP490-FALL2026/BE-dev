@@ -1,4 +1,6 @@
 import { Client } from 'pg';
+import request from 'supertest';
+import { DepartureClosureService } from '../../../src/modules/personnel/departure-closure/departure-closure.service';
 import { OffboardingHarness, type CaseWire, type RightWire } from '../../support/offboarding-harness';
 import type { Department, Person } from '../../support/request-harness';
 import { k1Checklist } from '../../support/k1-checklist';
@@ -267,5 +269,179 @@ describe('the end of a departure: the lock of the mailbox and the closing of the
 
       expect(byHand.mailboxLock).toMatchObject({ recordedByAppUserId: h.it1.appUserId, recordedBySystem: false });
     }, 60_000);
+  });
+  describe('the system closes a departure that has left, whose revocations are done and whose mailbox is locked (QĐ-110e, T-MF2G)', () => {
+    const closing = () => h.ctx.app.get(DepartureClosureService);
+    const wireOf = async (id: string) => h.dataOf<CaseWire>(await h.readCase(id).expect(200));
+    /** Takes the task and completes a K2 revocation. */
+    const removeK2 = async (taskId: string) => {
+      await h.claim(taskId).expect(200);
+      await h.revoked(taskId, { completion: 'ACCOUNT_REMOVED', evidence: 'đã xóa tài khoản' }).expect(200);
+    };
+    const taskOf = async (id: string, seat: string) =>
+      (await rightsOf(id)).find((right) => right.assignmentId === seat)?.revocation?.taskId ?? '';
+    const completeK1 = async (taskId: string) => {
+      await h.claim(taskId).expect(200);
+      await h
+        .revoked(taskId, {
+          completion: 'RENEWAL_CANCELLED',
+          evidence: 'đã hủy gia hạn',
+          paidThroughOn: h.day(36),
+          accessState: 'UNTIL_PAID_END',
+          k1Checklist: k1Checklist('DEPARTURE'),
+        })
+        .expect(200);
+    };
+    const closedBy = async (id: string) => {
+      const row = await h.caseRow(id);
+
+      return [row.closed_at !== null, row.closed_by_app_user_id];
+    };
+
+    it('closes when (1b) is the last thing the case waited for: nobody closes it, the answer of the route already says so', async () => {
+      const { seats, wire } = await lockedLeaver([k2]);
+      await h.revokeRights(wire.id, {}).expect(200);
+      await removeK2(await taskOf(wire.id, seats[0]));
+      expect(await wireOf(wire.id)).toMatchObject({ closed: false, blockers: { MAILBOX_LOCK_NOT_RECORDED: 1 } });
+
+      const done = h.dataOf<CaseWire>(await h.lockMailbox(wire.id, MAILBOX).expect(200));
+
+      expect(done).toMatchObject({ closed: true, blockers: {} });
+      expect(done.closure).toMatchObject({ closedByAppUserId: null, closedBySystem: true });
+      expect(await closedBy(wire.id)).toEqual([true, null]);
+      expect(await h.changeKinds(wire.id)).toEqual([
+        'RECORDED',
+        'MARKED_LEFT',
+        'ACCOUNT_LOCK_RECORDED',
+        'REVOCATIONS_OPENED',
+        'MAILBOX_LOCKED',
+        'CLOSED_BY_SYSTEM',
+      ]);
+      const [event] = await h.auditEventsOf('OFFBOARDING_CASE.CLOSED', wire.id);
+      expect(event).toMatchObject({ actor_kind: 'SYSTEM', actor_app_user_id: null });
+      // Closed once: asking for (1b) again answers 200 with the case as it is and writes nothing more.
+      await h.lockMailbox(wire.id, {}).expect(200);
+      expect(await h.auditEventsOf('OFFBOARDING_CASE.CLOSED', wire.id)).toHaveLength(1);
+    });
+
+    it('keeps a person who holds a K1 seat open until the last revocation, whichever the order: the lock ticked there closes it', async () => {
+      const first = await lockedLeaver([k2, k1]);
+      await h.revokeRights(first.wire.id, {}).expect(200);
+      await removeK2(await taskOf(first.wire.id, first.seats[0]));
+      expect(await wireOf(first.wire.id)).toMatchObject({
+        closed: false,
+        mailboxLock: null,
+        blockers: { MAILBOX_LOCK_NOT_RECORDED: 1, PERSONAL_RIGHTS_OPEN: 1 },
+      });
+
+      await completeK1(await taskOf(first.wire.id, first.seats[1]));
+
+      const closed = await wireOf(first.wire.id);
+      expect(closed).toMatchObject({ closed: true, mailboxLock: { recordedBySystem: true } });
+      expect(closed.closure).toMatchObject({ closedByAppUserId: null, closedBySystem: true });
+
+      // The other order: the K1 revocation ticks the lock first, the case waits for the K2 seat, and its completion closes it.
+      const second = await lockedLeaver([k2, k1]);
+      await h.revokeRights(second.wire.id, {}).expect(200);
+      await completeK1(await taskOf(second.wire.id, second.seats[1]));
+      expect(await wireOf(second.wire.id)).toMatchObject({
+        closed: false,
+        mailboxLock: { recordedBySystem: true },
+        blockers: { PERSONAL_RIGHTS_OPEN: 1 },
+      });
+      await removeK2(await taskOf(second.wire.id, second.seats[0]));
+      expect(await wireOf(second.wire.id)).toMatchObject({ closed: true, blockers: {} });
+    });
+
+    it('stays open when the last revocation could not write (1b) because the case was held, and the route writes it and closes', async () => {
+      const { seats, wire } = await lockedLeaver([k1]);
+      await h.revokeRights(wire.id, {}).expect(200);
+      const task = await taskOf(wire.id, seats[0]);
+      await h.claim(task).expect(200);
+      const holder = new Client({ connectionString: h.ctx.database.url });
+      await holder.connect();
+      await holder.query('BEGIN');
+      await holder.query('SELECT id FROM offboarding_cases WHERE id = $1 FOR UPDATE', [wire.id]);
+      try {
+        await h
+          .revoked(task, {
+            completion: 'RENEWAL_CANCELLED',
+            evidence: 'đã hủy gia hạn',
+            paidThroughOn: h.day(36),
+            accessState: 'UNTIL_PAID_END',
+            k1Checklist: k1Checklist('DEPARTURE'),
+          })
+          .expect(200);
+      } finally {
+        await holder.query('ROLLBACK');
+        await holder.end();
+      }
+      // Every task is completed and nothing closed the case: (1b) is missing, and the hourly pass has nothing to close without it.
+      expect(await wireOf(wire.id)).toMatchObject({ closed: false, mailboxLock: null, heldRights: 1 });
+      expect(await closing().sweep()).toMatchObject({ failed: 0 });
+      expect((await h.caseRow(wire.id)).closed_at).toBeNull();
+
+      const done = h.dataOf<CaseWire>(await h.lockMailbox(wire.id, {}).expect(200));
+
+      expect(done).toMatchObject({ closed: true, mailboxLock: { recordedBySystem: false } });
+    }, 60_000);
+
+    it('does not close while a task failed, and a new task done for the same seat closes it', async () => {
+      const { seats, wire } = await lockedLeaver([k2]);
+      await h.revokeRights(wire.id, {}).expect(200);
+      const failed = await taskOf(wire.id, seats[0]);
+      await h.claim(failed).expect(200);
+      await h.fail(failed, { reason: 'Cổng quản trị từ chối xóa tài khoản' }).expect(200);
+
+      const written = h.dataOf<CaseWire>(await h.lockMailbox(wire.id, {}).expect(200));
+
+      expect(written).toMatchObject({ closed: false, mailboxLock: { recordedBySystem: false } });
+      expect(written.blockers).toEqual({ PERSONAL_RIGHTS_OPEN: 1 });
+      expect(await closing().sweep()).toMatchObject({ closed: 0, failed: 0 });
+      // The IT Admin closes the failed task and opens a new one for the seat; its completion is what the case waited for.
+      await h.closeFailed(failed, { reason: 'Mở tác vụ mới' }).expect(200);
+      const reopened = h.dataOf<CaseWire>(await h.revokeRights(wire.id, {}).expect(200));
+      expect(reopened.revocations).toEqual({ created: 1, reasonAdded: 0 });
+      expect(reopened.closed).toBe(false);
+      await removeK2(await taskOf(wire.id, seats[0]));
+      expect(await wireOf(wire.id)).toMatchObject({ closed: true, blockers: {} });
+    });
+
+    it('is closed by the hourly pass when the person is marked as left after (1a), (1b) and the revocations were done, and not before', async () => {
+      const made = await leaver([k2]);
+      const wire = await h.recordedCase(made.person);
+      // The last working day passed two days ago: the block is in force and the person is not yet marked as left.
+      await h.ctx.sql.query(
+        `UPDATE offboarding_cases SET last_working_day = $2::date, departure_effective_on = $3::date WHERE id = $1`,
+        [wire.id, h.day(-2), h.day(-1)],
+      );
+      await h.ctx.sql.query(`UPDATE employee_access_blocks SET blocked_from = $2::date WHERE employee_id = $1`, [
+        made.person.employeeId,
+        h.day(-1),
+      ]);
+      await h.lockAccount(wire.id, LOCK).expect(200);
+      await h.revokeRights(wire.id, {}).expect(200);
+      await removeK2(await taskOf(wire.id, made.seats[0]));
+      const locked = h.dataOf<CaseWire>(await h.lockMailbox(wire.id, {}).expect(200));
+      expect(locked).toMatchObject({ state: 'HANDING_OVER', closed: false });
+      expect(await closing().sweep()).toMatchObject({ closed: 0 });
+
+      await h.markLeft(wire.id).expect(200);
+      expect(await wireOf(wire.id)).toMatchObject({ state: 'LEFT', closed: false, blockers: {} });
+      const pass = await closing().sweep();
+
+      expect(pass).toMatchObject({ failed: 0 });
+      expect(pass.closed).toBeGreaterThanOrEqual(1);
+      expect(await wireOf(wire.id)).toMatchObject({ closed: true });
+      expect(await closedBy(wire.id)).toEqual([true, null]);
+    });
+
+    it('has no route for an IT Admin to close a case any more', async () => {
+      const { wire } = await lockedLeaver();
+
+      const route = await request(h.server()).post(`/api/v1/offboarding-cases/${wire.id}/closure`).set(h.as(h.it1));
+
+      expect(route.status).toBe(404);
+    });
   });
 });

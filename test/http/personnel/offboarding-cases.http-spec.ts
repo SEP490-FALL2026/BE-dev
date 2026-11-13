@@ -58,7 +58,6 @@ const ROUTES: Array<[string, Call]> = [
     'POST /offboarding-cases/{id}/revocations',
     (server) => request(server).post(`/api/v1/offboarding-cases/${ID}/revocations`).send({ count: 1, reason: 'x' }),
   ],
-  ['POST /offboarding-cases/{id}/closure', (server) => request(server).post(`/api/v1/offboarding-cases/${ID}/closure`)],
 ];
 
 /** The roles the guard of each route lets through: the Super Admin writes the events, the IT Admin reads the technical case and takes the steps. */
@@ -76,7 +75,6 @@ const ALLOWED: Record<string, readonly string[]> = {
   'POST /offboarding-cases/{id}/account-lock': ['IT_ADMIN'],
   'POST /offboarding-cases/{id}/mailbox-lock': ['IT_ADMIN'],
   'POST /offboarding-cases/{id}/revocations': ['IT_ADMIN'],
-  'POST /offboarding-cases/{id}/closure': ['IT_ADMIN'],
 };
 
 describe('offboarding case routes (e2e, no database)', () => {

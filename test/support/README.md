@@ -165,11 +165,11 @@ fixture SQL không chứng minh workflow tạo tài khoản. Dùng `bodyOf(respo
   return in `long-leave-return.integration-spec.ts`, what the database refuses, the list with the statement count, the leaving functions
   and `getLeaveIntervals` in `long-leave-integrity.integration-spec.ts`.
 - `support/offboarding-harness.ts`: the seat and revocation harness with what the record of a departure needs: `worker` (a person who joined long ago),
-  the eleven routes (`recordCase`, `readCase`, `listCases`, `rightsOf`, `caseChanges`, `changeLastDay`, `cancelCase`, `markLeft`, `lockAccount`,
-  `revokeRights`, `closeCase`), `body` and `recordedCase` (a departure expected to be recorded), `dueBefore(day)` (a working day before a day,
+  the routes (`recordCase`, `readCase`, `listCases`, `rightsOf`, `caseChanges`, `changeLastDay`, `cancelCase`, `markLeft`, `lockAccount`,
+  `revokeRights`, `lockMailbox`), `body` and `recordedCase` (a departure expected to be recorded), `dueBefore(day)` (a working day before a day,
   no day off), and `caseRow`, `caseCount`, `changeKinds`, `workState`, `employeeLeftOn`, `taskCount` for what the database keeps. The record
   is in `offboarding-record.integration-spec.ts`, moving and cancelling in `offboarding-change.integration-spec.ts`, the departure, the
-  revocations and the closing in `offboarding-departure.integration-spec.ts`, an IT Admin who leaves in `offboarding-self.integration-spec.ts`,
+  revocations and the closing in `offboarding-departure.integration-spec.ts` (the lock of the mailbox and the closing by the system in `departure-closure.integration-spec.ts`), an IT Admin who leaves in `offboarding-self.integration-spec.ts`,
   what the database refuses and the reads with the statement count in `offboarding-integrity.integration-spec.ts`, and the routes without a
   database in `test/http/personnel/offboarding-cases.http-spec.ts`.
 - `support/offboarding-harness.ts` also has the routes of the requests of a person who left: `openRequestsOf`, `openGrantTasksOf` and

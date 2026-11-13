@@ -1,6 +1,5 @@
 import { randomUUID } from 'node:crypto';
 import request from 'supertest';
-import { OffboardingBlockerContributions } from '../../../src/modules/personnel/public/personnel.extension-points';
 import { OffboardingHarness, type CaseWire, type RightWire } from '../../support/offboarding-harness';
 import type { Department, Person } from '../../support/request-harness';
 import { k1Checklist } from '../../support/k1-checklist';
@@ -212,27 +211,21 @@ describe('the departure of a person, the revocations and the closing (integratio
       expect([lockRoute.status, h.codeOf(lockRoute)]).toEqual([409, 'OFFBOARDING_CASE.ALREADY_RECORDED']);
     });
 
-    it('are completed by the IT Admin with no handover step, and then the case closes with its steps done (AC-20, QĐ-62i)', async () => {
+    it('are completed by the IT Admin with no handover step, and the case stays open until the lock of the mailbox is written, then the system closes it (AC-20, QĐ-110e)', async () => {
       const { person } = await leaver();
       const wire = await h.recordedCase(person);
       await h.leaveOnLastDay(wire.id).expect(200);
       const lockedFirst = h.dataOf<CaseWire>(await h.lockAccount(wire.id, LOCK).expect(200));
       expect(lockedFirst.accountLock).toMatchObject({ note: LOCK.note });
-      const blockers = h.ctx.app.get(OffboardingBlockerContributions);
-      let waiting = 1;
-      blockers.add('SERVICE_ACCOUNTS_WITHOUT_ANSWERER', {
-        code: 'SERVICE_ACCOUNTS_WITHOUT_ANSWERER',
-        countFor: () => Promise.resolve(waiting),
-      });
       await h.revokeRights(wire.id, {}).expect(200);
       const held = await rightsOf(wire.id);
       expect(held).toHaveLength(3);
 
-      const early = await h.closeCase(wire.id);
-      expect([early.status, h.codeOf(early)]).toEqual([409, 'OFFBOARDING_CASE.CASE_NOT_CLOSEABLE']);
-      expect(h.detailsOf(early).blockers).toEqual(
-        expect.arrayContaining(['PERSONAL_RIGHTS_OPEN', 'SERVICE_ACCOUNTS_WITHOUT_ANSWERER']),
-      );
+      const early = h.dataOf<CaseWire>(await h.readCase(wire.id).expect(200));
+      expect(early).toMatchObject({
+        closed: false,
+        blockers: { MAILBOX_LOCK_NOT_RECORDED: 1, PERSONAL_RIGHTS_OPEN: 3 },
+      });
       // No tool is held for a handover (QĐ-110g): the IT Admin takes and completes each task at once.
       for (const right of held) {
         const taskId = right.revocation?.taskId ?? '';
@@ -240,36 +233,41 @@ describe('the departure of a person, the revocations and the closing (integratio
         await h.revoked(taskId, { completion: 'ACCOUNT_REMOVED', evidence: 'đã xóa tài khoản' }).expect(200);
       }
       const detail = h.dataOf<CaseWire>(await h.readCase(wire.id).expect(200));
-      expect(detail).toMatchObject({ heldRights: 0, blockers: { SERVICE_ACCOUNTS_WITHOUT_ANSWERER: 1 } });
+      expect(detail).toMatchObject({ heldRights: 0, closed: false, blockers: { MAILBOX_LOCK_NOT_RECORDED: 1 } });
       expect(detail.checklist).toMatchObject({
         dataHandover: { state: 'DONE', pendingDuties: 0 },
         revokeAccess: { state: 'DONE' },
         seatsReleased: { state: 'DONE', opened: 3, released: 3 },
       });
 
-      const blocked = await h.closeCase(wire.id);
-      expect(h.detailsOf(blocked).blockers).toEqual(['SERVICE_ACCOUNTS_WITHOUT_ANSWERER']);
-      waiting = 0;
-      const closed = h.dataOf<CaseWire>(await h.closeCase(wire.id).expect(200));
+      const closed = h.dataOf<CaseWire>(await h.lockMailbox(wire.id, {}).expect(200));
 
       expect(closed).toMatchObject({ closed: true, blockers: {} });
-      expect(closed.closure).not.toBeNull();
-      expect(await h.changeKinds(wire.id)).toContain('CLOSED');
-      expect((await h.auditEventsOf('OFFBOARDING_CASE.CLOSED', wire.id)).length).toBe(1);
-      const twice = await h.closeCase(wire.id);
-      expect([twice.status, h.codeOf(twice)]).toEqual([409, 'OFFBOARDING_CASE.CASE_NOT_CLOSEABLE']);
-      waiting = 0;
+      expect(closed.closure).toMatchObject({ closedByAppUserId: null, closedBySystem: true });
+      expect(await h.changeKinds(wire.id)).toEqual([
+        'RECORDED',
+        'MARKED_LEFT',
+        'ACCOUNT_LOCK_RECORDED',
+        'REVOCATIONS_OPENED',
+        'MAILBOX_LOCKED',
+        'CLOSED_BY_SYSTEM',
+      ]);
+      expect((await h.auditEventsOf('OFFBOARDING_CASE.CLOSED', wire.id)).map((event) => event.actor_kind)).toEqual([
+        'SYSTEM',
+      ]);
     });
 
-    it('never close a case whose account is not recorded as locked, even with no right left', async () => {
+    it('never close a case whose account and mailbox are not recorded as locked, even with no right left', async () => {
       const person = await h.worker(des, code());
       const wire = await h.recordedCase(person);
-      await h.leaveOnLastDay(wire.id).expect(200);
 
-      const response = await h.closeCase(wire.id);
+      const left = h.dataOf<CaseWire>(await h.leaveOnLastDay(wire.id).expect(200));
 
-      expect([response.status, h.codeOf(response)]).toEqual([409, 'OFFBOARDING_CASE.CASE_NOT_CLOSEABLE']);
-      expect(h.detailsOf(response).blockers).toContain('ACCOUNT_LOCK_NOT_RECORDED');
+      expect(left).toMatchObject({
+        closed: false,
+        blockers: { ACCOUNT_LOCK_NOT_RECORDED: 1, MAILBOX_LOCK_NOT_RECORDED: 1 },
+      });
+      expect((await h.caseRow(wire.id)).closed_at).toBeNull();
     });
   });
 
@@ -327,12 +325,13 @@ describe('the departure of a person, the revocations and the closing (integratio
 
       const detail = h.dataOf<CaseWire>(await h.readCase(wire.id).expect(200));
       expect(detail.heldRights).toBe(2);
-      expect(detail.blockers).toEqual({ PERSONAL_RIGHTS_OPEN: 1, ACCESS_RUNS_ON: 1 });
+      // A K1 whose access runs on has its task completed, so it does not keep the case open (QĐ-110e); the seat with no revocation (K3) does.
+      // The last K1 revocation ticked the lock of the mailbox, which the system wrote.
+      expect(detail.blockers).toEqual({ PERSONAL_RIGHTS_OPEN: 1 });
+      expect(detail.mailboxLock).toMatchObject({ recordedBySystem: true });
       expect((await rightsOf(wire.id)).find((right) => right.assignmentId === k1Seat)?.accessRunsOnUntil).toBe(
         h.day(36),
       );
-      const refused = await h.closeCase(wire.id);
-      expect(h.detailsOf(refused).blockers).toEqual(['PERSONAL_RIGHTS_OPEN', 'ACCESS_RUNS_ON']);
       // No seat was handed to anyone: the person holds the seats they held, none moved to another employee.
       const owners = await h.ctx.sql.query(
         `SELECT DISTINCT employee_id FROM license_assignments WHERE id = ANY($1::uuid[])`,

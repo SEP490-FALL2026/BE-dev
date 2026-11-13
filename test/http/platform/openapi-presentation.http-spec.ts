@@ -267,8 +267,8 @@ describe('API inventory (e2e): openapi presentation and wire messages', () => {
         })
         .map((operation) => operation.key);
 
-      // 344 at gói 7; 375 with MF-5 (ghost seats, usage), 381 with K4 withdrawal, the run by hand of G1–G4 and the four routes of the history; 378 with QĐ-111g (five Business Owner routes out, the responsibility transfer and the IT Admin list in); 374 with QĐ-110g (the four routes of the handover out); 375 with the flag of a machine account (P13) and 371 with QĐ-110m (the four routes of the service accounts out); 372 with MF2-G.1 (the lock of the mailbox for good, P28).
-      expect(operations).toHaveLength(372);
+      // 344 at gói 7; 375 with MF-5 (ghost seats, usage), 381 with K4 withdrawal, the run by hand of G1–G4 and the four routes of the history; 378 with QĐ-111g (five Business Owner routes out, the responsibility transfer and the IT Admin list in); 374 with QĐ-110g (the four routes of the handover out); 375 with the flag of a machine account (P13) and 371 with QĐ-110m (the four routes of the service accounts out); 372 with MF2-G.1 (the lock of the mailbox for good, P28) and 371 with MF2-G.3 (the closing route of the IT Admin out, P4: the system closes the case).
+      expect(operations).toHaveLength(371);
       expect(missing).toEqual([]);
     });
 

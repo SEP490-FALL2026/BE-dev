@@ -231,16 +231,6 @@ export class OffboardingRepo {
     return done.count === 1;
   }
 
-  /** Closes the case once; false when it was closed meanwhile. */
-  async close(tx: DbTx, id: string, appUserId: string): Promise<boolean> {
-    const done = await tx.offboardingCase.updateMany({
-      where: { id, state: 'LEFT', closedAt: null },
-      data: { closedAt: new Date(), closedByAppUserId: appUserId },
-    });
-
-    return done.count === 1;
-  }
-
   async insertChange(
     tx: DbTx,
     input: {

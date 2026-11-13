@@ -35,7 +35,7 @@ export interface CaseWire {
     recordedBySystem: boolean;
     note: string | null;
   } | null;
-  closure?: { closedAt: string } | null;
+  closure?: { closedAt: string; closedByAppUserId: string | null; closedBySystem: boolean } | null;
   checklist?: {
     dataHandover: { state: string; pendingDuties: number };
     accountLock: { state: string; urgent: boolean };
@@ -161,8 +161,6 @@ export class OffboardingHarness extends SeatRevocationHarness {
     request(this.server()).post(`/api/v1/offboarding-cases/${id}/mailbox-lock`).set(this.as(account)).send(body);
   revokeRights = (id: string, body: object, account: ApiAccount = this.it1) =>
     request(this.server()).post(`/api/v1/offboarding-cases/${id}/revocations`).set(this.as(account)).send(body);
-  closeCase = (id: string, account: ApiAccount = this.it1) =>
-    request(this.server()).post(`/api/v1/offboarding-cases/${id}/closure`).set(this.as(account));
   openRequestsOf = (id: string, query = '', account: ApiAccount = this.it1) =>
     request(this.server()).get(`/api/v1/offboarding-cases/${id}/open-requests${query}`).set(this.as(account));
   openGrantTasksOf = (id: string, query = '', account: ApiAccount = this.it1) =>

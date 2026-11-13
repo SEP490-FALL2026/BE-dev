@@ -187,9 +187,9 @@ describe('the block of the access from the day after the last working day (integ
       // Nothing is held, so there is nothing to take away: the answer comes from the selection, not from the state of the case.
       const empty = await h.revokeRights(wire.id, {});
       expect([empty.status, h.codeOf(empty)]).toEqual([409, 'OFFBOARDING_CASE.NOTHING_TO_REVOKE']);
-      // Closing still needs the departure: the person has not been marked left.
-      const closed = await h.closeCase(wire.id);
-      expect([closed.status, h.codeOf(closed)]).toEqual([409, 'OFFBOARDING_CASE.CASE_NOT_LEFT']);
+      // The lock of the mailbox is written the same way, but the system closes the case only once the person has been marked left (QĐ-110e).
+      const mailbox = h.dataOf<CaseWire>(await h.lockMailbox(wire.id, {}).expect(200));
+      expect(mailbox).toMatchObject({ state: 'HANDING_OVER', closed: false, mailboxLock: { recordedBySystem: false } });
     });
 
     it('says in the list and in the case whether the person is blocked and from which day', async () => {

@@ -153,10 +153,6 @@ export const ROUTE_ERROR_CODES_PERSONNEL: Readonly<
   offboardingCaseChangeList: {
     '404': ['OFFBOARDING_CASE.NOT_FOUND'],
   },
-  offboardingCaseClose: {
-    '404': ['OFFBOARDING_CASE.NOT_FOUND'],
-    '409': ['OFFBOARDING_CASE.CASE_NOT_CLOSEABLE', 'OFFBOARDING_CASE.CASE_NOT_LEFT'],
-  },
   offboardingCaseGet: {
     '404': ['OFFBOARDING_CASE.NOT_FOUND'],
   },

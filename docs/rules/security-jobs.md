@@ -120,6 +120,16 @@
   `ACCOUNT_LOCK_OVERDUE:<case>`, once for the case, with the audit event `OFFBOARDING_CASE.ACCOUNT_LOCK_OVERDUE`) when a departure blocked now
   has no lock of the company account from the day after it was recorded. It revokes nothing and opens no task. Run one by hand with
   `BlockAnnouncementService.announce(now)` and `AccountLockOverdueService.notice(now)`.
+  The API also runs `DepartureClosureSweeper` once an hour (the first pass five minutes after start, unreferenced timer): for each departure whose
+  person has left, that is not closed and has the lock of the mailbox (1b) written (`offboarding_cases.mailbox_lock_at`), it closes the case when
+  nothing keeps it open (`QĐ-110e`, `B-1`): every personal seat of the person has a completed task of revocation (counted through
+  `LicensingApi.countPersonalSeatsWithoutCompletedTaskOf`) and the lock of the company account (1a) is written. Each case has a transaction of
+  its own that locks the employee, then the case `FOR UPDATE`, reads it again and writes `closed_at` with no account (`closed_by_app_user_id`
+  NULL), the line `CLOSED_BY_SYSTEM` of the log of the case and the audit event `OFFBOARDING_CASE.CLOSED` (actor `SYSTEM`), so a pass on another
+  instance, a pass run again or a command at the same time never both act; a case that fails is logged and tried again at the next pass without
+  stopping the others. The same closing is asked for at the moment a fact that closes the case is written (the last revocation of the person
+  completed, (1b) recorded on the route), so the hourly pass only settles what those did not reach. It revokes nothing and opens no task. Run one by
+  hand with `DepartureClosureService.sweep(now)`.
   The API also runs `SaasIssueSweeper` once an hour (the first pass five minutes after start, unreferenced timer): it closes each resolved
   report of an error in a SaaS right whose last day to reopen (`saas_issues.reopen_until`, fixed when it was resolved from
   `SAAS_ISSUE_REOPEN_WORKING_DAYS`) has passed (state `CLOSED`, a `SYSTEM` entry and the audit event `SAAS_ISSUE.CLOSED`, under the row lock),

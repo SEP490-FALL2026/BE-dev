@@ -65,12 +65,9 @@ export type RoleFlagMap = Record<RoleFlag, boolean>;
 
 /**
  * The code the wire names, under the warnings of a departure, for the roles the person holds that need someone to take over: how many
- * flags there are. A warning and never a blocker. The code the blocker of the workspaces they still own or administer carries is below.
+ * flags there are. A warning and never a blocker (`QĐ-110j`).
  */
 export const OFFBOARDING_ROLE_HOLDER = 'ROLE_HOLDER_NEEDS_REPLACEMENT';
-
-/** The code the wire names for the workspaces of K2 plans the person still owns or administers: it keeps the departure from closing. */
-export const WORKSPACE_OWNER_NOT_TRANSFERRED = 'WORKSPACE_OWNER_NOT_TRANSFERRED';
 
 /** The kinds of basis every personnel operation takes (`BM-04`); the controlled procedure checks its `--basis-type` against the same list. */
 export const GROUNDS_TYPES = ['HR_DECISION', 'APPROVED_APPLICATION', 'WRITTEN_DIRECTIVE'] as const;

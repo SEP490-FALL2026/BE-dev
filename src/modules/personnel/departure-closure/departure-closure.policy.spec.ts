@@ -1,5 +1,6 @@
 import type { K1ChecklistFacts } from '../../licensing/public/licensing.types';
 import {
+  closureDue,
   mailboxLockRefusal,
   mailboxLockedByTask,
   systemMailboxLockDue,
@@ -59,5 +60,27 @@ describe('the lock of the mailbox the last K1 revocation of a person ticks (QĐ-
     expect(systemMailboxLockDue({ ...due, ticked: false })).toBe(false);
     expect(systemMailboxLockDue({ ...due, accountLocked: false })).toBe(false);
     expect(systemMailboxLockDue({ ...due, mailboxLocked: true })).toBe(false);
+  });
+});
+
+describe('when the system closes a departure (QĐ-110e, B-1)', () => {
+  const closable = { state: 'LEFT' as const, closed: false, lockRecorded: true, mailboxLocked: true, openRights: 0 };
+
+  it('closes a person who has left whose company account and mailbox are locked and who holds no seat without a completed revocation', () => {
+    expect(closureDue(closable)).toBe(true);
+  });
+
+  it.each([
+    [
+      'the person has not left (a handover under way, even with both locks written)',
+      { state: 'HANDING_OVER' as const },
+    ],
+    ['the case was cancelled', { state: 'CANCELLED' as const }],
+    ['the case is closed already', { closed: true }],
+    ['the lock of the company account (1a) is not written', { lockRecorded: false }],
+    ['the lock of the mailbox for good (1b) is not written', { mailboxLocked: false }],
+    ['a seat has no task of revocation completed (a task failed or none was opened)', { openRights: 1 }],
+  ])('does not close while %s', (_name, change) => {
+    expect(closureDue({ ...closable, ...change })).toBe(false);
   });
 });

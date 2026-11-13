@@ -9,7 +9,9 @@ import { OperatingParametersModule } from '../operating-parameters/operating-par
 import { OrganizationModule } from '../organization/organization.module';
 import { RequestsModule } from '../requests/requests.module';
 import { DepartmentMemberController } from './department-member/department-member.controller';
+import { DepartureClosureSweeper } from './departure-closure/departure-closure.job';
 import { DepartureClosureRepo } from './departure-closure/departure-closure.repo';
+import { DepartureClosureService } from './departure-closure/departure-closure.service';
 import { MailboxLockRevocationListener } from './departure-closure/mailbox-lock-revocation.listener';
 import { MailboxLockController } from './departure-closure/mailbox-lock.controller';
 import { MailboxLockService } from './departure-closure/mailbox-lock.service';
@@ -70,7 +72,6 @@ import { OpenRequestsSource } from './offboarding/open-requests/open-requests.li
 import { OffboardingService } from './offboarding/offboarding.service';
 import {
   NoticeRecorderContributions,
-  OffboardingBlockerContributions,
   OffboardingWarningContributions,
   PersonnelFileHookContributions,
 } from './public/personnel.extension-points';
@@ -85,7 +86,6 @@ import { RoleDutiesService } from './role-duties/role-duties.service';
 import { RoleDutiesViewService } from './role-duties/role-duties-view.service';
 import { RoleWarningSource } from './role-duties/role-warning.listener';
 import { SuperAdminWatchController } from './role-duties/super-admin-watch.controller';
-import { WorkspaceBlockerSource } from './role-duties/workspace-blocker.listener';
 import { PersonnelApi } from './public/personnel.api';
 import { PersonnelDashboardApi } from './public/personnel-dashboard.api';
 import { PersonnelDashboardFactsRepo } from './dashboard-facts/dashboard-facts.repo';
@@ -129,7 +129,8 @@ import { TransferReviewsController } from './transfer-review/transfer-reviews.co
  * a late return is only told by an hourly sweep, never acted on, and the facade `PersonnelApi` gives the days of leave to the rules
  * that read them. The departure of a person (a handover with the last working day or an abrupt departure, the rights the person
  * holds, the lock of the company account, the revocations the IT Admin asks for and the closing of the case) is kept here as well:
- * nothing is revoked by itself, and the flows that come after add what keeps a case open to `OffboardingBlockerContributions`.
+ * nothing is revoked by itself, the system closes the case when the person has left, every revocation is completed and the lock of the mailbox for good is
+ * written (`departure-closure/`), and the flows that come after add what only shows beside a case to `OffboardingWarningContributions`.
  * The notice a head of department sends about a change coming for one of their people is kept here too: information with no effect, which
  * the IT Admin rejects or verifies and records through the transfer, the long leave or the departure (each adds its own recorder
  * to `NoticeRecorderContributions`), told as late by an hourly sweep and never acted on.
@@ -167,6 +168,8 @@ import { TransferReviewsController } from './transfer-review/transfer-reviews.co
   ],
   providers: [
     DepartureClosureRepo,
+    DepartureClosureService,
+    DepartureClosureSweeper,
     MailboxLockService,
     MailboxLockRevocationListener,
     AccountLockOverdueService,
@@ -217,7 +220,6 @@ import { TransferReviewsController } from './transfer-review/transfer-reviews.co
     LeaveReturnSweeper,
     OffboardingRepo,
     OffboardingListRepo,
-    OffboardingBlockerContributions,
     OffboardingWarningContributions,
     OffboardingSources,
     OffboardingAuditService,
@@ -246,7 +248,6 @@ import { TransferReviewsController } from './transfer-review/transfer-reviews.co
     RoleDutiesHook,
     DeviceRegistrationHook,
     RoleWarningSource,
-    WorkspaceBlockerSource,
     NoticeRepo,
     NoticeRecorderContributions,
     NoticeService,

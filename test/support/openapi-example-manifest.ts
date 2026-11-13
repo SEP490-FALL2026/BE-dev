@@ -241,7 +241,6 @@ export const SUCCESS_MESSAGES: Readonly<Record<string, string>> = {
   offboardingCaseCancel: 'OFFBOARDING_CASE.CANCELLED',
   offboardingCaseChangeLastDay: 'OFFBOARDING_CASE.LAST_DAY_CHANGED',
   offboardingCaseChangeList: 'OFFBOARDING_CASE.CHANGES_LISTED',
-  offboardingCaseClose: 'OFFBOARDING_CASE.CLOSED',
   offboardingCaseGet: 'OFFBOARDING_CASE.RETRIEVED',
   offboardingCaseList: 'OFFBOARDING_CASE.LISTED',
   offboardingCaseMarkLeft: 'OFFBOARDING_CASE.LEFT',

@@ -5,13 +5,11 @@ import { LicensingApi } from '../../licensing/public/licensing.api';
 import { userActor } from '../public/personnel.types';
 import { RevocationRefusedError, AssignmentNotOpenError } from '../../licensing/public/licensing.errors';
 import { OffboardingAuditService } from './offboarding-audit.service';
-import { OffboardingSources } from './offboarding-sources.service';
 import { OffboardingFrame } from './offboarding-frame.service';
 import { OffboardingLeftService } from './offboarding-left.service';
 import { OffboardingRefusedError } from './offboarding.errors';
 import { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
 import {
-  closeRefusal,
   departureRevocationSource,
   isBlocked,
   ownBlock,
@@ -33,12 +31,11 @@ export interface RevocationsOpened {
 export const DEPARTURE_REVOCATION = 'DEPARTURE_REVOCATION';
 
 /**
- * The IT Admin takes the rights of a person who has left away, all at once from the list of the rights the case keeps, and closes the
- * case (`US-03-04` AC-4, AC-5, AC-16, AC-20, `QĐ-62i`, `QĐ-77i`). Nothing is taken away by itself: a task is made for a seat only when
- * the IT Admin asks for it, with the standard reason of a departure and the note they add (the server counts the rights), and
- * after the lock of the company account is written or together with it. Every task goes through the one gate of `licensing`, in one
- * transaction with the case. The case closes only when no personal right is left, the account is locked, and what the flows that come
- * after register is empty.
+ * The IT Admin takes the rights of a person who has left away, all at once from the list of the rights the case keeps (`US-03-04` AC-4,
+ * AC-5, AC-16, `QĐ-62i`, `QĐ-77i`). Nothing is taken away by itself: a task is made for a seat only when the IT Admin asks for it, with the
+ * standard reason of a departure and the note they add (the server counts the rights), and after the lock of the company account is written or
+ * together with it. Every task goes through the one gate of `licensing`, in one transaction with the case. Closing the case is not here: the
+ * system closes it when every revocation is completed and the lock of the mailbox for good is written (`departure-closure/`, `QĐ-110e`).
  */
 @Injectable()
 export class OffboardingRevocationService {
@@ -47,7 +44,6 @@ export class OffboardingRevocationService {
     private readonly repo: OffboardingRepo,
     private readonly licensing: LicensingApi,
     private readonly left: OffboardingLeftService,
-    private readonly sources: OffboardingSources,
     private readonly audit: OffboardingAuditService,
     private readonly identity: IdentityAccessApi,
   ) {}
@@ -105,40 +101,6 @@ export class OffboardingRevocationService {
       });
 
       return { record: (await this.repo.find(held.id, tx)) ?? held, created, reasonAdded };
-    });
-  }
-
-  /** Closes the case when nothing keeps it open (`US-03-04` AC-20). Throws OffboardingRefusedError with the blockers. */
-  close(actor: AuthenticatedPrincipal, id: string): Promise<OffboardingRecord> {
-    return this.frame.runTechnical(actor, id, {}, async (tx, { held, today }) => {
-      const seats = held.state === 'LEFT' ? await this.licensing.listPersonalSeatsOf(held.employeeId, today, tx) : [];
-      const terminating = new Set(
-        held.state === 'LEFT'
-          ? (await this.licensing.listTerminatingAccess([held.employeeId], tx)).map((access) => access.assignmentId)
-          : [],
-      );
-      const refusal = closeRefusal({
-        state: held.state,
-        closed: held.closedAt !== null,
-        lockRecorded: held.accountLockAt !== null,
-        openRights: seats.filter((seat) => !terminating.has(seat.assignmentId)).length,
-        accessRunsOn: seats.filter((seat) => terminating.has(seat.assignmentId)).length,
-        registered: await this.sources.blockersOf(held.employeeId, tx),
-      });
-      if (refusal) throw new OffboardingRefusedError(refusal.code, refusal.details);
-      if (!(await this.repo.close(tx, held.id, actor.appUserId)))
-        throw new OffboardingRefusedError('CONCURRENT_CHANGE');
-      await this.repo.insertChange(tx, {
-        caseId: held.id,
-        kind: 'CLOSED',
-        changedByAppUserId: actor.appUserId,
-        changedByTicketId: null,
-      });
-      await this.audit.changed(tx, userActor(actor), held, 'OFFBOARDING_CASE.CLOSED', null, {
-        employeeId: held.employeeId,
-      });
-
-      return (await this.repo.find(held.id, tx)) ?? held;
     });
   }
 

@@ -12153,7 +12153,7 @@
             }
           },
           "403": {
-            "description": "Only an IT Admin records the lock of the account, takes the rights away or closes a departure (AUTHORIZATION.FORBIDDEN).",
+            "description": "Only an IT Admin records the lock of the account or takes the rights away (AUTHORIZATION.FORBIDDEN).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -12427,7 +12427,7 @@
             }
           },
           "403": {
-            "description": "Only an IT Admin records the lock of the account, takes the rights away or closes a departure (AUTHORIZATION.FORBIDDEN).",
+            "description": "Only an IT Admin records the lock of the account or takes the rights away (AUTHORIZATION.FORBIDDEN).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -12677,214 +12677,6 @@
         },
         "security": [{ "bearer": [] }],
         "summary": "Take the rights of the person away",
-        "tags": ["offboarding-cases"]
-      }
-    },
-    "/api/v1/offboarding-cases/{id}/closure": {
-      "post": {
-        "operationId": "offboardingCaseClose",
-        "parameters": [
-          { "name": "id", "required": true, "in": "path", "schema": { "format": "uuid", "type": "string" } }
-        ],
-        "responses": {
-          "200": {
-            "description": "The case is closed: the company account is recorded as locked and the person holds no personal right any more, and nothing registered by the flows that come after keeps it open.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "allOf": [
-                    { "$ref": "#/components/schemas/OffboardingDetailResponseDto" },
-                    { "properties": { "message": { "example": "OFFBOARDING_CASE.CLOSED" } } }
-                  ]
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Authentication is required or the token is no longer valid.",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "AUTHENTICATION_REQUIRED": {
-                    "summary": "A Bearer access token is required.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "AUTHENTICATION_REQUIRED",
-                        "message": "A Bearer access token is required.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "INVALID_ACCESS_TOKEN": {
-                    "summary": "The access token is invalid.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "INVALID_ACCESS_TOKEN",
-                        "message": "The access token is invalid.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Only an IT Admin records the lock of the account, takes the rights away or closes a departure (AUTHORIZATION.FORBIDDEN).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "AUTHORIZATION.FORBIDDEN": {
-                    "summary": "You do not have permission to perform this action.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "AUTHORIZATION.FORBIDDEN",
-                        "message": "You do not have permission to perform this action.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "The offboarding case does not exist, or an IT Admin reads one of a department they are not in charge of (OFFBOARDING_CASE.NOT_FOUND).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "OFFBOARDING_CASE.NOT_FOUND": {
-                    "summary": "The offboarding case does not exist.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "OFFBOARDING_CASE.NOT_FOUND",
-                        "message": "The offboarding case does not exist.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "The person has not left yet (OFFBOARDING_CASE.CASE_NOT_LEFT), or something keeps the case open (CASE_NOT_CLOSEABLE, with the codes in the details): the lock of the account is not recorded, a personal right is held (also one whose access runs on to the end of the paid period), or a later flow still waits.",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "OFFBOARDING_CASE.CASE_NOT_LEFT": {
-                    "summary": "The employee has not left yet.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "OFFBOARDING_CASE.CASE_NOT_LEFT",
-                        "message": "The employee has not left yet.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "OFFBOARDING_CASE.CASE_NOT_CLOSEABLE": {
-                    "summary": "Something still keeps the case open.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "OFFBOARDING_CASE.CASE_NOT_CLOSEABLE",
-                        "message": "Something still keeps the case open.",
-                        "details": { "blockers": ["ACCOUNT_LOCK_NOT_RECORDED", "PERSONAL_RIGHTS_OPEN"] },
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "The id is not valid (VALIDATION_ERROR).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "VALIDATION_ERROR": {
-                    "summary": "Request validation failed.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "VALIDATION_ERROR",
-                        "message": "Request validation failed.",
-                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "HTTP_TOO_MANY_REQUESTS": {
-                    "summary": "The request could not be processed.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "HTTP_TOO_MANY_REQUESTS",
-                        "message": "The request could not be processed.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "TOKEN_VERIFICATION_UNAVAILABLE": {
-                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
-                        "message": "Authentication is temporarily unavailable. Retry shortly.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "SERVICE_UNAVAILABLE": {
-                    "summary": "The service is temporarily unavailable. Retry shortly.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "SERVICE_UNAVAILABLE",
-                        "message": "The service is temporarily unavailable. Retry shortly.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        },
-        "security": [{ "bearer": [] }],
-        "summary": "Close a departure",
         "tags": ["offboarding-cases"]
       }
     },
@@ -88435,9 +88227,10 @@
                 "type": "object",
                 "properties": {
                   "closedAt": { "type": "string", "format": "date-time" },
-                  "closedByAppUserId": { "type": "string", "format": "uuid" }
+                  "closedByAppUserId": { "type": "string", "format": "uuid", "nullable": true },
+                  "closedBySystem": { "type": "boolean" }
                 },
-                "required": ["closedAt", "closedByAppUserId"],
+                "required": ["closedAt", "closedByAppUserId", "closedBySystem"],
                 "additionalProperties": false,
                 "nullable": true
               },
@@ -89101,9 +88894,10 @@
                 "type": "object",
                 "properties": {
                   "closedAt": { "type": "string", "format": "date-time" },
-                  "closedByAppUserId": { "type": "string", "format": "uuid" }
+                  "closedByAppUserId": { "type": "string", "format": "uuid", "nullable": true },
+                  "closedBySystem": { "type": "boolean" }
                 },
-                "required": ["closedAt", "closedByAppUserId"],
+                "required": ["closedAt", "closedByAppUserId", "closedBySystem"],
                 "additionalProperties": false,
                 "nullable": true
               },
