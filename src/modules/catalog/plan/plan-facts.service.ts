@@ -102,8 +102,8 @@ export class PlanFactsService implements ApplicationPlans {
   }
 
   /** The plans with these ids by name, with their application: for the views that list seats. */
-  summaries(ids: readonly string[]): Promise<PlanSummary[]> {
-    return this.plans.findSummaries(ids);
+  summaries(ids: readonly string[], tx?: DbTx): Promise<PlanSummary[]> {
+    return this.plans.findSummaries(ids, tx);
   }
 
   /** The plans of the other applications of the same functional group (`US-05-04` AC-3): bounded, empty with no group. */

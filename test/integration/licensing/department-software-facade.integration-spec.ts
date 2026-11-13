@@ -148,6 +148,30 @@ describe('the facade that adds software to the list of a department from the lin
     expect(await entries(one.applicationId)).toEqual([]);
   });
 
+  it('sees a plan the caller made in its own transaction, which no other connection sees yet (R1)', async () => {
+    const existing = await place();
+    const planId = randomUUID();
+
+    const result = await run(async (tx) => {
+      // What the link of a request to the catalog does in one transaction: the plan is made, then it is linked and listed.
+      await tx.$executeRawUnsafe(
+        `INSERT INTO plans (id, organization_id, application_id, name, normalized_name, provisioning_type, pricing_model, control_level,
+                            revocation_note, data_loss_on_removal, sharing_policy, has_admin_console)
+         SELECT $2::uuid, organization_id, application_id, $3, $3, provisioning_type, pricing_model, control_level,
+                revocation_note, data_loss_on_removal, sharing_policy, has_admin_console
+           FROM plans WHERE id = $1::uuid`,
+        existing.planId,
+        planId,
+        `made in the transaction ${planId}`,
+      );
+
+      return link(tx, { applicationId: existing.applicationId, planId });
+    });
+
+    expect(result.added).toBe(true);
+    expect((await entries(existing.applicationId)).map((row) => row.plan_id)).toEqual([planId]);
+  });
+
   it('refuses a department that does not exist', async () => {
     const here = await place();
 

@@ -37,7 +37,7 @@ export class DepartmentSoftwareViewService {
     const applicationIds = [...new Set(items.map((item) => item.applicationId))];
     const planIds = [...new Set(items.flatMap((item) => (item.planId === null ? [] : [item.planId])))];
     const applications = await this.catalog.getCollectorApplications(applicationIds, tx);
-    const plans = planIds.length === 0 ? [] : await this.catalog.getPlanSummaries(planIds);
+    const plans = planIds.length === 0 ? [] : await this.catalog.getPlanSummaries(planIds, tx);
 
     return {
       applications: new Map(

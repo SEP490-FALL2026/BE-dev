@@ -88,9 +88,9 @@ export class CatalogApi {
     return this.plans.workspaceDutiesOf(employeeIds, tx);
   }
 
-  /** The plans with these ids by name, with their application, as far as they exist. */
-  getPlanSummaries(ids: readonly string[]): Promise<PlanSummary[]> {
-    return this.onboarding.planSummaries(ids);
+  /** The plans with these ids by name, with their application, as far as they exist; `tx` reads in the caller's transaction, which sees the plans it made. */
+  getPlanSummaries(ids: readonly string[], tx?: DbTx): Promise<PlanSummary[]> {
+    return this.onboarding.planSummaries(ids, tx);
   }
 
   /**
