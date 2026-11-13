@@ -37,14 +37,18 @@ export function mailboxLockedByTask(checklist: K1ChecklistFacts | null): boolean
 
 /**
  * Whether the system writes item (1b) now (`P28`): the last K1 revocation ticked it, (1a) is written (it always is before a departure's
- * revocation is opened, but a revocation another source asked for can end in the same hour) and (1b) was not written already.
+ * revocation is opened, but a revocation another source asked for can end in the same hour), (1b) was not written already, and the person holds
+ * no K1 seat without a completed revocation, which is the very case the route refuses (`mailboxLockRefusal`). The task that ticked the lock is
+ * the last K1 revocation _opened_ (`licensing` counts the revocations alive, D-62), not the last K1 seat: the IT Admin may have opened only some
+ * of the seats, and the mailbox is locked for good after the last seat is taken away (`S17`, D-71).
  */
 export function systemMailboxLockDue(facts: {
   ticked: boolean;
   accountLocked: boolean;
   mailboxLocked: boolean;
+  k1RightsOpen: number;
 }): boolean {
-  return facts.ticked && facts.accountLocked && !facts.mailboxLocked;
+  return facts.ticked && facts.accountLocked && !facts.mailboxLocked && facts.k1RightsOpen === 0;
 }
 
 /**

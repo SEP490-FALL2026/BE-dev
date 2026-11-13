@@ -1,7 +1,7 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { RevocationListeners, type RevocationEvent } from '../../licensing/public/licensing.extension-points';
-import { mailboxLockedByTask, systemMailboxLockDue } from './departure-closure.policy';
+import { mailboxLockedByTask } from './departure-closure.policy';
 import { DepartureClosureRepo } from './departure-closure.repo';
 import { DepartureClosureService } from './departure-closure.service';
 import { MailboxLockService } from './mailbox-lock.service';
@@ -40,13 +40,13 @@ export class MailboxLockRevocationListener implements OnModuleInit {
     if (event.moment !== 'AFTER_WORK' || event.task.status !== 'COMPLETED') return;
     const held = await this.cases.lockOpenOfEmployee(tx, event.task.employeeId);
     if (!held) return;
-    const ticked = mailboxLockedByTask(event.task.completed?.k1Checklist ?? null);
-    const due = systemMailboxLockDue({
-      ticked,
-      accountLocked: held.accountLockAt !== null,
-      mailboxLocked: held.mailboxLockAt !== null,
-    });
-    const current = due ? ((await this.locks.write(tx, held, { kind: 'SYSTEM' }, event.now)) ?? held) : held;
+    // The system writes (1b) only when no K1 seat of the person is left without a completed revocation (D-71).
+    const current = await this.locks.writeForSystemIfDue(
+      tx,
+      held,
+      mailboxLockedByTask(event.task.completed?.k1Checklist ?? null),
+      event.now,
+    );
     // This may be the revocation that was the last thing the case waited for.
     await this.closing.closeIfDue(tx, current, event.now);
   }

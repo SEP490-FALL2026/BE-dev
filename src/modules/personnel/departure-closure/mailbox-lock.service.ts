@@ -3,6 +3,7 @@ import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
 import { LicensingApi } from '../../licensing/public/licensing.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { OffboardingAuditService } from '../offboarding/offboarding-audit.service';
 import { OffboardingFrame } from '../offboarding/offboarding-frame.service';
 import { OffboardingRefusedError } from '../offboarding/offboarding.errors';
@@ -10,7 +11,7 @@ import { isBlocked, ownBlock } from '../offboarding/offboarding.policy';
 import { OffboardingRepo } from '../offboarding/offboarding.repo';
 import type { OffboardingRecord } from '../offboarding/offboarding.types';
 import { userActor } from '../public/personnel.types';
-import { mailboxLockRefusal } from './departure-closure.policy';
+import { mailboxLockRefusal, systemMailboxLockDue } from './departure-closure.policy';
 import { DepartureClosureRepo } from './departure-closure.repo';
 import { DepartureClosureService } from './departure-closure.service';
 
@@ -34,6 +35,7 @@ export class MailboxLockService {
     private readonly licensing: LicensingApi,
     private readonly audit: OffboardingAuditService,
     private readonly closing: DepartureClosureService,
+    private readonly organizationReads: OrganizationReadApi,
   ) {}
 
   /** The IT Admin writes (1b). Throws OffboardingRefusedError and PersonnelAccessRefusedError. */
@@ -57,6 +59,34 @@ export class MailboxLockService {
 
       return (await this.cases.find(held.id, tx)) ?? written;
     });
+  }
+
+  /**
+   * The system writes (1b) for a case the caller holds, when a K1 revocation of the person ticked the lock of the mailbox (`ticked`: the
+   * revocation that just completed, or the checklist it kept) and the case is due for it (`systemMailboxLockDue`): (1a) is written, (1b) is not,
+   * and the person holds no K1 seat without a completed revocation. Returns the case as it is then. The seats are counted only when the cheap
+   * facts say it could be written.
+   */
+  async writeForSystemIfDue(
+    tx: DbTx,
+    held: OffboardingRecord,
+    ticked: boolean,
+    now: Date = new Date(),
+  ): Promise<OffboardingRecord> {
+    const accountLocked = held.accountLockAt !== null;
+    const mailboxLocked = held.mailboxLockAt !== null;
+    const k1RightsOpen =
+      ticked && accountLocked && !mailboxLocked
+        ? await this.licensing.countPersonalSeatsOfKindWithoutCompletedTask(
+            held.employeeId,
+            'K1',
+            await this.organizationReads.businessToday(now, tx),
+            tx,
+          )
+        : 0;
+    if (!systemMailboxLockDue({ ticked, accountLocked, mailboxLocked, k1RightsOpen })) return held;
+
+    return (await this.write(tx, held, { kind: 'SYSTEM' }, now)) ?? held;
   }
 
   /**

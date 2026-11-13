@@ -241,6 +241,32 @@ describe('the end of a departure: the lock of the mailbox and the closing of the
       });
     });
 
+    it('does not write it while a K1 seat of the person has no completed revocation, although the task that ticked the lock was the last one opened (D-71)', async () => {
+      const other = await h.subscription(60, 'K1');
+      const { seats, wire } = await lockedLeaver([k1, other]);
+      // The IT Admin opens the revocation of one of the two K1 seats only: its task is the last live K1 revocation, so it carries the lock step.
+      await h.revokeRights(wire.id, { assignmentIds: [seats[0]] }).expect(200);
+      const first =
+        (await rightsOf(wire.id)).find((right) => right.assignmentId === seats[0])?.revocation?.taskId ?? '';
+
+      await completeK1(first);
+
+      expect((await h.caseRow(wire.id)).mailbox_lock_at).toBeNull();
+      const route = await h.lockMailbox(wire.id);
+      expect(refused(route)).toEqual([409, 'OFFBOARDING_CASE.MAILBOX_LOCK_BEFORE_K1']);
+      expect(h.detailsOf(route)).toMatchObject({ k1RightsOpen: 1 });
+      expect(await h.changeKinds(wire.id)).not.toContain('MAILBOX_LOCKED');
+
+      // The other seat is taken away too: now nothing of the person is left on K1, and the system writes it.
+      await h.revokeRights(wire.id, {}).expect(200);
+      const second =
+        (await rightsOf(wire.id)).find((right) => right.assignmentId === seats[1])?.revocation?.taskId ?? '';
+      await completeK1(second);
+      expect(h.dataOf<CaseWire>(await h.readCase(wire.id).expect(200)).mailboxLock).toMatchObject({
+        recordedBySystem: true,
+      });
+    });
+
     it('does not wait for a case another command holds: the revocation is completed, (1b) is not lost and the IT Admin writes it', async () => {
       const { seats, wire } = await lockedLeaver([k1]);
       const [task] = await openedTasks(wire.id, seats);

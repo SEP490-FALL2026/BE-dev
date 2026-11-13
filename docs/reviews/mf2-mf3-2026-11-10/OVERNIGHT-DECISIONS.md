@@ -543,6 +543,15 @@ Không sửa code; SPEC không bị sửa trong lượt này (spec là của Own
 - **Đổi lại:** muốn chỉ mục chỉ có hồ sơ mở: cần câu đọc dùng hằng enum (B) rồi mới thêm `state` lại vào vị từ.
 - **Chạm:** `prisma/migrations/20261113001700_personnel_open_cases_index_predicate/`, test `departure-revocation-deadline.integration-spec.ts`; D-52 vẫn đúng về lý do chọn chỉ mục `(id)` theo `id` nhưng vị từ của nó nay là D-70.
 
+### D-71 · MF2-G review R1 (Required) · Hệ thống tự ghi (1b) chỉ khi người đó không còn ghế `K1` nào chưa có tác vụ thu hồi `COMPLETED`
+
+- **Lỗi review:** D-66 cho listener tự ghi (1b) khi tác vụ thu hồi `K1` vừa hoàn tất tick `MAILBOX_LOCKED`. Nhưng tác vụ "cuối" của K1-CL (D-62) là tác vụ `K1` **sống** cuối cùng của người đó, không phải ghế `K1` cuối cùng: P28 (D-65) cho IT mở thu hồi một phần ghế (`assignmentIds`). Người có 2 ghế `K1`, IT mở tác vụ cho 1 ghế ⟹ tác vụ đó là "cuối", có bước 6, IT tick ⟹ hệ thống ghi (1b) trong khi ghế kia chưa thu hồi — đúng ca route P28 trả 409 `MAILBOX_LOCK_BEFORE_K1`, trái S17 và R-1.
+- **Phương án:** A. sửa K1-CL để "cuối" đếm cả ghế `K1` chưa mở tác vụ (đổi hợp đồng FE: thẻ tác vụ và 422 của hoàn tất đổi theo số ghế, thẻ phải biết ghế chưa mở). B. **listener kiểm lại bằng đúng định nghĩa "người có K1" của P28** (`LicensingApi.countPersonalSeatsOfKindWithoutCompletedTask(…, 'K1')` bằng 0, đếm trong transaction của hoàn tất nên tác vụ vừa xong đã tính). **ĐÃ CHỌN B**: một định nghĩa duy nhất cho route và cho hệ thống (policy `systemMailboxLockDue` nhận `k1RightsOpen`), không đổi hợp đồng K1-CL. Hệ quả chấp nhận: tác vụ `K1` đầu có bước 6 (vì lúc đó nó là tác vụ sống cuối) nhưng bước đó không khóa gì; khi IT mở và hoàn tất ghế còn lại (tác vụ cuối thật) và tick lần nữa thì hệ thống ghi (1b). `checklist` đã lưu của tác vụ đầu vẫn ghi `MAILBOX_LOCKED` đã tick (bằng chứng IT khai); (1b) chỉ ghi khi hết ghế (D-72 dùng cùng điều kiện cho lượt quét).
+- **Hiện thực:** `MailboxLockService.writeForSystemIfDue(tx, held, ticked, now)` (đếm ghế chỉ khi các điều kiện rẻ đã đúng), dùng ở listener; policy `systemMailboxLockDue` thêm `k1RightsOpen`.
+- **Test:** spec policy (đỏ trước); integration `departure-closure` +1 ca (2 ghế `K1`, mở thu hồi cho 1 ghế, hoàn tất có tick ⟹ không ghi (1b), P28 vẫn 409 `k1RightsOpen = 1`, không dòng nhật ký `MAILBOX_LOCKED`; mở nốt ghế kia và hoàn tất ⟹ hệ thống ghi). Kiểm đột biến: bỏ `k1RightsOpen === 0` ⟹ ca mới đỏ.
+- **Đổi lại:** muốn như D-66: bỏ `k1RightsOpen` khỏi `systemMailboxLockDue` (và (1b) có thể ghi khi còn ghế `K1`, trái P28).
+- **Chạm:** `departure-closure/{departure-closure.policy(+spec),mailbox-lock.service,mailbox-lock-revocation.listener}.ts`, README module `personnel`; test `departure-closure.integration-spec.ts`.
+
 ## Bị chặn
 
 (chưa có)

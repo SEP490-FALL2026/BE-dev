@@ -53,13 +53,15 @@ describe('the lock of the mailbox the last K1 revocation of a person ticks (QĐ-
     expect(mailboxLockedByTask(checklist)).toBe(ticked);
   });
 
-  it('is due for the system only when it is ticked, the company account (1a) is locked and (1b) is not written yet', () => {
-    const due = { ticked: true, accountLocked: true, mailboxLocked: false };
+  it('is due for the system only when it is ticked, (1a) is written, (1b) is not written yet and the person holds no K1 seat without a completed revocation', () => {
+    const due = { ticked: true, accountLocked: true, mailboxLocked: false, k1RightsOpen: 0 };
 
     expect(systemMailboxLockDue(due)).toBe(true);
     expect(systemMailboxLockDue({ ...due, ticked: false })).toBe(false);
     expect(systemMailboxLockDue({ ...due, accountLocked: false })).toBe(false);
     expect(systemMailboxLockDue({ ...due, mailboxLocked: true })).toBe(false);
+    // The task that ticked it was the last one opened, but another K1 seat of the person has no completed revocation: the same case P28 refuses.
+    expect(systemMailboxLockDue({ ...due, k1RightsOpen: 1 })).toBe(false);
   });
 });
 

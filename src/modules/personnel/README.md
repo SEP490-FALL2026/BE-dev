@@ -108,7 +108,7 @@ anh em `event-notice` để báo, nên `event-notice` không được import l�
   `POST /offboarding-cases/{id}/mailbox-lock` (`mailbox-lock.controller.ts`, IT Admin, `{ note? }`) → `MailboxLockService` (khung `OffboardingFrame`;
   `departure-closure.policy.ts`: `mailboxLockRefusal` — hồ sơ đóng, chưa chặn, chưa có (1a) ⟹ 409 `ACCOUNT_LOCK_FIRST`, còn ghế `K1` chưa có tác vụ thu hồi
   `COMPLETED` ⟹ 409 `MAILBOX_LOCK_BEFORE_K1`; ghi lần hai 200 không đổi). `MailboxLockRevocationListener` gắn `RevocationListeners` (`AFTER_WORK`, tác vụ
-  `COMPLETED`): tác vụ thu hồi `K1` cuối của người nghỉ tick `MAILBOX_LOCKED` ⟹ hệ thống tự ghi (1b) (actor `SYSTEM`, không tài khoản), khóa hồ sơ bằng
+  `COMPLETED`): tác vụ thu hồi `K1` cuối của người nghỉ tick `MAILBOX_LOCKED` **và người đó không còn ghế `K1` nào chưa có tác vụ thu hồi `COMPLETED`** (cùng định nghĩa với P28, D-71) ⟹ hệ thống tự ghi (1b) (actor `SYSTEM`, không tài khoản), khóa hồ sơ bằng
   `FOR UPDATE SKIP LOCKED` (không chờ, D-66). `DepartureClosureService.closeIfDue` đóng hồ sơ khi đã `LEFT`, mọi ghế cá nhân có tác vụ thu hồi `COMPLETED`
   (`LicensingApi.countPersonalSeatsWithoutCompletedTaskOf`) và có (1a) + (1b) (`closureDue` ở `departure-closure.policy.ts`, cùng `blockersOf` của
   `offboarding.policy.ts` mà chi tiết hồ sơ hiện trong `blockers`): dòng nhật ký `CLOSED_BY_SYSTEM`, audit `OFFBOARDING_CASE.CLOSED` (SYSTEM),
