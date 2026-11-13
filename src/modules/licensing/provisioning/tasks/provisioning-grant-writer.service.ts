@@ -62,14 +62,13 @@ export class ProvisioningGrantWriter {
     const target = await this.lockTarget(tx, plan, subscriptionId);
     // R-49: the right the request replaces ends the day of the grant, before the seats are counted and the new right is written.
     const replaced = await this.endReplacedRight(tx, actor, claimed, target, input.requestId, today, organization.id);
-    // Judged under the locks of the grant, so the count of the free seats cannot change before the seat is written (`BR-MF1-09a`).
-    const { decision: purchase, stock } = await this.sharedPool.judgePurchase(tx, {
-      planId: plan.planId,
-      provisioningType: plan.provisioningType,
+    const purchase = await this.reserveSeat(tx, actor, {
+      plan,
+      target,
+      requested: input.purchase,
       today,
-      purchase: input.purchase,
+      carriesOn: replaced !== null,
     });
-    await this.takeSeat(tx, actor, { plan, target, purchased: purchase.purchased, stock });
     const holder = await this.holderOf(tx, actor, { input, answer, claimed, serviceIdentifier, today });
     const assignment = await this.assignments.createFromRequest(tx, actor, {
       organizationId: organization.id,
@@ -82,7 +81,7 @@ export class ProvisioningGrantWriter {
       replacesAssignmentId: replaced,
     });
 
-    const bought = grantPurchaseOf(plan.provisioningType, purchase, new Date());
+    const bought = grantPurchaseOf(plan.provisioningType, purchase, new Date(), replaced !== null);
     const task = await this.repo.insert(tx, {
       organizationId: organization.id,
       assignmentId: assignment.id,
@@ -109,6 +108,33 @@ export class ProvisioningGrantWriter {
     if (holder.selfExecuted === true) await this.frame.tellSuperAdmin(tx, organization.id, task.id, actor.employeeId);
 
     return task;
+  }
+
+  /**
+   * Judged under the locks of the grant, so the count of the free seats cannot change before the seat is written (`BR-MF1-09a`): whether the grant buys
+   * a seat, and the seat made room for. A grant that carries on a right it replaced (R-49) buys none. Returns the decision about the purchase.
+   */
+  private async reserveSeat(
+    tx: DbTx,
+    actor: AuthenticatedPrincipal,
+    facts: {
+      plan: SeatTarget;
+      target: SeatTarget;
+      requested: GrantInput['purchase'];
+      today: string;
+      carriesOn: boolean;
+    },
+  ) {
+    const { plan, target, today, carriesOn } = facts;
+    const { decision, stock } = await this.sharedPool.judgePurchase(tx, {
+      planId: plan.planId,
+      provisioningType: plan.provisioningType,
+      today,
+      purchase: facts.requested,
+    });
+    await this.takeSeat(tx, actor, { plan, target, purchased: decision.purchased, stock, carriesOn });
+
+    return decision;
   }
 
   /**
@@ -187,11 +213,12 @@ export class ProvisioningGrantWriter {
   private async takeSeat(
     tx: DbTx,
     actor: AuthenticatedPrincipal,
-    facts: { plan: SeatTarget; target: SeatTarget; purchased: boolean; stock: PoolStock | null },
+    facts: { plan: SeatTarget; target: SeatTarget; purchased: boolean; stock: PoolStock | null; carriesOn: boolean },
   ): Promise<void> {
-    const { plan, target, purchased, stock } = facts;
+    const { plan, target, purchased, stock, carriesOn } = facts;
     if (target.subscriptionId === null) return;
-    if (plan.provisioningType === 'K1' || purchased) {
+    // A K1 grant that carries on a right it replaced (R-49) buys no seat: the one the old right held at the vendor is the seat of the new one.
+    if ((plan.provisioningType === 'K1' && !carriesOn) || purchased) {
       await this.catalog.addPoolSeat(tx, actor, target.subscriptionId);
 
       return;

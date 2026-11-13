@@ -8,13 +8,16 @@ export interface GrantPurchase {
 /**
  * What the grant bought (`BR-MF1-09b`, `BR-MF1-09d`): every K1 grant buys the seat of its holder (the quantity rises by one), so it
  * records `K1_SUBSCRIPTION` whether or not the IT Admin said so; a K2 or K4 grant records the purchase the pool allowed; one that took
- * its seat from the pool records none.
+ * its seat from the pool records none. A grant that carries on a right it replaced (R-49) buys nothing, K1 included: the seat the old right held at the
+ * vendor is the seat of the new one, so the quantity of the subscription does not rise.
  */
 export function grantPurchaseOf(
   provisioningType: string,
   decision: { purchased: false } | { purchased: true; kind: 'POOL_TOP_UP' | 'KEY_PURCHASE'; reason: string | null },
   now: Date,
+  carriesOnRight = false,
 ): GrantPurchase | null {
+  if (carriesOnRight) return null;
   if (provisioningType === 'K1') return { kind: 'K1_SUBSCRIPTION', reason: null, purchasedAt: now };
   if (!decision.purchased) return null;
 

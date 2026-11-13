@@ -175,6 +175,48 @@ describe('asking again on the same subscription in the grace of a transfer (inte
     expect(await revokeTasksOf(newSeat)).toEqual([]);
   }, 300_000);
 
+  it('R-49 on a K1 right: the seat of the old right is carried on — one seat for the person, the quantity of the subscription and the purchase of the grant do not rise', async () => {
+    counter += 1;
+    const u = await h.departmentWithHead(`P-RG${counter}`);
+    const dest = await h.departmentWithHead(`P-RG${counter}-DEST`);
+    await h.budgetFor(dest, { total: 500 * M });
+    await h.setItAdminInCharge(dest.department, { employeeId: it2.employeeId, account: it2 });
+    const code = `RG-E${counter}`;
+    const person = await h.worker(u.department, code);
+    const mailbox = await h.subscription(40, 'K1');
+    const mailboxPlan = await h.planOf(mailbox);
+    const oldSeat = await h.seatOf(person, { subscriptionId: mailbox }, code);
+    const wire = await h.moveToday(person, dest.department);
+    await shifted(wire.id);
+    const quantity = async (): Promise<number> =>
+      (
+        await h.ctx.sql.query<{ q: number }>('SELECT purchased_quantity AS q FROM subscriptions WHERE id = $1', [
+          mailbox,
+        ])
+      ).rows[0].q;
+    const before = await quantity();
+    const requestId = await approvedAgain(person, dest, mailboxPlan);
+
+    const granted = await h.grant({ requestId, subscriptionId: mailbox }).expect(201);
+
+    const taskId = h.dataOf<{ task: { id: string } }>(granted).task.id;
+    const newSeat = await seatOfTask(taskId);
+    expect(await seatRow(oldSeat)).toMatchObject({ valid_until: h.today() });
+    expect(await seatRow(newSeat)).toMatchObject({ replaces: oldSeat });
+    expect(await quantity()).toBe(before);
+    const purchase = await h.ctx.sql.query<{ purchase_kind: string | null }>(
+      'SELECT purchase_kind::text AS purchase_kind FROM provisioning_tasks WHERE id = $1',
+      [taskId],
+    );
+    expect(purchase.rows[0].purchase_kind).toBeNull();
+    const held = await h.ctx.sql.query(
+      `SELECT 1 FROM license_assignments WHERE subscription_id = $1 AND employee_id = $2 AND failed_at IS NULL AND cancelled_at IS NULL
+          AND valid_from <= CURRENT_DATE AND (valid_until IS NULL OR valid_until > CURRENT_DATE)`,
+      [mailbox, person.employeeId],
+    );
+    expect(held.rowCount).toBe(1);
+  }, 300_000);
+
   it('a right given again the very day of the transfer is the new department’s: the grace does not take it back', async () => {
     const { dest, person, canvaSeat, figmaSeat } = await example();
     const wire = await h.moveToday(person, dest.department);

@@ -750,6 +750,14 @@ Không sửa code; SPEC không bị sửa trong lượt này (spec là của Own
 - **Test.** `transfer-sweep.policy.spec` (ca ảnh chụp: quyền cấp sau ảnh cùng ngày không phải quyền cũ), `transfer-grace-sweep` (quyền cấp sau khi chuyển với ngày bắt đầu lùi vẫn không bị thu hồi — thay ca dịch `valid_from` bằng SQL), `transfer-grace-regrant` (cấp lại đúng ngày hiệu lực ⟹ sweeper chỉ thu hồi Figma). Đột biến `pictureIds` luôn `null` ⟹ đỏ 2 ca.
 - **Chạm:** `personnel/transfer-grace/{transfer-sweep.policy(.spec),transfer-closure.service,transfer-revocation.service,transfer-telling.service}.ts`, hai file integration nói trên.
 
+### D-93 · MF3-C-R2 (review MF3-C, Critical) · Cấp lại K1 trong ân hạn không mua thêm ghế
+
+- **Lỗi.** D-91 câu 5 ghi nhận "K1 cấp lại mua thêm một ghế" như hệ quả chấp nhận được. Sai: SPEC S5 và R-49 đòi **đúng một seat** sau cấp lại. `grantPurchaseOf` luôn ghi `K1_SUBSCRIPTION` cho K1 và `takeSeat` luôn `addPoolSeat` (số lượng thuê bao +1, dấu "đã mua" cho hóa đơn SBF-19 tính cho phòng mới) trong khi quyền cũ chỉ kết thúc ở sổ — ở nhà cung cấp vẫn là một ghế. Hệ quả: thuê bao K1 phình một ghế và phòng mới bị tính một khoản mua không có thật.
+- **Phương án.** (A) giữ và ghi chú (đã bỏ); (B) lần cấp thay quyền cũ (`replaced !== null`) **không mua gì**: `takeSeat` bỏ `addPoolSeat` cho K1 và `grantPurchaseOf(…, carriesOnRight = true)` trả `null` (không `purchase_kind`). **ĐÃ CHỌN B.** K2/K4: quyền cũ đã kết thúc trước khi đếm kho nên ghế trống có sẵn và `judgePurchase` không đòi mua; nếu IT cố gửi `purchase` khi còn trống vẫn 409 `PURCHASE_NOT_ALLOWED` như cũ.
+- **Test.** `provisioning-grant.policy.spec` (`carriesOnRight` ⟹ `null` cả K1, K2), `transfer-grace-regrant` ca K1 (số lượng thuê bao không đổi, `purchase_kind` null, đúng một dòng ghế còn hiệu lực của người đó). Đột biến `carriesOn` luôn `false` ⟹ đỏ (quantity 41).
+- **Thay D-91 câu 5.** Câu "Quyền K1 cấp lại: … mua thêm một ghế (ghi nhận, không đổi)" **hết hiệu lực**, thay bằng quyết định trên.
+- **Chạm:** `licensing/provisioning/tasks/{provisioning-grant.policy(.spec),provisioning-grant-writer.service}.ts` (tách `reserveSeat` để `write` ≤ 60 dòng), `test/integration/personnel/transfer-grace-regrant.integration-spec.ts`.
+
 ## Bị chặn
 
 (chưa có)

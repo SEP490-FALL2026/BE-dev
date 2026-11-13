@@ -52,6 +52,11 @@ describe('G9-04 what a grant records as bought (BR-MF1-09b, BR-MF1-09d)', () => 
     });
   });
 
+  it('R-49: records nothing for a grant that carries on a right it replaced, K1 included: the seat of the old right is the seat of the new one', () => {
+    expect(grantPurchaseOf('K1', { purchased: false }, now, true)).toBeNull();
+    expect(grantPurchaseOf('K2', { purchased: false }, now, true)).toBeNull();
+  });
+
   it('records the purchase the pool allowed for K2 or K4, and none for a seat taken from the pool', () => {
     expect(grantPurchaseOf('K2', { purchased: true, kind: 'POOL_TOP_UP', reason: 'why' }, now)).toEqual({
       kind: 'POOL_TOP_UP',
