@@ -24,6 +24,7 @@ import {
   liveIdsByPlan,
   liveSiblingsOf,
 } from './subscription-pool.policy';
+import { SubscriptionSeatIncreaseService } from '../seat-increase/subscription-seat-increase.service';
 import { stateOf } from '../subscription.mapper';
 import { SubscriptionRepo } from '../subscription.repo';
 import type {
@@ -67,6 +68,7 @@ export class SubscriptionPoolService {
     private readonly baselinePhase: SeatBaselinePhaseHook,
     private readonly applications: ApplicationFactsService,
     private readonly planFacts: PlanFactsService,
+    private readonly seatIncrease: SubscriptionSeatIncreaseService,
   ) {}
 
   /**
@@ -207,7 +209,12 @@ export class SubscriptionPoolService {
    * audit event. No gate of a Cost Center is asked: the request that takes the seat is charged to the department of its beneficiary
    * (`QĐ-103d`(2)). Throws PoolSeatNotAddableError.
    */
-  async addSeat(tx: DbTx, actor: AuthenticatedPrincipal, subscriptionId: string): Promise<number> {
+  async addSeat(
+    tx: DbTx,
+    actor: AuthenticatedPrincipal,
+    subscriptionId: string,
+    requestId: string | null = null,
+  ): Promise<number> {
     const current = await this.subscriptions.find(subscriptionId, tx);
     if (!current) throw new PoolSeatNotAddableError('NOT_FOUND');
     if (current.status !== 'ACTIVE') throw new PoolSeatNotAddableError('NOT_ACTIVE');
@@ -228,6 +235,17 @@ export class SubscriptionPoolService {
         { purchasedQuantity: next, cause: 'SEAT_BOUGHT_WITH_GRANT' },
       ),
     );
+    // The IT Admin who answers for a K2 or K4 pool is told of the seat bought for a request (`QĐ-110v`); a K1 purchase tells nobody (`S-4`).
+    await this.seatIncrease.told(tx, {
+      organizationId: organization.id,
+      subscriptionId: current.id,
+      planProvisioningType: current.planProvisioningType,
+      responsibleItAdminEmployeeId: current.responsibleItAdminEmployeeId,
+      from: current.purchasedQuantity,
+      to: next,
+      requestId,
+      actor,
+    });
 
     return next;
   }

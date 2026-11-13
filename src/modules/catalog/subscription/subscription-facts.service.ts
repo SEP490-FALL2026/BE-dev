@@ -20,9 +20,14 @@ export class SubscriptionFactsService {
     private readonly pricing: SubscriptionPriceService,
   ) {}
 
-  /** Buys one more seat on a subscription the caller holds locked (see `CatalogApi.addPoolSeat`). Throws PoolSeatNotAddableError. */
-  addSeat(tx: DbTx, actor: AuthenticatedPrincipal, subscriptionId: string): Promise<number> {
-    return this.pool.addSeat(tx, actor, subscriptionId);
+  /** Buys one more seat on a subscription the caller holds locked, for the request that asks for it when there is one (see `CatalogApi.addPoolSeat`). Throws PoolSeatNotAddableError. */
+  addSeat(
+    tx: DbTx,
+    actor: AuthenticatedPrincipal,
+    subscriptionId: string,
+    requestId: string | null = null,
+  ): Promise<number> {
+    return this.pool.addSeat(tx, actor, subscriptionId, requestId);
   }
 
   /** Every active subscription of the company, for the baseline of the budget: one statement. */

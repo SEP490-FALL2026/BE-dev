@@ -5,6 +5,7 @@ import { ObjectStorageModule } from '../../infrastructure/object-storage/object-
 import { AuditModule } from '../audit/audit.module';
 import { FinanceModule } from '../finance/finance.module';
 import { IdentityAccessFacadeModule } from '../identity-access/identity-access-facade.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 import { OperatingParametersModule } from '../operating-parameters/operating-parameters.module';
 import { OrganizationModule } from '../organization/organization.module';
 import { CatalogApi } from './public/catalog.api';
@@ -56,6 +57,7 @@ import { SubscriptionFactsService } from './subscription/subscription-facts.serv
 import { SubscriptionNoticeService } from './subscription/subscription-notice.service';
 import { SubscriptionPeriodService } from './subscription/subscription-period.service';
 import { SubscriptionPeriodApi } from './public/subscription-period.api';
+import { SubscriptionSeatIncreaseService } from './subscription/seat-increase/subscription-seat-increase.service';
 import { SubscriptionObligationService } from './subscription/obligation/subscription-obligation.service';
 import { SubscriptionGrantingRepo } from './subscription/subscription-granting.repo';
 import { SubscriptionChangeGuard } from './subscription/subscription-change-guard.service';
@@ -96,6 +98,7 @@ import { VendorRepo } from './vendor/vendor.repo';
     IdentityAccessFacadeModule,
     FinanceModule,
     OperatingParametersModule,
+    NotificationsModule,
     ObjectStorageModule,
   ],
   controllers: [
@@ -152,6 +155,7 @@ import { VendorRepo } from './vendor/vendor.repo';
     SubscriptionChangeService,
     SubscriptionService,
     SubscriptionPoolService,
+    SubscriptionSeatIncreaseService,
     SubscriptionPricingService,
     SubscriptionObligationService,
     SubscriptionDepartmentUseReader,

@@ -68,6 +68,7 @@ export class ProvisioningGrantWriter {
       requested: input.purchase,
       today,
       carriesOn: replaced !== null,
+      requestId: input.requestId,
     });
     const holder = await this.holderOf(tx, actor, { input, answer, claimed, serviceIdentifier, today });
     const assignment = await this.assignments.createFromRequest(tx, actor, {
@@ -123,6 +124,7 @@ export class ProvisioningGrantWriter {
       requested: GrantInput['purchase'];
       today: string;
       carriesOn: boolean;
+      requestId: string;
     },
   ) {
     const { plan, target, today, carriesOn } = facts;
@@ -132,7 +134,14 @@ export class ProvisioningGrantWriter {
       today,
       purchase: facts.requested,
     });
-    await this.takeSeat(tx, actor, { plan, target, purchased: decision.purchased, stock, carriesOn });
+    await this.takeSeat(tx, actor, {
+      plan,
+      target,
+      purchased: decision.purchased,
+      stock,
+      carriesOn,
+      requestId: facts.requestId,
+    });
 
     return decision;
   }
@@ -224,13 +233,20 @@ export class ProvisioningGrantWriter {
   private async takeSeat(
     tx: DbTx,
     actor: AuthenticatedPrincipal,
-    facts: { plan: SeatTarget; target: SeatTarget; purchased: boolean; stock: PoolStock | null; carriesOn: boolean },
+    facts: {
+      plan: SeatTarget;
+      target: SeatTarget;
+      purchased: boolean;
+      stock: PoolStock | null;
+      carriesOn: boolean;
+      requestId: string;
+    },
   ): Promise<void> {
     const { plan, target, purchased, stock, carriesOn } = facts;
     if (target.subscriptionId === null) return;
     // A K1 grant that carries on a right it replaced (R-49) buys no seat: the one the old right held at the vendor is the seat of the new one.
     if ((plan.provisioningType === 'K1' && !carriesOn) || purchased) {
-      await this.catalog.addPoolSeat(tx, actor, target.subscriptionId);
+      await this.catalog.addPoolSeat(tx, actor, target.subscriptionId, facts.requestId);
 
       return;
     }
