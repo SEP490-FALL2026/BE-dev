@@ -184,6 +184,18 @@ describe('where a transfer stands (P7, QĐ-110p)', () => {
     ['the last day of the grace is still the grace: the revocation opens the day after', {}, '2026-11-20', 'IN_GRACE'],
     ['the day after the last day the rights are being taken back', {}, '2026-11-21', 'REVOKING'],
     ['a closed transfer is closed, whatever the day', { closed: true }, '2026-11-25', 'CLOSED'],
+    [
+      'a transfer closed because a departure took the rights over is superseded (QĐ-110r)',
+      { closed: true, supersededByCaseId: '0194b7a8-0000-7000-8000-000000000001' },
+      '2026-11-17',
+      'SUPERSEDED',
+    ],
+    [
+      'a closed transfer no departure took over is closed even with a null case',
+      { closed: true, supersededByCaseId: null },
+      '2026-11-25',
+      'CLOSED',
+    ],
     ['a transfer that took effect and has no grace yet is in grace', { graceEndsOn: null }, '2026-11-16', 'IN_GRACE'],
   ] as const)('%s', (_name, over, today, expected) => {
     expect(transferPhase(transfer(over), today)).toBe(expected);

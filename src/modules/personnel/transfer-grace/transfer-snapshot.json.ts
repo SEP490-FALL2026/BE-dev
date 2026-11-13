@@ -33,7 +33,9 @@ const beforeSchema = z.object({
 /** What is left of those rights when the transfer closes (written by the closing, MF3-C.2): what became of each right. */
 const afterSchema = z.object({
   takenOn: businessDate,
-  rights: z.array(z.object({ assignmentId: z.string(), outcome: z.enum(['REVOKED', 'ENDED', 'REGRANTED']) })),
+  rights: z.array(
+    z.object({ assignmentId: z.string(), outcome: z.enum(['REVOKED', 'ENDED', 'REGRANTED', 'TAKEN_OVER']) }),
+  ),
 });
 
 export type TransferSnapshotBefore = z.output<typeof beforeSchema>;

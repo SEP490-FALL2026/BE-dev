@@ -25,6 +25,7 @@ const SUMMARY = {
   effectiveOn: true,
   status: true,
   closedAt: true,
+  supersededByCaseId: true,
   graceEndsOn: true,
   graceReminderOn: true,
 } as const;
@@ -55,6 +56,7 @@ function toRecord(row: TransferRow): TransferRecord {
     closedAt: row.closedAt,
     closedByAppUserId: row.closedByAppUserId,
     closedBySystem: row.closedBySystem,
+    supersededByCaseId: row.supersededByCaseId,
     graceEndsOn: dayOrNull(row.graceEndsOn),
     graceReminderOn: dayOrNull(row.graceReminderOn),
     remindedAt: row.remindedAt,
@@ -132,6 +134,7 @@ export class TransferRepo {
       | 'closedAt'
       | 'closedByAppUserId'
       | 'closedBySystem'
+      | 'supersededByCaseId'
       | 'graceEndsOn'
       | 'graceReminderOn'
       | 'remindedAt'

@@ -93,7 +93,7 @@ export function heldOnOrBefore<T extends { effectiveFrom: BusinessDate }>(
   return seats.filter((seat) => seat.effectiveFrom <= effectiveOn);
 }
 
-/** Where a transfer stands (P7). `SUPERSEDED` (a departure recorded in the grace takes over the rights, MF3-C) is set by the closing, not read here. */
+/** Where a transfer stands (P7). `SUPERSEDED`: a departure recorded in the grace took the rights over and closed the transfer (`QĐ-110r`). */
 export type TransferPhase = 'PENDING' | 'IN_GRACE' | 'REVOKING' | 'CLOSED' | 'CANCELLED' | 'SUPERSEDED';
 
 /**
@@ -101,12 +101,17 @@ export type TransferPhase = 'PENDING' | 'IN_GRACE' | 'REVOKING' | 'CLOSED' | 'CA
  * rights are being taken back, closed, or cancelled. The last day of the grace is still the grace: the system opens the revocation the day after.
  */
 export function transferPhase(
-  transfer: { status: 'PENDING' | 'EFFECTIVE' | 'CANCELLED'; closed: boolean; graceEndsOn: BusinessDate | null },
+  transfer: {
+    status: 'PENDING' | 'EFFECTIVE' | 'CANCELLED';
+    closed: boolean;
+    graceEndsOn: BusinessDate | null;
+    supersededByCaseId?: string | null;
+  },
   today: BusinessDate,
 ): TransferPhase {
   if (transfer.status === 'PENDING') return 'PENDING';
   if (transfer.status === 'CANCELLED') return 'CANCELLED';
-  if (transfer.closed) return 'CLOSED';
+  if (transfer.closed) return transfer.supersededByCaseId ? 'SUPERSEDED' : 'CLOSED';
 
   return transfer.graceEndsOn === null || today <= transfer.graceEndsOn ? 'IN_GRACE' : 'REVOKING';
 }

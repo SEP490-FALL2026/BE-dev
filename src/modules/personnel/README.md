@@ -95,6 +95,10 @@ anh em `event-notice` để báo, nên `event-notice` không được import l�
   `TransferRevocationService.sweep` ngày sau `grace_ends_on` mở `LicensingApi.openRevocation` nguồn `TRANSFER` (actor `SystemActor`, `referenceKind DEPARTMENT_TRANSFER`, `referenceId` = điều chuyển) cho
   mọi quyền cá nhân giữ từ ngày hiệu lực trở về trước còn hiệu lực và có tác vụ thu hồi (`rightsToTakeBack` trong `transfer-sweep.policy.ts`: K3 không có thu hồi nên không tính), giao IT phụ trách
   phòng mới. Idempotent bằng chính cổng `openRevocation`; mỗi điều chuyển một transaction khóa nhân viên rồi điều chuyển.
+  **Đóng điều chuyển (MF3-C.2, `QĐ-110r`)** `TransferClosureService.closeIfDue`: hết ân hạn và không còn quyền cũ cần thu hồi (`closureDue`) ⟹ hệ thống đóng (`closed_by_system`, không tài khoản,
+  `snapshot_after` = kết cục từng quyền `REVOKED`/`ENDED`/`REGRANTED`/`TAKEN_OVER` qua `rightOutcome`), gồm cả điều chuyển người không giữ quyền nào và điều chuyển m-17; được hỏi ngay khi một tác vụ thu hồi
+  của người đó hoàn tất (`TransferClosureListener` bind `RevocationListeners` `AFTER_WORK`, khóa `SKIP LOCKED`) và ở cuối mỗi lượt quét giờ. `supersede`: ghi nghỉ việc trong ân hạn (hook
+  `PersonnelFileHookContributions.onRecorded` của hồ sơ `OFFBOARDING`) ⟹ điều chuyển đóng `SUPERSEDED` (`superseded_by_case_id`), sweeper không mở thu hồi, MF-2 thu hồi theo hạn của hồ sơ.
 - `departure-deadline/` — hạn thu hồi và tác động của nghỉ việc (MF2-B.3, MF2-D…): `DepartureImpactService.impactOf(tx, …)` **chỉ đọc** (quyền sẽ thu hồi qua
   `LicensingApi.listPersonalSeatsOf`, Request sẽ hủy / tác vụ cấp đang chạy / cam kết sẽ giải phóng qua `RequestsApi.previewBeneficiaryGone`, hạn thu hồi;
   `responsibilities` null và `vendorAdminRoles` rỗng tới X-IT). `OffboardingService` đọc nó trước khi ghi và lưu số đếm vào thay đổi `RECORDED`; route xem

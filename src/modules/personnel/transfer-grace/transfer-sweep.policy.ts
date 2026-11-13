@@ -67,3 +67,32 @@ export function rightsToTakeBack<
     (seat) => seat.effectiveFrom <= effectiveOn && seat.validUntil === null && isRevocableType(seat.provisioningType),
   );
 }
+
+/**
+ * Whether the system closes the transfer (`QĐ-110r`, SPEC MF3-C.2): the grace is over and no right of the old department is left to take back —
+ * every task of revocation is completed, or the person held nothing, or the rights ended another way. Closed at once, with no account: a transfer
+ * whose person held nothing is closed too, or the person could never be moved again (`TRANSFER_SETTLING`).
+ */
+export function closureDue(transfer: SweptTransfer, openRights: number, today: BusinessDate): boolean {
+  return inForce(transfer) && today > transfer.graceEndsOn && openRights === 0;
+}
+
+/** Whether a departure recorded today takes the old rights over (`QĐ-110r`): while the grace lasts, the last day included; after it the revocation is open and the departure adds its reason to the tasks. */
+export function supersedable(transfer: SweptTransfer, today: BusinessDate): boolean {
+  return inForce(transfer) && today <= transfer.graceEndsOn;
+}
+
+/** What became of one right of the picture when the transfer closes. */
+export type RightOutcome = 'REVOKED' | 'ENDED' | 'REGRANTED' | 'TAKEN_OVER';
+
+/**
+ * What became of a right of the picture of the transfer (`snapshot_after`): asked for again and granted on the same subscription (R-49), taken over by
+ * a departure that was recorded in the grace (`held`: it is still the person's, and now the departure's to take back), taken back by the revocation
+ * this transfer opened, or ended some other way (a return, an expiry, a revocation of a departure).
+ */
+export function rightOutcome(facts: { held: boolean; revoked: boolean; regranted: boolean }): RightOutcome {
+  if (facts.regranted) return 'REGRANTED';
+  if (facts.held) return 'TAKEN_OVER';
+
+  return facts.revoked ? 'REVOKED' : 'ENDED';
+}

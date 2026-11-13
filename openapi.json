@@ -6180,7 +6180,7 @@
         ],
         "responses": {
           "200": {
-            "description": "A page of transfers, the latest day first, optionally of one person, one state or a range of days. Each row says who, what changes, from where to where, the day, where it stands (phase: PENDING, IN_GRACE while the person keeps the rights of the old department, REVOKING once the grace is over, CLOSED, CANCELLED) and the grace (the last day the person keeps those rights and the day they are told once more; graceEndsBefore keeps the transfers whose grace ends before a day); the basis, the head handover and the old rights are in the detail. An IT Admin reads only the transfers that leave or enter a department they are in charge of.",
+            "description": "A page of transfers, the latest day first, optionally of one person, one state or a range of days. Each row says who, what changes, from where to where, the day, where it stands (phase: PENDING, IN_GRACE while the person keeps the rights of the old department, REVOKING once the grace is over, CLOSED when the system closed it with nothing left to take back, SUPERSEDED when a departure recorded in the grace took the rights over, CANCELLED) and the grace (the last day the person keeps those rights and the day they are told once more; graceEndsBefore keeps the transfers whose grace ends before a day); the basis, the head handover and the old rights are in the detail. An IT Admin reads only the transfers that leave or enter a department they are in charge of.",
             "content": {
               "application/json": {
                 "schema": {
@@ -6334,7 +6334,7 @@
         ],
         "responses": {
           "200": {
-            "description": "The transfer with its basis, who follows the head of the old department, who recorded it (an account, or the controlled procedure) and how it ended, where it stands and its grace, the rights of the old department (oldRights: each with whether it is still held, the task that takes it away and whether the person was given it again), the money that went back to the budget of the old department the day it took effect (commitmentsReleased) and the picture of the rights before and after (snapshot). The IT Admin reads a minimal projection: no basis, no head handover, no reason of a cancellation, no money and no snapshot.",
+            "description": "The transfer with its basis, who follows the head of the old department, who recorded it (an account, or the controlled procedure) and how it ended (closure: the system closes it with no account once every right of the old department is taken back, or a departure recorded in the grace closes it as superseded and names the case), where it stands and its grace, the rights of the old department (oldRights: each with whether it is still held, the task that takes it away and whether the person was given it again), the money that went back to the budget of the old department the day it took effect (commitmentsReleased) and the picture of the rights before and after (snapshot). The IT Admin reads a minimal projection: no basis, no head handover, no reason of a cancellation, no money and no snapshot.",
             "content": {
               "application/json": {
                 "schema": {
@@ -86155,9 +86155,10 @@
                 "properties": {
                   "closedAt": { "type": "string", "format": "date-time" },
                   "closedByAppUserId": { "type": "string", "format": "uuid", "nullable": true },
-                  "closedBySystem": { "type": "boolean" }
+                  "closedBySystem": { "type": "boolean" },
+                  "supersededByCaseId": { "type": "string", "format": "uuid", "nullable": true }
                 },
-                "required": ["closedAt", "closedByAppUserId", "closedBySystem"],
+                "required": ["closedAt", "closedByAppUserId", "closedBySystem", "supersededByCaseId"],
                 "additionalProperties": false,
                 "nullable": true
               },
@@ -86263,7 +86264,7 @@
                           "type": "object",
                           "properties": {
                             "assignmentId": { "type": "string", "format": "uuid" },
-                            "outcome": { "type": "string", "enum": ["REVOKED", "ENDED", "REGRANTED"] }
+                            "outcome": { "type": "string", "enum": ["REVOKED", "ENDED", "REGRANTED", "TAKEN_OVER"] }
                           },
                           "required": ["assignmentId", "outcome"],
                           "additionalProperties": false
@@ -86517,9 +86518,10 @@
                 "properties": {
                   "closedAt": { "type": "string", "format": "date-time" },
                   "closedByAppUserId": { "type": "string", "format": "uuid", "nullable": true },
-                  "closedBySystem": { "type": "boolean" }
+                  "closedBySystem": { "type": "boolean" },
+                  "supersededByCaseId": { "type": "string", "format": "uuid", "nullable": true }
                 },
-                "required": ["closedAt", "closedByAppUserId", "closedBySystem"],
+                "required": ["closedAt", "closedByAppUserId", "closedBySystem", "supersededByCaseId"],
                 "additionalProperties": false,
                 "nullable": true
               },
@@ -86625,7 +86627,7 @@
                           "type": "object",
                           "properties": {
                             "assignmentId": { "type": "string", "format": "uuid" },
-                            "outcome": { "type": "string", "enum": ["REVOKED", "ENDED", "REGRANTED"] }
+                            "outcome": { "type": "string", "enum": ["REVOKED", "ENDED", "REGRANTED", "TAKEN_OVER"] }
                           },
                           "required": ["assignmentId", "outcome"],
                           "additionalProperties": false

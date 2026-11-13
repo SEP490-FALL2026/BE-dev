@@ -65,6 +65,7 @@ export class TransferGraceSweeper implements OnApplicationBootstrap, OnModuleDes
           this.logger.log(
             `Opened the revocation of ${pass.rights} right(s) of ${pass.transfers} transfer(s) whose grace is over`,
           );
+        if (pass.closed > 0) this.logger.log(`Closed ${pass.closed} transfer(s) with nothing left to take back`);
       });
     } finally {
       this.schedule(SWEEP_EVERY_MS);

@@ -1,8 +1,11 @@
 import {
+  closureDue,
   legacyAnnouncementDue,
   reminderDue,
   revocationDue,
+  rightOutcome,
   rightsToTakeBack,
+  supersedable,
   type SweptTransfer,
 } from './transfer-sweep.policy';
 
@@ -115,5 +118,82 @@ describe('rightsToTakeBack (QĐ-110p, C.1: the personal rights held from before 
 
   it('is empty for a person who holds nothing', () => {
     expect(rightsToTakeBack([], '2026-11-16')).toEqual([]);
+  });
+});
+
+describe('closureDue (QĐ-110r: the system closes the transfer when no right of the old department is left to take back)', () => {
+  it.each([
+    ['the grace is not over: even with no right left, the person keeps the grace', '2026-11-20', 0, false],
+    [
+      'the day after the last day with no right left (nothing to revoke, or every task completed)',
+      '2026-11-21',
+      0,
+      true,
+    ],
+    ['a later day with no right left', '2026-12-01', 0, true],
+    ['one right still held, a task waits', '2026-11-21', 1, false],
+    ['three rights still held', '2026-12-01', 3, false],
+  ])('%s (%s, %s open) ⟹ %s', (_name, today, open, expected) => {
+    expect(closureDue(effective, open, today)).toBe(expected);
+  });
+
+  it.each([
+    ['closed already', { closed: true }],
+    ['cancelled', { status: 'CANCELLED' as const }],
+    ['waiting', { status: 'PENDING' as const }],
+    ['with no grace', { graceEndsOn: null, graceReminderOn: null }],
+  ])('never closes a transfer that is %s', (_name, change) => {
+    expect(closureDue({ ...effective, ...change }, 0, '2026-12-01')).toBe(false);
+  });
+});
+
+describe('supersedable (QĐ-110r: a departure recorded in the grace takes the old rights over)', () => {
+  it.each([
+    ['the first day of the grace', '2026-11-16', true],
+    ['the last day of the grace', '2026-11-20', true],
+    [
+      'the day after: the system has opened the revocation, the departure adds its reason to the tasks',
+      '2026-11-21',
+      false,
+    ],
+  ])('%s (%s) ⟹ %s', (_name, today, expected) => {
+    expect(supersedable(effective, today)).toBe(expected);
+  });
+
+  it.each([
+    ['closed', { closed: true }],
+    ['cancelled', { status: 'CANCELLED' as const }],
+    ['waiting', { status: 'PENDING' as const }],
+    ['with no grace', { graceEndsOn: null, graceReminderOn: null }],
+  ])('is not owed on a transfer that is %s', (_name, change) => {
+    expect(supersedable({ ...effective, ...change }, '2026-11-17')).toBe(false);
+  });
+});
+
+describe('rightOutcome (QĐ-110r: what became of each right of the picture, written when the transfer closes)', () => {
+  it.each([
+    [
+      'asked for again on the same subscription and granted (R-49)',
+      { held: false, revoked: false, regranted: true },
+      'REGRANTED',
+    ],
+    [
+      'a departure takes the right over while the grace lasts',
+      { held: true, revoked: false, regranted: false },
+      'TAKEN_OVER',
+    ],
+    ['taken back by the revocation of this transfer', { held: false, revoked: true, regranted: false }, 'REVOKED'],
+    [
+      'ended some other way (returned, expired, revoked by a departure)',
+      { held: false, revoked: false, regranted: false },
+      'ENDED',
+    ],
+    [
+      'regranted wins over a revocation that was opened for it',
+      { held: false, revoked: true, regranted: true },
+      'REGRANTED',
+    ],
+  ])('%s ⟹ %s', (_name, facts, expected) => {
+    expect(rightOutcome(facts)).toBe(expected);
   });
 });

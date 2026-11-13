@@ -112,6 +112,7 @@ export function toDetail(
           closedAt: record.closedAt.toISOString(),
           closedByAppUserId: record.closedByAppUserId,
           closedBySystem: record.closedBySystem,
+          supersededByCaseId: record.supersededByCaseId,
         }
       : null,
     oldRights: extras.oldRights,

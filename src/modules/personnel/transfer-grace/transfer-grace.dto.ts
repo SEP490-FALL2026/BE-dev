@@ -5,7 +5,7 @@ import { successEnvelopeSchema } from '../../../infrastructure/http/dto/success-
 /** The most old rights of one person a transfer lists (`API-LIST-DETAIL.1`: the rights of one person are bounded). */
 export const OLD_RIGHTS_MAX = 200;
 
-/** Where a transfer stands (P7): waiting, the person keeps the old rights, the grace is over and they are being taken back, closed, cancelled, or taken over by a departure. */
+/** Where a transfer stands (P7): waiting, the person keeps the old rights, the grace is over and they are being taken back, closed by the system, cancelled, or taken over by a departure recorded in the grace. */
 export const transferPhaseSchema = z.enum(['PENDING', 'IN_GRACE', 'REVOKING', 'CLOSED', 'CANCELLED', 'SUPERSEDED']);
 
 /** The last day the person keeps the rights of the old department and the day they are told once more. */
@@ -45,7 +45,9 @@ export const transferSnapshotSchema = z.strictObject({
     .strictObject({
       takenOn: z.string(),
       rights: z
-        .array(z.strictObject({ assignmentId: z.uuid(), outcome: z.enum(['REVOKED', 'ENDED', 'REGRANTED']) }))
+        .array(
+          z.strictObject({ assignmentId: z.uuid(), outcome: z.enum(['REVOKED', 'ENDED', 'REGRANTED', 'TAKEN_OVER']) }),
+        )
         .max(OLD_RIGHTS_MAX),
     })
     .nullable(),

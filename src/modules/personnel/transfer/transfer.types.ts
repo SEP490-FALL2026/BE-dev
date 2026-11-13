@@ -41,6 +41,8 @@ export interface TransferRecord {
   closedByAppUserId: string | null;
   /** The system closed it (no account did): once every right of the old department was taken back (`QĐ-110r`). */
   closedBySystem: boolean;
+  /** The departure that took the old rights over while the grace lasted and so closed this transfer (`QĐ-110r`); null for every other. */
+  supersededByCaseId: string | null;
   /** The last day the person keeps the rights of the old department, and the day they are told once more; null until the transfer took effect. */
   graceEndsOn: BusinessDate | null;
   graceReminderOn: BusinessDate | null;
@@ -59,6 +61,7 @@ export interface TransferSummaryRecord {
   effectiveOn: BusinessDate;
   status: TransferStatus;
   closed: boolean;
+  supersededByCaseId: string | null;
   graceEndsOn: BusinessDate | null;
   graceReminderOn: BusinessDate | null;
 }

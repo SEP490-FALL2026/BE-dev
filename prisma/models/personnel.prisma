@@ -48,6 +48,8 @@ model DepartmentTransfer {
   closedAt             DateTime?                @map("closed_at") @db.Timestamptz(3)
   closedByAppUserId    String?                  @map("closed_by_app_user_id") @db.Uuid
   closedBySystem       Boolean                  @default(false) @map("closed_by_system")
+  // A departure recorded while the grace lasts takes the old rights over and closes the transfer (`QĐ-110r`, MF3-C.2): the case that did. Only on a transfer closed by the system.
+  supersededByCaseId   String?                  @map("superseded_by_case_id") @db.Uuid
   // The grace of the old rights (`QĐ-110p`, MF3-B): the last day the person keeps them, the day they are told once more, and when that was
   // done; set once, when the transfer takes effect. A transfer that took effect before the release has them from the day of the release.
   graceEndsOn          DateTime?                @map("grace_ends_on") @db.Date
@@ -61,6 +63,7 @@ model DepartmentTransfer {
 
   organization      Organization               @relation(fields: [organizationId], references: [id])
   notice            PersonnelNotice?           @relation(fields: [noticeId], references: [id], onDelete: Restrict)
+  supersededByCase  OffboardingCase?           @relation("TransferSupersededByCase", fields: [supersededByCaseId], references: [id], onDelete: Restrict)
   employee          Employee                   @relation(fields: [employeeId], references: [id])
   fromDepartment    Department                 @relation("TransferFromDepartment", fields: [fromDepartmentId], references: [id])
   toDepartment      Department                 @relation("TransferToDepartment", fields: [toDepartmentId], references: [id])
@@ -361,6 +364,7 @@ model OffboardingCase {
   changes           OffboardingCaseChange[]
   recordedByTicket  SuperAdminEventTicket?  @relation("OffboardingRecordedByTicket", fields: [recordedByTicketId], references: [id], onDelete: Restrict)
   cancelledByTicket SuperAdminEventTicket?  @relation("OffboardingCancelledByTicket", fields: [cancelledByTicketId], references: [id], onDelete: Restrict)
+  supersededTransfers DepartmentTransfer[]  @relation("TransferSupersededByCase")
 
   @@index([lastWorkingDay, id])
   @@index([employeeId])

@@ -92,6 +92,8 @@ import { PersonnelDashboardApi } from './public/personnel-dashboard.api';
 import { PersonnelDashboardFactsRepo } from './dashboard-facts/dashboard-facts.repo';
 import { MeDepartmentTransferController } from './transfer-grace/me-department-transfer.controller';
 import { MyTransferService } from './transfer-grace/my-transfer.service';
+import { TransferClosureListener } from './transfer-grace/transfer-closure.listener';
+import { TransferClosureService } from './transfer-grace/transfer-closure.service';
 import { TransferEffectsService } from './transfer-grace/transfer-effects.service';
 import { TransferGraceSweeper } from './transfer-grace/transfer-grace.job';
 import { TransferGraceRepo } from './transfer-grace/transfer-grace.repo';
@@ -183,6 +185,8 @@ import { TransfersController } from './transfer/transfers.controller';
     TransferGraceRepo,
     TransferGraceService,
     TransferGraceSweeper,
+    TransferClosureService,
+    TransferClosureListener,
     TransferTellingService,
     TransferRevocationService,
     TransferOldRightsService,

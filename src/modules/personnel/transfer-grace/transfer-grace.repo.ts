@@ -4,7 +4,12 @@ import { Prisma } from '../../../generated/prisma/client';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { HeldTransfer, SweptRef } from './transfer-grace.types';
-import { snapshotBeforeJson, type TransferSnapshotBefore } from './transfer-snapshot.json';
+import {
+  snapshotAfterJson,
+  snapshotBeforeJson,
+  type TransferSnapshotAfter,
+  type TransferSnapshotBefore,
+} from './transfer-snapshot.json';
 
 /** The transfer of a person while its grace lasts, with what P8 shows of it. */
 export interface TransferInGrace {
@@ -100,16 +105,47 @@ export class TransferGraceRepo {
     return row && toHeld(row);
   }
 
-  /** The transfer held `FOR UPDATE SKIP LOCKED` that took effect and is not closed, or null: for a listener that must never wait for a command. */
-  async lockUnclosedOfSkippingLocked(tx: DbTx, employeeId: string): Promise<HeldTransfer | null> {
-    const locked = await tx.$queryRaw<{ id: string }[]>`
+  /**
+   * The transfer of the person that took effect and is not closed, held `FOR UPDATE` until the transaction ends (the caller holds the employee first),
+   * the latest if there are more; null when there is none. With `skipLocked` it never waits for a transfer another command holds (null then), which a
+   * listener in the transaction of a completion must not do.
+   */
+  async lockUnclosedOf(
+    tx: DbTx,
+    employeeId: string,
+    options: { skipLocked: boolean } = { skipLocked: false },
+  ): Promise<HeldTransfer | null> {
+    const locked = await tx.$queryRaw<{ id: string }[]>(Prisma.sql`
       SELECT id FROM department_transfers
        WHERE employee_id = ${employeeId}::uuid AND status = 'EFFECTIVE' AND closed_at IS NULL
-       ORDER BY effective_on DESC, id DESC LIMIT 1 FOR UPDATE SKIP LOCKED`;
+       ORDER BY effective_on DESC, id DESC LIMIT 1 FOR UPDATE ${options.skipLocked ? Prisma.sql`SKIP LOCKED` : Prisma.empty}`);
     if (locked.length === 0) return null;
     const row = await tx.departmentTransfer.findUnique({ where: { id: locked[0].id } });
 
     return row && toHeld(row);
+  }
+
+  /**
+   * The system closes the transfer, once, with no account (`closed_by_system`) and the picture of what became of the rights; `supersededByCaseId`
+   * names the departure that took them over. False when it was closed meanwhile.
+   */
+  async close(
+    tx: DbTx,
+    id: string,
+    closing: { at: Date; after: TransferSnapshotAfter; supersededByCaseId: string | null },
+  ): Promise<boolean> {
+    const { count } = await tx.departmentTransfer.updateMany({
+      where: { id, status: 'EFFECTIVE', closedAt: null },
+      data: {
+        closedAt: closing.at,
+        closedBySystem: true,
+        closedByAppUserId: null,
+        snapshotAfter: snapshotAfterJson.encode(closing.after),
+        ...(closing.supersededByCaseId === null ? {} : { supersededByCaseId: closing.supersededByCaseId }),
+      },
+    });
+
+    return count === 1;
   }
 
   /** The person is told once more: written once, the guard of the table lets `reminded_at` change from empty only. False when it was written. */

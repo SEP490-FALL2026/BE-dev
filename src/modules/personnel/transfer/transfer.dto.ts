@@ -106,6 +106,8 @@ export const transferDetailSchema = transferSummarySchema.extend({
       closedAt: z.iso.datetime(),
       closedByAppUserId: z.uuid().nullable(),
       closedBySystem: z.boolean(),
+      /** The departure that took the old rights over while the grace lasted (the phase is then `SUPERSEDED`); null for every other closing. */
+      supersededByCaseId: z.uuid().nullable(),
     })
     .nullable(),
   /** The rights of the old department with where each stands; empty before the transfer took effect. Bounded by the rights of one person. */

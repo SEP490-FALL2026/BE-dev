@@ -348,6 +348,8 @@ describe('the reads and the hook of a revocation (integration, real PostgreSQL)'
         'requests.return-request',
         // MF2-G (QĐ-110e): the last K1 revocation of a person who leaves locks the mailbox by itself, and any completed revocation may close the case.
         'personnel.departure-closure',
+        // MF3-C.2 (QĐ-110r): any completed revocation may be the last right of the old department of a person who moved, and the system closes the transfer.
+        'personnel.transfer-closure',
         'optimization.ghost-seat',
       ]);
     });

@@ -10,6 +10,7 @@ import { OrganizationApi } from '../../organization/public/organization.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { PersonnelNotifier } from '../event-notice/personnel-notifier.service';
 import { personnelSystemAuditEvent } from '../personnel-audit-event.mapper';
+import { TransferClosureService } from './transfer-closure.service';
 import { TransferGraceRepo } from './transfer-grace.repo';
 import { heldOnOrBefore } from './transfer-grace.policy';
 import type { HeldTransfer, SweptRef } from './transfer-grace.types';
@@ -23,6 +24,8 @@ const PAGE = 200;
 export interface RevocationPass {
   transfers: number;
   rights: number;
+  /** The transfers the pass closed: nothing was left to take back (QĐ-110r). */
+  closed: number;
   failed: number;
 }
 
@@ -30,6 +33,7 @@ export interface RevocationPass {
 export interface TransfersRevoked {
   created: number;
   reasonAdded: number;
+  closed: boolean;
 }
 
 /**
@@ -57,11 +61,12 @@ export class TransferRevocationService {
     private readonly licensing: LicensingApi,
     private readonly audit: AuditApi,
     private readonly notifier: PersonnelNotifier,
+    private readonly closing: TransferClosureService,
   ) {}
 
   async sweep(now: Date = new Date()): Promise<RevocationPass> {
     const today = await this.organizationReads.businessToday(now);
-    const pass: RevocationPass = { transfers: 0, rights: 0, failed: 0 };
+    const pass: RevocationPass = { transfers: 0, rights: 0, closed: 0, failed: 0 };
     let afterId: string | null = null;
     for (;;) {
       const page: SweptRef[] = await this.graces.pageGraceOver(today, { afterId, take: PAGE });
@@ -72,6 +77,7 @@ export class TransferRevocationService {
             pass.transfers += 1;
             pass.rights += done.created + done.reasonAdded;
           }
+          if (done?.closed) pass.closed += 1;
         } catch (error) {
           pass.failed += 1;
           this.logger.error(
@@ -98,15 +104,25 @@ export class TransferRevocationService {
     const held = await this.graces.lock(tx, ref.id);
     if (!held || !revocationDue(sweptOf(held), today)) return null;
 
-    return this.takeBack(tx, held, today, now);
+    const done = await this.takeBack(tx, held, today, now);
+    // Nothing may be left to take back (the person held nothing, or every right ended): the transfer closes now, or the person could never be moved again.
+    // Read again, for the picture of the rights that taking back may have kept.
+    const current = (await this.graces.lock(tx, held.id)) ?? held;
+
+    return { ...done, closed: await this.closing.closeIfDue(tx, current, now) };
   }
 
   /** Opens the revocation of every right of the held transfer, in the caller's transaction, which holds the employee and the transfer. */
-  async takeBack(tx: DbTx, held: HeldTransfer, today: BusinessDate, now: Date): Promise<TransfersRevoked> {
+  private async takeBack(
+    tx: DbTx,
+    held: HeldTransfer,
+    today: BusinessDate,
+    now: Date,
+  ): Promise<Omit<TransfersRevoked, 'closed'>> {
     const seats = await this.licensing.listPersonalSeatsOf(held.employeeId, today, tx);
     if (held.snapshotBefore === null) await this.keepPicture(tx, held, seats, today);
     const system: SystemActor = { kind: 'SYSTEM', correlationId: `transfer-grace:${held.id}` };
-    const done: TransfersRevoked = { created: 0, reasonAdded: 0 };
+    const done = { created: 0, reasonAdded: 0 };
     for (const right of rightsToTakeBack(seats, held.effectiveOn)) {
       try {
         const opened = await this.licensing.openRevocation(tx, system, {
@@ -148,7 +164,7 @@ export class TransferRevocationService {
     });
   }
 
-  private async tell(tx: DbTx, held: HeldTransfer, done: TransfersRevoked): Promise<void> {
+  private async tell(tx: DbTx, held: HeldTransfer, done: { created: number; reasonAdded: number }): Promise<void> {
     await this.audit.record(
       tx,
       personnelSystemAuditEvent(

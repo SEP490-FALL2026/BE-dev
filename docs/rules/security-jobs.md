@@ -144,7 +144,12 @@
   has a live task of another source is given the reason besides). Each transfer has a transaction of its own that locks the employee, then the transfer
   `FOR UPDATE`, reads it again and acts, so two instances, a pass run again or a command at the same time never both act; one that fails is logged and
   tried again at the next pass without stopping the others. Run one by hand with `TransferTellingService.announceUnannounced(now)`,
-  `TransferTellingService.remind(now)` and `TransferRevocationService.sweep(now)`.
+  `TransferTellingService.remind(now)` and `TransferRevocationService.sweep(now)`. At the end of its transaction for a transfer whose grace is over, the pass
+  asks `TransferClosureService.closeIfDue`: when no right of the old department is left to take back (every task completed, the person held nothing, or
+  the rights ended another way) the system closes the transfer (`closed_at`, `closed_by_system`, no account, `snapshot_after`, the audit event
+  `DEPARTMENT_TRANSFER.CLOSED`, actor `SYSTEM`), so a person whose transfer had nothing to revoke can be moved again (`QĐ-110r`). The same closing is asked
+  the moment a task of revocation of the person is completed (a listener of `RevocationListeners`), and a departure recorded while the grace lasts
+  closes the transfer as superseded (`DEPARTMENT_TRANSFER.SUPERSEDED`, `superseded_by_case_id`) so the sweep opens nothing for it.
   The API also runs `SaasIssueSweeper` once an hour (the first pass five minutes after start, unreferenced timer): it closes each resolved
   report of an error in a SaaS right whose last day to reopen (`saas_issues.reopen_until`, fixed when it was resolved from
   `SAAS_ISSUE_REOPEN_WORKING_DAYS`) has passed (state `CLOSED`, a `SYSTEM` entry and the audit event `SAAS_ISSUE.CLOSED`, under the row lock),
