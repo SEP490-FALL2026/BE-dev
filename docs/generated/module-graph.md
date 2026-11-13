@@ -84,7 +84,7 @@ flowchart BT
   installation -->|11| identity_access
   installation -->|8| organization
   licensing -->|28| audit
-  licensing -->|48| catalog
+  licensing -->|49| catalog
   licensing -->|2| finance
   licensing -->|9| identity_access
   licensing -->|7| notifications
