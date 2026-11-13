@@ -98,6 +98,16 @@ dịch vụ nào đọc cả ghế lẫn thu hồi thì đứng trên cả hai (
   được). Seat có cờ không tính vào INV-02; bật cờ cần lý do; tắt cờ khi trùng seat cá nhân cùng thuê bao ⟹ 409 `MACHINE_ACCOUNT_OVERLAP`.
 - `department-tools/` — công cụ phòng ban đang dùng (US-03-06); `department-tools.controller.ts`; `DepartmentToolsService`.
   Đọc ghế của `assignment/` và việc thu hồi của `provisioning/` nên đứng trên cả hai.
+  **Danh sách phần mềm của phòng** (DS, `QĐ-110s`, `QĐ-110t`, `QĐ-111c`, SPEC P16–P18; chỉ hướng dẫn, không tự cấp): bảng `department_software_entries`
+  (một dòng cho mỗi (phòng, ứng dụng, gói); unique `NULLS NOT DISTINCT` nên "ứng dụng không gói" chỉ một lần) và `department_software_proposals` (lịch sử đề xuất,
+  partial unique một đề xuất `PENDING` cho mỗi chỗ). `department-software.controller.ts`: `GET /departments/{id}/software-list`
+  (thành viên phòng, trưởng phòng, mọi IT Admin, Super Admin), `POST …/software-list/changes { add ≤ 50, remove ≤ 50 }` (chỉ IT Admin phụ trách phòng theo phạm vi
+  `US-01-11`), `GET /me/department-software-list` (phòng của chính người gọi). `DepartmentSoftwareChangesService` gỡ rồi thêm trong một transaction,
+  khóa phòng `FOR SHARE`, `insertEntries` là `ON CONFLICT DO NOTHING` nên trùng ⟹ 409 `DEPARTMENT_SOFTWARE.ALREADY_LISTED` và không ghi gì; ngoài danh mục
+  (ứng dụng không có/đã ngừng, gói không thuộc ứng dụng) ⟹ 422 `NOT_IN_CATALOG`; mục không thuộc phòng ⟹ 404 `ENTRY_NOT_FOUND`. Quyền và luật ở
+  `department-software.policy.ts` (thuần, có spec); `DepartmentSoftwareAccessService` gom dữ kiện; `DepartmentSoftwareViewService` đặt tên
+  (một lần đọc catalog cho cả trang); mọi SQL ở `department-software.repo.ts`. Thứ tự: mới thêm trước rồi `id`. Tên file tiền tố `department-software-` để
+  tách khỏi `tools-in-use`.
 - `seat-baseline/` — xem/đóng baseline ghế (US-02-05 AC-6); `seat-baseline.controller.ts`; `SeatBaselineService`.
 - `provisioning/` — task grant và thu hồi; `revocation.service.ts` (mở thu hồi) với `RevocationTaskFactory`,
   `RevocationRecorder`, `revocation-open.policy.ts`; `provisioning.policy.ts`. Con: `tasks/`

@@ -89,6 +89,18 @@ export class ToolsDepartmentOutOfScopeError extends Error {
 }
 
 /**
+ * A place proposed for the list of software of a department, or added to it, is not what the catalog offers (`QĐ-110t`): an application that
+ * does not exist or is retired, or a plan that is not one of that application. Every such place is named. What the catalog does not have
+ * is asked for as new software (case B), never listed.
+ */
+export class DepartmentSoftwareNotInCatalogError extends Error {
+  constructor(readonly places: readonly { applicationId: string; planId: string | null }[]) {
+    super('The software is not in the catalog: ask for it as new software.');
+    this.name = 'DepartmentSoftwareNotInCatalogError';
+  }
+}
+
+/**
  * The request cannot be granted: the gate that answers for requests does not know it, has not seen it approved, has ended
  * it, it asks for software that is not in the catalog yet (`US-05-06` AC-8), or it is for a service account whose boundary
  * the IT Admin has not accepted (`US-05-21` AC-3).

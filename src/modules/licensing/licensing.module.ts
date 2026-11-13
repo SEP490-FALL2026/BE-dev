@@ -28,7 +28,12 @@ import { AssignmentsController } from './assignment/assignments.controller';
 import { DashboardFactsRepo } from './dashboard-facts/dashboard-facts.repo';
 import { DashboardFactsService } from './dashboard-facts/dashboard-facts.service';
 import { DepartmentToolsController } from './department-tools/department-tools.controller';
+import { DepartmentSoftwareAccessService } from './department-tools/department-software-access.service';
+import { DepartmentSoftwareChangesService } from './department-tools/department-software-changes.service';
+import { DepartmentSoftwareController } from './department-tools/department-software.controller';
+import { DepartmentSoftwareQueryService } from './department-tools/department-software-query.service';
 import { DepartmentSoftwareRepo } from './department-tools/department-software.repo';
+import { DepartmentSoftwareViewService } from './department-tools/department-software-view.service';
 import { DepartmentToolsService } from './department-tools/department-tools.service';
 import { SubscriptionSeatsController } from './assignment/subscription-seats.controller';
 import { MachineAccountController } from './machine-account/machine-account.controller';
@@ -155,6 +160,7 @@ import { SubscriptionRenewalsController } from './subscription-renewal/subscript
     MachineAccountController,
     SubscriptionSeatsController,
     DepartmentToolsController,
+    DepartmentSoftwareController,
     SeatBaselineController,
     ProvisioningTasksController,
     RevocationTasksController,
@@ -183,6 +189,10 @@ import { SubscriptionRenewalsController } from './subscription-renewal/subscript
     AssignmentListService,
     DepartmentToolsService,
     DepartmentSoftwareRepo,
+    DepartmentSoftwareAccessService,
+    DepartmentSoftwareViewService,
+    DepartmentSoftwareQueryService,
+    DepartmentSoftwareChangesService,
     SeatBaselineRepo,
     SeatBaselineService,
     SeatBaselinePhaseListener,
