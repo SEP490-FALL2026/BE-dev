@@ -22,9 +22,22 @@ describe('BR-MF1-02: group need routing', () => {
     expect(planNeedSteps({ ...input, senderEmployeeId: 'head', senderIsHead: true })).toMatchObject([
       { confirmedBySending: true, step: { routingRow: 5 } },
     ]));
-  it('makes an employee group without an effective head one-step', () =>
+  it('QĐ-110i: makes a paid employee group without an effective head wait at the need step, not one-step', () =>
     expect(
       planNeedSteps({ ...input, headEmployeeId: null, facts: { ...facts, departmentHeadEmployeeId: null } }),
+    ).toMatchObject([
+      {
+        confirmedBySending: false,
+        step: { state: 'WAITING', routingRow: 4, waitingReason: 'NO_DEPARTMENT_HEAD', assigneeEmployeeId: null },
+      },
+    ]));
+  it('QĐ-111bc: keeps a free internal employee group without an effective head one-step', () =>
+    expect(
+      planNeedSteps({
+        ...input,
+        headEmployeeId: null,
+        facts: { ...facts, departmentHeadEmployeeId: null, chainHasSpendStep: false },
+      }),
     ).toMatchObject([
       {
         confirmedBySending: false,
