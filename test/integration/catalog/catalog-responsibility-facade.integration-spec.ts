@@ -170,6 +170,66 @@ describe('the catalog facade that counts and hands over what an IT Admin answers
     expect(await h.count('audit_events')).toBe(before);
   });
 
+  /** A block on the access of the person from `day` (a departure the file has recorded): written through `sql` or in the caller's own transaction. */
+  const blockFrom = (employeeId: string, day: string) =>
+    h.ctx.sql.query(
+      `INSERT INTO employee_access_blocks (employee_id, organization_id, blocked_from, cause)
+       VALUES ($1, $2, $3::date, 'DEPARTURE_BLOCK_NOW')`,
+      [employeeId, h.seed.organizationId, day],
+    );
+
+  it('X-IT-R3: refuses an IT Admin whose access a departure already blocks, sees a block written in the caller’s own transaction, and accepts one whose block begins later', async () => {
+    const leaving = await buildActivatedAccount(h.ctx, h.seed, {
+      code: 'E-IT9',
+      email: 'it9@acme.vn',
+      role: 'IT_ADMIN',
+    });
+    const blocked = await buildActivatedAccount(h.ctx, h.seed, {
+      code: 'E-IT10',
+      email: 'it10@acme.vn',
+      role: 'IT_ADMIN',
+    });
+    const inFlight = await buildActivatedAccount(h.ctx, h.seed, {
+      code: 'E-IT11',
+      email: 'it11@acme.vn',
+      role: 'IT_ADMIN',
+    });
+    const later = await buildActivatedAccount(h.ctx, h.seed, {
+      code: 'E-IT12',
+      email: 'it12@acme.vn',
+      role: 'IT_ADMIN',
+    });
+    const mine = await thingsOf(leaving, 1);
+    const actor = await principal(h.it1);
+    await blockFrom(blocked.employeeId, '2000-01-01');
+    await blockFrom(later.employeeId, '2999-12-31');
+    const refusal = (to: string, before?: (tx: Parameters<Parameters<typeof runner.run>[0]>[0]) => Promise<unknown>) =>
+      runner
+        .run(async (tx) => {
+          await before?.(tx);
+
+          return api.transferResponsibilities(tx, actor, leaving.employeeId, to);
+        })
+        .then(
+          () => null,
+          (error: unknown) => (error as ResponsibilityHandoverRefusedError).problem,
+        );
+
+    expect(await refusal(blocked.employeeId)).toBe('TARGET_NOT_IT_ADMIN');
+    expect(
+      await refusal(
+        inFlight.employeeId,
+        (tx) =>
+          tx.$executeRaw`INSERT INTO employee_access_blocks (employee_id, organization_id, blocked_from, cause)
+           VALUES (${inFlight.employeeId}::uuid, ${h.seed.organizationId}::uuid, '2000-01-01'::date, 'DEPARTURE_BLOCK_NOW')`,
+      ),
+    ).toBe('TARGET_NOT_IT_ADMIN');
+    expect(await holders('subscriptions', mine.subscriptionIds)).toEqual([leaving.employeeId]);
+
+    expect(await refusal(later.employeeId)).toBeNull();
+    expect(await holders('subscriptions', mine.subscriptionIds)).toEqual([later.employeeId]);
+  });
+
   it('is part of the caller’s transaction: when the caller rolls back, subscriptions, applications and audit events come back', async () => {
     const leaving = await buildActivatedAccount(h.ctx, h.seed, {
       code: 'E-IT8',

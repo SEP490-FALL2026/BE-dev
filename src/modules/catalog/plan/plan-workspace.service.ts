@@ -13,6 +13,7 @@ import {
   PlanWorkspaceTextInvalidError,
 } from './plan.errors';
 import { assertWorkspaceShape, cleanWorkspaceText } from './plan.policy';
+import { PlanFactsService } from './plan-facts.service';
 import { PlanRepo } from './plan.repo';
 import { assertVendorAdminsEnough, needsVendorAdmins } from './plan-vendor-admins.policy';
 import type {
@@ -71,6 +72,7 @@ export class PlanWorkspaceService {
     private readonly plans: PlanRepo,
     private readonly organizationReads: OrganizationReadApi,
     private readonly identity: IdentityAccessApi,
+    private readonly facts: PlanFactsService,
     private readonly audit: AuditApi,
     private readonly runner: TransactionRunner,
   ) {}
@@ -146,7 +148,10 @@ export class PlanWorkspaceService {
     return this.view(stored);
   }
 
-  /** Every person the profile names (owner, admins, the holder of the emergency account) is an IT Admin who works now, in id order. */
+  /**
+   * Every person the profile names (owner, admins, the holder of the emergency account) is an IT Admin who works now, in id order: an account that can
+   * act, whose departure has not blocked yet (`workingAdminsAmong`, the judgment of the flags and of the hand-over).
+   */
   private async requirePeople(
     tx: DbTx,
     input: WorkspaceProfileInput,
@@ -157,7 +162,11 @@ export class PlanWorkspaceService {
       ...input.members.map((member) => member.employeeId),
       ...(emergency ? [emergency.holderEmployeeId] : []),
     ]);
-    for (const employeeId of [...people].sort()) await this.requireItAdmin(tx, employeeId);
+    const ordered = [...people].sort();
+    for (const employeeId of ordered) await this.requireItAdmin(tx, employeeId);
+    const working = await this.facts.workingAdminsAmong(ordered, tx);
+    const gone = ordered.find((employeeId) => !working.has(employeeId));
+    if (gone !== undefined) throw new PlanWorkspacePersonInvalidError(gone);
   }
 
   /** The profile with its people named from the organization. */

@@ -2,10 +2,10 @@ import { Injectable } from '@nestjs/common';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../../audit/public/audit.api';
-import { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { catalogAuditEvent } from '../catalog-audit-event.mapper';
 import { ApplicationRepo } from '../catalog-entry/application.repo';
+import { PlanFactsService } from '../plan/plan-facts.service';
 import { ResponsibilityHandoverRefusedError } from '../public/catalog-responsibility.errors';
 import type { ResponsibilitiesTransferred, ResponsibilityCounts } from '../public/catalog-responsibility.types';
 import { SubscriptionRepo } from '../subscription/subscription.repo';
@@ -15,14 +15,15 @@ import { handoverRefusal } from './responsibility-handover.policy';
  * What an IT Admin answers for in the catalog, and handing all of it to another IT Admin at once (`QĐ-111g`, `R-8`, `R-26`): every
  * subscription and every application that names them responsible, in the transaction of the caller, with one audit event for each thing
  * that changed hands (the same action the transfer of one application writes). The caller judges who may hand over; this judges only that
- * the one who takes them is somebody else and an IT Admin who works now, on the account as it is in this transaction.
+ * the one who takes them is somebody else and an IT Admin who works now (an account that can act, whose departure has not blocked yet: the same
+ * judgment as the admins of a plan at the vendor, `PlanFactsService.workingAdminsAmong`), on the account as it is in this transaction.
  */
 @Injectable()
 export class ResponsibilityHandoverService {
   constructor(
     private readonly applications: ApplicationRepo,
     private readonly subscriptions: SubscriptionRepo,
-    private readonly identity: IdentityAccessApi,
+    private readonly planFacts: PlanFactsService,
     private readonly organizationReads: OrganizationReadApi,
     private readonly audit: AuditApi,
   ) {}
@@ -47,8 +48,8 @@ export class ResponsibilityHandoverService {
     toEmployeeId: string,
     source?: { kind: string; id: string },
   ): Promise<ResponsibilitiesTransferred> {
-    const usable = await this.identity.findUsableItAdminEmployeeIds([toEmployeeId], tx);
-    const refusal = handoverRefusal({ fromEmployeeId, toEmployeeId, toIsUsableItAdmin: usable.has(toEmployeeId) });
+    const working = await this.planFacts.workingAdminsAmong([toEmployeeId], tx);
+    const refusal = handoverRefusal({ fromEmployeeId, toEmployeeId, toIsUsableItAdmin: working.has(toEmployeeId) });
     if (refusal) throw new ResponsibilityHandoverRefusedError(refusal);
     const organization = await this.organizationReads.getOrganization(tx);
     if (!organization) throw new Error('The catalog was used before installation');

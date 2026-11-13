@@ -140,6 +140,63 @@ describe('the vendor admins of a plan: the workspace profile (integration, real 
     expect(h.codeOf(refused)).toBe('PLAN.WORKSPACE_PERSON_INVALID');
   });
 
+  it('X-IT-R3: refuses to name an IT Admin whose access a departure already blocks (as one who has left), owner, admin or holder of the emergency account alike', async () => {
+    const planId = await planOf('K2');
+    const leaving = await buildActivatedAccount(h.ctx, h.seed, {
+      code: 'E-IT3',
+      email: 'it3@acme.vn',
+      role: 'IT_ADMIN',
+    });
+    const comingLater = await buildActivatedAccount(h.ctx, h.seed, {
+      code: 'E-IT4',
+      email: 'it4@acme.vn',
+      role: 'IT_ADMIN',
+    });
+    const block = (employeeId: string, day: string) =>
+      h.ctx.sql.query(
+        `INSERT INTO employee_access_blocks (employee_id, organization_id, blocked_from, cause)
+         VALUES ($1, $2, $3::date, 'DEPARTURE_LAST_DAY')`,
+        [employeeId, h.seed.organizationId, day],
+      );
+    await block(leaving.employeeId, '2000-01-01');
+    await block(comingLater.employeeId, '2999-12-31');
+
+    const asAdmin = await put(
+      planId,
+      profile({}, [
+        { employeeId: h.it1.employeeId, role: 'OWNER' },
+        { employeeId: leaving.employeeId, role: 'ADMIN' },
+      ]),
+    ).expect(422);
+    const asHolder = await put(
+      planId,
+      profile({
+        emergencyAccount: {
+          identity: 'emergency@acme.vn',
+          occupiesSeat: false,
+          holderEmployeeId: leaving.employeeId,
+          lastReviewedOn: '2026-11-01',
+        },
+      }),
+    ).expect(422);
+
+    expect([h.codeOf(asAdmin), h.codeOf(asHolder)]).toEqual([
+      'PLAN.WORKSPACE_PERSON_INVALID',
+      'PLAN.WORKSPACE_PERSON_INVALID',
+    ]);
+    expect(await h.ctx.sql.query('SELECT 1 FROM plan_workspace_profiles WHERE plan_id = $1', [planId])).toMatchObject({
+      rowCount: 0,
+    });
+    // A block that begins later does not refuse the person yet.
+    await put(
+      planId,
+      profile({}, [
+        { employeeId: h.it1.employeeId, role: 'OWNER' },
+        { employeeId: comingLater.employeeId, role: 'ADMIN' },
+      ]),
+    ).expect(200);
+  });
+
   it('gives a K4 plan with an admin console a profile like a K2 plan’s, and refuses one with a single admin', async () => {
     const planId = await planOf('K4', { hasAdminConsole: true });
 

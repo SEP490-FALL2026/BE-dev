@@ -223,6 +223,22 @@ describe('the hand-over of an IT Admin who leaves, over HTTP (integration, real 
       expect([again.status, code(again)]).toEqual([409, 'IT_HANDOVER.NOTHING_TO_HAND_OVER']);
     });
 
+    it('X-IT-R3: refuses a target whose own departure already blocks their access, as one who has left: 422 TARGET_NOT_IT_ADMIN', async () => {
+      const u = await unit();
+      const leaver = await itAdminWith(u, 1);
+      const recorded = await h.recordedCase(leaver, { accessBlockMode: 'BLOCK_NOW', lastWorkingDay: undefined });
+      const going = await itAdminWith(u, 0);
+      await h.recordedCase(going, { accessBlockMode: 'BLOCK_NOW', lastWorkingDay: undefined });
+
+      const refused = await handOver('offboarding-cases', recorded.id, going.employeeId, h.it1);
+
+      expect([refused.status, (refused.body as { error: { code: string } }).error.code]).toEqual([
+        422,
+        'IT_HANDOVER.TARGET_NOT_IT_ADMIN',
+      ]);
+      expect(await holders(leaver.employeeId)).toEqual({ subscriptions: 1, applications: 1 });
+    });
+
     it('is the IT Admin’s alone, and a case that does not exist is 404', async () => {
       const u = await unit();
       const leaver = await itAdminWith(u, 1);
