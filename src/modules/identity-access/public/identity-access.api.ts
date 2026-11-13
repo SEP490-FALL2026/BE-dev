@@ -131,8 +131,8 @@ export class IdentityAccessApi {
   }
 
   /** The blocks on the access of these employees by employee id, one statement (an unlocked read, for lists). */
-  findDepartureBlocks(employeeIds: readonly string[]): Promise<Map<string, AccessBlockRecord>> {
-    return this.accessBlocks.findMany(employeeIds);
+  findDepartureBlocks(employeeIds: readonly string[], tx?: DbTx): Promise<Map<string, AccessBlockRecord>> {
+    return this.accessBlocks.findMany(employeeIds, tx);
   }
 
   /** Among these employees, those who hold the IT Admin role on a usable account (an unlocked read, for lists). */

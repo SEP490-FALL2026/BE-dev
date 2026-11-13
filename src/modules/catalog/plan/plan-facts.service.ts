@@ -69,7 +69,7 @@ export class PlanFactsService implements ApplicationPlans {
     if (employeeIds.length === 0) return new Set();
     const usable = await this.identity.findUsableItAdminEmployeeIds(employeeIds, tx);
     if (usable.size === 0) return usable;
-    const blocks = await this.identity.findDepartureBlocks([...usable]);
+    const blocks = await this.identity.findDepartureBlocks([...usable], tx);
     const today = await this.organizationReads.businessToday(new Date(), tx);
 
     return notYetBlocked(
