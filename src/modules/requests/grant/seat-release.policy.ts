@@ -1,11 +1,7 @@
 import { addDays, type BusinessDate } from '../../../core/business-date';
 import { fiscalYearOf } from '../../../core/fiscal-year';
 import type { SeatCommitment } from '../../budgets/public/budgets.types';
-import type {
-  ProvisioningKind,
-  RevocationCompletedFacts,
-  RevocationSource,
-} from '../../licensing/public/licensing.types';
+import type { ProvisioningKind, RevocationCompletedFacts } from '../../licensing/public/licensing.types';
 import { releaseOnLateGrant, releaseOnRevocation } from '../../licensing/public/seat-month-cost.policy';
 
 /**
@@ -138,11 +134,31 @@ export function transferReleaseEndsOn(kind: ProvisioningKind, effectiveOn: Busin
   return BY_THE_MONTH.includes(kind) ? effectiveOn : null;
 }
 
+/** The reference of the release a commitment gives for a right the day the transfer takes effect: one for each transfer and right. */
+export const transferReleaseReference = (transferId: string, assignmentId: string): string =>
+  `transfer:${transferId}:assignment:${assignmentId}`;
+
+/** The right a release of a transfer was for, read from its reference; null for any other reference. */
+function assignmentOfTransferReference(reference: string): string | null {
+  const match = /^transfer:[^:]+:assignment:(.+)$/.exec(reference);
+
+  return match === null ? null : match[1];
+}
+
 /**
- * Whether the revocation of a right gives nothing back by the day (BLK-3): the old right of a person who moved gave its commitment back the
- * day the transfer took effect, so the revocation that follows the grace (source `TRANSFER`) must not give it back a second time, whatever
- * other source asked for the same task.
+ * Whether this commitment gave its money back for the right the day a transfer took effect (BLK-3, D-86): its own ledger has a release of the
+ * transfer for one of the assignments of the right (the one taken away and the ones it continues). Such a commitment gives nothing back when the
+ * right is taken away, whoever asks for it (the grace ending, a departure, a ghost seat, an expiry), because the days after the transfer went
+ * back already. A commitment with no such release goes back at the revocation as ever: a transfer from before the release has none, and the
+ * commitment of a year that began in the grace was held after it. So each commitment goes back once for the transfer, never twice and never not at all.
  */
-export function releasedAtTransfer(sources: readonly RevocationSource[]): boolean {
-  return sources.includes('TRANSFER');
+export function givenAtTransfer(
+  commitment: Pick<SeatCommitment, 'transferReleases'>,
+  chainAssignmentIds: readonly string[],
+): boolean {
+  return commitment.transferReleases.some((reference) => {
+    const assignmentId = assignmentOfTransferReference(reference);
+
+    return assignmentId !== null && chainAssignmentIds.includes(assignmentId);
+  });
 }

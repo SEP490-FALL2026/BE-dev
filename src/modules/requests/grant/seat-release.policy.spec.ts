@@ -3,11 +3,12 @@ import {
   firstMonthOf,
   lastMonthOf,
   lateGrantShare,
-  releasedAtTransfer,
+  givenAtTransfer,
   releasesBeforeGrant,
   revocationEndsOn,
   revocationShare,
   transferReleaseEndsOn,
+  transferReleaseReference,
   type SeatCoverage,
 } from './seat-release.policy';
 
@@ -17,6 +18,7 @@ const commitment = (over: Partial<SeatCommitment> = {}): SeatCommitment => ({
   origin: 'APPROVAL',
   seatMonthlyMinor: 1500n,
   heldMinor: 4500n,
+  transferReleases: [],
   ...over,
 });
 
@@ -247,16 +249,28 @@ describe('seat-release policy (RV-07, M-06, M-10)', () => {
     });
   });
 
-  describe('releasedAtTransfer (BLK-3: the commitment goes back once, the day the transfer takes effect)', () => {
+  describe('givenAtTransfer (BLK-3, D-86: a commitment goes back once for the transfer, decided by its own ledger)', () => {
+    const released = (...references: string[]) => commitment({ transferReleases: references });
+    const reference = transferReleaseReference('t1', 'a1');
+
+    it('names a release by the transfer and the right', () => {
+      expect(reference).toBe('transfer:t1:assignment:a1');
+    });
+
     it.each([
-      [['TRANSFER'], true],
-      [['MANAGER_NOT_NEEDED', 'TRANSFER'], true],
-      [['TRANSFER', 'DEPARTURE'], true],
-      [['DEPARTURE'], false],
-      [['RETURN', 'GHOST_SEAT'], false],
-      [[], false],
-    ] as const)('sources %j ⟹ the revocation gives nothing back again: %s', (sources, expected) => {
-      expect(releasedAtTransfer(sources)).toBe(expected);
+      ['a release for the right that is taken away', [reference], ['a1'], true],
+      [
+        'a release for a right the one taken away continues (a renewal carries the right on)',
+        [reference],
+        ['a2', 'a1'],
+        true,
+      ],
+      ['one of several releases', [transferReleaseReference('t0', 'a9'), reference], ['a1'], true],
+      ['a release for another right of the person', [reference], ['a2'], false],
+      ['no release at all: a transfer from before the release, or a year that began in the grace', [], ['a1'], false],
+      ['a reference that is not the one of a transfer', ['revocationTask:a1'], ['a1'], false],
+    ])('%s ⟹ the revocation gives nothing back again: %s', (_name, references, chain, expected) => {
+      expect(givenAtTransfer(released(...references), chain)).toBe(expected);
     });
   });
 });

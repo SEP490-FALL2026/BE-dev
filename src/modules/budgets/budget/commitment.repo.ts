@@ -148,11 +148,12 @@ export class CommitmentRepo {
    * years of each earliest first, as `lockOfRequest` takes them, so two releases queue and never wait for each other in a circle.
    */
   async lockSeatCommitmentsOf(tx: DbTx, requestIds: readonly string[], fromYear: number): Promise<SeatCommitment[]> {
-    const found: SeatCommitment[] = [];
+    const found: (Omit<SeatCommitment, 'transferReleases'> & { id: string })[] = [];
     for (const requestId of [...new Set(requestIds)].sort()) {
       for (const row of await this.lockOfRequest(tx, requestId)) {
         if (row.state !== 'HELD' || row.year < fromYear) continue;
         found.push({
+          id: row.id,
           requestId,
           year: row.year,
           origin: row.origin,
@@ -161,8 +162,29 @@ export class CommitmentRepo {
         });
       }
     }
+    // The ledger is read under the locks just taken: a release of the transfer in this transaction, or one that committed before them, is seen.
+    const transferReleases = await this.transferReleasesOf(
+      tx,
+      found.map((item) => item.id),
+    );
 
-    return found;
+    return found.map(({ id, ...commitment }) => ({ ...commitment, transferReleases: transferReleases.get(id) ?? [] }));
+  }
+
+  /** For each of these commitments, the references of its releases for the day a transfer took effect; a commitment with none is absent. */
+  private async transferReleasesOf(tx: DbTx, commitmentIds: readonly string[]): Promise<Map<string, string[]>> {
+    const byCommitment = new Map<string, string[]>();
+    if (commitmentIds.length === 0) return byCommitment;
+    const rows = await tx.budgetCommitmentRelease.findMany({
+      where: { commitmentId: { in: [...commitmentIds] }, reason: 'TRANSFER_EFFECTIVE' },
+      select: { commitmentId: true, reasonText: true },
+    });
+    for (const row of rows) {
+      if (row.reasonText === null) continue;
+      byCommitment.set(row.commitmentId, [...(byCommitment.get(row.commitmentId) ?? []), row.reasonText]);
+    }
+
+    return byCommitment;
   }
 
   /** The commitments, among these, that already gave money back for this reason and reference. */

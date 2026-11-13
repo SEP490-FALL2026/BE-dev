@@ -9,12 +9,13 @@ import type { GrantOutcomeFacts, RevocationTaskFacts } from '../../licensing/pub
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import type { TransferReleaseInput, TransferReleaseResult } from '../public/requests.types';
 import {
+  givenAtTransfer,
   lateGrantShare,
-  releasedAtTransfer,
   releasesBeforeGrant,
   revocationEndsOn,
   revocationShare,
   transferReleaseEndsOn,
+  transferReleaseReference,
   type SeatCoverage,
 } from './seat-release.policy';
 import { SeatReleaseRepo } from './seat-release.repo';
@@ -38,14 +39,14 @@ export class SeatReleaseService {
   ) {}
 
   /**
-   * The revocation `task` was completed: what the right would have cost after its end goes back. Anything else is ignored. A revocation that a
-   * transfer asked for (source `TRANSFER`) gives nothing back: the right gave its commitment back the day the transfer took effect, and the
-   * commitment goes back exactly once (BLK-3).
+   * The revocation `task` was completed: what the right would have cost after its end goes back. Anything else is ignored. A commitment that
+   * gave back for this right the day a transfer took effect (its ledger says so) gives nothing back again, whoever asked for the revocation: the
+   * rule is the ledger of each commitment, not the source of the task, so a right taken away by a departure in the grace gives nothing twice, a
+   * transfer from before the release (no such release) gives at the revocation, and so does the commitment of a year that began in the grace (BLK-3, D-86).
    */
   async afterRevocation(tx: DbTx, task: RevocationTaskFacts, now: Date): Promise<void> {
     const completed = task.completed;
     if (task.status !== 'COMPLETED' || completed === undefined) return;
-    if (releasedAtTransfer(completed.sources)) return;
     const endsOn = revocationEndsOn(completed);
     if (endsOn === null) return;
     const coverages = await this.repo.coverageOf(tx, {
@@ -55,7 +56,10 @@ export class SeatReleaseService {
     await this.give(tx, coverages, now, {
       reason: 'REVOKED',
       reference: `revocationTask:${task.id}`,
-      shareOf: (commitment, coverage, currentYear) => revocationShare({ commitment, coverage, endsOn, currentYear }),
+      shareOf: (commitment, coverage, currentYear) =>
+        givenAtTransfer(commitment, completed.chainAssignmentIds)
+          ? 0n
+          : revocationShare({ commitment, coverage, endsOn, currentYear }),
     });
   }
 
@@ -83,7 +87,7 @@ export class SeatReleaseService {
       });
       const released = await this.give(tx, coverages, now, {
         reason: 'TRANSFER_EFFECTIVE',
-        reference: `transfer:${input.transferId}:assignment:${chain.assignmentId}`,
+        reference: transferReleaseReference(input.transferId, chain.assignmentId),
         shareOf: (commitment, coverage, currentYear) => revocationShare({ commitment, coverage, endsOn, currentYear }),
       });
       for (const [requestId, amountMinor] of released)
