@@ -191,6 +191,21 @@ export class OrganizationReadApi {
     return this.departments.memberIdsOn(departmentId, onDate ?? (await this.businessToday(new Date(), tx)), tx);
   }
 
+  /**
+   * Everyone placed in any of these departments on `onDate` (default today), each employee once, in one statement whatever the number of
+   * departments: what a reader of many departments needs instead of `getDepartmentMemberIds` for each. A department that does not exist
+   * adds nobody (where `getDepartmentMemberIds` answers null for it).
+   */
+  async getMemberIdsOfDepartments(
+    departmentIds: readonly string[],
+    onDate?: BusinessDate,
+    tx?: DbTx,
+  ): Promise<string[]> {
+    if (departmentIds.length === 0) return [];
+
+    return this.departments.memberIdsOfMany(departmentIds, onDate ?? (await this.businessToday(new Date(), tx)), tx);
+  }
+
   /** Who heads each of these departments on `onDate`; a department nobody heads is absent. */
   getDepartmentHeads(ids: string[], onDate: BusinessDate, tx?: DbTx): Promise<Map<string, DepartmentHeadRecord>> {
     return this.departments.headsOn(ids, onDate, tx);

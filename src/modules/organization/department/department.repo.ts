@@ -445,6 +445,20 @@ export class DepartmentRepo {
   }
 
   /**
+   * Everyone placed in any of these departments on `onDate` (the same test of the dates as `memberIdsOn`), each employee once, in ONE
+   * statement whatever the number of departments. A department that does not exist has no placement: it adds nobody and raises nothing.
+   */
+  async memberIdsOfMany(departmentIds: readonly string[], onDate: BusinessDate, tx?: DbTx): Promise<string[]> {
+    if (departmentIds.length === 0) return [];
+    const rows = await (tx ?? this.prisma).$queryRaw<{ employee_id: string }[]>`
+      SELECT DISTINCT p.employee_id FROM employee_placements p
+       WHERE p.department_id = ANY(${[...departmentIds]}::uuid[])
+         AND p.valid_from <= ${onDate}::date AND (p.valid_to IS NULL OR p.valid_to > ${onDate}::date)`;
+
+    return rows.map((row) => row.employee_id);
+  }
+
+  /**
    * The people placed in the department on `onDate`, in code order: one page and the total, read in one snapshot when the
    * caller has no transaction of its own (`LD-11`). The email is never read, only whether there is one.
    */

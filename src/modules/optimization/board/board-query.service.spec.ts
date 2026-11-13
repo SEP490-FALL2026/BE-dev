@@ -54,7 +54,11 @@ function build(overrides: { itScope?: string[]; members?: Record<string, string[
       .fn<Promise<string[]>, [string, (ids: string[]) => Promise<Set<string>>]>()
       .mockResolvedValue(overrides.itScope ?? ['d-it']),
     getHeadedDepartment: jest.fn().mockResolvedValue(null),
-    getDepartmentMemberIds: jest.fn((id: string) => Promise.resolve((overrides.members ?? {})[id] ?? [])),
+    // The members of many departments in ONE read, each once, a department that does not exist adds nobody.
+    getMemberIdsOfDepartments: jest.fn((ids: readonly string[]) =>
+      Promise.resolve([...new Set(ids.flatMap((id) => (overrides.members ?? {})[id] ?? []))]),
+    ),
+    getDepartmentMemberIds: jest.fn().mockRejectedValue(new Error('one read for each department is the old way')),
     getEmployees: jest.fn().mockResolvedValue([{ id: 'emp-1', employeeCode: 'E1', fullName: 'Nguyen Van A' }]),
     getDepartmentIdsInChargeOf: jest.fn().mockResolvedValue(['must-not-be-used']),
   };
@@ -175,5 +179,53 @@ describe('QĐ-111aw: a filter on a department or a holder stays inside the scope
     expect(seatStates.seatStatePage).not.toHaveBeenCalled();
     expect(all.items).toEqual([]);
     expect(mine.items).toEqual([]);
+  });
+});
+
+describe('the holders of the scope are read for all its departments in ONE call, not for each department', () => {
+  it('asks once with every department of the scope, and the set of holders is the union without duplicates', async () => {
+    const { service, seatStates, organizationReads } = build({
+      itScope: ['d-it', 'd-2', 'd-3'],
+      members: { 'd-it': ['emp-1', 'emp-2'], 'd-2': ['emp-2', 'emp-3'], 'd-3': [] },
+    });
+
+    await service.listSeatStates(itAdmin, { departmentScope: 'MINE', ...page });
+
+    expect(organizationReads.getMemberIdsOfDepartments).toHaveBeenCalledTimes(1);
+    expect(organizationReads.getMemberIdsOfDepartments).toHaveBeenCalledWith(['d-it', 'd-2', 'd-3']);
+    expect(organizationReads.getDepartmentMemberIds).not.toHaveBeenCalled();
+    expect(
+      seatStates.seatStatePage.mock.calls.map((call: unknown[]) => (call[1] as { employeeIds?: string[] }).employeeIds),
+    ).toEqual([['emp-1', 'emp-2', 'emp-3']]);
+  });
+
+  it('asks once with the one department when a filter names it', async () => {
+    const { service, organizationReads } = build({ itScope: ['d-it', 'd-2'], members: { 'd-2': ['emp-3'] } });
+
+    await service.listSeatStates(itAdmin, { departmentScope: 'MINE', departmentId: 'd-2', ...page });
+
+    expect(organizationReads.getMemberIdsOfDepartments).toHaveBeenCalledTimes(1);
+    expect(organizationReads.getMemberIdsOfDepartments).toHaveBeenCalledWith(['d-2']);
+  });
+
+  it('reads no department for a department outside the scope, and an empty page for a holder who is placed outside it', async () => {
+    const { service, seatStates, organizationReads } = build({
+      itScope: ['d-it', 'd-2'],
+      members: { 'd-it': ['emp-1'], 'd-2': ['emp-3'] },
+    });
+
+    const otherDepartment = await service.listSeatStates(itAdmin, {
+      departmentScope: 'MINE',
+      departmentId: 'd-x',
+      ...page,
+    });
+    expect(organizationReads.getMemberIdsOfDepartments).not.toHaveBeenCalled();
+
+    const outsider = await service.listSeatStates(itAdmin, { departmentScope: 'MINE', employeeId: 'emp-9', ...page });
+
+    expect(otherDepartment.items).toEqual([]);
+    expect(outsider.items).toEqual([]);
+    expect(organizationReads.getMemberIdsOfDepartments).toHaveBeenCalledTimes(1);
+    expect(seatStates.seatStatePage).not.toHaveBeenCalled();
   });
 });
