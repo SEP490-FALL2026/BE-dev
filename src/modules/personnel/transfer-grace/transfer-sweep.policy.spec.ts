@@ -89,35 +89,53 @@ describe('legacyAnnouncementDue (m-17: a transfer that took effect before the gr
   });
 });
 
-describe('rightsToTakeBack (QĐ-110p, C.1: the personal rights held from before the day, still in force, that a task can take away)', () => {
+describe('rightsToTakeBack (QĐ-110p, C.1: the personal rights of the old department, still in force, that a task can take away)', () => {
   const seat = (
-    id: string,
+    assignmentId: string,
     effectiveFrom: string,
     extra: { validUntil?: string | null; provisioningType?: string } = {},
-  ) => ({ id, effectiveFrom, validUntil: extra.validUntil ?? null, provisioningType: extra.provisioningType ?? 'K2' });
+  ) => ({
+    assignmentId,
+    effectiveFrom,
+    validUntil: extra.validUntil ?? null,
+    provisioningType: extra.provisioningType ?? 'K2',
+  });
+  /** A transfer from before the grace: no picture of the rights, so the old rights are the ones begun on the day or before. */
+  const noPicture = { effectiveOn: '2026-11-16', pictureIds: null };
+  const ids = (seats: { assignmentId: string }[]) => seats.map((s) => s.assignmentId);
 
-  it('keeps the rights begun on the day of the transfer or before, and not the ones begun after (they are the new department’s)', () => {
+  it('with no picture keeps the rights begun on the day of the transfer or before, and not the ones begun after (they are the new department’s)', () => {
     const seats = [seat('old', '2026-09-01'), seat('same-day', '2026-11-16'), seat('later', '2026-11-17')];
 
-    expect(rightsToTakeBack(seats, '2026-11-16').map((s) => s.id)).toEqual(['old', 'same-day']);
+    expect(ids(rightsToTakeBack(seats, noPicture))).toEqual(['old', 'same-day']);
+  });
+
+  it('with the picture of the day keeps the rights it names and no other: a right granted the day of the transfer, after the picture, is the new department’s (R-49)', () => {
+    const seats = [
+      seat('old', '2026-09-01'),
+      seat('granted-after', '2026-11-16'),
+      seat('earlier-not-named', '2026-09-02'),
+    ];
+
+    expect(ids(rightsToTakeBack(seats, { effectiveOn: '2026-11-16', pictureIds: ['old'] }))).toEqual(['old']);
   });
 
   it('leaves out a right that already has an end (a K1 right whose access runs to the end of the paid period is revoked already)', () => {
     const seats = [seat('open', '2026-09-01'), seat('ending', '2026-09-01', { validUntil: '2026-12-31' })];
 
-    expect(rightsToTakeBack(seats, '2026-11-16').map((s) => s.id)).toEqual(['open']);
+    expect(ids(rightsToTakeBack(seats, noPicture))).toEqual(['open']);
   });
 
   it.each(['K1', 'K2', 'K4', 'K5'])('keeps a %s right: it has a revocation', (type) => {
-    expect(rightsToTakeBack([seat('a', '2026-09-01', { provisioningType: type })], '2026-11-16')).toHaveLength(1);
+    expect(rightsToTakeBack([seat('a', '2026-09-01', { provisioningType: type })], noPicture)).toHaveLength(1);
   });
 
   it('leaves out a K3 right: no task can be made for it, so it must not keep the transfer open for ever', () => {
-    expect(rightsToTakeBack([seat('a', '2026-09-01', { provisioningType: 'K3' })], '2026-11-16')).toEqual([]);
+    expect(rightsToTakeBack([seat('a', '2026-09-01', { provisioningType: 'K3' })], noPicture)).toEqual([]);
   });
 
   it('is empty for a person who holds nothing', () => {
-    expect(rightsToTakeBack([], '2026-11-16')).toEqual([]);
+    expect(rightsToTakeBack([], noPicture)).toEqual([]);
   });
 });
 

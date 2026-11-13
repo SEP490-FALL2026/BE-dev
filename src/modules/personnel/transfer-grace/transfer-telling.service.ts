@@ -10,7 +10,7 @@ import { TransferGraceRepo } from './transfer-grace.repo';
 import { heldOnOrBefore } from './transfer-grace.policy';
 import type { SweptRef } from './transfer-grace.types';
 import { snapshotRightOf } from './transfer-snapshot.json';
-import { legacyAnnouncementDue, reminderDue, rightsToTakeBack, sweptOf } from './transfer-sweep.policy';
+import { legacyAnnouncementDue, pictureIdsOf, reminderDue, rightsToTakeBack, sweptOf } from './transfer-sweep.policy';
 
 /** How many transfers are read in one statement. */
 const PAGE = 200;
@@ -98,7 +98,8 @@ export class TransferTellingService {
       if (!held || !reminderDue(sweptOf(held), today) || held.graceEndsOn === null) return false;
       if (!(await this.graces.claimReminder(tx, held.id, now))) return false;
       const seats = await this.licensing.listPersonalSeatsOf(held.employeeId, today, tx);
-      if (rightsToTakeBack(seats, held.effectiveOn).length === 0) return false;
+      if (rightsToTakeBack(seats, { effectiveOn: held.effectiveOn, pictureIds: pictureIdsOf(held) }).length === 0)
+        return false;
 
       return this.notifier.transferGraceEnding(tx, {
         organizationId: held.organizationId,

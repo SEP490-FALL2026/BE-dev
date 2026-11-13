@@ -228,29 +228,16 @@ describe('the end of the grace of a transfer (integration, real PostgreSQL)', ()
     });
   }, 240_000);
 
-  it('takes back only a right that is still in force and was held from before the day: an ended one and one begun later are left alone', async () => {
+  it('takes back only a right that is still in force and is a right of the old department: an ended one and one granted after the picture of the day are left alone', async () => {
     const { dest, person, code } = await example();
     const ended = await h.seatOf(person, { subscriptionId: k2 }, code);
-    const later = await h.seatOf(person, { subscriptionId: k2b }, code);
     const held = await h.seatOf(person, { planId: internal }, code);
     const task = await h.open(ended, 'RETURN', { decision: { decidedRole: 'EMPLOYEE' } });
     await h.claim(task.taskId).expect(200);
     await h.revoked(task.taskId, { completion: 'ACCOUNT_REMOVED', evidence: 'Removed from the workspace' }).expect(200);
     const wire = await h.moveToday(person, dest.department);
-    // A right granted to a request of the new head after the day is the new department's.
-    await h.ctx.sql.query('BEGIN');
-    try {
-      await h.ctx.sql.query('ALTER TABLE license_assignments DISABLE TRIGGER USER');
-      await h.ctx.sql.query('UPDATE license_assignments SET valid_from = $2 WHERE id = $1', [
-        later,
-        addDays(h.today(), 1),
-      ]);
-      await h.ctx.sql.query('ALTER TABLE license_assignments ENABLE TRIGGER USER');
-      await h.ctx.sql.query('COMMIT');
-    } catch (error) {
-      await h.ctx.sql.query('ROLLBACK');
-      throw error;
-    }
+    // A right granted to a request of the new head after the picture of the day is the new department's, however far back its start is dated.
+    const later = await h.seatOf(person, { subscriptionId: k2b }, code);
 
     const pass = await revocation().sweep(at(afterGrace()));
 

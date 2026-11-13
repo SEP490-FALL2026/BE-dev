@@ -1,5 +1,6 @@
 import type { BusinessDate } from '../../../core/business-date';
 import { isRevocableType } from '../departure-deadline/departure-impact.policy';
+import { isOldRightOf } from './transfer-grace.policy';
 import type { HeldTransfer } from './transfer-grace.types';
 
 /** What the sweep needs to know of a transfer to decide what it owes it today. */
@@ -55,18 +56,28 @@ export function legacyAnnouncementDue(transfer: SweptTransfer, today: BusinessDa
 }
 
 /**
- * The personal rights the system takes back when the grace ends (`QĐ-110p`, C.1): the ones held from the day the transfer took effect or before
- * (the ones begun later are the new department's), that are still in force (a right with an end is revoked already or ends by itself) and that a
- * task can take away (K3 has no revocation: nothing could close the transfer if it waited for one). A right the person asked for again on the same
- * subscription in the grace was ended by the grant (R-49) and is not listed.
+ * The personal rights the system takes back when the grace ends (`QĐ-110p`, C.1): the rights of the old department (the ones the picture of the day the
+ * transfer took effect names; for a transfer from before the grace, which has none, the ones begun on that day or before — `isOldRightOf`), that are still
+ * in force (a right with an end is revoked already or ends by itself) and that a task can take away (K3 has no revocation: nothing could close the
+ * transfer if it waited for one). A right granted after the picture, even on the day itself, is the new department's. A right the person asked for again on
+ * the same subscription in the grace was ended by the grant (R-49) and is not listed.
  */
 export function rightsToTakeBack<
-  T extends { effectiveFrom: BusinessDate; validUntil: BusinessDate | null; provisioningType: string },
->(seats: readonly T[], effectiveOn: BusinessDate): T[] {
+  T extends {
+    assignmentId: string;
+    effectiveFrom: BusinessDate;
+    validUntil: BusinessDate | null;
+    provisioningType: string;
+  },
+>(seats: readonly T[], transfer: { effectiveOn: BusinessDate; pictureIds: readonly string[] | null }): T[] {
   return seats.filter(
-    (seat) => seat.effectiveFrom <= effectiveOn && seat.validUntil === null && isRevocableType(seat.provisioningType),
+    (seat) => isOldRightOf(transfer, seat) && seat.validUntil === null && isRevocableType(seat.provisioningType),
   );
 }
+
+/** The ids of the rights the picture of a held transfer names; null when it has none (a transfer from before the grace). */
+export const pictureIdsOf = (held: Pick<HeldTransfer, 'snapshotBefore'>): string[] | null =>
+  held.snapshotBefore?.rights.map((right) => right.assignmentId) ?? null;
 
 /**
  * Whether the system closes the transfer (`QĐ-110r`, SPEC MF3-C.2): the grace is over and no right of the old department is left to take back —

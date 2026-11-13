@@ -10,7 +10,14 @@ import { TransferGraceRepo } from './transfer-grace.repo';
 import { heldOnOrBefore } from './transfer-grace.policy';
 import type { HeldTransfer } from './transfer-grace.types';
 import { snapshotRightOf, type SnapshotRight, type TransferSnapshotAfter } from './transfer-snapshot.json';
-import { closureDue, rightOutcome, rightsToTakeBack, supersedable, sweptOf } from './transfer-sweep.policy';
+import {
+  closureDue,
+  pictureIdsOf,
+  rightOutcome,
+  rightsToTakeBack,
+  supersedable,
+  sweptOf,
+} from './transfer-sweep.policy';
 
 /** How the transfer is closed: the departure that took the rights over, or none. */
 interface Finish {
@@ -46,7 +53,14 @@ export class TransferClosureService {
   async closeIfDue(tx: DbTx, held: HeldTransfer, now: Date = new Date()): Promise<boolean> {
     const today = await this.organizationReads.businessToday(now, tx);
     const seats = await this.licensing.listPersonalSeatsOf(held.employeeId, today, tx);
-    if (!closureDue(sweptOf(held), rightsToTakeBack(seats, held.effectiveOn).length, today)) return false;
+    if (
+      !closureDue(
+        sweptOf(held),
+        rightsToTakeBack(seats, { effectiveOn: held.effectiveOn, pictureIds: pictureIdsOf(held) }).length,
+        today,
+      )
+    )
+      return false;
 
     return this.finish(tx, held, { seats, today, now, supersededByCaseId: null });
   }

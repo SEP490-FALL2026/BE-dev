@@ -175,6 +175,31 @@ describe('asking again on the same subscription in the grace of a transfer (inte
     expect(await revokeTasksOf(newSeat)).toEqual([]);
   }, 300_000);
 
+  it('a right given again the very day of the transfer is the new department’s: the grace does not take it back', async () => {
+    const { dest, person, canvaSeat, figmaSeat } = await example();
+    const wire = await h.moveToday(person, dest.department);
+    const requestId = await approvedAgain(person, dest, canva.plan);
+    const task = h.dataOf<{ task: { id: string } }>(
+      await h.grant({ requestId, subscriptionId: canva.subscriptionId }).expect(201),
+    ).task.id;
+    const newSeat = await seatOfTask(task);
+    // The day of the transfer is the day of the grant: the new right begins the day the transfer took effect, after the picture of the rights.
+    expect(await seatRow(newSeat)).toMatchObject({ valid_from: h.today() });
+    const graceEnds = (
+      await h.ctx.sql.query<{ d: string }>(
+        `SELECT to_char(grace_ends_on, 'YYYY-MM-DD') AS d FROM department_transfers WHERE id = $1`,
+        [wire.id],
+      )
+    ).rows[0].d;
+
+    const pass = await revocation().sweep(at(addDays(graceEnds, 1)));
+
+    expect(pass).toMatchObject({ transfers: 1, rights: 1 });
+    expect(await revokeTasksOf(canvaSeat)).toEqual([]);
+    expect(await revokeTasksOf(newSeat)).toEqual([]);
+    expect((await revokeTasksOf(figmaSeat)).map((row) => row.revocation_source)).toEqual(['TRANSFER']);
+  }, 300_000);
+
   it('the picture of the closing says which right was given again and which was taken back', async () => {
     const { dest, person, canvaSeat, figmaSeat } = await example();
     const wire = await h.moveToday(person, dest.department);

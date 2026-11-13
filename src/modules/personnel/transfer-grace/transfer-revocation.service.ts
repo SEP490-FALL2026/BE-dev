@@ -15,7 +15,7 @@ import { TransferGraceRepo } from './transfer-grace.repo';
 import { heldOnOrBefore } from './transfer-grace.policy';
 import type { HeldTransfer, SweptRef } from './transfer-grace.types';
 import { snapshotRightOf } from './transfer-snapshot.json';
-import { revocationDue, rightsToTakeBack, sweptOf } from './transfer-sweep.policy';
+import { pictureIdsOf, revocationDue, rightsToTakeBack, sweptOf } from './transfer-sweep.policy';
 
 /** How many transfers are read in one statement. */
 const PAGE = 200;
@@ -123,7 +123,7 @@ export class TransferRevocationService {
     if (held.snapshotBefore === null) await this.keepPicture(tx, held, seats, today);
     const system: SystemActor = { kind: 'SYSTEM', correlationId: `transfer-grace:${held.id}` };
     const done = { created: 0, reasonAdded: 0 };
-    for (const right of rightsToTakeBack(seats, held.effectiveOn)) {
+    for (const right of rightsToTakeBack(seats, { effectiveOn: held.effectiveOn, pictureIds: pictureIdsOf(held) })) {
       try {
         const opened = await this.licensing.openRevocation(tx, system, {
           assignmentId: right.assignmentId,
