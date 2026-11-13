@@ -52,11 +52,12 @@ flowchart BT
   budgets -->|5| notifications
   budgets -->|4| operating_parameters
   budgets -->|18| organization
-  catalog -->|20| audit
+  catalog -->|21| audit
   catalog -->|11| finance
-  catalog -->|6| identity_access
+  catalog -->|9| identity_access
+  catalog -->|2| notifications
   catalog -->|4| operating_parameters
-  catalog -->|28| organization
+  catalog -->|30| organization
   dashboards -->|2| devices
   dashboards -->|3| identity_access
   dashboards -->|4| licensing
@@ -109,14 +110,14 @@ flowchart BT
   optimization -->|9| usage
   organization -->|10| audit
   organization -->|5| notifications
-  personnel -->|23| audit
-  personnel -->|3| catalog
+  personnel -->|24| audit
+  personnel -->|10| catalog
   personnel -->|3| devices
-  personnel -->|20| identity_access
+  personnel -->|21| identity_access
   personnel -->|30| licensing
   personnel -->|6| notifications
   personnel -->|7| operating_parameters
-  personnel -->|91| organization
+  personnel -->|94| organization
   personnel -->|8| requests
   requests -->|58| audit
   requests -->|23| budgets
@@ -135,4 +136,4 @@ flowchart BT
   usage -->|10| organization
 ```
 
-93 module edges.
+94 module edges.
