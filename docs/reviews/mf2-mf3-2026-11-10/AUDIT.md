@@ -70,7 +70,23 @@ SPEC §5 MF3-B phạm vi case B đã định giá (D-2); chữ `QĐ-110q` nếu 
 
 ## 4. Full test sau sửa
 
-_(điền khi chạy xong — xem §6)_
+Lượt 1 (cây chính, trước commit): `test:http` 2238 xanh; `serial` 96 xanh; `timing` 28 xanh; `test:flows` 60 xanh (9 skip có từ trước);
+`pnpm check` đỏ 6 lỗi lint của chính phần sửa; `test:integration` 6 suite đỏ — 4 suite là test cũ theo luật trước A-1/D-62 (sửa: chạy lượt
+quét mốc chặn trước khi đóng, K1 không khóa hộp thư khi còn ghế K1), 2 suite tải (`TransientDatabaseError`). Sửa hết, chạy lại 8 suite: xanh.
+
+Lượt 2 (HEAD `67a1abeb`, chat 81 chạy test song song trên cùng Postgres):
+
+| Lệnh | Kết quả |
+| --- | --- |
+| `pnpm check` | unit 465 suite / 6052 test xanh; `test:gates` 1 đỏ: `test/support/ghost-seat-world.ts` 414 dòng > 400 (có từ `fa1d3c2f`, lượt trước bị che vì `check` dừng ở prettier). Sửa = cherry-pick đúng commit chat 81 làm cùng việc (`a3dd4e67`, tránh xung đột khi gộp nhánh); `pnpm test:gates` 331/331 xanh |
+| `test:http` | 93 suite / 2238 xanh |
+| `test:integration --maxWorkers=4` | 16 suite đỏ, 392 dòng `TransientDatabaseError`/timeout (DB chia với chat 81, 2503 s so với 1659 s); chạy lại đúng 16 suite `--maxWorkers=2`: **16/16, 112/112 xanh** |
+| `test:integration:serial` | 13 suite / 96 xanh |
+| `test:integration:timing` | 7 / 28 xanh |
+| `test:flows` | 10 suite / 60 xanh, 9 skip (có từ trước) |
+
+Ghi chú: chạy `npx jest --config test/config/jest.gates.cjs <file>` riêng lẻ cho `extension-wiring` báo 2 đỏ kể cả ở HEAD sạch; chạy qua
+`pnpm test:gates` thì xanh — cách gọi khác môi trường, không phải lỗi code.
 
 ## 5. Seed
 
