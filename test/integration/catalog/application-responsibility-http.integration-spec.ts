@@ -1,7 +1,9 @@
 import { randomUUID } from 'node:crypto';
+import { Client } from 'pg';
 import request from 'supertest';
 import { ApiAccount, adminToken, createActivatedAccount } from '../../support/api-accounts';
 import { HttpTestApp, SeededInstallation, createHttpTestApp, seedInstallation } from '../../support/http-test-app';
+import { waitForLockWaiters } from '../../support/lock-wait';
 import { PgRelay } from '../../support/pg-relay';
 import { QueryCounter, dataStatements } from '../../support/query-count';
 
@@ -224,11 +226,28 @@ describe('the responsible IT Admin of an application over HTTP (integration, rea
         created.id,
       ]);
 
-      const [a, b] = await Promise.all([
-        transfer(created.id, it2.employeeId, as(it2)),
-        transfer(created.id, it3.employeeId, as(it3)),
-      ]);
+      // The order is made, not hoped for: a connection of its own holds the row of the application, both requests are sent and are
+      // known to wait for that row (two backends in a lock wait), and only then is it released, so the two meet at the lock.
+      const holder = new Client({ connectionString: ctx.database.url });
+      await holder.connect();
+      let outcomes!: [request.Response, request.Response];
+      try {
+        await holder.query('BEGIN');
+        await holder.query('SELECT id FROM applications WHERE id = $1 FOR UPDATE', [created.id]);
 
+        const pending = Promise.all([
+          transfer(created.id, it2.employeeId, as(it2)).then((response) => response),
+          transfer(created.id, it3.employeeId, as(it3)).then((response) => response),
+        ]);
+        await waitForLockWaiters(ctx.sql, 2);
+        await holder.query('COMMIT');
+        outcomes = await pending;
+      } finally {
+        await holder.query('ROLLBACK').catch(() => undefined);
+        await holder.end();
+      }
+
+      const [a, b] = outcomes;
       expect([a.status, b.status].sort()).toEqual([200, 403]);
       const winner = a.status === 200 ? it2 : it3;
       expect(await responsibleOf(created.id)).toBe(winner.employeeId);
