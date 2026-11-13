@@ -62,7 +62,8 @@ const figures = {
 const rowSchema = z.strictObject({
   key: z.strictObject({
     id: z.uuid().nullable().meta({
-      description: 'The IT Admin or the department; null for the ones no task names an IT Admin for.',
+      description:
+        'The IT Admin or the department; null for the departures no task names an IT Admin for, or, grouped by department, of people who were never placed in one.',
     }),
     name: z.string().nullable().meta({ description: 'The full name of the IT Admin or the name of the department.' }),
   }),

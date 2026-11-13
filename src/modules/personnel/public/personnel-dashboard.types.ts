@@ -56,7 +56,8 @@ export interface RevocationWindowFacts {
   source: RevocationWindowSource;
   id: string;
   employeeId: string;
-  departmentId: string;
+  /** The department the work is in; null for a departure of a person who was never placed in one (a transfer always has one). */
+  departmentId: string | null;
   startOn: BusinessDate;
   dueOn: BusinessDate;
 }

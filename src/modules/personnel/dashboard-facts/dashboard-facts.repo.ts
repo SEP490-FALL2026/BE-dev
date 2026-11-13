@@ -150,17 +150,20 @@ export class PersonnelDashboardFactsRepo {
 
   /**
    * The departures whose window of revocations opens in a range of days (the day after the last working day), with the deadline kept on the case: the
-   * ones not cancelled that have one. `departmentIds` narrows to the departments of an IT Admin.
+   * ones not cancelled that have one. `departmentIds` narrows to the departments of an IT Admin; without it the whole company is read, a person who was
+   * never placed in a department included (their `departmentId` is null).
    */
   async departureWindows(
     query: RevocationWindowQuery,
-  ): Promise<{ id: string; employeeId: string; departmentId: string; startOn: BusinessDate; dueOn: BusinessDate }[]> {
+  ): Promise<
+    { id: string; employeeId: string; departmentId: string | null; startOn: BusinessDate; dueOn: BusinessDate }[]
+  > {
     if (query.departmentIds?.length === 0) return [];
     const rows = await this.prisma.offboardingCase.findMany({
       where: {
         state: { not: 'CANCELLED' },
         revocationDueOn: { not: null },
-        departmentId: query.departmentIds ? { in: [...query.departmentIds] } : { not: null },
+        ...(query.departmentIds ? { departmentId: { in: [...query.departmentIds] } } : {}),
         lastWorkingDay: { gte: toDateColumn(addDays(query.from, -1)), lte: toDateColumn(addDays(query.to, -1)) },
       },
       select: { id: true, employeeId: true, departmentId: true, lastWorkingDay: true, revocationDueOn: true },
@@ -168,7 +171,7 @@ export class PersonnelDashboardFactsRepo {
     });
 
     return rows.flatMap((row) =>
-      row.departmentId && row.revocationDueOn
+      row.revocationDueOn
         ? [
             {
               id: row.id,

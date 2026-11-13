@@ -323,4 +323,34 @@ describe('the report of the SLA of the revocations (integration, real PostgreSQL
     expect(await notices(transferOverdue.id)).toBe(0);
     expect((await report(h.sa, { source: 'TRANSFER' })).overdueOpen).toBe(1);
   });
+
+  it('RD-R1: a departure of a person with no department is in the report of the Super Admin, grouped under the key with no id, and in the report of no IT Admin', async () => {
+    const before = { all: await report(h.sa), asIt1: await report(it1), asIt2: await report(it2.account) };
+    const unplaced = await departure(des.department, desPool);
+    for (const task of unplaced.tasks) await finish(task, it1);
+    await h.ctx.sql.query('BEGIN');
+    try {
+      await h.ctx.sql.query('ALTER TABLE offboarding_cases DISABLE TRIGGER USER');
+      await h.ctx.sql.query('UPDATE offboarding_cases SET department_id = NULL WHERE id = $1', [unplaced.id]);
+      await h.ctx.sql.query('ALTER TABLE offboarding_cases ENABLE TRIGGER USER');
+      await h.ctx.sql.query('COMMIT');
+    } catch (error) {
+      await h.ctx.sql.query('ROLLBACK');
+      throw error;
+    }
+
+    const all = await report(h.sa);
+
+    expect([all.completed, all.onTime, all.overdueOpen]).toEqual([
+      before.all.completed + 1,
+      before.all.onTime + 1,
+      before.all.overdueOpen,
+    ]);
+    expect(all.rows.filter((row) => row.key.id === null)).toEqual([
+      expect.objectContaining({ key: { id: null, name: null }, completed: 1, onTime: 1, overdueOpen: 0 }),
+    ]);
+    // An IT Admin reads the departments in charge: the person with no department is in no one's scope.
+    expect(await report(it1)).toEqual(before.asIt1);
+    expect(await report(it2.account)).toEqual(before.asIt2);
+  });
 });

@@ -118940,7 +118940,7 @@
                         "id": {
                           "type": "string",
                           "format": "uuid",
-                          "description": "The IT Admin or the department; null for the ones no task names an IT Admin for.",
+                          "description": "The IT Admin or the department; null for the departures no task names an IT Admin for, or, grouped by department, of people who were never placed in one.",
                           "nullable": true
                         },
                         "name": {
