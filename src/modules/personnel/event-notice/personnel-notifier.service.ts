@@ -269,6 +269,53 @@ export class PersonnelNotifier {
   }
 
   /**
+   * The person who moved is told once more, `reminder_working_days` before the last day, that the rights of the old department are about to be
+   * taken back (`QĐ-110p`, `US-03-01`): once for the transfer. Returns whether a notice was written.
+   */
+  transferGraceEnding(
+    tx: DbTx,
+    input: { organizationId: string; transferId: string; employeeId: string; graceEndsOn: BusinessDate },
+  ): Promise<boolean> {
+    return this.tell(tx, input.organizationId, input.employeeId, 'TRANSFER_GRACE_ENDING', {
+      subject: { type: 'DEPARTMENT_TRANSFER', id: input.transferId },
+      params: { transferId: input.transferId, employeeId: input.employeeId, graceEndsOn: input.graceEndsOn },
+      eventKey: `TRANSFER_GRACE_ENDING:${input.transferId}`,
+    });
+  }
+
+  /**
+   * The grace is over and the system opened the revocation of the old rights (`QĐ-110p`): the person who moved and the IT Admin who answers for
+   * the new department, whose queue the tasks are in, are told how many there are. Once for the transfer, a person who is both once.
+   */
+  async transferRightsRevoking(
+    tx: DbTx,
+    input: {
+      organizationId: string;
+      transferId: string;
+      employeeId: string;
+      toDepartmentId: string;
+      rightCount: number;
+    },
+  ): Promise<void> {
+    const itAdmin = await this.itAdminOfDeparture(tx, {
+      departmentId: input.toDepartmentId,
+      employeeId: input.employeeId,
+    });
+    const recipients = new Set<string>([input.employeeId, ...(itAdmin === null ? [] : [itAdmin])]);
+    for (const recipient of recipients)
+      await this.tell(tx, input.organizationId, recipient, 'TRANSFER_RIGHTS_REVOKING', {
+        subject: { type: 'DEPARTMENT_TRANSFER', id: input.transferId },
+        params: {
+          transferId: input.transferId,
+          employeeId: input.employeeId,
+          toDepartmentId: input.toDepartmentId,
+          rightCount: input.rightCount,
+        },
+        eventKey: `TRANSFER_RIGHTS_REVOKING:${input.transferId}`,
+      });
+  }
+
+  /**
    * A departure blocked now still has no lock of the company account at the end of the day it was blocked (`QĐ-94m`(12), R-1): the IT Admin
    * and the Super Admin are told once for the case. Returns whether a notice was written.
    */

@@ -131,6 +131,20 @@
   stopping the others. The same closing is asked for at the moment a fact that closes the case is written (the last revocation of the person
   completed, (1b) recorded on the route), so the hourly pass only settles what those did not reach. It revokes nothing and opens no task. Run one by
   hand with `MailboxLockSettlement.settle(now)` and `DepartureClosureService.sweep(now)`.
+  The API also runs `TransferGraceSweeper` once an hour (the first pass five minutes after start, unreferenced timer): the grace of the old rights of a
+  person who moved (`QĐ-110p`, `QĐ-110r`, SPEC MF3-C.1). It (1) tells the start of the grace (`TRANSFER_GRACE_STARTED`) of a transfer that took effect
+  before the grace existed (the migration of m-17 gave it one and nobody was told; it has no `snapshot_before`, and the picture of the rights is kept
+  in the same transaction, so it is told once), (2) reminds the person who moved (`TRANSFER_GRACE_ENDING`, event key `TRANSFER_GRACE_ENDING:{transfer}`)
+  from `grace_reminder_on` to the last day of the grace, once for the transfer (`reminded_at` is claimed first; a person who holds nothing to lose is
+  not told), and (3) the day after `grace_ends_on` asks `LicensingApi.openRevocation` for a revocation with the source `TRANSFER`, the system as the
+  actor (`SystemActor`, the task is made by the system), `referenceKind DEPARTMENT_TRANSFER` and the transfer as the reference, for every personal
+  right the person held from the day the transfer took effect or before that is still in force and has a revocation (K3 has none), in the queue of
+  the IT Admin in charge of the new department; it writes the audit event `DEPARTMENT_TRANSFER.REVOCATION_OPENED` (actor `SYSTEM`) and tells the person
+  and that IT Admin (`TRANSFER_RIGHTS_REVOKING`) once. Asking again changes nothing (the gate adds no second task and no second reason, and a seat that
+  has a live task of another source is given the reason besides). Each transfer has a transaction of its own that locks the employee, then the transfer
+  `FOR UPDATE`, reads it again and acts, so two instances, a pass run again or a command at the same time never both act; one that fails is logged and
+  tried again at the next pass without stopping the others. Run one by hand with `TransferTellingService.announceUnannounced(now)`,
+  `TransferTellingService.remind(now)` and `TransferRevocationService.sweep(now)`.
   The API also runs `SaasIssueSweeper` once an hour (the first pass five minutes after start, unreferenced timer): it closes each resolved
   report of an error in a SaaS right whose last day to reopen (`saas_issues.reopen_until`, fixed when it was resolved from
   `SAAS_ISSUE_REOPEN_WORKING_DAYS`) has passed (state `CLOSED`, a `SYSTEM` entry and the audit event `SAAS_ISSUE.CLOSED`, under the row lock),

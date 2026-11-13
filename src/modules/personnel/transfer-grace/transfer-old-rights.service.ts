@@ -2,10 +2,9 @@ import { Injectable } from '@nestjs/common';
 import type { BusinessDate } from '../../../core/business-date';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { LicensingApi } from '../../licensing/public/licensing.api';
-import type { PersonalSeat } from '../../licensing/public/licensing.types';
 import { heldOnOrBefore } from './transfer-grace.policy';
 import { OLD_RIGHTS_MAX, type OldRightWire } from './transfer-grace.dto';
-import type { SnapshotRight, TransferSnapshotBefore } from './transfer-snapshot.json';
+import { snapshotRightOf, type SnapshotRight, type TransferSnapshotBefore } from './transfer-snapshot.json';
 
 /** What the old rights of one transfer are read from. */
 export interface OldRightsInput {
@@ -18,17 +17,6 @@ export interface OldRightsInput {
   snapshot: TransferSnapshotBefore | null;
   today: BusinessDate;
 }
-
-const seatToRight = (seat: PersonalSeat): SnapshotRight => ({
-  assignmentId: seat.assignmentId,
-  applicationId: seat.applicationId,
-  applicationName: seat.applicationName,
-  planId: seat.planId,
-  planName: seat.planName,
-  provisioningType: seat.provisioningType,
-  effectiveFrom: seat.effectiveFrom,
-  validUntil: seat.validUntil,
-});
 
 /**
  * The old rights of a transfer as P7 and P8 show them (`QĐ-110p`): the rights of the picture taken the day the transfer took effect, each with
@@ -43,7 +31,7 @@ export class TransferOldRightsService {
   async of(input: OldRightsInput, tx?: DbTx): Promise<OldRightWire[]> {
     const seats = input.closed ? [] : await this.licensing.listPersonalSeatsOf(input.employeeId, input.today, tx);
     const base: SnapshotRight[] =
-      input.snapshot?.rights ?? (input.closed ? [] : heldOnOrBefore(seats, input.effectiveOn).map(seatToRight));
+      input.snapshot?.rights ?? (input.closed ? [] : heldOnOrBefore(seats, input.effectiveOn).map(snapshotRightOf));
     const held = new Map(seats.map((seat) => [seat.assignmentId, seat]));
 
     return base.slice(0, OLD_RIGHTS_MAX).map((right) => {

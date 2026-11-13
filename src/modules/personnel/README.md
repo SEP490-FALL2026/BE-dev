@@ -90,6 +90,11 @@ anh em `event-notice` để báo, nên `event-notice` không được import l�
   `TransferImpactService.impactOf(tx, …)` **chỉ đọc**, cùng khuôn với `DepartureImpactService` (xem trước `P23` thêm ở RD.3); `TransferOldRightsService` đọc quyền cũ cho P7 (chi tiết
   điều chuyển) và P8 (`MeDepartmentTransferController`, `GET /me/department-transfer`). `transfer-grace.policy.ts` giữ ngày thuần (`graceStartsOn`, `graceOf`, `graceEndsOn`,
   `graceReminderOn`, `graceWindowEnd`), quyền cũ (`heldOnOrBefore`) và giai đoạn (`transferPhase`); dùng lại `rightToRevokeOf`/`commitmentToRelease` của `departure-impact.policy.ts`.
+  **Sweeper (MF3-C.1)** `TransferGraceSweeper` (`transfer-grace.job.ts`, mỗi giờ): `TransferTellingService.announceUnannounced` báo `TRANSFER_GRACE_STARTED` cho điều chuyển cũ do
+  migration m-17 cho ân hạn (không có `snapshot_before`; chụp ảnh quyền rồi mới báo, nên chỉ một lần), `remind` báo người chuyển `TRANSFER_GRACE_ENDING` từ `grace_reminder_on` (claim `reminded_at`),
+  `TransferRevocationService.sweep` ngày sau `grace_ends_on` mở `LicensingApi.openRevocation` nguồn `TRANSFER` (actor `SystemActor`, `referenceKind DEPARTMENT_TRANSFER`, `referenceId` = điều chuyển) cho
+  mọi quyền cá nhân giữ từ ngày hiệu lực trở về trước còn hiệu lực và có tác vụ thu hồi (`rightsToTakeBack` trong `transfer-sweep.policy.ts`: K3 không có thu hồi nên không tính), giao IT phụ trách
+  phòng mới. Idempotent bằng chính cổng `openRevocation`; mỗi điều chuyển một transaction khóa nhân viên rồi điều chuyển.
 - `departure-deadline/` — hạn thu hồi và tác động của nghỉ việc (MF2-B.3, MF2-D…): `DepartureImpactService.impactOf(tx, …)` **chỉ đọc** (quyền sẽ thu hồi qua
   `LicensingApi.listPersonalSeatsOf`, Request sẽ hủy / tác vụ cấp đang chạy / cam kết sẽ giải phóng qua `RequestsApi.previewBeneficiaryGone`, hạn thu hồi;
   `responsibilities` null và `vendorAdminRoles` rỗng tới X-IT). `OffboardingService` đọc nó trước khi ghi và lưu số đếm vào thay đổi `RECORDED`; route xem

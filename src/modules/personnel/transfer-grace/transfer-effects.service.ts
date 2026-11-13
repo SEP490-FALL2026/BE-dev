@@ -6,7 +6,7 @@ import type { SystemActor } from '../../licensing/public/licensing.types';
 import { RequestsApi } from '../../requests/public/requests.api';
 import { heldOnOrBefore } from './transfer-grace.policy';
 import type { GraceTransferFacts } from './transfer-grace.types';
-import type { TransferSnapshotBefore } from './transfer-snapshot.json';
+import { snapshotRightOf, type TransferSnapshotBefore } from './transfer-snapshot.json';
 
 /**
  * What the system does to the money and the requests of a person the day their transfer takes effect (`QĐ-110o`, `QĐ-111bg`, SPEC MF3-B.4), in
@@ -42,16 +42,7 @@ export class TransferEffectsService {
 
     return {
       takenOn: today,
-      rights: seats.map((seat) => ({
-        assignmentId: seat.assignmentId,
-        applicationId: seat.applicationId,
-        applicationName: seat.applicationName,
-        planId: seat.planId,
-        planName: seat.planName,
-        provisioningType: seat.provisioningType,
-        effectiveFrom: seat.effectiveFrom,
-        validUntil: seat.validUntil,
-      })),
+      rights: seats.map(snapshotRightOf),
       commitmentsReleased: released.released.map((item) => ({
         currency: item.currency,
         amountMinor: item.amountMinor.toString(),

@@ -93,10 +93,13 @@ import { PersonnelDashboardFactsRepo } from './dashboard-facts/dashboard-facts.r
 import { MeDepartmentTransferController } from './transfer-grace/me-department-transfer.controller';
 import { MyTransferService } from './transfer-grace/my-transfer.service';
 import { TransferEffectsService } from './transfer-grace/transfer-effects.service';
+import { TransferGraceSweeper } from './transfer-grace/transfer-grace.job';
 import { TransferGraceRepo } from './transfer-grace/transfer-grace.repo';
 import { TransferGraceService } from './transfer-grace/transfer-grace.service';
 import { TransferImpactService } from './transfer-grace/transfer-impact.service';
 import { TransferOldRightsService } from './transfer-grace/transfer-old-rights.service';
+import { TransferRevocationService } from './transfer-grace/transfer-revocation.service';
+import { TransferTellingService } from './transfer-grace/transfer-telling.service';
 import { TransferChangeWriter } from './transfer/transfer-change-writer.service';
 import { TransferChangeService } from './transfer/transfer-change.service';
 import { TransferEffectiveListener } from './transfer/transfer-effective.listener';
@@ -179,6 +182,9 @@ import { TransfersController } from './transfer/transfers.controller';
     TransferEffectsService,
     TransferGraceRepo,
     TransferGraceService,
+    TransferGraceSweeper,
+    TransferTellingService,
+    TransferRevocationService,
     TransferOldRightsService,
     MyTransferService,
     RevocationOverdueService,

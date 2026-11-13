@@ -40,6 +40,18 @@ export type TransferSnapshotBefore = z.output<typeof beforeSchema>;
 export type TransferSnapshotAfter = z.output<typeof afterSchema>;
 export type SnapshotRight = z.output<typeof rightSchema>;
 
+/** A right as the snapshot keeps it, from a personal seat as the licensing facade gives it. */
+export const snapshotRightOf = (seat: SnapshotRight): SnapshotRight => ({
+  assignmentId: seat.assignmentId,
+  applicationId: seat.applicationId,
+  applicationName: seat.applicationName,
+  planId: seat.planId,
+  planName: seat.planName,
+  provisioningType: seat.provisioningType,
+  effectiveFrom: seat.effectiveFrom,
+  validUntil: seat.validUntil,
+});
+
 /** `department_transfers.snapshot_before`: NULL for a transfer that took effect before the grace existed. */
 export const snapshotBeforeJson = nullableJsonColumn({
   table: 'department_transfers',
