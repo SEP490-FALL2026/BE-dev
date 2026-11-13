@@ -54,6 +54,34 @@ describe('QĐ-111an: the quote of an assessment is in dong, the price the vendor
     ).rejects.toThrow(MoneyOutOfRangeError);
   });
 
+  it('refuses to price a request from a quote kept in another currency (one an earlier release stored and no rate could convert): QUOTE_PRICE_NOT_VND', () => {
+    const kept = {
+      unitPrice: { amountMinor: 800n, currency: 'USD' },
+      originalPrice: null,
+      billingCycle: 'MONTHLY' as const,
+      validFrom: '2026-01-01',
+      validUntil: null,
+    };
+    const price = () => service.price(kept, { beneficiaries: 1, endDate: null }, { checkDate: '2026-10-23' });
+
+    expect(price).toThrow(AssessmentQuoteRefusedError);
+    expect(price).toThrow(expect.objectContaining({ reason: 'QUOTE_PRICE_NOT_VND' }) as Error);
+  });
+
+  it('prices the request from a quote kept in dong', () => {
+    const kept = {
+      unitPrice: { amountMinor: 200000n, currency: 'VND' },
+      originalPrice: null,
+      billingCycle: 'MONTHLY' as const,
+      validFrom: '2026-01-01',
+      validUntil: null,
+    };
+
+    const priced = service.price(kept, { beneficiaries: 2, endDate: null }, { checkDate: '2026-10-23' });
+
+    expect(priced).toMatchObject({ status: 'PRICED', amount: { currency: 'VND' } });
+  });
+
   it('still refuses a quote that ends before it begins', async () => {
     await expect(
       service.read({ ...quote({ amount: '1', currency: 'VND' }), validUntil: '2026-10-31' }),

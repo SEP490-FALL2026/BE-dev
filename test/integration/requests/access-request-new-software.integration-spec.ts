@@ -380,6 +380,25 @@ describe('requests over HTTP: software that is not in the catalog (integration, 
   });
 
   describe('completing it (AC-2, AC-3, AC-14)', () => {
+    it('QĐ-111an: refuses to complete an assessment whose stored quote is still in dollars (no rate could convert it): ASSESSMENT.QUOTE_PRICE_NOT_VND, nothing written', async () => {
+      const proposed = await awaiting();
+      await save(proposed.id, h.assessmentBody()).expect(200);
+      // As an earlier release left it when no exchange rate was entered for the currency of the quote.
+      await h.ctx.sql.query(
+        `UPDATE access_request_assessments SET quote_unit_price_minor = 800, quote_currency = 'USD' WHERE request_id = $1`,
+        [proposed.id],
+      );
+
+      const response = await complete(proposed.id).expect(422);
+
+      expect(h.codeOf(response)).toBe('ASSESSMENT.QUOTE_PRICE_NOT_VND');
+      expect(await stepsOf(proposed.id)).toMatchObject([
+        { kind: 'NEED', state: 'APPROVED' },
+        { kind: 'IT_ASSESSMENT', state: 'PENDING' },
+      ]);
+      expect((await h.assessmentWire(proposed.id, itInCharge.account)).status).toBe('DRAFT');
+    });
+
     it('prices the request from the quote, ends the step of the IT Admin and waits for the head to send it on', async () => {
       const proposed = await awaiting();
       await save(proposed.id, h.assessmentBody()).expect(200);

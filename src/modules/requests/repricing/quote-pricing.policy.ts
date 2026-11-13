@@ -1,5 +1,5 @@
 import type { BusinessDate } from '../../../core/business-date';
-import type { Money } from '../../../core/money/money';
+import { DONG, type Money } from '../../../core/money/money';
 import type { PricingRecord } from '../access-request/access-request.types';
 import type { Quote, QuoteCycle } from '../access-request/assessment-record.types';
 import { requestAmountOf } from '../access-request/pricing.policy';
@@ -27,6 +27,8 @@ export interface QuotePricingInput {
 
 export type QuoteRefusal =
   | { reason: 'QUOTE_NOT_IN_FORCE' }
+  /** The quote is kept in another currency (`QĐ-111an`): nothing here converts, so it prices nothing until it is recorded again in dong. */
+  | { reason: 'QUOTE_PRICE_NOT_VND' }
   /** The quote has no price: a paid request never costs 0, so the price data is incomplete. */
   | { reason: 'PRICE_REQUIRED'; missing: string[] }
   | { reason: 'AMOUNT_TOO_LARGE' };
@@ -44,6 +46,7 @@ export type QuotePricing =
 
 export function priceFromQuote(input: QuotePricingInput): QuotePricing {
   const { quote } = input;
+  if (quote.unitPrice.currency !== DONG) return { status: 'REFUSED', reason: 'QUOTE_PRICE_NOT_VND' };
   const expired = quote.validUntil !== null && quote.validUntil < input.checkDate;
   if (quote.validFrom > input.checkDate || (expired && input.expiredStillPrices !== true)) {
     return { status: 'REFUSED', reason: 'QUOTE_NOT_IN_FORCE' };

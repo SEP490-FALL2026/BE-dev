@@ -196,8 +196,14 @@ export class ProposalsController {
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
-        'The assessment lacks fields, with the names in details.missing (ASSESSMENT.INCOMPLETE), or the quote cannot price the request (ASSESSMENT.QUOTE_NOT_IN_FORCE, AMOUNT_TOO_LARGE). Nothing is written and the request stays with the IT Admin.',
-      examples: [VALIDATION_EXAMPLE, EXAMPLES.INCOMPLETE, EXAMPLES.QUOTE_NOT_IN_FORCE, EXAMPLES.AMOUNT_TOO_LARGE],
+        'The assessment lacks fields, with the names in details.missing (ASSESSMENT.INCOMPLETE), or the quote cannot price the request (ASSESSMENT.QUOTE_NOT_IN_FORCE, AMOUNT_TOO_LARGE, or QUOTE_PRICE_NOT_VND when the stored quote is not in dong: record it again in dong). Nothing is written and the request stays with the IT Admin.',
+      examples: [
+        VALIDATION_EXAMPLE,
+        EXAMPLES.INCOMPLETE,
+        EXAMPLES.QUOTE_NOT_IN_FORCE,
+        EXAMPLES.AMOUNT_TOO_LARGE,
+        EXAMPLES.QUOTE_PRICE_NOT_VND,
+      ],
     },
   )
   async completeAssessment(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Param() params: RequestIdParamDto) {
