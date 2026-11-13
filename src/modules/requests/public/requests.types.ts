@@ -1,3 +1,6 @@
+import type { BusinessDate } from '../../../core/business-date';
+import type { ProvisioningKind } from '../../licensing/public/licensing.types';
+
 /** A request a person is the beneficiary of that is not over, as the IT Admin sees it beside the record of their departure (`US-03-04` AC-24). */
 export interface OpenRequestOfBeneficiary {
   requestId: string;
@@ -61,6 +64,24 @@ export interface BeneficiaryGonePreview {
   wouldCancel: BeneficiaryGonePreviewItem[];
   needsItCheck: BeneficiaryGonePreviewItem[];
   heldToRelease: { requestId: string; currency: string; heldMinor: bigint }[];
+}
+
+/**
+ * The old rights of a person whose transfer has taken effect (`QĐ-111bg`, MF3-B.3): the money held for each of them by the department they
+ * left goes back by the day, from the day the transfer takes effect, once. `rights` are the personal rights the person held then; a kind whose
+ * price is not by the month (K3, K4, K5) gives nothing back.
+ */
+export interface TransferReleaseInput {
+  transferId: string;
+  /** The day the transfer takes effect: the first day the old department no longer pays for the rights. */
+  effectiveOn: BusinessDate;
+  rights: readonly { assignmentId: string; provisioningType: ProvisioningKind }[];
+  now?: Date;
+}
+
+/** What went back to the budget for the rights of a transfer, by currency in the smallest unit; nothing when it was released before. */
+export interface TransferReleaseResult {
+  released: { currency: string; amountMinor: bigint }[];
 }
 
 /** The longest reason a step of the summary source carries, in characters (code points): what the summary may read of it (`US-15-05`). */

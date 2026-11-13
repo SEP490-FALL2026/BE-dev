@@ -22,6 +22,7 @@ import type {
   PersonalSeat,
   ProvisioningFailureKind,
   ProvisioningKind,
+  RightChain,
   SeatHolding,
   RevocationSource,
   SelfExecutionMode,
@@ -86,6 +87,15 @@ export class LicensingApi {
    */
   listPersonalSeatsOf(employeeId: string, onDate: BusinessDate, tx?: DbTx): Promise<PersonalSeat[]> {
     return this.revocationView.personalSeatsOf(employeeId, onDate, tx);
+  }
+
+  /**
+   * The request that made each of these rights and the assignments each continues (a renewal or a handover carries a right on), in the order
+   * given: what the module of requests finds the money held for a right by when it gives it back without a revocation completed, the day a
+   * transfer takes effect (`QĐ-111bg`). Read in the caller's transaction.
+   */
+  listRightChainsOf(tx: DbTx, assignmentIds: readonly string[]): Promise<RightChain[]> {
+    return this.revocationView.rightChainsOf(tx, assignmentIds);
   }
 
   /**

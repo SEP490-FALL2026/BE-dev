@@ -1,7 +1,11 @@
 import { addDays, type BusinessDate } from '../../../core/business-date';
 import { fiscalYearOf } from '../../../core/fiscal-year';
 import type { SeatCommitment } from '../../budgets/public/budgets.types';
-import type { ProvisioningKind, RevocationCompletedFacts } from '../../licensing/public/licensing.types';
+import type {
+  ProvisioningKind,
+  RevocationCompletedFacts,
+  RevocationSource,
+} from '../../licensing/public/licensing.types';
 import { releaseOnLateGrant, releaseOnRevocation } from '../../licensing/public/seat-month-cost.policy';
 
 /**
@@ -124,3 +128,21 @@ export function lateGrantShare(input: {
 
 /** Whether the grant of this kind gives back the days before it: only a K2 right, whose seat is bought for the year (`M-10`). */
 export const releasesBeforeGrant = (kind: ProvisioningKind): boolean => kind === 'K2';
+
+/**
+ * The first day the old department no longer pays for a right of a person who moved (`QĐ-111bg`): the day the transfer takes effect, for a K1
+ * or K2 right alike (the old department stops paying the day the person leaves it; what was spent stays spent). Null for any other kind,
+ * whose commitment does not go back by day. The share is the one of {@link revocationShare}, so one rule gives back money by the day.
+ */
+export function transferReleaseEndsOn(kind: ProvisioningKind, effectiveOn: BusinessDate): BusinessDate | null {
+  return BY_THE_MONTH.includes(kind) ? effectiveOn : null;
+}
+
+/**
+ * Whether the revocation of a right gives nothing back by the day (BLK-3): the old right of a person who moved gave its commitment back the
+ * day the transfer took effect, so the revocation that follows the grace (source `TRANSFER`) must not give it back a second time, whatever
+ * other source asked for the same task.
+ */
+export function releasedAtTransfer(sources: readonly RevocationSource[]): boolean {
+  return sources.includes('TRANSFER');
+}

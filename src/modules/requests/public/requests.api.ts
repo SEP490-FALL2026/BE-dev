@@ -3,11 +3,14 @@ import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { SystemActor } from '../../licensing/public/licensing.types';
 import { OpenRequestService } from '../access-request/open-request/open-request.service';
 import { BeneficiaryGoneCancellation } from '../cancellation/beneficiary-gone-cancellation.service';
+import { SeatReleaseService } from '../grant/seat-release.service';
 import type {
   BeneficiaryGoneInput,
   BeneficiaryGonePreview,
   BeneficiaryGoneResult,
   OpenRequestOfBeneficiary,
+  TransferReleaseInput,
+  TransferReleaseResult,
 } from './requests.types';
 
 /**
@@ -20,6 +23,7 @@ export class RequestsApi {
   constructor(
     private readonly open: OpenRequestService,
     private readonly gone: BeneficiaryGoneCancellation,
+    private readonly seats: SeatReleaseService,
   ) {}
 
   /**
@@ -34,6 +38,18 @@ export class RequestsApi {
     input: BeneficiaryGoneInput,
   ): Promise<BeneficiaryGoneResult> {
     return this.gone.run(tx, actor, input, await this.open.idsOf(tx, input.employeeId));
+  }
+
+  /**
+   * Gives back to the budget of the old department the rest of the money held for each old right of a person whose transfer takes effect
+   * (`QĐ-111bg`), in the caller's transaction: the share of `revocationShare` with the day the transfer takes effect as the end, on the
+   * commitments of the request that made the right and of the requests that go on using it, at the price a month kept on each. Once for
+   * each right: it names `transfer:<transferId>:assignment:<assignmentId>`, so run again it gives nothing back again, and the revocation
+   * that follows the grace (source `TRANSFER`) gives nothing back either. No new commitment is made for the new department. Never throws
+   * for a right with no request, no commitment, a closed year or a price that is not by the month.
+   */
+  releaseForTransfer(tx: DbTx, input: TransferReleaseInput): Promise<TransferReleaseResult> {
+    return this.seats.afterTransferEffective(tx, input, input.now ?? new Date());
   }
 
   /**

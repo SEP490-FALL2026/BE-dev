@@ -445,6 +445,16 @@ export interface GrantOutcomeFacts {
   assignmentId: string;
 }
 
+/**
+ * Where the money held for a right is found: the request whose grant made it (a renewal or a handover carries the right on, so it is found
+ * through the chain) and the assignments the right continues, the one given first. The same two facts a completed revocation tells its listeners.
+ */
+export interface RightChain {
+  assignmentId: string;
+  grantRequestId: string | null;
+  chainAssignmentIds: string[];
+}
+
 /** The facts of a revocation task its listeners are told. */
 export interface RevocationTaskFacts {
   id: string;

@@ -4,24 +4,29 @@ import { fiscalYearOf } from '../../../core/fiscal-year';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { BudgetsApi } from '../../budgets/public/budgets.api';
 import type { CommitmentReleaseReason, SeatCommitment } from '../../budgets/public/budgets.types';
+import { LicensingApi } from '../../licensing/public/licensing.api';
 import type { GrantOutcomeFacts, RevocationTaskFacts } from '../../licensing/public/licensing.types';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
+import type { TransferReleaseInput, TransferReleaseResult } from '../public/requests.types';
 import {
   lateGrantShare,
+  releasedAtTransfer,
   releasesBeforeGrant,
   revocationEndsOn,
   revocationShare,
+  transferReleaseEndsOn,
   type SeatCoverage,
 } from './seat-release.policy';
 import { SeatReleaseRepo } from './seat-release.repo';
 
 /**
  * Gives back by the day what a request holds for one seat (`RV-07`, `M-06`, `M-10`), in the transaction of the event: when the revocation of
- * the right is completed, the days after its end; when a K2 right is granted after its commitment began, the days before the grant. The
- * commitments are those of the request that made the right and of every request to go on using of its chain, each for the months it covers,
- * so the request that holds the right on the day it ends gives back the rest and a later one gives back all of it. Business cases that
- * give nothing back (no request, no commitment, a closed year, a one-time price) do nothing and never throw; the budgets write the release
- * and its audit (`BUDGET_COMMITMENT.RELEASED`, actor the system), once for each task, whatever repeats it.
+ * the right is completed, the days after its end; when a K2 right is granted after its commitment began, the days before the grant; when the
+ * transfer of the person who holds it takes effect, the days from that day (`QĐ-111bg`). The commitments are those of the request that made
+ * the right and of every request to go on using of its chain, each for the months it covers, so the request that holds the right on the day
+ * it ends gives back the rest and a later one gives back all of it. Business cases that give nothing back (no request, no commitment, a closed
+ * year, a one-time price) do nothing and never throw; the budgets write the release and its audit (`BUDGET_COMMITMENT.RELEASED`, actor the
+ * system), once for each task, whatever repeats it.
  */
 @Injectable()
 export class SeatReleaseService {
@@ -29,12 +34,18 @@ export class SeatReleaseService {
     private readonly budgets: BudgetsApi,
     private readonly organizationReads: OrganizationReadApi,
     private readonly repo: SeatReleaseRepo,
+    private readonly licensing: LicensingApi,
   ) {}
 
-  /** The revocation `task` was completed: what the right would have cost after its end goes back. Anything else is ignored. */
+  /**
+   * The revocation `task` was completed: what the right would have cost after its end goes back. Anything else is ignored. A revocation that a
+   * transfer asked for (source `TRANSFER`) gives nothing back: the right gave its commitment back the day the transfer took effect, and the
+   * commitment goes back exactly once (BLK-3).
+   */
   async afterRevocation(tx: DbTx, task: RevocationTaskFacts, now: Date): Promise<void> {
     const completed = task.completed;
     if (task.status !== 'COMPLETED' || completed === undefined) return;
+    if (releasedAtTransfer(completed.sources)) return;
     const endsOn = revocationEndsOn(completed);
     if (endsOn === null) return;
     const coverages = await this.repo.coverageOf(tx, {
@@ -46,6 +57,40 @@ export class SeatReleaseService {
       reference: `revocationTask:${task.id}`,
       shareOf: (commitment, coverage, currentYear) => revocationShare({ commitment, coverage, endsOn, currentYear }),
     });
+  }
+
+  /**
+   * The transfer of a person takes effect (`QĐ-111bg`): for each old right the money the department they leave still holds goes back from the
+   * day of the transfer, by the same share as a revocation on that day, once (the reference names the transfer and the right). A right whose
+   * kind is not priced by the month, or that no request made, gives nothing. Returns what went back, by currency.
+   */
+  async afterTransferEffective(tx: DbTx, input: TransferReleaseInput, now: Date): Promise<TransferReleaseResult> {
+    const byRequest = new Map<string, bigint>();
+    const priced = input.rights.filter(
+      (right) => transferReleaseEndsOn(right.provisioningType, input.effectiveOn) !== null,
+    );
+    const chains = await this.licensing.listRightChainsOf(
+      tx,
+      priced.map((right) => right.assignmentId),
+    );
+    for (const chain of chains) {
+      const kind = priced.find((right) => right.assignmentId === chain.assignmentId)?.provisioningType;
+      const endsOn = kind === undefined ? null : transferReleaseEndsOn(kind, input.effectiveOn);
+      if (endsOn === null) continue;
+      const coverages = await this.repo.coverageOf(tx, {
+        requestIds: chain.grantRequestId === null ? [] : [chain.grantRequestId],
+        assignmentIds: chain.chainAssignmentIds,
+      });
+      const released = await this.give(tx, coverages, now, {
+        reason: 'TRANSFER_EFFECTIVE',
+        reference: `transfer:${input.transferId}:assignment:${chain.assignmentId}`,
+        shareOf: (commitment, coverage, currentYear) => revocationShare({ commitment, coverage, endsOn, currentYear }),
+      });
+      for (const [requestId, amountMinor] of released)
+        byRequest.set(requestId, (byRequest.get(requestId) ?? 0n) + amountMinor);
+    }
+
+    return { released: await this.byCurrency(byRequest) };
   }
 
   /** The grant of `requestId` was completed: a K2 right granted after its commitment began gives back the days before it. */
@@ -60,17 +105,36 @@ export class SeatReleaseService {
     });
   }
 
+  /** The amounts that went back, added up by the currency their request is committed in. */
+  private async byCurrency(byRequest: ReadonlyMap<string, bigint>): Promise<TransferReleaseResult['released']> {
+    if (byRequest.size === 0) return [];
+    const currencies = new Map(
+      (await this.budgets.committedByRequests([...byRequest.keys()])).map((item) => [item.requestId, item.currency]),
+    );
+    const totals = new Map<string, bigint>();
+    for (const [requestId, amountMinor] of byRequest) {
+      const currency = currencies.get(requestId);
+      if (currency !== undefined && amountMinor > 0n) totals.set(currency, (totals.get(currency) ?? 0n) + amountMinor);
+    }
+
+    return [...totals]
+      .map(([currency, amountMinor]) => ({ currency, amountMinor }))
+      .sort((a, b) => a.currency.localeCompare(b.currency));
+  }
+
+  /** Releases what `shareOf` says for each commitment and returns, by request, what really went back. */
   private async give(
     tx: DbTx,
     coverages: Map<string, SeatCoverage>,
     now: Date,
     by: {
-      reason: Extract<CommitmentReleaseReason, 'REVOKED' | 'LATE_GRANT'>;
+      reason: Extract<CommitmentReleaseReason, 'REVOKED' | 'LATE_GRANT' | 'TRANSFER_EFFECTIVE'>;
       reference: string;
       shareOf: (commitment: SeatCommitment, coverage: SeatCoverage, currentYear: number) => bigint;
     },
-  ): Promise<void> {
-    if (coverages.size === 0) return;
+  ): Promise<Map<string, bigint>> {
+    const given = new Map<string, bigint>();
+    if (coverages.size === 0) return given;
     // The years before the year of today are closed: their commitments are left as they are.
     const currentYear = fiscalYearOf(await this.organizationReads.businessToday(now, tx));
     const commitments = await this.budgets.lockSeatCommitments(tx, [...coverages.keys()], currentYear);
@@ -86,13 +150,19 @@ export class SeatReleaseService {
       ]);
     }
     for (const [requestId, items] of amounts) {
-      await this.budgets.releaseForRequest(tx, {
+      const released = await this.budgets.releaseForRequest(tx, {
         requestId,
         reason: by.reason,
         reference: by.reference,
         amounts: items,
         now,
       });
+      given.set(
+        requestId,
+        released.reduce((sum, commitment) => sum + commitment.releasedMinor, 0n),
+      );
     }
+
+    return given;
   }
 }
