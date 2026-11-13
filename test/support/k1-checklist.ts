@@ -37,26 +37,22 @@ export const K1_CODES: Record<K1Variant, readonly K1ChecklistCode[]> = {
   STILL_EMPLOYED: ['RENEWAL_DISABLED', 'EVIDENCE_RECORDED'],
 };
 
-/** The instant of the step at `index` of a checklist that ended a minute ago and was done a minute apart. */
-export function k1TimeOf(length: number, index: number, now: number = Date.now()): string {
-  return new Date(now - 60_000 * (length - index)).toISOString();
-}
-
 /**
- * A complete checklist of the variant; the evidence goes in it only when the test gives it (the body of the completion may carry it instead).
- * The lock of the mailbox is a step of the last K1 revocation of the person only (R-1): a test that completes one that is not the last asks
- * for the checklist `withLock: false`.
+ * A complete checklist of the variant, the steps done a second apart from a second ahead of now: after the task the test has just made (a step
+ * is never ticked before the task was made, review O2; one ahead of the clock is not refused, D-55). The evidence goes in it only when the test
+ * gives it (the body of the completion may carry it instead). The lock of the mailbox is a step of the last K1 revocation of the person only
+ * (R-1): a test that completes one that is not the last asks for the checklist `withLock: false`. `startAt` (ms) moves the first step.
  */
 export function k1Checklist(
   variant: K1Variant = 'STILL_EMPLOYED',
   evidence?: string,
-  options: { withLock?: boolean } = {},
+  options: { withLock?: boolean; startAt?: number } = {},
 ): K1ChecklistBody {
-  const now = Date.now();
+  const start = options.startAt ?? Date.now() + 1000;
   const codes = K1_CODES[variant].filter((code) => code !== 'MAILBOX_LOCKED' || options.withLock !== false);
 
   return {
-    items: codes.map((code, index) => ({ code, done: true, doneAt: k1TimeOf(codes.length, index, now) })),
+    items: codes.map((code, index) => ({ code, done: true, doneAt: new Date(start + 1000 * index).toISOString() })),
     ...(evidence === undefined ? {} : { evidence }),
   };
 }

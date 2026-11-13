@@ -474,6 +474,15 @@ Không sửa code; SPEC không bị sửa trong lượt này (spec là của Own
 - **Đổi lại:** bỏ `codes` khỏi `details`: sửa `provisioning.http-errors.ts` thành `{ variant: error.expected.variant }`; bỏ hẳn: không truyền `expected` ở `fail()` của policy.
 - **Chạm:** `licensing.errors.ts`, `licensing.types.ts`, `k1-checklist/provisioning-k1-checklist.policy.ts` (`fail(problem, expected)`), `provisioning.http-errors.ts`, `revocation-tasks.controller.ts` (mô tả), `openapi.json`; test: policy spec (+2 ca), `provisioning-k1-checklist.integration-spec.ts` (6 chỗ kiểm `details` trên dây, loại ghế không checklist không có `details`), `provisioning.http-spec.ts` (ví dụ OpenAPI mang `details`).
 
+### D-64 · K1-CL review O2 (Optional) · `doneAt` không được trước lúc tác vụ được tạo
+
+- **Yêu cầu:** chặn `doneAt` trước `createdAt` của tác vụ (rẻ), tự chốt mã; không chặn tương lai (D-55 cố ý). Phương án mã: A. **`K1_CHECKLIST_OUT_OF_ORDER`**: bước được tick _trước cả khi tác vụ tồn tại_ là sai trình tự theo thời gian của quy trình, cùng loại với "bước 6 trước bước 3", không thêm mã mới (không phải đổi bảng mã OpenAPI, tài liệu, `reactions` của generator). B. `K1_CHECKLIST_INCOMPLETE`: ý nghĩa của mã là _thiếu_ (chưa tick, không có giờ đọc được); một giờ đọc được nhưng vô lý không phải thiếu. C. mã mới `K1_CHECKLIST_TIME_INVALID`: đúng nghĩa hơn nhưng thêm bề mặt hợp đồng cho một kiểm tra rẻ. **ĐÃ CHỌN A**, kèm `details { variant, codes }` như D-63 để client biết chỗ nào cần sửa.
+- **Luật:** mọi `doneAt` phải **không nhỏ hơn** `provisioning_tasks.created_at` của tác vụ (bằng nhau thì được: giờ đồng hồ có độ phân giải). Thứ tự báo lỗi: thiếu (`INCOMPLETE`) trước, rồi `OUT_OF_ORDER` cho cả hai nguyên nhân (giờ trước lúc tạo hoặc giảm theo `order`). Không chặn tương lai, không dung sai.
+- **Rủi ro đã thấy và chấp nhận:** đồng hồ máy của IT Admin chậm hơn đồng hồ server nhiều hơn tuổi của tác vụ (tác vụ vừa mở vài giây rồi hoàn tất ngay) sẽ nhận 422 oan; tác vụ đã mở từ vài phút trở lên thì không. Nếu gặp ở demo/FE: nới bằng một dung sai (ví dụ trừ vài phút khỏi `openedAt` trong `planK1Checklist`) hoặc FE lấy giờ từ server; không đổi hợp đồng.
+- **Test:** bộ test dựng checklist (`test/support/k1-checklist.ts`) nay đặt bước đầu ở "bây giờ + 1 giây" và cách nhau 1 giây (không còn lùi về quá khứ, vốn trước lúc tác vụ được tạo); hằng `leaving` của spec hoàn tất thành hàm vì giá trị thời gian phải tính sau khi tác vụ có.
+- **Đổi lại:** bỏ kiểm: xóa điều kiện `time < opened` ở `planK1Checklist` (và tham số `openedAt`); đổi mã: đổi đối số của `fail(...)` ở đó.
+- **Chạm:** `k1-checklist/provisioning-k1-checklist.policy.ts` (`openedAt`), `.service.ts` (truyền `task.createdAt`), `revocation-tasks.controller.ts` (mô tả), `openapi.json`; test: spec mới `provisioning-k1-checklist-opened.policy.spec.ts` (3 nhóm ca, đỏ trước), `provisioning-k1-checklist.integration-spec.ts` (+1 ca), `test/support/k1-checklist.ts`, `provisioning-revocation-complete.integration-spec.ts`.
+
 ## Bị chặn
 
 (chưa có)

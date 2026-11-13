@@ -56,17 +56,23 @@ export class ProvisioningK1Checklist {
    */
   async plan(
     tx: DbTx,
-    task: { id: string; revocationSource: RevocationSource | null; assignment: { employeeId: string } },
+    task: {
+      id: string;
+      revocationSource: RevocationSource | null;
+      createdAt: Date;
+      assignment: { employeeId: string };
+    },
     input: { type: ProvisioningKind; claim: K1ChecklistClaim | undefined; evidence: string },
   ): Promise<K1ChecklistPlan | null> {
-    if (input.type !== 'K1') return planK1Checklist({ ...input, sources: [], lastOfPerson: true });
+    const opened = { openedAt: task.createdAt };
+    if (input.type !== 'K1') return planK1Checklist({ ...input, ...opened, sources: [], lastOfPerson: true });
 
     const employeeId = task.assignment.employeeId;
     await this.checklists.lockPerson(tx, employeeId);
     const others = (await this.liveK1Of([employeeId], tx)).get(employeeId) ?? [];
     const sources = sourcesOf(await this.reasons.listOf([task.id], tx), task.revocationSource);
 
-    return planK1Checklist({ ...input, sources, lastOfPerson: others.every((id) => id === task.id) });
+    return planK1Checklist({ ...input, ...opened, sources, lastOfPerson: others.every((id) => id === task.id) });
   }
 
   /** Keeps the checklist on the task, in the transaction of the completion and before the task is marked completed. */

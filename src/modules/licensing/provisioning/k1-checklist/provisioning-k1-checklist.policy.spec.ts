@@ -51,6 +51,7 @@ function plan(
     claim,
     evidence: options.evidence ?? '',
     lastOfPerson: options.lastOfPerson ?? true,
+    openedAt: new Date(Date.UTC(2026, 10, 13, 7, 0)),
   });
 }
 

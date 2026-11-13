@@ -221,7 +221,7 @@ describe('completing a revocation by the kind of grant, over HTTP (integration, 
       k1Checklist: k1Checklist('STILL_EMPLOYED'),
       ...extra,
     });
-    const leaving = { k1Checklist: k1Checklist('DEPARTURE') };
+    const leaving = () => ({ k1Checklist: k1Checklist('DEPARTURE') });
     const x = () => h.inDays(36);
 
     it('AC-5: locking the company account takes nothing back, and a completion without the state of the access is not stored', async () => {
@@ -271,7 +271,9 @@ describe('completing a revocation by the kind of grant, over HTTP (integration, 
       expect(await h.freeSeats(subscriptionId)).toBe(0);
 
       const done = taskOf(
-        await h.revoked(taskId, renewal({ ...leaving, paidThroughOn: x(), accessState: 'UNTIL_PAID_END' })).expect(200),
+        await h
+          .revoked(taskId, renewal({ ...leaving(), paidThroughOn: x(), accessState: 'UNTIL_PAID_END' }))
+          .expect(200),
       );
 
       expect(done).toMatchObject({
@@ -318,7 +320,7 @@ describe('completing a revocation by the kind of grant, over HTTP (integration, 
     it('AC-19: cutting the access earlier brings the end of the seat forward, once', async () => {
       const subscriptionId = await h.subscription(1, 'K1');
       const { assignmentId, taskId } = await taken({ subscriptionId }, 'ABRUPT_DEPARTURE');
-      await h.revoked(taskId, renewal({ ...leaving, paidThroughOn: x(), accessState: 'UNTIL_PAID_END' })).expect(200);
+      await h.revoked(taskId, renewal({ ...leaving(), paidThroughOn: x(), accessState: 'UNTIL_PAID_END' })).expect(200);
       const cutOn = h.inDays(-3);
 
       const cut = taskOf(

@@ -259,6 +259,24 @@ describe('the checklist of a K1 revocation, over HTTP (integration, real Postgre
       },
     );
 
+    it('refuses a step ticked before the task was made: K1_CHECKLIST_OUT_OF_ORDER with the details, and nothing changes (review O2)', async () => {
+      const { assignmentId, taskId } = await taken('RETURN');
+      const anHourAgo = Date.now() - 3_600_000;
+
+      const refused = await complete(taskId, k1Checklist('STILL_EMPLOYED', 'đã hủy', { startAt: anHourAgo })).expect(
+        422,
+      );
+
+      expect(h.codeOf(refused)).toBe('REVOCATION.K1_CHECKLIST_OUT_OF_ORDER');
+      expect(detailsOf(refused)).toEqual({ variant: 'STILL_EMPLOYED', codes: [...K1_CODES.STILL_EMPLOYED] });
+      await unchanged(assignmentId, taskId);
+      // Only the first step before the task is just as out of order; the same steps ticked after the task are taken.
+      const first = k1Checklist('STILL_EMPLOYED', 'đã hủy', { startAt: Date.now() + 1000 });
+      first.items[0].doneAt = new Date(anHourAgo).toISOString();
+      expect(h.codeOf(await complete(taskId, first).expect(422))).toBe('REVOCATION.K1_CHECKLIST_OUT_OF_ORDER');
+      await complete(taskId, k1Checklist('STILL_EMPLOYED', 'đã hủy')).expect(200);
+    });
+
     it('refuses the renewal ticked after the evidence, and a step sent twice', async () => {
       const { assignmentId, taskId } = await taken('TIME_LIMITED_EXPIRY');
 
