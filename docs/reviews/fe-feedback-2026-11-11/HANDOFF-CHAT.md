@@ -51,7 +51,7 @@ Thư mục kế hoạch BE (`docs/reviews/…`):
 
 ## 4. Đang chạy / việc kế tiếp
 
-- **Sonnet đang chạy prompt 2** (MF-2/MF-3 theo SPEC v2.3 + PLAN v2.4: X0 → … → RD → `AUDIT-LEFT`, bỏ Z). Khi xong Owner nhắn
+- **Sonnet đang chạy prompt 2 xuyên đêm 12–13/11** (MF-2/MF-3 theo SPEC v2.3 + PLAN v2.4: X0 → … → RD → `AUDIT-LEFT`, bỏ Z; subagent tuần tự + chế độ đêm §6 — đọc `mf2-mf3-2026-11-10/OVERNIGHT-DECISIONS.md` trước khi audit). Khi xong Owner nhắn
   **"audit MF-2/MF-3"** ⟹ làm theo §5, ghi `mf2-mf3-2026-11-10/AUDIT.md`.
 - Sau đó: prompt 3 (feedback FE, SPEC v2.1, bỏ Z2) → "audit feedback FE" → prompt 4 (pha cuối: full test, API thật, **gói Z + Z2 =
   sửa seed một lần**, `HANDOFF-REVIEW.md`) → chat Opus review cuối.
@@ -91,3 +91,33 @@ Thư mục kế hoạch BE (`docs/reviews/…`):
 coverage-manifest.json`), sửa annotation/CHANGELOG, test 45/45; commit Docs `docs(api)` **sau khi Owner commit BE** (ghi đúng sha +
    sha256 `openapi.json` ở README và CHANGELOG).
 8. Ghi `AUDIT.md` của gói; đưa Owner lệnh commit; cập nhật memory.
+
+## 6. Luật chạy chat Sonnet (Owner chốt 12–13/11) — chat điều phối dùng khi soạn prompt cho Sonnet
+
+1. **Quy trình theo từng SPEC, không gộp:** prompt 2 (MF-2/MF-3) → audit Opus → Owner commit → prompt 3 (feedback FE) → audit →
+   Owner commit → prompt 4 (pha cuối: full test, API thật, seed Z + Z2, `HANDOFF-REVIEW.md`) → review cuối. Không để code hết ba SPEC
+   rồi mới review. Một chat Opus không audit quá một SPEC lớn; đầy context thì bàn giao sang chat mới (file này).
+2. **Subagent tuần tự** (Owner đã gửi cho Sonnet giữa prompt 2): `superpowers:subagent-driven-development` nhưng **một subagent một gói,
+   lần lượt, không song song** (gói phụ thuộc nhau, migration tăng dần, cùng file `HANDOFF-CODE.md`/`openapi.json`, DB test chung —
+   `AGENTS.md` cấm). Không review hai bước mỗi task; cuối mỗi gói một subagent review nhẹ (chỉ đọc). Chat Sonnet chính chỉ điều phối:
+   kiểm `git log`, `git status`, dòng HANDOFF giữa hai gói; subagent trả ≤ 15 dòng.
+3. **Chế độ chạy đêm** (Owner treo máy): Sonnet **không** dùng AskUserQuestion, không dừng chờ. Gặp câu hỏi/mâu thuẫn ⟹ tự brainstorm
+   2–3 phương án, chọn theo thứ tự căn cứ QĐ → BRD → OWNER-REVIEW → SPEC/PLAN → code → thông lệ thực tế; ưu tiên đơn giản, dễ đổi lại
+   (không xóa dữ liệu, không drop, không đổi contract khó lùi), an toàn nghiệp vụ; **không** tự chốt điều trái QĐ. Ghi vào
+   `docs/reviews/<thư mục SPEC>/OVERNIGHT-DECISIONS.md` mục `D-n` (câu hỏi · phương án · đã chọn + căn cứ · file/commit · cách đổi lại),
+   commit message thêm "(tạm chốt D-n)". Task bị chặn ⟹ mục "Bị chặn", làm tiếp phần không phụ thuộc; còn < 10% context ⟹ mục
+   "Dừng ở đâu". Cuối file: "Tóm tắt cho Owner". **Audit sau đó hỏi Owner lại từng điểm `D-n` kèm phương án.**
+4. **Chat Sonnet đầy giữa chừng:** mở chat Sonnet mới, dán lại prompt của SPEC đó + đoạn subagent (+ chế độ đêm nếu cần) + câu "đọc
+   HANDOFF-CODE.md và OVERNIGHT-DECISIONS.md, làm tiếp từ gói/task chưa có commit".
+5. **Trước khi Owner treo máy:** quyền lệnh của Claude Code ở chế độ tự chấp nhận (không thì đứng ở lần hỏi đầu); Docker Desktop bật +
+   `slm-test-db` cổng 35432 chạy; cắm sạc (`powercfg … -ac 0`); tạm dừng Windows Update; chạm giới hạn lượt thì sáng nhắn "tiếp tục".
+6. **Luật cố định trong mọi prompt Sonnet:** quick check mỗi task (typecheck, lint, test file của task; đổi route/cạnh module thêm
+   `arch:check`), test đỏ trước cho policy, commit theo task + một dòng HANDOFF-CODE; cuối gói `test:gates` + `rules:check` +
+   `openapi:export` + `arch:routes` + tài liệu API FE `--check` (không commit Docs). Cấm: `pnpm check`/`test:http`/`test:integration`
+   toàn bộ/`test:flows`/`seed:local` (để audit và pha cuối), push/merge/deploy, sửa Docs ngoài `API-Integration`, tự bịa luật. DB test
+   cổng 35432, `--maxWorkers ≤ 4`, không export `TEST_DATABASE_BOOTSTRAP_URL` chung. Mô tả OpenAPI không chứa mã `QĐ-…`.
+7. **Ước lượng** (đo ở gói bug: ~25 task trong ~3–4 giờ Sonnet ⟹ 6–8 task/giờ): MF-2/MF-3 ~70 task / 18 gói ⟹ 10–14 giờ máy, thường
+   2–3 phiên; audit Opus 3–4 giờ (chủ yếu chờ full test ~1,5 giờ/lượt).
+8. **Code chính sách** (thư viện, checklist, file mẫu) nằm **chỉ ở SPEC feedback FE** gói PL-1/PL-2/PL-3 (prompt 3); PLAN FE đã ghi O-1
+   đóng (`QĐ-112b`), seed theo `POLICY-SEED-DRAFT.md`, mục `SYSTEM` đối chiếu guard (CS-8). Nghiên cứu chính sách đủ cho đồ án; còn 8
+   điểm luật VN chưa đối chiếu Công báo (cuối `R16-POLICY-SOURCES.md`) và mọi QĐ từ `QĐ-82` chưa báo GVHD/mentor.
