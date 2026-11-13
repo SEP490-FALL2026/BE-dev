@@ -169,7 +169,11 @@ UPDATE "access_requests" r
  WHERE r."id" = c."id";
 
 -- 4. The supplementary files of those requests. A file is append-only (INV-05): the trigger that refuses a change is switched off for this one
--- statement and on again, in the same transaction, so no other session ever sees it off.
+-- statement and on again, in the same transaction, so no other session ever sees it off. The two CHECK constraints `NOT VALID` of
+-- `20261109130000` (no spend day, an amount or an end date that changed) judge every new version of a row, also of a file an older release
+-- wrote (a day set, the amounts maybe equal): they are dropped for the same statement and added again exactly as they were, `NOT VALID`, so
+-- the older files stay as they are and a new file is judged as before. Dropping them is chosen over leaving such files in dollars next to a
+-- request that is in dong.
 CREATE TEMP TABLE "fx_supplement_changes" AS
 SELECT p."id", p."organization_id", p."request_id", p."number", p."currency" AS "old_currency",
        p."before_amount_minor" AS "old_before", p."after_amount_minor" AS "old_after", l."rate", l."rate_date",
@@ -199,6 +203,8 @@ SELECT gen_random_uuid(), c."organization_id", 'SYSTEM', NULL, '{}', 'ACCESS_REQ
   FROM "fx_supplement_changes" c;
 
 ALTER TABLE "request_supplements" DISABLE TRIGGER "request_supplements_no_update_delete";
+ALTER TABLE "request_supplements" DROP CONSTRAINT IF EXISTS "request_supplements_retired_spend_day_check";
+ALTER TABLE "request_supplements" DROP CONSTRAINT IF EXISTS "request_supplements_change_v2_check";
 
 UPDATE "request_supplements" p
    SET "before_amount_minor" = c."new_before",
@@ -206,6 +212,15 @@ UPDATE "request_supplements" p
        "currency" = 'VND'
   FROM "fx_supplement_changes" c
  WHERE p."id" = c."id";
+
+ALTER TABLE "request_supplements"
+    ADD CONSTRAINT "request_supplements_retired_spend_day_check"
+    CHECK ("before_expected_spend_on" IS NULL AND "after_expected_spend_on" IS NULL) NOT VALID;
+
+ALTER TABLE "request_supplements"
+    ADD CONSTRAINT "request_supplements_change_v2_check"
+    CHECK ("before_amount_minor" IS DISTINCT FROM "after_amount_minor"
+           OR "before_expected_end_date" IS DISTINCT FROM "after_expected_end_date") NOT VALID;
 
 ALTER TABLE "request_supplements" ENABLE TRIGGER "request_supplements_no_update_delete";
 
