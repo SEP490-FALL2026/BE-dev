@@ -1,6 +1,7 @@
 import {
   closureDue,
   legacyAnnouncementDue,
+  regrantsPendingOf,
   reminderDue,
   revocationDue,
   rightOutcome,
@@ -152,7 +153,20 @@ describe('closureDue (QĐ-110r: the system closes the transfer when no right of 
     ['one right still held, a task waits', '2026-11-21', 1, false],
     ['three rights still held', '2026-12-01', 3, false],
   ])('%s (%s, %s open) ⟹ %s', (_name, today, open, expected) => {
-    expect(closureDue(effective, open, today)).toBe(expected);
+    expect(closureDue(effective, { openRights: open, pendingRegrants: 0 }, today)).toBe(expected);
+  });
+
+  it.each([
+    [
+      'one grant of a right asked for again is still waiting: if it fails the old right is open again',
+      '2026-11-21',
+      1,
+      false,
+    ],
+    ['two grants wait', '2026-12-01', 2, false],
+    ['no grant waits (done, failed or cancelled)', '2026-11-21', 0, true],
+  ])('%s (%s, %s waiting) ⟹ %s', (_name, today, pendingRegrants, expected) => {
+    expect(closureDue(effective, { openRights: 0, pendingRegrants }, today)).toBe(expected);
   });
 
   it.each([
@@ -161,7 +175,29 @@ describe('closureDue (QĐ-110r: the system closes the transfer when no right of 
     ['waiting', { status: 'PENDING' as const }],
     ['with no grace', { graceEndsOn: null, graceReminderOn: null }],
   ])('never closes a transfer that is %s', (_name, change) => {
-    expect(closureDue({ ...effective, ...change }, 0, '2026-12-01')).toBe(false);
+    expect(closureDue({ ...effective, ...change }, { openRights: 0, pendingRegrants: 0 }, '2026-12-01')).toBe(false);
+  });
+});
+
+describe('regrantsPendingOf (R-49: a grant still waiting for a right of the picture, which it may give back if it fails)', () => {
+  const waiting = [
+    { replacedAssignmentId: 'a-canva', replacedEffectiveFrom: '2026-01-10' },
+    { replacedAssignmentId: 'a-other', replacedEffectiveFrom: '2026-02-01' },
+  ];
+
+  it('counts the grants whose replaced right is named by the picture of the transfer', () => {
+    const count = regrantsPendingOf(waiting, { effectiveOn: '2026-11-16', pictureIds: ['a-canva', 'a-figma'] });
+
+    expect(count).toBe(1);
+  });
+
+  it('without a picture (a transfer from before the grace) counts the replaced rights begun on the day it took effect or before', () => {
+    expect(regrantsPendingOf(waiting, { effectiveOn: '2026-01-31', pictureIds: null })).toBe(1);
+    expect(regrantsPendingOf(waiting, { effectiveOn: '2026-11-16', pictureIds: null })).toBe(2);
+  });
+
+  it('counts none when nothing waits', () => {
+    expect(regrantsPendingOf([], { effectiveOn: '2026-11-16', pictureIds: ['a-canva'] })).toBe(0);
   });
 });
 

@@ -28,6 +28,7 @@ import type {
   SelfExecutionMode,
   SystemActor,
   TerminatingAccess,
+  WaitingRegrant,
   WithdrawnRevocation,
   WithdrawRevocationInput,
 } from './licensing.types';
@@ -104,6 +105,14 @@ export class LicensingApi {
    */
   listRegrantedAssignments(assignmentIds: readonly string[], tx?: DbTx): Promise<Set<string>> {
     return this.assignments.regrantedAmong(assignmentIds, tx);
+  }
+
+  /**
+   * The grants of a right asked for again (R-49) of this person that still wait (not done, not failed, not cancelled), with the day the right each
+   * ended began: a transfer is not closed while one waits, because a grant that fails gives its old right back. One statement.
+   */
+  listWaitingRegrants(employeeId: string, tx?: DbTx): Promise<WaitingRegrant[]> {
+    return this.assignments.waitingRegrantsOf(employeeId, tx);
   }
 
   /**

@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { normalizeAccountIdentifier } from '../public/account-identifier.policy';
-import type { BusinessDate } from '../../../core/business-date';
+import { fromDateColumn, type BusinessDate } from '../../../core/business-date';
 import { endAfterGrant } from '../../../core/term-limit';
 import { DbTx, TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
@@ -16,6 +16,7 @@ import type {
   NewBaselineAssignment,
   SeatHolder,
   SeatUsage,
+  WaitingRegrant,
 } from '../public/licensing.types';
 import { licensingAuditEvent } from '../licensing-audit-event.mapper';
 import { toAssignmentFailure } from './assignment-conflicts.repo';
@@ -305,6 +306,16 @@ export class AssignmentService {
   /** Which of these rights a later right replaced (R-49): the ones a grant ended the day it gave the person the same software again. */
   regrantedAmong(ids: readonly string[], tx?: DbTx): Promise<Set<string>> {
     return this.repo.replacedAmong(ids, tx);
+  }
+
+  /** The grants of a right asked for again (R-49) of this person that wait, with the day each replaced right began: if one fails that right is open again. */
+  async waitingRegrantsOf(employeeId: string, tx?: DbTx): Promise<WaitingRegrant[]> {
+    const rows = await this.repo.waitingReplacementsOf(employeeId, tx);
+
+    return rows.map((row) => ({
+      replacedAssignmentId: row.replacedAssignmentId,
+      replacedEffectiveFrom: fromDateColumn(row.replacedValidFrom),
+    }));
   }
 
   /**

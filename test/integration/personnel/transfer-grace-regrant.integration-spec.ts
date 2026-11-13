@@ -132,6 +132,33 @@ describe('asking again on the same subscription in the grace of a transfer (inte
     ).rows;
   const detailOf = async (id: string): Promise<DetailWire> =>
     h.dataOf<DetailWire>(await h.readTransfer(id).expect(200));
+  /** The grace is over by the real clock too: the transfer took effect ten days ago and its last day was yesterday. */
+  const graceOverNow = async (transferId: string): Promise<void> => {
+    await h.ctx.sql.query('BEGIN');
+    try {
+      await h.ctx.sql.query('ALTER TABLE department_transfers DISABLE TRIGGER USER');
+      await h.ctx.sql.query(
+        `UPDATE department_transfers SET effective_on = $2, grace_ends_on = $3, grace_reminder_on = $4 WHERE id = $1`,
+        [transferId, addDays(h.today(), -10), addDays(h.today(), -1), addDays(h.today(), -3)],
+      );
+      await h.ctx.sql.query('ALTER TABLE department_transfers ENABLE TRIGGER USER');
+      await h.ctx.sql.query('COMMIT');
+    } catch (error) {
+      await h.ctx.sql.query('ROLLBACK');
+      throw error;
+    }
+  };
+  const closedAt = async (transferId: string): Promise<string | null> =>
+    (
+      await h.ctx.sql.query<{ closed_at: string | null }>('SELECT closed_at FROM department_transfers WHERE id = $1', [
+        transferId,
+      ])
+    ).rows[0].closed_at;
+  /** The IT Admin of the new department takes the task of revocation and completes it through the route. */
+  const revokedBy = async (taskId: string): Promise<void> => {
+    await h.claim(taskId, it2).expect(200);
+    await h.revoked(taskId, { completion: 'ACCOUNT_REMOVED', evidence: 'Removed from the workspace' }, it2).expect(200);
+  };
 
   it('T-MF3 (R-49): asked again and granted on the same subscription, the old right ends the day of the grant, and the grace takes back only the other right', async () => {
     const { dest, person, canvaSeat, figmaSeat } = await example();
@@ -247,27 +274,17 @@ describe('asking again on the same subscription in the grace of a transfer (inte
     const wire = await h.moveToday(person, dest.department);
     const { graceEnds } = await shifted(wire.id);
     const requestId = await approvedAgain(person, dest, canva.plan);
-    await h.grant({ requestId, subscriptionId: canva.subscriptionId }).expect(201);
+    const grantTask = h.dataOf<{ task: { id: string } }>(
+      await h.grant({ requestId, subscriptionId: canva.subscriptionId }).expect(201),
+    ).task.id;
+    // The new Canva right is in force: the IT Admin of the new department made the account and completed the grant.
+    await h.claim(grantTask).expect(200);
+    await h.complete(grantTask, { evidence: 'Account created' }).expect(200);
     await revocation().sweep(at(addDays(graceEnds, 1)));
     const figmaTask = (await revokeTasksOf(figmaSeat))[0].id;
     // The grace is over by the real clock too, then the IT Admin of the new department completes the one task through the route.
-    await h.ctx.sql.query('BEGIN');
-    try {
-      await h.ctx.sql.query('ALTER TABLE department_transfers DISABLE TRIGGER USER');
-      await h.ctx.sql.query(
-        `UPDATE department_transfers SET effective_on = $2, grace_ends_on = $3, grace_reminder_on = $4 WHERE id = $1`,
-        [wire.id, addDays(h.today(), -10), addDays(h.today(), -1), addDays(h.today(), -3)],
-      );
-      await h.ctx.sql.query('ALTER TABLE department_transfers ENABLE TRIGGER USER');
-      await h.ctx.sql.query('COMMIT');
-    } catch (error) {
-      await h.ctx.sql.query('ROLLBACK');
-      throw error;
-    }
-    await h.claim(figmaTask, it2).expect(200);
-    await h
-      .revoked(figmaTask, { completion: 'ACCOUNT_REMOVED', evidence: 'Removed from the workspace' }, it2)
-      .expect(200);
+    await graceOverNow(wire.id);
+    await revokedBy(figmaTask);
 
     const detail = await detailOf(wire.id);
 
@@ -318,6 +335,72 @@ describe('asking again on the same subscription in the grace of a transfer (inte
     });
     await revocation().sweep(at(addDays(graceEnds, 1)));
     expect((await revokeTasksOf(canvaSeat)).map((row) => row.revocation_source)).toEqual(['TRANSFER']);
+  }, 300_000);
+
+  it('a grant still waiting keeps the transfer open: the other rights are taken back and done, the transfer is not closed until the grant is decided', async () => {
+    const { dest, person, canvaSeat, figmaSeat } = await example();
+    const wire = await h.moveToday(person, dest.department);
+    const { graceEnds } = await shifted(wire.id);
+    const requestId = await approvedAgain(person, dest, canva.plan);
+    const grantTask = h.dataOf<{ task: { id: string } }>(
+      await h.grant({ requestId, subscriptionId: canva.subscriptionId }).expect(201),
+    ).task.id;
+    await revocation().sweep(at(addDays(graceEnds, 1)));
+    const figmaTask = (await revokeTasksOf(figmaSeat))[0].id;
+    await graceOverNow(wire.id);
+
+    // The last task of revocation is completed, the old Canva right ended the day of the grant: no right is left to take back, but the grant has not been done.
+    await revokedBy(figmaTask);
+
+    expect(await closedAt(wire.id)).toBeNull();
+    expect((await detailOf(wire.id)).phase).toBe('REVOKING');
+    // The hourly pass does not close it either, however often it asks.
+    await revocation().sweep(new Date());
+    expect(await closedAt(wire.id)).toBeNull();
+    expect(await revokeTasksOf(canvaSeat)).toEqual([]);
+
+    // The grant is done: the next pass closes the transfer, and the right is the one given again.
+    await h.claim(grantTask).expect(200);
+    await h.complete(grantTask, { evidence: 'Account created' }).expect(200);
+    await revocation().sweep(new Date());
+
+    expect(await closedAt(wire.id)).not.toBeNull();
+    const outcomes = Object.fromEntries(
+      ((await detailOf(wire.id)).snapshot?.after?.rights ?? []).map((r) => [r.assignmentId, r.outcome]),
+    );
+    expect(outcomes).toEqual({ [canvaSeat]: 'REGRANTED', [figmaSeat]: 'REVOKED' });
+  }, 300_000);
+
+  it('a grant that fails after the other rights were taken back: the old right is open again, the transfer was still open, so the grace takes it back too', async () => {
+    const { dest, person, canvaSeat, figmaSeat } = await example();
+    const wire = await h.moveToday(person, dest.department);
+    const { graceEnds } = await shifted(wire.id);
+    const requestId = await approvedAgain(person, dest, canva.plan);
+    const grantTask = h.dataOf<{ task: { id: string } }>(
+      await h.grant({ requestId, subscriptionId: canva.subscriptionId }).expect(201),
+    ).task.id;
+    await revocation().sweep(at(addDays(graceEnds, 1)));
+    await graceOverNow(wire.id);
+    await revokedBy((await revokeTasksOf(figmaSeat))[0].id);
+    expect(await closedAt(wire.id)).toBeNull();
+
+    await h.claim(grantTask).expect(200);
+    await h.fail(grantTask, { reason: 'The vendor refused the account' }).expect(200);
+    await h.closeFailed(grantTask, { reason: 'The vendor refused the account' }).expect(200);
+    expect((await seatRow(canvaSeat)).valid_until).toBeNull();
+    const pass = await revocation().sweep(new Date());
+
+    // The transfer still in force opens the revocation of the right given back, and closes when that task is done.
+    expect(pass).toMatchObject({ transfers: 1, rights: 1 });
+    const canvaTask = (await revokeTasksOf(canvaSeat))[0];
+    expect(canvaTask.revocation_source).toBe('TRANSFER');
+    expect(await closedAt(wire.id)).toBeNull();
+    await revokedBy(canvaTask.id);
+    expect(await closedAt(wire.id)).not.toBeNull();
+    const outcomes = Object.fromEntries(
+      ((await detailOf(wire.id)).snapshot?.after?.rights ?? []).map((r) => [r.assignmentId, r.outcome]),
+    );
+    expect(outcomes).toEqual({ [canvaSeat]: 'REVOKED', [figmaSeat]: 'REVOKED' });
   }, 300_000);
 
   it('a request that replaces nothing grants as ever: a person who never held the plan gets one seat and no right ends', async () => {

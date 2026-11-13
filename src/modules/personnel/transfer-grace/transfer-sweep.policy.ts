@@ -79,13 +79,37 @@ export function rightsToTakeBack<
 export const pictureIdsOf = (held: Pick<HeldTransfer, 'snapshotBefore'>): string[] | null =>
   held.snapshotBefore?.rights.map((right) => right.assignmentId) ?? null;
 
+/** A grant of a right asked for again (R-49) that has neither been done nor failed nor been cancelled, and the right of the person it ended. */
+export interface WaitingRegrant {
+  replacedAssignmentId: string;
+  replacedEffectiveFrom: BusinessDate;
+}
+
+/**
+ * How many grants of a right asked for again wait for the picture of a transfer (R-49): the right they ended is a right of the old department
+ * (`isOldRightOf`). If one fails or is cancelled the old right is open again and the grace has to take it back, so the transfer cannot be closed yet.
+ */
+export function regrantsPendingOf(
+  waiting: readonly WaitingRegrant[],
+  transfer: { effectiveOn: BusinessDate; pictureIds: readonly string[] | null },
+): number {
+  return waiting.filter((grant) =>
+    isOldRightOf(transfer, { assignmentId: grant.replacedAssignmentId, effectiveFrom: grant.replacedEffectiveFrom }),
+  ).length;
+}
+
 /**
  * Whether the system closes the transfer (`QĐ-110r`, SPEC MF3-C.2): the grace is over and no right of the old department is left to take back —
- * every task of revocation is completed, or the person held nothing, or the rights ended another way. Closed at once, with no account: a transfer
- * whose person held nothing is closed too, or the person could never be moved again (`TRANSFER_SETTLING`).
+ * every task of revocation is completed, or the person held nothing, or the rights ended another way — and no grant of a right asked for again waits
+ * (a grant that fails gives its old right back, R-49). Closed at once, with no account: a transfer whose person held nothing is closed too, or the
+ * person could never be moved again (`TRANSFER_SETTLING`).
  */
-export function closureDue(transfer: SweptTransfer, openRights: number, today: BusinessDate): boolean {
-  return inForce(transfer) && today > transfer.graceEndsOn && openRights === 0;
+export function closureDue(
+  transfer: SweptTransfer,
+  left: { openRights: number; pendingRegrants: number },
+  today: BusinessDate,
+): boolean {
+  return inForce(transfer) && today > transfer.graceEndsOn && left.openRights === 0 && left.pendingRegrants === 0;
 }
 
 /** Whether a departure recorded today takes the old rights over (`QĐ-110r`): while the grace lasts, the last day included; after it the revocation is open and the departure adds its reason to the tasks. */

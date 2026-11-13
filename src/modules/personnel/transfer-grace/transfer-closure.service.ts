@@ -13,6 +13,7 @@ import { snapshotRightOf, type SnapshotRight, type TransferSnapshotAfter } from 
 import {
   closureDue,
   pictureIdsOf,
+  regrantsPendingOf,
   rightOutcome,
   rightsToTakeBack,
   supersedable,
@@ -53,14 +54,14 @@ export class TransferClosureService {
   async closeIfDue(tx: DbTx, held: HeldTransfer, now: Date = new Date()): Promise<boolean> {
     const today = await this.organizationReads.businessToday(now, tx);
     const seats = await this.licensing.listPersonalSeatsOf(held.employeeId, today, tx);
-    if (
-      !closureDue(
-        sweptOf(held),
-        rightsToTakeBack(seats, { effectiveOn: held.effectiveOn, pictureIds: pictureIdsOf(held) }).length,
-        today,
-      )
-    )
-      return false;
+    const picture = { effectiveOn: held.effectiveOn, pictureIds: pictureIdsOf(held) };
+    // A grant of a right asked for again that waits may fail and give its old right back (R-49): the transfer stays open to take it back.
+    const waiting = await this.licensing.listWaitingRegrants(held.employeeId, tx);
+    const left = {
+      openRights: rightsToTakeBack(seats, picture).length,
+      pendingRegrants: regrantsPendingOf(waiting, picture),
+    };
+    if (!closureDue(sweptOf(held), left, today)) return false;
 
     return this.finish(tx, held, { seats, today, now, supersededByCaseId: null });
   }

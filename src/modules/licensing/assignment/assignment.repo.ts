@@ -285,6 +285,26 @@ export class AssignmentRepo {
     return new Set(rows.flatMap((row) => (row.replacesAssignmentId === null ? [] : [row.replacesAssignmentId])));
   }
 
+  /**
+   * The grants of a right asked for again (R-49) of this person that wait: the new assignment replaces an older right, and its task is neither done
+   * (`granted_on`) nor closed as failed nor cancelled. With the day the replaced right began. One statement.
+   */
+  async waitingReplacementsOf(
+    employeeId: string,
+    tx?: DbTx,
+  ): Promise<{ replacedAssignmentId: string; replacedValidFrom: Date }[]> {
+    const rows = await (tx ?? this.prisma).licenseAssignment.findMany({
+      where: { employeeId, replacesAssignmentId: { not: null }, grantedOn: null, failedAt: null, cancelledAt: null },
+      select: { replacesAssignmentId: true, replaces: { select: { validFrom: true } } },
+    });
+
+    return rows.flatMap((row) =>
+      row.replacesAssignmentId === null || row.replaces === null
+        ? []
+        : [{ replacedAssignmentId: row.replacesAssignmentId, replacedValidFrom: row.replaces.validFrom }],
+    );
+  }
+
   /** How many seats each of these purchases has held as of `day` (`HOLDING`: a future start and a service account included), one statement. */
   async countHoldingOfSubscriptions(
     ids: readonly string[],

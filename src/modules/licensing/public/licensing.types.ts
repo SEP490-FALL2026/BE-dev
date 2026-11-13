@@ -480,6 +480,15 @@ export interface RevocationReasonFacts {
   referenceId: string | null;
 }
 
+/**
+ * A grant of a right asked for again (R-49) that has not been done, failed or cancelled yet, with the right of the person it ended the day it was given:
+ * if the grant fails or is cancelled that right is open again.
+ */
+export interface WaitingRegrant {
+  replacedAssignmentId: string;
+  replacedEffectiveFrom: BusinessDate;
+}
+
 /** A personal seat a person still holds with the plan that tells how it is taken away, and the revocation that is under way. */
 export interface PersonalSeat {
   assignmentId: string;
