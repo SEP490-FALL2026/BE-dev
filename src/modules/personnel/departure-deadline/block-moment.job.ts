@@ -10,8 +10,8 @@ const SWEEP_EVERY_MS = 60 * 60 * 1000;
 /**
  * Once an hour announces the block moment of each departure whose person is refused from today or earlier and was never announced
  * (`BlockAnnouncementService`), then tells that the lock of the company account of a departure blocked now is late
- * (`AccountLockOverdueService`). Both write once for a case, so the hourly pass and every instance that runs it are safe; a failed pass only
- * logs and the next one tries again. The timer never keeps the process alive.
+ * (`AccountLockOverdueService`). Both write once for a case, so the hourly pass and every instance that runs it are safe; a work that fails as a
+ * whole only logs, the other still runs in the same pass, and the next pass tries again. The timer never keeps the process alive.
  */
 @Injectable()
 export class BlockMomentSweeper implements OnApplicationBootstrap, OnModuleDestroy {
@@ -46,14 +46,26 @@ export class BlockMomentSweeper implements OnApplicationBootstrap, OnModuleDestr
 
   private async sweep(): Promise<void> {
     try {
-      const announced = await this.announcement.announce();
-      if (announced.announced > 0) this.logger.log(`Announced the block of ${announced.announced} departure(s)`);
-      const overdue = await this.lockOverdue.notice();
-      if (overdue.told > 0) this.logger.log(`Told ${overdue.told} departure(s) whose account lock is late`);
-    } catch (error) {
-      this.logger.error(`Block moment sweep failed: ${describeForOperator(error)}`, traceForOperator(error));
+      // The two works are independent: one that fails as a whole (a page that cannot be read) never takes the other with it for the hour.
+      await this.run('Block moment announcement', async () => {
+        const announced = await this.announcement.announce();
+        if (announced.announced > 0) this.logger.log(`Announced the block of ${announced.announced} departure(s)`);
+      });
+      await this.run('Account lock overdue telling', async () => {
+        const overdue = await this.lockOverdue.notice();
+        if (overdue.told > 0) this.logger.log(`Told ${overdue.told} departure(s) whose account lock is late`);
+      });
     } finally {
       this.schedule(SWEEP_EVERY_MS);
+    }
+  }
+
+  /** Runs one of the works of the pass; a failure only logs, so the next work and the next pass still run. */
+  private async run(name: string, work: () => Promise<void>): Promise<void> {
+    try {
+      await work();
+    } catch (error) {
+      this.logger.error(`${name} failed: ${describeForOperator(error)}`, traceForOperator(error));
     }
   }
 }
