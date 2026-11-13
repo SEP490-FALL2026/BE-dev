@@ -87,7 +87,7 @@ export class TransfersController {
     status: HttpStatus.CREATED,
     message: 'DEPARTMENT_TRANSFER.RECORDED',
     description:
-      'The transfer was recorded: the placement the person has ends on the day and the new one begins on it, and the head of the department they leave is handed over or left empty as chosen. A day of today takes effect at once. The seats the person holds are not touched.',
+      'The transfer was recorded: the placement the person has ends on the day and the new one begins on it, and the head of the department they leave is handed over or left empty as chosen. A day of today takes effect at once: the paid requests sent from the old department that are still open are closed by the system, the money held for the old rights goes back to the budget of the old department, and the grace of the old rights begins. The seats the person holds are not touched.',
   })
   @ApiErrorResponses(
     ...WRITE_COMMON,
@@ -136,7 +136,7 @@ export class TransfersController {
   @ApiSuccessResponse(TransferPageResponseDto, {
     message: 'DEPARTMENT_TRANSFER.LISTED',
     description:
-      'A page of transfers, the latest day first, optionally of one person, one state or a range of days. Each row says who, what changes, from where to where, the day and where it stands; the basis and the head handover are in the detail. An IT Admin reads only the transfers that leave or enter a department they are in charge of.',
+      'A page of transfers, the latest day first, optionally of one person, one state or a range of days. Each row says who, what changes, from where to where, the day, where it stands (phase: PENDING, IN_GRACE while the person keeps the rights of the old department, REVOKING once the grace is over, CLOSED, CANCELLED) and the grace (the last day the person keeps those rights and the day they are told once more; graceEndsBefore keeps the transfers whose grace ends before a day); the basis, the head handover and the old rights are in the detail. An IT Admin reads only the transfers that leave or enter a department they are in charge of.',
   })
   @ApiErrorResponses(...COMMON, {
     status: HttpStatus.UNPROCESSABLE_ENTITY,
@@ -157,7 +157,7 @@ export class TransfersController {
   @ApiSuccessResponse(TransferDetailResponseDto, {
     message: 'DEPARTMENT_TRANSFER.RETRIEVED',
     description:
-      'The transfer with its basis, who follows the head of the old department, who recorded it (an account, or the controlled procedure) and how it ended. The IT Admin reads a minimal projection: no basis, no head handover and no reason of a cancellation.',
+      'The transfer with its basis, who follows the head of the old department, who recorded it (an account, or the controlled procedure) and how it ended, where it stands and its grace, the rights of the old department (oldRights: each with whether it is still held, the task that takes it away and whether the person was given it again), the money that went back to the budget of the old department the day it took effect (commitmentsReleased) and the picture of the rights before and after (snapshot). The IT Admin reads a minimal projection: no basis, no head handover, no reason of a cancellation, no money and no snapshot.',
   })
   @ApiErrorResponses(...COMMON, NOT_FOUND, {
     status: HttpStatus.UNPROCESSABLE_ENTITY,

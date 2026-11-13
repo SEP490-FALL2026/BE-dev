@@ -60,7 +60,7 @@ anh em `event-notice` để báo, nên `event-notice` không được import l�
 
 ## Capability → file chính
 
-- `transfer/` — chuyển phòng ban: ghi, dời ngày, hủy (US-03-01); không còn route đóng và không còn rà soát của trưởng phòng mới (`QĐ-110p`, `QĐ-110r`: hết ân hạn hệ thống thu hồi mọi quyền cũ, hệ thống đóng — MF3-B/C); `transfers.controller.ts`; `TransferService` điều phối ba bước:
+- `transfer/` — chuyển phòng ban: ghi, dời ngày, hủy (US-03-01); không còn route đóng và không còn rà soát của trưởng phòng mới (`QĐ-110p`, `QĐ-110r`: ngày hiệu lực mở ân hạn — `transfer-grace/`; hết ân hạn hệ thống thu hồi mọi quyền cũ và tự đóng — MF3-C); `transfers.controller.ts`; `TransferService` điều phối ba bước:
   `TransferPreconditions` (đọc, khóa theo thứ tự T-11, kiểm lại sau khóa, chính sách từ chối), `TransferRecorder` (ghi kỳ, bản ghi,
   audit, thông báo). `TransferChangeService` (dời ngày, hủy) giao phần ghi cho `TransferChangeWriter`. `placementHeld`,
   `subjectRefusal`, `headSuccessorLabel`, `previousSuccessorChoice` là hàm thuần trong `transfer.policy.ts`.
@@ -82,12 +82,14 @@ anh em `event-notice` để báo, nên `event-notice` không được import l�
   giữ nguyên nhưng rút lý do nghỉ việc khỏi tác vụ thu hồi qua `LicensingApi.withdrawRevocationReason` (đếm `revocationsWithdrawn`, báo IT phụ trách
   `DEPARTURE_REVOCATION_IT_CLOSE` khi còn tác vụ đang làm) và, qua hook `onCancelled` (`accessBlockInForce`), kết thúc đăng ký thiết bị;
   `offboarding-change.policy.ts`). Hồ sơ đã `LEFT` không hủy được (409 `CASE_LEFT`, R-41).
-- `transfer-grace/` — ân hạn quyền cũ sau điều chuyển (`QĐ-110p`, `QĐ-110r`; MF3-A.2 mở thư mục, MF3-B/C thêm sweeper): `TransferImpactService.impactOf(tx, …)`
-  **chỉ đọc**, cùng khuôn với `DepartureImpactService` (quyền cá nhân sẽ thu hồi khi hết ân hạn, Request trả phí phòng cũ sẽ hủy / tác vụ cấp đang chạy / cam kết
-  của Request đó qua `RequestsApi.previewBeneficiaryGone` phạm vi `PAID_OLD_DEPARTMENT`, ngày hết ân hạn và ngày nhắc); `responsibilities` null, `vendorAdminRoles`
-  rỗng tới X-IT, cam kết của chính ghế cũ thêm ở MF3-B.3. Chưa ai gọi ngoài test: route xem trước `P23` thêm ở RD.3, ảnh chụp lúc có hiệu lực ở MF3-B.4.
-  `transfer-grace.policy.ts` giữ ngày thuần (`graceEndsOn` = `nthWorkingDayFrom(ngày hiệu lực, N)`, `graceReminderOn`, `graceWindowEnd`); dùng lại
-  `rightToRevokeOf`/`commitmentToRelease` của `departure-impact.policy.ts`.
+- `transfer-grace/` — ân hạn quyền cũ sau điều chuyển (`QĐ-110p`, `QĐ-110r`, `QĐ-111bg`; MF3-A.2 mở thư mục, MF3-B thêm ngày hiệu lực, MF3-C thêm sweeper): ngày
+  hiệu lực, `TransferSettlementService.record` gọi `TransferGraceService.open` (idempotent bằng `TransferGraceRepo.claim`: chỉ ghi khi chưa có `grace_ends_on`) trong cùng
+  transaction: `TransferEffectsService` hủy Request trả phí phòng cũ (`RequestsApi.cancelForBeneficiaryGone`, phạm vi `PAID_OLD_DEPARTMENT`, `SystemActor`), giải phóng cam kết
+  quyền cũ một lần (`RequestsApi.releaseForTransfer`) và dựng `snapshot_before` (codec `transfer-snapshot.json.ts`); ghi `grace_ends_on`/`grace_reminder_on`, audit
+  `DEPARTMENT_TRANSFER.GRACE_OPENED` (SYSTEM), báo người chuyển / hai trưởng phòng / IT hai phòng (`PersonnelNotifier.transferGraceStarted`). Không thu hồi gì ở đây.
+  `TransferImpactService.impactOf(tx, …)` **chỉ đọc**, cùng khuôn với `DepartureImpactService` (xem trước `P23` thêm ở RD.3); `TransferOldRightsService` đọc quyền cũ cho P7 (chi tiết
+  điều chuyển) và P8 (`MeDepartmentTransferController`, `GET /me/department-transfer`). `transfer-grace.policy.ts` giữ ngày thuần (`graceStartsOn`, `graceOf`, `graceEndsOn`,
+  `graceReminderOn`, `graceWindowEnd`), quyền cũ (`heldOnOrBefore`) và giai đoạn (`transferPhase`); dùng lại `rightToRevokeOf`/`commitmentToRelease` của `departure-impact.policy.ts`.
 - `departure-deadline/` — hạn thu hồi và tác động của nghỉ việc (MF2-B.3, MF2-D…): `DepartureImpactService.impactOf(tx, …)` **chỉ đọc** (quyền sẽ thu hồi qua
   `LicensingApi.listPersonalSeatsOf`, Request sẽ hủy / tác vụ cấp đang chạy / cam kết sẽ giải phóng qua `RequestsApi.previewBeneficiaryGone`, hạn thu hồi;
   `responsibilities` null và `vendorAdminRoles` rỗng tới X-IT). `OffboardingService` đọc nó trước khi ghi và lưu số đếm vào thay đổi `RECORDED`; route xem

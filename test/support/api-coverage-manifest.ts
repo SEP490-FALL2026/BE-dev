@@ -307,6 +307,7 @@ export const API_COVERAGE_MANIFEST: readonly string[] = [
   'GET /api/v1/health/ready',
   'GET /api/v1/me',
   'GET /api/v1/me/departure-notice',
+  'GET /api/v1/me/department-transfer',
   'GET /api/v1/me/software-rights',
   'GET /api/v1/super-admin-watch',
   'POST /api/v1/me/password',

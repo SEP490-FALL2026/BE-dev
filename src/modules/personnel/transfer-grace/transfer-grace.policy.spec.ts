@@ -6,6 +6,7 @@ import {
   graceStartsOn,
   graceWindowEnd,
   heldOnOrBefore,
+  transferPhase,
 } from './transfer-grace.policy';
 
 const NONE: ReadonlySet<string> = new Set();
@@ -155,5 +156,36 @@ describe('the rights that are old rights of a transfer (QĐ-110p: held when the 
 
   it('keeps nothing of nobody', () => {
     expect(heldOnOrBefore([], '2026-11-16')).toEqual([]);
+  });
+});
+
+describe('where a transfer stands (P7, QĐ-110p)', () => {
+  const transfer = (over: Partial<Parameters<typeof transferPhase>[0]> = {}) => ({
+    status: 'EFFECTIVE' as const,
+    closed: false,
+    graceEndsOn: '2026-11-20',
+    ...over,
+  });
+
+  it.each([
+    [
+      'a transfer waiting for its day is pending',
+      { status: 'PENDING' as const, graceEndsOn: null },
+      '2026-11-13',
+      'PENDING',
+    ],
+    [
+      'a cancelled transfer is cancelled',
+      { status: 'CANCELLED' as const, graceEndsOn: null },
+      '2026-11-13',
+      'CANCELLED',
+    ],
+    ['the day it took effect the person is in grace', {}, '2026-11-16', 'IN_GRACE'],
+    ['the last day of the grace is still the grace: the revocation opens the day after', {}, '2026-11-20', 'IN_GRACE'],
+    ['the day after the last day the rights are being taken back', {}, '2026-11-21', 'REVOKING'],
+    ['a closed transfer is closed, whatever the day', { closed: true }, '2026-11-25', 'CLOSED'],
+    ['a transfer that took effect and has no grace yet is in grace', { graceEndsOn: null }, '2026-11-16', 'IN_GRACE'],
+  ] as const)('%s', (_name, over, today, expected) => {
+    expect(transferPhase(transfer(over), today)).toBe(expected);
   });
 });

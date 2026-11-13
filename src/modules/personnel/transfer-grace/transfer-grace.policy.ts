@@ -92,3 +92,21 @@ export function heldOnOrBefore<T extends { effectiveFrom: BusinessDate }>(
 ): T[] {
   return seats.filter((seat) => seat.effectiveFrom <= effectiveOn);
 }
+
+/** Where a transfer stands (P7). `SUPERSEDED` (a departure recorded in the grace takes over the rights, MF3-C) is set by the closing, not read here. */
+export type TransferPhase = 'PENDING' | 'IN_GRACE' | 'REVOKING' | 'CLOSED' | 'CANCELLED' | 'SUPERSEDED';
+
+/**
+ * The phase of a transfer (P7): waiting for its day, the person keeps the old rights until the last day of the grace, the grace is over and the
+ * rights are being taken back, closed, or cancelled. The last day of the grace is still the grace: the system opens the revocation the day after.
+ */
+export function transferPhase(
+  transfer: { status: 'PENDING' | 'EFFECTIVE' | 'CANCELLED'; closed: boolean; graceEndsOn: BusinessDate | null },
+  today: BusinessDate,
+): TransferPhase {
+  if (transfer.status === 'PENDING') return 'PENDING';
+  if (transfer.status === 'CANCELLED') return 'CANCELLED';
+  if (transfer.closed) return 'CLOSED';
+
+  return transfer.graceEndsOn === null || today <= transfer.graceEndsOn ? 'IN_GRACE' : 'REVOKING';
+}

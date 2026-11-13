@@ -90,10 +90,13 @@ import { SuperAdminWatchController } from './role-duties/super-admin-watch.contr
 import { PersonnelApi } from './public/personnel.api';
 import { PersonnelDashboardApi } from './public/personnel-dashboard.api';
 import { PersonnelDashboardFactsRepo } from './dashboard-facts/dashboard-facts.repo';
+import { MeDepartmentTransferController } from './transfer-grace/me-department-transfer.controller';
+import { MyTransferService } from './transfer-grace/my-transfer.service';
 import { TransferEffectsService } from './transfer-grace/transfer-effects.service';
 import { TransferGraceRepo } from './transfer-grace/transfer-grace.repo';
 import { TransferGraceService } from './transfer-grace/transfer-grace.service';
 import { TransferImpactService } from './transfer-grace/transfer-impact.service';
+import { TransferOldRightsService } from './transfer-grace/transfer-old-rights.service';
 import { TransferChangeWriter } from './transfer/transfer-change-writer.service';
 import { TransferChangeService } from './transfer/transfer-change.service';
 import { TransferEffectiveListener } from './transfer/transfer-effective.listener';
@@ -153,6 +156,7 @@ import { TransfersController } from './transfer/transfers.controller';
     OpenRequestsController,
     DepartmentMemberController,
     MeDepartureNoticeController,
+    MeDepartmentTransferController,
     SuperAdminWatchController,
     NoticesController,
   ],
@@ -175,6 +179,8 @@ import { TransfersController } from './transfer/transfers.controller';
     TransferEffectsService,
     TransferGraceRepo,
     TransferGraceService,
+    TransferOldRightsService,
+    MyTransferService,
     RevocationOverdueService,
     RevocationOverdueSweeper,
     PersonnelFileHookContributions,

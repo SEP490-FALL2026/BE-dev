@@ -3,6 +3,14 @@ import { z } from 'zod';
 import { successEnvelopeSchema } from '../../../infrastructure/http/dto/success-envelope.dto';
 import { businessDay } from '../../../infrastructure/http/dto/business-date.dto';
 import { groundsNoteBodySchema } from '../personnel-grounds.dto';
+import {
+  OLD_RIGHTS_MAX,
+  graceSchema,
+  oldRightSchema,
+  releasedMoneySchema,
+  transferPhaseSchema,
+  transferSnapshotSchema,
+} from '../transfer-grace/transfer-grace.dto';
 
 const successorBodySchema = z.discriminatedUnion('kind', [
   z.strictObject({ kind: z.literal('EMPLOYEE'), employeeId: z.uuid() }),
@@ -35,6 +43,8 @@ const listQuerySchema = z.strictObject({
   status: z.enum(['PENDING', 'EFFECTIVE', 'CANCELLED']).optional(),
   effectiveFrom: businessDay.optional(),
   effectiveTo: businessDay.optional(),
+  /** The transfers whose grace ends before this day (P7): the ones about to end, or over and not closed. */
+  graceEndsBefore: businessDay.optional(),
   page: z.coerce.number().int().positive().default(1),
   pageSize: z.coerce.number().int().positive().max(100).default(20),
 });
@@ -64,6 +74,10 @@ export const transferSummarySchema = z.strictObject({
   to: place,
   effectiveOn: z.string(),
   status: z.enum(['PENDING', 'EFFECTIVE', 'CANCELLED']),
+  /** Where it stands: waiting, in grace (the person keeps the old rights), revoking (the grace is over), closed, cancelled. */
+  phase: transferPhaseSchema,
+  /** The last day the person keeps the rights of the old department and the day they are told once more; null until the transfer took effect. */
+  grace: graceSchema.nullable(),
 });
 
 export const transferDetailSchema = transferSummarySchema.extend({
@@ -86,8 +100,20 @@ export const transferDetailSchema = transferSummarySchema.extend({
       reason: z.string(),
     })
     .nullable(),
-  /** Set when the IT Admin closed the transfer after the people who answer for the service accounts of the person were named. */
-  closure: z.strictObject({ closedAt: z.iso.datetime(), closedByAppUserId: z.uuid() }).nullable(),
+  /** Set once the transfer is closed: by the system when every right of the old department was taken back, or, for one closed before that rule, by the account of an IT Admin. */
+  closure: z
+    .strictObject({
+      closedAt: z.iso.datetime(),
+      closedByAppUserId: z.uuid().nullable(),
+      closedBySystem: z.boolean(),
+    })
+    .nullable(),
+  /** The rights of the old department with where each stands; empty before the transfer took effect. Bounded by the rights of one person. */
+  oldRights: z.array(oldRightSchema).max(OLD_RIGHTS_MAX),
+  /** What went back to the budget of the old department the day the transfer took effect, by currency; empty in the minimal projection an IT Admin reads. */
+  commitmentsReleased: z.array(releasedMoneySchema).max(OLD_RIGHTS_MAX),
+  /** The picture of the rights the day it took effect and, once closed, what became of them; null when there is none. */
+  snapshot: transferSnapshotSchema.nullable(),
 });
 
 /** What recording a transfer answers with: the transfer as the detail shows it (the warning about Business Owner applications is gone, `QĐ-111g`). */

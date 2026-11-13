@@ -226,6 +226,7 @@ export const SUCCESS_MESSAGES: Readonly<Record<string, string>> = {
   accessRequestAuditFlagList: 'ACCESS_REQUEST_HISTORY.AUDIT_FLAGS_LISTED',
   meChangePassword: 'AUTH.PASSWORD_CHANGED',
   needDecisionList: 'NEED_DECISION.LISTED',
+  meDepartmentTransferGet: 'ME.DEPARTMENT_TRANSFER_RETRIEVED',
   meDepartureNoticeGet: 'ME.DEPARTURE_NOTICE_RETRIEVED',
   meSoftwareRightList: 'ME.SOFTWARE_RIGHTS_LISTED',
   meGet: 'ME.RETRIEVED',

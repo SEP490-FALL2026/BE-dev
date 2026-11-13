@@ -6,6 +6,7 @@ import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { recordedGroundsOf, type RecordedGrounds } from '../personnel-grounds.policy';
 import { transferHeadHandoverJson } from '../personnel-head-handover.json';
+import { snapshotAfterJson, snapshotBeforeJson } from '../transfer-grace/transfer-snapshot.json';
 import type {
   HeadHandoverFacts,
   TransferChangeRecord,
@@ -23,7 +24,12 @@ const SUMMARY = {
   toDepartmentId: true,
   effectiveOn: true,
   status: true,
+  closedAt: true,
+  graceEndsOn: true,
+  graceReminderOn: true,
 } as const;
+
+const dayOrNull = (value: Date | null): BusinessDate | null => (value === null ? null : fromDateColumn(value));
 
 function toRecord(row: TransferRow): TransferRecord {
   return {
@@ -48,6 +54,12 @@ function toRecord(row: TransferRow): TransferRecord {
     cancelledReason: row.cancelledReason,
     closedAt: row.closedAt,
     closedByAppUserId: row.closedByAppUserId,
+    closedBySystem: row.closedBySystem,
+    graceEndsOn: dayOrNull(row.graceEndsOn),
+    graceReminderOn: dayOrNull(row.graceReminderOn),
+    remindedAt: row.remindedAt,
+    snapshotBefore: snapshotBeforeJson.decode(row.snapshotBefore),
+    snapshotAfter: snapshotAfterJson.decode(row.snapshotAfter),
   };
 }
 
@@ -119,6 +131,12 @@ export class TransferRepo {
       | 'cancelledReason'
       | 'closedAt'
       | 'closedByAppUserId'
+      | 'closedBySystem'
+      | 'graceEndsOn'
+      | 'graceReminderOn'
+      | 'remindedAt'
+      | 'snapshotBefore'
+      | 'snapshotAfter'
     > & { noticeId?: string | null },
   ): Promise<TransferRecord> {
     const created = await tx.departmentTransfer.create({
@@ -316,6 +334,7 @@ export class TransferRepo {
         : {}),
       ...(filter.employeeId ? { employeeId: filter.employeeId } : {}),
       ...(filter.status ? { status: filter.status } : {}),
+      ...(filter.graceEndsBefore ? { graceEndsOn: { lt: toDateColumn(filter.graceEndsBefore) } } : {}),
       ...(filter.effectiveFrom || filter.effectiveTo
         ? {
             effectiveOn: {
@@ -337,7 +356,13 @@ export class TransferRepo {
         });
 
         return {
-          items: rows.map((row) => ({ ...row, effectiveOn: fromDateColumn(row.effectiveOn) })),
+          items: rows.map(({ closedAt, ...row }) => ({
+            ...row,
+            effectiveOn: fromDateColumn(row.effectiveOn),
+            closed: closedAt !== null,
+            graceEndsOn: dayOrNull(row.graceEndsOn),
+            graceReminderOn: dayOrNull(row.graceReminderOn),
+          })),
           total: await tx.departmentTransfer.count({ where }),
         };
       },

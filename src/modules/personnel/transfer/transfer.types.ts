@@ -1,5 +1,6 @@
 import type { BusinessDate } from '../../../core/business-date';
 import type { RecordedGrounds } from '../personnel-grounds.policy';
+import type { TransferSnapshotAfter, TransferSnapshotBefore } from '../transfer-grace/transfer-snapshot.json';
 
 export type TransferStatus = 'PENDING' | 'EFFECTIVE' | 'CANCELLED';
 
@@ -38,6 +39,15 @@ export interface TransferRecord {
   cancelledReason: string | null;
   closedAt: Date | null;
   closedByAppUserId: string | null;
+  /** The system closed it (no account did): once every right of the old department was taken back (`QĐ-110r`). */
+  closedBySystem: boolean;
+  /** The last day the person keeps the rights of the old department, and the day they are told once more; null until the transfer took effect. */
+  graceEndsOn: BusinessDate | null;
+  graceReminderOn: BusinessDate | null;
+  remindedAt: Date | null;
+  /** The rights the person held the day it took effect, and what became of them when it closed; null for a transfer from before the grace. */
+  snapshotBefore: TransferSnapshotBefore | null;
+  snapshotAfter: TransferSnapshotAfter | null;
 }
 
 /** The row of the list: what identifies the transfer, where it goes and when; no basis, no handover, no who-recorded. */
@@ -48,6 +58,9 @@ export interface TransferSummaryRecord {
   toDepartmentId: string;
   effectiveOn: BusinessDate;
   status: TransferStatus;
+  closed: boolean;
+  graceEndsOn: BusinessDate | null;
+  graceReminderOn: BusinessDate | null;
 }
 
 export interface TransferChangeRecord {
@@ -70,6 +83,8 @@ export interface TransferListFilter {
   status?: TransferStatus;
   effectiveFrom?: BusinessDate;
   effectiveTo?: BusinessDate;
+  /** Only the transfers whose grace ends before this day (the ones about to end, or already over and not closed). */
+  graceEndsBefore?: BusinessDate;
   page: number;
   pageSize: number;
 }

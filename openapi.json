@@ -5727,7 +5727,7 @@
         },
         "responses": {
           "201": {
-            "description": "The transfer was recorded: the placement the person has ends on the day and the new one begins on it, and the head of the department they leave is handed over or left empty as chosen. A day of today takes effect at once. The seats the person holds are not touched.",
+            "description": "The transfer was recorded: the placement the person has ends on the day and the new one begins on it, and the head of the department they leave is handed over or left empty as chosen. A day of today takes effect at once: the paid requests sent from the old department that are still open are closed by the system, the money held for the old rights goes back to the budget of the old department, and the grace of the old rights begins. The seats the person holds are not touched.",
             "content": {
               "application/json": {
                 "schema": {
@@ -6153,6 +6153,13 @@
             "schema": { "format": "date", "type": "string" }
           },
           {
+            "name": "graceEndsBefore",
+            "required": false,
+            "in": "query",
+            "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused).",
+            "schema": { "format": "date", "type": "string" }
+          },
+          {
             "name": "page",
             "required": false,
             "in": "query",
@@ -6173,7 +6180,7 @@
         ],
         "responses": {
           "200": {
-            "description": "A page of transfers, the latest day first, optionally of one person, one state or a range of days. Each row says who, what changes, from where to where, the day and where it stands; the basis and the head handover are in the detail. An IT Admin reads only the transfers that leave or enter a department they are in charge of.",
+            "description": "A page of transfers, the latest day first, optionally of one person, one state or a range of days. Each row says who, what changes, from where to where, the day, where it stands (phase: PENDING, IN_GRACE while the person keeps the rights of the old department, REVOKING once the grace is over, CLOSED, CANCELLED) and the grace (the last day the person keeps those rights and the day they are told once more; graceEndsBefore keeps the transfers whose grace ends before a day); the basis, the head handover and the old rights are in the detail. An IT Admin reads only the transfers that leave or enter a department they are in charge of.",
             "content": {
               "application/json": {
                 "schema": {
@@ -6327,7 +6334,7 @@
         ],
         "responses": {
           "200": {
-            "description": "The transfer with its basis, who follows the head of the old department, who recorded it (an account, or the controlled procedure) and how it ended. The IT Admin reads a minimal projection: no basis, no head handover and no reason of a cancellation.",
+            "description": "The transfer with its basis, who follows the head of the old department, who recorded it (an account, or the controlled procedure) and how it ended, where it stands and its grace, the rights of the old department (oldRights: each with whether it is still held, the task that takes it away and whether the person was given it again), the money that went back to the budget of the old department the day it took effect (commitmentsReleased) and the picture of the rights before and after (snapshot). The IT Admin reads a minimal projection: no basis, no head handover, no reason of a cancellation, no money and no snapshot.",
             "content": {
               "application/json": {
                 "schema": {
@@ -13065,6 +13072,115 @@
         },
         "security": [{ "bearer": [] }],
         "summary": "Read my own departure",
+        "tags": ["me"]
+      }
+    },
+    "/api/v1/me/department-transfer": {
+      "get": {
+        "operationId": "meDepartmentTransferGet",
+        "parameters": [],
+        "responses": {
+          "200": {
+            "description": "The transfer of the signed-in person that took effect and whose grace has not ended, or no data when there is none: the old and the new department, the day it took effect, the last day they keep the rights of the old department and the day they are told once more, and the rights that are still theirs and will be taken back when the grace ends. It is never about anyone else. After the last day the rights are being taken back and the answer is no data.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/MyTransferResponseDto" },
+                    { "properties": { "message": { "example": "ME.DEPARTMENT_TRANSFER_RETRIEVED" } } }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHENTICATION_REQUIRED": {
+                    "summary": "A Bearer access token is required.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHENTICATION_REQUIRED",
+                        "message": "A Bearer access token is required.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "INVALID_ACCESS_TOKEN": {
+                    "summary": "The access token is invalid.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "INVALID_ACCESS_TOKEN",
+                        "message": "The access token is invalid.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_TOO_MANY_REQUESTS": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_TOO_MANY_REQUESTS",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "TOKEN_VERIFICATION_UNAVAILABLE": {
+                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
+                        "message": "Authentication is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SERVICE_UNAVAILABLE": {
+                    "summary": "The service is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SERVICE_UNAVAILABLE",
+                        "message": "The service is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "bearer": [] }],
+        "summary": "Read my own transfer while the grace lasts",
         "tags": ["me"]
       }
     },
@@ -85986,6 +86102,17 @@
               },
               "effectiveOn": { "type": "string" },
               "status": { "type": "string", "enum": ["PENDING", "EFFECTIVE", "CANCELLED"] },
+              "phase": {
+                "type": "string",
+                "enum": ["PENDING", "IN_GRACE", "REVOKING", "CLOSED", "CANCELLED", "SUPERSEDED"]
+              },
+              "grace": {
+                "type": "object",
+                "properties": { "endsOn": { "type": "string" }, "reminderOn": { "type": "string" } },
+                "required": ["endsOn", "reminderOn"],
+                "additionalProperties": false,
+                "nullable": true
+              },
               "groundsNote": { "type": "string", "nullable": true },
               "headSuccessor": {
                 "type": "object",
@@ -86027,9 +86154,128 @@
                 "type": "object",
                 "properties": {
                   "closedAt": { "type": "string", "format": "date-time" },
-                  "closedByAppUserId": { "type": "string", "format": "uuid" }
+                  "closedByAppUserId": { "type": "string", "format": "uuid", "nullable": true },
+                  "closedBySystem": { "type": "boolean" }
                 },
-                "required": ["closedAt", "closedByAppUserId"],
+                "required": ["closedAt", "closedByAppUserId", "closedBySystem"],
+                "additionalProperties": false,
+                "nullable": true
+              },
+              "oldRights": {
+                "maxItems": 200,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "assignmentId": { "type": "string", "format": "uuid" },
+                    "application": {
+                      "type": "object",
+                      "properties": { "id": { "type": "string", "format": "uuid" }, "name": { "type": "string" } },
+                      "required": ["id", "name"],
+                      "additionalProperties": false
+                    },
+                    "plan": {
+                      "type": "object",
+                      "properties": { "id": { "type": "string", "format": "uuid" }, "name": { "type": "string" } },
+                      "required": ["id", "name"],
+                      "additionalProperties": false
+                    },
+                    "provisioningType": { "type": "string" },
+                    "state": { "type": "string", "enum": ["HELD", "REVOKING", "ENDED"] },
+                    "revocation": {
+                      "type": "object",
+                      "properties": {
+                        "taskId": { "type": "string", "format": "uuid" },
+                        "status": { "type": "string" }
+                      },
+                      "required": ["taskId", "status"],
+                      "additionalProperties": false,
+                      "nullable": true
+                    },
+                    "regranted": { "type": "boolean" }
+                  },
+                  "required": [
+                    "assignmentId",
+                    "application",
+                    "plan",
+                    "provisioningType",
+                    "state",
+                    "revocation",
+                    "regranted"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "commitmentsReleased": {
+                "maxItems": 200,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": { "currency": { "type": "string" }, "amountMinor": { "type": "string" } },
+                  "required": ["currency", "amountMinor"],
+                  "additionalProperties": false
+                }
+              },
+              "snapshot": {
+                "type": "object",
+                "properties": {
+                  "before": {
+                    "type": "object",
+                    "properties": {
+                      "takenOn": { "type": "string" },
+                      "rights": {
+                        "maxItems": 200,
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "assignmentId": { "type": "string", "format": "uuid" },
+                            "applicationName": { "type": "string" },
+                            "planName": { "type": "string" },
+                            "provisioningType": { "type": "string" },
+                            "effectiveFrom": { "type": "string" },
+                            "validUntil": { "type": "string", "nullable": true }
+                          },
+                          "required": [
+                            "assignmentId",
+                            "applicationName",
+                            "planName",
+                            "provisioningType",
+                            "effectiveFrom",
+                            "validUntil"
+                          ],
+                          "additionalProperties": false
+                        }
+                      }
+                    },
+                    "required": ["takenOn", "rights"],
+                    "additionalProperties": false,
+                    "nullable": true
+                  },
+                  "after": {
+                    "type": "object",
+                    "properties": {
+                      "takenOn": { "type": "string" },
+                      "rights": {
+                        "maxItems": 200,
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "assignmentId": { "type": "string", "format": "uuid" },
+                            "outcome": { "type": "string", "enum": ["REVOKED", "ENDED", "REGRANTED"] }
+                          },
+                          "required": ["assignmentId", "outcome"],
+                          "additionalProperties": false
+                        }
+                      }
+                    },
+                    "required": ["takenOn", "rights"],
+                    "additionalProperties": false,
+                    "nullable": true
+                  }
+                },
+                "required": ["before", "after"],
                 "additionalProperties": false,
                 "nullable": true
               }
@@ -86041,6 +86287,8 @@
               "to",
               "effectiveOn",
               "status",
+              "phase",
+              "grace",
               "groundsNote",
               "headSuccessor",
               "recordedByAppUserId",
@@ -86048,7 +86296,10 @@
               "recordedAt",
               "effectiveAt",
               "cancellation",
-              "closure"
+              "closure",
+              "oldRights",
+              "commitmentsReleased",
+              "snapshot"
             ],
             "additionalProperties": false,
             "nullable": true
@@ -86116,9 +86367,20 @@
                       "additionalProperties": false
                     },
                     "effectiveOn": { "type": "string" },
-                    "status": { "type": "string", "enum": ["PENDING", "EFFECTIVE", "CANCELLED"] }
+                    "status": { "type": "string", "enum": ["PENDING", "EFFECTIVE", "CANCELLED"] },
+                    "phase": {
+                      "type": "string",
+                      "enum": ["PENDING", "IN_GRACE", "REVOKING", "CLOSED", "CANCELLED", "SUPERSEDED"]
+                    },
+                    "grace": {
+                      "type": "object",
+                      "properties": { "endsOn": { "type": "string" }, "reminderOn": { "type": "string" } },
+                      "required": ["endsOn", "reminderOn"],
+                      "additionalProperties": false,
+                      "nullable": true
+                    }
                   },
-                  "required": ["id", "employee", "from", "to", "effectiveOn", "status"],
+                  "required": ["id", "employee", "from", "to", "effectiveOn", "status", "phase", "grace"],
                   "additionalProperties": false
                 }
               },
@@ -86202,6 +86464,17 @@
               },
               "effectiveOn": { "type": "string" },
               "status": { "type": "string", "enum": ["PENDING", "EFFECTIVE", "CANCELLED"] },
+              "phase": {
+                "type": "string",
+                "enum": ["PENDING", "IN_GRACE", "REVOKING", "CLOSED", "CANCELLED", "SUPERSEDED"]
+              },
+              "grace": {
+                "type": "object",
+                "properties": { "endsOn": { "type": "string" }, "reminderOn": { "type": "string" } },
+                "required": ["endsOn", "reminderOn"],
+                "additionalProperties": false,
+                "nullable": true
+              },
               "groundsNote": { "type": "string", "nullable": true },
               "headSuccessor": {
                 "type": "object",
@@ -86243,9 +86516,128 @@
                 "type": "object",
                 "properties": {
                   "closedAt": { "type": "string", "format": "date-time" },
-                  "closedByAppUserId": { "type": "string", "format": "uuid" }
+                  "closedByAppUserId": { "type": "string", "format": "uuid", "nullable": true },
+                  "closedBySystem": { "type": "boolean" }
                 },
-                "required": ["closedAt", "closedByAppUserId"],
+                "required": ["closedAt", "closedByAppUserId", "closedBySystem"],
+                "additionalProperties": false,
+                "nullable": true
+              },
+              "oldRights": {
+                "maxItems": 200,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "assignmentId": { "type": "string", "format": "uuid" },
+                    "application": {
+                      "type": "object",
+                      "properties": { "id": { "type": "string", "format": "uuid" }, "name": { "type": "string" } },
+                      "required": ["id", "name"],
+                      "additionalProperties": false
+                    },
+                    "plan": {
+                      "type": "object",
+                      "properties": { "id": { "type": "string", "format": "uuid" }, "name": { "type": "string" } },
+                      "required": ["id", "name"],
+                      "additionalProperties": false
+                    },
+                    "provisioningType": { "type": "string" },
+                    "state": { "type": "string", "enum": ["HELD", "REVOKING", "ENDED"] },
+                    "revocation": {
+                      "type": "object",
+                      "properties": {
+                        "taskId": { "type": "string", "format": "uuid" },
+                        "status": { "type": "string" }
+                      },
+                      "required": ["taskId", "status"],
+                      "additionalProperties": false,
+                      "nullable": true
+                    },
+                    "regranted": { "type": "boolean" }
+                  },
+                  "required": [
+                    "assignmentId",
+                    "application",
+                    "plan",
+                    "provisioningType",
+                    "state",
+                    "revocation",
+                    "regranted"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "commitmentsReleased": {
+                "maxItems": 200,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": { "currency": { "type": "string" }, "amountMinor": { "type": "string" } },
+                  "required": ["currency", "amountMinor"],
+                  "additionalProperties": false
+                }
+              },
+              "snapshot": {
+                "type": "object",
+                "properties": {
+                  "before": {
+                    "type": "object",
+                    "properties": {
+                      "takenOn": { "type": "string" },
+                      "rights": {
+                        "maxItems": 200,
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "assignmentId": { "type": "string", "format": "uuid" },
+                            "applicationName": { "type": "string" },
+                            "planName": { "type": "string" },
+                            "provisioningType": { "type": "string" },
+                            "effectiveFrom": { "type": "string" },
+                            "validUntil": { "type": "string", "nullable": true }
+                          },
+                          "required": [
+                            "assignmentId",
+                            "applicationName",
+                            "planName",
+                            "provisioningType",
+                            "effectiveFrom",
+                            "validUntil"
+                          ],
+                          "additionalProperties": false
+                        }
+                      }
+                    },
+                    "required": ["takenOn", "rights"],
+                    "additionalProperties": false,
+                    "nullable": true
+                  },
+                  "after": {
+                    "type": "object",
+                    "properties": {
+                      "takenOn": { "type": "string" },
+                      "rights": {
+                        "maxItems": 200,
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "assignmentId": { "type": "string", "format": "uuid" },
+                            "outcome": { "type": "string", "enum": ["REVOKED", "ENDED", "REGRANTED"] }
+                          },
+                          "required": ["assignmentId", "outcome"],
+                          "additionalProperties": false
+                        }
+                      }
+                    },
+                    "required": ["takenOn", "rights"],
+                    "additionalProperties": false,
+                    "nullable": true
+                  }
+                },
+                "required": ["before", "after"],
                 "additionalProperties": false,
                 "nullable": true
               }
@@ -86257,6 +86649,8 @@
               "to",
               "effectiveOn",
               "status",
+              "phase",
+              "grace",
               "groundsNote",
               "headSuccessor",
               "recordedByAppUserId",
@@ -86264,7 +86658,10 @@
               "recordedAt",
               "effectiveAt",
               "cancellation",
-              "closure"
+              "closure",
+              "oldRights",
+              "commitmentsReleased",
+              "snapshot"
             ],
             "additionalProperties": false,
             "nullable": true
@@ -87888,6 +88285,110 @@
               }
             },
             "required": ["lastWorkingDay", "state", "level", "roleFlags"],
+            "additionalProperties": false,
+            "nullable": true
+          }
+        },
+        "required": ["success", "message", "data"],
+        "additionalProperties": false
+      },
+      "MyTransferResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "enum": [true] },
+          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string", "format": "uuid" },
+              "from": {
+                "type": "object",
+                "properties": {
+                  "department": {
+                    "type": "object",
+                    "properties": {
+                      "id": { "type": "string", "format": "uuid" },
+                      "code": { "type": "string" },
+                      "name": { "type": "string" }
+                    },
+                    "required": ["id", "code", "name"],
+                    "additionalProperties": false
+                  }
+                },
+                "required": ["department"],
+                "additionalProperties": false
+              },
+              "to": {
+                "type": "object",
+                "properties": {
+                  "department": {
+                    "type": "object",
+                    "properties": {
+                      "id": { "type": "string", "format": "uuid" },
+                      "code": { "type": "string" },
+                      "name": { "type": "string" }
+                    },
+                    "required": ["id", "code", "name"],
+                    "additionalProperties": false
+                  }
+                },
+                "required": ["department"],
+                "additionalProperties": false
+              },
+              "effectiveOn": { "type": "string" },
+              "grace": {
+                "type": "object",
+                "properties": { "endsOn": { "type": "string" }, "reminderOn": { "type": "string" } },
+                "required": ["endsOn", "reminderOn"],
+                "additionalProperties": false
+              },
+              "rights": {
+                "maxItems": 200,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "assignmentId": { "type": "string", "format": "uuid" },
+                    "application": {
+                      "type": "object",
+                      "properties": { "id": { "type": "string", "format": "uuid" }, "name": { "type": "string" } },
+                      "required": ["id", "name"],
+                      "additionalProperties": false
+                    },
+                    "plan": {
+                      "type": "object",
+                      "properties": { "id": { "type": "string", "format": "uuid" }, "name": { "type": "string" } },
+                      "required": ["id", "name"],
+                      "additionalProperties": false
+                    },
+                    "provisioningType": { "type": "string" },
+                    "state": { "type": "string", "enum": ["HELD", "REVOKING", "ENDED"] },
+                    "revocation": {
+                      "type": "object",
+                      "properties": {
+                        "taskId": { "type": "string", "format": "uuid" },
+                        "status": { "type": "string" }
+                      },
+                      "required": ["taskId", "status"],
+                      "additionalProperties": false,
+                      "nullable": true
+                    },
+                    "regranted": { "type": "boolean" }
+                  },
+                  "required": [
+                    "assignmentId",
+                    "application",
+                    "plan",
+                    "provisioningType",
+                    "state",
+                    "revocation",
+                    "regranted"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": ["id", "from", "to", "effectiveOn", "grace", "rights"],
             "additionalProperties": false,
             "nullable": true
           }

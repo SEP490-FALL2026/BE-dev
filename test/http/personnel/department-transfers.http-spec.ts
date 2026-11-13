@@ -135,6 +135,10 @@ describe('department transfer routes (e2e, no database)', () => {
       ['a state that does not exist', (server: App) => request(server).get('/api/v1/department-transfers?status=DONE')],
       ['a page size over the limit', (server: App) => request(server).get('/api/v1/department-transfers?pageSize=101')],
       [
+        'a day the grace ends before that is not a date',
+        (server: App) => request(server).get('/api/v1/department-transfers?graceEndsBefore=soon'),
+      ],
+      [
         'a new day that is not a date',
         (server: App) =>
           request(server).post(`/api/v1/department-transfers/${ID}/rescheduling`).send({ newEffectiveOn: 'tomorrow' }),
@@ -167,5 +171,32 @@ describe('department transfer routes (e2e, no database)', () => {
 
       expect(bodyOf(response).error.code).toBe('VALIDATION_ERROR');
     });
+  });
+
+  describe('the transfer of the person who asks, while the grace lasts (P8, QĐ-110p)', () => {
+    it('is closed to a request with no token: 401', async () => {
+      const response = await request(app.getHttpServer()).get('/api/v1/me/department-transfer').expect(401);
+
+      expect(bodyOf(response).error.code).toBe('AUTHENTICATION_REQUIRED');
+    });
+
+    it.each([
+      ['the Super Admin', ['SUPER_ADMIN'], []],
+      ['the IT Admin', ['IT_ADMIN'], []],
+      ['the finance officer', ['FINANCE'], []],
+      ['an employee', ['EMPLOYEE'], []],
+      ['an account with no role', [], []],
+      ['a department head, whose role is derived', [], ['MANAGER']],
+      ['the spending approver, whose role is derived', [], ['SPENDING_APPROVER']],
+    ])(
+      'lets %s past the guard: it asks for no role and is only ever about the account that asks',
+      async (_name, direct, derived) => {
+        const response = await request(app.getHttpServer())
+          .get('/api/v1/me/department-transfer')
+          .set('Authorization', bearer(principal([...direct, ...derived])));
+
+        expect([401, 403]).not.toContain(response.status);
+      },
+    );
   });
 });
