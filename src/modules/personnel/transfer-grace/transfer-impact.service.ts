@@ -10,6 +10,7 @@ import {
   vendorAdminRoleLabel,
 } from '../departure-deadline/departure-impact.policy';
 import { graceOf, graceStartsOn, graceWindowEnd, heldOnOrBefore } from './transfer-grace.policy';
+import { rightsToTakeBack } from './transfer-sweep.policy';
 import type { TransferImpact, TransferImpactInput } from './transfer-impact.types';
 
 /**
@@ -33,6 +34,13 @@ export class TransferImpactService {
 
   async impactOf(tx: DbTx, input: TransferImpactInput): Promise<TransferImpact> {
     const seats = await this.licensing.listPersonalSeatsOf(input.employeeId, input.today, tx);
+    // The picture of the rights the day the transfer takes effect would keep (the very call `TransferEffectsService` makes) and the rights the sweeper of
+    // the grace then takes back from it (`rightsToTakeBack`, which tells an old right by `isOldRightOf`): one definition of the old rights for the grace and for this reading.
+    const picture = heldOnOrBefore(seats, input.effectiveOn);
+    const toTakeBack = rightsToTakeBack(seats, {
+      effectiveOn: input.effectiveOn,
+      pictureIds: picture.map((seat) => seat.assignmentId),
+    });
     const gone = await this.requests.previewBeneficiaryGone(tx, {
       employeeId: input.employeeId,
       scope: { kind: 'PAID_OLD_DEPARTMENT', oldDepartmentId: input.fromDepartmentId },
@@ -49,7 +57,7 @@ export class TransferImpactService {
     const grace = await this.graceDays(input.effectiveOn, input.today);
 
     return {
-      rightsToRevoke: heldOnOrBefore(seats, input.effectiveOn).map(rightToRevokeOf),
+      rightsToRevoke: toTakeBack.map(rightToRevokeOf),
       openRequestsToCancel: gone.wouldCancel.map(ofItem),
       provisioningInFlight: gone.needsItCheck.map(ofItem),
       commitmentToRelease: commitmentToRelease(gone.heldToRelease),

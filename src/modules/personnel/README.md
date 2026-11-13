@@ -158,6 +158,7 @@ anh em `event-notice` để báo, nên `event-notice` không được import l�
   `departure-calendar.policy.ts`; RD.1) và các cửa sổ thu hồi cho báo cáo SLA (`revocationWindows`, `lateDepartures`, `graceWindowsOf`; RD.2: hạn của điều chuyển =
   ngày làm việc đầu sau ân hạn, tính như hạn nghỉ việc vì tác vụ của nó không có `due_on`, D-99/D-124); cùng điều kiện với danh sách tương ứng. Đọc qua
   `RevocationOverdueService` và `CatalogResponsibilityApi`; chỉ ra `PersonnelDashboardApi`.
+- `impact-preview/` — `POST /offboarding-cases/preview` và `POST /department-transfers/preview` (P23, SUPER_ADMIN; RD.3): chạy các kiểm tra của lệnh ghi (`OffboardingPreconditions`, `TransferPreconditions`) rồi đọc tác động bằng `DepartureImpactService`/`TransferImpactService`, trong giao dịch **luôn rollback** (`ImpactPreviewFrame`) nên không ghi gì và lỗi có đúng mã của lệnh ghi. Xem trước điều chuyển = đúng tập quyền sweeper ân hạn sẽ mở thu hồi (`rightsToTakeBack`). Capability riêng vì hai bộ kiểm tra ở `offboarding/`/`transfer/` là cấp trên `departure-deadline/`/`transfer-grace/` (D-125); không capability nào import nó.
 - `event-notice/` — `personnel-file-hooks.service.ts` (chạy file hook), `personnel-notifier.service.ts` (inbox, F17).
 - `super-admin-event/` — Nest module riêng của lệnh (`super-admin-event-cli.module.ts`), policy, repo ticket, ba service theo họ sự kiện (điều chuyển, nghỉ dài hạn,
   thôi việc) và `profile-correction`; tiến trình API và worker không load nó.

@@ -15,7 +15,11 @@ import type {
  * transfer takes effect (MF3-B.3 adds it to `commitmentToRelease`).
  */
 export interface TransferImpact {
-  /** Every personal right the person holds: the system opens its revocation when the grace ends (`QĐ-110p`), except one granted again meanwhile. */
+  /**
+   * The personal rights of the old department the system takes back when the grace ends (`QĐ-110p`): the ones the picture of the day the transfer takes effect
+   * would name that are still in force and of a kind a revocation can take away, which `rightsToTakeBack` of the sweeper judges (`isOldRightOf`), so this list is the set the
+   * sweeper then opens a revocation for. One granted again meanwhile (R-49) is only known later and is not in it.
+   */
   rightsToRevoke: RightToRevoke[];
   /** The paid requests sent from the old department that the system closes the day the transfer takes effect (`QĐ-110o`). */
   openRequestsToCancel: OpenRequestImpact[];

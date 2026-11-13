@@ -101,6 +101,11 @@ import { TransferGraceSweeper } from './transfer-grace/transfer-grace.job';
 import { TransferGraceRepo } from './transfer-grace/transfer-grace.repo';
 import { TransferGraceService } from './transfer-grace/transfer-grace.service';
 import { TransferImpactService } from './transfer-grace/transfer-impact.service';
+import { DeparturePreviewController } from './impact-preview/departure-preview.controller';
+import { DeparturePreviewService } from './impact-preview/departure-preview.service';
+import { ImpactPreviewFrame } from './impact-preview/impact-preview-frame.service';
+import { TransferPreviewController } from './impact-preview/transfer-preview.controller';
+import { TransferPreviewService } from './impact-preview/transfer-preview.service';
 import { TransferOldRightsService } from './transfer-grace/transfer-old-rights.service';
 import { TransferRevocationService } from './transfer-grace/transfer-revocation.service';
 import { TransferTellingService } from './transfer-grace/transfer-telling.service';
@@ -166,6 +171,8 @@ import { ItHandoverViewService } from './it-handover/it-handover-view.service';
     TransfersController,
     LongLeavesController,
     OffboardingController,
+    DeparturePreviewController,
+    TransferPreviewController,
     OffboardingStepsController,
     MailboxLockController,
     ItHandoverController,
@@ -199,6 +206,9 @@ import { ItHandoverViewService } from './it-handover/it-handover-view.service';
     DepartureDeadlineService,
     DepartureImpactService,
     TransferImpactService,
+    ImpactPreviewFrame,
+    DeparturePreviewService,
+    TransferPreviewService,
     TransferEffectsService,
     TransferGraceRepo,
     TransferGraceService,

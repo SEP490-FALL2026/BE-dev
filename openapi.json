@@ -11115,6 +11115,805 @@
         "tags": ["offboarding-cases"]
       }
     },
+    "/api/v1/offboarding-cases/preview": {
+      "post": {
+        "operationId": "offboardingCasePreview",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/RecordOffboardingBodyDto" } } }
+        },
+        "responses": {
+          "200": {
+            "description": "What recording the departure would do, without writing anything: the personal rights the person holds that the IT Admin takes away, the open requests the system closes the day the access is blocked and the ones with a grant under way that it leaves to the IT Admin, the money held for the closed ones that goes back to the budget (by currency), what the person answers for in the catalog if they are an IT Admin, the plans they administer at the vendor, whether a successor must be named for the head, and the day the IT Admin has until. The body is the one of the record and is refused the way the record refuses it, with the same codes; the answer is the same reading the record makes, so it matches what the system then does. Nothing is saved, no notice is sent and no audit event is written.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/DeparturePreviewResponseDto" },
+                    { "properties": { "message": { "example": "OFFBOARDING_CASE.PREVIEWED" } } }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_BAD_REQUEST": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_BAD_REQUEST",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHENTICATION_REQUIRED": {
+                    "summary": "A Bearer access token is required.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHENTICATION_REQUIRED",
+                        "message": "A Bearer access token is required.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "INVALID_ACCESS_TOKEN": {
+                    "summary": "The access token is invalid.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "INVALID_ACCESS_TOKEN",
+                        "message": "The access token is invalid.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only the Super Admin records a departure and so previews it (AUTHORIZATION.FORBIDDEN); the Super Admin does not do either about themselves in the application (PERSONNEL.SELF_CHANGE_FORBIDDEN).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHORIZATION.FORBIDDEN": {
+                    "summary": "You do not have permission to perform this action.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHORIZATION.FORBIDDEN",
+                        "message": "You do not have permission to perform this action.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "PERSONNEL.SELF_CHANGE_FORBIDDEN": {
+                    "summary": "An event or a notice about yourself is not recorded in the application: it is done by the controlled procedure (pnpm ops:record-super-admin-event).",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "PERSONNEL.SELF_CHANGE_FORBIDDEN",
+                        "message": "An event or a notice about yourself is not recorded in the application: it is done by the controlled procedure (pnpm ops:record-super-admin-event).",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The employee does not exist (OFFBOARDING_CASE.EMPLOYEE_NOT_FOUND).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "OFFBOARDING_CASE.EMPLOYEE_NOT_FOUND": {
+                    "summary": "The employee does not exist.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "OFFBOARDING_CASE.EMPLOYEE_NOT_FOUND",
+                        "message": "The employee does not exist.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The record would be refused: the person has left (OFFBOARDING_CASE.EMPLOYEE_LEFT) or is handing over already (ALREADY_HANDING_OVER), has a transfer that takes effect before the last working day or another event waiting (PENDING_EVENT_EXISTS), has placements but none in force or scheduled (PLACEMENT_OVERLAP), or was changed meanwhile (CONCURRENT_CHANGE).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "OFFBOARDING_CASE.EMPLOYEE_LEFT": {
+                    "summary": "The employee has left the organization.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "OFFBOARDING_CASE.EMPLOYEE_LEFT",
+                        "message": "The employee has left the organization.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "OFFBOARDING_CASE.ALREADY_HANDING_OVER": {
+                    "summary": "The employee is already handing over before leaving.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "OFFBOARDING_CASE.ALREADY_HANDING_OVER",
+                        "message": "The employee is already handing over before leaving.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "OFFBOARDING_CASE.PENDING_EVENT_EXISTS": {
+                    "summary": "The person has another event waiting.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "OFFBOARDING_CASE.PENDING_EVENT_EXISTS",
+                        "message": "The person has another event waiting.",
+                        "details": { "kind": "TRANSFER", "effectiveOn": "2026-01-01" },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "OFFBOARDING_CASE.CONCURRENT_CHANGE": {
+                    "summary": "The person was changed by someone else meanwhile; read the case again.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "OFFBOARDING_CASE.CONCURRENT_CHANGE",
+                        "message": "The person was changed by someone else meanwhile; read the case again.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "OFFBOARDING_CASE.PLACEMENT_OVERLAP": {
+                    "summary": "The placements of the person cannot take this change.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "OFFBOARDING_CASE.PLACEMENT_OVERLAP",
+                        "message": "The placements of the person cannot take this change.",
+                        "details": { "reason": "FIRST_PLACEMENT_PENDING", "validFrom": "2026-01-01" },
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_PAYLOAD_TOO_LARGE": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_PAYLOAD_TOO_LARGE",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_UNSUPPORTED_MEDIA_TYPE": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_UNSUPPORTED_MEDIA_TYPE",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The body is invalid (VALIDATION_ERROR) or the record would be refused: there is no last working day for a planned handover or the day is not allowed (OFFBOARDING_CASE.LAST_WORKING_DAY_REQUIRED, LAST_WORKING_DAY_INVALID), the basis is only the code of a notice (OFFBOARDING_CASE.GROUNDS_IS_NOTICE), a transfer that waits would be cancelled and the confirmation is missing (TRANSFER_CANCELLATION_REQUIRED), the person heads the department they leave and names nobody to follow them (PERSONNEL.SUCCESSOR_REQUIRED) or the one chosen cannot take the department that day (SUCCESSOR_NOT_A_MEMBER_ON_DATE).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "VALIDATION_ERROR": {
+                    "summary": "Request validation failed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "VALIDATION_ERROR",
+                        "message": "Request validation failed.",
+                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "OFFBOARDING_CASE.LAST_WORKING_DAY_REQUIRED": {
+                    "summary": "The last working day is required.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "OFFBOARDING_CASE.LAST_WORKING_DAY_REQUIRED",
+                        "message": "The last working day is required.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "OFFBOARDING_CASE.LAST_WORKING_DAY_INVALID": {
+                    "summary": "The last working day cannot be that day.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "OFFBOARDING_CASE.LAST_WORKING_DAY_INVALID",
+                        "message": "The last working day cannot be that day.",
+                        "details": { "reason": "IN_PAST", "today": "2026-01-01" },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "PERSONNEL.SUCCESSOR_REQUIRED": {
+                    "summary": "The person heads the department they leave: name an employee of it who follows them as head.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "PERSONNEL.SUCCESSOR_REQUIRED",
+                        "message": "The person heads the department they leave: name an employee of it who follows them as head.",
+                        "details": { "departmentId": "<department-id>" },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "OFFBOARDING_CASE.SUCCESSOR_NOT_A_MEMBER_ON_DATE": {
+                    "summary": "The person named cannot head the department on that day.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "OFFBOARDING_CASE.SUCCESSOR_NOT_A_MEMBER_ON_DATE",
+                        "message": "The person named cannot head the department on that day.",
+                        "details": { "reason": "NOT_A_MEMBER_ON_DATE" },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "OFFBOARDING_CASE.GROUNDS_IS_NOTICE": {
+                    "summary": "The code of a notice is not the document the departure rests on.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "OFFBOARDING_CASE.GROUNDS_IS_NOTICE",
+                        "message": "The code of a notice is not the document the departure rests on.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "OFFBOARDING_CASE.TRANSFER_CANCELLATION_REQUIRED": {
+                    "summary": "The transfer that waits ends before it takes effect: confirm that it is cancelled with the departure.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "OFFBOARDING_CASE.TRANSFER_CANCELLATION_REQUIRED",
+                        "message": "The transfer that waits ends before it takes effect: confirm that it is cancelled with the departure.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_TOO_MANY_REQUESTS": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_TOO_MANY_REQUESTS",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "TOKEN_VERIFICATION_UNAVAILABLE": {
+                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
+                        "message": "Authentication is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SERVICE_UNAVAILABLE": {
+                    "summary": "The service is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SERVICE_UNAVAILABLE",
+                        "message": "The service is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "bearer": [] }],
+        "summary": "Preview what recording a departure would do",
+        "tags": ["offboarding-cases"]
+      }
+    },
+    "/api/v1/department-transfers/preview": {
+      "post": {
+        "operationId": "departmentTransferPreview",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/RecordTransferBodyDto" } } }
+        },
+        "responses": {
+          "200": {
+            "description": "What recording the transfer would do, without writing anything: the personal rights of the old department that the system takes back when the grace ends (the ones the person holds the day the transfer takes effect that a revocation can take away, the very ones it then opens), the paid requests sent from the old department that it closes the day the transfer takes effect and the ones with a grant under way that it leaves to the IT Admin, the money held for the closed ones that goes back to the budget (by currency), what the person answers for in the catalog if they are an IT Admin, the plans they administer at the vendor, whether a successor must be named for the head, and the last day of the grace with the day the person is told once more. The body is the one of the record and is refused the way the record refuses it, with the same codes. Nothing is saved, no notice is sent and no audit event is written.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/TransferPreviewResponseDto" },
+                    { "properties": { "message": { "example": "DEPARTMENT_TRANSFER.PREVIEWED" } } }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_BAD_REQUEST": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_BAD_REQUEST",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHENTICATION_REQUIRED": {
+                    "summary": "A Bearer access token is required.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHENTICATION_REQUIRED",
+                        "message": "A Bearer access token is required.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "INVALID_ACCESS_TOKEN": {
+                    "summary": "The access token is invalid.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "INVALID_ACCESS_TOKEN",
+                        "message": "The access token is invalid.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only the Super Admin records a transfer and so previews it (AUTHORIZATION.FORBIDDEN); the Super Admin does not do either about themselves in the application (PERSONNEL.SELF_CHANGE_FORBIDDEN).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHORIZATION.FORBIDDEN": {
+                    "summary": "You do not have permission to perform this action.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHORIZATION.FORBIDDEN",
+                        "message": "You do not have permission to perform this action.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "PERSONNEL.SELF_CHANGE_FORBIDDEN": {
+                    "summary": "An event or a notice about yourself is not recorded in the application: it is done by the controlled procedure (pnpm ops:record-super-admin-event).",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "PERSONNEL.SELF_CHANGE_FORBIDDEN",
+                        "message": "An event or a notice about yourself is not recorded in the application: it is done by the controlled procedure (pnpm ops:record-super-admin-event).",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The employee does not exist (DEPARTMENT_TRANSFER.EMPLOYEE_NOT_FOUND).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "DEPARTMENT_TRANSFER.EMPLOYEE_NOT_FOUND": {
+                    "summary": "The employee does not exist.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "DEPARTMENT_TRANSFER.EMPLOYEE_NOT_FOUND",
+                        "message": "The employee does not exist.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The record would be refused: the person has left (DEPARTMENT_TRANSFER.EMPLOYEE_LEFT) or has another event waiting (PENDING_EVENT_EXISTS), the destination department cannot take people (DEPARTMENT_INACTIVE), or the placements cannot take it (PLACEMENT_OVERLAP, CONCURRENT_CHANGE).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "DEPARTMENT_TRANSFER.EMPLOYEE_LEFT": {
+                    "summary": "The employee has left the organization.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "DEPARTMENT_TRANSFER.EMPLOYEE_LEFT",
+                        "message": "The employee has left the organization.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "DEPARTMENT_TRANSFER.PENDING_EVENT_EXISTS": {
+                    "summary": "The person has another event waiting, or a transfer before that is not closed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "DEPARTMENT_TRANSFER.PENDING_EVENT_EXISTS",
+                        "message": "The person has another event waiting, or a transfer before that is not closed.",
+                        "details": { "kind": "TRANSFER", "effectiveOn": "2026-01-01" },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "DEPARTMENT_TRANSFER.DEPARTMENT_INACTIVE": {
+                    "summary": "The transfer was refused (DEPARTMENT_INACTIVE).",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "DEPARTMENT_TRANSFER.DEPARTMENT_INACTIVE",
+                        "message": "The transfer was refused (DEPARTMENT_INACTIVE).",
+                        "details": { "subject": "DEPARTMENT" },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "DEPARTMENT_TRANSFER.PLACEMENT_OVERLAP": {
+                    "summary": "The placements of the person cannot take this change.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "DEPARTMENT_TRANSFER.PLACEMENT_OVERLAP",
+                        "message": "The placements of the person cannot take this change.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "DEPARTMENT_TRANSFER.CONCURRENT_CHANGE": {
+                    "summary": "The person was changed by someone else meanwhile; read them again.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "DEPARTMENT_TRANSFER.CONCURRENT_CHANGE",
+                        "message": "The person was changed by someone else meanwhile; read them again.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_PAYLOAD_TOO_LARGE": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_PAYLOAD_TOO_LARGE",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_UNSUPPORTED_MEDIA_TYPE": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_UNSUPPORTED_MEDIA_TYPE",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The body is invalid (VALIDATION_ERROR) or the record would be refused: the day is in the past or not after the first day of the current placement (DEPARTMENT_TRANSFER.EFFECTIVE_DATE_IN_PAST, EFFECTIVE_DATE_NOT_AFTER_CURRENT_PERIOD), the department does not change (NO_CHANGE), is unknown (DEPARTMENT_NOT_FOUND) or takes effect later than the day (DEPARTMENT_NOT_YET_EFFECTIVE), the basis is only the code of a notice (GROUNDS_IS_NOTICE), or the head of the department they leave is not provided for (PERSONNEL.SUCCESSOR_REQUIRED, DEPARTMENT_TRANSFER.SUCCESSOR_NOT_A_MEMBER_ON_DATE).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "VALIDATION_ERROR": {
+                    "summary": "Request validation failed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "VALIDATION_ERROR",
+                        "message": "Request validation failed.",
+                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "DEPARTMENT_TRANSFER.NO_CHANGE": {
+                    "summary": "The change leaves the department as it is.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "DEPARTMENT_TRANSFER.NO_CHANGE",
+                        "message": "The change leaves the department as it is.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "DEPARTMENT_TRANSFER.EFFECTIVE_DATE_IN_PAST": {
+                    "summary": "The day a change takes effect is today or later.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "DEPARTMENT_TRANSFER.EFFECTIVE_DATE_IN_PAST",
+                        "message": "The day a change takes effect is today or later.",
+                        "details": { "today": "2026-01-01" },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "DEPARTMENT_TRANSFER.EFFECTIVE_DATE_NOT_AFTER_CURRENT_PERIOD": {
+                    "summary": "The day must come after the first day of the placement the person has now.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "DEPARTMENT_TRANSFER.EFFECTIVE_DATE_NOT_AFTER_CURRENT_PERIOD",
+                        "message": "The day must come after the first day of the placement the person has now.",
+                        "details": { "currentPeriodFrom": "2026-01-01" },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "DEPARTMENT_TRANSFER.DEPARTMENT_NOT_FOUND": {
+                    "summary": "The transfer was refused (DEPARTMENT_NOT_FOUND).",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "DEPARTMENT_TRANSFER.DEPARTMENT_NOT_FOUND",
+                        "message": "The transfer was refused (DEPARTMENT_NOT_FOUND).",
+                        "details": { "subject": "DEPARTMENT" },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "DEPARTMENT_TRANSFER.DEPARTMENT_NOT_YET_EFFECTIVE": {
+                    "summary": "The destination department takes effect later than the day of the change.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "DEPARTMENT_TRANSFER.DEPARTMENT_NOT_YET_EFFECTIVE",
+                        "message": "The destination department takes effect later than the day of the change.",
+                        "details": { "effectiveFrom": "2027-01-01" },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "DEPARTMENT_TRANSFER.GROUNDS_IS_NOTICE": {
+                    "summary": "The code of a notice is not the document the change rests on.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "DEPARTMENT_TRANSFER.GROUNDS_IS_NOTICE",
+                        "message": "The code of a notice is not the document the change rests on.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "PERSONNEL.SUCCESSOR_REQUIRED": {
+                    "summary": "The person heads the department they leave: name an employee of it who follows them as head.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "PERSONNEL.SUCCESSOR_REQUIRED",
+                        "message": "The person heads the department they leave: name an employee of it who follows them as head.",
+                        "details": { "departmentId": "<department-id>" },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "DEPARTMENT_TRANSFER.SUCCESSOR_NOT_A_MEMBER_ON_DATE": {
+                    "summary": "The person named cannot head the department on that day.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "DEPARTMENT_TRANSFER.SUCCESSOR_NOT_A_MEMBER_ON_DATE",
+                        "message": "The person named cannot head the department on that day.",
+                        "details": { "reason": "NOT_A_MEMBER_ON_DATE" },
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_TOO_MANY_REQUESTS": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_TOO_MANY_REQUESTS",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "TOKEN_VERIFICATION_UNAVAILABLE": {
+                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
+                        "message": "Authentication is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SERVICE_UNAVAILABLE": {
+                    "summary": "The service is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SERVICE_UNAVAILABLE",
+                        "message": "The service is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "bearer": [] }],
+        "summary": "Preview what recording a transfer would do",
+        "tags": ["department-transfers"]
+      }
+    },
     "/api/v1/offboarding-cases/{id}/account-lock": {
       "post": {
         "operationId": "offboardingCaseRecordAccountLock",
@@ -90243,6 +91042,322 @@
         "additionalProperties": false
       },
       "MarkLeftBodyDto": { "type": "object", "properties": {}, "additionalProperties": false },
+      "DeparturePreviewResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "enum": [true] },
+          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "rightsToRevoke": {
+                "maxItems": 200,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "assignmentId": { "type": "string", "format": "uuid" },
+                    "application": {
+                      "type": "object",
+                      "properties": { "id": { "type": "string", "format": "uuid" }, "name": { "type": "string" } },
+                      "required": ["id", "name"],
+                      "additionalProperties": false
+                    },
+                    "plan": {
+                      "type": "object",
+                      "properties": { "id": { "type": "string", "format": "uuid" }, "name": { "type": "string" } },
+                      "required": ["id", "name"],
+                      "additionalProperties": false
+                    },
+                    "provisioningType": { "type": "string", "description": "K1 to K5: how the seat is taken away." },
+                    "revocable": {
+                      "type": "boolean",
+                      "description": "A task can take the seat away; false for the kinds with no revocation yet."
+                    },
+                    "dataLossOnRemoval": { "type": "boolean" },
+                    "revocationNote": {
+                      "description": "The note of the plan on how the seat is taken away.",
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "revocationUnderWay": {
+                      "type": "boolean",
+                      "description": "A task of the queue already works on taking it away."
+                    }
+                  },
+                  "required": [
+                    "assignmentId",
+                    "application",
+                    "plan",
+                    "provisioningType",
+                    "revocable",
+                    "dataLossOnRemoval",
+                    "revocationNote",
+                    "revocationUnderWay"
+                  ],
+                  "additionalProperties": false
+                },
+                "description": "The personal rights the system takes back: for a departure the seats the person holds, which the IT Admin takes away; for a transfer the rights of the old department that the grace ends with, the very ones the system then opens a revocation for (granted after the transfer takes effect, ended or without a revocation are not in it)."
+              },
+              "openRequestsToCancel": {
+                "maxItems": 200,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "requestId": { "type": "string", "format": "uuid" },
+                    "type": { "type": "string" },
+                    "state": { "type": "string" },
+                    "line": {
+                      "type": "boolean",
+                      "description": "The request is for a group: only the line of this person ends."
+                    }
+                  },
+                  "required": ["requestId", "type", "state", "line"],
+                  "additionalProperties": false
+                },
+                "description": "The requests the system closes: all the open ones of a departure, the paid ones sent from the old department for a transfer."
+              },
+              "provisioningInFlight": {
+                "maxItems": 200,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "requestId": { "type": "string", "format": "uuid" },
+                    "type": { "type": "string" },
+                    "state": { "type": "string" },
+                    "line": {
+                      "type": "boolean",
+                      "description": "The request is for a group: only the line of this person ends."
+                    }
+                  },
+                  "required": ["requestId", "type", "state", "line"],
+                  "additionalProperties": false
+                },
+                "description": "The requests with a grant being carried out: not closed, the IT Admin in charge is told to check the vendor and close them."
+              },
+              "commitmentToRelease": {
+                "maxItems": 200,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "currency": { "type": "string" },
+                    "amountMinor": {
+                      "type": "string",
+                      "description": "The smallest unit of the currency, as a string."
+                    }
+                  },
+                  "required": ["currency", "amountMinor"],
+                  "additionalProperties": false
+                },
+                "description": "What is held and not spent for the requests that are closed and goes back to the budget, one entry for each currency."
+              },
+              "responsibilities": {
+                "type": "object",
+                "properties": {
+                  "subscriptions": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                  "applications": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+                },
+                "required": ["subscriptions", "applications"],
+                "additionalProperties": false,
+                "description": "What an IT Admin who leaves answers for in the catalog; 0 and 0 for anyone else."
+              },
+              "vendorAdminRoles": {
+                "maxItems": 200,
+                "type": "array",
+                "items": { "type": "string" },
+                "description": "The plans the person administers at the vendor, as `<application> / <plan> (OWNER|ADMIN)`."
+              },
+              "headSuccessorRequired": {
+                "type": "boolean",
+                "description": "The person heads the department they leave: the record needs an employee named to follow them."
+              },
+              "revocationDueOn": {
+                "type": "string",
+                "format": "date",
+                "description": "The day the IT Admin has until to take every right away."
+              }
+            },
+            "required": [
+              "rightsToRevoke",
+              "openRequestsToCancel",
+              "provisioningInFlight",
+              "commitmentToRelease",
+              "responsibilities",
+              "vendorAdminRoles",
+              "headSuccessorRequired",
+              "revocationDueOn"
+            ],
+            "additionalProperties": false,
+            "nullable": true
+          }
+        },
+        "required": ["success", "message", "data"],
+        "additionalProperties": false
+      },
+      "TransferPreviewResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "enum": [true] },
+          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "rightsToRevoke": {
+                "maxItems": 200,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "assignmentId": { "type": "string", "format": "uuid" },
+                    "application": {
+                      "type": "object",
+                      "properties": { "id": { "type": "string", "format": "uuid" }, "name": { "type": "string" } },
+                      "required": ["id", "name"],
+                      "additionalProperties": false
+                    },
+                    "plan": {
+                      "type": "object",
+                      "properties": { "id": { "type": "string", "format": "uuid" }, "name": { "type": "string" } },
+                      "required": ["id", "name"],
+                      "additionalProperties": false
+                    },
+                    "provisioningType": { "type": "string", "description": "K1 to K5: how the seat is taken away." },
+                    "revocable": {
+                      "type": "boolean",
+                      "description": "A task can take the seat away; false for the kinds with no revocation yet."
+                    },
+                    "dataLossOnRemoval": { "type": "boolean" },
+                    "revocationNote": {
+                      "description": "The note of the plan on how the seat is taken away.",
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "revocationUnderWay": {
+                      "type": "boolean",
+                      "description": "A task of the queue already works on taking it away."
+                    }
+                  },
+                  "required": [
+                    "assignmentId",
+                    "application",
+                    "plan",
+                    "provisioningType",
+                    "revocable",
+                    "dataLossOnRemoval",
+                    "revocationNote",
+                    "revocationUnderWay"
+                  ],
+                  "additionalProperties": false
+                },
+                "description": "The personal rights the system takes back: for a departure the seats the person holds, which the IT Admin takes away; for a transfer the rights of the old department that the grace ends with, the very ones the system then opens a revocation for (granted after the transfer takes effect, ended or without a revocation are not in it)."
+              },
+              "openRequestsToCancel": {
+                "maxItems": 200,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "requestId": { "type": "string", "format": "uuid" },
+                    "type": { "type": "string" },
+                    "state": { "type": "string" },
+                    "line": {
+                      "type": "boolean",
+                      "description": "The request is for a group: only the line of this person ends."
+                    }
+                  },
+                  "required": ["requestId", "type", "state", "line"],
+                  "additionalProperties": false
+                },
+                "description": "The requests the system closes: all the open ones of a departure, the paid ones sent from the old department for a transfer."
+              },
+              "provisioningInFlight": {
+                "maxItems": 200,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "requestId": { "type": "string", "format": "uuid" },
+                    "type": { "type": "string" },
+                    "state": { "type": "string" },
+                    "line": {
+                      "type": "boolean",
+                      "description": "The request is for a group: only the line of this person ends."
+                    }
+                  },
+                  "required": ["requestId", "type", "state", "line"],
+                  "additionalProperties": false
+                },
+                "description": "The requests with a grant being carried out: not closed, the IT Admin in charge is told to check the vendor and close them."
+              },
+              "commitmentToRelease": {
+                "maxItems": 200,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "currency": { "type": "string" },
+                    "amountMinor": {
+                      "type": "string",
+                      "description": "The smallest unit of the currency, as a string."
+                    }
+                  },
+                  "required": ["currency", "amountMinor"],
+                  "additionalProperties": false
+                },
+                "description": "What is held and not spent for the requests that are closed and goes back to the budget, one entry for each currency."
+              },
+              "responsibilities": {
+                "type": "object",
+                "properties": {
+                  "subscriptions": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                  "applications": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+                },
+                "required": ["subscriptions", "applications"],
+                "additionalProperties": false,
+                "description": "What an IT Admin who leaves answers for in the catalog; 0 and 0 for anyone else."
+              },
+              "vendorAdminRoles": {
+                "maxItems": 200,
+                "type": "array",
+                "items": { "type": "string" },
+                "description": "The plans the person administers at the vendor, as `<application> / <plan> (OWNER|ADMIN)`."
+              },
+              "headSuccessorRequired": {
+                "type": "boolean",
+                "description": "The person heads the department they leave: the record needs an employee named to follow them."
+              },
+              "graceEndsOn": {
+                "type": "string",
+                "format": "date",
+                "description": "The last day the person keeps the rights of the old department."
+              },
+              "graceReminderOn": {
+                "type": "string",
+                "format": "date",
+                "description": "The day the person is told once more that the rights are about to be taken back."
+              }
+            },
+            "required": [
+              "rightsToRevoke",
+              "openRequestsToCancel",
+              "provisioningInFlight",
+              "commitmentToRelease",
+              "responsibilities",
+              "vendorAdminRoles",
+              "headSuccessorRequired",
+              "graceEndsOn",
+              "graceReminderOn"
+            ],
+            "additionalProperties": false,
+            "nullable": true
+          }
+        },
+        "required": ["success", "message", "data"],
+        "additionalProperties": false
+      },
       "RecordAccountLockBodyDto": {
         "type": "object",
         "properties": { "note": { "type": "string", "minLength": 1, "maxLength": 1000 } },
