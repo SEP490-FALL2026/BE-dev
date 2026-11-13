@@ -26,9 +26,14 @@ export class RequestLimitsRepo {
    * The requests for new access each of these people has open, oldest first (`QĐ-104b`): sent (not a draft) and not at an end (a
    * request withdrawn that waits for the IT Admin to close its task counts as ended); a request of one person (`GRANT`, a proposal
    * of new software included) or the line of the person in a request for a group that has not ended. A request for a renewal, for a
-   * service account, or one that is exempt is not counted. One statement; the people with none are absent.
+   * service account, or one that is exempt is not counted, unless `includeExempt` (what the duplicate of a request in the grace of a transfer is
+   * judged against). One statement; the people with none are absent.
    */
-  async openNewRequestsOf(tx: DbTx, employeeIds: readonly string[]): Promise<Map<string, OpenNewRequest[]>> {
+  async openNewRequestsOf(
+    tx: DbTx,
+    employeeIds: readonly string[],
+    options: { includeExempt: boolean } = { includeExempt: false },
+  ): Promise<Map<string, OpenNewRequest[]>> {
     if (employeeIds.length === 0) return new Map();
     const ended = [...NOT_OPEN_FOR_LEAVER];
     const openLines = [...OPEN_LINE_STATES];
@@ -40,8 +45,8 @@ export class RequestLimitsRepo {
        WHERE b.employee_id = ANY(${[...employeeIds]}::uuid[])
          AND r.state <> 'DRAFT'
          AND (
-           (r.type = 'GRANT' AND r.limit_exemption IS NULL AND NOT (r.state::text = ANY(${ended}::text[])))
-           OR (r.type = 'GROUP_GRANT' AND l.limit_exemption IS NULL AND l.state::text = ANY(${openLines}::text[]))
+           (r.type = 'GRANT' AND (${options.includeExempt}::boolean OR r.limit_exemption IS NULL) AND NOT (r.state::text = ANY(${ended}::text[])))
+           OR (r.type = 'GROUP_GRANT' AND (${options.includeExempt}::boolean OR l.limit_exemption IS NULL) AND l.state::text = ANY(${openLines}::text[]))
          )
        ORDER BY b.employee_id, r.submitted_at, r.id`;
     const found = new Map<string, OpenNewRequest[]>();

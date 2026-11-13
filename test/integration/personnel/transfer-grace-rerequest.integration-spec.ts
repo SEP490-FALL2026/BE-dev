@@ -133,18 +133,35 @@ describe('asking again in the grace of a transfer (integration, real PostgreSQL)
     }
   }, 240_000);
 
-  it('GH-1 and GH-2 are skipped: a second open request for the same plan is not refused in the grace', async () => {
+  it('GH-1 still holds: a second open request for the same plan, the one sent in the grace included, is refused', async () => {
     const { dest, person } = await example();
     await h.moveToday(person, dest.department);
     const first = (await h.sent(person, plan, { termMonths: 1 })) as unknown as RequestWire;
 
     const preview = await h.previewed(person, plan);
-    const second = (await h.sent(person, plan, { termMonths: 1 })) as unknown as RequestWire;
+    const second = await h.submit(h.form(plan, { termMonths: 1 }), person.account);
 
-    expect(preview.limits).toMatchObject({ refusal: null, openRequestId: null });
-    expect(preview.canSubmit).toBe(true);
-    expect(second.id).not.toBe(first.id);
-    expect((await replaces(second.id)).exemption).toBe('TRANSFER_GRACE');
+    // The request sent in the grace is exempt from the count, not from the duplicate (QĐ-110q frees GH-2 only).
+    expect(preview).toMatchObject({
+      canSubmit: false,
+      limitExemption: 'TRANSFER_GRACE',
+      limits: { refusal: 'HAS_OPEN_REQUEST', openRequestId: first.id },
+    });
+    expect([second.status, h.codeOf(second)]).toEqual([409, 'ACCESS_REQUEST.OPEN_REQUEST_EXISTS']);
+  }, 240_000);
+
+  it('holding the right itself does not block: the person who holds the seat and has no open request asks again', async () => {
+    const { dest, person, seat } = await example();
+    await h.moveToday(person, dest.department);
+
+    const preview = await h.previewed(person, plan);
+
+    expect(preview).toMatchObject({
+      canSubmit: true,
+      limitExemption: 'TRANSFER_GRACE',
+      existingAccess: { assignmentId: seat },
+      limits: { refusal: null, openRequestId: null },
+    });
   }, 240_000);
 
   it('a seat that is not an old right is refused as ever: one granted after the day the transfer took effect', async () => {

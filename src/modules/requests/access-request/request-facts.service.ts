@@ -49,7 +49,7 @@ export interface Assessment {
   heldAccess: HeldAccess | null;
   /**
    * The seat held is a right from before a transfer whose grace still lasts (`QĐ-110q`, R-49): asking for it again is let through the check of the seat
-   * held and GH-1/GH-2, and the request replaces that right. Null when nothing is held, or the seat is not one of those.
+   * held and the count of the limits (GH-2; a duplicate of the plan stays refused), and the request replaces that right. Null when nothing is held, or the seat is not one of those.
    */
   graceHold: TransferGraceHolding | null;
   /** The last day a right asked for may end, and whether the end date asked for breaks it or is missing (`FR-2.8`, `US-05-23` AC-9). */

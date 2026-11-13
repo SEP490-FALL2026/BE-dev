@@ -85,7 +85,8 @@ const previewSchema = z.strictObject({
   }),
   /**
    * Set when the person holds the software asked for from before a transfer whose grace still lasts: the request is then let through the check of the seat
-   * held and left out of GH-1/GH-2 (`QĐ-110q`, P10), and the grant ends the old right if it is given on the same subscription (R-49). Null otherwise.
+   * held and left out of the count of GH-2 (`QĐ-110q`, P10; an open request of the same plan, an exempt one included, still refuses it as GH-1), and the grant
+   * ends the old right if it is given on the same subscription (R-49). Null otherwise.
    */
   limitExemption: limitExemptionSchema.nullable(),
   canSubmit: z.boolean(),

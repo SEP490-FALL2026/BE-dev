@@ -46,8 +46,8 @@ export interface TransferGraceHolding {
 
 /**
  * The contexts that know a person is in the grace of a transfer and holds a right from before it (`QĐ-110q`, `R-49`, SPEC P10): the personnel context.
- * Asked by the request of a person for software they already hold; the answer lets the request through the check of the seat held and the limits
- * GH-1/GH-2, and names the old right it replaces. With none added, nobody is in a grace and a seat held refuses the request as it always did.
+ * Asked by the request of a person for software they already hold; the answer lets the request through the check of the seat held and the count of the limits
+ * (GH-2; a duplicate of the plan stays refused), and names the old right it replaces. With none added, nobody is in a grace and a seat held refuses the request as it always did.
  */
 export interface TransferGraceHoldContribution {
   /**
