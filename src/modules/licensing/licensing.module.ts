@@ -31,6 +31,9 @@ import { DepartmentToolsController } from './department-tools/department-tools.c
 import { DepartmentSoftwareAccessService } from './department-tools/department-software-access.service';
 import { DepartmentSoftwareChangesService } from './department-tools/department-software-changes.service';
 import { DepartmentSoftwareController } from './department-tools/department-software.controller';
+import { DepartmentSoftwareNotice } from './department-tools/department-software-notice.service';
+import { DepartmentSoftwareProposalService } from './department-tools/department-software-proposal.service';
+import { DepartmentSoftwareProposalsController } from './department-tools/department-software-proposals.controller';
 import { DepartmentSoftwareQueryService } from './department-tools/department-software-query.service';
 import { DepartmentSoftwareRepo } from './department-tools/department-software.repo';
 import { DepartmentSoftwareViewService } from './department-tools/department-software-view.service';
@@ -161,6 +164,7 @@ import { SubscriptionRenewalsController } from './subscription-renewal/subscript
     SubscriptionSeatsController,
     DepartmentToolsController,
     DepartmentSoftwareController,
+    DepartmentSoftwareProposalsController,
     SeatBaselineController,
     ProvisioningTasksController,
     RevocationTasksController,
@@ -193,6 +197,8 @@ import { SubscriptionRenewalsController } from './subscription-renewal/subscript
     DepartmentSoftwareViewService,
     DepartmentSoftwareQueryService,
     DepartmentSoftwareChangesService,
+    DepartmentSoftwareNotice,
+    DepartmentSoftwareProposalService,
     SeatBaselineRepo,
     SeatBaselineService,
     SeatBaselinePhaseListener,

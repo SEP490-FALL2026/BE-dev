@@ -2,9 +2,10 @@ import { Injectable } from '@nestjs/common';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { CatalogApi } from '../../catalog/public/catalog.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
+import { DepartmentSoftwareNotInCatalogError } from '../public/licensing.errors';
 import type { SoftwareEntryWire, SoftwareProposalWire } from './department-software.dto';
 import { toEntryWire, toProposalWire, type SoftwareNames } from './department-software.mapper';
-import type { CatalogFacts, DepartmentSoftwareItem } from './department-software.policy';
+import { catalogRefusal, type CatalogFacts, type DepartmentSoftwareItem } from './department-software.policy';
 import type { SoftwareEntry, SoftwareProposal } from './department-software.types';
 
 /**
@@ -44,6 +45,18 @@ export class DepartmentSoftwareViewService {
       ),
       plans: new Map(plans.map((plan) => [plan.planId, { applicationId: plan.applicationId }])),
     };
+  }
+
+  /** Throws DepartmentSoftwareNotInCatalogError naming every place the catalog does not offer (`QĐ-110t`); none of them is written or proposed. */
+  async assertInCatalog(items: readonly DepartmentSoftwareItem[], tx?: DbTx): Promise<void> {
+    if (items.length === 0) return;
+    const facts = await this.catalogFacts(items, tx);
+    const outside = items.filter((item) => catalogRefusal(item, facts) !== null);
+    if (outside.length > 0) {
+      throw new DepartmentSoftwareNotInCatalogError(
+        outside.map((item) => ({ applicationId: item.applicationId, planId: item.planId })),
+      );
+    }
   }
 
   private async namesOf(
