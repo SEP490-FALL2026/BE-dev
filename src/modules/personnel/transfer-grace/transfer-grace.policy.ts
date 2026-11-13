@@ -39,3 +39,44 @@ export function graceReminderOn(
 export function graceWindowEnd(effectiveOn: BusinessDate): BusinessDate {
   return addDays(effectiveOn, CALENDAR_WINDOW_DAYS);
 }
+
+/**
+ * The day the grace begins (`QĐ-110p`, m-17): the day the transfer takes effect (day 1), unless the system only notes it later. A transfer
+ * that took effect before the release that brought the grace begins it on the day of the release, and one the system sees days after its
+ * day (it was not running) begins it on the day it sees it, so the person is never given less than the grace the rule promises.
+ */
+export function graceStartsOn(effectiveOn: BusinessDate, notedOn: BusinessDate): BusinessDate {
+  return notedOn > effectiveOn ? notedOn : effectiveOn;
+}
+
+/** The three days of the grace of one transfer. */
+export interface TransferGrace {
+  /** Day 1 of the grace (a Saturday or Sunday here makes the first working day the Monday after). */
+  startsOn: BusinessDate;
+  /** The last day the person keeps the rights of the old department. */
+  endsOn: BusinessDate;
+  /** The day the person is told once more that the rights are about to be taken back. */
+  reminderOn: BusinessDate;
+}
+
+/** What {@link graceOf} reads: the two parameters and the days off, from the day the grace begins to {@link graceWindowEnd}. */
+export interface GraceInput {
+  effectiveOn: BusinessDate;
+  /** The day the system opens the grace (today when the transfer is being settled). */
+  notedOn: BusinessDate;
+  workingDays: number;
+  reminderWorkingDays: number;
+  nonWorkingDates: NonWorkingDates;
+}
+
+/** The whole grace of a transfer: where it begins, where it ends and the day of the reminder. The one place the three days are worked out. */
+export function graceOf(input: GraceInput): TransferGrace {
+  const startsOn = graceStartsOn(input.effectiveOn, input.notedOn);
+  const endsOn = graceEndsOn(startsOn, input.workingDays, input.nonWorkingDates);
+
+  return {
+    startsOn,
+    endsOn,
+    reminderOn: graceReminderOn(startsOn, endsOn, input.reminderWorkingDays, input.nonWorkingDates),
+  };
+}

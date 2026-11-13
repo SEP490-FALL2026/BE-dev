@@ -43,9 +43,19 @@ model DepartmentTransfer {
   cancelledByAppUserId String?                  @map("cancelled_by_app_user_id") @db.Uuid
   cancelledByTicketId  String?                  @map("cancelled_by_ticket_id") @db.Uuid
   cancelledReason      String?                  @map("cancelled_reason")
-  // Closed by the IT Admin once the people who answer for the service accounts of the person are named (US-03-08); only an EFFECTIVE transfer.
+  // Closed once every right of the old department is taken back (`QĐ-110r`): by the system (`closedBySystem`, no account), or, for a
+  // transfer closed before that rule, by an IT Admin (`closedByAppUserId`); only an EFFECTIVE transfer.
   closedAt             DateTime?                @map("closed_at") @db.Timestamptz(3)
   closedByAppUserId    String?                  @map("closed_by_app_user_id") @db.Uuid
+  closedBySystem       Boolean                  @default(false) @map("closed_by_system")
+  // The grace of the old rights (`QĐ-110p`, MF3-B): the last day the person keeps them, the day they are told once more, and when that was
+  // done; set once, when the transfer takes effect. A transfer that took effect before the release has them from the day of the release.
+  graceEndsOn          DateTime?                @map("grace_ends_on") @db.Date
+  graceReminderOn      DateTime?                @map("grace_reminder_on") @db.Date
+  remindedAt           DateTime?                @map("reminded_at") @db.Timestamptz(3)
+  // The rights the person held when the transfer took effect, and, when it closes, what is left of them (codecs in `transfer-snapshot.json.ts`).
+  snapshotBefore       Json?                    @map("snapshot_before")
+  snapshotAfter        Json?                    @map("snapshot_after")
   // The notice of a head this transfer was recorded from, when there was one (US-03-11).
   noticeId             String?                  @unique @map("notice_id") @db.Uuid
 

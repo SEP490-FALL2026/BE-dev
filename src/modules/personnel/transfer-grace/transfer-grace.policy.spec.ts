@@ -1,5 +1,5 @@
 import { addDays } from '../../../core/business-date';
-import { graceEndsOn, graceReminderOn, graceWindowEnd } from './transfer-grace.policy';
+import { graceEndsOn, graceOf, graceReminderOn, graceStartsOn, graceWindowEnd } from './transfer-grace.policy';
 
 const NONE: ReadonlySet<string> = new Set();
 
@@ -62,5 +62,68 @@ describe('the day the person is told once more before the grace ends (QĐ-110p, 
     ],
   ])('%s', (_name, effectiveOn, endsOn, days, nonWorking, expected) => {
     expect(graceReminderOn(effectiveOn, endsOn, days, nonWorking)).toBe(expected);
+  });
+});
+
+describe('the day the grace begins (QĐ-110p, m-17)', () => {
+  it.each([
+    [
+      'the day the transfer takes effect is day 1 when the system sees it that day',
+      '2026-11-16',
+      '2026-11-16',
+      '2026-11-16',
+    ],
+    ['and when it is seen before the day', '2026-11-16', '2026-11-13', '2026-11-16'],
+    [
+      'a transfer that took effect before the release begins its grace on the day of the release',
+      '2026-11-02',
+      '2026-11-16',
+      '2026-11-16',
+    ],
+    [
+      'a transfer the system sees late begins its grace the day it sees it, so the person is never given less than the grace',
+      '2026-11-16',
+      '2026-11-18',
+      '2026-11-18',
+    ],
+  ])('%s', (_name, effectiveOn, notedOn, expected) => {
+    expect(graceStartsOn(effectiveOn, notedOn)).toBe(expected);
+  });
+});
+
+describe('the whole grace of a transfer (QĐ-110p, T-MF3, m-17)', () => {
+  const grace = (effectiveOn: string, notedOn: string, off: ReadonlySet<string> = NONE) =>
+    graceOf({ effectiveOn, notedOn, workingDays: 5, reminderWorkingDays: 2, nonWorkingDates: off });
+
+  it('T-MF3: takes effect on Monday 16/11 ⟹ ends on Friday 20/11, reminder on Wednesday 18/11', () => {
+    expect(grace('2026-11-16', '2026-11-16')).toEqual({
+      startsOn: '2026-11-16',
+      endsOn: '2026-11-20',
+      reminderOn: '2026-11-18',
+    });
+  });
+
+  it('m-17: a transfer that took effect long before a release of 16/11 has the grace of 16/11 to 20/11, reminder on 18/11', () => {
+    expect(grace('2026-10-05', '2026-11-16')).toEqual({
+      startsOn: '2026-11-16',
+      endsOn: '2026-11-20',
+      reminderOn: '2026-11-18',
+    });
+  });
+
+  it('a release on a Saturday begins the grace on the Monday after: the weekend is not counted', () => {
+    expect(grace('2026-10-05', '2026-11-14')).toEqual({
+      startsOn: '2026-11-14',
+      endsOn: '2026-11-20',
+      reminderOn: '2026-11-18',
+    });
+  });
+
+  it('a day off inside the grace moves its end (Thursday 19/11 off: day 5 is Monday 23/11) and the reminder counts two working days back from it (Friday 20/11, Wednesday 18/11)', () => {
+    expect(grace('2026-11-16', '2026-11-16', new Set(['2026-11-19']))).toEqual({
+      startsOn: '2026-11-16',
+      endsOn: '2026-11-23',
+      reminderOn: '2026-11-18',
+    });
   });
 });

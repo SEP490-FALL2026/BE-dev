@@ -4,7 +4,7 @@ import { LicensingApi } from '../../licensing/public/licensing.api';
 import { OperatingParametersApi } from '../../operating-parameters/public/operating-parameters.api';
 import { RequestsApi } from '../../requests/public/requests.api';
 import { commitmentToRelease, rightToRevokeOf } from '../departure-deadline/departure-impact.policy';
-import { graceEndsOn, graceReminderOn, graceWindowEnd } from './transfer-grace.policy';
+import { graceOf, graceStartsOn, graceWindowEnd } from './transfer-grace.policy';
 import type { TransferImpact, TransferImpactInput } from './transfer-impact.types';
 
 /**
@@ -37,7 +37,7 @@ export class TransferImpactService {
       state,
       line,
     });
-    const grace = await this.graceOf(input.effectiveOn);
+    const grace = await this.graceDays(input.effectiveOn, input.today);
 
     return {
       rightsToRevoke: seats.map(rightToRevokeOf),
@@ -52,12 +52,19 @@ export class TransferImpactService {
   }
 
   /** The last day of the grace and the day of the reminder, from the two parameters and the days off of the calendar of the organization. */
-  private async graceOf(effectiveOn: string): Promise<Pick<TransferImpact, 'graceEndsOn' | 'graceReminderOn'>> {
-    const days = Number(await this.parameters.getValue('TRANSFER_GRACE_WORKING_DAYS'));
-    const reminderDays = Number(await this.parameters.getValue('TRANSFER_GRACE_REMINDER_WORKING_DAYS'));
-    const nonWorking = await this.parameters.getNonWorkingDates(effectiveOn, graceWindowEnd(effectiveOn));
-    const endsOn = graceEndsOn(effectiveOn, days, nonWorking);
+  private async graceDays(
+    effectiveOn: string,
+    today: string,
+  ): Promise<Pick<TransferImpact, 'graceEndsOn' | 'graceReminderOn'>> {
+    const startsOn = graceStartsOn(effectiveOn, today);
+    const grace = graceOf({
+      effectiveOn,
+      notedOn: today,
+      workingDays: Number(await this.parameters.getValue('TRANSFER_GRACE_WORKING_DAYS')),
+      reminderWorkingDays: Number(await this.parameters.getValue('TRANSFER_GRACE_REMINDER_WORKING_DAYS')),
+      nonWorkingDates: await this.parameters.getNonWorkingDates(startsOn, graceWindowEnd(startsOn)),
+    });
 
-    return { graceEndsOn: endsOn, graceReminderOn: graceReminderOn(effectiveOn, endsOn, reminderDays, nonWorking) };
+    return { graceEndsOn: grace.endsOn, graceReminderOn: grace.reminderOn };
   }
 }
