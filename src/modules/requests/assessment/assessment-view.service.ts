@@ -87,6 +87,7 @@ export class AssessmentViewService {
   private async quoteView(quote: Quote): Promise<NonNullable<AssessmentWire['quote']>> {
     return {
       unitPrice: await this.pricing.moneyView(quote.unitPrice),
+      originalPrice: quote.originalPrice ? await this.pricing.moneyView(quote.originalPrice) : null,
       billingCycle: quote.billingCycle,
       validFrom: quote.validFrom,
       validUntil: quote.validUntil,

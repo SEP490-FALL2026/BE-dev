@@ -279,19 +279,36 @@ describe('requests over HTTP: software that is not in the catalog (integration, 
       ['an unknown field', { price: 3 }, 'VALIDATION_ERROR'],
       [
         'a negative price',
-        { quote: { unitPrice: { amount: '-1', currency: 'USD' }, billingCycle: 'MONTHLY', validFrom: '2026-01-01' } },
+        { quote: { unitPrice: { amount: '-1', currency: 'VND' }, billingCycle: 'MONTHLY', validFrom: '2026-01-01' } },
         'MONEY_OUT_OF_RANGE',
       ],
       [
-        'a currency that does not exist',
+        'a quote in another currency',
+        { quote: { unitPrice: { amount: '8.00', currency: 'USD' }, billingCycle: 'MONTHLY', validFrom: '2026-01-01' } },
+        'ASSESSMENT.QUOTE_PRICE_NOT_VND',
+      ],
+      [
+        'a quote in a currency that does not exist',
         { quote: { unitPrice: { amount: '1', currency: 'ZZZ' }, billingCycle: 'MONTHLY', validFrom: '2026-01-01' } },
+        'ASSESSMENT.QUOTE_PRICE_NOT_VND',
+      ],
+      [
+        'an original price in a currency that does not exist',
+        {
+          quote: {
+            unitPrice: { amount: '1', currency: 'VND' },
+            originalPrice: { amount: '1', currency: 'ZZZ' },
+            billingCycle: 'MONTHLY',
+            validFrom: '2026-01-01',
+          },
+        },
         'CURRENCY_NOT_SUPPORTED',
       ],
       [
         'a quote that ends before it begins',
         {
           quote: {
-            unitPrice: { amount: '1', currency: 'USD' },
+            unitPrice: { amount: '1', currency: 'VND' },
             billingCycle: 'MONTHLY',
             validFrom: '2026-02-01',
             validUntil: '2026-01-01',
@@ -301,7 +318,7 @@ describe('requests over HTTP: software that is not in the catalog (integration, 
       ],
       [
         'a billing cycle with no name for it',
-        { quote: { unitPrice: { amount: '1', currency: 'USD' }, billingCycle: 'OTHER', validFrom: '2026-01-01' } },
+        { quote: { unitPrice: { amount: '1', currency: 'VND' }, billingCycle: 'OTHER', validFrom: '2026-01-01' } },
         'VALIDATION_ERROR',
       ],
     ])('refuses %s', async (_name, body, code) => {
@@ -320,6 +337,25 @@ describe('requests over HTTP: software that is not in the catalog (integration, 
 
       expect(h.codeOf(response)).toBe('ASSESSMENT.REFERENCE_NOT_FOUND');
       expect(h.detailsOf(response)).toEqual({ field });
+    });
+
+    it('R-44: keeps the price the vendor quoted in another currency beside the quote in dong, and answers it back', async () => {
+      const proposed = await awaiting();
+      const quote = {
+        unitPrice: { amount: '203200', currency: 'VND' },
+        originalPrice: { amount: '8.00', currency: 'USD' },
+        billingCycle: 'MONTHLY',
+        validFrom: '2026-01-01',
+      };
+
+      await save(proposed.id, { quote }).expect(200);
+
+      expect((await h.assessmentWire(proposed.id, itInCharge.account)).quote).toMatchObject({
+        unitPrice: { amount: '203200', currency: 'VND' },
+        originalPrice: { amount: '8.00', currency: 'USD' },
+      });
+      await save(proposed.id, { quote: { ...quote, originalPrice: undefined } }).expect(200);
+      expect((await h.assessmentWire(proposed.id, itInCharge.account)).quote).toMatchObject({ originalPrice: null });
     });
 
     it('BR-MF1-05 refuses the retired Business Owner field at validation instead of looking up its employee', async () => {
@@ -354,8 +390,8 @@ describe('requests over HTTP: software that is not in the catalog (integration, 
         state: 'AWAITING_SPEND_SUBMISSION',
         pricing: {
           status: 'PRICED',
-          amount: { amount: `${8 * h.monthsOf(12)}.00`, currency: 'USD' },
-          unitPrice: { amount: '8.00', currency: 'USD' },
+          amount: { amount: `${200000 * h.monthsOf(12)}`, currency: 'VND' },
+          unitPrice: { amount: '200000', currency: 'VND' },
           billingCycle: 'MONTHLY',
           months: h.monthsOf(12),
         },
@@ -395,7 +431,7 @@ describe('requests over HTTP: software that is not in the catalog (integration, 
 
       await save(proposed.id, {
         quote: {
-          unitPrice: { amount: '8', currency: 'USD' },
+          unitPrice: { amount: '200000', currency: 'VND' },
           billingCycle: 'MONTHLY',
           validFrom: `${year}-01-01`,
           validUntil: `${year + 1}-12-31`,
@@ -409,7 +445,7 @@ describe('requests over HTTP: software that is not in the catalog (integration, 
       const proposed = await awaiting();
       const quote = (validFrom: string, validUntil: string | null) => ({
         quote: {
-          unitPrice: { amount: '8', currency: 'USD' },
+          unitPrice: { amount: '200000', currency: 'VND' },
           billingCycle: 'MONTHLY',
           validFrom,
           validUntil,
@@ -428,7 +464,7 @@ describe('requests over HTTP: software that is not in the catalog (integration, 
 
     describe('the amount of a quote is the months left of the year, as the amount of a plan of the catalog is (BR-MF1-06, QĐ-109)', () => {
       const monthly = {
-        unitPrice: { amount: '8', currency: 'USD' },
+        unitPrice: { amount: '200000', currency: 'VND' },
         billingCycle: 'MONTHLY',
         validFrom: '2026-01-01',
         validUntil: null,
@@ -446,7 +482,7 @@ describe('requests over HTTP: software that is not in the catalog (integration, 
           status: 'PRICED',
           kind: 'RECURRING',
           months: monthsLeft,
-          amount: { amount: `${8 * monthsLeft}.00`, currency: 'USD' },
+          amount: { amount: `${200000 * monthsLeft}`, currency: 'VND' },
         });
         expect(done).toMatchObject({ budgetYear: year });
       });
@@ -457,7 +493,7 @@ describe('requests over HTTP: software that is not in the catalog (integration, 
 
         const done = h.dataOf<{ request: AccessRequestWire }>(await complete(proposed.id).expect(200)).request;
 
-        expect(done.pricing).toMatchObject({ months: 1, amount: { amount: '8.00', currency: 'USD' } });
+        expect(done.pricing).toMatchObject({ months: 1, amount: { amount: '200000', currency: 'VND' } });
       });
 
       it('BR-MF1-06d: a quarterly or an annual price is a third or a twelfth a month', async () => {
@@ -465,14 +501,14 @@ describe('requests over HTTP: software that is not in the catalog (integration, 
         await save(
           quarterly.id,
           h.assessmentBody({
-            quote: { ...monthly, billingCycle: 'QUARTERLY', unitPrice: { amount: '24', currency: 'USD' } },
+            quote: { ...monthly, billingCycle: 'QUARTERLY', unitPrice: { amount: '600000', currency: 'VND' } },
           }),
         ).expect(200);
         const annual = await awaiting({ expectedEndDate: h.today() });
         await save(
           annual.id,
           h.assessmentBody({
-            quote: { ...monthly, billingCycle: 'ANNUAL', unitPrice: { amount: '96', currency: 'USD' } },
+            quote: { ...monthly, billingCycle: 'ANNUAL', unitPrice: { amount: '2400000', currency: 'VND' } },
           }),
         ).expect(200);
 
@@ -481,8 +517,8 @@ describe('requests over HTTP: software that is not in the catalog (integration, 
           h.dataOf<{ request: AccessRequestWire }>(await complete(annual.id).expect(200)).request,
         ];
 
-        expect(first.pricing).toMatchObject({ amount: { amount: '8.00' } });
-        expect(second.pricing).toMatchObject({ amount: { amount: '8.00' } });
+        expect(first.pricing).toMatchObject({ amount: { amount: '200000' } });
+        expect(second.pricing).toMatchObject({ amount: { amount: '200000' } });
       });
 
       it('takes no way of paying in the quote any more: the contract is not asked, only the price', async () => {
@@ -577,7 +613,7 @@ describe('requests over HTTP: software that is not in the catalog (integration, 
       expect(seen.costEstimate).toMatchObject({
         label: 'ESTIMATE_NO_PROFILE',
         basis: 'DEFAULT_NO_PROFILE',
-        preTax: { amount: `${8 * h.monthsOf(12)}.00`, currency: 'USD' },
+        preTax: { amount: `${200000 * h.monthsOf(12)}`, currency: 'VND' },
       });
       expect(missing.map((item) => item.id)).toContain(vendor.id);
       expect(await stateOf(proposed.id)).toBe('AWAITING_SPEND_SUBMISSION');

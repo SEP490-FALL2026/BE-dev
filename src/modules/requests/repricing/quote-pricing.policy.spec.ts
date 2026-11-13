@@ -7,6 +7,7 @@ const usd = (units: number) => ({ amountMinor: BigInt(units) * 100n, currency: '
 
 const quote = (over: Partial<Quote> = {}): Quote => ({
   unitPrice: usd(8),
+  originalPrice: null,
   billingCycle: 'MONTHLY',
   validFrom: day('2026-10-01'),
   validUntil: day('2026-12-31'),

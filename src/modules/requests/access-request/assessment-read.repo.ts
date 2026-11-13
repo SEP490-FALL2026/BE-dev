@@ -20,6 +20,10 @@ function toQuote(row: Row): Quote | null {
 
   return {
     unitPrice: { amountMinor: row.quoteUnitPriceMinor, currency: row.quoteCurrency },
+    originalPrice:
+      row.quoteOriginalUnitPriceMinor !== null && row.quoteOriginalCurrency !== null
+        ? { amountMinor: row.quoteOriginalUnitPriceMinor, currency: row.quoteOriginalCurrency }
+        : null,
     billingCycle: row.quoteBillingCycle,
     validFrom: fromDateColumn(row.quoteValidFrom),
     validUntil: row.quoteValidUntil ? fromDateColumn(row.quoteValidUntil) : null,

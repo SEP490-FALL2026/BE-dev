@@ -148,11 +148,12 @@ export class ProposalsController {
   @ApiErrorResponses(...AUTH_ERRORS, IT_ONLY, NOT_FOUND, NOT_AWAITING_ASSESSMENT, {
     status: HttpStatus.UNPROCESSABLE_ENTITY,
     description:
-      'A field is invalid (VALIDATION_ERROR), a vendor, plan or person it names does not exist (ASSESSMENT.REFERENCE_NOT_FOUND), or the quote runs backwards (ASSESSMENT.QUOTE_PERIOD_INVALID).',
+      'A field is invalid (VALIDATION_ERROR), a vendor, plan or person it names does not exist (ASSESSMENT.REFERENCE_NOT_FOUND), or the quote runs backwards (ASSESSMENT.QUOTE_PERIOD_INVALID) or is not in dong (ASSESSMENT.QUOTE_PRICE_NOT_VND; the price the vendor quoted in another currency goes in quote.originalPrice).',
     examples: [
       VALIDATION_EXAMPLE,
       EXAMPLES.REFERENCE_NOT_FOUND,
       EXAMPLES.QUOTE_PERIOD_INVALID,
+      EXAMPLES.QUOTE_PRICE_NOT_VND,
       EXAMPLES.MONEY_SCALE_EXCEEDED,
       EXAMPLES.MONEY_OUT_OF_RANGE,
       EXAMPLES.CURRENCY_NOT_SUPPORTED,
@@ -261,11 +262,12 @@ export class ProposalsController {
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
-        'The data sensitivity is not known (ASSESSMENT.INCOMPLETE), the quote cannot price the request (ASSESSMENT.QUOTE_NOT_IN_FORCE and the others), or the body is invalid (VALIDATION_ERROR). Nothing is registered and the request stays with the IT Admin.',
+        'The data sensitivity is not known (ASSESSMENT.INCOMPLETE), the quote cannot price the request (ASSESSMENT.QUOTE_NOT_IN_FORCE and the others, ASSESSMENT.QUOTE_PRICE_NOT_VND when it is not in dong), or the body is invalid (VALIDATION_ERROR). Nothing is registered and the request stays with the IT Admin.',
       examples: [
         VALIDATION_EXAMPLE,
         EXAMPLES.INCOMPLETE_DATA_SENSITIVITY,
         EXAMPLES.QUOTE_PERIOD_INVALID,
+        EXAMPLES.QUOTE_PRICE_NOT_VND,
         EXAMPLES.QUOTE_NOT_IN_FORCE,
         EXAMPLES.AMOUNT_TOO_LARGE,
         EXAMPLES.MONEY_SCALE_EXCEEDED,

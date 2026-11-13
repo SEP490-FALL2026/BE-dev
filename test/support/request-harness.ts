@@ -278,7 +278,7 @@ export class RequestHarness extends ProvisioningHarness {
     controlLevel: 'PARTIAL',
     controlRiskNote: 'No export of usage',
     quote: {
-      unitPrice: { amount: '8.00', currency: 'USD' },
+      unitPrice: { amount: '200000', currency: 'VND' },
       billingCycle: 'MONTHLY',
       validFrom: '2026-01-01',
       validUntil: null,

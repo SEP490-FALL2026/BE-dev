@@ -11,6 +11,7 @@ import {
 
 const quote: Quote = {
   unitPrice: { amountMinor: 800n, currency: 'USD' },
+  originalPrice: null,
   billingCycle: 'MONTHLY',
   validFrom: '2026-10-01',
   validUntil: null,

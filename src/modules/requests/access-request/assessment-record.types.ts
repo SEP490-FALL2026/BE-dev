@@ -34,8 +34,10 @@ export interface AssessmentFields {
 export type QuoteCycle = 'MONTHLY' | 'QUARTERLY' | 'ANNUAL';
 
 export interface Quote {
-  /** The price before tax of one person for one billing cycle. */
+  /** The price before tax of one person for one billing cycle, in dong (`QĐ-111an`). */
   unitPrice: Money;
+  /** The price the vendor quoted in another currency, only kept beside the price in dong (R-44); null when none is recorded. */
+  originalPrice: Money | null;
   billingCycle: QuoteCycle;
   validFrom: BusinessDate;
   validUntil: BusinessDate | null;

@@ -29,6 +29,8 @@ const QUOTE_CLEARED = {
   quoteBillingCycle: null,
   quoteValidFrom: null,
   quoteValidUntil: null,
+  quoteOriginalUnitPriceMinor: null,
+  quoteOriginalCurrency: null,
 } satisfies Prisma.AccessRequestAssessmentUncheckedUpdateInput;
 
 function quoteColumns(quote: Quote | null): Prisma.AccessRequestAssessmentUncheckedUpdateInput {
@@ -40,6 +42,8 @@ function quoteColumns(quote: Quote | null): Prisma.AccessRequestAssessmentUnchec
     quoteBillingCycle: quote.billingCycle,
     quoteValidFrom: toDateColumn(quote.validFrom),
     quoteValidUntil: quote.validUntil ? toDateColumn(quote.validUntil) : null,
+    quoteOriginalUnitPriceMinor: quote.originalPrice?.amountMinor ?? null,
+    quoteOriginalCurrency: quote.originalPrice?.currency ?? null,
   };
 }
 

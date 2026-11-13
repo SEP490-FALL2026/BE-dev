@@ -275,7 +275,7 @@ describe('requests over HTTP: registering internal software (integration, real P
 
   describe('when the grant itself needs a payment (AC-10)', () => {
     const quote = (over: Record<string, unknown> = {}) => ({
-      unitPrice: { amount: '8', currency: 'USD' },
+      unitPrice: { amount: '200000', currency: 'VND' },
       billingCycle: 'MONTHLY',
       validFrom: `${year}-01-01`,
       validUntil: null,
@@ -292,7 +292,11 @@ describe('requests over HTTP: registering internal software (integration, real P
       expect(done).toMatchObject({
         branch: 'NEW_SOFTWARE',
         state: 'AWAITING_SPEND_SUBMISSION',
-        pricing: { status: 'PRICED', amount: { amount: `${8 * monthsLeft}.00`, currency: 'USD' }, months: monthsLeft },
+        pricing: {
+          status: 'PRICED',
+          amount: { amount: `${200000 * monthsLeft}`, currency: 'VND' },
+          months: monthsLeft,
+        },
         policy: { hasSpendStep: true },
       });
       expect(done.plan?.planId).toBeTruthy();

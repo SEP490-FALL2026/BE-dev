@@ -26,6 +26,7 @@ const empty: AssessmentFields = {
 };
 const quote: NonNullable<AssessmentFields['quote']> = {
   unitPrice: { amountMinor: 800n, currency: 'USD' },
+  originalPrice: null,
   billingCycle: 'MONTHLY',
   validFrom: '2026-01-01',
   validUntil: null,

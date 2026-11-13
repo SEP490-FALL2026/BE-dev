@@ -44,6 +44,8 @@ const ASSESSMENT_FIELDS = {
   quoteBillingCycle: true,
   quoteValidFrom: true,
   quoteValidUntil: true,
+  quoteOriginalUnitPriceMinor: true,
+  quoteOriginalCurrency: true,
   savedByEmployeeId: true,
 } as const;
 
@@ -63,6 +65,10 @@ function quoteOf(row: AssessmentColumns): Quote | null {
 
   return {
     unitPrice: { amountMinor: row.quoteUnitPriceMinor, currency: row.quoteCurrency },
+    originalPrice:
+      row.quoteOriginalUnitPriceMinor !== null && row.quoteOriginalCurrency !== null
+        ? { amountMinor: row.quoteOriginalUnitPriceMinor, currency: row.quoteOriginalCurrency }
+        : null,
     billingCycle: row.quoteBillingCycle,
     validFrom: fromDateColumn(row.quoteValidFrom),
     validUntil: row.quoteValidUntil ? fromDateColumn(row.quoteValidUntil) : null,

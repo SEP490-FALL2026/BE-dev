@@ -40,7 +40,16 @@ const moneyInput = z.strictObject({ amount: z.string().max(40), currency: z.stri
 
 /** The quote the IT Admin records: what one person costs for one billing cycle and the days it is in force (`BR-MF1-06`). */
 const quoteInput = z.strictObject({
-  unitPrice: moneyInput,
+  unitPrice: moneyInput.meta({
+    description:
+      'What one person costs for one billing cycle, in dong: a decimal string in major units, currency VND. Another currency is refused (ASSESSMENT.QUOTE_PRICE_NOT_VND).',
+  }),
+  originalPrice: moneyInput
+    .meta({
+      description:
+        'The price the vendor quoted in another currency, kept beside the quote in dong for matching an invoice later: a decimal string in major units of its currency. It is only kept, never converted.',
+    })
+    .optional(),
   billingCycle: z.enum(['MONTHLY', 'QUARTERLY', 'ANNUAL']),
   validFrom: businessDate,
   validUntil: businessDate.nullable().optional(),
@@ -117,6 +126,7 @@ export const internalRegistrationBodySchema = z.strictObject({
 
 const quoteView = z.strictObject({
   unitPrice: moneySchema,
+  originalPrice: moneySchema.nullable(),
   billingCycle: z.enum(['MONTHLY', 'QUARTERLY', 'ANNUAL']),
   validFrom: z.string(),
   validUntil: z.string().nullable(),
