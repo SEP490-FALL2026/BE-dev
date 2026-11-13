@@ -424,6 +424,38 @@ Không sửa code; SPEC không bị sửa trong lượt này (spec là của Own
 - **Đổi lại:** bỏ cột bằng migration sau (mất checklist đã lưu, không mất việc đã hoàn tất).
 - **Chạm:** `prisma/models/licensing.prisma`, `prisma/migrations/20261113001400_licensing_k1_checklist/`, `licensing/provisioning/k1-checklist/*`, `licensing.module.ts`, `provisioning-task.repo.ts`.
 
+### D-57 · K1-CL.2 · Bằng chứng của `K1` nằm ở `k1Checklist.evidence` hay `evidence` ngoài, mã khi thiếu, và `k1Checklist` có bắt buộc không
+
+- SPEC P25: body `k1Checklist { items, evidence }`; thiếu tick/bằng chứng ⟹ `REVOCATION.K1_CHECKLIST_INCOMPLETE`. Body hoàn tất cũ đã có `evidence` ngoài (thiếu ⟹ `PROVISIONING_TASK.EVIDENCE_REQUIRED`). Phương án: A. chỉ `k1Checklist.evidence`, `evidence` ngoài bị cấm cho `K1` (thêm một nhánh 422, client và test cũ gãy cả hai chỗ). B. **chấp nhận cả hai: dùng `k1Checklist.evidence` nếu có, không thì `evidence` ngoài; cả hai có thì checklist thắng; thiếu cả hai ⟹ `K1_CHECKLIST_INCOMPLETE`** (thứ thiếu là checklist, không phải ô bằng chứng riêng lẻ). C. chỉ `evidence` ngoài (trái P25). **ĐÃ CHỌN B:** khớp hình P25, tương thích client cũ gửi `evidence` ngoài (không có trường nào bị bỏ lặng lẽ), chỉ một nơi lưu (cột `evidence` của tác vụ).
+- **`k1Checklist` bắt buộc với `K1`, không có đường tương thích:** S16 "hoàn tất thu hồi `K1` cần checklist đủ tick". Áp cả cho tác vụ do hệ thống tạo (`created_by_system`, IT vẫn hoàn tất bằng checklist) lẫn ghost seat, điều chuyển, hết hạn, trả lại (đều là `STILL_EMPLOYED`). Tác vụ `K1` mở trước khi triển khai vẫn hoàn tất được: thẻ trả mẫu tính lúc đọc, không cần migration dữ liệu. **Đổi hợp đồng cho FE:** hoàn tất `K1` chỉ có `evidence` nay 422 `K1_CHECKLIST_INCOMPLETE` (ghi changelog tài liệu API FE). Một cách hoàn tất không khớp loại ghế (`ACCOUNT_REMOVED` cho `K1`) vẫn báo `COMPLETION_NOT_ALLOWED` trước.
+- **Đổi lại:** A: bỏ nhánh dùng `evidence` ngoài ở `planK1Checklist` và thêm kiểm trong `planCompletion`; cho phép `K1` không checklist: bỏ nhánh `claim === undefined` ở `planK1Checklist`.
+- **Chạm:** `k1-checklist/provisioning-k1-checklist.policy.ts`, `revocation.policy.ts` (`CompletionInput.k1Checklist`), `provisioning.dto.ts` (`k1Checklist`), `revocation-completion/revocation-aftermath.service.ts`.
+
+### D-58 · K1-CL.2 · Hình trên dây của thẻ (`k1Checklist` của `GET /provisioning-tasks/{id}`) và của body
+
+- P25 chỉ có `variant` và `items[{ code, label, order }]`. **Thêm `items[].doneAt` (ISO UTC, `null` khi chưa tick)** để thẻ của tác vụ đã hoàn tất hiện lại cái đã tick và FE `K1-GR` dùng lại cùng hình; phần P25 không đổi. Chỉ ở **chi tiết** (`GET {id}` và trả lời các route ghi trả `task`), không ở dòng danh sách (danh sách không tải lý do; thêm sẽ làm N+1 hay một truy vấn thừa). Hiện khi: tác vụ `K1` thu hồi còn hoàn tất được (`QUEUED`, `RETRY_SCHEDULED`, `IN_PROGRESS`, `FAILED`) ⟹ mẫu của biến thể, chưa tick; `COMPLETED` có checklist đã lưu ⟹ cái đã lưu (từ `provisioning_tasks.k1_checklist`, không tính lại từ mẫu hiện tại); còn lại `null` (không phải `K1` thu hồi; `K1` hoàn tất trước checklist — không có dữ liệu để chứng minh; `CANCELLED`, `CLOSED_FAILED`).
+- **Body:** `done` là boolean (P25 ghi `done: true`): `false` được nhận rồi báo `K1_CHECKLIST_INCOMPLETE` thay vì `VALIDATION_ERROR`, để FE có thể gửi đủ mục kèm cờ. `doneAt` nhận offset (`+07:00`), lưu UTC; tối đa 10 mục (đúng trần "mục checklist ≤ 10" của SPEC); `variant` không nhận (strict ⟹ `VALIDATION_ERROR`: server quyết).
+- **Đổi lại:** bỏ `doneAt` khỏi thẻ: xóa khỏi `k1ChecklistCardSchema` và `k1ChecklistCard` (cột vẫn giữ); chỉ nhận `done: true`: đổi `z.boolean()` thành `z.literal(true)`.
+- **Chạm:** `provisioning.dto.ts`, `provisioning-task-view.service.ts`, `provisioning-task.mapper.ts`, `provisioning-tasks.controller.ts` + `revocation-tasks.controller.ts` (mô tả OpenAPI), `provisioning.http-errors.ts` (hai ví dụ lỗi), `test/support/openapi-example-route-codes-licensing.ts`.
+
+### D-59 · K1-CL.2 · `RevocationCompletedFacts.k1Checklist`: kiểu, bắt buộc hay không, và có vào audit không
+
+- Listener `AFTER_WORK` của `personnel` (MF2-G.2) cần đọc `MAILBOX_LOCKED`. **ĐÃ CHỌN:** `k1Checklist: { variant, doneCodes: K1ChecklistCode[] } | null` (`null` với loại ghế khác `K1`), **trường bắt buộc** (không `?`) để mọi nơi dựng facts phải nói rõ; sửa hai literal trong `commitment-release-by-day.integration-spec.ts`. Listener đọc `doneCodes.includes('MAILBOX_LOCKED')`; `variant` đi cùng để không phải đoán lại. Không đưa danh sách đầy đủ kèm `doneAt` (listener không cần; thẻ có).
+- **Không thêm vào sự kiện audit `REVOCATION_COMPLETED`:** checklist đã nằm bất biến trên tác vụ (trigger cấm sửa tác vụ xong), audit chỉ nói việc đã làm, không nói chữ viết kèm (cùng nguyên tắc của bằng chứng và ghi chú).
+- **Chạm:** `licensing/public/licensing.types.ts` (`K1ChecklistFacts`, `RevocationCompletedFacts`), `revocation-completed-facts.service.ts`, `revocation-completion.service.ts`.
+
+### D-60 · K1-CL.2 · Chỗ gọi checklist trong hoàn tất thu hồi, và thứ tự lỗi
+
+- `RevocationCompletionService` đã có đúng 8 phụ thuộc (trần `max-params` của constructor) và hàm `complete` ở 60 dòng. **ĐÃ CHỌN:** gọi qua `RevocationAftermath.keepChecklist` (cùng tiền lệ `holdsKey`: một cổng ủy quyền để service chính không thêm phụ thuộc). Hàm này kiểm **và ghi** checklist ngay (trước `markRevocationCompleted`), vì trigger cấm sửa tác vụ đã `COMPLETED`; mọi lỗi sau đó (vd `PAID_THROUGH_REQUIRED`) làm cả transaction rollback nên không để lại checklist của một lần hoàn tất bị từ chối (test: `unchanged` đọc cột `k1_checklist` vẫn NULL).
+- **Thứ tự lỗi:** cách hoàn tất không khớp loại ghế (`COMPLETION_NOT_ALLOWED`) ⟹ checklist (`COMPLETION_NOT_ALLOWED` cho mục ngoài biến thể/trùng/gửi cho loại khác, rồi `K1_CHECKLIST_INCOMPLETE`, rồi `K1_CHECKLIST_OUT_OF_ORDER`) ⟹ các lỗi còn lại của `planCompletion` (`PAID_THROUGH_REQUIRED`, `ACCESS_STATE_*`...). Nghĩa là K1 gửi thiếu cả checklist lẫn `paidThroughOn` nhận lỗi checklist trước.
+- **Chạm:** `revocation-aftermath.service.ts`, `revocation-completion.service.ts`; cập nhật test K1 đã có (`provisioning-revocation-complete`, `departure-*`, `offboarding-*`, `return-request`, `rule-seats`, `ghost-seat-g2`, `my-software-http`, `department-tools-http`, `read-contracts`) gửi `k1Checklist` đúng biến thể qua `test/support/k1-checklist.ts`.
+
+### D-61 · K1-CL.2 · Gate hợp đồng danh sách/chi tiết đòi ghi mảng lồng `k1Checklist.items`
+
+- Gate `api-collection-contract` đỏ vì `provisioningTaskGet#task.k1Checklist.items` là mảng lồng chưa ghi sổ. Ghi như `provisioningTaskGet#task.steps`: **`bounded`**, tối đa 10 (`K1_CHECKLIST_MAX_ITEMS` trong DTO, đúng trần "mục checklist ≤ 10" của SPEC; thật sự 6 hoặc 2), cùng một sự kiện sổ cái `added` (finding `LD-14` như các mảng `bounded` thêm sau 23/10). Chủ và hạng mục là `licensing-provisioning-task-read-contracts` (hạng mục có spec của thẻ tác vụ; `docs/workspace/items/` chưa có hạng mục riêng của MF-2/MF-3 và gate đòi thư mục có `spec.md`). Hai file hỗ trợ mới vì `api-collection-registry-nested.ts`/`-events.ts` sát trần 400 dòng của file hỗ trợ.
+- **Đổi lại:** nếu Owner muốn hạng mục riêng cho MF-2/MF-3, đổi `owner`/`item` ở hai file `*-k1cl.ts`.
+- **Chạm:** `test/support/api-collection-registry-nested-k1cl.ts`, `…-events-k1cl.ts`, `…-nested-first-half.ts`, `…-events-w3.ts`.
+
 ## Bị chặn
 
 (chưa có)

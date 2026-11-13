@@ -1,5 +1,6 @@
 import { ReturnHarness, type ReturnWire } from '../../support/return-harness';
 import type { Unit } from '../../support/spend-harness';
+import { k1Checklist } from '../../support/k1-checklist';
 
 const h = new ReturnHarness();
 const NOTE = 'Export the boards before the seat is taken away';
@@ -309,6 +310,7 @@ describe('the return of a seat over PostgreSQL (US-05-13)', () => {
           evidence: 'Cancelled in the billing page',
           paidThroughOn: h.inDays(20),
           accessState: 'UNTIL_PAID_END',
+          k1Checklist: k1Checklist('STILL_EMPLOYED'),
         })
         .expect(200);
 

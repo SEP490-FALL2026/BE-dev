@@ -420,6 +420,8 @@ export interface RevocationCompletedFacts {
   paidThroughOn: BusinessDate | null;
   /** Every source that asked for the revocation. */
   sources: RevocationSource[];
+  /** K1 only: the checklist the IT Admin ticked, so a listener can read `MAILBOX_LOCKED` (`QĐ-111az`); null for any other kind of provisioning. */
+  k1Checklist: K1ChecklistFacts | null;
 }
 
 /**

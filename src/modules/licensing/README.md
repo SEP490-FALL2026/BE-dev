@@ -104,7 +104,9 @@ dịch vụ nào đọc cả ghế lẫn thu hồi thì đứng trên cả hai (
   (`provisioning-tasks.controller.ts`; grant: `ProvisioningGrantService` → `ProvisioningGrantPlanner` (xét trước khóa) +
   `ProvisioningGrantWriter` (ghi trong transaction), `provisioning-grant.policy.ts`; `ProvisioningService` giữ danh sách,
   claim, hoàn tất, báo lỗi; `ProvisioningDecisionService`), `revocation-completion/`
-  (`revocation-tasks.controller.ts`), `grant-cancellation/`, `open-grants/`, `department-use/`.
+  (`revocation-tasks.controller.ts`), `grant-cancellation/`, `open-grants/`, `department-use/`, `k1-checklist/` (checklist thu hồi `K1`,
+  `QĐ-111az`: biến thể `DEPARTURE` 6 mục / `STILL_EMPLOYED` 2 mục suy từ các lý do còn đứng, kiểm đủ tick + bằng chứng + `doneAt` không giảm theo
+  `order`; cột `provisioning_tasks.k1_checklist`, codec `provisioning-k1-checklist.json.ts`; `RevocationAftermath.keepChecklist` gọi lúc hoàn tất).
 - `expiry/` — quyền đã hết hạn, nhắc trước 7 ngày (US-03-05); `expiry.controller.ts`; `expiry-reminder.job.ts`.
   Cửa sổ Request tiếp tục (BR-MF1-08a): `expiry-renewal-window.job.ts` mỗi giờ ghi `assignment_renewal_windows` (số ngày lúc mở, bất biến)
   và báo người giữ + trưởng phòng một lần (`RENEWAL_WINDOW_OPENED`). Tác vụ `EXTEND` (`provisioning/tasks/provisioning-extension.service.ts`,
@@ -176,6 +178,12 @@ dịch vụ nào đọc cả ghế lẫn thu hồi thì đứng trên cả hai (
 - Mốc thu hồi (`BR-MF5-04`): mỗi lý do giữ `due_on`/`not_before` của nơi gọi; tác vụ giữ mốc suy ra từ các lý do còn hiệu
   lực — **lý do không mốc thắng ân hạn** (một lý do không `not_before` ⟹ tác vụ không mốc, R-J08), ngược lại `MIN`.
   `claim` và `revocation-completion` trước `not_before` ⟹ 409 `PROVISIONING_TASK.NOT_BEFORE` (`details.notBefore`).
+- Hoàn tất thu hồi `K1` (`QĐ-111az`, P25): body phải có `k1Checklist { items[{ code, done, doneAt }], evidence? }` của đúng biến thể thẻ nêu
+  (`GET /provisioning-tasks/{id}` → `k1Checklist { variant, items[{ code, label, order, doneAt }] }`; server quyết biến thể: có lý do `DEPARTURE`/`ABRUPT_DEPARTURE`
+  ⟹ `DEPARTURE`). Thiếu mục/tick/thời điểm/bằng chứng ⟹ 422 `REVOCATION.K1_CHECKLIST_INCOMPLETE`; `doneAt` giảm theo `order` (vd khóa hộp thư trước đăng xuất
+  mọi phiên) ⟹ 422 `K1_CHECKLIST_OUT_OF_ORDER`; mục ngoài biến thể, trùng, hoặc `k1Checklist` cho loại ghế khác ⟹ `COMPLETION_NOT_ALLOWED`. Hệ thống không điều
+  khiển Google/M365. Checklist ghi cùng transaction hoàn tất (trước khi tác vụ `COMPLETED`); sự kiện `AFTER_WORK` mang `completed.k1Checklist { variant, doneCodes }`
+  để listener của `personnel` đọc `MAILBOX_LOCKED`.
 - **Lý do đã gỡ không được đọc ở đâu** (chỉ `listAllOf` cho lịch sử trên thẻ tác vụ): `find`, `listOf`, `countOf`,
   `listRevocationsOpenedFor`, `listPersonalSeatsOf` (đang thu hồi) đều lọc `withdrawn_at IS NULL`; index
   duy nhất lý do là partial `WHERE withdrawn_at IS NULL` nên mở lại cùng `(source, reference)` trên cùng tác vụ được.

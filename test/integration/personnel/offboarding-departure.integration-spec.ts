@@ -3,6 +3,7 @@ import request from 'supertest';
 import { OffboardingBlockerContributions } from '../../../src/modules/personnel/public/personnel.extension-points';
 import { OffboardingHarness, type CaseWire, type RightWire } from '../../support/offboarding-harness';
 import type { Department, Person } from '../../support/request-harness';
+import { k1Checklist } from '../../support/k1-checklist';
 
 const h = new OffboardingHarness();
 
@@ -320,6 +321,7 @@ describe('the departure of a person, the revocations and the closing (integratio
           evidence: 'đã hủy gia hạn',
           paidThroughOn: h.day(36),
           accessState: 'UNTIL_PAID_END',
+          k1Checklist: k1Checklist('DEPARTURE'),
         })
         .expect(200);
 

@@ -6,6 +6,7 @@ import { ApiAccount, createActivatedAccount } from '../../support/api-accounts';
 import { RevocationHarness } from '../../support/revocation-harness';
 import { changeRoleTo } from '../../support/builders/account.builder';
 import { legacyServiceAccount } from '../../support/legacy-service-account';
+import { k1Checklist } from '../../support/k1-checklist';
 
 const h = new RevocationHarness();
 
@@ -253,6 +254,7 @@ describe('the tools a department uses (US-03-06 AC-13, AC-17, F22, integration, 
           evidence: 'đã hủy',
           paidThroughOn: h.inDays(10),
           accessState: 'UNTIL_PAID_END',
+          k1Checklist: k1Checklist('DEPARTURE'),
         })
         .expect(200);
 

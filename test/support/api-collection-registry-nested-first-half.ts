@@ -1,5 +1,6 @@
 import { ROLE_GRANTS, type NestedArrayEntry } from './api-collection-registry';
 import { NESTED_ARRAYS_G9 } from './api-collection-registry-nested-g9';
+import { NESTED_ARRAYS_K1CL } from './api-collection-registry-nested-k1cl';
 import { NESTED_ARRAYS_W2 } from './api-collection-registry-nested-w2';
 import { NESTED_ARRAYS_W3 } from './api-collection-registry-nested-w3';
 import { NESTED_ARRAYS_W6 } from './api-collection-registry-nested-w6';
@@ -344,4 +345,5 @@ export const NESTED_ARRAYS_FIRST_HALF: readonly NestedArrayEntry[] = [
   ...NESTED_ARRAYS_W3,
   ...NESTED_ARRAYS_G9,
   ...NESTED_ARRAYS_W6,
+  ...NESTED_ARRAYS_K1CL,
 ];

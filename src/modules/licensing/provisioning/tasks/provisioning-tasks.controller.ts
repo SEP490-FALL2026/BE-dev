@@ -140,7 +140,8 @@ export class ProvisioningTasksController {
   @ApiOperation({ operationId: 'provisioningTaskGet', summary: 'Get the card of a provisioning task' })
   @ApiSuccessResponse(TaskResponseDto, {
     message: 'PROVISIONING_TASK.FETCHED',
-    description: 'The task with the steps of its kind of provisioning and what ends it.',
+    description:
+      'The task with the steps of its kind of provisioning and what ends it. A K1 revocation also carries k1Checklist: the steps the IT Admin ticks to complete it, DEPARTURE or STILL_EMPLOYED as the server decides from why the seat is revoked, each with its order and, once completed, the instant it was ticked.',
   })
   @ApiErrorResponses(...AUTH_ERRORS, IT_ONLY, NOT_FOUND, {
     status: HttpStatus.UNPROCESSABLE_ENTITY,

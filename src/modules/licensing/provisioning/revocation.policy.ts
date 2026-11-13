@@ -18,6 +18,7 @@ import {
   type RevocationCompletion,
   type RevocationSource,
 } from '../public/licensing.types';
+import type { K1ChecklistClaim } from './k1-checklist/provisioning-k1-checklist.policy';
 import { cleanEvidence } from './provisioning.policy';
 
 /** The longest note a completion or a reason keeps; the DTO bounds the request with it. */
@@ -98,6 +99,8 @@ export interface CompletionInput {
   keyDisposition?: KeyDisposition | undefined;
   /** K4 only, with `WITHDRAW`: why the key is withdrawn from the store. */
   withdrawalReason?: string | undefined;
+  /** K1 only, required: the steps the IT Admin ticked (`QĐ-111az`); judged by the checklist of the task, not by `planCompletion`. */
+  k1Checklist?: K1ChecklistClaim | undefined;
 }
 
 /** What is stored of a completion and the day the assignment ends because of it. */

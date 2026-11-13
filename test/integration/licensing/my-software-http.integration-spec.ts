@@ -6,6 +6,7 @@ import type { ApiAccount } from '../../support/api-accounts';
 import { PgRelay } from '../../support/pg-relay';
 import { dataStatements, QueryCounter, tablesOf } from '../../support/query-count';
 import { RevocationHarness } from '../../support/revocation-harness';
+import { k1Checklist } from '../../support/k1-checklist';
 
 const h = new RevocationHarness();
 
@@ -172,6 +173,7 @@ describe('my software rights (integration, real PostgreSQL)', () => {
         evidence: 'đã hủy gia hạn',
         paidThroughOn: h.inDays(10),
         accessState: 'UNTIL_PAID_END',
+        k1Checklist: k1Checklist('DEPARTURE'),
       })
       .expect(200);
     const gone = await h.open(seats.gone, 'ABRUPT_DEPARTURE');

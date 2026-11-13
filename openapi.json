@@ -29529,7 +29529,7 @@
         ],
         "responses": {
           "200": {
-            "description": "The task with the steps of its kind of provisioning and what ends it.",
+            "description": "The task with the steps of its kind of provisioning and what ends it. A K1 revocation also carries k1Checklist: the steps the IT Admin ticks to complete it, DEPARTURE or STILL_EMPLOYED as the server decides from why the seat is revoked, each with its order and, once completed, the instant it was ticked.",
             "content": {
               "application/json": {
                 "schema": {
@@ -31605,7 +31605,7 @@
         },
         "responses": {
           "200": {
-            "description": "The only end of a revocation that gives the seat back. K2 is completed as ACCOUNT_REMOVED with evidence, or as ALREADY_GONE with a note when the person removed the account themselves; K5 as OFF_SYSTEM_REVOKED with evidence; K4 as KEY_DEACTIVATED with evidence, and the IT Admin must say where its key goes (keyDisposition, required for K4): back to the store (RETURN_TO_STORE) or back and withdrawn from it at once (WITHDRAW, with a withdrawalReason: a key that may not move to another device), with LICENSE_KEY.RETURNED_TO_STORE (and LICENSE_KEY.WITHDRAWN) in the audit trail; K1 as RENEWAL_CANCELLED with evidence, the day the paid period ends (paidThroughOn) and what is known of the access: UNTIL_PAID_END, or CUT with the day (accessCutOn) and its evidence. The assignment ends the same day for K2, K4 and K5, and for K1 at the end of the paid period or the day the access was cut, whichever is earlier; a K1 seat whose access runs on is reported as terminating. The completion writes no saving, invoice, contract or budget.",
+            "description": "The only end of a revocation that gives the seat back. K2 is completed as ACCOUNT_REMOVED with evidence, or as ALREADY_GONE with a note when the person removed the account themselves; K5 as OFF_SYSTEM_REVOKED with evidence; K4 as KEY_DEACTIVATED with evidence, and the IT Admin must say where its key goes (keyDisposition, required for K4): back to the store (RETURN_TO_STORE) or back and withdrawn from it at once (WITHDRAW, with a withdrawalReason: a key that may not move to another device), with LICENSE_KEY.RETURNED_TO_STORE (and LICENSE_KEY.WITHDRAWN) in the audit trail; K1 as RENEWAL_CANCELLED with the day the paid period ends (paidThroughOn), what is known of the access (UNTIL_PAID_END, or CUT with the day accessCutOn and its accessEvidence) and the checklist of the card (k1Checklist, required: the steps of the variant the card tells, DEPARTURE or STILL_EMPLOYED, each { code, done: true, doneAt } with doneAt not falling as the steps go, and the evidence in k1Checklist.evidence, or in evidence when the checklist has none; k1Checklist is refused for any other kind of grant). The assignment ends the same day for K2, K4 and K5, and for K1 at the end of the paid period or the day the access was cut, whichever is earlier; a K1 seat whose access runs on is reported as terminating. The completion writes no saving, invoice, contract or budget.",
             "content": {
               "application/json": {
                 "schema": {
@@ -31810,7 +31810,7 @@
             }
           },
           "422": {
-            "description": "The request is invalid (VALIDATION_ERROR), or the completion is refused and nothing is stored: REVOCATION.COMPLETION_NOT_ALLOWED (the way does not fit the kind of grant), NOTE_REQUIRED, PAID_THROUGH_REQUIRED, ACCESS_STATE_REQUIRED, ACCESS_STATE_INVALID, KEY_DISPOSITION_REQUIRED (a K4 completion without keyDisposition), WITHDRAWAL_REASON_REQUIRED (a K4 key withdrawn with no reason; keyDisposition or withdrawalReason on another kind is COMPLETION_NOT_ALLOWED), or no evidence (PROVISIONING_TASK.EVIDENCE_REQUIRED).",
+            "description": "The request is invalid (VALIDATION_ERROR), or the completion is refused and nothing is stored: REVOCATION.COMPLETION_NOT_ALLOWED (the way does not fit the kind of grant), NOTE_REQUIRED, PAID_THROUGH_REQUIRED, ACCESS_STATE_REQUIRED, ACCESS_STATE_INVALID, KEY_DISPOSITION_REQUIRED (a K4 completion without keyDisposition), WITHDRAWAL_REASON_REQUIRED (a K4 key withdrawn with no reason; keyDisposition or withdrawalReason on another kind is COMPLETION_NOT_ALLOWED), no evidence (PROVISIONING_TASK.EVIDENCE_REQUIRED), or a K1 checklist that is not valid: a step missing, not ticked or ticked with no time, or no evidence (K1_CHECKLIST_INCOMPLETE), steps ticked out of their order, such as the lock of the mailbox before the sign-out of the sessions (K1_CHECKLIST_OUT_OF_ORDER), or a step the variant does not have, sent twice or sent for a kind that has no checklist (COMPLETION_NOT_ALLOWED).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -31911,6 +31911,28 @@
                       "error": {
                         "code": "PROVISIONING_TASK.EVIDENCE_REQUIRED",
                         "message": "The completion of a task needs the evidence of what was done.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "REVOCATION.K1_CHECKLIST_INCOMPLETE": {
+                    "summary": "The completion of the revocation is not valid: K1_CHECKLIST_INCOMPLETE.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "REVOCATION.K1_CHECKLIST_INCOMPLETE",
+                        "message": "The completion of the revocation is not valid: K1_CHECKLIST_INCOMPLETE.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "REVOCATION.K1_CHECKLIST_OUT_OF_ORDER": {
+                    "summary": "The completion of the revocation is not valid: K1_CHECKLIST_OUT_OF_ORDER.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "REVOCATION.K1_CHECKLIST_OUT_OF_ORDER",
+                        "message": "The completion of the revocation is not valid: K1_CHECKLIST_OUT_OF_ORDER.",
                         "requestId": "req_example"
                       }
                     }
@@ -93218,7 +93240,47 @@
                   "handedOffAt": { "type": "string", "format": "date-time", "nullable": true },
                   "handOffEvidence": { "type": "string", "nullable": true },
                   "closedBy": { "type": "string", "format": "uuid", "nullable": true },
-                  "closeReason": { "type": "string", "nullable": true }
+                  "closeReason": { "type": "string", "nullable": true },
+                  "k1Checklist": {
+                    "type": "object",
+                    "properties": {
+                      "variant": { "type": "string", "enum": ["DEPARTURE", "STILL_EMPLOYED"] },
+                      "items": {
+                        "maxItems": 10,
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "code": {
+                              "type": "string",
+                              "enum": [
+                                "MAILBOX_PASSWORD_RESET",
+                                "SOFTWARE_FORGOT_PASSWORD",
+                                "SESSIONS_SIGNED_OUT",
+                                "RENEWAL_DISABLED",
+                                "EVIDENCE_RECORDED",
+                                "MAILBOX_LOCKED"
+                              ]
+                            },
+                            "label": { "type": "string" },
+                            "order": {
+                              "type": "integer",
+                              "exclusiveMinimum": true,
+                              "maximum": 9007199254740991,
+                              "minimum": 0
+                            },
+                            "doneAt": { "type": "string", "format": "date-time", "nullable": true }
+                          },
+                          "required": ["code", "label", "order", "doneAt"],
+                          "additionalProperties": false
+                        }
+                      }
+                    },
+                    "required": ["variant", "items"],
+                    "additionalProperties": false,
+                    "description": "Present on a K1 revocation that can still be completed (the steps to tick) and on one completed with a checklist (what was ticked and when). The variant is decided by the server from why the seat is revoked: DEPARTURE (a person who leaves: reset the mailbox password, Forgot password on the software, sign out every session, turn off the renewal, record the evidence, lock the mailbox) or STILL_EMPLOYED (turn off the renewal, record the evidence). The system does not control Google or Microsoft 365: the IT Admin does the steps there and ticks them here, in order. Null on any other task, on a K1 revocation completed before the checklist, and on one cancelled or closed as failed.",
+                    "nullable": true
+                  }
                 },
                 "required": [
                   "id",
@@ -93261,7 +93323,8 @@
                   "handedOffAt",
                   "handOffEvidence",
                   "closedBy",
-                  "closeReason"
+                  "closeReason",
+                  "k1Checklist"
                 ],
                 "additionalProperties": false
               },
@@ -93781,7 +93844,47 @@
                   "handedOffAt": { "type": "string", "format": "date-time", "nullable": true },
                   "handOffEvidence": { "type": "string", "nullable": true },
                   "closedBy": { "type": "string", "format": "uuid", "nullable": true },
-                  "closeReason": { "type": "string", "nullable": true }
+                  "closeReason": { "type": "string", "nullable": true },
+                  "k1Checklist": {
+                    "type": "object",
+                    "properties": {
+                      "variant": { "type": "string", "enum": ["DEPARTURE", "STILL_EMPLOYED"] },
+                      "items": {
+                        "maxItems": 10,
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "code": {
+                              "type": "string",
+                              "enum": [
+                                "MAILBOX_PASSWORD_RESET",
+                                "SOFTWARE_FORGOT_PASSWORD",
+                                "SESSIONS_SIGNED_OUT",
+                                "RENEWAL_DISABLED",
+                                "EVIDENCE_RECORDED",
+                                "MAILBOX_LOCKED"
+                              ]
+                            },
+                            "label": { "type": "string" },
+                            "order": {
+                              "type": "integer",
+                              "exclusiveMinimum": true,
+                              "maximum": 9007199254740991,
+                              "minimum": 0
+                            },
+                            "doneAt": { "type": "string", "format": "date-time", "nullable": true }
+                          },
+                          "required": ["code", "label", "order", "doneAt"],
+                          "additionalProperties": false
+                        }
+                      }
+                    },
+                    "required": ["variant", "items"],
+                    "additionalProperties": false,
+                    "description": "Present on a K1 revocation that can still be completed (the steps to tick) and on one completed with a checklist (what was ticked and when). The variant is decided by the server from why the seat is revoked: DEPARTURE (a person who leaves: reset the mailbox password, Forgot password on the software, sign out every session, turn off the renewal, record the evidence, lock the mailbox) or STILL_EMPLOYED (turn off the renewal, record the evidence). The system does not control Google or Microsoft 365: the IT Admin does the steps there and ticks them here, in order. Null on any other task, on a K1 revocation completed before the checklist, and on one cancelled or closed as failed.",
+                    "nullable": true
+                  }
                 },
                 "required": [
                   "id",
@@ -93824,7 +93927,8 @@
                   "handedOffAt",
                   "handOffEvidence",
                   "closedBy",
-                  "closeReason"
+                  "closeReason",
+                  "k1Checklist"
                 ],
                 "additionalProperties": false
               }
@@ -93878,7 +93982,39 @@
           },
           "accessEvidence": { "type": "string", "maxLength": 2000 },
           "keyDisposition": { "type": "string", "enum": ["RETURN_TO_STORE", "WITHDRAW"] },
-          "withdrawalReason": { "type": "string", "maxLength": 500 }
+          "withdrawalReason": { "type": "string", "maxLength": 500 },
+          "k1Checklist": {
+            "type": "object",
+            "properties": {
+              "items": {
+                "maxItems": 10,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "MAILBOX_PASSWORD_RESET",
+                        "SOFTWARE_FORGOT_PASSWORD",
+                        "SESSIONS_SIGNED_OUT",
+                        "RENEWAL_DISABLED",
+                        "EVIDENCE_RECORDED",
+                        "MAILBOX_LOCKED"
+                      ]
+                    },
+                    "done": { "type": "boolean" },
+                    "doneAt": { "type": "string", "format": "date-time" }
+                  },
+                  "required": ["code", "done"],
+                  "additionalProperties": false
+                }
+              },
+              "evidence": { "type": "string", "maxLength": 2000 }
+            },
+            "required": ["items"],
+            "additionalProperties": false
+          }
         },
         "required": ["completion"],
         "additionalProperties": false

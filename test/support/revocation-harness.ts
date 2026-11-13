@@ -12,6 +12,7 @@ import type {
   WithdrawnRevocation,
 } from '../../src/modules/licensing/public/licensing.types';
 import type { ApiAccount } from './api-accounts';
+import type { K1ChecklistCardWire } from './k1-checklist';
 import { ProvisioningHarness, type TaskWire } from './provisioning-harness';
 
 /** What a task of a revocation says of it on the wire, in a row of the list and in the detail. */
@@ -40,6 +41,8 @@ export interface RevocationBlockWire {
 export type RevocationTaskWire = Omit<TaskWire, 'requestId'> & {
   requestId: string | null;
   revocation: RevocationBlockWire | null;
+  /** The checklist of a K1 revocation (`QĐ-111az`); null on any other task. */
+  k1Checklist: K1ChecklistCardWire | null;
 };
 
 export interface OpenOptions {

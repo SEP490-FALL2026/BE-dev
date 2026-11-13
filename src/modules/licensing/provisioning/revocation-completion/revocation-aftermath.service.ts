@@ -3,9 +3,11 @@ import type { BusinessDate } from '../../../../core/business-date';
 import type { DbTx } from '../../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../../infrastructure/security/tokens/access-token-verifier.port';
 import { LicenseKeyAssignmentService } from '../../license-key/license-key-assignment.service';
-import type { AccessState } from '../../public/licensing.types';
+import type { AccessState, ProvisioningKind } from '../../public/licensing.types';
+import type { K1ChecklistPlan } from '../k1-checklist/provisioning-k1-checklist.policy';
+import { ProvisioningK1Checklist } from '../k1-checklist/provisioning-k1-checklist.service';
 import type { ProvisioningTaskRecord } from '../provisioning-task.types';
-import type { KeyReturnPlan } from '../revocation.policy';
+import { completionsFor, type CompletionInput, type KeyReturnPlan } from '../revocation.policy';
 import { RevocationLeaverAlert } from './revocation-leaver-alert.service';
 
 /**
@@ -20,11 +22,31 @@ export class RevocationAftermath {
   constructor(
     private readonly keys: LicenseKeyAssignmentService,
     private readonly leaverAlert: RevocationLeaverAlert,
+    private readonly checklists: ProvisioningK1Checklist,
   ) {}
 
   /** Whether the seat holds a key (a K4 seat granted before the key pool holds none), its row locked until commit. */
   holdsKey(tx: DbTx, assignmentId: string): Promise<boolean> {
     return this.keys.holdsKey(tx, assignmentId);
+  }
+
+  /**
+   * The checklist a K1 completion stands on (`QĐ-111az`), judged and kept on the task before the task is marked completed (a completed task is
+   * never changed again; a refusal after this rolls the transaction back). Null for any other kind, which refuses a checklist. A way that does
+   * not fit the kind has none: `planCompletion` refuses it, so a wrong way is told as that and not as a missing checklist. Throws
+   * RevocationCompletionError.
+   */
+  async keepChecklist(
+    tx: DbTx,
+    task: ProvisioningTaskRecord,
+    type: ProvisioningKind,
+    input: CompletionInput,
+  ): Promise<K1ChecklistPlan | null> {
+    if (!completionsFor(type).includes(input.completion)) return null;
+    const plan = await this.checklists.plan(tx, task, { type, claim: input.k1Checklist, evidence: input.evidence });
+    if (plan) await this.checklists.record(tx, task.id, plan);
+
+    return plan;
   }
 
   async follow(

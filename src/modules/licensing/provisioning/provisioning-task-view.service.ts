@@ -18,6 +18,8 @@ import type {
 } from '../public/licensing.types';
 import { availableDecisions } from './failure.policy';
 import { doneWhenFor, inGeneralQueue, stepsFor } from './provisioning.policy';
+import type { K1ChecklistCard } from './k1-checklist/provisioning-k1-checklist.policy';
+import { ProvisioningK1Checklist } from './k1-checklist/provisioning-k1-checklist.service';
 import { isTerminating } from './revocation.policy';
 import type { ProvisioningTaskRecord } from './provisioning-task.types';
 import { ProvisioningTaskReasonRepo, type ReasonRecord } from './provisioning-task-reason.repo';
@@ -117,6 +119,8 @@ export interface TaskDetailFields {
   closedBy: string | null;
   closeReason: string | null;
   revocation: RevocationDetailView | null;
+  /** The checklist of a K1 revocation: the steps to tick while it can be completed, what was ticked once it is (`QĐ-111az`); null on any other task. */
+  k1Checklist: K1ChecklistCard | null;
 }
 
 export type TaskView = Omit<TaskSummaryView, 'revocation'> & TaskDetailFields;
@@ -158,6 +162,7 @@ export class ProvisioningTaskViewService {
     private readonly catalog: CatalogApi,
     private readonly organizationReads: OrganizationReadApi,
     private readonly reasons: ProvisioningTaskReasonRepo,
+    private readonly checklists: ProvisioningK1Checklist,
   ) {}
 
   /** The rows of a list: no steps, evidence or errors. */
@@ -170,6 +175,18 @@ export class ProvisioningTaskViewService {
   /** The cards with everything a detail shows. */
   async views(records: readonly ProvisioningTaskRecord[]): Promise<TaskView[]> {
     const context = await this.contextOf(records, true);
+    const checklists = await this.checklists.cardsOf(
+      records
+        .filter(
+          (task) => task.kind === 'REVOKE' && context.plans.get(task.assignment.planId)?.provisioningType === 'K1',
+        )
+        .map((task) => ({
+          id: task.id,
+          status: task.status,
+          revocationSource: task.revocationSource,
+          reasons: (context.reasons.get(task.id) ?? []).filter((reason) => reason.withdrawnAt === null),
+        })),
+    );
 
     return records.map((task) => {
       const plan = context.plans.get(task.assignment.planId);
@@ -190,6 +207,7 @@ export class ProvisioningTaskViewService {
         closedBy: task.closedByAppUserId,
         closeReason: task.closeReason,
         revocation: summary ? this.detailOf(task, summary, context.reasons.get(task.id) ?? []) : null,
+        k1Checklist: checklists.get(task.id) ?? null,
       };
     });
   }

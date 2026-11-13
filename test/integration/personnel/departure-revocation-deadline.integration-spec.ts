@@ -7,6 +7,7 @@ import { migrationEndingWith } from '../../support/migration-history';
 import { RevocationOverdueService } from '../../../src/modules/personnel/departure-deadline/revocation-overdue.service';
 import { OffboardingHarness, type CaseWire } from '../../support/offboarding-harness';
 import type { Department, Person } from '../../support/request-harness';
+import { k1Checklist } from '../../support/k1-checklist';
 
 const h = new OffboardingHarness();
 const NONE: ReadonlySet<string> = new Set();
@@ -422,6 +423,7 @@ describe('the deadline of the revocations of a departure (integration, real Post
           evidence: 'Đã hủy gia hạn',
           paidThroughOn: h.day(36),
           accessState: 'UNTIL_PAID_END',
+          k1Checklist: k1Checklist('DEPARTURE'),
         })
         .expect(200);
       // The seat listing reads only a task whose reason was not withdrawn: here it does not see the completed one, the other two do not change.

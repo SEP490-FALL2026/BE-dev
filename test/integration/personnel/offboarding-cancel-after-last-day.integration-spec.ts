@@ -4,6 +4,7 @@ import { ACCOUNT_PASSWORD } from '../../support/api-accounts';
 import { recordAsSuperAdmin } from '../../support/super-admin-event-runner';
 import { OffboardingHarness, type CaseWire } from '../../support/offboarding-harness';
 import type { Department, Person } from '../../support/request-harness';
+import { k1Checklist } from '../../support/k1-checklist';
 
 const h = new OffboardingHarness();
 const LOCK = { note: 'Đã khóa tài khoản công ty' };
@@ -268,6 +269,7 @@ describe('cancelling a handover after its last working day (integration, real Po
         evidence: 'Đã hủy gia hạn',
         paidThroughOn: h.day(36),
         accessState: 'UNTIL_PAID_END',
+        k1Checklist: k1Checklist('DEPARTURE'),
       });
       await completeTask(done, { completion: 'ACCOUNT_REMOVED', evidence: 'Đã gỡ khỏi workspace' });
 

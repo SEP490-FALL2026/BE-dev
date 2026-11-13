@@ -44,7 +44,7 @@ export class RevocationTasksController {
   @ApiSuccessResponse(TaskResponseDto, {
     message: 'PROVISIONING_TASK.REVOCATION_COMPLETED',
     description:
-      'The only end of a revocation that gives the seat back. K2 is completed as ACCOUNT_REMOVED with evidence, or as ALREADY_GONE with a note when the person removed the account themselves; K5 as OFF_SYSTEM_REVOKED with evidence; K4 as KEY_DEACTIVATED with evidence, and the IT Admin must say where its key goes (keyDisposition, required for K4): back to the store (RETURN_TO_STORE) or back and withdrawn from it at once (WITHDRAW, with a withdrawalReason: a key that may not move to another device), with LICENSE_KEY.RETURNED_TO_STORE (and LICENSE_KEY.WITHDRAWN) in the audit trail; K1 as RENEWAL_CANCELLED with evidence, the day the paid period ends (paidThroughOn) and what is known of the access: UNTIL_PAID_END, or CUT with the day (accessCutOn) and its evidence. The assignment ends the same day for K2, K4 and K5, and for K1 at the end of the paid period or the day the access was cut, whichever is earlier; a K1 seat whose access runs on is reported as terminating. The completion writes no saving, invoice, contract or budget.',
+      'The only end of a revocation that gives the seat back. K2 is completed as ACCOUNT_REMOVED with evidence, or as ALREADY_GONE with a note when the person removed the account themselves; K5 as OFF_SYSTEM_REVOKED with evidence; K4 as KEY_DEACTIVATED with evidence, and the IT Admin must say where its key goes (keyDisposition, required for K4): back to the store (RETURN_TO_STORE) or back and withdrawn from it at once (WITHDRAW, with a withdrawalReason: a key that may not move to another device), with LICENSE_KEY.RETURNED_TO_STORE (and LICENSE_KEY.WITHDRAWN) in the audit trail; K1 as RENEWAL_CANCELLED with the day the paid period ends (paidThroughOn), what is known of the access (UNTIL_PAID_END, or CUT with the day accessCutOn and its accessEvidence) and the checklist of the card (k1Checklist, required: the steps of the variant the card tells, DEPARTURE or STILL_EMPLOYED, each { code, done: true, doneAt } with doneAt not falling as the steps go, and the evidence in k1Checklist.evidence, or in evidence when the checklist has none; k1Checklist is refused for any other kind of grant). The assignment ends the same day for K2, K4 and K5, and for K1 at the end of the paid period or the day the access was cut, whichever is earlier; a K1 seat whose access runs on is reported as terminating. The completion writes no saving, invoice, contract or budget.',
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,
@@ -64,7 +64,7 @@ export class RevocationTasksController {
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
-        'The request is invalid (VALIDATION_ERROR), or the completion is refused and nothing is stored: REVOCATION.COMPLETION_NOT_ALLOWED (the way does not fit the kind of grant), NOTE_REQUIRED, PAID_THROUGH_REQUIRED, ACCESS_STATE_REQUIRED, ACCESS_STATE_INVALID, KEY_DISPOSITION_REQUIRED (a K4 completion without keyDisposition), WITHDRAWAL_REASON_REQUIRED (a K4 key withdrawn with no reason; keyDisposition or withdrawalReason on another kind is COMPLETION_NOT_ALLOWED), or no evidence (PROVISIONING_TASK.EVIDENCE_REQUIRED).',
+        'The request is invalid (VALIDATION_ERROR), or the completion is refused and nothing is stored: REVOCATION.COMPLETION_NOT_ALLOWED (the way does not fit the kind of grant), NOTE_REQUIRED, PAID_THROUGH_REQUIRED, ACCESS_STATE_REQUIRED, ACCESS_STATE_INVALID, KEY_DISPOSITION_REQUIRED (a K4 completion without keyDisposition), WITHDRAWAL_REASON_REQUIRED (a K4 key withdrawn with no reason; keyDisposition or withdrawalReason on another kind is COMPLETION_NOT_ALLOWED), no evidence (PROVISIONING_TASK.EVIDENCE_REQUIRED), or a K1 checklist that is not valid: a step missing, not ticked or ticked with no time, or no evidence (K1_CHECKLIST_INCOMPLETE), steps ticked out of their order, such as the lock of the mailbox before the sign-out of the sessions (K1_CHECKLIST_OUT_OF_ORDER), or a step the variant does not have, sent twice or sent for a kind that has no checklist (COMPLETION_NOT_ALLOWED).',
       examples: [
         VALIDATION_EXAMPLE,
         EXAMPLES.COMPLETION_NOT_ALLOWED,
@@ -75,6 +75,8 @@ export class RevocationTasksController {
         EXAMPLES.KEY_DISPOSITION_REQUIRED,
         EXAMPLES.WITHDRAWAL_REASON_REQUIRED,
         EXAMPLES.EVIDENCE_REQUIRED,
+        EXAMPLES.K1_CHECKLIST_INCOMPLETE,
+        EXAMPLES.K1_CHECKLIST_OUT_OF_ORDER,
       ],
     },
   )

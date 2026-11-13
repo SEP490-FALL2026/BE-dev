@@ -205,6 +205,8 @@ export const PROVISIONING_ERROR_EXAMPLES = {
   ACCESS_STATE_INVALID: example(new RevocationCompletionError('ACCESS_STATE_INVALID')),
   WITHDRAWAL_REASON_REQUIRED: example(new RevocationCompletionError('WITHDRAWAL_REASON_REQUIRED')),
   KEY_DISPOSITION_REQUIRED: example(new RevocationCompletionError('KEY_DISPOSITION_REQUIRED')),
+  K1_CHECKLIST_INCOMPLETE: example(new RevocationCompletionError('K1_CHECKLIST_INCOMPLETE')),
+  K1_CHECKLIST_OUT_OF_ORDER: example(new RevocationCompletionError('K1_CHECKLIST_OUT_OF_ORDER')),
   KEY_REQUIRED: example(new ProvisioningKeyError('KEY_REQUIRED')),
   KEY_NOT_APPLICABLE: example(new ProvisioningKeyError('KEY_NOT_APPLICABLE')),
   KEY_NOT_FOUND: example(new LicenseKeyNotFoundError()),

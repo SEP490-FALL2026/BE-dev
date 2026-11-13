@@ -9,6 +9,7 @@ import type {
 import { PgRelay } from '../../support/pg-relay';
 import { QueryCounter, dataStatements } from '../../support/query-count';
 import { RevocationHarness, type RevocationTaskWire } from '../../support/revocation-harness';
+import { k1Checklist } from '../../support/k1-checklist';
 
 const h = new RevocationHarness();
 
@@ -169,6 +170,7 @@ describe('the reads and the hook of a revocation (integration, real PostgreSQL)'
           evidence: 'đã hủy',
           paidThroughOn: h.inDays(days),
           accessState: 'UNTIL_PAID_END',
+          k1Checklist: k1Checklist('DEPARTURE'),
         })
         .expect(200);
 

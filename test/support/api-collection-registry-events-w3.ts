@@ -1,5 +1,6 @@
 import type { RegistryEvent } from './api-collection-registry';
 import { G9_REGISTRY_EVENTS } from './api-collection-registry-events-g9';
+import { K1CL_REGISTRY_EVENTS } from './api-collection-registry-events-k1cl';
 import { W6_REGISTRY_EVENTS } from './api-collection-registry-events-w6';
 
 /** The events of the nested-array registry written by the package 3 (MF1-B) of `mf1-mf4-reaudit`. */
@@ -29,4 +30,5 @@ export const W3_REGISTRY_EVENTS: readonly RegistryEvent[] = [
   ...W3_OWN_EVENTS,
   ...G9_REGISTRY_EVENTS,
   ...W6_REGISTRY_EVENTS,
+  ...K1CL_REGISTRY_EVENTS,
 ];
