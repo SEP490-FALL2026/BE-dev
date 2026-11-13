@@ -541,6 +541,9 @@ model AccessRequestAssessment {
   quoteBillingCycle               BillingCycle?             @map("quote_billing_cycle")
   quoteValidFrom                  DateTime?                 @map("quote_valid_from") @db.Date
   quoteValidUntil                 DateTime?                 @map("quote_valid_until") @db.Date
+  // The price the vendor quoted in another currency, kept beside the quote in dong (QĐ-111an, R-44).
+  quoteOriginalUnitPriceMinor     BigInt?                   @map("quote_original_unit_price_minor")
+  quoteOriginalCurrency           String?                   @map("quote_original_currency") @db.Char(3)
   // How long the contract binds and how it is paid; needed when the term spans more than one billing cycle (QĐ-84e).
   commitmentMonths                Int?                      @map("commitment_months")
   paymentFrequency                PaymentFrequency?         @map("payment_frequency")
@@ -566,6 +569,7 @@ model AccessRequestAssessment {
   savedBy             Employee?     @relation("AssessmentSavedBy", fields: [savedByEmployeeId], references: [id], onDelete: Restrict)
   completedBy         Employee?     @relation("AssessmentCompletedBy", fields: [completedByEmployeeId], references: [id], onDelete: Restrict)
   quoteCurrencyRecord Currency?     @relation("AssessmentQuoteCurrency", fields: [quoteCurrency], references: [code], onDelete: Restrict)
+  quoteOriginalCurrencyRecord Currency? @relation("AssessmentQuoteOriginalCurrency", fields: [quoteOriginalCurrency], references: [code], onDelete: Restrict)
 
   @@map("access_request_assessments")
 }

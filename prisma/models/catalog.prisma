@@ -344,6 +344,9 @@ model Subscription {
   priceReportingMinor    BigInt?            @map("price_reporting_minor")
   priceReportingCurrency String?            @map("price_reporting_currency") @db.Char(3)
   priceExchangeRateId    String?            @map("price_exchange_rate_id") @db.Uuid
+  // The price a vendor quoted in another currency, kept beside the price in dong (QĐ-111an, R-44): the amount in the minor units of its own currency.
+  originalUnitPriceMinor BigInt?            @map("original_unit_price_minor")
+  originalCurrency       String?            @map("original_currency") @db.Char(3)
   billingCycle           BillingCycle?      @map("billing_cycle")
   // The months the purchase commits to, 1 or 12 (QĐ-103e); a perpetual purchase has none (a CHECK). A new active term needs it (checked by the application).
   commitmentTermMonths   Int?               @map("commitment_term_months") @db.SmallInt
@@ -379,6 +382,7 @@ model Subscription {
   deadlineEvent       SubscriptionDeadlineEvent?
   ownerAssignment     SubscriptionOwnerAssignment?
   priceCurrency       Currency?                    @relation("SubscriptionPriceCurrency", fields: [unitPriceCurrency], references: [code], onDelete: Restrict)
+  originalCurrencyRecord Currency?                 @relation("SubscriptionOriginalCurrency", fields: [originalCurrency], references: [code], onDelete: Restrict)
   exchangeRate        ExchangeRate?                @relation(fields: [priceExchangeRateId], references: [id], onDelete: Restrict)
   seatBaselineImports SeatBaselineImport[]
   licenseAssignments  LicenseAssignment[]
