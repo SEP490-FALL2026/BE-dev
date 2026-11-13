@@ -88,6 +88,7 @@ export const ROUTE_ERROR_CODES_CATALOG: Readonly<Record<string, Partial<Record<R
     planCreate: {
       '409': ['PLAN.NAME_TAKEN'],
       '422': [
+        'PLAN.ADMIN_CONSOLE_NOT_APPLICABLE',
         'PLAN.APPLICATION_NOT_FOUND',
         'PLAN.APPLICATION_RETIRED',
         'PLAN.CONTROL_LEVEL_REQUIRED',
@@ -125,6 +126,7 @@ export const ROUTE_ERROR_CODES_CATALOG: Readonly<Record<string, Partial<Record<R
         'PLAN.WORKSPACE_PROFILE_BLOCKS_TYPE_CHANGE',
       ],
       '422': [
+        'PLAN.ADMIN_CONSOLE_NOT_APPLICABLE',
         'PLAN.CONTROL_LEVEL_REQUIRED',
         'PLAN.DATA_LOSS_NOTE_REQUIRED',
         'PLAN.NAME_INVALID',

@@ -26,6 +26,7 @@ export const declarePlanBodySchema = z.strictObject({
   revocationNote: note.nullable().optional(),
   dataLossOnRemoval: z.boolean().optional(),
   sharingPolicy: sharingPolicy.optional(),
+  hasAdminConsole: z.boolean().optional(),
 });
 
 /** The application cannot change: it is not a field here, so naming it is a validation error. */
@@ -37,6 +38,7 @@ export const updatePlanBodySchema = z.strictObject({
   revocationNote: note.nullable().optional(),
   dataLossOnRemoval: z.boolean().optional(),
   sharingPolicy: sharingPolicy.nullable().optional(),
+  hasAdminConsole: z.boolean().optional(),
 });
 
 export const workspaceProfileBodySchema = z.strictObject({
@@ -95,6 +97,8 @@ const planSummarySchema = z.strictObject({
   controlLevel: controlLevel.nullable(),
   dataLossOnRemoval: z.boolean(),
   sharingPolicy: sharingPolicy.nullable(),
+  /** A `K4` plan the company administers through a console of the vendor needs two IT Admins there (`R-53`); false for every other kind. */
+  hasAdminConsole: z.boolean(),
   seatTracking: z.enum(['APPLICABLE', 'NOT_APPLICABLE']),
   createdAt: z.iso.datetime(),
   updatedAt: z.iso.datetime(),

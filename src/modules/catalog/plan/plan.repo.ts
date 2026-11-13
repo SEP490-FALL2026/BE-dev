@@ -32,6 +32,7 @@ const toPlan = (row: PlanRow): PlanRecord => ({
   revocationNote: row.revocationNote,
   dataLossOnRemoval: row.dataLossOnRemoval,
   sharingPolicy: row.sharingPolicy,
+  hasAdminConsole: row.hasAdminConsole,
   createdAt: row.createdAt,
   updatedAt: row.updatedAt,
 });
@@ -73,6 +74,7 @@ export class PlanRepo {
         revocationNote: input.revocationNote,
         dataLossOnRemoval: input.dataLossOnRemoval,
         sharingPolicy: input.sharingPolicy,
+        hasAdminConsole: input.hasAdminConsole,
       },
       include: WITH_APPLICATION,
     });
@@ -128,6 +130,7 @@ export class PlanRepo {
         ...(changes.revocationNote !== undefined ? { revocationNote: changes.revocationNote } : {}),
         ...(changes.dataLossOnRemoval !== undefined ? { dataLossOnRemoval: changes.dataLossOnRemoval } : {}),
         ...(changes.sharingPolicy !== undefined ? { sharingPolicy: changes.sharingPolicy } : {}),
+        ...(changes.hasAdminConsole !== undefined ? { hasAdminConsole: changes.hasAdminConsole } : {}),
       },
       include: WITH_APPLICATION,
     });
@@ -151,6 +154,7 @@ export class PlanRepo {
           provisioningType: row.provisioningType,
           pricingModel: row.pricingModel,
           sharingPolicy: row.sharingPolicy,
+          hasAdminConsole: row.hasAdminConsole,
           applicationId: row.applicationId,
           applicationName: row.application.name,
           applicationKind: row.application.kind,
@@ -175,6 +179,7 @@ export class PlanRepo {
       provisioningType: row.provisioningType,
       pricingModel: row.pricingModel,
       sharingPolicy: row.sharingPolicy,
+      hasAdminConsole: row.hasAdminConsole,
       applicationId: row.applicationId,
       applicationName: row.application.name,
       applicationKind: row.application.kind,
@@ -317,6 +322,7 @@ export class PlanRepo {
             controlLevel: true,
             dataLossOnRemoval: true,
             sharingPolicy: true,
+            hasAdminConsole: true,
             createdAt: true,
             updatedAt: true,
             application: { select: { name: true, kind: true } },

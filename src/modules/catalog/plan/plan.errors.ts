@@ -89,6 +89,14 @@ export class PlanUpdateEmptyError extends Error {
   }
 }
 
+/** The flag "has an admin console" is given for a plan that is not a `K4` plan (`R-53`). */
+export class PlanAdminConsoleNotApplicableError extends Error {
+  constructor() {
+    super('Only a K4 plan says whether it has an admin console.');
+    this.name = 'PlanAdminConsoleNotApplicableError';
+  }
+}
+
 export class PlanWorkspaceProfileNotApplicableError extends Error {
   constructor() {
     super('Only a K2 plan has a workspace profile.');

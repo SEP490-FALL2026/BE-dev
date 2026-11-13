@@ -21,6 +21,7 @@ import {
 } from './plan.errors';
 import { assertPlanShape, cleanPlanName, cleanRevocationNote } from './plan.policy';
 import { PlanRepo } from './plan.repo';
+import { assertAdminConsoleApplicable } from './plan-vendor-admins.policy';
 import { PlanWorkspaceService } from './plan-workspace.service';
 import type {
   ControlLevel,
@@ -42,6 +43,8 @@ export interface DeclarePlanInput {
   revocationNote?: string | null;
   dataLossOnRemoval?: boolean;
   sharingPolicy?: SharingPolicy;
+  /** A `K4` plan only (`R-53`); any other kind that gives it is refused. */
+  hasAdminConsole?: boolean;
 }
 
 export interface UpdatePlanInput {
@@ -52,6 +55,7 @@ export interface UpdatePlanInput {
   revocationNote?: string | null;
   dataLossOnRemoval?: boolean;
   sharingPolicy?: SharingPolicy | null;
+  hasAdminConsole?: boolean;
 }
 
 const snapshot = (plan: PlanRecord) => ({
@@ -63,6 +67,7 @@ const snapshot = (plan: PlanRecord) => ({
   revocationNote: plan.revocationNote,
   dataLossOnRemoval: plan.dataLossOnRemoval,
   sharingPolicy: plan.sharingPolicy,
+  hasAdminConsole: plan.hasAdminConsole,
 });
 
 /**
@@ -131,8 +136,10 @@ export class PlanService {
           revocationNote,
           dataLossOnRemoval: input.dataLossOnRemoval ?? false,
           sharingPolicy: input.sharingPolicy ?? null,
+          hasAdminConsole: input.hasAdminConsole ?? false,
         };
         assertPlanShape({ ...plan, applicationKind: application.kind });
+        assertAdminConsoleApplicable(plan.provisioningType, input.hasAdminConsole);
 
         const created = await this.plans.insert(tx, plan);
         await this.audit.record(
@@ -174,8 +181,12 @@ export class PlanService {
           revocationNote: revocationNote === undefined ? current.revocationNote : revocationNote,
           dataLossOnRemoval: input.dataLossOnRemoval ?? current.dataLossOnRemoval,
           sharingPolicy: input.sharingPolicy === undefined ? current.sharingPolicy : input.sharingPolicy,
+          // The flag belongs to a K4 plan: a plan that stops being one loses it (the row says so too), and one that is not K4 cannot be given it.
+          hasAdminConsole:
+            input.hasAdminConsole ?? (input.provisioningType === undefined ? current.hasAdminConsole : false),
         };
         assertPlanShape({ ...next, applicationKind: current.applicationKind });
+        assertAdminConsoleApplicable(next.provisioningType, input.hasAdminConsole);
         if (
           next.provisioningType !== current.provisioningType &&
           next.provisioningType !== 'K2' &&
@@ -192,6 +203,7 @@ export class PlanService {
         if (next.revocationNote !== current.revocationNote) changes.revocationNote = next.revocationNote;
         if (next.dataLossOnRemoval !== current.dataLossOnRemoval) changes.dataLossOnRemoval = next.dataLossOnRemoval;
         if (next.sharingPolicy !== current.sharingPolicy) changes.sharingPolicy = next.sharingPolicy;
+        if (next.hasAdminConsole !== current.hasAdminConsole) changes.hasAdminConsole = next.hasAdminConsole;
         if (Object.keys(changes).length === 0) return current;
 
         const updated = await this.plans.update(tx, id, changes);

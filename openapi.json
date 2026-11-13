@@ -20176,7 +20176,7 @@
             }
           },
           "422": {
-            "description": "The request is invalid (VALIDATION_ERROR) or a rule refuses it: PLAN.APPLICATION_NOT_FOUND, APPLICATION_RETIRED, NAME_INVALID, NOTE_INVALID, PROVISIONING_TYPE_NOT_SUPPORTED, PROVISIONING_TYPE_MISMATCH, PRICING_MODEL_REQUIRED, PRICING_MODEL_NOT_APPLICABLE, CONTROL_LEVEL_REQUIRED, DATA_LOSS_NOTE_REQUIRED or UPDATE_EMPTY.",
+            "description": "The request is invalid (VALIDATION_ERROR) or a rule refuses it: PLAN.APPLICATION_NOT_FOUND, APPLICATION_RETIRED, NAME_INVALID, NOTE_INVALID, PROVISIONING_TYPE_NOT_SUPPORTED, PROVISIONING_TYPE_MISMATCH, PRICING_MODEL_REQUIRED, PRICING_MODEL_NOT_APPLICABLE, CONTROL_LEVEL_REQUIRED, DATA_LOSS_NOTE_REQUIRED, ADMIN_CONSOLE_NOT_APPLICABLE (the flag hasAdminConsole belongs to a K4 plan alone) or UPDATE_EMPTY.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -20299,6 +20299,17 @@
                       "error": {
                         "code": "PLAN.DATA_LOSS_NOTE_REQUIRED",
                         "message": "A plan marked as losing data on removal says in the note what is lost.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "PLAN.ADMIN_CONSOLE_NOT_APPLICABLE": {
+                    "summary": "Only a K4 plan says whether it has an admin console.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "PLAN.ADMIN_CONSOLE_NOT_APPLICABLE",
+                        "message": "Only a K4 plan says whether it has an admin console.",
                         "requestId": "req_example"
                       }
                     }
@@ -20756,7 +20767,7 @@
             }
           },
           "422": {
-            "description": "The request is invalid (VALIDATION_ERROR) or a rule refuses it: PLAN.APPLICATION_NOT_FOUND, APPLICATION_RETIRED, NAME_INVALID, NOTE_INVALID, PROVISIONING_TYPE_NOT_SUPPORTED, PROVISIONING_TYPE_MISMATCH, PRICING_MODEL_REQUIRED, PRICING_MODEL_NOT_APPLICABLE, CONTROL_LEVEL_REQUIRED, DATA_LOSS_NOTE_REQUIRED or UPDATE_EMPTY.",
+            "description": "The request is invalid (VALIDATION_ERROR) or a rule refuses it: PLAN.APPLICATION_NOT_FOUND, APPLICATION_RETIRED, NAME_INVALID, NOTE_INVALID, PROVISIONING_TYPE_NOT_SUPPORTED, PROVISIONING_TYPE_MISMATCH, PRICING_MODEL_REQUIRED, PRICING_MODEL_NOT_APPLICABLE, CONTROL_LEVEL_REQUIRED, DATA_LOSS_NOTE_REQUIRED, ADMIN_CONSOLE_NOT_APPLICABLE (the flag hasAdminConsole belongs to a K4 plan alone) or UPDATE_EMPTY.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -20857,6 +20868,17 @@
                       "error": {
                         "code": "PLAN.DATA_LOSS_NOTE_REQUIRED",
                         "message": "A plan marked as losing data on removal says in the note what is lost.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "PLAN.ADMIN_CONSOLE_NOT_APPLICABLE": {
+                    "summary": "Only a K4 plan says whether it has an admin console.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "PLAN.ADMIN_CONSOLE_NOT_APPLICABLE",
+                        "message": "Only a K4 plan says whether it has an admin console.",
                         "requestId": "req_example"
                       }
                     }
@@ -90415,6 +90437,7 @@
                     },
                     "dataLossOnRemoval": { "type": "boolean" },
                     "sharingPolicy": { "type": "string", "enum": ["ALLOWED", "NOT_ALLOWED", null], "nullable": true },
+                    "hasAdminConsole": { "type": "boolean" },
                     "seatTracking": { "type": "string", "enum": ["APPLICABLE", "NOT_APPLICABLE"] },
                     "createdAt": { "type": "string", "format": "date-time" },
                     "updatedAt": { "type": "string", "format": "date-time" }
@@ -90429,6 +90452,7 @@
                     "controlLevel",
                     "dataLossOnRemoval",
                     "sharingPolicy",
+                    "hasAdminConsole",
                     "seatTracking",
                     "createdAt",
                     "updatedAt"
@@ -90474,7 +90498,8 @@
           "controlLevel": { "type": "string", "enum": ["FULL", "PARTIAL", "UNCONTROLLABLE"] },
           "revocationNote": { "type": "string", "maxLength": 5000, "nullable": true },
           "dataLossOnRemoval": { "type": "boolean" },
-          "sharingPolicy": { "type": "string", "enum": ["ALLOWED", "NOT_ALLOWED"] }
+          "sharingPolicy": { "type": "string", "enum": ["ALLOWED", "NOT_ALLOWED"] },
+          "hasAdminConsole": { "type": "boolean" }
         },
         "required": ["applicationId", "name", "provisioningType"],
         "additionalProperties": false
@@ -90504,6 +90529,7 @@
               },
               "dataLossOnRemoval": { "type": "boolean" },
               "sharingPolicy": { "type": "string", "enum": ["ALLOWED", "NOT_ALLOWED", null], "nullable": true },
+              "hasAdminConsole": { "type": "boolean" },
               "seatTracking": { "type": "string", "enum": ["APPLICABLE", "NOT_APPLICABLE"] },
               "createdAt": { "type": "string", "format": "date-time" },
               "updatedAt": { "type": "string", "format": "date-time" },
@@ -90519,6 +90545,7 @@
               "controlLevel",
               "dataLossOnRemoval",
               "sharingPolicy",
+              "hasAdminConsole",
               "seatTracking",
               "createdAt",
               "updatedAt",
@@ -90556,6 +90583,7 @@
               },
               "dataLossOnRemoval": { "type": "boolean" },
               "sharingPolicy": { "type": "string", "enum": ["ALLOWED", "NOT_ALLOWED", null], "nullable": true },
+              "hasAdminConsole": { "type": "boolean" },
               "seatTracking": { "type": "string", "enum": ["APPLICABLE", "NOT_APPLICABLE"] },
               "createdAt": { "type": "string", "format": "date-time" },
               "updatedAt": { "type": "string", "format": "date-time" },
@@ -90646,6 +90674,7 @@
               "controlLevel",
               "dataLossOnRemoval",
               "sharingPolicy",
+              "hasAdminConsole",
               "seatTracking",
               "createdAt",
               "updatedAt",
@@ -90672,7 +90701,8 @@
           "controlLevel": { "type": "string", "enum": ["FULL", "PARTIAL", "UNCONTROLLABLE", null], "nullable": true },
           "revocationNote": { "type": "string", "maxLength": 5000, "nullable": true },
           "dataLossOnRemoval": { "type": "boolean" },
-          "sharingPolicy": { "type": "string", "enum": ["ALLOWED", "NOT_ALLOWED", null], "nullable": true }
+          "sharingPolicy": { "type": "string", "enum": ["ALLOWED", "NOT_ALLOWED", null], "nullable": true },
+          "hasAdminConsole": { "type": "boolean" }
         },
         "additionalProperties": false
       },

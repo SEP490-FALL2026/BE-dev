@@ -217,6 +217,8 @@ model Plan {
   revocationNote    String?          @map("revocation_note")
   dataLossOnRemoval Boolean          @default(false) @map("data_loss_on_removal")
   sharingPolicy     SharingPolicy?   @map("sharing_policy")
+  // R-53: a K4 plan the company administers through a console of the vendor needs two admins there (QĐ-110k). Only K4 may be true (a CHECK).
+  hasAdminConsole   Boolean          @default(false) @map("has_admin_console")
   createdAt         DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt         DateTime         @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
 

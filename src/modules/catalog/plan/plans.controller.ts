@@ -40,7 +40,7 @@ const READERS = {
   examples: [FORBIDDEN_EXAMPLE],
 } as const;
 const INVALID_DESCRIPTION =
-  'The request is invalid (VALIDATION_ERROR) or a rule refuses it: PLAN.APPLICATION_NOT_FOUND, APPLICATION_RETIRED, NAME_INVALID, NOTE_INVALID, PROVISIONING_TYPE_NOT_SUPPORTED, PROVISIONING_TYPE_MISMATCH, PRICING_MODEL_REQUIRED, PRICING_MODEL_NOT_APPLICABLE, CONTROL_LEVEL_REQUIRED, DATA_LOSS_NOTE_REQUIRED or UPDATE_EMPTY.';
+  'The request is invalid (VALIDATION_ERROR) or a rule refuses it: PLAN.APPLICATION_NOT_FOUND, APPLICATION_RETIRED, NAME_INVALID, NOTE_INVALID, PROVISIONING_TYPE_NOT_SUPPORTED, PROVISIONING_TYPE_MISMATCH, PRICING_MODEL_REQUIRED, PRICING_MODEL_NOT_APPLICABLE, CONTROL_LEVEL_REQUIRED, DATA_LOSS_NOTE_REQUIRED, ADMIN_CONSOLE_NOT_APPLICABLE (the flag hasAdminConsole belongs to a K4 plan alone) or UPDATE_EMPTY.';
 /** The rule refusals of the shape of a plan, met by a declaration and by a change alike. */
 const SHAPE_EXAMPLES = [
   EXAMPLES.NAME_INVALID,
@@ -51,6 +51,7 @@ const SHAPE_EXAMPLES = [
   EXAMPLES.PRICING_MODEL_NOT_APPLICABLE,
   EXAMPLES.CONTROL_LEVEL_REQUIRED,
   EXAMPLES.DATA_LOSS_NOTE_REQUIRED,
+  EXAMPLES.ADMIN_CONSOLE_NOT_APPLICABLE,
 ] as const;
 const DECLARE_INVALID = {
   status: HttpStatus.UNPROCESSABLE_ENTITY,
@@ -96,6 +97,7 @@ function toPlanSummaryWire(plan: PlanSummaryRecord) {
     controlLevel: plan.controlLevel,
     dataLossOnRemoval: plan.dataLossOnRemoval,
     sharingPolicy: plan.sharingPolicy,
+    hasAdminConsole: plan.hasAdminConsole,
     seatTracking: seatTrackingOf(plan.pricingModel),
     createdAt: plan.createdAt.toISOString(),
     updatedAt: plan.updatedAt.toISOString(),
