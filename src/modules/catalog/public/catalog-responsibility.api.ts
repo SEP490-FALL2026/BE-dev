@@ -20,15 +20,16 @@ export class CatalogResponsibilityApi {
 
   /**
    * Hands every subscription and every application `fromEmployeeId` answers for to `toEmployeeId`, in the caller's transaction, with an
-   * audit event for each, written as `actor`. Throws ResponsibilityHandoverRefusedError (the same person, or not an IT Admin who works
-   * now) with nothing written.
+   * audit event for each, written as `actor`; `source` names the departure or the transfer that asked for it, and the events say so. Throws
+   * ResponsibilityHandoverRefusedError (the same person, or not an IT Admin who works now) with nothing written.
    */
   transferResponsibilities(
     tx: DbTx,
     actor: AuthenticatedPrincipal,
     fromEmployeeId: string,
     toEmployeeId: string,
+    source?: { kind: string; id: string },
   ): Promise<ResponsibilitiesTransferred> {
-    return this.handover.transfer(tx, actor, fromEmployeeId, toEmployeeId);
+    return this.handover.transfer(tx, actor, fromEmployeeId, toEmployeeId, source);
   }
 }

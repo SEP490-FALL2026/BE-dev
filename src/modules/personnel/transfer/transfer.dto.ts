@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { successEnvelopeSchema } from '../../../infrastructure/http/dto/success-envelope.dto';
 import { businessDay } from '../../../infrastructure/http/dto/business-date.dto';
 import { groundsNoteBodySchema } from '../personnel-grounds.dto';
+import { itHandoverSchema } from '../it-handover/it-handover.dto';
 import {
   OLD_RIGHTS_MAX,
   graceSchema,
@@ -116,6 +117,8 @@ export const transferDetailSchema = transferSummarySchema.extend({
   commitmentsReleased: z.array(releasedMoneySchema).max(OLD_RIGHTS_MAX),
   /** The picture of the rights the day it took effect and, once closed, what became of them; null when there is none. */
   snapshot: transferSnapshotSchema.nullable(),
+  /** What the person still answers for in the catalog and the hand-over of all of it to one IT Admin (`R-8`, `QĐ-110j`); null when there is nothing. It never holds the transfer back. */
+  itHandover: itHandoverSchema.nullable(),
 });
 
 /** What recording a transfer answers with: the transfer as the detail shows it (the warning about Business Owner applications is gone, `QĐ-111g`). */

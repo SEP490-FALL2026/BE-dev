@@ -12007,6 +12007,620 @@
         "tags": ["offboarding-cases"]
       }
     },
+    "/api/v1/offboarding-cases/{id}/it-admin-handover": {
+      "post": {
+        "operationId": "offboardingCaseItAdminHandover",
+        "parameters": [
+          { "name": "id", "required": true, "in": "path", "schema": { "format": "uuid", "type": "string" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ItHandoverBodyDto" } } }
+        },
+        "responses": {
+          "200": {
+            "description": "The IT Admin who is leaving hands over before the block of the departure or the day the transfer takes effect; from then on any IT Admin does. Every subscription and every application the person answers for now goes to the IT Admin named, in one operation: the Audit Trail names the person who gave them up, the one who took them and the departure, the log of the case says so, and the one who took them is told. The case is read again for its itHandover section.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/ItHandoverResultResponseDto" },
+                    { "properties": { "message": { "example": "OFFBOARDING_CASE.IT_ADMIN_HANDED_OVER" } } }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_BAD_REQUEST": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_BAD_REQUEST",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHENTICATION_REQUIRED": {
+                    "summary": "A Bearer access token is required.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHENTICATION_REQUIRED",
+                        "message": "A Bearer access token is required.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "INVALID_ACCESS_TOKEN": {
+                    "summary": "The access token is invalid.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "INVALID_ACCESS_TOKEN",
+                        "message": "The access token is invalid.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only an IT Admin hands responsibilities over (AUTHORIZATION.FORBIDDEN). Before the block of the departure or the day the transfer takes effect only the IT Admin who is leaving does (IT_HANDOVER.NOT_YET_YOURS).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHORIZATION.FORBIDDEN": {
+                    "summary": "You do not have permission to perform this action.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHORIZATION.FORBIDDEN",
+                        "message": "You do not have permission to perform this action.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "IT_HANDOVER.NOT_YET_YOURS": {
+                    "summary": "Before the block of the departure or the day the transfer takes effect, only the IT Admin who is leaving hands their responsibilities over.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "IT_HANDOVER.NOT_YET_YOURS",
+                        "message": "Before the block of the departure or the day the transfer takes effect, only the IT Admin who is leaving hands their responsibilities over.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The departure or the transfer does not exist (IT_HANDOVER.NOT_FOUND).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "IT_HANDOVER.NOT_FOUND": {
+                    "summary": "The departure or the transfer does not exist.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "IT_HANDOVER.NOT_FOUND",
+                        "message": "The departure or the transfer does not exist.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The departure or the transfer was cancelled (IT_HANDOVER.SOURCE_CANCELLED), or the IT Admin who leaves answers for no subscription and no application now (IT_HANDOVER.NOTHING_TO_HAND_OVER).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "IT_HANDOVER.SOURCE_CANCELLED": {
+                    "summary": "The departure or the transfer was cancelled: there is nothing to hand over for it.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "IT_HANDOVER.SOURCE_CANCELLED",
+                        "message": "The departure or the transfer was cancelled: there is nothing to hand over for it.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "IT_HANDOVER.NOTHING_TO_HAND_OVER": {
+                    "summary": "The IT Admin answers for no subscription and no application now.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "IT_HANDOVER.NOTHING_TO_HAND_OVER",
+                        "message": "The IT Admin answers for no subscription and no application now.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_PAYLOAD_TOO_LARGE": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_PAYLOAD_TOO_LARGE",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_UNSUPPORTED_MEDIA_TYPE": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_UNSUPPORTED_MEDIA_TYPE",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The id or the body is invalid (VALIDATION_ERROR), or the one who would take the responsibilities is the one who gives them up (IT_HANDOVER.SAME_PERSON) or is not an IT Admin who works now (IT_HANDOVER.TARGET_NOT_IT_ADMIN): nothing moves.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "VALIDATION_ERROR": {
+                    "summary": "Request validation failed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "VALIDATION_ERROR",
+                        "message": "Request validation failed.",
+                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "IT_HANDOVER.SAME_PERSON": {
+                    "summary": "The responsibilities cannot be handed to the IT Admin who gives them up.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "IT_HANDOVER.SAME_PERSON",
+                        "message": "The responsibilities cannot be handed to the IT Admin who gives them up.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "IT_HANDOVER.TARGET_NOT_IT_ADMIN": {
+                    "summary": "The IT Admin who takes the responsibilities must be an IT Admin who works now.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "IT_HANDOVER.TARGET_NOT_IT_ADMIN",
+                        "message": "The IT Admin who takes the responsibilities must be an IT Admin who works now.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_TOO_MANY_REQUESTS": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_TOO_MANY_REQUESTS",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "TOKEN_VERIFICATION_UNAVAILABLE": {
+                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
+                        "message": "Authentication is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SERVICE_UNAVAILABLE": {
+                    "summary": "The service is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SERVICE_UNAVAILABLE",
+                        "message": "The service is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "bearer": [] }],
+        "summary": "Hand the responsibilities of a leaving IT Admin to another",
+        "tags": ["it-admin-handover"]
+      }
+    },
+    "/api/v1/department-transfers/{id}/it-admin-handover": {
+      "post": {
+        "operationId": "departmentTransferItAdminHandover",
+        "parameters": [
+          { "name": "id", "required": true, "in": "path", "schema": { "format": "uuid", "type": "string" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ItHandoverBodyDto" } } }
+        },
+        "responses": {
+          "200": {
+            "description": "The IT Admin who is leaving hands over before the block of the departure or the day the transfer takes effect; from then on any IT Admin does. Every subscription and every application the person answers for now goes to the IT Admin named, in one operation: the Audit Trail names the person who gave them up, the one who took them and the transfer, and the one who took them is told. The transfer is read again for its itHandover section.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/ItHandoverResultResponseDto" },
+                    { "properties": { "message": { "example": "DEPARTMENT_TRANSFER.IT_ADMIN_HANDED_OVER" } } }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_BAD_REQUEST": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_BAD_REQUEST",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHENTICATION_REQUIRED": {
+                    "summary": "A Bearer access token is required.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHENTICATION_REQUIRED",
+                        "message": "A Bearer access token is required.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "INVALID_ACCESS_TOKEN": {
+                    "summary": "The access token is invalid.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "INVALID_ACCESS_TOKEN",
+                        "message": "The access token is invalid.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only an IT Admin hands responsibilities over (AUTHORIZATION.FORBIDDEN). Before the block of the departure or the day the transfer takes effect only the IT Admin who is leaving does (IT_HANDOVER.NOT_YET_YOURS).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHORIZATION.FORBIDDEN": {
+                    "summary": "You do not have permission to perform this action.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHORIZATION.FORBIDDEN",
+                        "message": "You do not have permission to perform this action.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "IT_HANDOVER.NOT_YET_YOURS": {
+                    "summary": "Before the block of the departure or the day the transfer takes effect, only the IT Admin who is leaving hands their responsibilities over.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "IT_HANDOVER.NOT_YET_YOURS",
+                        "message": "Before the block of the departure or the day the transfer takes effect, only the IT Admin who is leaving hands their responsibilities over.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The departure or the transfer does not exist (IT_HANDOVER.NOT_FOUND).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "IT_HANDOVER.NOT_FOUND": {
+                    "summary": "The departure or the transfer does not exist.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "IT_HANDOVER.NOT_FOUND",
+                        "message": "The departure or the transfer does not exist.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The departure or the transfer was cancelled (IT_HANDOVER.SOURCE_CANCELLED), or the IT Admin who leaves answers for no subscription and no application now (IT_HANDOVER.NOTHING_TO_HAND_OVER).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "IT_HANDOVER.SOURCE_CANCELLED": {
+                    "summary": "The departure or the transfer was cancelled: there is nothing to hand over for it.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "IT_HANDOVER.SOURCE_CANCELLED",
+                        "message": "The departure or the transfer was cancelled: there is nothing to hand over for it.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "IT_HANDOVER.NOTHING_TO_HAND_OVER": {
+                    "summary": "The IT Admin answers for no subscription and no application now.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "IT_HANDOVER.NOTHING_TO_HAND_OVER",
+                        "message": "The IT Admin answers for no subscription and no application now.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_PAYLOAD_TOO_LARGE": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_PAYLOAD_TOO_LARGE",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_UNSUPPORTED_MEDIA_TYPE": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_UNSUPPORTED_MEDIA_TYPE",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The id or the body is invalid (VALIDATION_ERROR), or the one who would take the responsibilities is the one who gives them up (IT_HANDOVER.SAME_PERSON) or is not an IT Admin who works now (IT_HANDOVER.TARGET_NOT_IT_ADMIN): nothing moves.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "VALIDATION_ERROR": {
+                    "summary": "Request validation failed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "VALIDATION_ERROR",
+                        "message": "Request validation failed.",
+                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "IT_HANDOVER.SAME_PERSON": {
+                    "summary": "The responsibilities cannot be handed to the IT Admin who gives them up.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "IT_HANDOVER.SAME_PERSON",
+                        "message": "The responsibilities cannot be handed to the IT Admin who gives them up.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "IT_HANDOVER.TARGET_NOT_IT_ADMIN": {
+                    "summary": "The IT Admin who takes the responsibilities must be an IT Admin who works now.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "IT_HANDOVER.TARGET_NOT_IT_ADMIN",
+                        "message": "The IT Admin who takes the responsibilities must be an IT Admin who works now.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_TOO_MANY_REQUESTS": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_TOO_MANY_REQUESTS",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "TOKEN_VERIFICATION_UNAVAILABLE": {
+                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
+                        "message": "Authentication is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SERVICE_UNAVAILABLE": {
+                    "summary": "The service is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SERVICE_UNAVAILABLE",
+                        "message": "The service is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "bearer": [] }],
+        "summary": "Hand the responsibilities of a moving IT Admin to another",
+        "tags": ["it-admin-handover"]
+      }
+    },
     "/api/v1/offboarding-cases/{id}/open-requests": {
       "get": {
         "operationId": "offboardingCaseOpenRequestList",
@@ -86303,6 +86917,29 @@
                 "required": ["before", "after"],
                 "additionalProperties": false,
                 "nullable": true
+              },
+              "itHandover": {
+                "type": "object",
+                "properties": {
+                  "state": { "type": "string", "enum": ["PENDING", "DONE"] },
+                  "subscriptions": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                  "applications": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                  "handedOver": {
+                    "type": "object",
+                    "properties": {
+                      "at": { "type": "string" },
+                      "toItAdminEmployeeId": { "type": "string", "format": "uuid" },
+                      "subscriptions": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                      "applications": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+                    },
+                    "required": ["at", "toItAdminEmployeeId", "subscriptions", "applications"],
+                    "additionalProperties": false,
+                    "nullable": true
+                  }
+                },
+                "required": ["state", "subscriptions", "applications", "handedOver"],
+                "additionalProperties": false,
+                "nullable": true
               }
             },
             "required": [
@@ -86324,7 +86961,8 @@
               "closure",
               "oldRights",
               "commitmentsReleased",
-              "snapshot"
+              "snapshot",
+              "itHandover"
             ],
             "additionalProperties": false,
             "nullable": true
@@ -86666,6 +87304,29 @@
                 "required": ["before", "after"],
                 "additionalProperties": false,
                 "nullable": true
+              },
+              "itHandover": {
+                "type": "object",
+                "properties": {
+                  "state": { "type": "string", "enum": ["PENDING", "DONE"] },
+                  "subscriptions": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                  "applications": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                  "handedOver": {
+                    "type": "object",
+                    "properties": {
+                      "at": { "type": "string" },
+                      "toItAdminEmployeeId": { "type": "string", "format": "uuid" },
+                      "subscriptions": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                      "applications": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+                    },
+                    "required": ["at", "toItAdminEmployeeId", "subscriptions", "applications"],
+                    "additionalProperties": false,
+                    "nullable": true
+                  }
+                },
+                "required": ["state", "subscriptions", "applications", "handedOver"],
+                "additionalProperties": false,
+                "nullable": true
               }
             },
             "required": [
@@ -86687,7 +87348,8 @@
               "closure",
               "oldRights",
               "commitmentsReleased",
-              "snapshot"
+              "snapshot",
+              "itHandover"
             ],
             "additionalProperties": false,
             "nullable": true
@@ -87206,6 +87868,29 @@
                 "additionalProperties": false,
                 "nullable": true
               },
+              "itHandover": {
+                "type": "object",
+                "properties": {
+                  "state": { "type": "string", "enum": ["PENDING", "DONE"] },
+                  "subscriptions": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                  "applications": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                  "handedOver": {
+                    "type": "object",
+                    "properties": {
+                      "at": { "type": "string" },
+                      "toItAdminEmployeeId": { "type": "string", "format": "uuid" },
+                      "subscriptions": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                      "applications": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+                    },
+                    "required": ["at", "toItAdminEmployeeId", "subscriptions", "applications"],
+                    "additionalProperties": false,
+                    "nullable": true
+                  }
+                },
+                "required": ["state", "subscriptions", "applications", "handedOver"],
+                "additionalProperties": false,
+                "nullable": true
+              },
               "closure": {
                 "type": "object",
                 "properties": {
@@ -87310,6 +87995,7 @@
               "cancellation",
               "accountLock",
               "mailboxLock",
+              "itHandover",
               "closure",
               "checklist",
               "blockers",
@@ -87875,6 +88561,29 @@
                 "additionalProperties": false,
                 "nullable": true
               },
+              "itHandover": {
+                "type": "object",
+                "properties": {
+                  "state": { "type": "string", "enum": ["PENDING", "DONE"] },
+                  "subscriptions": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                  "applications": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                  "handedOver": {
+                    "type": "object",
+                    "properties": {
+                      "at": { "type": "string" },
+                      "toItAdminEmployeeId": { "type": "string", "format": "uuid" },
+                      "subscriptions": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                      "applications": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+                    },
+                    "required": ["at", "toItAdminEmployeeId", "subscriptions", "applications"],
+                    "additionalProperties": false,
+                    "nullable": true
+                  }
+                },
+                "required": ["state", "subscriptions", "applications", "handedOver"],
+                "additionalProperties": false,
+                "nullable": true
+              },
               "closure": {
                 "type": "object",
                 "properties": {
@@ -87988,6 +88697,7 @@
               "cancellation",
               "accountLock",
               "mailboxLock",
+              "itHandover",
               "closure",
               "checklist",
               "blockers",
@@ -88004,6 +88714,44 @@
       "RecordMailboxLockBodyDto": {
         "type": "object",
         "properties": { "note": { "type": "string", "minLength": 1, "maxLength": 1000 } },
+        "additionalProperties": false
+      },
+      "ItHandoverBodyDto": {
+        "type": "object",
+        "properties": { "toItAdminEmployeeId": { "type": "string", "format": "uuid" } },
+        "required": ["toItAdminEmployeeId"],
+        "additionalProperties": false
+      },
+      "ItHandoverResultResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "enum": [true] },
+          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "sourceKind": { "type": "string", "enum": ["OFFBOARDING_CASE", "DEPARTMENT_TRANSFER"] },
+              "sourceId": { "type": "string", "format": "uuid" },
+              "fromEmployeeId": { "type": "string", "format": "uuid" },
+              "toItAdminEmployeeId": { "type": "string", "format": "uuid" },
+              "subscriptions": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+              "applications": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+              "handedOverAt": { "type": "string" }
+            },
+            "required": [
+              "sourceKind",
+              "sourceId",
+              "fromEmployeeId",
+              "toItAdminEmployeeId",
+              "subscriptions",
+              "applications",
+              "handedOverAt"
+            ],
+            "additionalProperties": false,
+            "nullable": true
+          }
+        },
+        "required": ["success", "message", "data"],
         "additionalProperties": false
       },
       "OpenRequestPageResponseDto": {

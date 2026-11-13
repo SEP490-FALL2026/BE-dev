@@ -4,6 +4,7 @@ import { IdentityAccessApi } from '../../../identity-access/public/identity-acce
 import { OrganizationReadApi } from '../../../organization/public/organization-read.api';
 import type { EmployeeRecord } from '../../../organization/public/organization.types';
 import type { ReadAccess } from '../../personnel-self-action.policy';
+import { ItHandoverViewService } from '../../it-handover/it-handover-view.service';
 import { RoleDutiesService } from '../../role-duties/role-duties.service';
 import type { OffboardingDetailWire } from '../offboarding.dto';
 import { toDetail } from '../offboarding.mapper';
@@ -27,6 +28,7 @@ export class OffboardingDetailService {
     private readonly sources: OffboardingSources,
     private readonly roleDuties: RoleDutiesService,
     private readonly identity: IdentityAccessApi,
+    private readonly itHandovers: ItHandoverViewService,
   ) {}
 
   /** The case in full: for a case that is not cancelled, what the person still holds, the four steps and what keeps it open. */
@@ -66,6 +68,7 @@ export class OffboardingDetailService {
         checklist: facts.checklist,
         blockers: facts.blockers,
         registeredWarnings: nonZero(warnings),
+        itHandover: await this.itHandovers.wireOf({ kind: 'OFFBOARDING_CASE', id: record.id }, record.employeeId),
       },
       access,
     );

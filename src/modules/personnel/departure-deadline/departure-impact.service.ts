@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
+import { CatalogResponsibilityApi } from '../../catalog/public/catalog-responsibility.api';
 import { LicensingApi } from '../../licensing/public/licensing.api';
 import { RequestsApi } from '../../requests/public/requests.api';
 import { DepartureDeadlineService } from './departure-deadline.service';
@@ -14,8 +15,8 @@ import type { DepartureImpact, DepartureImpactInput } from './departure-impact.t
  * nothing: the caller has already judged whether the person may leave, and says whether a head needs a successor. Everything is read in the
  * transaction of the caller and no lock is taken.
  *
- * Not yet counted, for lack of a source: the subscriptions and applications an IT Admin who leaves is responsible for
- * (`responsibilities`, null until the hand-over of an IT Admin, X-IT) and the vendor admin roles they hold (`vendorAdminRoles`, empty).
+ * `responsibilities` is what an IT Admin who leaves answers for in the catalog (subscriptions and applications, `R-8`); the vendor admin roles
+ * they hold (`vendorAdminRoles`) are not counted yet and stay empty.
  */
 @Injectable()
 export class DepartureImpactService {
@@ -23,6 +24,7 @@ export class DepartureImpactService {
     private readonly licensing: LicensingApi,
     private readonly requests: RequestsApi,
     private readonly deadlines: DepartureDeadlineService,
+    private readonly responsibilities: CatalogResponsibilityApi,
   ) {}
 
   async impactOf(tx: DbTx, input: DepartureImpactInput): Promise<DepartureImpact> {
@@ -31,6 +33,9 @@ export class DepartureImpactService {
       employeeId: input.employeeId,
       scope: { kind: 'ALL_OPEN' },
     });
+    const answersFor = (await this.responsibilities.countResponsibilitiesOf([input.employeeId], tx)).get(
+      input.employeeId,
+    );
     const ofItem = ({ requestId, type, state, line }: (typeof gone.wouldCancel)[number]) => ({
       requestId,
       type,
@@ -43,7 +48,7 @@ export class DepartureImpactService {
       openRequestsToCancel: gone.wouldCancel.map(ofItem),
       provisioningInFlight: gone.needsItCheck.map(ofItem),
       commitmentToRelease: commitmentToRelease(gone.heldToRelease),
-      responsibilities: { subscriptions: null, applications: null },
+      responsibilities: { subscriptions: answersFor?.subscriptions ?? 0, applications: answersFor?.applications ?? 0 },
       vendorAdminRoles: [],
       headSuccessorRequired: input.headSuccessorRequired,
       revocationDueOn: await this.deadlines.revocationDueOn(input.lastWorkingDay),

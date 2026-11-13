@@ -28,7 +28,7 @@ và lệnh `src/cli/record-super-admin-event/`.
 
 - `department_transfers`, `department_transfer_changes`, `transfer_reviews`, `transfer_review_items`
   (hai bảng sau chỉ còn dữ liệu cũ, không ai ghi: giữ theo expand–contract, drop ở đợt dọn),
-  `employee_leaves`, `employee_leave_changes`, `offboarding_cases`, `offboarding_case_changes`, `personnel_notices`,
+  `employee_leaves`, `employee_leave_changes`, `offboarding_cases`, `offboarding_case_changes`, `it_admin_handovers`, `personnel_notices`,
   `personnel_notice_verifications`, `personnel_notice_counters`, `super_admin_event_tickets`
   (`prisma/models/personnel.prisma`).
 - Hồ sơ nghỉ việc ghi/dời/hủy dòng chặn truy cập `employee_access_blocks` (bảng của `identity-access`, qua `IdentityAccessApi`) trong
@@ -41,7 +41,7 @@ và lệnh `src/cli/record-super-admin-event/`.
 Bốn point mở của module (cả bốn do listener trong chính module đăng ký), cộng điểm mở của `licensing` mà `personnel` gắn vào:
 
 - `PersonnelFileHookContributions` (`personnel.file-hook`) — `offboarding/open-requests/open-requests.listener.ts`,
-  `role-duties/role-duties.listener.ts`.
+  `role-duties/role-duties.listener.ts`, `it-handover/it-handover-recorder.listener.ts` (`personnel.it-handover`, `onRecorded`).
 - `OffboardingWarningContributions` (`personnel.offboarding-warning`) — `open-requests.listener.ts`, `role-warning.listener.ts`. Không còn điểm mở
   _blocker_: trách nhiệm chưa chuyển (workspace, thuê bao, vai trò) chỉ là cảnh báo, không chặn đóng hồ sơ (`QĐ-110e`, `QĐ-110j`).
 - `NoticeRecorderContributions` (`personnel.notice-recorder`) — `notice/transfer-notice.listener.ts`,
@@ -130,6 +130,17 @@ anh em `event-notice` để báo, nên `event-notice` không được import l�
   `closed_by_app_user_id` NULL. Được hỏi ngay khi sự kiện đóng được ghi (tác vụ thu hồi hoàn tất, P28), và mỗi giờ bởi `DepartureClosureSweeper`
   (`MailboxLockSettlement.settle` ghi (1b) từ checklist `K1` đã lưu cho hồ sơ bị giữ lúc listener hỏi, D-72, rồi `DepartureClosureService.sweep`) cho phần còn lại (người được ghi _đã nghỉ việc_ sau cùng, hồ sơ bị giữ lúc listener hỏi). Cột
   `offboarding_cases.mailbox_lock_at/by_app_user_id/note`. Tác vụ `FAILED` giữ hồ sơ mở; IT mở tác vụ mới.
+- `it-handover/` — bàn giao của IT Admin rời đi (X-IT.3, `QĐ-110j`, `QĐ-111g`, R-8, R-26, SPEC P5): bảng `it_admin_handovers` (mục tạo MỘT LẦN lúc ghi hồ sơ nếu người đó
+  đang phụ trách thuê bao/ứng dụng: `ItHandoverRecorder` bind `PersonnelFileHookContributions.onRecorded` cho cả `OFFBOARDING` và `TRANSFER`, đếm qua `CatalogResponsibilityApi`;
+  về sau ghi bàn giao mới nhất: người nhận, lúc nào, bao nhiêu). `POST /offboarding-cases/{id}/it-admin-handover` và `POST /department-transfers/{id}/it-admin-handover`
+  (`it-handover.controller.ts`, `@RequireRoles('IT_ADMIN')`): `ItHandoverService.handOver` khóa nhân viên rồi hồ sơ, `handoverRefusal` (`it-handover.policy.ts`: hồ sơ bị hủy ⟹ 409
+  `SOURCE_CANCELLED`; trước mốc chỉ chính người rời ⟹ 403 `NOT_YET_YOURS`, từ mốc IT Admin nào cũng được; không còn gì ⟹ 409 `NOTHING_TO_HAND_OVER`), rồi
+  `CatalogResponsibilityApi.transferResponsibilities` đổi MỌI thuê bao + ứng dụng (đích khác người rời và là IT Admin dùng được, không thì 422 `SAME_PERSON`/`TARGET_NOT_IT_ADMIN`);
+  `ItHandoverTellingService` ghi dòng log `IT_ADMIN_HANDED_OVER` (chỉ hồ sơ nghỉ việc), Audit `OFFBOARDING_CASE|DEPARTMENT_TRANSFER.IT_ADMIN_HANDED_OVER` và báo người nhận
+  (`IT_ADMIN_HANDOVER_RECEIVED`). Mốc = ngày đầu tiên nghỉ việc từ chối người đó (chặn hoặc đã nghỉ) / ngày điều chuyển hiệu lực (`milestoneDay`). Tới mốc còn trách nhiệm ⟹ mọi IT Admin
+  đang làm việc nhận `IT_ADMIN_HANDOVER_PENDING` một lần (`ItHandoverMilestoneService.reached`, gọi trong transaction của `BlockMomentEffects` và `TransferGraceService.open`).
+  Phần `itHandover { state, subscriptions, applications, handedOver }` của chi tiết hồ sơ/điều chuyển đọc qua `ItHandoverViewService` (đếm còn lại tại lúc đọc). **Không bao giờ chặn
+  hồ sơ** (`QĐ-110e`). Capability không import `offboarding/`, `transfer/`, `departure-deadline/` (chính chúng import nó).
 - `department-member/` — trưởng phòng đọc một người đang ở phòng mình hôm nay (`QĐ-41c`(2)); `department-member.controller.ts`
   (`GET /departments/{id}/employees/{employeeId}` + `…/software-rights` + `…/open-requests`, `@RequireRoles('MANAGER')`),
   `DepartmentMemberQueryService` (hồ sơ không email/hợp đồng + hai số đếm; hai danh sách phân trang ≤ 100),

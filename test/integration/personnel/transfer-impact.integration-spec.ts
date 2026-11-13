@@ -132,12 +132,28 @@ describe('the impact of a transfer, read and never written (integration, real Po
     expect(found.provisioningInFlight.map((item) => item.requestId)).toEqual([running]);
     expect(found.commitmentToRelease).toHaveLength(1);
     expect(BigInt(found.commitmentToRelease[0].amountMinor)).toBeGreaterThan(0n);
-    expect(found.responsibilities).toEqual({ subscriptions: null, applications: null });
+    // An employee who is not an IT Admin answers for nothing in the catalog (R-8).
+    expect(found.responsibilities).toEqual({ subscriptions: 0, applications: 0 });
     expect(found.vendorAdminRoles).toEqual([]);
     expect(found.headSuccessorRequired).toBe(false);
     // Day 1 is the Monday the transfer takes effect: day 5 is that Friday, and the person is told again on Wednesday (SPEC T-MF3, no day off here).
     expect(found.graceEndsOn).toBe(addDays(effectiveOn, 4));
     expect(found.graceReminderOn).toBe(addDays(effectiveOn, 2));
+  });
+
+  it('counts the subscriptions and the applications the person answers for in the catalog (R-8)', async () => {
+    const { u } = await busyMover();
+    await h.ctx.sql.query(`UPDATE subscriptions SET responsible_it_admin_employee_id = $2 WHERE id = $1`, [
+      seatSubscription,
+      u.mover.employeeId,
+    ]);
+    await h.ctx.sql.query(
+      `UPDATE applications SET responsible_it_admin_employee_id = $2
+        WHERE id = (SELECT p.application_id FROM subscriptions s JOIN plans p ON p.id = s.plan_id WHERE s.id = $1)`,
+      [seatSubscription, u.mover.employeeId],
+    );
+
+    expect((await impact(u, u.mover, mondayFrom(10))).responsibilities).toEqual({ subscriptions: 1, applications: 1 });
   });
 
   it('counts the grace from the next working day when the transfer takes effect on a day off', async () => {

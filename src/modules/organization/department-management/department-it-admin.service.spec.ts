@@ -28,7 +28,7 @@ describe('DepartmentItAdminService', () => {
     }),
   };
   const departments = {
-    countActiveInChargeOf: jest.fn<(tx: unknown, id: string) => Promise<number>>().mockImplementation(() => {
+    countActiveInChargeOf: jest.fn(() => {
       calls.push('count');
 
       return Promise.resolve(3);

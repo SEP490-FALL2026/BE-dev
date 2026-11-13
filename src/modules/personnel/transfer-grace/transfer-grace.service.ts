@@ -4,6 +4,7 @@ import { AuditApi } from '../../audit/public/audit.api';
 import { OperatingParametersApi } from '../../operating-parameters/public/operating-parameters.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { PersonnelNotifier } from '../event-notice/personnel-notifier.service';
+import { ItHandoverMilestoneService } from '../it-handover/it-handover-milestone.service';
 import { personnelSystemAuditEvent } from '../personnel-audit-event.mapper';
 import { TransferEffectsService } from './transfer-effects.service';
 import { TransferGraceRepo } from './transfer-grace.repo';
@@ -27,6 +28,7 @@ export class TransferGraceService {
     private readonly organizationReads: OrganizationReadApi,
     private readonly audit: AuditApi,
     private readonly notifier: PersonnelNotifier,
+    private readonly handovers: ItHandoverMilestoneService,
   ) {}
 
   /** Returns what it did, or null when the grace was open already. */
@@ -70,6 +72,13 @@ export class TransferGraceService {
       toDepartmentId: transfer.toDepartmentId,
       graceEndsOn: grace.endsOn,
       today,
+    });
+    // A moved IT Admin who still answers for something in the catalog: every IT Admin is told, the transfer is not held back (`R-26`).
+    await this.handovers.reached(tx, {
+      organizationId: transfer.organizationId,
+      source: { kind: 'DEPARTMENT_TRANSFER', id: transfer.id },
+      employeeId: transfer.employeeId,
+      dueOn: transfer.effectiveOn,
     });
 
     return {

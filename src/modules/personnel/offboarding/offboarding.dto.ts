@@ -5,6 +5,7 @@ import { REVOCATION_SOURCES } from '../../licensing/public/licensing.types';
 import { ROLE_FLAGS } from '../public/personnel.types';
 import { businessDay } from '../../../infrastructure/http/dto/business-date.dto';
 import { groundsNoteBodySchema } from '../personnel-grounds.dto';
+import { itHandoverSchema } from '../it-handover/it-handover.dto';
 
 const flag = z.enum(['true', 'false']).transform((value) => value === 'true');
 
@@ -203,6 +204,12 @@ export const offboardingDetailSchema = offboardingSummarySchema.extend({
       note: z.string().nullable(),
     })
     .nullable(),
+  /**
+   * What the person still answers for in the catalog and the hand-over of all of it to one IT Admin (`R-8`, `QĐ-110j`, SPEC P5): `PENDING` while
+   * they answer for a subscription or an application, `DONE` when nothing is left. Null when they answered for nothing and answer for nothing now.
+   * It never holds the case back.
+   */
+  itHandover: itHandoverSchema.nullable(),
   /**
    * How the case was closed; null while it is open. The system closes it (`QĐ-110e`) when the person has left, every revocation is completed and
    * the lock of the mailbox (1b) is written: `closedBySystem` is then true and `closedByAppUserId` null. A case an IT Admin closed before the system

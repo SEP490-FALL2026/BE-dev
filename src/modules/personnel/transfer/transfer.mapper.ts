@@ -1,5 +1,6 @@
 import type { BusinessDate } from '../../../core/business-date';
 import type { DepartmentBrief, EmployeeRecord } from '../../organization/public/organization.types';
+import type { ItHandoverWire } from '../it-handover/it-handover.dto';
 import { groundsNoteOf } from '../personnel-grounds.policy';
 import type { ReadAccess } from '../personnel-self-action.policy';
 import type { OldRightWire, TransferSnapshotWire } from '../transfer-grace/transfer-grace.dto';
@@ -51,6 +52,8 @@ export function toSummary(
 export interface TransferDetailExtras {
   today: BusinessDate;
   oldRights: OldRightWire[];
+  /** What the person answers for in the catalog and the hand-over of it; null when there is nothing. */
+  itHandover: ItHandoverWire | null;
 }
 
 const snapshotOf = (record: TransferRecord): TransferSnapshotWire | null =>
@@ -118,6 +121,7 @@ export function toDetail(
     oldRights: extras.oldRights,
     commitmentsReleased: full ? (record.snapshotBefore?.commitmentsReleased ?? []) : [],
     snapshot: full ? snapshotOf(record) : null,
+    itHandover: extras.itHandover,
   };
 }
 

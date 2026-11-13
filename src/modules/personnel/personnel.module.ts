@@ -116,6 +116,14 @@ import { TransferPreconditions } from './transfer/transfer-preconditions.service
 import { TransferRecorder } from './transfer/transfer-recorder.service';
 import { TransferService } from './transfer/transfer.service';
 import { TransfersController } from './transfer/transfers.controller';
+import { ItHandoverController } from './it-handover/it-handover.controller';
+import { ItHandoverMilestoneService } from './it-handover/it-handover-milestone.service';
+import { ItHandoverRecorder } from './it-handover/it-handover-recorder.listener';
+import { ItHandoverRepo } from './it-handover/it-handover.repo';
+import { ItHandoverSourceRepo } from './it-handover/it-handover-source.repo';
+import { ItHandoverTellingService } from './it-handover/it-handover-telling.service';
+import { ItHandoverService } from './it-handover/it-handover.service';
+import { ItHandoverViewService } from './it-handover/it-handover-view.service';
 
 /**
  * What happens to the place of a person in the organization (ADR-0017): the transfer to another department or job title
@@ -159,6 +167,7 @@ import { TransfersController } from './transfer/transfers.controller';
     OffboardingController,
     OffboardingStepsController,
     MailboxLockController,
+    ItHandoverController,
     OpenRequestsController,
     DepartmentMemberController,
     MeDepartureNoticeController,
@@ -167,6 +176,13 @@ import { TransfersController } from './transfer/transfers.controller';
     NoticesController,
   ],
   providers: [
+    ItHandoverRepo,
+    ItHandoverSourceRepo,
+    ItHandoverTellingService,
+    ItHandoverService,
+    ItHandoverViewService,
+    ItHandoverMilestoneService,
+    ItHandoverRecorder,
     DepartureClosureRepo,
     DepartureClosureService,
     DepartureClosureSweeper,

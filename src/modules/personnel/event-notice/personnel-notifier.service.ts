@@ -329,6 +329,58 @@ export class PersonnelNotifier {
     return this.toItAdminAndSuperAdmin(tx, input, 'ACCOUNT_LOCK_OVERDUE', notice);
   }
 
+  /**
+   * The milestone of a departure (the block) or of a transfer (the day it takes effect) has come and the IT Admin who leaves still answers for
+   * something in the catalog (`QĐ-110j`, `R-26`): every IT Admin who works is told, once each for the file, since the work is the common queue's.
+   * It never holds the file back. Returns how many were told.
+   */
+  async itHandoverPending(
+    tx: DbTx,
+    input: { organizationId: string; source: { kind: string; id: string }; employeeId: string; dueOn: BusinessDate },
+  ): Promise<number> {
+    let told = 0;
+    for (const recipient of await this.identity.findAllUsableItAdminEmployeeIds(tx)) {
+      const written = await this.tell(tx, input.organizationId, recipient, 'IT_ADMIN_HANDOVER_PENDING', {
+        subject: { type: input.source.kind, id: input.source.id },
+        params: {
+          sourceKind: input.source.kind,
+          sourceId: input.source.id,
+          employeeId: input.employeeId,
+          dueOn: input.dueOn,
+        },
+        eventKey: `IT_ADMIN_HANDOVER_PENDING:${input.source.kind}:${input.source.id}`,
+      });
+      if (written) told += 1;
+    }
+
+    return told;
+  }
+
+  /** The IT Admin who took everything a leaving IT Admin answered for is told how many of each are theirs now (SPEC P5). */
+  async itHandoverReceived(
+    tx: DbTx,
+    input: {
+      organizationId: string;
+      source: { kind: string; id: string };
+      fromEmployeeId: string;
+      toEmployeeId: string;
+      subscriptions: number;
+      applications: number;
+    },
+  ): Promise<void> {
+    await this.tell(tx, input.organizationId, input.toEmployeeId, 'IT_ADMIN_HANDOVER_RECEIVED', {
+      subject: { type: input.source.kind, id: input.source.id },
+      params: {
+        sourceKind: input.source.kind,
+        sourceId: input.source.id,
+        fromEmployeeId: input.fromEmployeeId,
+        subscriptions: input.subscriptions,
+        applications: input.applications,
+      },
+      eventKey: `IT_ADMIN_HANDOVER_RECEIVED:${input.source.kind}:${input.source.id}:${randomUUID()}`,
+    });
+  }
+
   /** A person who holds a role that needs someone to take over is leaving: the Super Admin is told, once for each role. */
   async roleHolderLeaving(
     tx: DbTx,

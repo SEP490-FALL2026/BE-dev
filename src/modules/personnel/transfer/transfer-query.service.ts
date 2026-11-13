@@ -3,6 +3,7 @@ import type { BusinessDate } from '../../../core/business-date';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
+import { ItHandoverViewService } from '../it-handover/it-handover-view.service';
 import { PersonnelAccessRefusedError } from '../public/personnel.errors';
 import { readAccessOf, type ReadAccess } from '../personnel-self-action.policy';
 import { TransferOldRightsService } from '../transfer-grace/transfer-old-rights.service';
@@ -47,6 +48,7 @@ export class TransferQueryService {
     private readonly organizationReads: OrganizationReadApi,
     private readonly identity: IdentityAccessApi,
     private readonly oldRights: TransferOldRightsService,
+    private readonly itHandovers: ItHandoverViewService,
   ) {}
 
   /** The transfers of these people that have taken effect on `onDate` and are not closed (`getTransfersInOverlap`). */
@@ -106,6 +108,7 @@ export class TransferQueryService {
 
     return {
       today,
+      itHandover: await this.itHandovers.wireOf({ kind: 'DEPARTMENT_TRANSFER', id: record.id }, record.employeeId),
       oldRights:
         record.status === 'EFFECTIVE'
           ? await this.oldRights.of({

@@ -31,7 +31,7 @@ export interface CommitmentToRelease {
 
 /**
  * What a departure does to a person, read and never written (`P23`, `MIN-7`). The record of the departure and the preview share it.
- * `responsibilities` is null until the hand-over of an IT Admin (X-IT) has a source to count them from; `vendorAdminRoles` is empty until then.
+ * `responsibilities` is what an IT Admin who leaves answers for in the catalog (0 and 0 for anyone else); `vendorAdminRoles` is empty until it is counted.
  */
 export interface DepartureImpact {
   rightsToRevoke: RightToRevoke[];
@@ -41,7 +41,7 @@ export interface DepartureImpact {
   provisioningInFlight: OpenRequestImpact[];
   /** What is held and not spent for the requests that are closed, by currency (the share of a group line is not in it). */
   commitmentToRelease: CommitmentToRelease[];
-  responsibilities: { subscriptions: number | null; applications: number | null };
+  responsibilities: { subscriptions: number; applications: number };
   vendorAdminRoles: string[];
   headSuccessorRequired: boolean;
   /** The day the IT Admin has until to take every right away. */

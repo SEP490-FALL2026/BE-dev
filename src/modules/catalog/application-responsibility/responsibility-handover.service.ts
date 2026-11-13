@@ -45,6 +45,7 @@ export class ResponsibilityHandoverService {
     actor: AuthenticatedPrincipal,
     fromEmployeeId: string,
     toEmployeeId: string,
+    source?: { kind: string; id: string },
   ): Promise<ResponsibilitiesTransferred> {
     const usable = await this.identity.findUsableItAdminEmployeeIds([toEmployeeId], tx);
     const refusal = handoverRefusal({ fromEmployeeId, toEmployeeId, toIsUsableItAdmin: usable.has(toEmployeeId) });
@@ -55,7 +56,11 @@ export class ResponsibilityHandoverService {
     const applicationIds = await this.applications.reassignResponsible(tx, fromEmployeeId, toEmployeeId);
     const subscriptionIds = await this.subscriptions.reassignResponsible(tx, fromEmployeeId, toEmployeeId);
     const before = { responsibleItAdminEmployeeId: fromEmployeeId };
-    const after = { responsibleItAdminEmployeeId: toEmployeeId };
+    // The event that asked for it (a departure or a transfer) is part of what the Audit Trail says (`US-04-06` AC-3): who from, who to, why.
+    const after = {
+      responsibleItAdminEmployeeId: toEmployeeId,
+      ...(source ? { sourceKind: source.kind, sourceId: source.id } : {}),
+    };
     for (const id of applicationIds) {
       await this.audit.record(
         tx,

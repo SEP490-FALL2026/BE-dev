@@ -174,6 +174,8 @@ export const IN_APP_NOTIFICATION_CODES = [
   'DEPARTMENT_WITHOUT_HEAD',
   'SUBSCRIPTION_SEATS_INCREASED',
   'IT_ADMIN_HANDOVER_PENDING',
+  // The IT Admin who took everything a leaving IT Admin answered for is told how many subscriptions and applications are theirs now (`QĐ-110j`, SPEC P5).
+  'IT_ADMIN_HANDOVER_RECEIVED',
   // A handover cancelled after its last working day left revocation tasks in progress with no reason of the departure: the IT Admin closes
   // them by what happened at the provider (`QĐ-110c`, MF2-C).
   'DEPARTURE_REVOCATION_IT_CLOSE',

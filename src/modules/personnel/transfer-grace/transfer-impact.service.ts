@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
+import { CatalogResponsibilityApi } from '../../catalog/public/catalog-responsibility.api';
 import { LicensingApi } from '../../licensing/public/licensing.api';
 import { OperatingParametersApi } from '../../operating-parameters/public/operating-parameters.api';
 import { RequestsApi } from '../../requests/public/requests.api';
@@ -23,6 +24,7 @@ export class TransferImpactService {
     private readonly licensing: LicensingApi,
     private readonly requests: RequestsApi,
     private readonly parameters: OperatingParametersApi,
+    private readonly responsibilities: CatalogResponsibilityApi,
   ) {}
 
   async impactOf(tx: DbTx, input: TransferImpactInput): Promise<TransferImpact> {
@@ -31,6 +33,9 @@ export class TransferImpactService {
       employeeId: input.employeeId,
       scope: { kind: 'PAID_OLD_DEPARTMENT', oldDepartmentId: input.fromDepartmentId },
     });
+    const answersFor = (await this.responsibilities.countResponsibilitiesOf([input.employeeId], tx)).get(
+      input.employeeId,
+    );
     const ofItem = ({ requestId, type, state, line }: (typeof gone.wouldCancel)[number]) => ({
       requestId,
       type,
@@ -44,7 +49,7 @@ export class TransferImpactService {
       openRequestsToCancel: gone.wouldCancel.map(ofItem),
       provisioningInFlight: gone.needsItCheck.map(ofItem),
       commitmentToRelease: commitmentToRelease(gone.heldToRelease),
-      responsibilities: { subscriptions: null, applications: null },
+      responsibilities: { subscriptions: answersFor?.subscriptions ?? 0, applications: answersFor?.applications ?? 0 },
       vendorAdminRoles: [],
       headSuccessorRequired: input.headSuccessorRequired,
       ...grace,

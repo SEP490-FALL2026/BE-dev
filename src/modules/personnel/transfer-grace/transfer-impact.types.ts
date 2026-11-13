@@ -10,9 +10,9 @@ import type {
  * (`P6`) and the preview before it share it, as the departure does (`DepartureImpact`); the shape is the same so the screen reads both
  * alike, with the day the grace ends in place of the day the revocations are due.
  *
- * Not yet counted, for lack of a source: the subscriptions and applications an IT Admin who is moved is responsible for (`responsibilities`,
- * null until the hand-over of an IT Admin, X-IT), the vendor admin roles they hold (`vendorAdminRoles`, empty), and the commitment that
- * the seats of the old department give back the day the transfer takes effect (MF3-B.3 adds it to `commitmentToRelease`).
+ * `responsibilities` is what an IT Admin who is moved answers for in the catalog (subscriptions and applications, `R-8`). Not yet counted: the
+ * vendor admin roles they hold (`vendorAdminRoles`, empty), and the commitment that the seats of the old department give back the day the
+ * transfer takes effect (MF3-B.3 adds it to `commitmentToRelease`).
  */
 export interface TransferImpact {
   /** Every personal right the person holds: the system opens its revocation when the grace ends (`QĐ-110p`), except one granted again meanwhile. */
@@ -23,7 +23,7 @@ export interface TransferImpact {
   provisioningInFlight: OpenRequestImpact[];
   /** What is held and not spent for the requests that are closed, by currency (the share of a group line is not in it). */
   commitmentToRelease: CommitmentToRelease[];
-  responsibilities: { subscriptions: number | null; applications: number | null };
+  responsibilities: { subscriptions: number; applications: number };
   vendorAdminRoles: string[];
   headSuccessorRequired: boolean;
   /** The last day the person keeps the rights of the old department. */

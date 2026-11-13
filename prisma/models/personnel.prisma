@@ -71,6 +71,7 @@ model DepartmentTransfer {
   cancelledByTicket SuperAdminEventTicket?     @relation("TransferCancelledByTicket", fields: [cancelledByTicketId], references: [id], onDelete: Restrict)
   changes           DepartmentTransferChange[]
   reviews           TransferReview[]
+  itAdminHandover   ItAdminHandover?
 
   @@index([effectiveOn(sort: Desc), id])
   @@index([employeeId])
@@ -365,6 +366,7 @@ model OffboardingCase {
   recordedByTicket  SuperAdminEventTicket?  @relation("OffboardingRecordedByTicket", fields: [recordedByTicketId], references: [id], onDelete: Restrict)
   cancelledByTicket SuperAdminEventTicket?  @relation("OffboardingCancelledByTicket", fields: [cancelledByTicketId], references: [id], onDelete: Restrict)
   supersededTransfers DepartmentTransfer[]  @relation("TransferSupersededByCase")
+  itAdminHandover   ItAdminHandover?
 
   @@index([lastWorkingDay, id])
   @@index([employeeId])
@@ -539,4 +541,32 @@ model PersonnelNoticeCounter {
   lastValue Int @map("last_value")
 
   @@map("personnel_notice_counters")
+}
+
+// What an IT Admin who leaves still answers for in the catalog (the subscriptions and the applications that name them responsible), kept once
+// when the departure or the transfer is recorded (`QĐ-110j`, `QĐ-111g`, `R-8`, `R-26`, X-IT.3), and the one hand-over of all of it that an IT
+// Admin makes (the latest one is kept): to whom, when, and how many were moved. Exactly one of the two sources; each has at most one row. A row exists only when the
+// person answered for something when the file was recorded. It never blocks the closing of the file (`QĐ-110e`).
+model ItAdminHandover {
+  id                    String    @id @default(uuid(7)) @db.Uuid
+  organizationId        String    @map("organization_id") @db.Uuid
+  offboardingCaseId     String?   @unique @map("offboarding_case_id") @db.Uuid
+  departmentTransferId  String?   @unique @map("department_transfer_id") @db.Uuid
+  subscriptionsAtRecord Int       @map("subscriptions_at_record")
+  applicationsAtRecord  Int       @map("applications_at_record")
+  createdAt             DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  // Set together when an IT Admin hands everything over (the latest hand-over): the IT Admin who took it, and how many of each were moved.
+  doneAt                DateTime? @map("done_at") @db.Timestamptz(3)
+  doneToEmployeeId      String?   @map("done_to_employee_id") @db.Uuid
+  doneSubscriptions     Int?      @map("done_subscriptions")
+  doneApplications      Int?      @map("done_applications")
+
+  organization       Organization        @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  offboardingCase    OffboardingCase?    @relation(fields: [offboardingCaseId], references: [id], onDelete: Restrict)
+  departmentTransfer DepartmentTransfer? @relation(fields: [departmentTransferId], references: [id], onDelete: Restrict)
+  doneToEmployee     Employee?           @relation("ItAdminHandoverReceiver", fields: [doneToEmployeeId], references: [id], onDelete: Restrict)
+
+  @@index([organizationId])
+  @@index([doneToEmployeeId])
+  @@map("it_admin_handovers")
 }

@@ -107,6 +107,7 @@ model Organization {
   offboardingCases                   OffboardingCase[]
   personnelNotices                   PersonnelNotice[]
   planUsageRates                     PlanUsageRate[]
+  itAdminHandovers                   ItAdminHandover[]
 
   @@map("organizations")
 }
@@ -271,6 +272,7 @@ model Employee {
   workspacePrimaryOwnerOf         PlanWorkspaceProfile[]              @relation("WorkspacePrimaryOwner")
   workspaceEmergencyHolderOf      PlanWorkspaceProfile[]              @relation("WorkspaceEmergencyHolder")
   workspaceMemberships            PlanWorkspaceAdmin[]                @relation("WorkspaceMember")
+  itAdminHandoversReceived        ItAdminHandover[]                   @relation("ItAdminHandoverReceiver")
   subscriptionsInCharge           Subscription[]                      @relation("SubscriptionResponsibleItAdmin")
   planTermOpinions                PlanTermOpinion[]
   applicationBusinessOwners       ApplicationBusinessOwner[]

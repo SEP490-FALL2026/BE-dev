@@ -163,6 +163,7 @@ const PRISMA_MODEL_OWNER: Readonly<Record<string, string>> = {
   EmployeeLeaveChange: 'personnel',
   OffboardingCase: 'personnel',
   OffboardingCaseChange: 'personnel',
+  ItAdminHandover: 'personnel',
   PersonnelNotice: 'personnel',
   PersonnelNoticeVerification: 'personnel',
   PersonnelNoticeCounter: 'personnel',

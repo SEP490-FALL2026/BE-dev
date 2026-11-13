@@ -6,6 +6,7 @@ import type {
   OffboardingRightWire,
   OffboardingSummaryWire,
 } from './offboarding.dto';
+import type { ItHandoverWire } from '../it-handover/it-handover.dto';
 import { groundsNoteOf } from '../personnel-grounds.policy';
 import type { ReadAccess } from '../personnel-self-action.policy';
 import { ROLE_FLAGS, type RoleFlagMap } from '../public/personnel.types';
@@ -85,6 +86,8 @@ export interface DetailFacts {
   checklist: Checklist | null;
   blockers: Record<string, number>;
   registeredWarnings: Record<string, number>;
+  /** What the person answers for in the catalog and the hand-over of it (`R-8`); null when there is nothing. */
+  itHandover?: ItHandoverWire | null | undefined;
 }
 
 /** Both moments are taken inside one transaction when the person is left as the departure is recorded. */
@@ -185,6 +188,7 @@ export function toDetail(
           note: record.mailboxLockNote,
         }
       : null,
+    itHandover: facts.itHandover ?? null,
     closure: record.closedAt
       ? {
           closedAt: record.closedAt.toISOString(),

@@ -124,11 +124,27 @@ describe('the impact of a departure, read and never written (integration, real P
     // What is held and not spent goes back, by currency: the approved request only (the one being carried out is the IT Admin's to check).
     expect(found.commitmentToRelease).toHaveLength(1);
     expect(BigInt(found.commitmentToRelease[0].amountMinor)).toBeGreaterThan(0n);
-    expect(found.responsibilities).toEqual({ subscriptions: null, applications: null });
+    // An employee who is not an IT Admin answers for nothing in the catalog (R-8).
+    expect(found.responsibilities).toEqual({ subscriptions: 0, applications: 0 });
     expect(found.vendorAdminRoles).toEqual([]);
     expect(found.headSuccessorRequired).toBe(false);
     // The working day after the last one is the first of the days the IT Admin has (QĐ-110c): no day off in a test installation.
     expect(found.revocationDueOn).toBe(nthWorkingDayFrom(addDays(lastWorkingDay, 1), 1, new Set()));
+  });
+
+  it('counts the subscriptions and the applications the person answers for in the catalog (R-8)', async () => {
+    const { u } = await busyLeaver();
+    await h.ctx.sql.query(`UPDATE subscriptions SET responsible_it_admin_employee_id = $2 WHERE id = $1`, [
+      seatSubscription,
+      u.leaver.employeeId,
+    ]);
+    await h.ctx.sql.query(
+      `UPDATE applications SET responsible_it_admin_employee_id = $2
+        WHERE id = (SELECT p.application_id FROM subscriptions s JOIN plans p ON p.id = s.plan_id WHERE s.id = $1)`,
+      [seatSubscription, u.leaver.employeeId],
+    );
+
+    expect((await impact(u.leaver, h.day(10))).responsibilities).toEqual({ subscriptions: 1, applications: 1 });
   });
 
   it('says a head who leaves needs a successor, as the caller judged it', async () => {

@@ -111,6 +111,8 @@ describe('a hook of a personnel file and the transaction of the write (integrati
     const wire = await h.recordedCase(person);
 
     expect(realHooks.filter((name) => name !== 'personnel.device-registration')).toEqual([
+      // X-IT.3 (R-8): what an IT Admin who leaves answers for in the catalog is kept with the file, first of the flows that follow it.
+      'personnel.it-handover',
       // MF3-C.2 (QĐ-110r): a departure recorded in the grace of a transfer closes it as superseded, before the flows that follow the file.
       'personnel.transfer-closure',
       'personnel.open-requests',
@@ -118,7 +120,7 @@ describe('a hook of a personnel file and the transaction of the write (integrati
     ]);
     expect(realHooks).toContain('personnel.device-registration');
     expect(hooks.names()).toEqual([...realHooks, 'test.switch']);
-    expect(spies.map((spy) => spy.mock.calls.length)).toEqual([1, 1, 1, 1]);
+    expect(spies.map((spy) => spy.mock.calls.length)).toEqual([1, 1, 1, 1, 1]);
     const order = spies.map((spy) => spy.mock.invocationCallOrder[0]);
     expect(order).toEqual([...order].sort((first, second) => first - second));
     expect(spies[0].mock.calls[0][1]).toEqual({
