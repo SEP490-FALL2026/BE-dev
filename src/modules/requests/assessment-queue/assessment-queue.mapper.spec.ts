@@ -67,6 +67,7 @@ const row = (over: Partial<AssessmentQueueRow> = {}): AssessmentQueueRow => ({
   readerIsParty: false,
   softwareName: 'Miro',
   expectedUsers: 5,
+  planOnly: false,
   started: false,
   fields: empty,
   ...over,
@@ -119,6 +120,7 @@ describe('a row of the queue as the wire shows it', () => {
       canAct: true,
       started: false,
       classification: 'PAID_LICENSED',
+      scope: 'FULL',
       readiness: 'COMPLETABLE',
       missingCount: 0,
       quote: 'RECORDED',
@@ -146,5 +148,28 @@ describe('a row of the queue as the wire shows it', () => {
       canAct: false,
       quote: 'MISSING',
     });
+  });
+});
+
+describe('the assessment of a plan alone in the queue (case B, short)', () => {
+  const planFields: AssessmentFields = {
+    ...empty,
+    plannedPlanName: 'Business',
+    provisioningType: 'K2',
+    termsSummary: 'Annual',
+    quote,
+  };
+
+  it('is judged by the plan alone: no classification, no flags, no control level', () => {
+    expect(readinessOf(planFields, 'PLAN_ONLY')).toEqual({ readiness: 'COMPLETABLE', missingCount: 0 });
+    expect(readinessOf(planFields)).toEqual({ readiness: 'INCOMPLETE', missingCount: 1 });
+  });
+
+  it('says its scope on the item', () => {
+    expect(queueItemOf(row({ planOnly: true, fields: planFields }), READER, lookups)).toMatchObject({
+      scope: 'PLAN_ONLY',
+      readiness: 'COMPLETABLE',
+    });
+    expect(queueItemOf(row(), READER, lookups)).toMatchObject({ scope: 'FULL' });
   });
 });

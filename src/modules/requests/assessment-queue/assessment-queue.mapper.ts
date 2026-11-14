@@ -1,4 +1,4 @@
-import { judgeCompletion } from '../assessment/assessment.policy';
+import { judgeCompletion, type AssessmentScope } from '../assessment/assessment.policy';
 import type { AssessmentQueueItemWire } from './assessment-queue.dto';
 import type { AssessmentQueueRow } from './assessment-queue.repo';
 
@@ -14,7 +14,7 @@ export interface QueueLookups {
   departments: ReadonlyMap<string, { id: string; name: string }>;
 }
 
-const personOf = (lookups: QueueLookups, id: string) => {
+export const personOf = (lookups: QueueLookups, id: string) => {
   const found = lookups.people.get(id);
   if (!found) throw new Error(`The employee ${id} of a waiting assessment does not exist.`);
 
@@ -22,11 +22,14 @@ const personOf = (lookups: QueueLookups, id: string) => {
 };
 
 /** What completing the assessment would do now, and how many fields it still lacks, as the completion judges it. */
-export function readinessOf(fields: AssessmentQueueRow['fields']): {
+export function readinessOf(
+  fields: AssessmentQueueRow['fields'],
+  scope: AssessmentScope = 'FULL',
+): {
   readiness: AssessmentQueueItemWire['readiness'];
   missingCount: number;
 } {
-  const verdict = judgeCompletion(fields);
+  const verdict = judgeCompletion(fields, scope);
   switch (verdict.kind) {
     case 'OK':
       return { readiness: 'COMPLETABLE', missingCount: 0 };
@@ -68,7 +71,8 @@ export function queueItemOf(
     canAct: !row.readerIsParty,
     started: row.started,
     classification: row.fields.classification,
-    ...readinessOf(row.fields),
+    scope: row.planOnly ? 'PLAN_ONLY' : 'FULL',
+    ...readinessOf(row.fields, row.planOnly ? 'PLAN_ONLY' : 'FULL'),
     quote: row.fields.quote === null ? 'MISSING' : 'RECORDED',
     slaWorkingDays: row.slaWorkingDays,
     waitingSince: row.reachedItAt.toISOString(),

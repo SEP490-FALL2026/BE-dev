@@ -22,8 +22,11 @@ import { SeatRevocationHook } from './grant/seat-revocation.listener';
 import { GrantQueueController } from './grant-queue/grant-queue.controller';
 import { GrantQueueRepo } from './grant-queue/grant-queue.repo';
 import { GrantQueueService } from './grant-queue/grant-queue.service';
+import { AssessmentDecisionsRepo } from './assessment-queue/assessment-decisions.repo';
+import { AssessmentDecisionsService } from './assessment-queue/assessment-decisions.service';
 import { AssessmentQueueController } from './assessment-queue/assessment-queue.controller';
 import { AssessmentQueueRepo } from './assessment-queue/assessment-queue.repo';
+import { AssessmentQueueReachService } from './assessment-queue/assessment-queue-reach.service';
 import { AssessmentQueueService } from './assessment-queue/assessment-queue.service';
 import { RequestCommitmentReleaseGuard } from './spend/commitment-release.listener';
 import { RequestCommitmentFacts } from './spend/commitment-request-facts.listener';
@@ -335,6 +338,9 @@ import { MyRequestsService } from './my-requests/my-requests.service';
     GrantQueueService,
     AssessmentQueueRepo,
     AssessmentQueueService,
+    AssessmentQueueReachService,
+    AssessmentDecisionsRepo,
+    AssessmentDecisionsService,
     ReturnRequestRepo,
     ReturnSeatGate,
     ReturnRequestService,

@@ -80,6 +80,8 @@ export const SUCCESS_MESSAGES: Readonly<Record<string, string>> = {
   appUserLock: 'APP_USER.LOCKED',
   appUserResendInvitation: 'APP_USER.INVITATION_SENT',
   appUserUnlock: 'APP_USER.UNLOCKED',
+  assessmentDecisionList: 'ASSESSMENT_DECISIONS.LISTED',
+  assessmentQueueDepartmentList: 'ASSESSMENT_QUEUE.DEPARTMENTS_LISTED',
   assessmentQueueList: 'ASSESSMENT_QUEUE.LISTED',
   applicationCreate: 'APPLICATION.CREATED',
   applicationGet: 'APPLICATION.FETCHED',
