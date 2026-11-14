@@ -4,17 +4,22 @@ Mục đích: danh mục phần mềm dùng chung — từ điển vendor, ứng
 của plan, subscription/mua đứt, hợp đồng và file đính kèm. Story chính: US-04-01 → US-04-07, US-04-11, US-12-09 (route
 hồ sơ thuế vendor); US-05-20 (đăng ký phần mềm nội bộ, gọi qua facade). Tầng: T4 (`scripts/arch/tiers.cjs`). Phụ thuộc:
 audit, organization, identity-access, finance, operating-parameters. Được dùng bởi: licensing, budgets, requests,
-personnel, onboarding, data-import (chỉ type); gốc `src/app/app.module.ts` và lệnh `src/cli/assign-subscription-owner/`.
+personnel, onboarding, data-import (chỉ type), installation (`CatalogBootstrapApi`); gốc `src/app/app.module.ts` và lệnh `src/cli/assign-subscription-owner/`.
 
 ## Public API (`public/`)
 
 - `CatalogPricingApi` (`public/catalog-pricing.api.ts`) — `getPlanPrice` chỉ đọc, cùng nguồn giá với `CatalogApi`.
   `CatalogPricingFacadeModule` dùng chung với worker: không controller, storage hay listener vòng đời.
 
+- `CatalogBootstrapApi` (`public/catalog-bootstrap.api.ts`, Nest module `catalog-bootstrap-facade.module.ts`: không controller, storage hay listener) — `seedStandardFunctionalGroups(tx, organizationId)`: ghi
+  bảy nhóm chức năng chuẩn của một tổ chức lúc cài đặt (`QĐ-111bf`), trong transaction của bên gọi; nhóm đã có giữ nguyên, trả số nhóm đã ghi. Dùng bởi `installation` (`InstallationApi.install`); ngoài ra không ghi gì của catalog.
+- `public/catalog-duplicate.policy.ts` — `duplicateOf`: mục danh mục đã là phần mềm đó theo tên chuẩn hóa (hoa thường, dấu, khoảng trắng bỏ qua) hoặc tên miền (host đã chuẩn hóa, tên xét trước,
+  `QĐ-111b`); hàm thuần, một luật cho lệnh tạo ứng dụng (`application-intake/`) và cho cửa case B của `requests` (qua `findCatalogEntryOfSoftware`); đăng ký trong `PUBLIC_ROOT_POLICY_FILES` vì cả hai bên dùng.
 - `CatalogApi` ([public/catalog.api.ts](public/catalog.api.ts)) — facade cho module khác:
   - `findSeatTarget`, `findPlanSeatTargets`, `lockSeatTarget` — đích ghế (một subscription hoặc một plan nội bộ).
   - `findCatalogEntryOfSoftware(tx, { name, homepageUrl })` — mục danh mục đã là phần mềm đó theo tên chuẩn hóa hoặc tên miền (cùng quy tắc `duplicateOf` với lệnh tạo ứng dụng) kèm
     tối đa 20 gói; cửa case B của `requests` (`QĐ-111b`). `getCatalogEntry(tx, applicationId, planName?)` — một ứng dụng với gói của nó và gói trùng tên đã hỏi (đề xuất rút gọn, `QĐ-111a`).
+  - `getCollectorApplications(ids, tx?)` — ứng dụng một allowlist của collector cần xét: tên, kiểu, `logoUrl`, cờ ứng dụng liên lạc (**suy từ nhóm _Liên lạc_**, `QĐ-111e`, không còn cờ riêng; không bao giờ báo cáo, `QĐ-62o`) và đã retired chưa.
   - `getPlanSummaries`, `getPlanRevocationInfo`, `getSimilarPlanIds`, `getPlanVendorId`, `getPlanVendorIds` (nhiều plan trong một lần đọc), `getPlanResponsibleItAdminId` — đọc
     plan.
   - `getPlanPrice(planId, tx?)` — giá của plan từ thuê bao chính (`pickPriceSource`: cờ `is_primary_for_plan`, không có thì giá tháng quy đổi
@@ -62,7 +67,7 @@ unitPrice, reportingUnitPrice, billingCycle }`, thuê bao `PERPETUAL` có giá �
 
 Không vòng (`pnpm arch:capabilities --module catalog`, gate `capability-graph`). Từ thấp lên cao: `vendor-dictionary` →
 `vendor`, `functional-group` → `catalog-entry` → `plan` → `subscription` → `plan-terms`; `application-retirement`,
-`internal-software-registration` và `requestable-software` đứng trên `catalog-entry`, `plan` (và `subscription`). Một cạnh ngược mới là vòng: chuyển
+`application-intake`, `internal-software-registration` và `requestable-software` đứng trên `catalog-entry`, `plan` (và `subscription`). Một cạnh ngược mới là vòng: chuyển
 file thuần xuống tầng thấp, hoặc đưa dịch vụ điều phối lên capability mới theo tên use case.
 
 ## Capability → file chính
@@ -71,12 +76,15 @@ file thuần xuống tầng thấp, hoặc đưa dịch vụ điều phối lên
   `vendor-dictionary.controller.ts`; `VendorDictionaryService`, `VendorRecognitionService`, `VendorProposalService`.
 - `vendor/` — danh sách vendor, hồ sơ thuế và ước tính thuế (US-12-09, dữ liệu qua `FinanceApi`);
   `vendors.controller.ts`; `VendorQueryService`, `VendorTaxService`.
-- `catalog-entry/` — ứng dụng (US-04-01), IT Admin phụ trách (`QĐ-111g`: người tạo, đọc `responsibleItAdmin`/`needsResponsible`), gợi ý K2 (`k2-recommendation.policy.ts`);
+- `catalog-entry/` — ứng dụng (US-04-01; `logoUrl` là một link `https://` ≤ 500 ký tự, CHECK ở DB, `null` khi sửa là xóa — đọc cùng câu truy vấn ở danh sách/chi tiết ứng dụng, `requestable-software`, gói và, qua `CatalogApi`, ở `licensing`: phần mềm của tôi, danh sách phần mềm của phòng), IT Admin phụ trách (`QĐ-111g`: người tạo, đọc `responsibleItAdmin`/`needsResponsible`), gợi ý K2 (`k2-recommendation.policy.ts`);
   `applications.controller.ts`; `ApplicationService` (phần kiểm trước khi ghi ở
   `ApplicationWriteGuards`, phần đổi trạng thái là hàm thuần trong `application-state.policy.ts`). Gốc của module: `plan/` và
   `subscription/` đọc ứng dụng qua `ApplicationFactsService`; ứng dụng muốn biết plan của mình để gợi ý K2 thì khai
   `application-plans.types.ts` (`ApplicationPlans`) và `plan/plan-facts.service.ts` trả lời, `catalog.module.ts` nối hai bên.
 - `plan/` (X-IT.4): cờ `plans.has_admin_console` (chỉ gói `K4`, `plan-vendor-admins.policy.ts`: `needsVendorAdmins` = `K2` hoặc `K4` có cờ, `assertAdminConsoleApplicable`); hồ sơ workspace (`PUT /plans/{id}/workspace-profile`) chỉ cho gói cần admin, thêm `ownerAccountEmail`/`adminNote`, `primaryOwner` + `members` ≥ 2 IT Admin khác nhau đang làm việc (`PLAN.VENDOR_ADMINS_INVALID`).
+- `application-intake/` — một lệnh tạo ứng dụng kèm gói đầu (`POST /applications`, `QĐ-111f`): `application-intake.controller.ts`; `ApplicationIntakeService` ghi cả hai trong một transaction (gói bị luật từ chối thì không để lại ứng dụng);
+  kiểu ứng dụng suy từ kiểu cấp của gói (`application-intake.policy.ts`: K5 ⟹ `INTERNAL`, còn lại `SAAS`), mô hình giá do `PlanService` suy (B-5), nhóm chức năng không nêu ⟹ _Khác_; kiểm trùng bằng `duplicateOf` chạy dưới
+  `pg_advisory_xact_lock` theo tổ chức (409 `APPLICATION.DUPLICATE` kèm mục đã có). Đứng trên `catalog-entry/` và `plan/`.
 - `application-responsibility/` — chuyển IT Admin phụ trách ứng dụng (`POST /applications/{id}/responsibility-transfer`, khóa dòng ứng dụng,
   `QĐ-111g`, R-26); `application-responsibility.policy.ts` quyết ai chuyển cho ai.
   `responsibility-handover.service.ts` (+ `.policy.ts`) chuyển MỘT LẦN mọi thuê bao và ứng dụng của một IT Admin (facade `CatalogResponsibilityApi`).
