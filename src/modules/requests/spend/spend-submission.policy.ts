@@ -1,4 +1,4 @@
-import { TERM_LIMIT_MONTHS } from '../../../core/term-limit';
+import { termEndOf, termRuleOf, type TermKind } from '../../../core/term-limit';
 import { currentMissingReasonOf } from '../access-request/access-request.policy';
 
 /**
@@ -34,8 +34,23 @@ export type SupplementRefusal =
   | 'NO_CHANGE'
   /** The time of use is not shorter than the one the request has (a right with no end is longer than any). */
   | 'TERM_NOT_REDUCED'
-  /** The time of use is not 1 to 12 whole months. */
-  | 'TERM_MONTHS_OUT_OF_RANGE';
+  /** The time of use is not 1 to 12 whole months (1 to 9 for a plan bought by the month). */
+  | 'TERM_MONTHS_OUT_OF_RANGE'
+  /** The plan is bought once: it takes no time of use. */
+  | 'TERM_NOT_ASKED';
+
+type SupplementTerm = NonNullable<Parameters<typeof checkSupplement>[0]['term']>;
+
+/** The months a file asks for are months the kind of the plan takes, and fewer than the request has (`QĐ-111i`, `L2-38`). */
+function checkSupplementTerm(term: SupplementTerm): SupplementRefusal | null {
+  const { requested, current, kind, endDate } = term;
+  const rule = termRuleOf(kind);
+  if (!rule.asked) return 'TERM_NOT_ASKED';
+  if (!Number.isInteger(requested) || requested < 1 || requested > rule.maxMonths) return 'TERM_MONTHS_OUT_OF_RANGE';
+  if (endDate) return termEndOf(endDate.today, requested) < endDate.end ? null : 'TERM_NOT_REDUCED';
+
+  return current !== null && requested >= current ? 'TERM_NOT_REDUCED' : null;
+}
 
 /**
  * The head shortens the term, or leaves people of a group out, only on a request that is back in their queue, priced, and only
@@ -46,20 +61,22 @@ export function checkSupplement(facts: {
   priced: boolean;
   /** The file leaves people of a request for a group out. */
   leavesPeopleOut?: boolean;
-  /** The months of use the file asks for, when it asks for them, and the months the request has (null: a right with no end). */
-  term?: { requested: number; current: number | null };
+  /**
+   * The months of use the file asks for, when it asks for them, with the kind of the plan, and the months the request has (null: a right with no
+   * end). A request of an older release carries a day and no months: `endDate` is that day and the day the file is made, and the months must end
+   * sooner than it.
+   */
+  term?: {
+    requested: number;
+    current: number | null;
+    kind: TermKind;
+    endDate?: { today: string; end: string };
+  };
 }): SupplementRefusal | null {
   if (facts.state !== 'AWAITING_SPEND_SUBMISSION' && facts.state !== 'AWAITING_REQUESTER_REVISION')
     return 'NOT_IN_QUEUE';
   if (!facts.priced) return 'NOT_PRICED';
-  if (facts.term) {
-    const { requested, current } = facts.term;
-    if (!Number.isInteger(requested) || requested < 1 || requested > TERM_LIMIT_MONTHS)
-      return 'TERM_MONTHS_OUT_OF_RANGE';
-    if (current !== null && requested >= current) return 'TERM_NOT_REDUCED';
-
-    return null;
-  }
+  if (facts.term) return checkSupplementTerm(facts.term);
 
   return facts.leavesPeopleOut === true ? null : 'NO_CHANGE';
 }

@@ -148,6 +148,7 @@ export const GROUP_REQUEST_ERROR_EXAMPLES = {
   SUPPLEMENT_NO_CHANGE: example(new SpendSupplementRefusedError('NO_CHANGE')),
   SUPPLEMENT_TERM_NOT_REDUCED: example(new SpendSupplementRefusedError('TERM_NOT_REDUCED')),
   SUPPLEMENT_TERM_MONTHS_OUT_OF_RANGE: example(new SpendSupplementRefusedError('TERM_MONTHS_OUT_OF_RANGE')),
+  SUPPLEMENT_TERM_NOT_ASKED: example(new SpendSupplementRefusedError('TERM_NOT_ASKED')),
   NOT_PRICEABLE: example(new AccessRequestNotPriceableError()),
   LINE_NOT_DROPPABLE: example(new GroupSupplementDropRefusedError('LINE_NOT_DROPPABLE', [PERSON])),
   CANNOT_DROP_LAST_LINE: example(new GroupSupplementDropRefusedError('CANNOT_DROP_LAST_LINE')),

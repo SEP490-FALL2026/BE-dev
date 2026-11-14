@@ -5,7 +5,11 @@ describe('the supplementary file (US-06-14 AC-13, AC-15; US-05-04 AC-16; L2-38)'
     state: 'AWAITING_SPEND_SUBMISSION',
     priced: true,
   };
-  const term = (requested: number, current: number | null) => ({ requested, current });
+  const term = (requested: number, current: number | null, kind: 'K1' | 'K2' | 'K4' | 'K5' = 'K2') => ({
+    requested,
+    current,
+    kind,
+  });
 
   it('leaves people of a group out of a request back in the queue', () => {
     expect(checkSupplement({ ...facts, leavesPeopleOut: true })).toBeNull();
@@ -31,6 +35,27 @@ describe('the supplementary file (US-06-14 AC-13, AC-15; US-05-04 AC-16; L2-38)'
   it('L2-38: refuses a time of use that is not shorter than the one the request has', () => {
     expect(checkSupplement({ ...facts, term: term(6, 6) })).toBe('TERM_NOT_REDUCED');
     expect(checkSupplement({ ...facts, term: term(9, 6) })).toBe('TERM_NOT_REDUCED');
+  });
+
+  it('QĐ-111i: follows the kind of the plan: a plan bought once asks no months, and K1 takes 1 to 9', () => {
+    expect(checkSupplement({ ...facts, term: term(3, null, 'K4') })).toBe('TERM_NOT_ASKED');
+    expect(checkSupplement({ ...facts, term: term(9, 12, 'K1') })).toBeNull();
+    expect(checkSupplement({ ...facts, term: term(10, 12, 'K1') })).toBe('TERM_MONTHS_OUT_OF_RANGE');
+    expect(checkSupplement({ ...facts, term: term(12, null, 'K5') })).toBeNull();
+  });
+
+  it('L2-38: a request of an older release that carries an end date takes only months that end sooner than that day', () => {
+    const older = (requested: number) => ({
+      requested,
+      current: null,
+      kind: 'K2' as const,
+      endDate: { today: '2026-11-10', end: '2027-03-31' },
+    });
+
+    expect(checkSupplement({ ...facts, term: older(3) })).toBeNull();
+    expect(checkSupplement({ ...facts, term: older(5) })).toBe('TERM_NOT_REDUCED');
+    expect(checkSupplement({ ...facts, term: older(6) })).toBe('TERM_NOT_REDUCED');
+    expect(checkSupplement({ ...facts, term: older(13) })).toBe('TERM_MONTHS_OUT_OF_RANGE');
   });
 
   it('QĐ-111i: refuses a time of use that is not 1 to 12 whole months', () => {

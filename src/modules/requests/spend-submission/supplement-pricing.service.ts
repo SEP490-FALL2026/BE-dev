@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { termEndOf } from '../../../core/term-limit';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
+import { CatalogApi } from '../../catalog/public/catalog.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { AccessRequestNotPriceableError } from '../access-request/access-request.errors';
 import type { AccessRequestRecord, PricingRecord } from '../access-request/access-request.types';
@@ -20,7 +21,26 @@ export class SupplementPricing {
     private readonly organizationReads: OrganizationReadApi,
     private readonly repricing: RepricingService,
     private readonly groups: GroupSupplementService,
+    private readonly catalog: CatalogApi,
   ) {}
+
+  /**
+   * What the check of the months of a file reads: the kind of the plan decides what months it takes (a plan bought once takes none, K1 at most
+   * 9), and a request of an older release, which carries a day, takes only months that end sooner than that day (`QĐ-111i`, `L2-38`). A proposal
+   * of software that is not in the catalog has no kind yet: the rule that takes the most judges it.
+   */
+  async termFactsOf(tx: DbTx, request: AccessRequestRecord, termMonths: number | undefined, now: Date) {
+    if (termMonths === undefined) return undefined;
+    const [target] = request.planId === null ? [] : await this.catalog.findPlanSeatTargets([request.planId], tx);
+    const asked = { requested: termMonths, kind: target?.provisioningType ?? ('K2' as const) };
+    if (request.expectedEndDate === null) return { ...asked, current: request.termMonths };
+
+    return {
+      ...asked,
+      current: null,
+      endDate: { today: await this.organizationReads.businessToday(now, tx), end: request.expectedEndDate },
+    };
+  }
 
   async repriceFor(
     tx: DbTx,

@@ -33,7 +33,8 @@ export class SpendBatchNotFoundError extends Error {
 /** The supplementary file cannot be made (`US-06-14` AC-13, AC-15). */
 export class SpendSupplementRefusedError extends Error {
   constructor(
-    readonly reason: 'NOT_IN_QUEUE' | 'NOT_PRICED' | 'NO_CHANGE' | 'TERM_NOT_REDUCED' | 'TERM_MONTHS_OUT_OF_RANGE',
+    readonly reason:
+      'NOT_IN_QUEUE' | 'NOT_PRICED' | 'NO_CHANGE' | 'TERM_NOT_REDUCED' | 'TERM_MONTHS_OUT_OF_RANGE' | 'TERM_NOT_ASKED',
   ) {
     super(`The supplementary file cannot be made: ${reason}.`);
     this.name = 'SpendSupplementRefusedError';

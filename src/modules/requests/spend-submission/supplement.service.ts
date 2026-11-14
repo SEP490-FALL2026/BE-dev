@@ -14,18 +14,6 @@ import { SupplementQueryService } from './supplement-query.service';
 import { SupplementRecorder } from './supplement-recorder.service';
 
 /**
- * The months the file asks for and the months the request has. A request of an older release that carries an end date has no months to compare:
- * any time of use of the file is shorter (`QĐ-111i`).
- */
-const termFactsOf = (
-  body: SupplementBodyDto,
-  request: { termMonths: number | null; expectedEndDate: string | null },
-) =>
-  body.termMonths === undefined
-    ? undefined
-    : { requested: body.termMonths, current: request.expectedEndDate === null ? request.termMonths : null };
-
-/**
  * The supplementary file of the head (`QĐ-82n`, `US-06-14` AC-13, AC-15, `L2-38`): once a request is sent, its term is shortened (an
  * earlier end date) or people of a group are left out only in a file of its own, with the reason, on a request that is back in the
  * queue (given back by Finance, or stopped by the data). The request is priced again for the day of the file and the budget year
@@ -65,7 +53,7 @@ export class SupplementService {
         state: request.state,
         priced: pricing.status === 'PRICED' && pricing.amount !== null,
         leavesPeopleOut: dropped.length > 0,
-        term: termFactsOf(body, request),
+        term: await this.pricing.termFactsOf(tx, request, body.termMonths, now),
       });
       if (refusal) throw new SpendSupplementRefusedError(refusal);
 

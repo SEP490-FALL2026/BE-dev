@@ -47,6 +47,30 @@ describe('the amount and the term of a request (integration, real PostgreSQL)', 
       ...over,
     });
 
+  const keyPlan = async (): Promise<string> => {
+    const application = await declareApplication(h.ctx, h.it1.accessToken, {
+      name: h.unique('Licensed'),
+      kind: 'LICENSED',
+      vendorName: h.unique('Vendor'),
+      dataSensitivity: 'LOW',
+      communication: { personToPersonMessaging: false, callsOrMeetings: false, mailbox: false },
+    });
+    const key = await declarePlan(h.ctx, h.it1.accessToken, {
+      applicationId: application,
+      name: h.unique('Key'),
+      provisioningType: 'K4',
+      pricingModel: 'PER_SEAT',
+      controlLevel: 'FULL',
+    });
+    await subscribe(key, {
+      kind: 'PERPETUAL',
+      billingCycle: undefined,
+      unitPrice: { amount: '500000', currency: 'VND' },
+    });
+
+    return key;
+  };
+
   describe('the price: the main subscription of the plan, whichever department sends (BR-MF1-07, S1-02)', () => {
     it('BR-MF1-07: with several subscriptions and no flag is the one with the highest price a month', async () => {
       const shared = await h.plan('K2');
@@ -103,30 +127,6 @@ describe('the amount and the term of a request (integration, real PostgreSQL)', 
     const year = Number(h.today().slice(0, 4));
     /** A plan of the kind asked for, with a subscription of 1 000 000 a seat a month. */
     const planOfKind = async (type: 'K1' | 'K2'): Promise<string> => h.planOf(await h.subscription(10, type));
-    const keyPlan = async (): Promise<string> => {
-      const application = await declareApplication(h.ctx, h.it1.accessToken, {
-        name: h.unique('Licensed'),
-        kind: 'LICENSED',
-        vendorName: h.unique('Vendor'),
-        dataSensitivity: 'LOW',
-        communication: { personToPersonMessaging: false, callsOrMeetings: false, mailbox: false },
-      });
-      const key = await declarePlan(h.ctx, h.it1.accessToken, {
-        applicationId: application,
-        name: h.unique('Key'),
-        provisioningType: 'K4',
-        pricingModel: 'PER_SEAT',
-        controlLevel: 'FULL',
-      });
-      await subscribe(key, {
-        kind: 'PERPETUAL',
-        billingCycle: undefined,
-        unitPrice: { amount: '500000', currency: 'VND' },
-      });
-
-      return key;
-    };
-
     it('QĐ-111i: the end date is not a field of the form any more, on the preview and on the sending', async () => {
       const body = { planId: plan, businessReason: 'Design', expectedEndDate: '2027-03-31' };
 
@@ -428,6 +428,30 @@ describe('the amount and the term of a request (integration, real PostgreSQL)', 
       expect(h.codeOf(far)).toBe('SPEND.SUPPLEMENT_TERM_MONTHS_OUT_OF_RANGE');
       expect(h.codeOf(nothing)).toBe('VALIDATION_ERROR');
       expect(h.codeOf(endDate)).toBe('VALIDATION_ERROR');
+    });
+
+    it('QĐ-111i: a plan bought once takes no months, so a file that gives some is refused', async () => {
+      const key = await keyPlan();
+      const sent = await h.sent(design.member, key);
+      await h.decide(sent.id, { decision: 'APPROVE' }, design.head.account).expect(200);
+
+      const refused = await file(sent.id, { termMonths: 3 }).expect(409);
+
+      expect(h.codeOf(refused)).toBe('SPEND.SUPPLEMENT_TERM_NOT_ASKED');
+    });
+
+    it('L2-38: a request of an older release that carries an end date takes only months that end sooner than that day', async () => {
+      const id = await queued();
+      await h.ctx.sql.query(`UPDATE access_requests SET term_months = NULL, expected_end_date = $2 WHERE id = $1`, [
+        id,
+        addDays(h.today(), 60),
+      ]);
+
+      const longer = await file(id, { termMonths: 6 }).expect(409);
+      const shorter = await file(id, { termMonths: 1 }).expect(201);
+
+      expect(h.codeOf(longer)).toBe('SPEND.SUPPLEMENT_TERM_NOT_REDUCED');
+      expect(shorter.status).toBe(201);
     });
 
     it('L2-38: is for a request back in the queue of the head, not for one being decided', async () => {
