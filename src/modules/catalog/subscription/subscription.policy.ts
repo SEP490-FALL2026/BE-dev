@@ -221,8 +221,8 @@ export function sameUnitPrice(
   );
 }
 
-/** Active when nothing keeps the subscription a draft (`missingData`), a draft otherwise. */
-export function subscriptionStatusOf(
+/** What keeps a state a draft (`missingData`), read from the fields of a subscription: a price that is not in dong is no price. */
+export function missingDataOf(
   plan: { pricingModel: PlanPricingModel | null },
   kind: SubscriptionKind,
   state: {
@@ -232,8 +232,8 @@ export function subscriptionStatusOf(
     unitPrice: { currency: string } | null;
     priceSnapshot: unknown;
   },
-): 'ACTIVE' | 'DRAFT' {
-  const missing = missingData({
+): MissingItem[] {
+  return missingData({
     kind,
     planPricingModel: plan.pricingModel,
     quantity: state.purchasedQuantity,
@@ -241,8 +241,15 @@ export function subscriptionStatusOf(
     billingCycle: state.billingCycle,
     hasPrice: isPricedInDong(state),
   });
+}
 
-  return missing.length === 0 ? 'ACTIVE' : 'DRAFT';
+/** Active when nothing keeps the subscription a draft (`missingData`), a draft otherwise. */
+export function subscriptionStatusOf(
+  plan: { pricingModel: PlanPricingModel | null },
+  kind: SubscriptionKind,
+  state: Parameters<typeof missingDataOf>[2],
+): 'ACTIVE' | 'DRAFT' {
+  return missingDataOf(plan, kind, state).length === 0 ? 'ACTIVE' : 'DRAFT';
 }
 
 /** The value a declaration gives, or the one a subscription starts with when it gives none. */

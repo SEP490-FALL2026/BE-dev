@@ -42,7 +42,7 @@ const NOT_FOUND = {
   examples: [SUBSCRIPTION_ERROR_EXAMPLES.NOT_FOUND],
 } as const;
 const INVALID_UPDATE_NOTE =
-  ' An update that would put the seats bought under the seats taken is refused with SUBSCRIPTION.QUANTITY_BELOW_OCCUPIED (details.occupied, details.requested).';
+  ' An update that would put the seats bought under the seats taken is refused with SUBSCRIPTION.QUANTITY_BELOW_OCCUPIED (details.occupied, details.requested). An active subscription is never lowered to a draft by an update: one still priced in another currency (an earlier release could not convert it) is refused with SUBSCRIPTION.STILL_DRAFT (details.missing is UNIT_PRICE) until the update enters the price in dong, and it stays active.';
 const INVALID = {
   status: HttpStatus.UNPROCESSABLE_ENTITY,
   description:

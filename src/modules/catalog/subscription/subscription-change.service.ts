@@ -7,12 +7,14 @@ import { PlanFactsService } from '../plan/plan-facts.service';
 import {
   SubscriptionNotFoundError,
   SubscriptionPlanNotFoundError,
+  SubscriptionStillDraftError,
   SubscriptionUpdateEmptyError,
 } from './subscription.errors';
 import { sameState, snapshotOf, stateOf } from './subscription.mapper';
 import {
   assertSubscriptionShape,
   deriveNotice,
+  missingDataOf,
   nextStateOf,
   noticeInputOf,
   sameUnitPrice,
@@ -112,7 +114,7 @@ export class SubscriptionChangeService {
       ...next,
       ...priced,
       originalPrice: originalPrice === undefined ? current.originalPrice : originalPrice,
-      status: subscriptionStatusOf(plan, current.kind, { ...next, ...priced }),
+      status: this.statusAfter(plan, current, { ...next, ...priced }),
     };
     await this.guard.judgePool(tx, { plan, current, state, input, actor, organizationId });
     if (sameState(state, stateOf(current))) return current;
@@ -140,6 +142,24 @@ export class SubscriptionChangeService {
     });
 
     return updated;
+  }
+
+  /**
+   * The status a change leaves: a change never lowers an active subscription to a draft on its own account. One an earlier release left priced
+   * in another currency (no rate was there to turn it into dong) has no price of the new flow, and the change says so (SubscriptionStillDraftError,
+   * 422, naming what is missing) instead of taking the subscription out of the pool in silence; entering the price in dong keeps it active.
+   */
+  private statusAfter(
+    plan: Parameters<typeof subscriptionStatusOf>[0],
+    current: SubscriptionRecord,
+    state: Parameters<typeof subscriptionStatusOf>[2],
+  ): 'ACTIVE' | 'DRAFT' {
+    const status = subscriptionStatusOf(plan, current.kind, state);
+    if (current.status === 'ACTIVE' && status === 'DRAFT') {
+      throw new SubscriptionStillDraftError(missingDataOf(plan, current.kind, state));
+    }
+
+    return status;
   }
 
   private async auditChange(
