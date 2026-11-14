@@ -1,3 +1,4 @@
+import { RenewalHoldHook } from '../../../src/modules/licensing/public/licensing.extension-points';
 import { monthsBetween } from '../../../src/modules/requests/renewal-request/renewal-request.policy';
 import { ExpiryHarness } from '../../support/expiry-harness';
 import { pretendBusinessToday } from '../../support/pretend-today';
@@ -316,5 +317,75 @@ describe('the end of the time of use and the renewal of the right (T-RQ3, integr
     expect(request).toMatchObject({ termMonths: 3, expectedEndDate: '2026-12-31' });
     expect(request.renewal).toMatchObject({ newExpectedEndDate: '2026-12-31' });
     expect(request.pricing).toMatchObject({ months: 2, nextYearAmount: null });
+  });
+
+  describe('R-27, by the real reader of the renewals (no stand-in): the reminder follows the end the right has', () => {
+    /** What the module of requests tells licensing of the renewal that waits for a seat, as the real reader answers it. */
+    const waitingOf = async (assignmentId: string) =>
+      (await h.ctx.app.get(RenewalHoldHook).get().pendingRenewalsOf([assignmentId])).get(assignmentId);
+
+    it('holds the reminder of 28/10 back once the renewal is approved in full, and the record that follows is reminded from 28/01/2027', async () => {
+      const { unit, assignmentId } = await holder(k1);
+      on('2026-10-05');
+      const { request } = await h.renewed(unit.member.account, months(assignmentId, 3));
+      // Sent and not decided: waiting, not approved.
+      expect(await waitingOf(assignmentId)).toEqual({ requestId: request.id, state: 'PENDING', approved: false });
+
+      // Approved in full on 20/10 (the head, then the spending approver): the request waits for the IT Admin to extend the right.
+      on('2026-10-20');
+      await approvedAndPaid(request.id, unit);
+      expect(await h.state(request.id)).toBe('AWAITING_EXECUTION');
+      expect(await waitingOf(assignmentId)).toEqual({
+        requestId: request.id,
+        state: 'AWAITING_EXECUTION',
+        approved: true,
+      });
+
+      // 28/10: the end the right has is about to move, so the reminder of 04/11 is not owed.
+      on('2026-10-28');
+      await h.noticeDue();
+      expect(await h.reminderRows(assignmentId)).toEqual([]);
+
+      on('2026-10-29');
+      const task = await extensionTaskOf(request.id);
+      await h.claim(task.id).expect(200);
+      await h.complete(task.id, { evidence: 'Extended with the vendor until 04/02/2027' }).expect(200);
+      const [next] = await h.successorsOf(assignmentId);
+      expect(next).toMatchObject({ valid_until: null, expected_end_date: '2027-02-04' });
+
+      // Nothing is waiting any more, the record that follows is reminded from 28/01/2027, and the old one never was.
+      expect(await waitingOf(assignmentId)).toBeUndefined();
+      on('2027-01-27');
+      await h.noticeDue();
+      expect(await h.reminderRows(next.id)).toEqual([]);
+      on('2027-01-28');
+      await h.noticeDue();
+      expect((await h.reminderRows(next.id)).map((row) => [row.audience, row.expected_end_date])).toEqual([
+        ['EMPLOYEE', '2027-02-04'],
+        ['HEAD', '2027-02-04'],
+        ['IT_ADMIN', '2027-02-04'],
+      ]);
+      expect(await h.reminderRows(assignmentId)).toEqual([]);
+    });
+
+    it('still reminds a right whose renewal waits for its decision: the holder and the head choose to renew or let the right end (US-03-05 AC-1)', async () => {
+      const { unit, assignmentId } = await holder(k1);
+      on('2026-10-05');
+      const { request } = await h.renewed(unit.member.account, months(assignmentId, 3));
+      // The head approved the need and the spending approver has not decided: still not approved in full.
+      on('2026-10-20');
+      await h.decide(request.id, { decision: 'APPROVE' }, unit.head.account).expect(200);
+      expect(await waitingOf(assignmentId)).toMatchObject({ requestId: request.id, approved: false });
+      expect(await waitingOf(assignmentId)).not.toMatchObject({ state: 'AWAITING_EXECUTION' });
+
+      on('2026-10-28');
+      await h.noticeDue();
+
+      expect((await h.reminderRows(assignmentId)).map((row) => [row.audience, row.expected_end_date])).toEqual([
+        ['EMPLOYEE', '2026-11-04'],
+        ['HEAD', '2026-11-04'],
+        ['IT_ADMIN', '2026-11-04'],
+      ]);
+    });
   });
 });
