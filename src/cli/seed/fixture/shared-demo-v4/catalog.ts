@@ -11,7 +11,7 @@ const k2 = (key: string, name: string, extra: Partial<DemoPlan> = {}): DemoPlan 
   ...extra,
 });
 
-const k4 = (key: string, name: string): DemoPlan => ({
+const k4 = (key: string, name: string, extra: Partial<DemoPlan> = {}): DemoPlan => ({
   key,
   name,
   provisioningType: 'K4',
@@ -19,6 +19,7 @@ const k4 = (key: string, name: string): DemoPlan => ({
   controlLevel: 'FULL',
   dataLossOnRemoval: false,
   sharingPolicy: 'NOT_ALLOWED',
+  ...extra,
 });
 
 const app = (
@@ -31,9 +32,14 @@ const app = (
 ): DemoApplication => ({ key, name, kind, vendorName, dataSensitivity, plans });
 
 /*
- * Twelve applications. Each (application, plan) has exactly one subscription, the stock of the shared pool (`QĐ-103d`): K2 plans have
+ * Thirteen applications. Each (application, plan) has exactly one subscription, the stock of the shared pool (`QĐ-103d`): K2 plans have
  * seats Free to grant (Postman, Slack, GitHub, Mailchimp, Canva, Jira, Figma) and one plan is sold out (1Password); K1 plans are bought
  * on each grant; K4 plans draw from a key store (JetBrains has keys, DataGrip has none); K5 is internal software.
+ *
+ * A plan administered at the vendor (every K2, and JetBrains All Products, the K4 plan with an admin console) has a workspace profile of two
+ * IT Admins (`QĐ-110k`, R-53): DataGrip, a K4 plan without one, is the control case that needs none. Mailchimp is owned by NV-ITA4, who
+ * leaves, with NV-ITA3 as the other admin; Canva names no company account at the vendor, so its subscription carries the flag
+ * `ownerAccountEmailMissing` (`QĐ-110u`).
  */
 const APPLICATIONS: DemoApplication[] = [
   app('jira', 'Jira Software', 'Atlassian', [k2('jira-standard', 'Jira Standard')]),
@@ -47,8 +53,15 @@ const APPLICATIONS: DemoApplication[] = [
   app('github', 'GitHub', 'GitHub', [k2('github-team', 'GitHub Team')], 'SAAS', 'HIGH'),
   app('onepassword', '1Password', 'AgileBits', [k2('onepassword-business', '1Password Business')], 'SAAS', 'HIGH'),
   app('postman', 'Postman', 'Postman', [k2('postman-professional', 'Postman Professional')]),
-  app('mailchimp', 'Mailchimp', 'Intuit Mailchimp', [k2('mailchimp-standard', 'Mailchimp Standard')], 'SAAS', 'LOW'),
-  app('canva', 'Canva', 'Canva', [k2('canva-teams', 'Canva Teams')], 'SAAS', 'LOW'),
+  app(
+    'mailchimp',
+    'Mailchimp',
+    'Intuit Mailchimp',
+    [k2('mailchimp-standard', 'Mailchimp Standard', { vendorAdmin: 'NV-ITA3' })],
+    'SAAS',
+    'LOW',
+  ),
+  app('canva', 'Canva', 'Canva', [k2('canva-teams', 'Canva Teams', { withoutOwnerAccountEmail: true })], 'SAAS', 'LOW'),
   app(
     'chatgpt',
     'ChatGPT',
@@ -86,10 +99,31 @@ const APPLICATIONS: DemoApplication[] = [
     'HIGH',
   ),
   app(
+    'grammarly',
+    'Grammarly',
+    'Grammarly',
+    [
+      {
+        key: 'grammarly-pro',
+        name: 'Grammarly Pro',
+        provisioningType: 'K1',
+        pricingModel: 'PER_SEAT',
+        controlLevel: 'PARTIAL',
+        dataLossOnRemoval: false,
+        sharingPolicy: 'NOT_ALLOWED',
+      },
+    ],
+    'SAAS',
+    'MEDIUM',
+  ),
+  app(
     'jetbrains',
     'JetBrains',
     'JetBrains',
-    [k4('jetbrains-all', 'JetBrains All Products'), k4('jetbrains-datagrip', 'JetBrains DataGrip')],
+    [
+      k4('jetbrains-all', 'JetBrains All Products', { hasAdminConsole: true, vendorAdmin: 'NV-ITA3' }),
+      k4('jetbrains-datagrip', 'JetBrains DataGrip'),
+    ],
     'LICENSED',
   ),
   {
@@ -141,12 +175,15 @@ const SUBSCRIPTIONS: DemoSubscription[] = [
   monthly('github', 'github-team', '100000', 'NV-ITA1', 5),
   monthly('onepassword', 'onepassword-business', '200000', 'NV-ITA1', 0),
   monthly('postman', 'postman-professional', '300000', 'NV-ITA1', 5),
-  monthly('mailchimp', 'mailchimp-standard', '400000', 'NV-ITA2', 4),
+  // The IT Admin who leaves answers for it: his departure hands it over (P5).
+  monthly('mailchimp', 'mailchimp-standard', '400000', 'NV-ITA4', 4),
   monthly('canva', 'canva-teams', '250000', 'NV-ITA2', 4),
-  // K1: bought one by one when a seat is granted, so it starts with none.
+  // K1: bought one by one when a seat is granted, so ChatGPT and Cursor start with none (the MF-5 reduction flows count their seats).
   { ...monthly('chatgpt', 'chatgpt-plus', '500000', 'NV-ITA1', 0), quantity: 0, ownerDepartment: 'ENG' },
   // The one plan priced in a foreign currency: Finance records the rate of the day.
   { ...monthly('cursor', 'cursor-pro', '20', 'NV-ITA1', 0, 'USD'), quantity: 0, ownerDepartment: 'ENG' },
+  // The K1 plan of the person who leaves today: its one seat is his, so his revocation shows the K1 checklist (D-62).
+  { ...monthly('grammarly', 'grammarly-pro', '300000', 'NV-ITA1', 0), quantity: 1, ownerDepartment: 'ENG' },
   // K4: a key is bought once; the keys sit in the key store. JetBrains has three, DataGrip none.
   {
     key: 'jetbrains',
@@ -203,6 +240,8 @@ const SEATS: DemoSeat[] = [
   ...seat('postman', ['NV-ENGH', 'NV-LGL1']),
   ...seat('mailchimp', ['NV-DEV4']),
   ...seat('canva', ['NV-DESH', 'NV-DES5']),
+  // The K1 seat of the person who leaves today: its revocation task carries the K1 checklist with the mailbox lock last (D-62).
+  ...seat('grammarly', ['NV-OFF1']),
 ];
 
 export const CATALOG: Pick<DemoFixture, 'applications' | 'subscriptions' | 'seats' | 'exchangeRates'> = {

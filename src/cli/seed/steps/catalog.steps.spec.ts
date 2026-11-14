@@ -60,22 +60,33 @@ describe('the workspace profile the dataset records for the plans that need admi
   const ctx = { fixture: SHARED_DEMO_V4, today: '2026-11-10', ids: { employees } } as unknown as DemoRunContext;
   const plan = (key: string) => SHARED_DEMO_V4.applications.flatMap((app) => app.plans).find((p) => p.key === key)!;
 
-  it('names the IT Admin who answers for the subscription as the owner and another IT Admin as the admin, for every K2 plan', () => {
-    for (const k2 of SHARED_DEMO_V4.applications
+  it('names the IT Admin who answers for the subscription as the owner and another IT Admin as the admin, for every plan that needs them', () => {
+    const needing = SHARED_DEMO_V4.applications
       .flatMap((app) => app.plans)
-      .filter((p) => p.provisioningType === 'K2')) {
-      const body = workspaceProfileBody(ctx, k2)!;
-      const responsible = SHARED_DEMO_V4.subscriptions.find((s) => s.plan === k2.key)!.responsible;
+      .filter((p) => p.provisioningType === 'K2' || p.hasAdminConsole === true);
+    expect(needing.map((p) => p.key)).toContain('jetbrains-all');
+    for (const needed of needing) {
+      const body = workspaceProfileBody(ctx, needed)!;
+      const responsible = SHARED_DEMO_V4.subscriptions.find((s) => s.plan === needed.key)!.responsible;
 
       expect(body.primaryOwnerEmployeeId).toBe(`id-${responsible}`);
       expect(body.members).toHaveLength(2);
       expect(new Set(body.members.map((member) => member.employeeId)).size).toBe(2);
       expect(body.members).toContainEqual({ employeeId: `id-${responsible}`, role: 'OWNER' });
+      if (needed.vendorAdmin)
+        expect(body.members).toContainEqual({ employeeId: `id-${needed.vendorAdmin}`, role: 'ADMIN' });
     }
   });
 
+  it('records the company account at the vendor for every profile but the one left without it to show the flag (QĐ-110u)', () => {
+    expect(workspaceProfileBody(ctx, plan('canva-teams'))).not.toHaveProperty('ownerAccountEmail');
+    expect(workspaceProfileBody(ctx, plan('jira-standard'))?.ownerAccountEmail).toBe(
+      'it-jira-standard@saoviet.example',
+    );
+  });
+
   it('asks nothing of a plan that needs no admins at the vendor (K1, K4 with no console, K5)', () => {
-    for (const key of ['chatgpt-plus', 'jetbrains-all', 'hr-portal-access']) {
+    for (const key of ['chatgpt-plus', 'jetbrains-datagrip', 'hr-portal-access']) {
       expect(workspaceProfileBody(ctx, plan(key))).toBeNull();
     }
   });

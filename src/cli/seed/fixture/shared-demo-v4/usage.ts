@@ -20,7 +20,7 @@ const row = (code: string, lastActivityDaysAgo: number | null) => ({ identifier:
  * - NV-DES3 has no Jira row at all → G3 (never used);
  * - the traps that must give nothing: NV-DES6 (a new seat), NV-DES7 (long leave), NV-DES8 (an identity nobody could tie), NV-DES9
  *   (granted 30 days ago: outside the coverage), NV-DES10 (the right ends within a month);
- * - NV-OFF1 has left today and still holds three seats → G2.
+ * - NV-OFF1 has left today and still holds his seats → G2.
  */
 const FIGMA: DemoUsageSource = {
   key: 'figma',
@@ -99,9 +99,20 @@ export const USAGE: Pick<DemoFixture, 'usageSources' | 'ghostDecisions' | 'perso
     },
     { holder: 'NV-DESH', application: 'figma', choice: 'KEEP', reason: 'Dùng để duyệt thiết kế của phòng.' },
   ],
-  // Recorded after the baseline: a long leave and a departure that blocks access today (a transfer cannot take effect on the day a person is placed).
+  /*
+   * Recorded after the baseline and the requests, in this order:
+   * - a long leave of NV-DES7 (a trap of the rules);
+   * - NV-OFF1 leaves with access blocked today, holding Figma, Jira, GitHub and a K1 Grammarly seat of the baseline (MF-2: 1a, revocations, the K1
+   *   checklist, 1b; the case closes after the hourly sweep of the block). The seed leaves it there: the G2 of MF-5 is the seats he still holds;
+   * - NV-ITA4, the IT Admin who answers for Mailchimp and owns its workspace, leaves on the third working day from today (`WITH_LAST_DAY`):
+   *   the IT handover is pending (P5), the preview lists his responsibilities and admin roles (P23);
+   * - NV-DEV4 moves from Engineering to IT tomorrow, the earliest day a person placed today can move: from tomorrow he is in grace with his
+   *   old paid rights, and may ask again for one he holds (P10).
+   */
   personnel: [
     { kind: 'LONG_LEAVE', employee: 'NV-DES7', returnInDays: 60 },
     { kind: 'OFFBOARDING', employee: 'NV-OFF1' },
+    { kind: 'OFFBOARDING', employee: 'NV-ITA4', lastDayInWorkingDays: 3 },
+    { kind: 'TRANSFER', employee: 'NV-DEV4', toDepartment: 'ITO', effectiveInDays: 1 },
   ],
 };

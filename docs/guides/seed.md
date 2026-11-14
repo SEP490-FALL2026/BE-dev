@@ -230,11 +230,11 @@ Kiểm ready và dữ liệu phục hồi trước khi nhả khóa. Không gọi
 
 Mọi ngày của dataset tính tương đối theo ngày chạy seed, nên chạy hôm nào cũng ra đúng các trạng thái trong [README fixture](../../src/cli/seed/fixture/shared-demo-v4/README.md). Dataset đã nạp ở năm khác bị từ chối; dùng wrapper và chọn reset. Năm ngân sách phải bắt đầu tháng 1.
 
-Thứ tự của lệnh: tổ chức → Cost Center và tỷ giá → danh mục (ứng dụng, gói, **một thuê bao mỗi gói**) → ghế nền (tệp CSV, rồi đóng baseline) → kho khóa K4 → kỳ ngân sách năm và năm sau → ngân sách năm đã duyệt của mọi phòng có Cost Center → ngân sách năm sau (đề xuất chờ Finance, phiên bản đã gửi, phiên bản bị yêu cầu sửa) → 24 Request MF-1 → bản nháp, báo lỗi, BM-09 → sự kiện nhân sự → nguồn và tệp usage → chạy luật G1–G4 → trưởng phòng Thiết kế quyết một phần khuyến nghị.
+Thứ tự của lệnh: tổ chức → Cost Center và tỷ giá → danh mục (ứng dụng, gói, hồ sơ workspace của gói cần admin ở nhà cung cấp, **một thuê bao mỗi gói**) → ghế nền (tệp CSV, rồi đóng baseline) → kho khóa K4 → danh sách phần mềm của phòng và đề xuất của trưởng phòng → kỳ ngân sách năm và năm sau → ngân sách năm đã duyệt của mọi phòng có Cost Center → ngân sách năm sau (đề xuất chờ Finance, phiên bản đã gửi, phiên bản bị yêu cầu sửa) → 25 Request MF-1 → bản nháp, báo lỗi, BM-09 → sự kiện nhân sự (nghỉ dài, hai nghỉ việc, một điều chuyển hiệu lực ngày mai) → nguồn và tệp usage → chạy luật G1–G4 → trưởng phòng Thiết kế quyết một phần khuyến nghị.
 
 **Bước cuối chờ job hàng chờ.** Khuyến nghị G3/G4 chỉ vào hàng chờ của trưởng phòng khi job theo dõi hàng chờ chạy lượt đầu, 6 phút sau khi API khởi động. Wrapper khởi động API ngay trước `apply`, nên bước `ghost.decisions` tự chờ tới 9 phút; lần seed đầu vì thế lâu hơn vài phút. Chạy lại (`--continue`) khi mọi thứ đã có thì không chờ.
 
-**Hạn chế đã biết.** Không có điều chuyển hiệu lực hôm nay (API chặn điều chuyển trong ngày nhân viên được xếp phòng); không có hóa đơn mua hàng, điểm điều chỉnh thuê bao hay quyền theo vai (code hiện hành chưa có các API đó). Ba lượt mô tả đầy đủ nằm trong README fixture.
+**Hạn chế đã biết.** Không có điều chuyển hiệu lực hôm nay (API chặn điều chuyển trong ngày nhân viên được xếp phòng): điều chuyển của dataset vào ân hạn từ ngày sau ngày seed, nên seed ít nhất một ngày trước buổi demo MF-3; không có hóa đơn mua hàng, điểm điều chỉnh thuê bao hay quyền theo vai (code hiện hành chưa có các API đó). Ba lượt mô tả đầy đủ nằm trong README fixture.
 
 ## Bằng chứng và việc Owner còn phải chạy
 

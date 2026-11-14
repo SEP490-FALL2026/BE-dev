@@ -38,6 +38,7 @@ describe('shared dataset v4: the organization', () => {
       'NV-ITA1',
       'NV-ITA2',
       'NV-ITA3',
+      'NV-ITA4',
     ]);
   });
 
@@ -300,14 +301,88 @@ describe('shared dataset v4: the usage and the people of MF-5', () => {
   it('has a decision of each kind the head can take, and the events of the people who feed the rules', () => {
     expect(new Set(F.ghostDecisions.map((d) => d.choice))).toEqual(new Set(['KEEP', 'RECLAIM', 'EXEMPT']));
     expect(F.ghostDecisions.some((d) => d.holder === 'NV-DESH')).toBe(true);
-    expect(F.personnel.map((e) => e.kind).sort()).toEqual(['LONG_LEAVE', 'OFFBOARDING']);
+    expect(F.personnel.map((e) => e.kind).sort()).toEqual(['LONG_LEAVE', 'OFFBOARDING', 'OFFBOARDING', 'TRANSFER']);
     for (const d of F.ghostDecisions) expect(person(d.holder).department).toBe('DES');
   });
 
-  it('records a departure only of a person who heads no department: the seed names no successor, and a head who leaves must have one (QĐ-110h)', () => {
+  it('records a departure or a transfer only of a person who heads no department: the seed names no successor, and a head who leaves must have one (QĐ-110h)', () => {
     const heads = new Set(F.departments.flatMap((d) => (d.head ? [d.head] : [])));
-    for (const event of F.personnel.filter((e) => e.kind === 'OFFBOARDING'))
+    for (const event of F.personnel.filter((e) => e.kind !== 'LONG_LEAVE'))
       expect(heads.has(event.employee)).toBe(false);
+  });
+});
+
+describe('shared dataset v4: MF-2, MF-3 and the IT Admins (QĐ-110, QĐ-111)', () => {
+  const event = <K extends (typeof F.personnel)[number]['kind']>(kind: K, employee: string) =>
+    F.personnel.find((e) => e.kind === kind && e.employee === employee) as Extract<
+      (typeof F.personnel)[number],
+      { kind: K }
+    >;
+
+  it('has an IT Admin who leaves on a day ahead, answers for a subscription, owns its workspace and is in charge of no department (P5)', () => {
+    const leaving = event('OFFBOARDING', 'NV-ITA4');
+    expect(leaving.lastDayInWorkingDays).toBeGreaterThan(0);
+    expect(person('NV-ITA4').account).toBe('IT_ADMIN');
+    expect(F.subscriptions.filter((s) => s.responsible === 'NV-ITA4').map((s) => s.plan)).toEqual([
+      'mailchimp-standard',
+    ]);
+    expect(plan('mailchimp-standard').vendorAdmin).toBe('NV-ITA3');
+    expect(F.departments.some((d) => d.itAdmin === 'NV-ITA4')).toBe(false);
+  });
+
+  it('blocks NV-OFF1 today with a K1 seat, so his revocations show the K1 checklist (D-62)', () => {
+    expect(event('OFFBOARDING', 'NV-OFF1').lastDayInWorkingDays).toBeUndefined();
+    const k1 = F.subscriptions.filter((s) => plan(s.plan).provisioningType === 'K1').map((s) => s.key);
+    expect(F.seats.some((s) => k1.includes(s.subscription) && s.holder === 'NV-OFF1')).toBe(true);
+    expect(subscriptionOf('grammarly-pro').quantity).toBe(F.seats.filter((s) => s.subscription === 'grammarly').length);
+    // The K1 plans of the MF-5 reduction flows start with no seat of the baseline: those flows count their seats.
+    expect(F.seats.some((s) => s.subscription === 'chatgpt' || s.subscription === 'cursor')).toBe(false);
+  });
+
+  it('moves a person with paid seats tomorrow, the earliest day after the placement of today, and not the person the MF-3 flow moves', () => {
+    const transfer = F.personnel.find((e) => e.kind === 'TRANSFER')!;
+    expect(transfer).toMatchObject({ employee: 'NV-DEV4', toDepartment: 'ITO', effectiveInDays: 1 });
+    expect(person('NV-DEV4').account).not.toBeNull();
+    expect(F.seats.filter((s) => s.holder === 'NV-DEV4').length).toBeGreaterThan(0);
+    expect(transfer.employee).not.toBe('NV-CTR1');
+  });
+
+  it('records a workspace profile for a K4 plan with an admin console and leaves one K2 plan without the company account (QĐ-110k, QĐ-110u)', () => {
+    expect(plan('jetbrains-all')).toMatchObject({ provisioningType: 'K4', hasAdminConsole: true });
+    expect(plan('jetbrains-datagrip').hasAdminConsole).toBeUndefined();
+    const flagged = F.applications.flatMap((a) => a.plans).filter((p) => p.withoutOwnerAccountEmail);
+    expect(flagged.map((p) => [p.key, p.provisioningType])).toEqual([['canva-teams', 'K2']]);
+  });
+
+  it('lists software for departments with an IT Admin, from the catalog, and proposes only what their list does not hold (P16–P18)', () => {
+    const apps = new Set(F.applications.map((a) => a.key));
+    for (const list of F.departmentSoftware) {
+      expect(department(list.department).itAdmin).not.toBeNull();
+      for (const item of list.items) {
+        expect(apps.has(item.application)).toBe(true);
+        if (item.plan)
+          expect(F.applications.find((a) => a.key === item.application)!.plans.map((p) => p.key)).toContain(item.plan);
+      }
+    }
+    expect(F.softwareProposals.map((p) => p.outcome).sort()).toEqual(['PENDING', 'REJECTED']);
+    for (const proposal of F.softwareProposals) {
+      expect(department(proposal.department).head).not.toBeNull();
+      const listed = F.departmentSoftware.find((l) => l.department === proposal.department)?.items ?? [];
+      expect(listed.some((i) => i.application === proposal.application && i.plan === proposal.plan)).toBe(false);
+      if (proposal.outcome === 'REJECTED') expect(proposal.rejectionReason).toBeTruthy();
+    }
+  });
+
+  it('has a request for internal software in the department with no head, granted by IT without a need step (QĐ-111bc)', () => {
+    const headless = F.departments.find((d) => d.head === null)!.code;
+    expect(
+      F.requests.some(
+        (r) =>
+          person(r.requester).department === headless &&
+          plan(r.plan ?? '')?.provisioningType === 'K5' &&
+          r.target === 'COMPLETED',
+      ),
+    ).toBe(true);
   });
 });
 
