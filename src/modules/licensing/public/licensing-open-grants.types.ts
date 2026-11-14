@@ -1,3 +1,5 @@
+import type { ProvisioningChannel, ProvisioningTaskStatus } from './licensing.types';
+
 /**
  * Why the grant of a request is cancelled: the requester withdrew it (`US-05-08`), the person it was for left (`US-03-04` AC-25) or
  * was transferred to another department (`QĐ-89b`: the IT Admin closes the part not yet granted, with evidence).
@@ -54,4 +56,20 @@ export interface SeatRootsOfRequests {
 export interface GrantCompletion {
   completedByAppUserId: string | null;
   completedAt: Date;
+}
+
+/**
+ * The grant task of one person of a request, as the queue of grants shows where the grant stands: the task, its state and channel, and why
+ * it failed. A request for one person has one; a request for a group has one for each person granted. The newest first when a person has
+ * had more than one (a failed task tried again is the same task, so only a request made again has two).
+ */
+export interface GrantExecution {
+  requestId: string;
+  /** The person the seat was given to: the holder of the assignment the task answers for. */
+  employeeId: string;
+  taskId: string;
+  status: ProvisioningTaskStatus;
+  channel: ProvisioningChannel;
+  failureReason: string | null;
+  createdAt: Date;
 }

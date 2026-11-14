@@ -99,11 +99,11 @@ describe('the grant of the people of a request for a group, one person at a time
       const { people, id } = await approved(3);
 
       const before = h
-        .dataOf<{ items: QueueItem[] }>(await h.grantQueue(h.it1, { pageSize: 100 }).expect(200))
+        .dataOf<{ items: QueueItem[] }>(await h.grantQueue(h.it1, { state: 'WAITING', pageSize: 100 }).expect(200))
         .items.filter((item) => item.requestId === id);
       await granted(id, people[1].employeeId);
       const after = h
-        .dataOf<{ items: QueueItem[] }>(await h.grantQueue(h.it1, { pageSize: 100 }).expect(200))
+        .dataOf<{ items: QueueItem[] }>(await h.grantQueue(h.it1, { state: 'WAITING', pageSize: 100 }).expect(200))
         .items.filter((item) => item.requestId === id);
 
       expect(before.map((item) => [item.beneficiary.employeeId, item.type, item.lineCount])).toEqual(

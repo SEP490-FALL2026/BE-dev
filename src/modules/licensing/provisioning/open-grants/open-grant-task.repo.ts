@@ -5,6 +5,7 @@ import { fromDateColumn, type BusinessDate } from '../../../../core/business-dat
 import {
   OPEN_GRANT_TASK_STATUSES,
   type GrantCompletion,
+  type GrantExecution,
   type GrantedSeatOfRequest,
   type SeatRootsOfRequests,
 } from '../../public/licensing-open-grants.types';
@@ -64,6 +65,43 @@ export class OpenGrantTaskRepo {
           ? []
           : [[row.requestId, { completedByAppUserId: row.completedByAppUserId, completedAt: row.completedAt }]],
       ),
+    );
+  }
+
+  /**
+   * The grant tasks of these requests that were not cancelled, with the person each one is for, the newest first: one statement whatever
+   * the number of requests. What the queue of grants reads to say where the grant of each person stands.
+   */
+  async grantExecutionsOf(requestIds: readonly string[], tx?: DbTx): Promise<GrantExecution[]> {
+    if (requestIds.length === 0) return [];
+    const rows = await (tx ?? this.prisma).provisioningTask.findMany({
+      where: { kind: 'GRANT', status: { not: 'CANCELLED' }, requestId: { in: [...new Set(requestIds)] } },
+      select: {
+        id: true,
+        requestId: true,
+        status: true,
+        channel: true,
+        failureReason: true,
+        createdAt: true,
+        assignment: { select: { employeeId: true } },
+      },
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+    });
+
+    return rows.flatMap((row) =>
+      row.requestId === null
+        ? []
+        : [
+            {
+              requestId: row.requestId,
+              employeeId: row.assignment.employeeId,
+              taskId: row.id,
+              status: row.status,
+              channel: row.channel,
+              failureReason: row.failureReason,
+              createdAt: row.createdAt,
+            },
+          ],
     );
   }
 

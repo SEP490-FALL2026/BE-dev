@@ -4,6 +4,7 @@ import { CatalogApi } from '../../../catalog/public/catalog.api';
 import type { BusinessDate } from '../../../../core/business-date';
 import type {
   GrantCompletion,
+  GrantExecution,
   GrantedSeatOfRequest,
   OpenGrantTask,
   SeatRootsOfRequests,
@@ -68,5 +69,10 @@ export class OpenGrantTaskService {
 
   grantCompletionsOf(requestIds: readonly string[], tx?: DbTx): Promise<Map<string, GrantCompletion>> {
     return this.repo.grantCompletionsOf(requestIds, tx);
+  }
+
+  /** Where the grant of each person of these requests stands: their grant tasks that were not cancelled, the newest first. */
+  grantExecutionsOf(requestIds: readonly string[], tx?: DbTx): Promise<GrantExecution[]> {
+    return this.repo.grantExecutionsOf(requestIds, tx);
   }
 }

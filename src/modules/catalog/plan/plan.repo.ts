@@ -230,12 +230,12 @@ export class PlanRepo {
     }));
   }
 
-  /** The plans with these ids, as far as they exist, with the name of their application; `tx` reads in the caller's transaction, which sees the plans it made. */
+  /** The plans with these ids, as far as they exist, with the name and the logo of their application; `tx` reads in the caller's transaction, which sees the plans it made. */
   async findSummaries(ids: readonly string[], tx?: DbTx): Promise<PlanSummary[]> {
     if (ids.length === 0) return [];
     const rows = await (tx ?? this.prisma).plan.findMany({
       where: { id: { in: [...ids] } },
-      select: { id: true, name: true, applicationId: true, application: { select: { name: true } } },
+      select: { id: true, name: true, applicationId: true, application: { select: { name: true, logoUrl: true } } },
     });
 
     return rows.map((row) => ({
@@ -243,6 +243,7 @@ export class PlanRepo {
       planName: row.name,
       applicationId: row.applicationId,
       applicationName: row.application.name,
+      applicationLogoUrl: row.application.logoUrl,
     }));
   }
 
