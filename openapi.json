@@ -31168,7 +31168,7 @@
         },
         "responses": {
           "201": {
-            "description": "The seat is taken from today by an assignment of source REQUEST, and a manual task is queued for the IT Admin in charge of the beneficiary department (none: the general queue, with a warning). K5 takes no subscription and no seat. For the request of a service account the IT Admin enters the account identifier (not read from the request) and may name another active person of the owning department to answer for it (responsibleEmployeeId); the assignment is a service one, owned by that department and charged to its Unit Cost Center, with the purpose as its reason.",
+            "description": "The seat is taken from today by an assignment of source REQUEST, and a manual task is made that the IT Admin who pressed has already taken: it is in progress (IN_PROGRESS) under their account (claimedBy), whoever is in charge of the beneficiary department by default (defaultResponsibleEmployeeId; none: the general queue, with a warning). Pressing again for the same request (for a request for a group, the same person), or another IT Admin pressing, makes nothing new: the answer is the task that exists, 201 with no warnings, still taken by whoever took it first. K5 takes no subscription and no seat. For the request of a service account the IT Admin enters the account identifier (not read from the request) and may name another active person of the owning department to answer for it (responsibleEmployeeId); the assignment is a service one, owned by that department and charged to its Unit Cost Center, with the purpose as its reason.",
             "content": {
               "application/json": {
                 "schema": {
@@ -31298,7 +31298,7 @@
             }
           },
           "409": {
-            "description": "PROVISIONING.REQUEST_NOT_APPROVED, REQUEST_ENDED, REQUEST_NOT_IN_CATALOG (the software is not registered in the catalog yet), REQUEST_BOUNDARY_NOT_CHECKED (a service account whose boundary the IT Admin has not accepted), RESPONSIBLE_NOT_IN_DEPARTMENT (the person who answers for a service account left its department or the company: name another), TYPE_NOT_SUPPORTED (K3), BENEFICIARY_DEPARTED (the person has left, or a departure has blocked their access from today though they are not marked left yet: details.cause LEFT or ACCESS_BLOCKED, details.nextStep CANCEL_REQUEST), BENEFICIARY_NOT_STARTED (details.startsOn: the person joins later), CONTRACT_ENDED (details.contractEndDate: the contract of a contractor, freelancer or intern ended before today, so no seat is granted), PURCHASE_NOT_ALLOWED (a `purchase` was sent while the pool of the plan still has a free seat: details.freeSeats and details.subscriptionIds), SEAT_TARGET.APPLICATION_RETIRED, or LICENSE_ASSIGNMENT.SEAT_CAPACITY (the subscription has no free seat and no `purchase` was sent: details.freeSeatsInPool is how many seats the other subscriptions of the plan hold free). A refused purchase is kept in the audit trail with the free seats (PROVISIONING_TASK.PURCHASE_REFUSED).",
+            "description": "PROVISIONING.REQUEST_NOT_APPROVED, REQUEST_ENDED (the request was refused, withdrawn, cancelled or closed as failed; a request that was granted answers with its task instead, 201), REQUEST_NOT_IN_CATALOG (the software is not registered in the catalog yet), REQUEST_BOUNDARY_NOT_CHECKED (a service account whose boundary the IT Admin has not accepted), RESPONSIBLE_NOT_IN_DEPARTMENT (the person who answers for a service account left its department or the company: name another), TYPE_NOT_SUPPORTED (K3), BENEFICIARY_DEPARTED (the person has left, or a departure has blocked their access from today though they are not marked left yet: details.cause LEFT or ACCESS_BLOCKED, details.nextStep CANCEL_REQUEST), BENEFICIARY_NOT_STARTED (details.startsOn: the person joins later), CONTRACT_ENDED (details.contractEndDate: the contract of a contractor, freelancer or intern ended before today, so no seat is granted), PURCHASE_NOT_ALLOWED (a `purchase` was sent while the pool of the plan still has a free seat: details.freeSeats and details.subscriptionIds), SEAT_TARGET.APPLICATION_RETIRED, or LICENSE_ASSIGNMENT.SEAT_CAPACITY (the subscription has no free seat and no `purchase` was sent: details.freeSeatsInPool is how many seats the other subscriptions of the plan hold free). A refused purchase is kept in the audit trail with the free seats (PROVISIONING_TASK.PURCHASE_REFUSED).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -105000,6 +105000,12 @@
                           ]
                         },
                         "failureReason": { "type": "string", "nullable": true },
+                        "claimedBy": {
+                          "type": "string",
+                          "format": "uuid",
+                          "description": "The account of the IT Admin who took the task, the same value as claimedBy of the task; null while nobody has. Pressing \"Grant\" takes it, so another IT Admin sees here that the work is already someone's.",
+                          "nullable": true
+                        },
                         "availableActions": {
                           "maxItems": 7,
                           "type": "array",
@@ -105018,7 +105024,7 @@
                           "description": "What the IT Admin may do next on the task, each one a route of the provisioning task: take it, complete it with evidence, report it as not done, try it again, hand it to a person, close it as failed, or cancel it when the requester withdrew."
                         }
                       },
-                      "required": ["taskId", "status", "failureReason", "availableActions"],
+                      "required": ["taskId", "status", "failureReason", "claimedBy", "availableActions"],
                       "additionalProperties": false,
                       "nullable": true
                     },
