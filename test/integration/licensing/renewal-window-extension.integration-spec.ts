@@ -277,6 +277,8 @@ describe('the window and the IT extension of a renewal (integration, real Postgr
             budgetYear: null,
             nextYearAmountMinor: null,
             amountCurrency: null,
+            unitPriceMinor: null,
+            billingCycle: null,
           },
         ]),
       );

@@ -203,6 +203,26 @@ describe('the commitment of 01/01 is what the approval kept (T-RQ2 for 01/01, T-
     expect((await rows(id)).map((row) => row.amount_minor)).toEqual(['8400000']);
   });
 
+  it('B1A-04: one person of the group has their seat closed in March, before the term the approval counted: 01/01 holds their months to the day it closes at the price of the approval (3 × 600.000), not at the price of 01/01 (650.000)', async () => {
+    const u = await unit();
+    const { subscription, plan } = await planAt('K2', 600_000);
+    const group = await people(u, 3);
+    const id = await groupApprovedOn(u, plan, group, `${h.year}-11-15`);
+    for (const person of group) await granted(id, subscription, person);
+    // The seat of the third person closes on 31/03 of the year that begins; the term of the approval ran to 14/08 (9 months from 15/11).
+    await h.ctx.sql.query(
+      `UPDATE license_assignments SET valid_until = $3::date
+        WHERE employee_id = $2 AND id IN (SELECT assignment_id FROM provisioning_tasks WHERE request_id = $1)`,
+      [id, group[2].employeeId, `${h.next}-04-01`],
+    );
+    await setPrice(subscription, 650_000);
+
+    await passOn();
+
+    // 2 × 4.200.000 kept, and January to March at 600.000 for the one who closes; never 3 × 650.000.
+    expect((await rows(id)).map((row) => row.amount_minor)).toEqual([String(2n * 4_200_000n + 3n * 600_000n)]);
+  });
+
   it('B1A-01: a request approved in dollars by an older release is not counted by the number it kept (14.000 cents are not 14.000 dong): the months at the price of 01/01, and the audit trail says so', async () => {
     const u = await unit();
     const { subscription, plan } = await planAt('K1', 600_000);

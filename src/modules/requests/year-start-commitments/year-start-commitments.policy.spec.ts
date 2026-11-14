@@ -20,6 +20,7 @@ const seat = (patch: Partial<YearStartSeat> = {}): YearStartSeat => ({
   departmentId: null,
   termLimited: false,
   savedMinor: null,
+  approvalPrice: null,
   ...patch,
 });
 const amount = (seats: readonly YearStartSeat[], price: YearStartPrice | null = MONTHLY) =>
@@ -138,9 +139,41 @@ describe('BR-MF1-09: the commitment made on 01/01 for a right that goes on', () 
       expect(amount([limited(4_200_000n), closed], at(650_000n))).toMatchObject({ amountMinor: 4_200_000n });
     });
 
-    it('QĐ-111ak: a seat that closes in the new year before the term the approval counted holds the months to that day at the price of 01/01, not the kept number', () => {
-      const closing = limited(4_200_000n, { validUntil: '2027-03-01' });
-      expect(amount([closing], at(650_000n))).toMatchObject({ amountMinor: 2n * 650_000n });
+    describe('B1A-04: a seat that closes in the new year before the term the approval counted', () => {
+      /** The price of a month the approval worked the kept number out at, which is the price of the request and not the one of 01/01. */
+      const approvedAt = (monthly: bigint) => ({
+        unitPrice: { amountMinor: monthly, currency: 'VND' },
+        billingCycle: 'MONTHLY' as const,
+      });
+
+      it('holds the months to the day it closes at the price of the approval (600.000), not at the price of 01/01 (650.000)', () => {
+        const closing = limited(4_200_000n, { validUntil: '2027-03-01', approvalPrice: approvedAt(600_000n) });
+        expect(amount([closing], at(650_000n))).toMatchObject({ amountMinor: 2n * 600_000n });
+      });
+
+      it('never holds more than the approval kept: seven months to 09/07 at 600.000 are 4.200.000 and the commitment stays there when the price of 01/01 rises to 650.000', () => {
+        const closing = limited(4_200_000n, {
+          expectedEndDate: '2027-07-14',
+          validUntil: '2027-07-10',
+          approvalPrice: approvedAt(600_000n),
+        });
+        expect(amount([closing], at(650_000n))).toMatchObject({ amountMinor: 4_200_000n });
+      });
+
+      it('is cut at the kept number when the months at the price of the approval come to more of it', () => {
+        const closing = limited(1_000_000n, { validUntil: '2027-04-01', approvalPrice: approvedAt(600_000n) });
+        expect(amount([closing], at(650_000n))).toMatchObject({ amountMinor: 1_000_000n });
+      });
+
+      it('is not moved by a price of 01/01 that falls', () => {
+        const closing = limited(4_200_000n, { validUntil: '2027-03-01', approvalPrice: approvedAt(600_000n) });
+        expect(amount([closing], at(400_000n))).toMatchObject({ amountMinor: 2n * 600_000n });
+      });
+
+      it('keeps the number of the approval when the price it was worked out at is not known (nothing is worked out at the price of 01/01)', () => {
+        const closing = limited(4_200_000n, { validUntil: '2027-03-01', approvalPrice: null });
+        expect(amount([closing], at(650_000n))).toMatchObject({ amountMinor: 4_200_000n });
+      });
     });
 
     it('a request of an older release kept nothing: its seat is counted by the months to its end at the price of 01/01, as before', () => {

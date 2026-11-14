@@ -17,6 +17,8 @@ const candidate = (patch: Partial<YearStartCandidate> & { id: string }): YearSta
   budgetYear: 2026,
   nextYearAmountMinor: null,
   amountCurrency: 'VND',
+  unitPriceMinor: null,
+  billingCycle: null,
   ...patch,
 });
 

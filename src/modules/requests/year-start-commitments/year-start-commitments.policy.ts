@@ -30,6 +30,11 @@ export interface YearStartSeat {
   termLimited: boolean;
   /** What the approval kept of this seat for the year that begins (`QĐ-111k`, M-13): null when it kept nothing (a request of an older release). */
   savedMinor: bigint | null;
+  /**
+   * The price of a seat the approval worked the kept number out at, in dong (the unit price and billing cycle the request carries): a seat that
+   * closes before its term is counted at this price, never at the price of 01/01 (`QĐ-111ak`). Null when the request does not carry one.
+   */
+  approvalPrice: Pick<YearStartPrice, 'unitPrice' | 'billingCycle'> | null;
 }
 
 /** What a plan is bought at, as the catalog says it. */
@@ -77,23 +82,36 @@ export function seatCountsOn(seat: YearStartSeat, yearStart: BusinessDate): bool
 }
 
 /**
- * Whether the number the approval kept holds for the seat: only for a seat of a request for months of use, that still ends the way the
- * approval counted it. A seat that closes in the new year before its term (a revocation, a period that closes) is counted by the months it
- * has left, at the price of 01/01, so the commitment never holds what nobody will use. A right with no end is never counted from the kept
- * number: it holds twelve months of the price on 01/01 (`QĐ-111ak`, R-46), the kept number is for the warning of the approval only.
+ * What the approval kept of the seat, when the seat is of a request for months of use and the approval kept a number (`QĐ-111ak`: exactly the
+ * number of the year after it kept): null for a seat that kept none (a request of an older release) and for a right with no end, which holds
+ * twelve months of the price on 01/01 (R-46; the kept number is for the warning of the approval only). A seat that closes in the new year
+ * before its term (a revocation, a period that closes) holds the months it has left, so the commitment never holds what nobody will use, but
+ * at the price the approval counted with and never more than the approval kept: the price of 01/01 does not reach a seat that kept a number.
  */
-function keptAmountOf(seat: YearStartSeat): bigint | null {
+function keptAmountOf(seat: YearStartSeat, yearStart: BusinessDate): bigint | null {
   if (!seat.termLimited || seat.savedMinor === null) return null;
   const closes = seat.validUntil === null ? null : addDays(seat.validUntil, -1);
   const closesBeforeTerm = closes !== null && (seat.expectedEndDate === null || closes < seat.expectedEndDate);
+  if (!closesBeforeTerm || seat.approvalPrice === null) return seat.savedMinor;
 
-  return closesBeforeTerm ? null : seat.savedMinor;
+  const monthsToClose = requestAmountOf({
+    kind: 'RECURRING',
+    unitPrice: seat.approvalPrice.unitPrice,
+    billingCycle: seat.approvalPrice.billingCycle,
+    beneficiaries: 1,
+    checkDate: yearStart,
+    endDate: closes,
+  });
+  if (monthsToClose.status === 'MISSING') return seat.savedMinor;
+
+  return monthsToClose.amount.amountMinor < seat.savedMinor ? monthsToClose.amount.amountMinor : seat.savedMinor;
 }
 
 /**
  * The amount of the commitment of one request on 01/01 (`QĐ-111ak`, `QĐ-111k`, M-13), the one rule of the pass and of the amount the budget
  * of the year after takes as carried over: of the seats that still stand after 31/12 (the person who left, the seat revoked, the right that
- * ended hold nothing), a seat of a request for months of use holds exactly what the approval kept of it for the year; a seat with no end
+ * ended hold nothing), a seat of a request for months of use holds exactly what the approval kept of it for the year (a seat that closes before
+ * its term, the months it has left at the price of the approval, no more than that); a seat with no end
  * holds twelve months of the monthly price of 01/01; a seat of an older release, which kept nothing, the months from January to the month of
  * its last day at that price, worked out with the rule of the amount of a request (`requestAmountOf`, the day it is checked on being 01/01),
  * so the two cannot disagree on a month.
@@ -115,7 +133,7 @@ export function yearStartAmountOf(input: {
   const seatsByEnd = new Map<string | null, number>();
   let total = 0n;
   for (const seat of counted) {
-    const kept = keptAmountOf(seat);
+    const kept = keptAmountOf(seat, yearStart);
     if (kept !== null) {
       total += kept;
       continue;

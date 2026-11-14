@@ -51,6 +51,24 @@ interface IgnoredSaved {
 type LeftOut = { requestId: string; reason: YearStartSkipReason };
 
 /**
+ * The price of a seat each request counted with at its approval, in dong (`unit_price_minor` and `billing_cycle` of the request): a seat that
+ * closes before its term is counted at it, not at the price of 01/01 (`QĐ-111ak`). Null for a request that carries none, or carries it in
+ * another currency: such a number is never read as dong (`QĐ-111an`).
+ */
+function approvalPriceOf(
+  candidates: readonly YearStartCandidate[],
+): (requestId: string) => YearStartSeat['approvalPrice'] {
+  const byId = new Map(candidates.map((candidate) => [candidate.id, candidate]));
+
+  return (requestId) => {
+    const request = byId.get(requestId);
+    if (!request || request.amountCurrency !== DONG || request.unitPriceMinor === null) return null;
+
+    return { unitPrice: { amountMinor: request.unitPriceMinor, currency: DONG }, billingCycle: request.billingCycle };
+  };
+}
+
+/**
  * One batch of the pass of 01/01 (`FR-5.8`(6), `BR-MF1-09e`, `QĐ-109a`), in one transaction. The order of the locks is the one of the budgets
  * and of every transaction of a request, after the lock of the pass the caller took: (1) the rows of the requests of the batch, `FOR UPDATE` in
  * order of id, and what is judged is read after, from their state now; (2) the grants, read without a lock; (3) in `holdYearStart`, the lock of
@@ -196,12 +214,13 @@ export class YearStartCommitmentsBatchService {
     year: number,
   ): Promise<{ seats: Map<string, YearStartSeat[]>; ignored: IgnoredSaved[] }> {
     const { keptOf, ignored } = await this.keptNumbersOf(tx, candidates, year);
+    const priceOf = approvalPriceOf(candidates);
     const seats = new Map<string, YearStartSeat[]>();
     for (const [requestId, seat] of [
       ...(await this.unclaimedSeatsOf(tx, candidates, year, keptOf)),
       ...(await this.grantedSeatsOf(tx, candidates, year, keptOf)),
     ]) {
-      seats.set(requestId, [...(seats.get(requestId) ?? []), seat]);
+      seats.set(requestId, [...(seats.get(requestId) ?? []), { ...seat, approvalPrice: priceOf(requestId) }]);
     }
 
     return { seats, ignored };
@@ -276,6 +295,7 @@ export class YearStartCommitmentsBatchService {
             departmentId: null,
             termLimited: termMonths !== null || seat.expectedEndDate !== null,
             savedMinor,
+            approvalPrice: null,
           },
         ]);
       }
@@ -317,6 +337,7 @@ export class YearStartCommitmentsBatchService {
           departmentId: seat.owningDepartmentId,
           termLimited: (termOf.get(seat.requestId) ?? null) !== null || seat.expectedEndDate !== null,
           savedMinor: keptOf(seat.requestId, seat.employeeId),
+          approvalPrice: null,
         },
       ]);
   }

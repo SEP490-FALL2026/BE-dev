@@ -3,6 +3,7 @@ import { Prisma } from '../../../generated/prisma/client';
 import { fromDateColumn, type BusinessDate } from '../../../core/business-date';
 import { DONG } from '../../../core/money/money';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
+import type { BillingCycleCode } from '../access-request/access-request.types';
 import { YEAR_START_REQUEST_STATES } from './year-start-commitments.policy';
 
 /** A request the pass may commit for, as it stands now (its row is locked until the transaction ends). */
@@ -21,6 +22,9 @@ export interface YearStartCandidate {
   nextYearAmountMinor: bigint | null;
   /** The currency the approval worked its amounts out in: a request approved before the prices were all in dong may still have another (`QĐ-111an`). */
   amountCurrency: string | null;
+  /** The price of a seat per billing period the approval worked out at, in that currency (`unit_price_minor`, `billing_cycle` of the request). */
+  unitPriceMinor: bigint | null;
+  billingCycle: BillingCycleCode | null;
 }
 
 /** A number the approval of a person of a group kept of a year in a currency other than dong. */
@@ -42,6 +46,8 @@ interface CandidateRow {
   budget_year: number | null;
   next_year_amount_minor: bigint | null;
   amount_currency: string | null;
+  unit_price_minor: bigint | null;
+  billing_cycle: BillingCycleCode | null;
 }
 
 /**
@@ -170,7 +176,8 @@ export class YearStartCommitmentsRepo {
     const after = afterId === null ? Prisma.empty : Prisma.sql`AND r."id" > ${afterId}::uuid`;
     const rows = await tx.$queryRaw<CandidateRow[]>`
       SELECT r."id", r."type"::text AS "type", r."state"::text AS "state", r."plan_id", r."department_id", r."expected_end_date",
-             r."term_months", r."budget_year", r."next_year_amount_minor", r."amount_currency"
+             r."term_months", r."budget_year", r."next_year_amount_minor", r."amount_currency", r."unit_price_minor",
+             r."billing_cycle"::text AS "billing_cycle"
         FROM "access_requests" r
        WHERE r."organization_id" = ${organizationId}::uuid
          AND r."type" IN ('GRANT', 'SERVICE_ACCOUNT', 'GROUP_GRANT', 'RENEWAL')
@@ -192,6 +199,8 @@ export class YearStartCommitmentsRepo {
       budgetYear: row.budget_year,
       nextYearAmountMinor: row.next_year_amount_minor,
       amountCurrency: row.amount_currency,
+      unitPriceMinor: row.unit_price_minor,
+      billingCycle: row.billing_cycle,
     }));
   }
 
