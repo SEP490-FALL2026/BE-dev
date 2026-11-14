@@ -106,8 +106,6 @@ export interface NewAccessRequest {
   createdByAppUserId: string;
   now: Date;
   needStep: NewNeedStep;
-  /** GH-3 of the person, fixed when it is sent; absent or null when the request is not flagged. */
-  manyPaidSoftware?: ManyPaidSoftwareFlag | null;
   /** Why the request was left out of GH-1/GH-2 when it was sent; absent or null when it was not (`QĐ-110q`). */
   limitExemption?: LimitExemption | null;
   /** The old right of the person, held from before a transfer, that this request replaces (R-49): only beside the exemption of the grace. */
@@ -187,16 +185,8 @@ export interface CancellationRecord {
 export const LIMIT_EXEMPTIONS = ['TRANSFER_GRACE', 'ROLE_ENDED'] as const;
 export type LimitExemption = (typeof LIMIT_EXEMPTIONS)[number];
 
-/** GH-3 (`BR-MF1-01g`): the beneficiary used this many paid applications when the request was sent, and why they asked for more. */
-export interface ManyPaidSoftwareFlag {
-  count: number;
-  reason: string;
-}
-
 export interface AccessRequestRecord {
   routing?: import('./routing.policy').RequestRouting;
-  /** GH-3 of the person of a request of one person; null (or absent on a record made in a test) when it is not flagged. */
-  manyPaidSoftware?: ManyPaidSoftwareFlag | null;
   /** Why the request was left out of GH-1/GH-2 when it was sent (`QĐ-110q`: `TRANSFER_GRACE`); null (or absent) when it was not. */
   limitExemption?: LimitExemption | null;
   /** The old right of the person this request replaces (R-49); internal, never on the wire. */

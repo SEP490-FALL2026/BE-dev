@@ -138,7 +138,6 @@ describe('the operating parameters and the non-working dates over HTTP (integrat
         'BACKLOG_ALERT_THRESHOLD',
         'SPEND_SUBMISSION_WAIT_WORKING_DAYS',
         'REQUEST_OPEN_NEW_LIMIT',
-        'PAID_SOFTWARE_FLAG_THRESHOLD',
         'RENEWAL_WINDOW_DAYS',
         'FORECAST_ERROR_THRESHOLD_PERCENT',
         'BUDGET_RESERVE_DEFAULT_PERCENT',
@@ -422,11 +421,11 @@ describe('the operating parameters and the non-working dates over HTTP (integrat
       const parameters = await list();
 
       expect(parameters.has('BUDGET_PERIOD_KIND')).toBe(false);
-      // 27 before GH-1/2/3 and the renewal window (REQUEST_OPEN_NEW_LIMIT, PAID_SOFTWARE_FLAG_THRESHOLD, RENEWAL_WINDOW_DAYS), then the
-      // three of MF-2 and MF-3 (DEPARTURE_REVOCATION_WORKING_DAYS, TRANSFER_GRACE_WORKING_DAYS, TRANSFER_GRACE_REMINDER_WORKING_DAYS), less the
+      // 27 before GH-1/2/3 and the renewal window (REQUEST_OPEN_NEW_LIMIT, PAID_SOFTWARE_FLAG_THRESHOLD, RENEWAL_WINDOW_DAYS), less the
+      // threshold of GH-3 that went with it (PAID_SOFTWARE_FLAG_THRESHOLD, QĐ-111h), then the three of MF-2 and MF-3 (DEPARTURE_REVOCATION_WORKING_DAYS, TRANSFER_GRACE_WORKING_DAYS, TRANSFER_GRACE_REMINDER_WORKING_DAYS), less the
       // two of the handover that went (ABRUPT_DEPARTURE_HOLD_WORKING_DAYS, HANDOVER_SHORT_DEADLINE_WORKING_DAYS, QĐ-110g) and the deadline of the
       // review of the new head after a transfer (TRANSFER_REVIEW_WORKING_DAYS, QĐ-110p).
-      expect(parameters.size).toBe(30);
+      expect(parameters.size).toBe(29);
     });
 
     it('is 404 for a parameter that does not exist, the time zone included (AC-11)', async () => {

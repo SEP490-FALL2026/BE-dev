@@ -70,19 +70,15 @@ const previewSchema = z.strictObject({
     })
     .nullable(),
   /**
-   * GH-1/GH-2/GH-3 of the person on the day (`BR-MF1-01`): the requests for new access they were named in this calendar week (Monday to Sunday of
-   * the organization; withdrawn and refused ones count) and the most they may, the Monday the count starts again, the paid
-   * applications they use and the threshold, whether a reason is required, and why sending would be refused (`openRequestId` is the
-   * request of the same plan already open). Read without a lock: sending judges again.
+   * GH-1/GH-2 of the person on the day (`BR-MF1-01`): the requests for new access they were named in this calendar week (Monday to Sunday of
+   * the organization; withdrawn and refused ones count) and the most they may, the Monday the count starts again, and why sending would be
+   * refused (`openRequestId` is the request of the same plan already open). Read without a lock: sending judges again.
    */
   limits: z.strictObject({
     openNewCount: z.number().int().nonnegative(),
     openNewMax: z.number().int().positive(),
     /** The Monday, as YYYY-MM-DD, the count of GH-2 starts again. */
     resetsOn: z.string(),
-    paidSoftwareCount: z.number().int().nonnegative(),
-    paidSoftwareThreshold: z.number().int().positive(),
-    reasonRequired: z.boolean(),
     refusal: z.enum(['HAS_OPEN_REQUEST', 'OPEN_LIMIT_REACHED']).nullable(),
     openRequestId: z.uuid().nullable(),
   }),

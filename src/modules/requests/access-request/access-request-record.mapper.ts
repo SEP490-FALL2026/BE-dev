@@ -16,8 +16,6 @@ export const SELECT_REQUEST = {
   routingMode: true,
   oneStepReason: true,
   oneStepBlockedReason: true,
-  manyPaidSoftwareCount: true,
-  manyPaidSoftwareReason: true,
   limitExemption: true,
   replacesAssignmentId: true,
   planId: true,
@@ -133,24 +131,9 @@ function sentColumns(row: RequestRow): { costCenterId: string | null; submittedA
   return { costCenterId: row.costCenterId, submittedAt: row.submittedAt };
 }
 
-/** GH-3 of the request (`BR-MF1-01g`): the count and the reason are written together, or neither. */
-export function manyPaidSoftwareOf(row: {
-  manyPaidSoftwareCount: number | null;
-  manyPaidSoftwareReason: string | null;
-}): { count: number; reason: string } | null {
-  return row.manyPaidSoftwareCount !== null && row.manyPaidSoftwareReason !== null
-    ? { count: row.manyPaidSoftwareCount, reason: row.manyPaidSoftwareReason }
-    : null;
-}
-
 /** The exemption a request carries, as the policy knows it; a value the policy does not know (the overlap of a transfer of the old rule) reads as none. */
 export function limitExemptionOf(value: string | null): LimitExemption | null {
   return (LIMIT_EXEMPTIONS as readonly string[]).includes(value ?? '') ? (value as LimitExemption) : null;
-}
-
-/** The columns GH-3 writes on a request or a line (`BR-MF1-01g`): none when it is not flagged. */
-export function manyPaidSoftwareColumns(flag: { count: number; reason: string } | null | undefined) {
-  return flag ? { manyPaidSoftware: true, manyPaidSoftwareCount: flag.count, manyPaidSoftwareReason: flag.reason } : {};
 }
 
 export function toRecord(row: RequestRow): AccessRequestRecord {
@@ -183,7 +166,6 @@ export function toRecord(row: RequestRow): AccessRequestRecord {
       row.oneStepBlockedReason === null
         ? null
         : currentMissingReasonOf(row.oneStepBlockedReason as 'PRICE_MISSING' | 'RATE_MISSING'),
-    manyPaidSoftware: manyPaidSoftwareOf(row),
     limitExemption: limitExemptionOf(row.limitExemption),
     replacesAssignmentId: row.replacesAssignmentId,
     id: row.id,

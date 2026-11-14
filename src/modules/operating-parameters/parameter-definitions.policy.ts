@@ -122,18 +122,6 @@ export const PARAMETER_DEFINITIONS: readonly ParameterDefinition[] = [
     source: 'BR-MF1-01f, QĐ-111h',
   },
   {
-    key: 'PAID_SOFTWARE_FLAG_THRESHOLD',
-    label: 'Ngưỡng số phần mềm trả phí cần lý do khi xin thêm',
-    group: 'WORKFLOW',
-    shape: { kind: 'int', min: 1, max: 100 },
-    default: 10,
-    unit: 'applications',
-    unitLabel: 'phần mềm',
-    description:
-      'GH-3: a person who already uses this many paid applications may still ask for another one, with a reason, and the request is flagged.',
-    source: 'BR-MF1-01g, QĐ-103c',
-  },
-  {
     key: 'RENEWAL_WINDOW_DAYS',
     label: 'Cửa sổ gửi Request tiếp tục trước ngày kết thúc',
     group: 'WORKFLOW',

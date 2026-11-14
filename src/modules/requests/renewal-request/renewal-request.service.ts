@@ -144,16 +144,11 @@ export class RenewalRequestService {
     const expectedEndDate =
       body.newEndDate ?? effectiveEndOf({ start: input.today, months: body.extensionMonths ?? 12 });
     const termMonths = monthsBetween(input.today, expectedEndDate);
+    // A late ask is a request for new access: GH-1/GH-2 judge it as any other (BR-MF1-01).
     const record = await this.accessRequests.submitWithin(
       tx,
       actor,
-      {
-        planId: facts.planId,
-        businessReason: body.businessReason,
-        expectedEndDate,
-        // A late ask is a request for new access: GH-1/GH-2/GH-3 judge it as any other (BR-MF1-01).
-        manyPaidSoftwareReason: body.manyPaidSoftwareReason,
-      },
+      { planId: facts.planId, businessReason: body.businessReason, expectedEndDate },
       input.settings,
       { toleratedSeatId: facts.assignmentId },
     );

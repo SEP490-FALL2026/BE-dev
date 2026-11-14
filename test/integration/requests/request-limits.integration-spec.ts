@@ -1,5 +1,4 @@
 import request from 'supertest';
-import { businessDateAt } from '../../../src/core/business-date';
 import { TransactionRunner } from '../../../src/infrastructure/database/transaction-runner';
 import { RequestLimitsService } from '../../../src/modules/requests/request-limits/request-limits.service';
 import { Department, Person, RequestHarness } from '../../support/request-harness';
@@ -15,9 +14,9 @@ const codeOf = (response: Refused) => response.body.error?.code;
 const detailsOf = (response: Refused) => response.body.error?.details ?? {};
 
 /**
- * The limits of a request for new access, per beneficiary, over PostgreSQL (`BR-MF1-01` GH-1/GH-2/GH-3, `QĐ-103c`, `QĐ-111h`, `QĐ-106g`,
+ * The limits of a request for new access, per beneficiary, over PostgreSQL (`BR-MF1-01` GH-1/GH-2, `QĐ-103c`, `QĐ-111h`, `QĐ-106g`,
  * `QĐ-108c`): an open request of the same plan refuses, and so do as many requests sent in the calendar week of the organization as the
- * parameter allows, whatever became of them; many paid applications ask for a reason and flag the request; a request for a group is
+ * parameter allows, whatever became of them; there is no GH-3; a request for a group is
  * refused whole with every line that breaks a limit. The harness raises GH-2 for the other suites; this one sets it to three to keep the
  * cases short, and judges the week of T-RQ1 with ten.
  */
@@ -39,7 +38,6 @@ describe('the limits of a request for new access (integration, real PostgreSQL, 
     await h.start();
     await h.enforceRequestLimits();
     await h.setParameter('REQUEST_OPEN_NEW_LIMIT', 3).expect(200);
-    await h.setParameter('PAID_SOFTWARE_FLAG_THRESHOLD', 10).expect(200);
     design = await h.departmentWithUnit('P-GH');
     head = await h.staff(design, 'GH-H1');
     await h.makeHead(design, head);
@@ -209,10 +207,8 @@ describe('the limits of a request for new access (integration, real PostgreSQL, 
         limits.judgeOne(tx, {
           employeeId: who.employeeId,
           planId: probePlan,
-          applicationId: null,
           now,
-          today: businessDateAt(now, 'Asia/Ho_Chi_Minh'),
-          settings: { weeklyLimit: 10, paidThreshold: 10 },
+          settings: { weeklyLimit: 10 },
         }),
       );
 
@@ -311,7 +307,7 @@ describe('the limits of a request for new access (integration, real PostgreSQL, 
     });
   });
 
-  describe('BR-MF1-01g GH-3: many paid applications in use', () => {
+  describe('QĐ-111h: there is no GH-3, a person who uses many paid applications asks as anyone', () => {
     let e7: Person;
     let fresh: string;
 
@@ -328,56 +324,37 @@ describe('the limits of a request for new access (integration, real PostgreSQL, 
           [planId, e7.employeeId],
         );
       }
-      await h.setParameter('PAID_SOFTWARE_FLAG_THRESHOLD', 2).expect(200);
       fresh = await h.planOf(await h.subscription(20));
     });
 
-    afterAll(async () => {
-      await h.setParameter('PAID_SOFTWARE_FLAG_THRESHOLD', 10).expect(200);
-    });
-
-    it('the preview says a reason is required, with the count and the threshold', async () => {
+    it('the preview says nothing of paid applications: no count, no threshold, no reason asked', async () => {
       const preview = await h.previewed(e7, fresh);
+      const { limits } = preview as unknown as { limits: Record<string, unknown> };
 
-      expect((preview as unknown as { limits: Record<string, unknown> }).limits).toMatchObject({
-        paidSoftwareCount: 2,
-        paidSoftwareThreshold: 2,
-        reasonRequired: true,
-        refusal: null,
-      });
+      expect(limits).toMatchObject({ refusal: null });
+      for (const gone of ['paidSoftwareCount', 'paidSoftwareThreshold', 'reasonRequired'])
+        expect(limits).not.toHaveProperty(gone);
     });
 
-    it('refuses the request without a reason, and flags it with one for the head and the spending approver', async () => {
-      const without = await open(e7, fresh).expect(422);
+    it('sends the request with no reason, flags nothing and writes nothing of GH-3', async () => {
+      const sent = (await open(e7, fresh).expect(201)).body as {
+        data: { request: Record<string, unknown> & { id: string } };
+      };
 
-      expect(codeOf(without)).toBe('ACCESS_REQUEST.MANY_PAID_SOFTWARE_REASON_REQUIRED');
-      expect(detailsOf(without)).toEqual({ count: 2, threshold: 2 });
-
-      const sent = (
-        (await open(e7, fresh, { manyPaidSoftwareReason: 'The client works in it' }).expect(201)).body as {
-          data: { request: { id: string; flags: unknown } };
-        }
-      ).data.request;
-      expect(sent.flags).toEqual({ manyPaidSoftware: { count: 2, reason: 'The client works in it' } });
-
-      const read = (await h.fetch(sent.id, head.account).expect(200)).body as { data: { request: { flags: unknown } } };
-      expect(read.data.request.flags).toEqual({ manyPaidSoftware: { count: 2, reason: 'The client works in it' } });
-    });
-
-    it('does not flag nor store a reason under the threshold', async () => {
-      const e8 = await person('GH-E8');
-      const sent = (
-        (await open(e8, fresh, { manyPaidSoftwareReason: 'Just in case' }).expect(201)).body as {
-          data: { request: { id: string; flags: unknown } };
-        }
-      ).data.request;
-
-      expect(sent.flags).toEqual({ manyPaidSoftware: null });
+      expect(sent.data.request).not.toHaveProperty('flags');
       const { rows } = await h.ctx.sql.query<{ many_paid_software: boolean; many_paid_software_reason: string | null }>(
         `SELECT many_paid_software, many_paid_software_reason FROM access_requests WHERE id = $1`,
-        [sent.id],
+        [sent.data.request.id],
       );
       expect(rows[0]).toEqual({ many_paid_software: false, many_paid_software_reason: null });
+    });
+
+    it('refuses a body that still carries the reason of GH-3, as a field the form does not have', async () => {
+      const e8 = await person('GH-E8');
+
+      const refused = await open(e8, fresh, { manyPaidSoftwareReason: 'Just in case' }).expect(422);
+
+      expect(codeOf(refused)).toBe('VALIDATION_ERROR');
     });
   });
 

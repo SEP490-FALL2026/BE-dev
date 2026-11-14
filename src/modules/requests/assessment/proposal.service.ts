@@ -64,16 +64,8 @@ export class ProposalService {
         lockDepartment: true,
       });
       assertTermAllowed(assessed);
-      // A proposal names no plan: GH-1 has nothing to match, GH-2 counts it, and GH-3 flags it (`BR-MF1-01`).
-      const manyPaidSoftware = await this.limits.requireForOne(tx, {
-        employeeId: actor.employeeId,
-        planId: null,
-        applicationId: null,
-        now,
-        today: assessed.today,
-        settings: limitSettings,
-        reason: body.manyPaidSoftwareReason,
-      });
+      // A proposal names no plan: GH-1 has nothing to match, and GH-2 counts it (`BR-MF1-01`).
+      await this.limits.requireForOne(tx, { employeeId: actor.employeeId, planId: null, now, settings: limitSettings });
       const { unit, policy, pricing, routing } = assessed;
       const { decision, departmentHeadEmployeeId } = routing;
       const assigned = decision.outcome === 'ASSIGNED';
@@ -91,7 +83,6 @@ export class ProposalService {
         businessReason: body.purpose,
         termMonths: null,
         expectedEndDate: expectedEndDate,
-        manyPaidSoftware,
         pricing,
         policy,
         createdByAppUserId: actor.appUserId,

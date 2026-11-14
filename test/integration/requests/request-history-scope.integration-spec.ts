@@ -13,7 +13,6 @@ interface HistoryRow {
   department: { id: string; code: string };
   routing: { mode: string; oneStepReason: string | null };
   reserveUsed: boolean;
-  flags: { manyPaidSoftware: { count: number; reason: string } | null };
   awaitingMe?: boolean;
 }
 interface HistoryPage {
@@ -203,7 +202,7 @@ describe('the histories of requests by role (integration, real PostgreSQL)', () 
       expect(h.codeOf(await get(PATH, design.member.account).expect(403))).toBe('AUTHORIZATION.FORBIDDEN');
     });
 
-    it('BR-MF1-01g GH-3: says on the row the flag the request was sent with, how many paid applications and why, and null otherwise', async () => {
+    it('QĐ-111h: there is no GH-3 flag any more: a request an older release flagged reads like any other, with no flag and no reason on the row', async () => {
       await h.ctx.sql.query(
         `UPDATE access_requests SET many_paid_software = true, many_paid_software_count = 12, many_paid_software_reason = $2 WHERE id = $1`,
         [r.other, 'Needs both design suites for the client'],
@@ -211,10 +210,8 @@ describe('the histories of requests by role (integration, real PostgreSQL)', () 
       const rows = h.dataOf<HistoryPage>(await get(PATH, h.it1, { pageSize: 100 }).expect(200)).items;
       const byId = new Map(rows.map((row) => [row.id, row]));
 
-      expect(byId.get(r.other)?.flags).toEqual({
-        manyPaidSoftware: { count: 12, reason: 'Needs both design suites for the client' },
-      });
-      expect(byId.get(r.waiting)?.flags).toEqual({ manyPaidSoftware: null });
+      expect(byId.get(r.other)).not.toHaveProperty('flags');
+      expect(JSON.stringify(rows)).not.toContain('Needs both design suites for the client');
       expect(byId.get(r.other)?.reserveUsed).toBe(false);
     });
 

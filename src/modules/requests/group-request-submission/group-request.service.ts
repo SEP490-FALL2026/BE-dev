@@ -50,7 +50,6 @@ export interface GroupCheck {
     employeeId: string;
     ok: boolean;
     reason: LineReason | 'DUPLICATE_LINE' | null;
-    manyPaidSoftware: { count: number; threshold: number } | null;
   }[];
   pricing: PricingRecord;
   lineCount: number;
@@ -101,7 +100,6 @@ export class GroupRequestService {
             employeeId: line.employeeId,
             ok: reason === null,
             reason,
-            manyPaidSoftware: judged.limits.get(line.employeeId)?.manyPaidSoftware ?? null,
           };
         }),
         pricing: judged.pricing,

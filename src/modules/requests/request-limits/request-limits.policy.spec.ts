@@ -1,27 +1,16 @@
-import {
-  judgeNewRequestLimits,
-  manyPaidSoftwareReasonOf,
-  weekWindowOf,
-  type LimitFacts,
-} from './request-limits.policy';
+import { judgeNewRequestLimits, weekWindowOf, type LimitFacts } from './request-limits.policy';
 
 const HCM = 'Asia/Ho_Chi_Minh';
 
 const facts = (over: Partial<LimitFacts> = {}): LimitFacts => ({
   planId: 'plan-figma-pro',
-  applicationId: 'app-figma',
   openNew: [],
   sentThisWeek: 0,
   weeklyLimit: 10,
   resetsOn: '2026-11-16',
-  paidApplicationIds: new Set<string>(),
-  paidThreshold: 10,
   exemption: null,
   ...over,
 });
-
-const apps = (count: number, ...extra: string[]): Set<string> =>
-  new Set([...Array.from({ length: count }, (_, index) => `app-${index}`), ...extra]);
 
 describe('judgeNewRequestLimits (BR-MF1-01)', () => {
   describe('BR-MF1-01e GH-1: a request of the same plan open', () => {
@@ -81,20 +70,12 @@ describe('judgeNewRequestLimits (BR-MF1-01)', () => {
   });
 
   describe('QĐ-108c: a request after a role ended (ROLE_ENDED)', () => {
-    it('skips GH-1 and GH-2 but not GH-3', () => {
+    it('skips GH-1 and GH-2', () => {
       const open = ['r-1', 'r-2', 'r-3'].map((requestId) => ({ requestId, planId: 'plan-figma-pro' }));
 
-      const verdict = judgeNewRequestLimits(
-        facts({
-          openNew: open,
-          sentThisWeek: 10,
-          exemption: 'ROLE_ENDED',
-          applicationId: 'app-miro',
-          paidApplicationIds: apps(10),
-        }),
-      );
+      const verdict = judgeNewRequestLimits(facts({ openNew: open, sentThisWeek: 10, exemption: 'ROLE_ENDED' }));
 
-      expect(verdict).toMatchObject({ refusal: null, sentThisWeek: 0, manyPaidSoftware: { count: 10, threshold: 10 } });
+      expect(verdict).toMatchObject({ refusal: null, sentThisWeek: 0 });
     });
   });
 
@@ -133,77 +114,6 @@ describe('judgeNewRequestLimits (BR-MF1-01)', () => {
       );
 
       expect(verdict.refusal).toBeNull();
-    });
-
-    it('keeps GH-3: many paid applications still ask a reason', () => {
-      const verdict = judgeNewRequestLimits(grace({ applicationId: 'app-miro', paidApplicationIds: apps(10) }));
-
-      expect(verdict).toMatchObject({ refusal: null, manyPaidSoftware: { count: 10, threshold: 10 } });
-    });
-  });
-
-  describe('BR-MF1-01g GH-3: many paid applications in use', () => {
-    it('flags a person who uses ten paid applications asking for another one', () => {
-      const verdict = judgeNewRequestLimits(facts({ applicationId: 'app-miro', paidApplicationIds: apps(10) }));
-
-      expect(verdict).toMatchObject({
-        refusal: null,
-        manyPaidSoftware: { count: 10, threshold: 10 },
-        paidSoftwareCount: 10,
-      });
-    });
-
-    it('does not flag nine (the count is of applications: two plans of one application are one, K5 is not read)', () => {
-      const verdict = judgeNewRequestLimits(facts({ applicationId: 'app-miro', paidApplicationIds: apps(9) }));
-
-      expect(verdict.manyPaidSoftware).toBeNull();
-      expect(verdict.paidSoftwareCount).toBe(9);
-    });
-
-    it('M-16: does not flag another plan of an application the person already uses at ten', () => {
-      const verdict = judgeNewRequestLimits(
-        facts({ applicationId: 'app-figma', paidApplicationIds: apps(9, 'app-figma') }),
-      );
-
-      expect(verdict.manyPaidSoftware).toBeNull();
-    });
-
-    it('flags a proposal of new software (no application known yet)', () => {
-      const verdict = judgeNewRequestLimits(facts({ planId: null, applicationId: null, paidApplicationIds: apps(10) }));
-
-      expect(verdict.manyPaidSoftware).toEqual({ count: 10, threshold: 10 });
-    });
-
-    it('is told together with a refusal: GH-3 never refuses by itself', () => {
-      const verdict = judgeNewRequestLimits(
-        facts({ sentThisWeek: 10, applicationId: 'app-miro', paidApplicationIds: apps(12) }),
-      );
-
-      expect(verdict).toMatchObject({ refusal: 'OPEN_LIMIT_REACHED', manyPaidSoftware: { count: 12 } });
-    });
-  });
-});
-
-describe('manyPaidSoftwareReasonOf (BR-MF1-01g GH-3)', () => {
-  const flagged = { manyPaidSoftware: { count: 10, threshold: 10 } };
-
-  it('keeps the reason of a flagged request, trimmed', () => {
-    expect(manyPaidSoftwareReasonOf(flagged, '  needed for the client  ')).toEqual({
-      flagged: true,
-      reason: 'needed for the client',
-      missing: false,
-    });
-  });
-
-  it.each([undefined, null, '', '   '])('a flagged request with the reason %p misses it', (reason) => {
-    expect(manyPaidSoftwareReasonOf(flagged, reason)).toEqual({ flagged: true, reason: null, missing: true });
-  });
-
-  it('drops a reason sent for a request that is not flagged', () => {
-    expect(manyPaidSoftwareReasonOf({ manyPaidSoftware: null }, 'why not')).toEqual({
-      flagged: false,
-      reason: null,
-      missing: false,
     });
   });
 });

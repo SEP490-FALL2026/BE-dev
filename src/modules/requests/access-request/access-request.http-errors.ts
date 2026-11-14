@@ -9,7 +9,6 @@ import { FinanceSetupIncompleteError } from '../../organization/public/organizat
 import { errorExampleOf } from '../../../infrastructure/http/openapi-error-examples';
 import {
   AccessRequestAlreadyHoldsAccessError,
-  AccessRequestManyPaidSoftwareReasonRequiredError,
   AccessRequestOpenLimitReachedError,
   AccessRequestOpenRequestExistsError,
   AccessRequestEmployeeRequiredError,
@@ -113,13 +112,6 @@ export function toAccessRequestApiException(error: unknown): unknown {
       details: { limit: error.limit, resetsOn: error.resetsOn },
     });
   }
-  if (error instanceof AccessRequestManyPaidSoftwareReasonRequiredError) {
-    return new ApiException(HttpStatus.UNPROCESSABLE_ENTITY, {
-      code: 'ACCESS_REQUEST.MANY_PAID_SOFTWARE_REASON_REQUIRED',
-      message: error.message,
-      details: { count: error.count, threshold: error.threshold },
-    });
-  }
   if (error instanceof AccessRequestNotAssigneeError) {
     return refuse(HttpStatus.FORBIDDEN, 'ACCESS_REQUEST.NOT_THE_ASSIGNEE', error.message);
   }
@@ -207,7 +199,6 @@ export const ACCESS_REQUEST_ERROR_EXAMPLES = {
   ),
   OPEN_REQUEST_EXISTS: example(new AccessRequestOpenRequestExistsError('<request-id>')),
   OPEN_LIMIT_REACHED: example(new AccessRequestOpenLimitReachedError(10, '2026-11-16')),
-  MANY_PAID_SOFTWARE_REASON_REQUIRED: example(new AccessRequestManyPaidSoftwareReasonRequiredError(10, 10)),
   NOT_ASSIGNEE: example(new AccessRequestNotAssigneeError()),
   EMPLOYEE_REQUIRED: example(new AccessRequestEmployeeRequiredError()),
   GROUP_USES_LINES: example(new AccessRequestGroupUsesLinesError()),

@@ -22,11 +22,6 @@ export const renewalSubmitSchema = z
     /** Deprecated: how many months more the holder wants, kept for the clients of before `newEndDate`. Exactly one of the two. */
     extensionMonths: z.number().int().min(1).max(12).optional(),
     businessReason: reason,
-    /**
-     * GH-3 (`BR-MF1-01g`): used only when the right has already ended and the ask becomes a request for new access, and the holder
-     * then uses as many paid applications as the threshold; ignored otherwise.
-     */
-    manyPaidSoftwareReason: reason.optional(),
   })
   .refine((body) => (body.newEndDate === undefined) !== (body.extensionMonths === undefined), {
     message: 'Give exactly one of newEndDate and extensionMonths.',

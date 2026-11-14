@@ -9,8 +9,8 @@
  *   withdrawn or refused still counts: the count is of what was sent, not of what is open. A request in the grace of a transfer
  *   (`QĐ-110q`) is left out of this count and of the seat held, but not of the duplicate of GH-1: an open request of the same plan, an
  *   exempt one included, still refuses it.
- * - GH-3 (`BR-MF1-01g`): a person who already uses `paidThreshold` paid applications or more may still ask, with a reason, and the
- *   request is flagged; asking for another plan of an application they already use adds nothing, so it is not flagged (M-16).
+ *
+ * There is no GH-3 (`QĐ-111h`): how many paid applications a person uses neither asks a reason nor flags a request.
  *
  * A request for a renewal, for a service account, or a request again exempt by `QĐ-108c` or the grace of a transfer is not judged
  * by GH-1/GH-2.
@@ -57,8 +57,6 @@ export interface OpenNewRequest {
 export interface LimitFacts {
   /** The plan asked for; null for a proposal of software that is not in the catalog. */
   planId: string | null;
-  /** The application of the plan asked for; null for a proposal. */
-  applicationId: string | null;
   /** The requests for new access of the person that are still open, for the duplicate of the plan (GH-1). */
   openNew: readonly OpenNewRequest[];
   /**
@@ -72,10 +70,7 @@ export interface LimitFacts {
   weeklyLimit: number;
   /** The Monday the count starts again: what a refusal says. */
   resetsOn: BusinessDate;
-  /** The paid applications the person uses (ids), each once. */
-  paidApplicationIds: ReadonlySet<string>;
-  paidThreshold: number;
-  /** The request is exempt: `ROLE_ENDED` from GH-1 and GH-2, `TRANSFER_GRACE` from GH-2 only (a duplicate of its plan is still refused); GH-3 still applies. */
+  /** The request is exempt: `ROLE_ENDED` from GH-1 and GH-2, `TRANSFER_GRACE` from GH-2 only (a duplicate of its plan is still refused). */
   exemption: LimitExemption | null;
 }
 
@@ -87,18 +82,10 @@ export interface LimitVerdict {
   sentThisWeek: number;
   /** The Monday the count of GH-2 starts again. */
   resetsOn: BusinessDate;
-  /** GH-3: the person uses this many paid applications, at or above the threshold; null when the request is not flagged. */
-  manyPaidSoftware: { count: number; threshold: number } | null;
-  /** How many paid applications the person uses, flagged or not. */
-  paidSoftwareCount: number;
 }
 
 export function judgeNewRequestLimits(facts: LimitFacts): LimitVerdict {
-  const count = facts.paidApplicationIds.size;
-  const alreadyUsed = facts.applicationId !== null && facts.paidApplicationIds.has(facts.applicationId);
-  const manyPaidSoftware =
-    count >= facts.paidThreshold && !alreadyUsed ? { count, threshold: facts.paidThreshold } : null;
-  const base = { openRequestId: null, resetsOn: facts.resetsOn, manyPaidSoftware, paidSoftwareCount: count };
+  const base = { openRequestId: null, resetsOn: facts.resetsOn };
   // A request in the grace of a transfer is left out of the count (GH-2), not out of the duplicate: a second open request of the same plan, an exempt one
   // included, is refused (`QĐ-110q` frees the count of the limit, it does not let the same software be asked for twice).
   if (facts.exemption === 'TRANSFER_GRACE') {
@@ -119,24 +106,4 @@ export function judgeNewRequestLimits(facts: LimitFacts): LimitVerdict {
   if (facts.sentThisWeek >= facts.weeklyLimit) return { ...counted, refusal: 'OPEN_LIMIT_REACHED' };
 
   return { ...counted, refusal: null };
-}
-
-/** What GH-3 asks of the reason the sender gave: kept only when the request is flagged, so a reason sent for nothing is not stored. */
-export interface PaidSoftwareReason {
-  flagged: boolean;
-  reason: string | null;
-  /** The request is flagged and no reason was given: it cannot be sent. */
-  missing: boolean;
-}
-
-export function manyPaidSoftwareReasonOf(
-  verdict: Pick<LimitVerdict, 'manyPaidSoftware'>,
-  reason: string | null | undefined,
-): PaidSoftwareReason {
-  if (verdict.manyPaidSoftware === null) return { flagged: false, reason: null, missing: false };
-  const cleaned = reason?.trim() ?? '';
-
-  return cleaned.length > 0
-    ? { flagged: true, reason: cleaned, missing: false }
-    : { flagged: true, reason: null, missing: true };
 }

@@ -112,6 +112,11 @@ describe('operating parameter definitions (US-01-04)', () => {
     expect(validateParameterValue('REQUEST_OPEN_NEW_LIMIT', 15, defaultValues())).toEqual({ ok: true });
   });
 
+  it('QĐ-111h: there is no GH-3, so no threshold of paid applications is known, set or read', () => {
+    expect(defaultValues()).not.toHaveProperty('PAID_SOFTWARE_FLAG_THRESHOLD');
+    expect(definitionOf('PAID_SOFTWARE_FLAG_THRESHOLD')).toBeUndefined();
+  });
+
   it('knows its own keys and nothing else', () => {
     expect(definitionOf('APPROVAL_SLA_WORKING_DAYS')?.unit).toBe('working days');
     expect(definitionOf('TIME_ZONE')).toBeUndefined();
@@ -124,7 +129,6 @@ const EXPECTED_KEYS = [
   'BACKLOG_ALERT_THRESHOLD',
   'SPEND_SUBMISSION_WAIT_WORKING_DAYS',
   'REQUEST_OPEN_NEW_LIMIT',
-  'PAID_SOFTWARE_FLAG_THRESHOLD',
   'RENEWAL_WINDOW_DAYS',
   'FORECAST_ERROR_THRESHOLD_PERCENT',
   'BUDGET_RESERVE_DEFAULT_PERCENT',
@@ -214,13 +218,6 @@ describe('operating parameter labels and groups (QĐ93-PARAM-LABEL)', () => {
       ['BACKLOG_ALERT_THRESHOLD', 'Ngưỡng tồn đọng bước phê duyệt', 'WORKFLOW', 'steps', 'bước'],
       ['SPEND_SUBMISSION_WAIT_WORKING_DAYS', 'Hạn chờ trình duyệt chi', 'WORKFLOW', 'working days', 'ngày làm việc'],
       ['REQUEST_OPEN_NEW_LIMIT', 'Số Request cấp mới tối đa mỗi tuần của một người', 'WORKFLOW', 'requests', 'Request'],
-      [
-        'PAID_SOFTWARE_FLAG_THRESHOLD',
-        'Ngưỡng số phần mềm trả phí cần lý do khi xin thêm',
-        'WORKFLOW',
-        'applications',
-        'phần mềm',
-      ],
       ['RENEWAL_WINDOW_DAYS', 'Cửa sổ gửi Request tiếp tục trước ngày kết thúc', 'WORKFLOW', 'days', 'ngày'],
       ['FORECAST_ERROR_THRESHOLD_PERCENT', 'Ngưỡng sai số dự báo chi phí', 'BUDGET', 'percent', '%'],
       ['BUDGET_RESERVE_DEFAULT_PERCENT', 'Tỷ lệ dự phòng mặc định của ngân sách năm', 'BUDGET', 'percent', '%'],

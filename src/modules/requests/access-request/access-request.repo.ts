@@ -3,7 +3,7 @@ import { toDateColumn } from '../../../core/business-date';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { pricingColumns } from './access-request-pricing.mapper';
-import { SELECT_REQUEST, manyPaidSoftwareColumns, toRecord } from './access-request-record.mapper';
+import { SELECT_REQUEST, toRecord } from './access-request-record.mapper';
 import type { AccessRequestBranchCode, RequestPolicy } from './access-request.policy';
 import { requestPolicyJson } from './access-request.json';
 import type {
@@ -65,7 +65,6 @@ export class AccessRequestRepo {
       costCenterId: input.costCenterId,
       businessReason: input.businessReason,
       termMonths: input.termMonths,
-      ...manyPaidSoftwareColumns(input.manyPaidSoftware),
       ...(input.limitExemption
         ? { limitExemption: input.limitExemption, replacesAssignmentId: input.replacesAssignmentId ?? null }
         : {}),

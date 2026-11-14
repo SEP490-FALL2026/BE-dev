@@ -74,8 +74,7 @@ export type LineReason =
   | 'TERM_REQUIRED'
   | 'HAS_ACCESS'
   | 'HAS_OPEN_REQUEST'
-  | 'OPEN_LIMIT_REACHED'
-  | 'MANY_PAID_SOFTWARE_REASON_REQUIRED';
+  | 'OPEN_LIMIT_REACHED';
 
 /** What is known of one person who was named, read on the day. */
 export interface LineFacts {
@@ -92,8 +91,6 @@ export interface LineFacts {
   hasOpenRequest: boolean;
   /** GH-2 (`BR-MF1-01f`, `QĐ-111h`): the person was already named in as many requests for new access this calendar week as they may. */
   openLimitReached?: boolean;
-  /** GH-3 (`BR-MF1-01g`): the person uses many paid applications and the sender gave no reason for their line. */
-  manyPaidSoftwareReasonMissing?: boolean;
   /** The sender heads the department and this is their own line: it asks for no email and no end day. */
   isDepartmentHead?: boolean;
   /** The person is not staff and the group names no end date: a contractor, a freelancer or an intern gets access for a term (`FR-2.8`). */
@@ -137,7 +134,6 @@ function reasonFor(departmentId: string, person: LineFacts): LineReason | null {
   if (person.termRequired) return 'TERM_REQUIRED';
   if (person.holdsAccess) return 'HAS_ACCESS';
   if (person.hasOpenRequest) return 'HAS_OPEN_REQUEST';
-  if (person.openLimitReached) return 'OPEN_LIMIT_REACHED';
 
-  return person.manyPaidSoftwareReasonMissing ? 'MANY_PAID_SOFTWARE_REASON_REQUIRED' : null;
+  return person.openLimitReached ? 'OPEN_LIMIT_REACHED' : null;
 }

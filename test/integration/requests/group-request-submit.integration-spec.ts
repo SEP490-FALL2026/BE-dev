@@ -190,7 +190,6 @@ describe('a request for a group of people, sent and checked over PostgreSQL (US-
         employeeId: u.head.employeeId,
         ok: false,
         reason: 'HEAD_IN_GROUP',
-        manyPaidSoftware: null,
       });
     });
 

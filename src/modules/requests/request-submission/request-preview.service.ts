@@ -89,9 +89,6 @@ export class RequestPreviewService {
         openNewCount: limits.sentThisWeek,
         openNewMax: limitSettings.weeklyLimit,
         resetsOn: limits.resetsOn,
-        paidSoftwareCount: limits.paidSoftwareCount,
-        paidSoftwareThreshold: limitSettings.paidThreshold,
-        reasonRequired: limits.manyPaidSoftware !== null,
         refusal: limits.refusal,
         openRequestId: limits.openRequestId,
       },
@@ -141,9 +138,7 @@ export class RequestPreviewService {
       const limits = await this.limits.judgeOne(tx, {
         employeeId: actor.employeeId,
         planId: body.planId,
-        applicationId: assessed.target.applicationId,
         now,
-        today: assessed.today,
         settings: limitSettings,
         exemptions: assessed.graceHold ? new Map([[actor.employeeId, 'TRANSFER_GRACE' as const]]) : undefined,
       });

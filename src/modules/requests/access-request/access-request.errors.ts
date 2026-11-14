@@ -77,17 +77,6 @@ export class AccessRequestOpenLimitReachedError extends Error {
   }
 }
 
-/** GH-3 (`BR-MF1-01g`): the person uses many paid applications already, so a reason is needed to ask for another one. */
-export class AccessRequestManyPaidSoftwareReasonRequiredError extends Error {
-  constructor(
-    readonly count: number,
-    readonly threshold: number,
-  ) {
-    super('The person uses many paid applications already: a reason is required to ask for another one.');
-    this.name = 'AccessRequestManyPaidSoftwareReasonRequiredError';
-  }
-}
-
 /** The request cannot be priced for another day: its quote is not in force then, or does not say how it is paid. */
 export class AccessRequestNotPriceableError extends Error {
   constructor() {

@@ -130,15 +130,6 @@ export class RevocationViewService {
     return this.k1Checklists.mailboxLockedAmong(people, tx);
   }
 
-  /** The paid applications each of these people uses on `onDate` or will (GH-3), in one statement. */
-  paidApplicationsOf(
-    employeeIds: readonly string[],
-    onDate: BusinessDate,
-    tx?: DbTx,
-  ): Promise<Map<string, Set<string>>> {
-    return this.reads.paidApplicationsOf(employeeIds, onDate, tx);
-  }
-
   /** Which of these seats a revocation asked for with this reference is under way for (one statement). */
   openedByReference(
     sources: readonly RevocationSource[],
