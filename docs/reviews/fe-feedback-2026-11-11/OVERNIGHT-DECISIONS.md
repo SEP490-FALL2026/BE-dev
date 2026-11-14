@@ -59,3 +59,42 @@
 - **Đã chọn (tạm chốt):** (a). Căn cứ: (b) để lại hồ sơ bổ sung bằng USD bên cạnh Request đã quy VND, đúng thứ mà QĐ-111an muốn bỏ; (a) khôi phục nguyên định nghĩa (không validate hàng cũ, hồ sơ mới vẫn bị chặn; test dựng lịch sử cũ kiểm cả hai), cùng một giao dịch với DISABLE/ENABLE trigger nên không phiên nào thấy trạng thái thiếu. Rủi ro còn lại: `DROP/ADD CONSTRAINT` giữ khóa bảng ngắn; migration chạy một lần ngoài giờ.
 - **File/commit:** `prisma/migrations/20261113002900_fx_prices_to_vnd/migration.sql` (sửa tại chỗ vì chưa chạy trên DB thật, như D-3), `test/integration/catalog/fx-prices-to-vnd-upgrade.integration-spec.ts` — `71b32df6`.
 - **Đổi lại:** nếu Owner muốn (b): bỏ `DROP/ADD CONSTRAINT`, thêm điều kiện lọc hàng thỏa CHECK ở `fx_supplement_changes` và NOTICE cho phần còn lại; migration chưa chạy thật nên sửa tại chỗ.
+
+### D-7 — `RATE_MISSING` đã lưu (Request, dòng lô) đọc ra thành `PRICE_MISSING`; mã bỏ khỏi mọi enum OpenAPI
+
+- **Câu hỏi:** SPEC §5 FX-2 vừa nói "mapper hiển thị như lý do đã ngừng" vừa nói "bỏ mã khỏi OpenAPI". `access_requests.one_step_blocked_reason` (CHECK còn cho `RATE_MISSING`) và `spend_batch_items.stop_reason` có thể còn giá trị cũ.
+- **Phương án:** (a) giữ `RATE_MISSING` trong enum như mã "chỉ đọc, không bao giờ cho" (như `STALE_COST_EVIDENCE`) — trái "bỏ khỏi OpenAPI"; (b) đọc ra `PRICE_MISSING` (một hàm `currentMissingReasonOf`, theo mẫu `currentStateOf`), enum bỏ mã; (c) đọc ra rỗng.
+- **Đã chọn:** (b). Căn cứ: SPEC §5 FX-2 + PLAN FX-2.3 ("grep `RATE_MISSING` chỉ còn mapper đọc"); nghĩa cũ (không có tỷ giá để quy ra VND) = giá chưa ở VND = thiếu giá VND, nên người gửi/IT Admin xử lý y như `PRICE_MISSING`. Test: unit `access-request.policy.spec`, `spend-submission.policy.spec`; integration `one-step-supplement-rate` (SQL đặt `RATE_MISSING`, wire trả `PRICE_MISSING`; đột biến mapper đi thẳng làm ca đỏ).
+- **File/commit:** `requests/access-request/access-request.policy.ts` (`currentMissingReasonOf`), `access-request-record.mapper.ts`, `spend/spend-submission.policy.ts` (`stopReasonOf`), `spend/spend-batch.repo.ts` — `c9e58380`, `409758ea`, `3ae4c509`.
+- **Đổi lại:** thêm `RATE_MISSING` vào 3 enum DTO (`access-request.dto`, `spend-submission.dto` ×2) và các kiểu; `currentMissingReasonOf` thành hàm đồng nhất.
+
+### D-8 — Giá/số tiền còn ở ngoại tệ (cũ, không quy được) ⟹ kiểm ngân sách `PRICE_MISSING`, khoản 01/01 `NO_PRICE`; không quy đổi
+
+- **Câu hỏi:** SPEC nói kiểm ngân sách và khoản 01/01 "dùng thẳng số VND", nhưng migration FX-1 để nguyên dòng ngoại tệ không có tỷ giá (Request chưa duyệt chi, thuê bao), nên số tiền ngoại tệ vẫn có thể tới hai chỗ này.
+- **Phương án:** (a) coi số minor của ngoại tệ như VND (sai số tiền, nguy hiểm); (b) ném lỗi lập trình (500 trên đường người dùng, và job 01/01 dừng); (c) coi như chưa có giá hợp lệ: kiểm ngân sách `NOT_CHECKABLE PRICE_MISSING` (một-bước ⟹ trả người gửi), khoản 01/01 bỏ qua `NO_PRICE` kèm audit.
+- **Đã chọn:** (c), cùng luật với D-5 (bản nháp ngoại tệ = thiếu giá) và FX-1-R3 (báo giá ngoại tệ không định giá). Hàm thuần `costInDong` (`budget-check.policy`) và `isRecurringPriceInDong` (`year-start-commitments.policy`) có unit test.
+- **File/commit:** `requests/spend/budget-check.policy.ts`, `budget-check.service.ts` (`FinanceApi` khỏi constructor) — `02ff11d5`; `requests/year-start-commitments/*` — `0ac38149`.
+- **Đổi lại:** thay hai hàm thuần bằng nhánh khác (ví dụ lỗi) — một chỗ mỗi nơi.
+
+### D-9 — Khoản 01/01: `BudgetsApi.holdYearStart` còn từ chối `CURRENCY_MISMATCH` ⟹ lô ném lỗi, không ghi lý do bỏ qua
+
+- **Câu hỏi:** SPEC FX-2.4 bảo bỏ `CURRENCY_MISMATCH` khỏi lý do bỏ qua của khoản 01/01, nhưng facade ngân sách (ngoài danh sách file FX-2) vẫn trả `refused` khi phiên bản duyệt của năm ở tiền tệ khác số tiền.
+- **Phương án:** (a) vẫn ghi `CURRENCY_MISMATCH` (trái "thôi ghi"); (b) sửa facade ngân sách (ngoài phạm vi, đụng contract khó lùi); (c) coi `refused` là lỗi dữ liệu: ném `Error` (cả lô rollback, lượt sau thử lại, job báo lỗi) vì mọi số tiền và mọi phiên bản ngân sách đều ở VND.
+- **Đã chọn:** (c). Căn cứ: QĐ-111an (một tiền tệ), "tiền tệ khác ⟹ lỗi lập trình" (SPEC FX-2); không âm thầm bỏ mất khoản. Test: `year-start-commitments-batch.service.spec` (`rejects.toThrow('is not in dong')`, không ghi audit bỏ qua).
+- **File/commit:** `requests/year-start-commitments/year-start-commitments-batch.service.ts` — `0ac38149`.
+- **Đổi lại:** trả lại vòng `for (const refused of held.refused) leftOut.push(...)` và thêm lại `CURRENCY_MISMATCH` vào `YearStartSkipReason`. **Hở còn lại (Owner quyết, ngoài FX-2):** lệnh cài đặt (`installation.dto`, `--currency`) vẫn nhận mọi mã tiền tệ làm `reportingCurrency`; D2 nói tiền tệ báo cáo cố định VND — một cài đặt không phải VND sẽ làm `snapshotMoney` ném lỗi và mục trên ném lỗi.
+
+### D-10 — FX-2.5 xóa hẳn code tỷ giá thay vì chỉ gỡ khỏi wiring; `snapshotMoney` trả thẳng snapshot
+
+- **Câu hỏi:** SPEC FX-2.5 viết "gỡ `finance/exchange-rate/` khỏi wiring" và "`snapshotMoney` còn trả snapshot đồng nhất"; D1 viết "route bỏ xóa luôn".
+- **Phương án:** (a) chỉ gỡ wiring, để service/repo/ledger/DTO/test mồ côi; (b) xóa thư mục `finance/exchange-rate/` (10 file), `OrganizationApi.setReportingCurrency` và repo, `ReportingCurrencyLockedError`, `core/money/convert.ts`; giữ bảng, trigger, `rate.ts`; `snapshotMoney` trả `ConversionSnapshot` (không còn bọc `{ status }`, không `MISSING_RATE`), tiền tệ khác tiền tệ báo cáo ⟹ `Error`.
+- **Đã chọn:** (b). Căn cứ: D1, S-1, "bảng giữ" (dữ liệu không mất); code mồ côi + test của nó chỉ làm gate sai nghĩa. `snapshotMoney` hiện không có nơi gọi nào trong `src` (SPEC bắt giữ) — chỉ test integration dùng.
+- **File/commit:** `d5b6ec29` (+ `GET /reporting-currency` giữ, trả giá trị lưu của tổ chức — VND theo migration FX-1 và cài đặt, không phải hằng).
+- **Đổi lại:** `git revert d5b6ec29` khôi phục toàn bộ; không có migration nào để đổi.
+
+### D-11 — Hai việc FX-1 để lại cho FX-2 ngoài danh sách bốn test
+
+- **Câu hỏi:** chạy test HTTP nền tảng (OpenAPI) sau FX-1 thấy đỏ: manifest mã lỗi từng route còn `REPORTING_CURRENCY_NOT_SUPPORTED`, thiếu `SUBSCRIPTION.PRICE_NOT_VND` và `ASSESSMENT.QUOTE_PRICE_NOT_VND`; test đếm route (379) lệch khi bỏ 3 route.
+- **Đã chọn:** sửa manifest (`openapi-example-route-codes-catalog/requests`), đổi test "REPORTING_CURRENCY_NOT_SUPPORTED đúng chỗ quy đổi" thành "không route nào khai mã đó", đếm 379 → 376. Căn cứ: brief ("không để test đỏ ở gate"), D1.
+- **File/commit:** `d5b6ec29`.
+- **Đổi lại:** không cần; lỗi `REPORTING_CURRENCY_NOT_SUPPORTED` (lớp ở `core/money/money.errors.ts` + ánh xạ ở `infrastructure/http/errors/money-errors.ts`) hiện không còn nơi ném — dọn ở đợt sau cùng tài liệu API.
