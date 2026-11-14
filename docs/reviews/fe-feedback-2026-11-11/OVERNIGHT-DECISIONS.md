@@ -131,11 +131,11 @@
 - **File/commit:** `operating-parameters/parameter-definitions.policy.ts` (+ spec, integration `operating-parameters-http`: 30 ⟹ 29 khóa), `licensing/public/licensing.api.ts`, `licensing/provisioning/revocation-view.service.ts`, `revocation-read.repo.ts` — `0a2c6d0c`, `965056d4`.
 - **Đổi lại:** thêm lại định nghĩa vào `PARAMETER_DEFINITIONS` (cột giá trị cũ vẫn còn); khôi phục ba hàm licensing từ `git show 0a2c6d0c^`.
 
-### D-16 — Ngày hết hợp đồng của nhân sự có thời hạn: cột mới `employees.contract_end_date` (đọc được, chưa có đường ghi qua API)
+### D-16 — Ngày hết hợp đồng của nhân sự có thời hạn: cột mới `employees.contract_end_date` (đã đổi tên và có đường ghi ở D-21)
 
 - **Câu hỏi:** R-38/`INV-07`/`FR-2.8` bắt hệ thống "cắt tại ngày hết hợp đồng" và US-05-23 nêu tiền đề "nhân sự có thời hạn có ngày hết hợp đồng", nhưng SPEC RQ-2 ghi "không cột mới" và code không có ngày hết hợp đồng ở đâu (bảng `employees` chỉ có `hire_date`; `expectedEndDate` của body cũ là ngày người xin tự nhập, nay bị bỏ).
 - **Phương án:** (a) cột nullable `employees.contract_end_date` (CHECK ≥ `hire_date`), đọc qua `EmployeeRecord.contractEndDate`; (b) không có dữ liệu ⟹ không bao giờ cắt (T-R38 không kiểm được); (c) FE gửi kèm ngày hết hợp đồng (trái `QĐ-111i`: không còn ô ngày).
-- **Đã chọn (tạm chốt):** (a). Căn cứ: BRD `FR-2.8`/`INV-07`, R-38, US-05-23 AC-2; expand-only, nullable, không drop, chạy lại an toàn. **Hở còn lại (Owner quyết, ngoài RQ-2):** chưa có đường ghi qua API (`PATCH/POST /employees`, import `BM-09`) — hiện chỉ SQL/seed; nếu Owner muốn Super Admin nhập ngày này thì thêm vào trường chính thức của hồ sơ nhân sự (gói PF/Z2).
+- **Đã chọn (tạm chốt):** (a). Căn cứ: BRD `FR-2.8`/`INV-07`, R-38, US-05-23 AC-2; expand-only, nullable, không drop, chạy lại an toàn. **Cập nhật theo review:** đường ghi qua `POST/PATCH /employees` đã có (D-21); còn thiếu import `BM-09` (gói khác).
 - **File/commit:** `prisma/migrations/20261113003000_rq2_employee_contract_end`, `prisma/models/organization.prisma`, `organization/employee/employee.repo.ts`, `organization/public/organization.types.ts` — `ff5d4529`.
 - **Đổi lại:** thôi đọc `contractEndDate` ở `RequestFactsService.termOf`, `RequestTermEndsService`, `ProvisioningGrantPlanner`; cột để nguyên (không drop).
 
@@ -157,6 +157,51 @@
 
 ### D-19 — Request nhóm: chia phần cam kết vẫn chia đều; các điểm nhỏ của RQ-2
 
-- **Câu hỏi/đã chọn (tạm chốt):** (1) Giá của Request nhóm = tổng từng người theo ngày kết thúc riêng (người bị cắt rẻ hơn); `amountMonths` của Request nhóm = số tháng lớn nhất. **Hở:** phần cam kết năm nay chia cho các dòng (`allocateEvenly`) và phần quy đổi khi chỉ duyệt một phần (`scaleAmount`) vẫn **chia đều** — sai lệch nhỏ khi có dòng bị cắt; làm đúng cần chia theo từng dòng (việc của gói sau nếu Owner muốn). (2) Hồ sơ bổ sung (`POST …/supplements`): `termMonths` phải ngắn hơn số tháng đang có (`_Dùng lâu dài_` thì số nào 1–12 cũng ngắn hơn); Request cũ có ngày thì mọi số tháng đều coi là ngắn hơn; mã `SPEND.SUPPLEMENT_END_DATE_OUT_OF_RANGE` ⟹ `SPEND.SUPPLEMENT_TERM_MONTHS_OUT_OF_RANGE`; ngày trước/sau của hồ sơ = ngày kết thúc nếu số tháng bắt đầu hôm nay. (3) Đề xuất phần mềm ngoài danh mục (case B): chưa biết kiểu cấp ⟹ luật `K2` (1–12 hoặc không). (4) Request tiếp tục gửi trễ (chuyển thành Request mới) gửi `termMonths = extensionMonths`; RQ-3 làm lại. (5) Thẻ tác vụ cấp: `termCutAt` = ngày hết hạn của quyền khi trùng ngày hết hợp đồng của người giữ.
+- **Câu hỏi/đã chọn (tạm chốt):** (1) Giá của Request nhóm = tổng từng người theo ngày kết thúc riêng (người bị cắt rẻ hơn); `amountMonths` của Request nhóm = số tháng lớn nhất. **Cập nhật theo review:** chia đều đã bỏ, cam kết theo số tiền từng người (D-23). (2) Hồ sơ bổ sung (`POST …/supplements`): `termMonths` phải ngắn hơn số tháng đang có (`_Dùng lâu dài_` thì số nào 1–12 cũng ngắn hơn); Request cũ có ngày thì mọi số tháng đều coi là ngắn hơn; mã `SPEND.SUPPLEMENT_END_DATE_OUT_OF_RANGE` ⟹ `SPEND.SUPPLEMENT_TERM_MONTHS_OUT_OF_RANGE`; ngày trước/sau của hồ sơ = ngày kết thúc nếu số tháng bắt đầu hôm nay. (3) Đề xuất phần mềm ngoài danh mục (case B): chưa biết kiểu cấp ⟹ luật `K2` (1–12 hoặc không). (4) Request tiếp tục gửi trễ (chuyển thành Request mới) gửi `termMonths = extensionMonths`; RQ-3 làm lại. (5) Thẻ tác vụ cấp: `termCutAt` = ngày hết hạn của quyền khi trùng ngày hết hợp đồng của người giữ.
 - **File/commit:** `group-request-submission/*`, `group-request/*`, `spend-submission/*`, `assessment/*`, `renewal-request/*`, `licensing/provisioning/provisioning-task-view.service.ts` — `c5c86612`, `d77a0bb5`.
 - **Đổi lại:** mỗi mục một chỗ; (1) đổi `allocateEvenly` sang chia theo dòng cần thêm dữ liệu từng dòng ở `GroupSpendHold`.
+
+### D-20 — Nhân sự có thời hạn xin gói mua một lần (`K4`): chỉ khi biết ngày hết hợp đồng, seat hết ở ngày đó
+
+- **Câu hỏi:** `K4` không hỏi số tháng ⟹ seat không có ngày kết thúc, nhưng `INV-07` (trigger `license_assignments_rules`) bắt seat của nhà thầu/freelancer/thực tập có ngày kết thúc: Request gửi 201, duyệt chi (tiền đã cam kết), IT cấp ⟹ 422 `EXPECTED_END_REQUIRED`.
+- **Phương án:** (a) chặn ngay lúc gửi mọi nhân sự có thời hạn xin `K4`; (b) cho phép khi biết `contractEndDate`, seat hết ở ngày đó, còn không biết thì chặn bằng `TERM_LONG_TERM_NOT_ALLOWED`; (c) chỉ sửa ở bước cấp.
+- **Đã chọn (tạm chốt):** (b). Căn cứ: R-38 (cắt ở ngày hết hợp đồng), `INV-07`; không cấm oan người có hợp đồng; mã `TERM_LONG_TERM_NOT_ALLOWED` đúng nghĩa "quyền không có ngày kết thúc cho người có thời hạn". Lúc cấp: seat không bị ràng buộc theo tháng của người có thời hạn ⟹ ngày kết thúc = ngày hết hợp đồng (`ProvisioningGrantPlanner` đọc loại nhân sự + ngày, `ProvisioningGrantWriter.endOfSeat`).
+- **File/commit:** `core/term-limit.ts` (`checkTermMonths` tham số `contractEndKnown`), `requests/access-request/request-facts.service.ts`, `licensing/provisioning/tasks/provisioning-grant-planner.service.ts`, `provisioning-grant-writer.service.ts` — `bba09477`.
+- **Đổi lại:** (a) = bỏ nhánh `contractEndKnown` trong `checkTermMonths` (K4 + người có thời hạn luôn bị chặn).
+
+### D-21 — `contract_end_date` theo thiết kế `qd96-100-approved-end-date`, có đường ghi tối thiểu (sửa D-16)
+
+- **Câu hỏi:** D-16 đặt `employees.contract_ends_on`, chưa có đường ghi; thiết kế cũ của đợt trước (`docs/workspace/items/qd96-100-approved-end-date/spec.md` phần B, chưa từng build) đã chọn `employees.contract_end_date` / `contractEndDate`, CHECK STAFF ⟹ NULL, lỗi `EMPLOYEE.CONTRACT_END_NOT_APPLICABLE`.
+- **Đã chọn (tạm chốt):** đổi tên theo thiết kế cũ (API `contractEndDate`); sửa migration `20261113003000` **tại chỗ** vì chưa merge, chưa chạy trên DB thật (DB test dựng mới mỗi lần chạy); thêm CHECK `employment_type <> 'STAFF' OR contract_end_date IS NULL` và giữ CHECK `>= hire_date`. Đường ghi: `contractEndDate` (`date|null`) ở `POST /employees` và `PATCH /employees/{id}` (trường chính thức, có audit before/after), lỗi dòng `CONTRACT_END_NOT_APPLICABLE` (nhân sự chính thức có ngày, hoặc đổi sang STAFF mà còn ngày) và `CONTRACT_END_BEFORE_HIRE` (ngày trước ngày vào làm, kể cả dời `hireDate` quá ngày này); cột vẫn NULLABLE (dữ liệu cũ không có; vắng ⟹ `TERM_REQUIRED` như D-17). **Không làm:** import `BM-09` (cột `contract_end_date` ở file import, thiết kế cũ mục 1) — hở, ghi HANDOFF; không sửa seed.
+- **File/commit:** `prisma/migrations/20261113003000_rq2_employee_contract_end`, `organization/employee/*`, `organization/public/organization.types.ts` — `d99c21c3`.
+- **Đổi lại:** đổi tên cột bằng migration mới nếu migration đã chạy ở đâu đó; bỏ `contractEndDate` khỏi DTO để ngừng cho ghi.
+
+### D-22 — Guard `access_request_line_amounts_guard` giữ `held`
+
+- **Câu hỏi:** guard cũ chỉ so (request, employee, year, amount, currency) nên `held` sửa được bằng UPDATE; lật `held` false→true làm `shareToRelease` trả lại cam kết chưa từng giữ.
+- **Đã chọn:** migration mới `20261113003200_rq2_line_amount_guard_held`: `CREATE OR REPLACE FUNCTION` thêm `NEW.held IS DISTINCT FROM OLD.held`; không sửa migration `…003100`. Test: `group-request-constraints` (lật cả hai chiều ⟹ `55000`; `released_at` vẫn ghi được một lần).
+- **File/commit:** `prisma/migrations/20261113003200_rq2_line_amount_guard_held` — `608341db`.
+- **Đổi lại:** migration mới đưa hàm về bản cũ; cột không đổi.
+
+### D-23 — Request nhóm: cam kết theo số tiền từng người (thay phần "chia đều" của D-19)
+
+- **Câu hỏi:** cam kết năm nay, phần trả khi rút người và quy đổi khi duyệt một phần chia ĐỀU ⟹ có dòng bị cắt thì cam kết ≠ tổng từng người (nhóm {F, F, C<F} duyệt hai người đủ giữ thiếu).
+- **Đã chọn (tạm chốt):** `CheckScope.employeeIds`: lúc duyệt, kiểm ngân sách tính giá lại **chỉ những người được duyệt**, mỗi người theo ngày kết thúc riêng (`RepricingService`), không chia đều cả nhóm; `lineAmountsOf` (`spend/line-allocation.policy.ts`): người cùng ngày kết thúc tính một lần rồi chia đều trong nhóm đó (phần dư cho người đầu), tổng đúng bằng giá của Request; phần của từng dòng trong cam kết năm nay và hàng năm sau (`held = false`) lấy từ đó; nếu tổng từng người không khớp số cam kết thì rơi về chia đều (an toàn). Request giữ tổng (`amount_minor`, `next_year_amount_minor`). Rút người trả đúng phần đã lưu của người đó (không đổi). **Còn hở (hiển thị, không phải tiền):** `cost` của từng dòng ở `GET /access-requests/{id}/lines` trước khi duyệt vẫn là phần chia đều của tổng.
+- **File/commit:** `requests/spend/budget-check.service.ts`, `spend/line-allocation.policy.ts`, `group-line-decisions/group-spend-decision.service.ts`, `group-spend-hold.service.ts` — `3dbbc891`; test số cố định `7e72533d`.
+- **Đổi lại:** bỏ `employeeIds` ở `group-spend-decision.service.ts` ⟹ trở về chia đều (hai ca số cố định đỏ).
+
+### D-24 — Khối `cost` của Request đã gửi đọc từ số đã lưu, không từ ngày xem
+
+- **Câu hỏi:** `RequestCostViewService` chạy `termRunOf` từ `new Date()` ⟹ `cost.months`/`nextYear.months`/`termCutAt` đổi theo ngày xem, lệch sau 01/01 và không khớp số tiền đã lưu; nhóm hiện tháng không cắt cạnh tiền đã cắt.
+- **Đã chọn (tạm chốt):** suy từ số đã lưu: tháng năm nay = `amountMonths`; tháng năm sau = số tháng mà `nextYearAmount` đại diện (số ít nhất mà giá làm tròn lên đúng bằng số đã lưu; _Dùng lâu dài_ = 12); tháng đã bắt đầu = hai số cộng lại; `termCutAt` = ngày hết hợp đồng khi số tháng đã bắt đầu < số tháng xin (lệch nhỏ: cắt mà vẫn đủ tháng đã bắt đầu thì không báo cắt). Nhóm: số tiền, **không** tháng/cắt (null). Xem trước (chưa lưu gì) vẫn tính theo hôm nay.
+- **File/commit:** `requests/request-view/request-cost-view.service.ts`, `pricing-view.service.ts` — `71fd9c89`, `fe1cc22e`.
+- **Đổi lại:** lưu thêm số tháng đã bắt đầu vào Request nếu muốn con số tuyệt đối thay vì suy.
+
+### D-25 — Hồ sơ bổ sung theo kiểu cấp của gói và ngày của Request cũ
+
+- **Câu hỏi:** `/supplements` nhận `termMonths` mà không kiểm theo kiểu cấp; Request cũ có ngày thì `current = null` ⟹ nhận mọi số tháng (có thể kéo dài).
+- **Đã chọn:** kiểu cấp lấy từ gói (`CatalogApi.findPlanSeatTargets`; đề xuất ngoài danh mục dùng luật `K2`): `K4` ⟹ 409 `SPEND.SUPPLEMENT_TERM_NOT_ASKED`; `K1` tối đa 9; Request cũ có ngày: số tháng phải kết thúc **sớm hơn** ngày đó (`termEndOf(hôm nay, tháng) < ngày`), nếu không `TERM_NOT_REDUCED`.
+- **File/commit:** `spend/spend-submission.policy.ts`, `spend/spend.errors.ts`, `spend-submission/supplement-pricing.service.ts`, `supplement.service.ts` — `fe6bd36e`.
+- **Đổi lại:** một nhánh của `checkSupplementTerm`.
+
+*Bổ sung D-17 (review 8):* `K1` + người có thời hạn: `termMonths: null` ⟹ `TERM_LONG_TERM_NOT_ALLOWED`, vắng ⟹ `TERM_REQUIRED` (T-R38 bullet 2); nhân sự chính thức trên `K1` vắng/`null` ⟹ `TERM_REQUIRED` — `64c3778b`.
