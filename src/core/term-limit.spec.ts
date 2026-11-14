@@ -107,7 +107,11 @@ describe('the time of use a kind of grant asks for (QĐ-111i, FR-2.8)', () => {
     expect(asked('K5', null, true)).toBe('TERM_LONG_TERM_NOT_ALLOWED');
     expect(asked('K2', undefined, true)).toBe('TERM_REQUIRED');
     expect(asked('K2', 6, true)).toBeNull();
-    expect(asked('K1', null, true)).toBe('TERM_REQUIRED');
+    // K1 takes no right with no end for anybody: staff who say none are missing the months, a person with a term who says none is refused (T-R38).
+    expect(asked('K1', null, true)).toBe('TERM_LONG_TERM_NOT_ALLOWED');
+    expect(asked('K1', undefined, true)).toBe('TERM_REQUIRED');
+    expect(asked('K1', null, false)).toBe('TERM_REQUIRED');
+    expect(asked('K1', 6, true)).toBeNull();
   });
 
   it('INV-07: a plan bought once (K4) has no months, so a person with a term gets the key only up to the end of their contract, and none when it is not known', () => {

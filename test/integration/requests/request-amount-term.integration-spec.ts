@@ -240,6 +240,20 @@ describe('the amount and the term of a request (integration, real PostgreSQL)', 
         expect(preview.cost).toMatchObject({ termCutAt: null, months: 1 });
       });
 
+      it('T-R38: on a plan bought by the month (K1) the same person who says null is refused TERM_LONG_TERM_NOT_ALLOWED, and saying nothing is TERM_REQUIRED', async () => {
+        const monthly = await planOfKind('K1');
+
+        const explicitNull = await h.submit(h.form(monthly, { termMonths: null }), intern.account).expect(422);
+        const nothing = await h.submit(h.form(monthly), intern.account).expect(422);
+        const given = await h.submit(h.form(monthly, { termMonths: 9 }), intern.account);
+        const preview = await h.previewed(intern, monthly, { termMonths: null });
+
+        expect(h.codeOf(explicitNull)).toBe('ACCESS_REQUEST.TERM_LONG_TERM_NOT_ALLOWED');
+        expect(h.codeOf(nothing)).toBe('ACCESS_REQUEST.TERM_REQUIRED');
+        expect(given.status).toBe(201);
+        expect(preview).toMatchObject({ canSubmit: false, termRefusal: 'TERM_LONG_TERM_NOT_ALLOWED' });
+      });
+
       it('INV-07: a plan bought once asks no months, so a person with a term gets it with the end of their contract known, and is refused when it is not', async () => {
         const key = await keyPlan();
         const unknown = await h.staff(design.department, 'AMT-INTERN2');

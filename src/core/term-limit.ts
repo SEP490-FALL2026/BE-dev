@@ -80,10 +80,22 @@ export function checkTermMonths(facts: {
       ? null
       : 'TERM_MONTHS_OUT_OF_RANGE';
   }
-  if (!rule.longTermAllowed) return 'TERM_REQUIRED';
-  if (!facts.fixedTermPerson) return null;
 
-  return termMonths === undefined ? 'TERM_REQUIRED' : 'TERM_LONG_TERM_NOT_ALLOWED';
+  return checkNoMonths(rule.longTermAllowed, termMonths, facts.fixedTermPerson);
+}
+
+/**
+ * No months were given: nothing said is a missing field, null is a right with no end. A person with a term never gets one, on any plan (a null
+ * from them is refused, T-R38); for the others it is fine where the plan takes it (K2, K5) and missing months where it does not (K1).
+ */
+function checkNoMonths(
+  longTermAllowed: boolean,
+  termMonths: null | undefined,
+  fixedTermPerson: boolean,
+): TermRefusal | null {
+  if (fixedTermPerson) return termMonths === null ? 'TERM_LONG_TERM_NOT_ALLOWED' : 'TERM_REQUIRED';
+
+  return longTermAllowed ? null : 'TERM_REQUIRED';
 }
 
 /** A term as it runs for one person from the day it begins (`QĐ-111i`, `QĐ-111j`, R-38, R-39). */
