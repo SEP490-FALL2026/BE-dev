@@ -40,7 +40,10 @@ describe('MF-3 điều chuyển: quyết định công cụ của trưởng phò
       groundsNote,
     });
     expect([self.status, call().codeOf(self)]).toEqual([403, 'PERSONNEL.SELF_CHANGE_FORBIDDEN']);
-    expect(await world.facts.count('department_transfers')).toBe(0);
+    // The dataset holds a transfer of its own (NV-DEV4 to IT, tomorrow): the refused one wrote none for the Super Admin.
+    expect(
+      await world.facts.count('department_transfers', 'employee_id = $1', [await world.facts.employeeId('NV-SA')]),
+    ).toBe(0);
     const recorded = await call().post('NV-SA', '/department-transfers', {
       employeeId: contractor,
       toDepartmentId: sales,

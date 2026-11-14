@@ -10,6 +10,7 @@ import { FINANCE_STEPS } from './steps/finance.steps';
 import { ORGANIZATION_STEPS } from './steps/organization.steps';
 import { PERSONNEL_STEPS } from './steps/personnel.steps';
 import { requestSteps } from './steps/request.steps';
+import { SOFTWARE_LIST_STEPS } from './steps/software-list.steps';
 import { USAGE_STEPS } from './steps/usage.steps';
 
 /** The fixtures the command knows, by id. A new version of the data is a new entry, never an edit of an applied one. */
@@ -32,6 +33,7 @@ export function demoSteps(fixture: DemoFixture): DemoStep[] {
     pick('finance.tax-profile'),
     ...BASELINE_STEPS,
     ...ASSET_STEPS,
+    ...SOFTWARE_LIST_STEPS,
     pick('budget.cycles'),
     ...budgetSteps(),
     ...requestSteps(fixture.requests),

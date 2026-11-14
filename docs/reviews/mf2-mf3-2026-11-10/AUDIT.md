@@ -70,12 +70,55 @@ SPEC §5 MF3-B phạm vi case B đã định giá (D-2); chữ `QĐ-110q` nếu 
 
 ## 4. Full test sau sửa
 
-_(điền khi chạy xong — xem §6)_
+Lượt 1 (cây chính, trước commit): `test:http` 2238 xanh; `serial` 96 xanh; `timing` 28 xanh; `test:flows` 60 xanh (9 skip có từ trước);
+`pnpm check` đỏ 6 lỗi lint của chính phần sửa; `test:integration` 6 suite đỏ — 4 suite là test cũ theo luật trước A-1/D-62 (sửa: chạy lượt
+quét mốc chặn trước khi đóng, K1 không khóa hộp thư khi còn ghế K1), 2 suite tải (`TransientDatabaseError`). Sửa hết, chạy lại 8 suite: xanh.
 
-## 5. Seed
+Lượt 2 (HEAD `67a1abeb`, chat 81 chạy test song song trên cùng Postgres):
 
-_(điền khi xong)_
+| Lệnh | Kết quả |
+| --- | --- |
+| `pnpm check` | unit 465 suite / 6052 test xanh; `test:gates` 1 đỏ: `test/support/ghost-seat-world.ts` 414 dòng > 400 (có từ `fa1d3c2f`, lượt trước bị che vì `check` dừng ở prettier). Sửa = cherry-pick đúng commit chat 81 làm cùng việc (`a3dd4e67`, tránh xung đột khi gộp nhánh); `pnpm test:gates` 331/331 xanh |
+| `test:http` | 93 suite / 2238 xanh |
+| `test:integration --maxWorkers=4` | 16 suite đỏ, 392 dòng `TransientDatabaseError`/timeout (DB chia với chat 81, 2503 s so với 1659 s); chạy lại đúng 16 suite `--maxWorkers=2`: **16/16, 112/112 xanh** |
+| `test:integration:serial` | 13 suite / 96 xanh |
+| `test:integration:timing` | 7 / 28 xanh |
+| `test:flows` | 10 suite / 60 xanh, 9 skip (có từ trước) |
 
-## 6. Lệnh và commit
+Ghi chú: chạy `npx jest --config test/config/jest.gates.cjs <file>` riêng lẻ cho `extension-wiring` báo 2 đỏ kể cả ở HEAD sạch; chạy qua
+`pnpm test:gates` thì xanh — cách gọi khác môi trường, không phải lỗi code.
 
-_(điền khi xong)_
+## 5. Seed (gói Z của MF-2/MF-3) — commit `b4e638cf`
+
+Theo [AUDIT-C.md](AUDIT-C.md) Phần 2, Z1–Z8, Z10–Z12 (Z9 chờ Owner chốt C-3). Mọi dữ liệu ghi qua route/service; 40 người / 29 tài khoản.
+
+| Ca demo | Người | FE làm gì |
+| --- | --- | --- |
+| K4 có trang quản trị + hồ sơ 2 IT Admin; Canva thiếu email chủ | JetBrains All (ITA1+ITA3), Canva | xem `GET /subscriptions` (cờ), `GET /plans/{id}/workspace-profile` |
+| IT Admin nghỉ việc có bàn giao (P5) | NV-ITA4 (Mailchimp, chủ workspace) | `POST /offboarding-cases/{id}/it-admin-handover` → NV-ITA3; preview P23 |
+| Điều chuyển qua P6 | NV-DEV4 ENG → ITO, hiệu lực ngày mai | từ ngày hiệu lực + job tổ chức: ân hạn P7/P8, xin lại Jira P10 |
+| Danh sách phần mềm phòng + đề xuất | ENG, DES, MKT; NV-DESH (Canva, `PENDING`), NV-ENGH (Mailchimp, `REJECTED`) | `GET /me/department-software-list`, P16/P18 |
+| K5 ở phòng không trưởng phòng | R28 NV-LGL1 `hr-portal-access` | `GET /access-request-audit-flags` |
+| Nghỉ việc chặn ngay theo luồng mới | NV-OFF1 (Figma, Jira, GitHub, Grammarly K1), dừng trước (1a) | ITA1: (1a) → mở thu hồi → hoàn tất (K1 checklist 6 bước) → (1b) tự ghi → đóng sau lượt quét |
+
+Bỏ: ca m-17 (không dựng được qua route). Lưu ý khi demo (từ lượt rà tài liệu demo):
+
+- **Lỗ hổng sản phẩm (cần Owner/prompt sau):** IT Admin nghỉ việc mà không phụ trách phòng nào (NV-ITA4) **không tự tìm được id hồ sơ nghỉ
+  việc của mình** để gọi P5 — danh sách hồ sơ chỉ trả hồ sơ của phòng IT phụ trách, `GET /me/departure-notice` không trả id. Demo: Super Admin
+  đọc id rồi đưa. Đề xuất A: P5 có route `/me/...` hoặc danh sách cho phép người đó thấy hồ sơ của chính mình.
+- Request R22 của NV-DEV4 bị hệ thống hủy khi điều chuyển có hiệu lực (ngày sau ngày seed, `SYSTEM_BENEFICIARY_TRANSFERRED`, đúng luật): bước
+  IT cấp R22 của demo MF-1 chỉ làm được trong ngày seed.
+- Preview P23 cho NV-ITA4 trả 409 `ALREADY_HANDING_OVER` (đã có hồ sơ); demo preview trên người khác.
+
+Tài liệu demo FE đã sửa theo seed: Docs `4fbaf06` (chưa push), gồm tài liệu API theo BE `67a1abeb`. Kiểm: `typecheck`, `format:check`, `rules:check` 0 lỗi; `jest src/cli/seed` 154/154;
+`test:gates` 331/331; `seed:local -- --continue` trên DB sạch `slm_smoke` (cổng 35432) 54 bước exit 0, chạy lại 54 "đã có" exit 2;
+`test:flows` 60 xanh, 9 skip có sẵn; `test:integration:serial` 96 xanh.
+
+## 6. Commit (nhánh `feat/mf2-mf3`, chưa push)
+
+`5767a120` D-2 · `96a47cc0` D-5 · `b3655d42` D-62/D-64 · `a112030b` A-1, B-4 · `4f3af64e` C-1 · `c9305ecc` B-2 (migration
+`20261113002700`) · `e9eba8a1` gate/serial/flow · `dc879586` biên bản + prompt 3 · `67a1abeb` module graph · `a3dd4e67` GhostRow (cherry-pick
+từ `feat/fe-feedback`) · `a54590fa` kết quả test · `b4e638cf` seed Z. Nhánh `feat/fe-feedback` tách từ `dc879586`: khi gộp, lấy
+`feat/mf2-mf3` vào `feat/fe-feedback` (commit `a3dd4e67` trùng nội dung với `2ec03e4f` nên không xung đột).
+
+Sáng Owner: `git -C D:\FPT\FALL2026\Code\BE-dev-software-license-management push origin feat/mf2-mf3`, chờ CI xanh rồi merge; đọc §3.2.

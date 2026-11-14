@@ -38,6 +38,8 @@ trong docs/architecture. Các gói triển khai auth/US cũ đã được dọn 
 
 ## Quyết định đề xuất (chưa Accepted)
 
+- [Thiết kế đề xuất lịch sử AI dùng MongoDB](workspace/proposals/ai-history-mongodb/spec.md) — draft 13/11/2026;
+  BE sở hữu dữ liệu và phân quyền, AI service tiếp tục stateless. Chưa implement hoặc thay thế baseline lưu trữ hiện hành.
 - [Xác thực nội bộ, phiên và quy ước persistence vùng danh tính](decisions/0011-internal-authentication-and-sessions.md) — Proposed; chờ dev review/Accepted.
 - [Gửi thư vòng đời tài khoản: outbox, thư viện SMTP, dispatcher](decisions/0012-account-email-delivery.md) — Proposed; chờ dev review/Accepted.
 - [Ba ngữ cảnh `catalog`, `finance`, `licensing` thay mẫu catalog cũ](decisions/0013-catalog-finance-licensing-contexts.md) — Proposed; chờ Owner review/Accepted.

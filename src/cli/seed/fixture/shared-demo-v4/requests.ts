@@ -217,6 +217,15 @@ export const REQUESTS: Pick<DemoFixture, 'requests' | 'keys' | 'draft' | 'saasIs
         'Phòng chưa có trưởng phòng: Request trả phí chờ ở bước nhu cầu tới khi Super Admin gán trưởng phòng (QĐ-110i).',
     }),
     r({
+      key: 'R28',
+      requester: 'NV-LGL1',
+      plan: 'hr-portal-access',
+      end: 'NONE',
+      target: 'COMPLETED',
+      summary:
+        'Phần mềm nội bộ K5 của phòng chưa có trưởng phòng: không bước nhu cầu, IT cấp thẳng, Super Admin nhận cờ audit (QĐ-111bc).',
+    }),
+    r({
       key: 'R24',
       requester: 'NV-ITA2',
       plan: 'slack-pro',
