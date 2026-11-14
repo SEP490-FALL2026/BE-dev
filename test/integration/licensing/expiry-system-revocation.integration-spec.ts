@@ -1,4 +1,5 @@
 import { randomUUID } from 'node:crypto';
+import { Logger } from '@nestjs/common';
 import { ExpiryHarness } from '../../support/expiry-harness';
 import { pretendBusinessToday } from '../../support/pretend-today';
 
@@ -196,7 +197,7 @@ describe('the system opens the revocation of a right that ended (integration, re
     expect((await h.reasonsOf(tasks[0].id)).map((reason) => reason.source)).toEqual(['RETURN']);
   });
 
-  it('leaves a right with no end date, a service account and a right that has not ended alone', async () => {
+  it('leaves a right with no end date and a right that has not ended alone', async () => {
     seq += 1;
     on('2026-08-10');
     const unit = await h.departmentWithHead(`P-XS${seq}`);
@@ -210,6 +211,62 @@ describe('the system opens the revocation of a right that ended (integration, re
 
     expect(await tasksOf(open)).toEqual([]);
     expect(await tasksOf(later)).toEqual([]);
+  });
+
+  it('leaves the right of a service account alone, even when its end day has passed: a person answers for it and no revocation of it is asked', async () => {
+    seq += 1;
+    on('2026-08-10');
+    const unit = await h.departmentWithHead(`P-XS${seq}`);
+    await longAgo(unit);
+    const serviceSeat = randomUUID();
+    await h.ctx.sql.query(
+      `INSERT INTO license_assignments (id, organization_id, kind, source, plan_id, subscription_id, employee_id,
+         account_identifier, normalized_account_identifier, reason, cost_center_id, owning_department_id, valid_from,
+         valid_from_basis, expected_end_date, created_by_app_user_id)
+       VALUES ($1, $2, 'SERVICE', 'REQUEST', $3, $4, $5, 'ci-bot-9', 'ci-bot-9', 'CI', $6, $7, '2026-08-05', 'ACTUAL', '2026-11-04', $8)`,
+      [
+        serviceSeat,
+        h.seed.organizationId,
+        k1.planId,
+        k1.subscriptionId,
+        unit.member.employeeId,
+        unit.department.unitId,
+        unit.department.id,
+        randomUUID(),
+      ],
+    );
+
+    on('2026-11-05');
+    await h.openDue();
+
+    expect(await tasksOf(serviceSeat)).toEqual([]);
+  });
+
+  it('asks nothing of a right whose plan has no revocation (K3) and logs no error for it, pass after pass', async () => {
+    seq += 1;
+    on('2026-08-10');
+    const unit = await h.departmentWithHead(`P-XS${seq}`);
+    await h.setItAdminInCharge(unit.department, { employeeId: h.it1.employeeId, account: h.it1 });
+    await longAgo(unit);
+    const subscriptionId = await h.subscription(10, 'K1');
+    const planId = await h.planOf(subscriptionId);
+    const assignmentId = await h.seatOf(
+      unit.member,
+      { subscriptionId },
+      { grantedOn: '2026-08-05', expectedEndDate: '2026-11-04' },
+    );
+    // K3 is specified and not built: nothing could complete its revocation, so the gate refuses it (`TYPE_NOT_SUPPORTED`).
+    await h.ctx.sql.query(`UPDATE plans SET provisioning_type = 'K3', pricing_model = NULL WHERE id = $1`, [planId]);
+    const logged = jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
+
+    on('2026-11-05');
+    await h.openDue();
+    on('2026-11-06');
+    await h.openDue();
+
+    expect(await tasksOf(assignmentId)).toEqual([]);
+    expect(logged).not.toHaveBeenCalled();
+    expect(await h.seatRow(assignmentId)).toMatchObject({ valid_until: null, expected_end_date: '2026-11-04' });
   });
 
   describe('the reminder follows the end the right has (R-27)', () => {

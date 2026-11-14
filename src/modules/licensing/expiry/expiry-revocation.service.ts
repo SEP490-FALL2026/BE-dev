@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import { describeForOperator, traceForOperator } from '../../../infrastructure/observability/operator-error';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
-import { AssignmentNotOpenError } from '../public/licensing.errors';
+import { AssignmentNotOpenError, RevocationRefusedError } from '../public/licensing.errors';
 import { RenewalHoldHook } from '../public/licensing.extension-points';
 import type { SystemActor } from '../public/licensing.types';
 import { RevocationService } from '../provisioning/revocation.service';
@@ -80,6 +80,9 @@ export class ExpiryRevocationService {
     } catch (error) {
       // The right ended between the reading and the asking (a return, a revocation completed): nothing is left to ask.
       if (error instanceof AssignmentNotOpenError) return 0;
+      // The gate refuses a right it cannot take away (K3 is specified and not built): there is no revocation to open, and the same answer every
+      // hour is no fault to log. The right stays in the queue of the IT Admin, who sees what its plan allows.
+      if (error instanceof RevocationRefusedError) return 0;
       this.logger.error(
         `Opening the revocation of the right ${assignmentId} that ended failed: ${describeForOperator(error)}`,
         traceForOperator(error),
