@@ -57,11 +57,23 @@ const listQuerySchema = z.strictObject({
   state: state.optional(),
   overdue: flag.optional(),
   reporterEmployeeId: z.uuid().optional(),
+  departmentId: z.uuid().optional().meta({
+    description:
+      'Only the reports of the people placed in this department today. Only an IT Admin asks for it, and a department outside the ones they work answers an empty page.',
+  }),
   ...pageQuery,
 });
 
 const employeeBrief = z.strictObject({ employeeId: z.uuid(), employeeCode: z.string(), fullName: z.string() });
-const planBrief = z.strictObject({ planId: z.uuid(), planName: z.string(), applicationName: z.string() });
+const planBrief = z.strictObject({
+  planId: z.uuid(),
+  planName: z.string(),
+  applicationName: z.string(),
+  logoUrl: z.string().nullable().meta({
+    description:
+      'The https link to the logo image of the application that the IT Admin pasted, or null. The server never checks it: it may be broken, so show the first letter of the name when the image does not load.',
+  }),
+});
 
 /** A report on a list: who sent it, for which right, in which state and by when it should be taken up. */
 export const saasIssueSummarySchema = z.strictObject({
@@ -72,7 +84,11 @@ export const saasIssueSummarySchema = z.strictObject({
   impact,
   assignmentId: z.uuid(),
   plan: planBrief,
+  /** The first line of what the reporter wrote, at most 120 characters: a report has no title of its own. */
+  title: z.string().max(120),
   reporter: employeeBrief,
+  /** The department the reporter is placed in today; null when they are placed in none (they left). */
+  department: z.strictObject({ id: z.uuid(), name: z.string() }).nullable(),
   assignedItAdmin: employeeBrief,
   responseDueOn: z.string(),
   overdue: z.boolean(),
