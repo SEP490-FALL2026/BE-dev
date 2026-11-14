@@ -1,4 +1,4 @@
-import { checkSupplement, supplementAuditDetail, supplementChangeOf } from './spend-submission.policy';
+import { checkSupplement, stopReasonOf, supplementAuditDetail, supplementChangeOf } from './spend-submission.policy';
 
 describe('the supplementary file (US-06-14 AC-13, AC-15; US-05-04 AC-16; L2-38)', () => {
   const facts = {
@@ -106,5 +106,16 @@ describe('what a supplementary file changes, and what it says (QĐ-82n, US-06-14
       afterAmountMinor: '800',
       droppedEmployeeIds: ['emp-3'],
     });
+  });
+});
+
+describe('QĐ-111an, R-4: the stop reason of a batch item an older release made is read with the reasons that exist now', () => {
+  it('reads a request that stopped for want of a rate as the missing price it comes to, and leaves the other reasons as they were', () => {
+    expect(['RATE_MISSING', 'PRICE_MISSING', 'OVER_RESERVE', null].map(stopReasonOf)).toEqual([
+      'PRICE_MISSING',
+      'PRICE_MISSING',
+      'OVER_RESERVE',
+      null,
+    ]);
   });
 });

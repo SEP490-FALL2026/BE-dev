@@ -1,3 +1,5 @@
+import { currentMissingReasonOf } from '../access-request/access-request.policy';
+
 /**
  * The rules of sending a request that costs money on to be decided as spend (`US-06-14`, `US-05-04` AC-12 to AC-16), as pure
  * decisions: which line of the plan a request is attached to, who sends it on, what stops it, and when its day may change.
@@ -17,6 +19,11 @@ export type StopReason =
   | 'OVER_RESERVE'
   | 'STALE_COST_EVIDENCE'
   | 'CLOSED_OR_EXPIRED_BUDGET_PERIOD';
+
+/** The stop reason of a batch item as it is stored: `RATE_MISSING` of a batch made before `QĐ-111an` is read as `PRICE_MISSING`. */
+export function stopReasonOf(stored: string | null): StopReason | null {
+  return stored === null ? null : (currentMissingReasonOf(stored) as StopReason);
+}
 
 export type SupplementRefusal =
   /** The request is not in the queue of the head: it is being decided, or has been. */

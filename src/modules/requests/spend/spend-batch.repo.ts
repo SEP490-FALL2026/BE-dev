@@ -2,8 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { Prisma } from '../../../generated/prisma/client';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
-import { currentMissingReasonOf } from '../access-request/access-request.policy';
-import type { StopReason } from './spend-submission.policy';
+import { stopReasonOf, type StopReason } from './spend-submission.policy';
 
 /** `SENT_TO_FINANCE` is read from batches made before: Finance has no review any more. */
 export type BatchItemOutcome = 'SENT_TO_APPROVER' | 'SENT_TO_FINANCE' | 'AWAITING_RESERVE_CONFIRMATION' | 'STOPPED';
@@ -41,11 +40,7 @@ const toItem = (row: {
   stopReason: string | null;
   leftReason: LeftReason | null;
   leftAt: Date | null;
-}): BatchItemRecord => ({
-  ...row,
-  // A batch an older release made may say RATE_MISSING; it is read as the missing price it comes to (`currentMissingReasonOf`).
-  stopReason: row.stopReason === null ? null : (currentMissingReasonOf(row.stopReason) as StopReason),
-});
+}): BatchItemRecord => ({ ...row, stopReason: stopReasonOf(row.stopReason) });
 
 /**
  * The one writer of `spend_batches` and `spend_batch_items`, and their reads. A batch and what its items said are never
