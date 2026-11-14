@@ -10,6 +10,8 @@ export interface PlanRecord {
   id: string;
   applicationId: string;
   applicationName: string;
+  /** The https link to the logo image the IT Admin pasted, or null. */
+  applicationLogoUrl: string | null;
   applicationKind: ApplicationKind;
   name: string;
   provisioningType: ProvisioningType;

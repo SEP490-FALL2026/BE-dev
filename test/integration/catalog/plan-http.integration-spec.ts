@@ -11,6 +11,7 @@ import {
 import { declareApplication } from '../../support/builders/catalog.builder';
 
 interface PlanWire {
+  applicationLogoUrl: string | null;
   id: string;
   applicationId: string;
   applicationName: string;
@@ -664,6 +665,17 @@ describe('plans and workspace profiles over HTTP (integration, real PostgreSQL)'
       );
       expect(all.items.map((item) => item.name)).toEqual(['A plan', 'B plan', 'C plan']);
       expect(all.pagination.totalItems).toBe(3);
+      // CT-1.L2: each row names the logo link of its application, null while there is none.
+      expect(all.items.map((item) => item.applicationLogoUrl)).toEqual([null, null, null]);
+      await ctx.sql.query(`UPDATE applications SET logo_url = 'https://cdn.example.com/logo.png' WHERE id = $1`, [app]);
+      const logo = dataOf<{ items: PlanWire[] }>(
+        await request(server()).get('/api/v1/plans').query({ applicationId: app }).set(as(it1)).expect(200),
+      );
+      expect(logo.items.map((item) => item.applicationLogoUrl)).toEqual([
+        'https://cdn.example.com/logo.png',
+        'https://cdn.example.com/logo.png',
+        'https://cdn.example.com/logo.png',
+      ]);
       const k1 = dataOf<{ items: PlanWire[] }>(
         await request(server())
           .get('/api/v1/plans')

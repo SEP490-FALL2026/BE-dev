@@ -7,6 +7,7 @@ export function toPlanSummaryWire(plan: PlanSummaryRecord) {
     id: plan.id,
     applicationId: plan.applicationId,
     applicationName: plan.applicationName,
+    applicationLogoUrl: plan.applicationLogoUrl,
     name: plan.name,
     provisioningType: plan.provisioningType,
     pricingModel: plan.pricingModel,

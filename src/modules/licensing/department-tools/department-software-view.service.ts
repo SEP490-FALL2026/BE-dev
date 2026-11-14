@@ -81,7 +81,9 @@ export class DepartmentSoftwareViewService {
           ]);
 
     return {
-      applications: new Map(applications.map((application) => [application.id, application.name])),
+      applications: new Map(
+        applications.map((application) => [application.id, { name: application.name, logoUrl: application.logoUrl }]),
+      ),
       plans: new Map(plans.map((plan) => [plan.planId, plan.planName])),
       people: new Map(
         people.map((person) => [person.id, { employeeCode: person.employeeCode, fullName: person.fullName }]),

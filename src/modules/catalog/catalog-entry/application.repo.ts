@@ -298,7 +298,14 @@ export class ApplicationRepo {
     ids: readonly string[],
     tx?: DbTx,
   ): Promise<
-    { id: string; name: string; kind: ApplicationKind; isCommunicationService: boolean; retiredAt: Date | null }[]
+    {
+      id: string;
+      name: string;
+      kind: ApplicationKind;
+      logoUrl: string | null;
+      isCommunicationService: boolean;
+      retiredAt: Date | null;
+    }[]
   > {
     const rows = await (tx ?? this.prisma).application.findMany({
       where: { id: { in: [...ids] } },
@@ -306,6 +313,7 @@ export class ApplicationRepo {
         id: true,
         name: true,
         kind: true,
+        logoUrl: true,
         retiredAt: true,
         functionalGroup: { select: { systemKey: true } },
       },

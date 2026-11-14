@@ -17,7 +17,7 @@ import type {
   WorkspaceProfileRecord,
 } from './plan.types';
 
-const WITH_APPLICATION = { application: { select: { name: true, kind: true } } } as const;
+const WITH_APPLICATION = { application: { select: { name: true, kind: true, logoUrl: true } } } as const;
 type PlanRow = Prisma.PlanGetPayload<{ include: typeof WITH_APPLICATION }>;
 type ProfileRow = Prisma.PlanWorkspaceProfileGetPayload<{ include: { members: true } }>;
 
@@ -25,6 +25,7 @@ const toPlan = (row: PlanRow): PlanRecord => ({
   id: row.id,
   applicationId: row.applicationId,
   applicationName: row.application.name,
+  applicationLogoUrl: row.application.logoUrl,
   applicationKind: row.application.kind,
   name: row.name,
   provisioningType: row.provisioningType,
@@ -213,7 +214,7 @@ export class PlanRepo {
         provisioningType: true,
         revocationNote: true,
         dataLossOnRemoval: true,
-        application: { select: { name: true } },
+        application: { select: { name: true, logoUrl: true } },
       },
     });
 
@@ -222,6 +223,7 @@ export class PlanRepo {
       planName: row.name,
       applicationId: row.applicationId,
       applicationName: row.application.name,
+      applicationLogoUrl: row.application.logoUrl,
       provisioningType: row.provisioningType,
       revocationNote: row.revocationNote,
       dataLossOnRemoval: row.dataLossOnRemoval,
@@ -347,7 +349,7 @@ export class PlanRepo {
             hasAdminConsole: true,
             createdAt: true,
             updatedAt: true,
-            application: { select: { name: true, kind: true } },
+            application: { select: { name: true, kind: true, logoUrl: true } },
           },
           orderBy: [{ application: { normalizedName: 'asc' } }, { normalizedName: 'asc' }, { id: 'asc' }],
           skip: filter.skip,
@@ -358,6 +360,7 @@ export class PlanRepo {
           items: rows.map(({ application, ...row }) => ({
             ...row,
             applicationName: application.name,
+            applicationLogoUrl: application.logoUrl,
             applicationKind: application.kind,
           })),
           total: await tx.plan.count({ where }),

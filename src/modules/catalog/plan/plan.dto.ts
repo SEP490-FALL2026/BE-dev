@@ -109,6 +109,10 @@ const planSummarySchema = z.strictObject({
   id: z.uuid(),
   applicationId: z.uuid(),
   applicationName: z.string(),
+  applicationLogoUrl: z.string().nullable().meta({
+    description:
+      'The https link to the logo image of the application, or null. It may be broken: show the first letter of the application name when the image does not load.',
+  }),
   name: z.string(),
   provisioningType,
   pricingModel: pricingModel.nullable(),

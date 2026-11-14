@@ -59,6 +59,10 @@ const requestableApplicationSummarySchema = z.strictObject({
   id: z.uuid(),
   name: z.string(),
   kind,
+  logoUrl: z.string().nullable().meta({
+    description:
+      'The https link to the logo image, or null. It may be broken: show the first letter of the name when the image does not load.',
+  }),
   vendorName: z.string().nullable(),
   functionalGroup: z.strictObject({ id: z.uuid(), name: z.string() }).nullable(),
   planCount: z.number().int().positive(),
@@ -72,7 +76,7 @@ const requestablePlanSummarySchema = z.strictObject({
   id: z.uuid(),
   name: z.string(),
   provisioningType: z.enum(['K1', 'K2', 'K3', 'K4', 'K5']),
-  application: z.strictObject({ id: z.uuid(), name: z.string(), kind }),
+  application: z.strictObject({ id: z.uuid(), name: z.string(), kind, logoUrl: z.string().nullable() }),
   price: z
     .strictObject({
       status: z.enum(['PRICED', 'MISSING', 'NOT_APPLICABLE']),

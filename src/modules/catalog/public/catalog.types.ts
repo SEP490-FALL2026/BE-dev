@@ -80,6 +80,8 @@ export interface PlanRevocationInfo {
   planName: string;
   applicationId: string;
   applicationName: string;
+  /** The https link to the logo image the IT Admin pasted, or null. */
+  applicationLogoUrl: string | null;
   provisioningType: 'K1' | 'K2' | 'K3' | 'K4' | 'K5';
   revocationNote: string | null;
   dataLossOnRemoval: boolean;

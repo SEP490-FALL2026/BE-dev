@@ -9,7 +9,7 @@ import { bearer, createHttpContractApp, principal } from '../../support/http-con
 const PATH = '/api/v1/me/software-rights';
 const RIGHT = {
   assignmentId: '3f0c7d54-9e1b-4f6a-8d2c-5b7a1e9c0d11',
-  application: { id: '3f0c7d54-9e1b-4f6a-8d2c-5b7a1e9c0d12', name: 'Office' },
+  application: { id: '3f0c7d54-9e1b-4f6a-8d2c-5b7a1e9c0d12', name: 'Office', logoUrl: null },
   plan: { id: '3f0c7d54-9e1b-4f6a-8d2c-5b7a1e9c0d13', name: 'Office 2021' },
   provisioningType: 'K4',
   status: 'ACTIVE',

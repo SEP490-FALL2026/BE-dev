@@ -199,6 +199,9 @@ describe('the software a person may request (integration, real PostgreSQL)', () 
     });
 
     it('answers the detail of an application and of a plan with the fields a requester may see', async () => {
+      await h.ctx.sql.query(`UPDATE applications SET logo_url = 'https://cdn.example.com/sel.png' WHERE id = $1`, [
+        licensed.applicationId,
+      ]);
       const application = h.dataOf<Record<string, unknown>>(
         await call(`/api/v1/requestable-applications/${licensed.applicationId}`, designer).expect(200),
       );
@@ -210,6 +213,7 @@ describe('the software a person may request (integration, real PostgreSQL)', () 
         id: licensed.applicationId,
         name: 'Sel Autodesk',
         kind: 'LICENSED',
+        logoUrl: 'https://cdn.example.com/sel.png',
         vendorName: 'Sel Autodesk Vendor',
         // QĐ-111d: an application declared with no group stands in Khác.
         functionalGroup: { id: expect.any(String) as unknown, name: 'Khác' },
@@ -223,7 +227,12 @@ describe('the software a person may request (integration, real PostgreSQL)', () 
         id: licensed.planId,
         name: 'Sel Autodesk Plan',
         provisioningType: 'K1',
-        application: { id: licensed.applicationId, name: 'Sel Autodesk', kind: 'LICENSED' },
+        application: {
+          id: licensed.applicationId,
+          name: 'Sel Autodesk',
+          kind: 'LICENSED',
+          logoUrl: 'https://cdn.example.com/sel.png',
+        },
         costsMoney: true,
         price: { status: 'PRICED', missingReason: null },
         canSubmit: true,
@@ -232,6 +241,23 @@ describe('the software a person may request (integration, real PostgreSQL)', () 
         sharingPolicy: null,
         dataLossOnRemoval: false,
       });
+    });
+  });
+
+  describe('the logo of an application in what a person searches (CT-1.L2)', () => {
+    it('is the link the IT Admin pasted, or null, in the list of requestable applications', async () => {
+      await h.ctx.sql.query(`UPDATE applications SET logo_url = 'https://cdn.example.com/logo.png' WHERE id = $1`, [
+        saas.applicationId,
+      ]);
+
+      const found = h.dataOf<{ items: { id: string; logoUrl: string | null }[] }>(
+        await call('/api/v1/requestable-applications?pageSize=100', designer).expect(200),
+      );
+
+      expect(found.items.find((item) => item.id === saas.applicationId)?.logoUrl).toBe(
+        'https://cdn.example.com/logo.png',
+      );
+      expect(found.items.find((item) => item.id === internal.applicationId)?.logoUrl).toBeNull();
     });
   });
 

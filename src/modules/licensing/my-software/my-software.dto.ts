@@ -16,7 +16,7 @@ const querySchema = z.strictObject({
 /** One right of the caller on a list: the software and plan, how it is granted, where it stands and until when. */
 export const mySoftwareRightSummarySchema = z.strictObject({
   assignmentId: z.uuid(),
-  application: z.strictObject({ id: z.uuid(), name: z.string() }),
+  application: z.strictObject({ id: z.uuid(), name: z.string(), logoUrl: z.string().nullable() }),
   plan: z.strictObject({ id: z.uuid(), name: z.string() }),
   provisioningType: z.enum(['K1', 'K2', 'K3', 'K4', 'K5']),
   status: z.enum(MY_SOFTWARE_STATUSES),

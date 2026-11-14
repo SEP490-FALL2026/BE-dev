@@ -12,7 +12,7 @@ const h = new RevocationHarness();
 
 interface RightWire {
   assignmentId: string;
-  application: { id: string; name: string };
+  application: { id: string; name: string; logoUrl: string | null };
   plan: { id: string; name: string };
   provisioningType: string;
   status: string;
@@ -189,6 +189,12 @@ describe('my software rights (integration, real PostgreSQL)', () => {
 
   // US-12-15 AC-2, US-16-01 AC-1: the software granted, K4 included.
   it('lists every right the Employee holds today or later, across K1, K2, K4 and K5, and nothing else', async () => {
+    // CT-1.L2: the link to the logo the IT Admin pasted comes with the application, null for the others.
+    await h.ctx.sql.query(
+      `UPDATE applications SET logo_url = 'https://cdn.example.com/logo.png'
+        WHERE id = (SELECT p.application_id FROM license_assignments la JOIN plans p ON p.id = la.plan_id WHERE la.id = $1)`,
+      [seats.figma],
+    );
     const page = await pageOf(e1);
 
     expect(page.asOf).toBe(h.today());
@@ -222,6 +228,10 @@ describe('my software rights (integration, real PostgreSQL)', () => {
       provisioningType: 'K5',
       status: 'ACTIVE',
     });
+    expect(page.items.find((item) => item.assignmentId === seats.figma)?.application.logoUrl).toBe(
+      'https://cdn.example.com/logo.png',
+    );
+    expect(page.items.find((item) => item.assignmentId === seats.portal)?.application.logoUrl).toBeNull();
   });
 
   it('shows a K4 right as granted and never the key of its purchase, an account identifier or a price', async () => {
