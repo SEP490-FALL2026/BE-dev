@@ -337,6 +337,10 @@ describe('POST /applications: the application and its first plan in one command 
       for (const logoUrl of [
         'http://cdn.example.com/logo.png',
         'javascript:alert(1)',
+        'https:example.com/logo.png',
+        'https:/example.com/logo.png',
+        'https://example.com/a b.png',
+        'https://example.com/a\tb.png',
         `https://cdn.example.com/${'a'.repeat(480)}`,
       ]) {
         const response = await create({

@@ -15,6 +15,7 @@ const kind = z.enum(['SAAS', 'LICENSED', 'INTERNAL']);
 
 /** The longest link a logo may be: the column and its CHECK say the same. */
 export const MAX_LOGO_URL_LENGTH = 500;
+const HTTPS_LINK = /^https:\/\/\S+$/i;
 const isHttpsLink = (value: string): boolean => {
   try {
     const url = new URL(value);
@@ -35,6 +36,8 @@ export const logoUrlSchema = z
   .string()
   .trim()
   .max(MAX_LOGO_URL_LENGTH)
+  // The shape the CHECK `applications_logo_url_https` holds: `https://` and no blank at all (the URL parser would repair `https:host` and keep a tab).
+  .regex(HTTPS_LINK, { message: 'The logo is a link that starts with https:// and has no blank' })
   .refine(isHttpsLink, { message: 'The logo is a link that starts with https://' });
 
 /** The kind and the vendor cannot change: they are not fields here, so naming one is a validation error. */
