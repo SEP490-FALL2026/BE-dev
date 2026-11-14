@@ -110,22 +110,19 @@ export class PricingViewService {
     if (pricing.status !== 'PRICED' || pricing.amount === null || pricing.budgetYear === null) return null;
     if (pricing.kind !== 'RECURRING') return null;
     const year = pricing.budgetYear;
+    const months = term ?? { currentMonths: pricing.amountMonths, nextMonths: null, startedMonths: null, cutAt: null };
     const { nextYearAmount } = pricing;
 
     return {
-      currentYear: {
-        year,
-        months: term === null ? pricing.amountMonths : term.currentMonths,
-        amount: await this.moneyView(pricing.amount),
-      },
+      currentYear: { year, months: months.currentMonths, amount: await this.moneyView(pricing.amount) },
       nextYear: nextYearAmount && {
         from: `${year + 1}-01-01`,
-        months: term?.nextMonths ?? null,
+        months: months.nextMonths,
         amount: await this.moneyView(nextYearAmount),
         estimate: true,
       },
-      termCutAt: term?.cutAt ?? null,
-      months: term?.startedMonths ?? null,
+      termCutAt: months.cutAt,
+      months: months.startedMonths,
     };
   }
 
