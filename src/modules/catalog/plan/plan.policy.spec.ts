@@ -1,5 +1,6 @@
 import {
   PlanControlLevelRequiredError,
+  PlanPricingModelNotDerivedError,
   PlanDataLossNoteRequiredError,
   PlanNameInvalidError,
   PlanNoteInvalidError,
@@ -14,6 +15,7 @@ import {
 } from './plan.errors';
 import {
   assertPlanShape,
+  assertPricingModelDerived,
   assertWorkspaceShape,
   cleanPlanName,
   derivedPricingModel,
@@ -277,5 +279,22 @@ describe('derivedPricingModel (B-5: the kind of provisioning says how a plan is 
 
   it('leaves K3, which cannot be declared yet, with none', () => {
     expect(derivedPricingModel('K3')).toBeNull();
+  });
+});
+
+describe('assertPricingModelDerived (B-5: a pricing model that is sent is the one the kind implies)', () => {
+  it('lets through what is not sent and the model the kind implies', () => {
+    expect(() => assertPricingModelDerived('K1', undefined)).not.toThrow();
+    expect(() => assertPricingModelDerived('K2', 'PER_SEAT')).not.toThrow();
+    expect(() => assertPricingModelDerived('K4', null)).not.toThrow();
+    expect(() => assertPricingModelDerived('K5', null)).not.toThrow();
+  });
+
+  it('refuses any other, telling the model the kind implies', () => {
+    expect(() => assertPricingModelDerived('K1', 'FLAT_RATE')).toThrow(PlanPricingModelNotDerivedError);
+    expect(() => assertPricingModelDerived('K2', null)).toThrow(PlanPricingModelNotDerivedError);
+    expect(() => assertPricingModelDerived('K4', 'PER_SEAT')).toThrow(PlanPricingModelNotDerivedError);
+    expect(() => assertPricingModelDerived('K4', 'PER_HOST')).toThrow(PlanPricingModelNotDerivedError);
+    expect(new PlanPricingModelNotDerivedError('PER_SEAT').expected).toBe('PER_SEAT');
   });
 });

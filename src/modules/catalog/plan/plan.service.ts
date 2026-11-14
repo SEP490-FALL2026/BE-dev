@@ -19,7 +19,13 @@ import {
   PlanUpdateEmptyError,
   PlanWorkspaceProfileBlocksTypeChangeError,
 } from './plan.errors';
-import { assertPlanShape, cleanPlanName, cleanRevocationNote, derivedPricingModel } from './plan.policy';
+import {
+  assertPlanShape,
+  assertPricingModelDerived,
+  cleanPlanName,
+  cleanRevocationNote,
+  derivedPricingModel,
+} from './plan.policy';
 import { PlanRepo } from './plan.repo';
 import { assertAdminConsoleApplicable } from './plan-vendor-admins.policy';
 import { PlanWorkspaceService } from './plan-workspace.service';
@@ -145,6 +151,7 @@ export class PlanService {
           hasAdminConsole: input.hasAdminConsole ?? false,
         };
         assertPlanShape({ ...plan, applicationKind: application.kind });
+        assertPricingModelDerived(input.provisioningType, input.pricingModel);
         assertAdminConsoleApplicable(plan.provisioningType, input.hasAdminConsole);
 
         const created = await this.plans.insert(tx, plan);
@@ -193,6 +200,7 @@ export class PlanService {
             ((input.provisioningType ?? current.provisioningType) === 'K4' ? current.hasAdminConsole : false),
         };
         assertPlanShape({ ...next, applicationKind: current.applicationKind });
+        assertPricingModelDerived(next.provisioningType, input.pricingModel);
         assertAdminConsoleApplicable(next.provisioningType, input.hasAdminConsole);
         if (
           next.provisioningType !== current.provisioningType &&

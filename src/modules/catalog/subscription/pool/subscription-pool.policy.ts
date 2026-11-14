@@ -4,6 +4,7 @@ import {
   SubscriptionCommitmentTermNotAllowedError,
   SubscriptionCommitmentTermRequiredError,
   SubscriptionK1MonthlyOnlyError,
+  SubscriptionK4PerpetualOnlyError,
   SubscriptionResponsibleRequiredError,
   SubscriptionVendorAdminsRequiredError,
 } from '../subscription.errors';
@@ -50,10 +51,20 @@ export function assertDeclarableCycle(billingCycle: string | undefined): void {
   }
 }
 
+/** What the kind of provisioning says of a term: a K4 plan is bought once, never a term (`B-5`); a K1 plan is for one month and paid by the month (R-E01). */
+function assertTermOfKind(input: PoolTermsInput): void {
+  if (input.planProvisioningType === 'K4') throw new SubscriptionK4PerpetualOnlyError();
+  if (input.planProvisioningType === 'K1') {
+    const longer = input.commitmentTermMonths !== null && input.commitmentTermMonths !== 1;
+    const notMonthly = input.billingCycle !== null && input.billingCycle !== 'MONTHLY';
+    if (longer || notMonthly) throw new SubscriptionK1MonthlyOnlyError();
+  }
+}
+
 /**
  * The rules of the shared pool on a write (`QĐ-103e`, `QĐ-104d`(3), R-E01, R-G01), in a fixed order: a perpetual purchase commits to no
  * term; paying by the year for a commitment of one month is refused; a K1 plan is for one month and paid by the month; a term that
- * becomes active names its commitment. Throws the first that fails. Data older than the rules is not judged by a write that does not
+ * becomes active names its commitment; a K4 plan is bought once, so only a perpetual purchase is written for it (`B-5`). Throws the first that fails. Data older than the rules is not judged by a write that does not
  * touch these fields: the caller says when to call this.
  */
 export function assertPoolTerms(input: PoolTermsInput): void {
@@ -65,11 +76,7 @@ export function assertPoolTerms(input: PoolTermsInput): void {
   if (input.commitmentTermMonths === 1 && input.billingCycle === 'ANNUAL') {
     throw new SubscriptionBillingLongerThanCommitmentError();
   }
-  if (input.planProvisioningType === 'K1') {
-    const longer = input.commitmentTermMonths !== null && input.commitmentTermMonths !== 1;
-    const notMonthly = input.billingCycle !== null && input.billingCycle !== 'MONTHLY';
-    if (longer || notMonthly) throw new SubscriptionK1MonthlyOnlyError();
-  }
+  assertTermOfKind(input);
   if (input.activating && input.commitmentTermMonths === null) throw new SubscriptionCommitmentTermRequiredError();
 }
 

@@ -4,6 +4,7 @@ import {
   SubscriptionCommitmentTermNotAllowedError,
   SubscriptionCommitmentTermRequiredError,
   SubscriptionK1MonthlyOnlyError,
+  SubscriptionK4PerpetualOnlyError,
   SubscriptionResponsibleRequiredError,
   SubscriptionVendorAdminsRequiredError,
 } from '../subscription.errors';
@@ -73,6 +74,21 @@ describe('the rules of the shared pool on a write (QĐ-103e, QĐ-104d(3), R-E01,
     );
     expect(() =>
       assertPoolTerms({ ...k1, billingCycle: 'MONTHLY', commitmentTermMonths: 1, activating: true }),
+    ).not.toThrow();
+  });
+
+  it('B-5: a K4 plan is bought once, so what is written for it is a perpetual purchase and never a term', () => {
+    const k4 = { ...term, planProvisioningType: 'K4' as const, billingCycle: 'MONTHLY' as const };
+
+    expect(() => assertPoolTerms({ ...k4, commitmentTermMonths: 1 })).toThrow(SubscriptionK4PerpetualOnlyError);
+    expect(() => assertPoolTerms({ ...k4, commitmentTermMonths: null, activating: false })).toThrow(
+      SubscriptionK4PerpetualOnlyError,
+    );
+    expect(() =>
+      assertPoolTerms({ ...k4, kind: 'PERPETUAL', billingCycle: null, commitmentTermMonths: null, activating: true }),
+    ).not.toThrow();
+    expect(() =>
+      assertPoolTerms({ ...term, planProvisioningType: 'K2' as const, commitmentTermMonths: 12 }),
     ).not.toThrow();
   });
 

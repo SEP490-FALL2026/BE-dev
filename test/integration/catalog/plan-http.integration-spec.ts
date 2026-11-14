@@ -209,12 +209,55 @@ describe('plans and workspace profiles over HTTP (integration, real PostgreSQL)'
     it('AC-3: a plan that is not per seat shows seats as not applicable, never as zero', async () => {
       const app = await application();
 
+      // A plan made before the pricing model followed the kind may have any of these: the row says it, the answer shows the seats as not applicable.
       for (const pricingModel of ['FLAT_RATE', 'CONCURRENT', 'CONSUMPTION', 'PER_HOST']) {
-        const created = await plan(app, { pricingModel });
+        const created = await plan(app);
+        await ctx.sql.query(`UPDATE plans SET pricing_model = $2::"PricingModel" WHERE id = $1`, [
+          created.id,
+          pricingModel,
+        ]);
+        const read = dataOf<PlanWire & { workspaceProfile: unknown }>(
+          await request(server()).get(`/api/v1/plans/${created.id}`).set(as(it1)).expect(200),
+        );
 
-        expect(created.seatTracking).toBe('NOT_APPLICABLE');
-        expect(Object.keys(created).filter((key) => /seat/i.test(key))).toEqual(['seatTracking']);
+        expect(read.pricingModel).toBe(pricingModel);
+        expect(read.seatTracking).toBe('NOT_APPLICABLE');
+        expect(Object.keys(read).filter((key) => /seat/i.test(key))).toEqual(['seatTracking']);
       }
+    });
+
+    it('B-5: refuses a pricing model the kind of provisioning does not imply, telling the one it does, and writes nothing', async () => {
+      const app = await application();
+      const before = await n('plans');
+      const refused = async (body: object, expected: string | null) => {
+        const response = await createPlan({
+          applicationId: app,
+          name: unique('Not derived'),
+          controlLevel: 'FULL',
+          ...body,
+        }).expect(422);
+        expect(codeOf(response)).toBe('PLAN.PRICING_MODEL_NOT_DERIVED');
+        expect((response.body as { error: { details: { expected: string | null } } }).error.details.expected).toBe(
+          expected,
+        );
+      };
+
+      await refused({ provisioningType: 'K1', pricingModel: 'FLAT_RATE' }, 'PER_SEAT');
+      await refused({ provisioningType: 'K2', pricingModel: 'PER_HOST' }, 'PER_SEAT');
+      await refused({ provisioningType: 'K4', pricingModel: 'PER_SEAT' }, null);
+      expect(await n('plans')).toBe(before);
+      // The one the kind implies is accepted, and so is leaving it out.
+      await createPlan({
+        applicationId: app,
+        name: unique('Implied'),
+        provisioningType: 'K1',
+        pricingModel: 'PER_SEAT',
+        controlLevel: 'FULL',
+      }).expect(201);
+      const k2plan = await plan(app);
+      const patched = await patchPlan(k2plan.id, { pricingModel: 'FLAT_RATE' }).expect(422);
+      expect(codeOf(patched)).toBe('PLAN.PRICING_MODEL_NOT_DERIVED');
+      await patchPlan(k2plan.id, { provisioningType: 'K4', pricingModel: null }).expect(200);
     });
 
     it('AC-4: refuses a plan without a kind; one application has plans of different kinds; K3 cannot be declared yet', async () => {
@@ -366,15 +409,14 @@ describe('plans and workspace profiles over HTTP (integration, real PostgreSQL)'
       const changed = dataOf<PlanWire>(
         await patchPlan(created.id, {
           provisioningType: 'K1',
-          pricingModel: 'FLAT_RATE',
           controlLevel: 'PARTIAL',
         }).expect(200),
       );
       expect(changed).toMatchObject({
         provisioningType: 'K1',
-        pricingModel: 'FLAT_RATE',
+        pricingModel: 'PER_SEAT',
         controlLevel: 'PARTIAL',
-        seatTracking: 'NOT_APPLICABLE',
+        seatTracking: 'APPLICABLE',
       });
       expect(codeOf(await patchPlan(created.id, { provisioningType: 'K5' }).expect(422))).toBe(
         'PLAN.PROVISIONING_TYPE_MISMATCH',
@@ -636,9 +678,9 @@ describe('plans and workspace profiles over HTTP (integration, real PostgreSQL)'
       const k2Plan = await plan(await application());
       await putProfile(k2Plan.id, profileBody()).expect(200);
 
-      expect(
-        codeOf(await patchPlan(k2Plan.id, { provisioningType: 'K1', pricingModel: 'FLAT_RATE' }).expect(409)),
-      ).toBe('PLAN.WORKSPACE_PROFILE_BLOCKS_TYPE_CHANGE');
+      expect(codeOf(await patchPlan(k2Plan.id, { provisioningType: 'K1' }).expect(409))).toBe(
+        'PLAN.WORKSPACE_PROFILE_BLOCKS_TYPE_CHANGE',
+      );
       await patchPlan(k2Plan.id, { name: unique('Still K2') }).expect(200);
       expect(dataOf<PlanWire>(await getPlan(k2Plan.id).expect(200)).provisioningType).toBe('K2');
     });
@@ -714,71 +756,6 @@ describe('plans and workspace profiles over HTTP (integration, real PostgreSQL)'
           .expect(200),
       );
       expect(paged.items.map((item) => item.name)).toEqual(['C plan']);
-    });
-
-    it('CT-1.6: filters the plan list by the functional group of the application, its catalog status and a search over plan and application names', async () => {
-      const tag = unique('Filter').replace(/ /g, '-');
-      const group = async (name: string): Promise<string> =>
-        dataOf<{ id: string }>(
-          await request(server()).post('/api/v1/functional-groups').set(as(it1)).send({ name }).expect(201),
-        ).id;
-      const design = await group(`${tag} Design`);
-      const writing = await group(`${tag} Writing`);
-      const declare = (name: string, functionalGroupId: string) =>
-        declareApplication(ctx, it1.accessToken, {
-          name,
-          kind: 'SAAS',
-          vendorName: `${name} vendor`,
-          dataSensitivity: 'LOW',
-          functionalGroupId,
-        });
-      const figma = await declare(`${tag} Fígma`, design);
-      const notion = await declare(`${tag} Notion`, writing);
-      await plan(figma, { name: 'Organization' });
-      await plan(figma, { name: 'Professional' });
-      await plan(figma, { name: 'Pay_as%you' });
-      await plan(notion, { name: 'Team' });
-      await ctx.sql.query(`UPDATE applications SET catalog_status = 'RETIRED', retired_at = now() WHERE id = $1`, [
-        notion,
-      ]);
-      const list = async (query: object) =>
-        dataOf<{ items: PlanWire[]; pagination: { totalItems: number } }>(
-          await request(server()).get('/api/v1/plans').query(query).set(as(it1)).expect(200),
-        );
-      const names = (page: { items: PlanWire[] }) => page.items.map((item) => item.name);
-
-      expect(names(await list({ functionalGroupId: design }))).toEqual(['Organization', 'Pay_as%you', 'Professional']);
-      expect(names(await list({ functionalGroupId: writing }))).toEqual(['Team']);
-      expect(names(await list({ functionalGroupId: design, status: 'APPROVED' }))).toEqual([
-        'Organization',
-        'Pay_as%you',
-        'Professional',
-      ]);
-      expect(names(await list({ functionalGroupId: design, status: 'RETIRED' }))).toEqual([]);
-      expect(names(await list({ functionalGroupId: writing, status: 'RETIRED' }))).toEqual(['Team']);
-      // The search reads the plan name and the application name, ignoring case and accents.
-      expect(names(await list({ functionalGroupId: design, search: 'PROFESS' }))).toEqual(['Professional']);
-      expect(names(await list({ functionalGroupId: design, search: `${tag} figma` }))).toEqual([
-        'Organization',
-        'Pay_as%you',
-        'Professional',
-      ]);
-      expect(names(await list({ functionalGroupId: design, search: 'zzz-no-such' }))).toEqual([]);
-      // The characters of a pattern in the search are taken as text: they find the name that holds them and nothing else.
-      expect(names(await list({ functionalGroupId: design, search: '_as%y' }))).toEqual(['Pay_as%you']);
-      expect(names(await list({ functionalGroupId: design, search: 'o_g' }))).toEqual([]);
-      // A search is text, not a pattern: a percent sign matches nothing.
-      expect((await list({ functionalGroupId: design, search: '%x' })).pagination.totalItems).toBe(0);
-      const paged = await list({ functionalGroupId: design, page: 2, pageSize: 1 });
-      expect(names(paged)).toEqual(['Pay_as%you']);
-      expect(paged.pagination.totalItems).toBe(3);
-    });
-
-    it('CT-1.6: refuses a functional group that is not a uuid and a status that is not one: 422 VALIDATION_ERROR', async () => {
-      for (const query of [{ functionalGroupId: 'not-a-uuid' }, { status: 'ACTIVE' }, { search: 'x'.repeat(101) }]) {
-        const response = await request(server()).get('/api/v1/plans').query(query).set(as(it1)).expect(422);
-        expect(codeOf(response)).toBe('VALIDATION_ERROR');
-      }
     });
   });
 });

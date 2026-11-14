@@ -13,6 +13,7 @@ import {
   seedInstallation,
 } from '../../support/http-test-app';
 import { intakeBodyOf } from '../../support/application-body';
+import { pricingOfBody, writeLegacyPricing } from '../../support/legacy-pricing';
 
 const NO = { personToPersonMessaging: false, callsOrMeetings: false, mailbox: false };
 
@@ -71,10 +72,11 @@ describe('what licensing reads of catalog and organization (integration, real Po
           applicationId,
           name: unique('Plan'),
           provisioningType: type,
-          ...(type === 'K5' ? {} : { pricingModel: pricing ?? 'PER_SEAT', controlLevel: 'FULL' }),
+          ...(type === 'K5' ? {} : { ...pricingOfBody(type, pricing ?? 'PER_SEAT'), controlLevel: 'FULL' }),
         })
         .expect(201),
     );
+    await writeLegacyPricing(ctx.sql, created.id, type, pricing ?? 'PER_SEAT');
     // A plan that needs admins at the vendor gets the two-person profile an active subscription asks for (X-IT.5).
     await ensureVendorAdmins(ctx, created.id, it1.employeeId);
 

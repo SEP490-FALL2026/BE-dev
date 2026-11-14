@@ -5,6 +5,7 @@ import { ensureVendorAdmins } from '../../support/builders/catalog.builder';
 import { ApiAccount, adminToken, createActivatedAccount } from '../../support/api-accounts';
 import { HttpTestApp, SeededInstallation, createHttpTestApp, seedInstallation } from '../../support/http-test-app';
 import { intakeBodyOf } from '../../support/application-body';
+import { pricingOfBody, writeLegacyPricing } from '../../support/legacy-pricing';
 
 interface TermsWire {
   termsUrl: string | null;
@@ -121,11 +122,12 @@ describe('plan terms and review alerts over HTTP (integration, real PostgreSQL)'
           applicationId: application.id,
           name: unique('Plan'),
           provisioningType: type,
-          ...(type === 'K5' ? {} : { pricingModel: setup.pricing ?? 'PER_SEAT', controlLevel: 'FULL' }),
+          ...(type === 'K5' ? {} : { ...pricingOfBody(type, setup.pricing ?? 'PER_SEAT'), controlLevel: 'FULL' }),
         })
         .expect(201),
     );
 
+    await writeLegacyPricing(ctx.sql, created.id, type, setup.pricing ?? 'PER_SEAT');
     // A plan that needs admins at the vendor gets the two-person profile an active subscription asks for (X-IT.5).
     await ensureVendorAdmins(ctx, created.id, it1.employeeId);
 
@@ -278,7 +280,7 @@ describe('plan terms and review alerts over HTTP (integration, real PostgreSQL)'
       const response = await request(server())
         .patch(`/api/v1/plans/${k4.planId}`)
         .set(as(it1))
-        .send({ provisioningType: 'K1', pricingModel: 'FLAT_RATE', controlLevel: 'PARTIAL' })
+        .send({ provisioningType: 'K1', controlLevel: 'PARTIAL' })
         .expect(409);
 
       expect(codeOf(response)).toBe('PLAN.TERMS_BLOCK_TYPE_CHANGE');

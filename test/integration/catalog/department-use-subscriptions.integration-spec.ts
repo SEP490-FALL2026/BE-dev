@@ -54,7 +54,6 @@ describe('what keeps a department in use: its subscriptions and purchases (integ
           applicationId: application.id,
           name: h.unique('Plan'),
           provisioningType: 'K4',
-          pricingModel: 'PER_SEAT',
           controlLevel: 'FULL',
         })
         .expect(201),

@@ -373,7 +373,6 @@ describe('the vault of license keys over HTTP (integration, real PostgreSQL)', (
           applicationId: application.id,
           name: h.unique('Plan'),
           provisioningType: 'K4',
-          pricingModel: 'PER_SEAT',
           controlLevel: 'FULL',
         })
         .expect(201),

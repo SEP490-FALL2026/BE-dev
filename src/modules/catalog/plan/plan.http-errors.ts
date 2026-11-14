@@ -13,6 +13,7 @@ import {
   PlanProvisioningTypeMismatchError,
   PlanPricingModelRequiredError,
   PlanPricingModelNotApplicableError,
+  PlanPricingModelNotDerivedError,
   PlanControlLevelRequiredError,
   PlanDataLossNoteRequiredError,
   PlanInUseBlocksChangeError,
@@ -58,6 +59,11 @@ export function toPlanApiException(error: unknown): unknown {
     return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'PLAN.PROVISIONING_TYPE_MISMATCH', error.message);
   if (error instanceof PlanPricingModelRequiredError)
     return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'PLAN.PRICING_MODEL_REQUIRED', error.message);
+  if (error instanceof PlanPricingModelNotDerivedError) {
+    return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'PLAN.PRICING_MODEL_NOT_DERIVED', error.message, {
+      expected: error.expected,
+    });
+  }
   if (error instanceof PlanPricingModelNotApplicableError)
     return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'PLAN.PRICING_MODEL_NOT_APPLICABLE', error.message);
   if (error instanceof PlanControlLevelRequiredError)
@@ -117,6 +123,7 @@ export const PLAN_ERROR_EXAMPLES = {
   PROVISIONING_TYPE_MISMATCH: example(new PlanProvisioningTypeMismatchError()),
   PRICING_MODEL_REQUIRED: example(new PlanPricingModelRequiredError()),
   PRICING_MODEL_NOT_APPLICABLE: example(new PlanPricingModelNotApplicableError()),
+  PRICING_MODEL_NOT_DERIVED: example(new PlanPricingModelNotDerivedError('PER_SEAT')),
   CONTROL_LEVEL_REQUIRED: example(new PlanControlLevelRequiredError()),
   DATA_LOSS_NOTE_REQUIRED: example(new PlanDataLossNoteRequiredError()),
   UPDATE_EMPTY: example(new PlanUpdateEmptyError()),

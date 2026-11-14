@@ -12,6 +12,7 @@ import {
   seedInstallation,
 } from './http-test-app';
 import { intakeBodyOf } from './application-body';
+import { pricingOfBody, writeLegacyPricing } from './legacy-pricing';
 
 /** Subscriptions and perpetual purchases over HTTP: the set-up the subscription specs share. */
 export interface SubscriptionWire {
@@ -156,11 +157,12 @@ export class SubscriptionHttpHarness {
           applicationId: application.id,
           name: this.unique('Plan'),
           provisioningType: type,
-          ...(type === 'K5' ? {} : { pricingModel: setup.pricing ?? 'PER_SEAT', controlLevel: 'FULL' }),
+          ...(type === 'K5' ? {} : { ...pricingOfBody(type, setup.pricing ?? 'PER_SEAT'), controlLevel: 'FULL' }),
         })
         .expect(201),
     );
 
+    await writeLegacyPricing(this.ctx.sql, created.id, type, setup.pricing ?? 'PER_SEAT');
     // A plan that needs admins at the vendor gets the two-person profile an active subscription asks for (X-IT.5); the rule itself is proved in its own suites.
     await ensureVendorAdmins(this.ctx, created.id, this.it1.employeeId);
 

@@ -62,6 +62,14 @@ export class PlanPricingModelRequiredError extends Error {
   }
 }
 
+/** A pricing model that is sent is the one the kind of provisioning implies (`B-5`): the system works it out, the IT Admin is not asked. */
+export class PlanPricingModelNotDerivedError extends Error {
+  constructor(readonly expected: 'PER_SEAT' | null) {
+    super('The pricing model follows the kind of provisioning: leave it out, or send the one the kind implies.');
+    this.name = 'PlanPricingModelNotDerivedError';
+  }
+}
+
 export class PlanPricingModelNotApplicableError extends Error {
   constructor() {
     super('A K5 plan has no pricing model.');

@@ -115,6 +115,14 @@ export class SubscriptionK1MonthlyOnlyError extends Error {
   }
 }
 
+/** A K4 plan is bought once: what is written for it is a perpetual purchase, never a term (B-5). */
+export class SubscriptionK4PerpetualOnlyError extends Error {
+  constructor() {
+    super('A plan of provisioning type K4 is bought once: its subscription is a perpetual purchase, not a term.');
+    this.name = 'SubscriptionK4PerpetualOnlyError';
+  }
+}
+
 /** Paying by the year for a commitment of one month would bill what is not committed (R-G01). */
 export class SubscriptionBillingLongerThanCommitmentError extends Error {
   constructor() {

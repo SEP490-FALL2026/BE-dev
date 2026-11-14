@@ -18,6 +18,7 @@ import {
   SubscriptionCommitmentTermNotAllowedError,
   SubscriptionCommitmentTermRequiredError,
   SubscriptionK1MonthlyOnlyError,
+  SubscriptionK4PerpetualOnlyError,
   SubscriptionPrimaryConflictError,
   SubscriptionPrimaryNotEligibleError,
   SubscriptionResponsibleNotItAdminError,
@@ -104,6 +105,9 @@ export function toSubscriptionApiException(error: unknown): unknown {
   if (error instanceof SubscriptionK1MonthlyOnlyError) {
     return refuse(UNPROCESSABLE, 'SUBSCRIPTION.K1_MONTHLY_ONLY', error.message);
   }
+  if (error instanceof SubscriptionK4PerpetualOnlyError) {
+    return refuse(UNPROCESSABLE, 'SUBSCRIPTION.K4_PERPETUAL_ONLY', error.message);
+  }
   if (error instanceof SubscriptionBillingLongerThanCommitmentError) {
     return refuse(UNPROCESSABLE, 'SUBSCRIPTION.BILLING_LONGER_THAN_COMMITMENT', error.message);
   }
@@ -161,6 +165,7 @@ export const SUBSCRIPTION_ERROR_EXAMPLES = {
   COMMITMENT_TERM_REQUIRED: example(new SubscriptionCommitmentTermRequiredError()),
   COMMITMENT_TERM_NOT_ALLOWED: example(new SubscriptionCommitmentTermNotAllowedError()),
   K1_MONTHLY_ONLY: example(new SubscriptionK1MonthlyOnlyError()),
+  K4_PERPETUAL_ONLY: example(new SubscriptionK4PerpetualOnlyError()),
   BILLING_LONGER_THAN_COMMITMENT: example(new SubscriptionBillingLongerThanCommitmentError()),
   BILLING_CYCLE_UNSUPPORTED: example(new SubscriptionBillingCycleUnsupportedError('QUARTERLY')),
   RESPONSIBLE_REQUIRED: example(new SubscriptionResponsibleRequiredError()),

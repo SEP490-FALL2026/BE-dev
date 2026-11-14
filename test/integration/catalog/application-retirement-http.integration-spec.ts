@@ -259,7 +259,6 @@ describe('the retirement of an application over HTTP (integration, real PostgreS
           applicationId,
           name: h.unique('Office 2021'),
           provisioningType: 'K4',
-          pricingModel: 'PER_SEAT',
           controlLevel: 'FULL',
         })
         .expect(201),

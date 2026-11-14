@@ -5,6 +5,7 @@ import {
   PlanNameInvalidError,
   PlanNoteInvalidError,
   PlanPricingModelNotApplicableError,
+  PlanPricingModelNotDerivedError,
   PlanPricingModelRequiredError,
   PlanPrimaryOwnerNotListedError,
   PlanProvisioningTypeMismatchError,
@@ -78,6 +79,17 @@ export function assertPlanShape(plan: PlanShape): void {
  */
 export function derivedPricingModel(type: ProvisioningType): PricingModel | null {
   return type === 'K1' || type === 'K2' ? 'PER_SEAT' : null;
+}
+
+/**
+ * A pricing model that is sent is the one the kind of provisioning implies (`B-5`, `QĐ-111f`): the system works the model out, so the IT Admin's
+ * value can only repeat it. Nothing sent is nothing to judge: a plan made before the rule keeps the model it has until its kind changes.
+ * Throws PlanPricingModelNotDerivedError.
+ */
+export function assertPricingModelDerived(type: ProvisioningType, sent: PricingModel | null | undefined): void {
+  if (sent === undefined) return;
+  const expected = derivedPricingModel(type) as 'PER_SEAT' | null;
+  if (sent !== expected) throw new PlanPricingModelNotDerivedError(expected);
 }
 
 /** Seats are counted only for a per-seat plan; any other plan shows them as not applicable, never as zero (`BR-06.4`). */

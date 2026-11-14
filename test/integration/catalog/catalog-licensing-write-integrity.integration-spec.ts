@@ -370,6 +370,28 @@ describe('write integrity of catalog, finance and licensing (integration, DB-03,
       expect(await sqlState(sql(), `UPDATE plans SET provisioning_type = 'K1' WHERE id = $1`, [plan])).toBe('23514');
     }, 60_000);
 
+    it('B-5: a K4 plan is bought once, so a term cannot be declared for it (422 SUBSCRIPTION.K4_PERPETUAL_ONLY) and a perpetual purchase can', async () => {
+      const k4 = await h.plan('K4');
+      const declare = (body: object) =>
+        request(h.server())
+          .post('/api/v1/subscriptions')
+          .set(as())
+          .send({ ownerDepartmentId: h.seed.departmentId, planId: k4, ...body });
+      const before = (await sql().query<{ n: number }>(`SELECT count(*)::int AS n FROM subscriptions`)).rows[0].n;
+
+      const term = await declare({
+        kind: 'TERM',
+        billingCycle: 'MONTHLY',
+        startDate: '2026-03-15',
+        purchasedQuantity: 5,
+      });
+
+      expect(term.status).toBe(422);
+      expect(h.codeOf(term)).toBe('SUBSCRIPTION.K4_PERPETUAL_ONLY');
+      expect((await sql().query<{ n: number }>(`SELECT count(*)::int AS n FROM subscriptions`)).rows[0].n).toBe(before);
+      expect((await declare({ kind: 'PERPETUAL', startDate: '2026-03-15', purchasedQuantity: 5 })).status).toBe(201);
+    }, 60_000);
+
     it('CT-1: refuses to leave K4 while a perpetual purchase of an application that is not licensed hangs on it, and lets a licensed one go', async () => {
       const perpetual = (planId: string) =>
         declareSubscription(h.ctx, h.it1.accessToken, {
