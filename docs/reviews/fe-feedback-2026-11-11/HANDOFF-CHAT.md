@@ -98,3 +98,32 @@ trái QĐ; ghi D-n (câu hỏi · phương án · chọn + căn cứ · file/com
 "Tóm tắt cho Owner". Quick check mỗi task; cuối gói `test:gates`, `rules:check`, `openapi:export`, `arch:routes`, `arch:graph`. Cấm full
 suite/seed:local (để audit/pha cuối), push/merge/deploy, sửa Docs. Mô tả OpenAPI không chứa mã `QĐ-…`. Chat Sonnet đầy giữa chừng ⟹ chat
 Sonnet mới, dán prompt của SPEC + "đọc HANDOFF-CODE.md và OVERNIGHT-DECISIONS.md, làm tiếp từ gói/task chưa có commit".
+
+## 7. Tiêu chuẩn review / verify / check code (Owner nhấn mạnh — áp cho MỌI đợt và audit cuối)
+
+Mục tiêu: xác nhận code Sonnet viết **đúng kiến trúc, logic, nghiệp vụ, luồng, BR theo tài liệu, main flow và quyết định mới nhất**, tìm bug
+thật — không chỉ "test xanh". Code AI viết phải soi kỹ hơn code người viết.
+
+1. **Nguồn đúng, mới nhất** (thứ tự căn cứ): sổ QĐ `Docs\Decisions\project-decisions.md` (QĐ mới nhất thắng; đọc cả QĐ sửa đổi) → BRD →
+   `Quy trình và chính sách theo main flow.md` → sơ đồ MF L0 `Docs\Diagrams\main-workflows-activity-diagram\` (luật `BR-MFn-xx`) → US/AC
+   (`Docs\BE-UserStory`) → OWNER-REVIEW / QD-11x-DRAFT / DECISIONS → SPEC/PLAN → code. SPEC ghim mốc Docs cũ ⟹ đối chiếu thêm Docs `main`
+   hiện tại, ghi chỗ lệch.
+2. **Nghiệp vụ + luồng:** đi từng bước main flow và luồng phụ được gọi — ai làm, điều kiện, trạng thái trước/sau, thông báo ai, audit gì,
+   tiền/cam kết ra sao; mỗi BR có code + test. Ca biên: phòng không trưởng phòng, người chưa xếp phòng, nghỉ/điều chuyển giữa chừng, Request
+   nhóm, K1/K2/K4/K5, quyền có thời hạn vs dùng lâu dài, qua năm 01/01.
+3. **Logic đúng đắn:** transaction và thứ tự khóa (deadlock), race giữa job quét và thao tác tay, idempotent khi chạy lại/đa instance, ngày
+   làm việc + múi giờ tổ chức (`business-date`), tiền VND (đơn vị minor, làm tròn, năm nay/năm sau, trả lại một lần), phân trang, N+1.
+4. **Kiến trúc** (`AGENTS.md`, `ARCHITECTURE.md`, `docs/rules/*`): tầng ADR-0019, chỉ import module khác qua `public/` (facade/types/errors),
+   **không query bảng module khác** (kể cả quan hệ Prisma lồng), capability folder + file vào group, hậu tố đúng vai, ≤ 25 file/thư mục,
+   module card README cập nhật, không thêm Hook/Listener sai chiều; `arch:check`, `test:gates`.
+5. **Phân quyền / SoD:** ai gọi được route (decorator), phạm vi phòng của IT Admin/trưởng phòng, SoD-1…8 (không tự duyệt, Super Admin không
+   thao tác chính mình…), không lộ dữ liệu wire (email, tiền với vai không được xem); mô tả OpenAPI không chứa mã `QĐ-…`.
+6. **Migration:** số tăng dần, `_values` riêng cho enum, expand–contract, không drop/đổi kiểu phá dữ liệu, backfill đúng và có audit, chạy
+   lại an toàn, trigger/CHECK khớp code; nghĩ tới dữ liệu thật đã có (deploy).
+7. **Test:** đọc test bị sửa/xóa (nới assertion, `it.skip`, xóa ca âm ⟹ finding); policy có test đỏ trước; mỗi chỗ sửa có **mutation**
+   (`audit-tools/mutate.py`) bị bắt; đoán test nào CI sẽ đỏ (Sonnet không chạy full).
+8. **D-n và Optional:** rà **từng** D-n Sonnet tự chốt theo (1): trái QĐ/BRD ⟹ Required phải sửa; thiết kế ⟹ ghi A/B. Kiểm code làm đúng
+   như D-n ghi. Mọi thứ Owner cần ⟹ đầu `OVERNIGHT-DECISIONS.md` của SPEC.
+9. **Cách làm:** 2–3 agent Opus chỉ đọc theo `audit-tools/review-brief.md` (đã chứa 5 trục trên) chia vùng; **tự đọc** migration, SQL, phân
+   quyền, test bị sửa; Critical/Required phải có file:dòng + kịch bản; gửi FIX; **đọc lại commit FIX** (đúng hướng, có test đỏ trước, mutation)
+   rồi test các file chạm; cuối SPEC full CI §1.
