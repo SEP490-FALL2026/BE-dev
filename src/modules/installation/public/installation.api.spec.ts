@@ -5,6 +5,7 @@ import type { IdentityAccessApi } from '../../identity-access/public/identity-ac
 import type { OrganizationApi } from '../../organization/public/organization.api';
 import type { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { AlreadyInstalledError, InstallationInputError } from './installation.errors';
+import type { CatalogBootstrapApi } from '../../catalog/public/catalog-bootstrap.api';
 import { InstallationApi } from './installation.api';
 
 /*
@@ -110,6 +111,7 @@ function harness(options: { installed?: boolean; currencies?: string[] } = {}) {
     audit as unknown as AuditApi,
     repo,
     finance as unknown as FinanceApi,
+    { seedStandardFunctionalGroups: () => Promise.resolve(7) } as unknown as CatalogBootstrapApi,
   );
 
   return { service, calls, audits };
@@ -160,6 +162,7 @@ describe('InstallationApi (QĐ-87f(1): organization, one department, the Super A
           timeZone: 'Asia/Ho_Chi_Minh',
           reportingCurrency: 'VND',
           environment: 'LOCAL_TEST',
+          standardFunctionalGroups: 7,
           installationException: true,
         },
         actorKind: 'OPERATOR',

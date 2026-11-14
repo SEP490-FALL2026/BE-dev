@@ -36,7 +36,7 @@ export interface RequestableApplicationRecord {
 }
 
 export interface RequestableApplicationDetailRecord extends RequestableApplicationRecord {
-  dataSensitivity: DataSensitivity;
+  dataSensitivity: DataSensitivity | null;
 }
 
 /** A plan a person may ask for, as a row of the list reads it. */

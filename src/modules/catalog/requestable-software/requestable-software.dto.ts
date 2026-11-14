@@ -65,7 +65,7 @@ const requestableApplicationSummarySchema = z.strictObject({
   ...submission,
 });
 const requestableApplicationDetailSchema = requestableApplicationSummarySchema.extend({
-  dataSensitivity: z.enum(['LOW', 'MEDIUM', 'HIGH']),
+  dataSensitivity: z.enum(['LOW', 'MEDIUM', 'HIGH']).nullable(),
 });
 
 const requestablePlanSummarySchema = z.strictObject({

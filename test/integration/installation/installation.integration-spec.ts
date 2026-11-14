@@ -128,6 +128,20 @@ describe('installation command use case (integration, real PostgreSQL)', () => {
     expect(everything).not.toContain('$argon2');
   });
 
+  it('seeds the seven standard functional groups of the organization, two of them fixed (QĐ-111bf, CT-1.1)', async () => {
+    await service.install(input(), PASSWORD);
+
+    const groups = await sql.query<{ name: string; system_key: string | null; status: string }>(
+      `SELECT name, system_key, status FROM functional_groups ORDER BY name`,
+    );
+    expect(groups.rows).toHaveLength(7);
+    expect(groups.rows.filter((row) => row.system_key !== null).map((row) => [row.name, row.system_key])).toEqual([
+      ['Khác', 'OTHER'],
+      ['Liên lạc (email, chat, họp)', 'COMMUNICATION'],
+    ]);
+    expect(new Set(groups.rows.map((row) => row.status))).toEqual(new Set(['ACTIVE']));
+  });
+
   it('leaves the first department with no Cost Center, head or IT Admin in charge, and the Super Admin without a job title (QĐ-87f(1))', async () => {
     await service.install(input(), PASSWORD);
 

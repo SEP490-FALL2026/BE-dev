@@ -63,6 +63,8 @@ const PUBLIC_CONTRACT_EXPORTS: ReadonlySet<string> = new Set([
   // The worker prices and checks conversions through read-only contracts, without mounting the HTTP contexts.
   'BudgetsReadFacadeModule: BudgetsReadApi',
   'CatalogPricingFacadeModule: CatalogPricingApi',
+  // CT-1.1 (QĐ-111bf): the installation command makes the standard functional groups of a new organization through this facade.
+  'CatalogBootstrapFacadeModule: CatalogBootstrapApi',
   // The extension points the requests context binds (public/budgets.extension-points.ts): what waits to be decided as spend, the release guard and the facts of a commitment request.
   'BudgetsModule: PendingSpendContributions',
   'BudgetsModule: CommitmentReleaseGuardHook',

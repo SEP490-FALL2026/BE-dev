@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import { AuditApi } from '../../audit/public/audit.api';
+import { CatalogBootstrapApi } from '../../catalog/public/catalog-bootstrap.api';
 import { FinanceApi } from '../../finance/public/finance.api';
 import { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
 import { OrganizationApi } from '../../organization/public/organization.api';
@@ -36,6 +37,7 @@ export class InstallationApi {
     private readonly audit: AuditApi,
     private readonly repo: InstallationRepo,
     private readonly finance: FinanceApi,
+    private readonly catalog: CatalogBootstrapApi,
   ) {}
 
   async install(rawInput: unknown, password: string): Promise<InstallationResult> {
@@ -90,10 +92,13 @@ export class InstallationApi {
         timeZone: input.timeZone,
         reportingCurrency: input.reportingCurrency,
       });
+      // QĐ-111bf: every application stands in a functional group, so the organization starts with the seven standard ones.
+      const standardFunctionalGroups = await this.catalog.seedStandardFunctionalGroups(tx, org.id);
       await record(org.id, 'INSTALLATION.ORGANIZATION_CREATED', 'Organization', org.id, {
         timeZone: input.timeZone,
         reportingCurrency: input.reportingCurrency,
         environment: input.environment,
+        standardFunctionalGroups,
       });
 
       const department = await this.organization.createDepartment(tx, {

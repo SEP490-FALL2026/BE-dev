@@ -113,6 +113,8 @@ model FunctionalGroup {
   name           String
   normalizedName String                @map("normalized_name")
   status         FunctionalGroupStatus @default(ACTIVE)
+  // QĐ-111bf: the two groups the system relies on (COMMUNICATION, OTHER) carry a key and are never renamed or switched off; null for the rest.
+  systemKey      String?               @map("system_key")
   createdAt      DateTime              @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt      DateTime              @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
 
@@ -120,6 +122,7 @@ model FunctionalGroup {
   applications Application[]
 
   @@unique([organizationId, normalizedName])
+  @@unique([organizationId, systemKey])
   @@map("functional_groups")
 }
 
@@ -138,11 +141,13 @@ model Application {
   // QĐ-111g: the IT Admin who answers for the application: the one who declared it, changed by a transfer of responsibility.
   // Null for an application whose creator is no longer a usable IT Admin; `needsResponsible` is read from this column and the account.
   responsibleItAdminEmployeeId String?        @map("responsible_it_admin_employee_id") @db.Uuid
-  dataSensitivity             DataSensitivity @map("data_sensitivity")
-  commPersonToPersonMessaging Boolean         @map("comm_person_to_person_messaging")
-  commCallsOrMeetings         Boolean         @map("comm_calls_or_meetings")
-  commMailbox                 Boolean         @map("comm_mailbox")
-  isCommunicationService      Boolean         @map("is_communication_service")
+  // QĐ-111f: may be left empty.
+  dataSensitivity             DataSensitivity? @map("data_sensitivity")
+  // QĐ-111e: no longer asked or written; the group COMMUNICATION says an application is a communication service. Kept (default false) for the rows written before.
+  commPersonToPersonMessaging Boolean         @default(false) @map("comm_person_to_person_messaging")
+  commCallsOrMeetings         Boolean         @default(false) @map("comm_calls_or_meetings")
+  commMailbox                 Boolean         @default(false) @map("comm_mailbox")
+  isCommunicationService      Boolean         @default(false) @map("is_communication_service")
   communicationNote           String?         @map("communication_note")
   domains                     String[]        @default([])
   catalogStatus               CatalogStatus   @default(APPROVED) @map("catalog_status")

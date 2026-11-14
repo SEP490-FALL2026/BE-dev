@@ -17,7 +17,8 @@ export interface ApplicationRecord {
   vendor: { id: string; name: string; dictionaryGroupId: string | null } | null;
   dictionaryServiceLineId: string | null;
   domains: string[];
-  dataSensitivity: DataSensitivity;
+  /** `QĐ-111f`: may be left empty. */
+  dataSensitivity: DataSensitivity | null;
   /** QĐ-111g: the IT Admin who answers for the application; null when the creator was not a usable IT Admin and nobody took it over. */
   responsibleItAdminEmployeeId: string | null;
   communication: ApplicationCommunication;
@@ -33,7 +34,7 @@ export interface ApplicationSummaryRecord {
   name: string;
   kind: ApplicationKind;
   vendor: { id: string; name: string } | null;
-  dataSensitivity: DataSensitivity;
+  dataSensitivity: DataSensitivity | null;
   responsibleItAdminEmployeeId: string | null;
   isCommunicationService: boolean;
   functionalGroup: { id: string; name: string } | null;
@@ -76,7 +77,7 @@ export interface NewApplication {
   dictionaryServiceLineId: string | null;
   functionalGroupId: string | null;
   responsibleItAdminEmployeeId: string | null;
-  dataSensitivity: DataSensitivity;
+  dataSensitivity: DataSensitivity | null;
   communication: ApplicationCommunication;
   domains: string[];
 }
@@ -85,7 +86,7 @@ export interface ApplicationChanges {
   name?: string;
   dictionaryServiceLineId?: string | null;
   functionalGroupId?: string | null;
-  dataSensitivity?: DataSensitivity;
+  dataSensitivity?: DataSensitivity | null;
   communication?: ApplicationCommunication;
   domains?: string[];
 }

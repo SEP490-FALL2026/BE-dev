@@ -63,7 +63,7 @@ const applicationSummarySchema = z.strictObject({
   name: z.string(),
   kind,
   vendor: z.strictObject({ id: z.uuid(), name: z.string() }).nullable(),
-  dataSensitivity: sensitivity,
+  dataSensitivity: sensitivity.nullable(),
   isCommunicationService: z.boolean(),
   responsibleItAdmin: z
     .strictObject({ employeeId: z.uuid(), employeeCode: z.string(), fullName: z.string() })

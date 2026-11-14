@@ -3,14 +3,19 @@ import { Prisma } from '../../../generated/prisma/client';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { searchKey } from '../vendor-dictionary/vendor-matcher.policy';
+import { STANDARD_FUNCTIONAL_GROUPS } from './functional-group-standard.policy';
 import type { FunctionalGroupListFilter, FunctionalGroupRecord, FunctionalGroupStatus } from './functional-group.types';
 
 type Row = Prisma.FunctionalGroupGetPayload<object>;
+
+const toSystemKey = (value: string | null): FunctionalGroupRecord['systemKey'] =>
+  value === 'COMMUNICATION' || value === 'OTHER' ? value : null;
 
 const toRecord = (row: Row): FunctionalGroupRecord => ({
   id: row.id,
   name: row.name,
   status: row.status,
+  systemKey: toSystemKey(row.systemKey),
   createdAt: row.createdAt,
   updatedAt: row.updatedAt,
 });
@@ -24,6 +29,21 @@ export class FunctionalGroupRepo {
     return toRecord(
       await tx.functionalGroup.create({ data: { organizationId, name, normalizedName: searchKey(name) } }),
     );
+  }
+
+  /** The seven standard groups of a new organization, in the transaction that makes it; a name it already has is left as it is. Returns how many were written. */
+  async insertStandard(tx: DbTx, organizationId: string): Promise<number> {
+    const { count } = await tx.functionalGroup.createMany({
+      data: STANDARD_FUNCTIONAL_GROUPS.map((group) => ({
+        organizationId,
+        name: group.name,
+        normalizedName: searchKey(group.name),
+        systemKey: group.systemKey,
+      })),
+      skipDuplicates: true,
+    });
+
+    return count;
   }
 
   /** The group, locked for the rest of the transaction, or null. */
