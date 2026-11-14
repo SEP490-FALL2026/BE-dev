@@ -278,7 +278,7 @@ describe('bootstrap-installation.sh: one explicit run from the private file', ()
       world,
       text(
         withSettings({
-          BOOTSTRAP_CURRENCY: 'USD',
+          BOOTSTRAP_CURRENCY: 'VND',
           BOOTSTRAP_LOGIN_EMAIL: 'sign.in@example.test',
           BOOTSTRAP_ADMIN_TYPE: 'CONTRACTOR',
         }),
@@ -287,7 +287,7 @@ describe('bootstrap-installation.sh: one explicit run from the private file', ()
     const set = run(world);
     assert.equal(set.status, 0, set.output);
     const argv = calls(world)[1].argv.slice(COMPOSE(world).length);
-    assert.ok(argv.includes('--currency=USD'));
+    assert.ok(argv.includes('--currency=VND'));
     assert.ok(argv.includes('--login-email=sign.in@example.test'));
     assert.ok(argv.includes('--admin-type=CONTRACTOR'));
 

@@ -46,8 +46,8 @@ export class InstallationApi {
       );
     }
     const input = parsed.data;
-    // The reporting currency must be one finance has a minor-unit table for (DB-02): a code outside it would only fail
-    // later, at the first conversion, with no way back once rates and prices are recorded in it.
+    // The input schema takes dong only (`QĐ-111an`); dong must also be one finance has a minor-unit table for (DB-02): a code
+    // outside it would only fail later, at the first price, with no way back once prices are recorded in it.
     if (!(await this.finance.findCurrency(input.reportingCurrency))) {
       throw new InstallationInputError([
         `reportingCurrency: ${input.reportingCurrency} is not in the currency table of this installation`,

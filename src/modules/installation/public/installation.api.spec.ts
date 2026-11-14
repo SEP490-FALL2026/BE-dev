@@ -29,7 +29,7 @@ const INPUT = {
   environment: 'LOCAL_TEST',
 };
 
-function harness(options: { installed?: boolean } = {}) {
+function harness(options: { installed?: boolean; currencies?: string[] } = {}) {
   const calls: string[] = [];
   const audits: { action: string; resourceType: string; after: unknown; [key: string]: unknown }[] = [];
   const TX = { name: 'the transaction' } as unknown as DbTx;
@@ -98,7 +98,9 @@ function harness(options: { installed?: boolean } = {}) {
   };
 
   // Not recorded in `calls`: the currency table is read before anything else and changes nothing.
-  const finance = { findCurrency: (code: string) => Promise.resolve(['USD', 'VND'].includes(code) ? { code } : null) };
+  const finance = {
+    findCurrency: (code: string) => Promise.resolve((options.currencies ?? ['VND']).includes(code) ? { code } : null),
+  };
 
   const service = new InstallationApi(
     runner as unknown as TransactionRunner,
@@ -272,16 +274,30 @@ describe('InstallationApi (QĐ-87f(1): organization, one department, the Super A
     expect(h.calls).toEqual([]);
   });
 
-  it('refuses a reporting currency outside the currency table, before hashing or locking anything (DB-02)', async () => {
-    const h = harness();
+  it('QĐ-111an, R-4: refuses a reporting currency other than dong, even one the table has, before hashing or locking anything', async () => {
+    const h = harness({ currencies: ['USD', 'VND', 'MYR'] });
 
-    const error = await h.service
-      .install({ ...INPUT, reportingCurrency: 'MYR' }, 'a-long-enough-password')
-      .catch((thrown: unknown) => thrown);
+    for (const currency of ['USD', 'MYR']) {
+      const error = await h.service
+        .install({ ...INPUT, reportingCurrency: currency }, 'a-long-enough-password')
+        .catch((thrown: unknown) => thrown);
+
+      expect(error).toBeInstanceOf(InstallationInputError);
+      expect((error as InstallationInputError).issues).toEqual([
+        'reportingCurrency: must be VND: every amount is in dong and nothing is converted',
+      ]);
+    }
+    expect(h.calls).toEqual([]);
+  });
+
+  it('refuses dong when the currency table does not have it, before hashing or locking anything (DB-02)', async () => {
+    const h = harness({ currencies: ['USD'] });
+
+    const error = await h.service.install(INPUT, 'a-long-enough-password').catch((thrown: unknown) => thrown);
 
     expect(error).toBeInstanceOf(InstallationInputError);
     expect((error as InstallationInputError).issues).toEqual([
-      'reportingCurrency: MYR is not in the currency table of this installation',
+      'reportingCurrency: VND is not in the currency table of this installation',
     ]);
     expect(h.calls).toEqual([]);
   });
