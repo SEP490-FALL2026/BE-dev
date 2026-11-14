@@ -170,8 +170,10 @@ cùng cần; phần ghi nằm ở `assessment/assessment.repo.ts`.
     dùng chung vị từ `canReadRequest` (`access-request.policy.ts`) qua `request-view/request-read-access.service.ts`: danh sách trả dòng nào
     thì chi tiết đọc được dòng đó; không đọc được ⟹ 404.
   - Hai hàng chờ đọc theo vai, chỉ đọc, không khóa, không ghi (L3): `need-decision-queue/` — `GET /need-decisions`, bước chờ quyết nhu cầu của người đang được giao
-    (`need-decision-queue.service.ts`, `.repo.ts`, `.mapper.ts`); `assessment-queue/` — `GET /assessment-queue`, việc thẩm định của IT Admin trong phạm vi phụ trách
-    (`assessment-queue.service.ts`, `.repo.ts`, `.mapper.ts`). `my-requests` và `need-decision-queue` đọc cột `policy` qua `requestPolicyJson` (không ép kiểu).
+    (`need-decision-queue.service.ts`, `.repo.ts`, `.mapper.ts`); `assessment-queue/` — `GET /assessment-queue` (lọc `departmentId`; phòng ngoài phạm vi ⟹ trang rỗng), việc thẩm định của IT Admin trong phạm vi phụ trách
+    (`assessment-queue.service.ts`, `.repo.ts`, `.mapper.ts`); `GET /assessment-queue/departments` đếm đơn đang chờ theo phòng (`departmentCounts`, cùng định nghĩa "đang chờ" `openAssessmentsIn`);
+    `GET /assessment-decisions` các đơn đã hoàn tất hoặc bị từ chối ở cổng (`assessment-decisions.service.ts`, `.repo.ts`, `.mapper.ts`, `.dto.ts`); phạm vi IT Admin chung ở
+    `assessment-queue-reach.service.ts`. Đơn case B rút gọn (đề xuất nêu `existingApplicationId`) mang `scope: PLAN_ONLY`: chỉ đánh giá gói. `my-requests` và `need-decision-queue` đọc cột `policy` qua `requestPolicyJson` (không ép kiểu).
 - **Request nhóm** (US-05-17)
   - `group-request/` — lõi nhóm: dòng từng người, phân bổ tiền, quyết định theo dòng, rút dòng, grant nhóm,
     `beneficiary-eligibility.policy.ts`; `group-line-decisions/` — `group-lines.controller.ts` và các service quyết định theo dòng (bước nhu cầu: `GroupNeedPreconditions`,

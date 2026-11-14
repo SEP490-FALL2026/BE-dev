@@ -13,6 +13,8 @@ personnel, onboarding, data-import (chỉ type); gốc `src/app/app.module.ts` v
 
 - `CatalogApi` ([public/catalog.api.ts](public/catalog.api.ts)) — facade cho module khác:
   - `findSeatTarget`, `findPlanSeatTargets`, `lockSeatTarget` — đích ghế (một subscription hoặc một plan nội bộ).
+  - `findCatalogEntryOfSoftware(tx, { name, homepageUrl })` — mục danh mục đã là phần mềm đó theo tên chuẩn hóa hoặc tên miền (cùng quy tắc `duplicateOf` với lệnh tạo ứng dụng) kèm
+    tối đa 20 gói; cửa case B của `requests` (`QĐ-111b`). `getCatalogEntry(tx, applicationId, planName?)` — một ứng dụng với gói của nó và gói trùng tên đã hỏi (đề xuất rút gọn, `QĐ-111a`).
   - `getPlanSummaries`, `getPlanRevocationInfo`, `getSimilarPlanIds`, `getPlanVendorId`, `getPlanVendorIds` (nhiều plan trong một lần đọc), `getPlanResponsibleItAdminId` — đọc
     plan.
   - `getPlanPrice(planId, tx?)` — giá của plan từ thuê bao chính (`pickPriceSource`: cờ `is_primary_for_plan`, không có thì giá tháng quy đổi

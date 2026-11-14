@@ -142,7 +142,11 @@ function rowOf(step: StepColumns, readerEmployeeId: string): AssessmentQueueRow 
   };
 }
 
-/** The open assessments of a scope: what the queue lists and what its counts by department count (one definition, so they cannot disagree). */
+/**
+ * The open assessments of a scope, as the counts by department read them. `page()` lists the same assessments with the Prisma filter it keeps beside
+ * it (an open step of the assessment, a request waiting for it, an assessment still a draft): two spellings of one meaning, held equal by
+ * `assessment-decisions.integration-spec.ts` (the count of a department is the total of its list).
+ */
 const openAssessmentsIn = (departmentIds: readonly string[]) => Prisma.sql`
   FROM access_request_steps s
   JOIN access_requests r ON r.id = s.request_id
