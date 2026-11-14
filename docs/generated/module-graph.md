@@ -77,8 +77,8 @@ flowchart BT
   devices -->|3| catalog
   devices -->|2| identity_access
   devices -->|12| organization
-  finance -->|4| audit
-  finance -->|4| organization
+  finance -->|3| audit
+  finance -->|3| organization
   identity_access -->|16| audit
   identity_access -->|10| notifications
   identity_access -->|36| organization
@@ -98,9 +98,8 @@ flowchart BT
   onboarding -->|2| identity_access
   onboarding -->|2| licensing
   onboarding -->|2| organization
-  operating_parameters -->|5| audit
-  operating_parameters -->|2| finance
-  operating_parameters -->|7| organization
+  operating_parameters -->|4| audit
+  operating_parameters -->|6| organization
   optimization -->|7| audit
   optimization -->|8| catalog
   optimization -->|5| identity_access
@@ -124,7 +123,7 @@ flowchart BT
   requests -->|58| audit
   requests -->|23| budgets
   requests -->|29| catalog
-  requests -->|9| finance
+  requests -->|7| finance
   requests -->|31| identity_access
   requests -->|51| licensing
   requests -->|10| notifications
@@ -138,4 +137,4 @@ flowchart BT
   usage -->|10| organization
 ```
 
-96 module edges.
+95 module edges.
