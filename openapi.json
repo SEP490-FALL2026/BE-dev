@@ -23886,6 +23886,20 @@
             "schema": { "type": "string", "enum": ["NO_ALERT_ANCHOR"] }
           },
           {
+            "name": "mine",
+            "required": false,
+            "in": "query",
+            "description": "true lists only the subscriptions the caller answers for as their IT Admin; false or absent lists them all.",
+            "schema": { "type": "string", "enum": ["true", "false"] }
+          },
+          {
+            "name": "expiry",
+            "required": false,
+            "in": "query",
+            "description": "SOON lists the subscriptions from the point of adjustment to the day of its deadline, EXPIRED those past the deadline while seats are still held. A purchase made once is never listed.",
+            "schema": { "type": "string", "enum": ["SOON", "EXPIRED"] }
+          },
+          {
             "name": "page",
             "required": false,
             "in": "query",
@@ -23906,7 +23920,7 @@
         ],
         "responses": {
           "200": {
-            "description": "A page of subscriptions by application, plan and creation, optionally filtered; warning=NO_ALERT_ANCHOR lists those with no date to alert from. Who administers the plan at the vendor (vendorAdmins), the email of the company account that owns it there (ownerAccountEmail) and the note (adminNote) are for the IT Admin: Finance reads them empty, with the two flags.",
+            "description": "A page of subscriptions by application, plan and creation, optionally filtered; warning=NO_ALERT_ANCHOR lists those with no date to alert from, mine=true those the caller answers for, expiry=SOON or EXPIRED those near or past the point of adjustment (a plan by the month 7 days before its payment day, a plan by the year 30 days before the deadline to cancel; a purchase made once never). Each row says the days left to the deadline, the seats of a shared pool (K2), who answers for it and the logo of the application. Who administers the plan at the vendor (vendorAdmins), the email of the company account that owns it there (ownerAccountEmail) and the note (adminNote) are for the IT Admin: Finance reads them empty, with the two flags.",
             "content": {
               "application/json": {
                 "schema": {
@@ -36740,6 +36754,13 @@
             "schema": { "format": "uuid", "type": "string" }
           },
           {
+            "name": "departmentId",
+            "required": false,
+            "in": "query",
+            "description": "Only the reports of the people placed in this department today. Only an IT Admin asks for it, and a department outside the ones they work answers an empty page.",
+            "schema": { "format": "uuid", "type": "string" }
+          },
+          {
             "name": "page",
             "required": false,
             "in": "query",
@@ -48947,6 +48968,20 @@
             "schema": { "format": "uuid", "type": "string" }
           },
           {
+            "name": "planId",
+            "required": false,
+            "in": "query",
+            "description": "Only the people waiting for this plan: what the stock of the plan lists to grant from.",
+            "schema": { "format": "uuid", "type": "string" }
+          },
+          {
+            "name": "state",
+            "required": false,
+            "in": "query",
+            "description": "Only the people whose grant stands here: WAITING (no task yet), EXECUTING (a task is being worked or has failed and waits for a decision) or DONE (completed, or closed as failed). Without it, every state is listed, the waiting ones first.",
+            "schema": { "type": "string", "enum": ["WAITING", "EXECUTING", "DONE"] }
+          },
+          {
             "name": "page",
             "required": false,
             "in": "query",
@@ -48967,7 +49002,7 @@
         ],
         "responses": {
           "200": {
-            "description": "The requests approved in full that the IT Admin has not carried out yet, kept together by the person they are for, then by when they were sent. Each says who asked, the tool, and the day the access ends for a person who is not staff.",
+            "description": "The requests approved in full, one row for each person, of the departments the IT Admin works only (the ones that name them in charge, and the ones nobody usable is in charge of); a filter that names a person of another department is an empty answer. Each row says where the grant of its person stands (state: WAITING, EXECUTING or DONE) and, once a task exists, which task (execution: its state, why it failed and what may be done next), who asked, the tool with its logo, the department, and the day the access ends for a person who is not staff. Without state every state is listed, the waiting ones first, then kept together by the person and by when they were sent; planId and state=WAITING list what waits for one plan.",
             "content": {
               "application/json": {
                 "schema": {
@@ -49109,7 +49144,7 @@
           }
         },
         "security": [{ "bearer": [] }],
-        "summary": "List the requests waiting to be carried out",
+        "summary": "List the approved requests to carry out, person by person",
         "tags": ["grant-queue"]
       }
     },
@@ -94473,6 +94508,11 @@
                     "ownerDepartmentId": { "type": "string", "format": "uuid", "nullable": true },
                     "applicationId": { "type": "string", "format": "uuid" },
                     "applicationName": { "type": "string" },
+                    "logoUrl": {
+                      "description": "The https link to the logo image of the application that the IT Admin pasted, or null. The server never checks it: it may be broken, so show the first letter of the name when the image does not load.",
+                      "type": "string",
+                      "nullable": true
+                    },
                     "vendor": {
                       "type": "object",
                       "properties": { "id": { "type": "string", "format": "uuid" }, "name": { "type": "string" } },
@@ -94530,6 +94570,18 @@
                     "autoRenew": { "type": "boolean" },
                     "allowsMidTermReduction": { "type": "boolean" },
                     "responsibleItAdminEmployeeId": { "type": "string", "format": "uuid", "nullable": true },
+                    "responsibleItAdmin": {
+                      "type": "object",
+                      "properties": {
+                        "employeeId": { "type": "string", "format": "uuid" },
+                        "employeeCode": { "type": "string" },
+                        "fullName": { "type": "string" }
+                      },
+                      "required": ["employeeId", "employeeCode", "fullName"],
+                      "additionalProperties": false,
+                      "description": "The IT Admin who answers for the subscription, by name; null when none is named.",
+                      "nullable": true
+                    },
                     "vendorMinimumSeats": {
                       "type": "integer",
                       "minimum": -9007199254740991,
@@ -94537,6 +94589,43 @@
                       "nullable": true
                     },
                     "isPrimaryForPlan": { "type": "boolean" },
+                    "expiry": {
+                      "type": "string",
+                      "enum": ["SOON", "EXPIRED", null],
+                      "description": "SOON from the point of adjustment to the day of its deadline, EXPIRED past it while seats are still held; null before the point, for a purchase made once and when no date is known to count from.",
+                      "nullable": true
+                    },
+                    "daysLeft": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "The days from today to the deadline the point counts to; negative once it is past; null when there is no point.",
+                      "nullable": true
+                    },
+                    "deadlineKind": {
+                      "type": "string",
+                      "enum": ["PAYMENT_DATE", "NOTICE_DEADLINE", "RENEWAL_DATE", "END_DATE", null],
+                      "description": "What daysLeft counts to: the payment day of a plan by the month; by the year, the deadline to cancel, else the renewal day, else the end day.",
+                      "nullable": true
+                    },
+                    "seats": {
+                      "type": "object",
+                      "properties": {
+                        "purchased": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991,
+                          "nullable": true
+                        },
+                        "assigned": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                        "free": { "type": "integer", "minimum": 0, "maximum": 9007199254740991, "nullable": true },
+                        "inRevocation": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+                      },
+                      "required": ["purchased", "assigned", "free", "inRevocation"],
+                      "additionalProperties": false,
+                      "description": "The seats of the shared pool of a K2 plan: bought, taken by an assignment from today on, free to grant, and held by a right being taken back. Null for any other kind of plan.",
+                      "nullable": true
+                    },
                     "noticeDeadline": {
                       "type": "object",
                       "properties": {
@@ -94628,6 +94717,7 @@
                     "ownerDepartmentId",
                     "applicationId",
                     "applicationName",
+                    "logoUrl",
                     "vendor",
                     "kind",
                     "status",
@@ -94645,8 +94735,13 @@
                     "autoRenew",
                     "allowsMidTermReduction",
                     "responsibleItAdminEmployeeId",
+                    "responsibleItAdmin",
                     "vendorMinimumSeats",
                     "isPrimaryForPlan",
+                    "expiry",
+                    "daysLeft",
+                    "deadlineKind",
+                    "seats",
                     "noticeDeadline",
                     "alerts",
                     "warnings",
@@ -94788,6 +94883,11 @@
               "ownerDepartmentId": { "type": "string", "format": "uuid", "nullable": true },
               "applicationId": { "type": "string", "format": "uuid" },
               "applicationName": { "type": "string" },
+              "logoUrl": {
+                "description": "The https link to the logo image of the application that the IT Admin pasted, or null. The server never checks it: it may be broken, so show the first letter of the name when the image does not load.",
+                "type": "string",
+                "nullable": true
+              },
               "vendor": {
                 "type": "object",
                 "properties": { "id": { "type": "string", "format": "uuid" }, "name": { "type": "string" } },
@@ -94845,6 +94945,18 @@
               "autoRenew": { "type": "boolean" },
               "allowsMidTermReduction": { "type": "boolean" },
               "responsibleItAdminEmployeeId": { "type": "string", "format": "uuid", "nullable": true },
+              "responsibleItAdmin": {
+                "type": "object",
+                "properties": {
+                  "employeeId": { "type": "string", "format": "uuid" },
+                  "employeeCode": { "type": "string" },
+                  "fullName": { "type": "string" }
+                },
+                "required": ["employeeId", "employeeCode", "fullName"],
+                "additionalProperties": false,
+                "description": "The IT Admin who answers for the subscription, by name; null when none is named.",
+                "nullable": true
+              },
               "vendorMinimumSeats": {
                 "type": "integer",
                 "minimum": -9007199254740991,
@@ -94852,6 +94964,43 @@
                 "nullable": true
               },
               "isPrimaryForPlan": { "type": "boolean" },
+              "expiry": {
+                "type": "string",
+                "enum": ["SOON", "EXPIRED", null],
+                "description": "SOON from the point of adjustment to the day of its deadline, EXPIRED past it while seats are still held; null before the point, for a purchase made once and when no date is known to count from.",
+                "nullable": true
+              },
+              "daysLeft": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991,
+                "description": "The days from today to the deadline the point counts to; negative once it is past; null when there is no point.",
+                "nullable": true
+              },
+              "deadlineKind": {
+                "type": "string",
+                "enum": ["PAYMENT_DATE", "NOTICE_DEADLINE", "RENEWAL_DATE", "END_DATE", null],
+                "description": "What daysLeft counts to: the payment day of a plan by the month; by the year, the deadline to cancel, else the renewal day, else the end day.",
+                "nullable": true
+              },
+              "seats": {
+                "type": "object",
+                "properties": {
+                  "purchased": {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991,
+                    "nullable": true
+                  },
+                  "assigned": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                  "free": { "type": "integer", "minimum": 0, "maximum": 9007199254740991, "nullable": true },
+                  "inRevocation": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+                },
+                "required": ["purchased", "assigned", "free", "inRevocation"],
+                "additionalProperties": false,
+                "description": "The seats of the shared pool of a K2 plan: bought, taken by an assignment from today on, free to grant, and held by a right being taken back. Null for any other kind of plan.",
+                "nullable": true
+              },
               "noticeDeadline": {
                 "type": "object",
                 "properties": {
@@ -94943,6 +95092,7 @@
               "ownerDepartmentId",
               "applicationId",
               "applicationName",
+              "logoUrl",
               "vendor",
               "kind",
               "status",
@@ -94960,8 +95110,13 @@
               "autoRenew",
               "allowsMidTermReduction",
               "responsibleItAdminEmployeeId",
+              "responsibleItAdmin",
               "vendorMinimumSeats",
               "isPrimaryForPlan",
+              "expiry",
+              "daysLeft",
+              "deadlineKind",
+              "seats",
               "noticeDeadline",
               "alerts",
               "warnings",
@@ -98143,9 +98298,14 @@
                       "properties": {
                         "planId": { "type": "string", "format": "uuid" },
                         "planName": { "type": "string" },
-                        "applicationName": { "type": "string" }
+                        "applicationName": { "type": "string" },
+                        "logoUrl": {
+                          "description": "The https link to the logo image of the application that the IT Admin pasted, or null. The server never checks it: it may be broken, so show the first letter of the name when the image does not load.",
+                          "type": "string",
+                          "nullable": true
+                        }
                       },
-                      "required": ["planId", "planName", "applicationName"],
+                      "required": ["planId", "planName", "applicationName", "logoUrl"],
                       "additionalProperties": false
                     },
                     "grantTaskId": { "type": "string", "format": "uuid", "nullable": true }
@@ -98231,11 +98391,17 @@
                 "properties": {
                   "planId": { "type": "string", "format": "uuid" },
                   "planName": { "type": "string" },
-                  "applicationName": { "type": "string" }
+                  "applicationName": { "type": "string" },
+                  "logoUrl": {
+                    "description": "The https link to the logo image of the application that the IT Admin pasted, or null. The server never checks it: it may be broken, so show the first letter of the name when the image does not load.",
+                    "type": "string",
+                    "nullable": true
+                  }
                 },
-                "required": ["planId", "planName", "applicationName"],
+                "required": ["planId", "planName", "applicationName", "logoUrl"],
                 "additionalProperties": false
               },
+              "title": { "type": "string", "maxLength": 120 },
               "reporter": {
                 "type": "object",
                 "properties": {
@@ -98245,6 +98411,13 @@
                 },
                 "required": ["employeeId", "employeeCode", "fullName"],
                 "additionalProperties": false
+              },
+              "department": {
+                "type": "object",
+                "properties": { "id": { "type": "string", "format": "uuid" }, "name": { "type": "string" } },
+                "required": ["id", "name"],
+                "additionalProperties": false,
+                "nullable": true
               },
               "assignedItAdmin": {
                 "type": "object",
@@ -98298,7 +98471,9 @@
               "impact",
               "assignmentId",
               "plan",
+              "title",
               "reporter",
+              "department",
               "assignedItAdmin",
               "responseDueOn",
               "overdue",
@@ -98369,11 +98544,17 @@
                       "properties": {
                         "planId": { "type": "string", "format": "uuid" },
                         "planName": { "type": "string" },
-                        "applicationName": { "type": "string" }
+                        "applicationName": { "type": "string" },
+                        "logoUrl": {
+                          "description": "The https link to the logo image of the application that the IT Admin pasted, or null. The server never checks it: it may be broken, so show the first letter of the name when the image does not load.",
+                          "type": "string",
+                          "nullable": true
+                        }
                       },
-                      "required": ["planId", "planName", "applicationName"],
+                      "required": ["planId", "planName", "applicationName", "logoUrl"],
                       "additionalProperties": false
                     },
+                    "title": { "type": "string", "maxLength": 120 },
                     "reporter": {
                       "type": "object",
                       "properties": {
@@ -98383,6 +98564,13 @@
                       },
                       "required": ["employeeId", "employeeCode", "fullName"],
                       "additionalProperties": false
+                    },
+                    "department": {
+                      "type": "object",
+                      "properties": { "id": { "type": "string", "format": "uuid" }, "name": { "type": "string" } },
+                      "required": ["id", "name"],
+                      "additionalProperties": false,
+                      "nullable": true
                     },
                     "assignedItAdmin": {
                       "type": "object",
@@ -98407,7 +98595,9 @@
                     "impact",
                     "assignmentId",
                     "plan",
+                    "title",
                     "reporter",
+                    "department",
                     "assignedItAdmin",
                     "responseDueOn",
                     "overdue",
@@ -104765,10 +104955,22 @@
                       "properties": {
                         "planId": { "type": "string", "format": "uuid" },
                         "planName": { "type": "string" },
-                        "applicationName": { "type": "string" }
+                        "applicationName": { "type": "string" },
+                        "logoUrl": {
+                          "description": "The https link to the logo image of the application that the IT Admin pasted, or null. The server never checks it: it may be broken, so show the first letter of the name when the image does not load.",
+                          "type": "string",
+                          "nullable": true
+                        }
                       },
-                      "required": ["planId", "planName", "applicationName"],
+                      "required": ["planId", "planName", "applicationName", "logoUrl"],
                       "additionalProperties": false
+                    },
+                    "department": {
+                      "type": "object",
+                      "properties": { "id": { "type": "string", "format": "uuid" }, "name": { "type": "string" } },
+                      "required": ["id", "name"],
+                      "additionalProperties": false,
+                      "description": "The department the request was sent for: the IT Admin works the departments they are in charge of."
                     },
                     "beneficiary": {
                       "type": "object",
@@ -104779,6 +104981,46 @@
                       },
                       "required": ["employeeId", "employeeCode", "fullName"],
                       "additionalProperties": false
+                    },
+                    "state": { "type": "string", "enum": ["WAITING", "EXECUTING", "DONE"] },
+                    "execution": {
+                      "type": "object",
+                      "properties": {
+                        "taskId": { "type": "string", "format": "uuid" },
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "QUEUED",
+                            "RETRY_SCHEDULED",
+                            "IN_PROGRESS",
+                            "COMPLETED",
+                            "FAILED",
+                            "CLOSED_FAILED",
+                            "CANCELLED"
+                          ]
+                        },
+                        "failureReason": { "type": "string", "nullable": true },
+                        "availableActions": {
+                          "maxItems": 7,
+                          "type": "array",
+                          "items": {
+                            "type": "string",
+                            "enum": [
+                              "CLAIM",
+                              "COMPLETE",
+                              "REPORT_FAILURE",
+                              "RETRY",
+                              "HAND_OFF",
+                              "CLOSE_FAILED",
+                              "CANCEL"
+                            ]
+                          },
+                          "description": "What the IT Admin may do next on the task, each one a route of the provisioning task: take it, complete it with evidence, report it as not done, try it again, hand it to a person, close it as failed, or cancel it when the requester withdrew."
+                        }
+                      },
+                      "required": ["taskId", "status", "failureReason", "availableActions"],
+                      "additionalProperties": false,
+                      "nullable": true
                     },
                     "requester": {
                       "type": "object",
@@ -104809,7 +105051,10 @@
                     "lineCount",
                     "boundaryState",
                     "plan",
+                    "department",
                     "beneficiary",
+                    "state",
+                    "execution",
                     "requester",
                     "expectedEndDate",
                     "stock",

@@ -90,7 +90,7 @@ flowchart BT
   licensing -->|30| audit
   licensing -->|50| catalog
   licensing -->|2| finance
-  licensing -->|11| identity_access
+  licensing -->|12| identity_access
   licensing -->|8| notifications
   licensing -->|7| operating_parameters
   licensing -->|55| organization
@@ -123,13 +123,13 @@ flowchart BT
   personnel -->|8| requests
   requests -->|58| audit
   requests -->|25| budgets
-  requests -->|32| catalog
+  requests -->|33| catalog
   requests -->|7| finance
-  requests -->|32| identity_access
-  requests -->|54| licensing
+  requests -->|33| identity_access
+  requests -->|58| licensing
   requests -->|10| notifications
   requests -->|11| operating_parameters
-  requests -->|91| organization
+  requests -->|92| organization
   usage -->|7| audit
   usage -->|7| catalog
   usage -->|15| devices
