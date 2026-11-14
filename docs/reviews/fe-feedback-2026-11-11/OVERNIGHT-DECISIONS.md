@@ -34,7 +34,7 @@
 
 - **Câu hỏi:** `POST` kết quả gia hạn (`licensing/subscription-renewal`) nhận `unitPrice` của kỳ mới qua `SubscriptionPeriodApi.recordNextPeriod` → `pricing.read`; sau FX-1.2 ngoại tệ không còn đọc được. SPEC chỉ nêu `POST/PATCH /subscriptions` và báo giá.
 - **Phương án:** (a) để lỗi `SubscriptionPriceNotVndError` rơi ra 500 (licensing không import được lỗi nội bộ catalog); (b) `recordNext` đổi thành `SubscriptionPeriodRefusedError('PRICE_NOT_VND')` ⟹ licensing đã map sang `409 SUBSCRIPTION_RENEWAL.PERIOD_REFUSED` `details.reason`; (c) thêm lỗi 422 riêng ở licensing.
-- **Đã chọn:** (b): không đổi contract mới, đi đúng đường refusal có sẵn, không chạm module licensing. Căn cứ: QĐ-111an (giá chỉ VND, mọi chỗ nhập giá gói), "đơn giản, dễ đổi lại".
+- **Đã chọn (tạm chốt, Owner xác nhận ở audit):** (b): không đổi contract mới, đi đúng đường refusal có sẵn, không chạm module licensing. Căn cứ: QĐ-111an (giá chỉ VND, mọi chỗ nhập giá gói), "đơn giản, dễ đổi lại". Có test integration (`subscription-renewal-pool-fields`: 409, `details.reason = PRICE_NOT_VND`, không ghi gì) và mô tả route `outcome` nêu lý do (`FX-1-R4`).
 - **File/commit:** `catalog/subscription/subscription-period.service.ts`, `catalog/public/subscription-period.types.ts` — `bf773874`.
 - **Đổi lại:** đổi nhánh `catch` ở `recordNext` (hoặc làm (c) ở gói FX-2 nếu Owner muốn 422).
 
@@ -51,3 +51,11 @@
 ## Dừng ở đâu
 
 ## Tóm tắt cho Owner
+
+### D-6 — Hồ sơ bổ sung cũ: bỏ rồi thêm lại hai CHECK `NOT VALID` quanh UPDATE của migration (thay vì chỉ quy hồ sơ thỏa CHECK)
+
+- **Câu hỏi:** `request_supplements_retired_spend_day_check` (không có ngày chi) và `request_supplements_change_v2_check` (số tiền hoặc ngày kết thúc phải đổi), cả hai `NOT VALID` ở `20261109130000`, vẫn kiểm mọi phiên bản mới của một hàng, kể cả hàng cũ trước 09/11 (có ngày chi, số tiền có thể bằng nhau) ⟹ UPDATE quy VND dừng ở 23514 và cả migration dừng.
+- **Phương án:** (a) bỏ hai CHECK, UPDATE, thêm lại đúng định nghĩa `NOT VALID`, cùng giao dịch; (b) chỉ UPDATE hồ sơ thỏa CHECK, liệt kê phần còn lại trong NOTICE.
+- **Đã chọn (tạm chốt):** (a). Căn cứ: (b) để lại hồ sơ bổ sung bằng USD bên cạnh Request đã quy VND, đúng thứ mà QĐ-111an muốn bỏ; (a) khôi phục nguyên định nghĩa (không validate hàng cũ, hồ sơ mới vẫn bị chặn; test dựng lịch sử cũ kiểm cả hai), cùng một giao dịch với DISABLE/ENABLE trigger nên không phiên nào thấy trạng thái thiếu. Rủi ro còn lại: `DROP/ADD CONSTRAINT` giữ khóa bảng ngắn; migration chạy một lần ngoài giờ.
+- **File/commit:** `prisma/migrations/20261113002900_fx_prices_to_vnd/migration.sql` (sửa tại chỗ vì chưa chạy trên DB thật, như D-3), `test/integration/catalog/fx-prices-to-vnd-upgrade.integration-spec.ts` — `71b32df6`.
+- **Đổi lại:** nếu Owner muốn (b): bỏ `DROP/ADD CONSTRAINT`, thêm điều kiện lọc hàng thỏa CHECK ở `fx_supplement_changes` và NOTICE cho phần còn lại; migration chưa chạy thật nên sửa tại chỗ.
