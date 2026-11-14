@@ -91,6 +91,10 @@ function setup(input: {
   return { service, repo, budgets, catalog, grants, organization, held, skipped };
 }
 
+/** What the approval of a request for a group kept of the year for each person: `{ person: amount }`. */
+const keptBy = (requestId: string, amounts: Record<string, bigint>) =>
+  new Map([[requestId, new Map(Object.entries(amounts))]]);
+
 describe('YearStartCommitmentsBatchService (BR-MF1-09e, FR-5.8(6): one batch of the pass of 01/01)', () => {
   describe('a right a renewal extended is the renewal’s', () => {
     it('BR-MF1-09e: the renewal holds the year of the record that follows the renewed one; the request that first granted it holds nothing', async () => {
@@ -205,16 +209,7 @@ describe('YearStartCommitmentsBatchService (BR-MF1-09e, FR-5.8(6): one batch of 
     });
 
     it('T-XY1: a group of three that kept 4.200.000 each holds 12.600.000; the one who left on 20/12 is not counted: 8.400.000', async () => {
-      const kept = new Map([
-        [
-          'r-group',
-          new Map([
-            ['e-1', 4_200_000n],
-            ['e-2', 4_200_000n],
-            ['e-3', 4_200_000n],
-          ]),
-        ],
-      ]);
+      const kept = keptBy('r-group', { 'e-1': 4_200_000n, 'e-2': 4_200_000n, 'e-3': 4_200_000n });
       const group = candidate({ id: 'r-group', type: 'GROUP_GRANT', termMonths: 9 });
       const seats = (leaver?: string) =>
         ['e-1', 'e-2', 'e-3'].map((employeeId) =>
@@ -244,7 +239,7 @@ describe('YearStartCommitmentsBatchService (BR-MF1-09e, FR-5.8(6): one batch of 
           heldSeat({ requestId: 'r-group', employeeId: 'e-1', expectedEndDate: '2027-08-14' }),
           heldSeat({ requestId: 'r-group', employeeId: 'e-2', expectedEndDate: '2027-03-31' }),
         ],
-        kept: new Map([['r-group', new Map([['e-1', 4_200_000n]])]]),
+        kept: keptBy('r-group', { 'e-1': 4_200_000n }),
         price: at(650_000n),
       });
 
@@ -298,15 +293,7 @@ describe('YearStartCommitmentsBatchService (BR-MF1-09e, FR-5.8(6): one batch of 
             ],
           ],
         ]),
-        kept: new Map([
-          [
-            'r-group',
-            new Map([
-              ['e-1', 4_200_000n],
-              ['e-2', 3_900_000n],
-            ]),
-          ],
-        ]),
+        kept: keptBy('r-group', { 'e-1': 4_200_000n, 'e-2': 3_900_000n }),
         price: at(650_000n),
       });
 
