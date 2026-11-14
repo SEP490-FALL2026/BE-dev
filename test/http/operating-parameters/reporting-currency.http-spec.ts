@@ -4,7 +4,7 @@ import { App } from 'supertest/types';
 import { bodyOf } from '../../support/api-body';
 import { bearer, createHttpContractApp, principal } from '../../support/http-contract-app';
 
-describe('reporting currency routes (e2e, no database)', () => {
+describe('reporting currency route (e2e, no database)', () => {
   let app: INestApplication<App>;
 
   beforeAll(async () => {
@@ -15,11 +15,8 @@ describe('reporting currency routes (e2e, no database)', () => {
     await app?.close();
   });
 
-  it.each([
-    ['GET', (s: App) => request(s).get('/api/v1/reporting-currency')],
-    ['PUT', (s: App) => request(s).put('/api/v1/reporting-currency').send({ currency: 'USD' })],
-  ])('%s without a token is 401', async (_name, call) => {
-    const response = await call(app.getHttpServer()).expect(401);
+  it('GET without a token is 401', async () => {
+    const response = await request(app.getHttpServer()).get('/api/v1/reporting-currency').expect(401);
 
     expect(bodyOf(response).error.code).toBe('AUTHENTICATION_REQUIRED');
   });
@@ -30,36 +27,18 @@ describe('reporting currency routes (e2e, no database)', () => {
     ['an employee', ['EMPLOYEE'], []],
     ['a department head, whose role is derived', [], ['MANAGER']],
     ['the spending approver, whose role is derived', [], ['SPENDING_APPROVER']],
-  ])('refuses %s on both routes with 403: only the Super Admin sets it (AC-6)', async (_name, direct, derived) => {
-    for (const call of [
-      (s: App) => request(s).get('/api/v1/reporting-currency'),
-      (s: App) => request(s).put('/api/v1/reporting-currency').send({ currency: 'USD' }),
-    ]) {
-      const response = await call(app.getHttpServer())
-        .set('Authorization', bearer(principal([...direct, ...derived])))
-        .expect(403);
-      expect(bodyOf(response).error.code).toBe('AUTHORIZATION.FORBIDDEN');
-    }
-  });
-
-  it.each([
-    ['no currency', {}],
-    ['a currency in lower case', { currency: 'usd' }],
-    ['a currency of two letters', { currency: 'US' }],
-    ['a currency that is a number', { currency: 840 }],
-    ['a field that is not known', { currency: 'USD', locked: false }],
-  ])('turns away a PUT with %s, 422 VALIDATION_ERROR', async (_name, body) => {
+  ])('refuses %s with 403: only the Super Admin reads it (AC-6)', async (_name, direct, derived) => {
     const response = await request(app.getHttpServer())
-      .put('/api/v1/reporting-currency')
-      .set('Authorization', bearer(principal(['SUPER_ADMIN'])))
-      .send(body)
-      .expect(422);
+      .get('/api/v1/reporting-currency')
+      .set('Authorization', bearer(principal([...direct, ...derived])))
+      .expect(403);
 
-    expect(bodyOf(response).error.code).toBe('VALIDATION_ERROR');
+    expect(bodyOf(response).error.code).toBe('AUTHORIZATION.FORBIDDEN');
   });
 
-  it('has no route that deletes the reporting currency or changes it through another verb: 404', async () => {
+  it('QĐ-111an: has no route that sets, changes or deletes the reporting currency: the route is gone, 404 and not 410, for every other verb', async () => {
     for (const [method, path] of [
+      ['put', '/api/v1/reporting-currency'],
       ['delete', '/api/v1/reporting-currency'],
       ['patch', '/api/v1/reporting-currency'],
       ['post', '/api/v1/reporting-currency'],
@@ -68,6 +47,16 @@ describe('reporting currency routes (e2e, no database)', () => {
       const response = await request(app.getHttpServer())
         [method](path)
         .set('Authorization', bearer(principal(['SUPER_ADMIN'])))
+        .expect(404);
+      expect(bodyOf(response).error.code).toBe('HTTP_NOT_FOUND');
+    }
+  });
+
+  it('QĐ-111an: has no route of exchange rates: 404 for the list and for a new rate', async () => {
+    for (const method of ['get', 'post'] as const) {
+      const response = await request(app.getHttpServer())
+        [method]('/api/v1/exchange-rates')
+        .set('Authorization', bearer(principal(['FINANCE', 'SUPER_ADMIN'])))
         .expect(404);
       expect(bodyOf(response).error.code).toBe('HTTP_NOT_FOUND');
     }

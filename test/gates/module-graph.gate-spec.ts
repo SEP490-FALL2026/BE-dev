@@ -83,10 +83,8 @@ const PUBLIC_CONTRACT_EXPORTS: ReadonlySet<string> = new Set([
   // The extension point the usage module binds the collector allowlist to (devices/public/devices.extension-points.ts).
   'DevicesModule: CollectorAllowlistHook',
   'DevicesModule: Symbol(DEVICE_CREDENTIAL_VERIFIER)', // port of src/infrastructure/security
-  // G3 (ADR-0013): the finance facade, money in and conversion snapshot out; the repos stay private.
+  // G3 (ADR-0013): the finance facade, money in and the snapshot of the same currency out; the repos stay private.
   'FinanceModule: FinanceApi',
-  // The audited exchange-rate use case the finance HTTP module serves; the raw ledger is not exported.
-  'FinanceModule: ExchangeRateService',
   'IdentityAccessFacadeModule: IdentityAccessApi',
   // D-S21 (qd93-remove-fallback-substitute-approvers): who can never ask for or be given access through a Request, one facade for every route that makes one.
   'IdentityAccessFacadeModule: RequestPartyEligibilityApi',

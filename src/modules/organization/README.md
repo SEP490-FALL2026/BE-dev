@@ -28,8 +28,8 @@ operating-parameters, personnel, requests ([module-graph](../../../docs/generate
       `lockForEmployeeImport` (`FOR SHARE` trên phòng ban), `getProfileNotices`, `getOnboardingFacts`.
     - Cost Center: `getCostCentersByCodes`, `costCentersByIds`, `lockCostCentersShared`, `getOwningUnits`,
       `requireUnitCostCenter` (kiểm thuần, không chạm CSDL).
-  - `OrganizationApi` ([public/organization.api.ts](public/organization.api.ts)), 10 phương thức ghi, khóa ghi và bộ đọc "đang dùng":
-    - Ghi: `createOrganization`, `setReportingCurrency`, `createDepartment`, `createUnitCostCenter`,
+  - `OrganizationApi` ([public/organization.api.ts](public/organization.api.ts)), 9 phương thức ghi, khóa ghi và bộ đọc "đang dùng":
+    - Ghi: `createOrganization`, `createDepartment`, `createUnitCostCenter`,
       `createEmployeeWithPlacement` (cách duy nhất tạo nhân viên), `updateEmployeeOfficialFields`, `emitChange` (báo thay đổi).
     - Khóa ghi: `lockEmployeeForUpdate` (`FOR UPDATE`).
     - Đang dùng: `getDepartmentUse`, `getCostCenterUse` (hỏi các extension point bên dưới).

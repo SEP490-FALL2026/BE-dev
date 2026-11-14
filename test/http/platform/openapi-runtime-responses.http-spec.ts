@@ -135,16 +135,16 @@ describe('API inventory (e2e): responses the runtime answers and the contract us
       expect(description.slice(own.length + 1)).toContain('it is not valid JSON');
     });
 
-    it('declares REPORTING_CURRENCY_NOT_SUPPORTED as a 409 exactly where a price is converted', () => {
+    it('declares REPORTING_CURRENCY_NOT_SUPPORTED nowhere: no price is converted (QĐ-111an) and the price in another currency is told as PRICE_NOT_VND', () => {
       expect(
         idsWhere((candidate) =>
           Object.values(candidate.responses).some((response) =>
             response.description?.includes('REPORTING_CURRENCY_NOT_SUPPORTED'),
           ),
         ),
-      ).toEqual(['subscriptionComplete', 'subscriptionCreate', 'subscriptionUpdate']);
-      for (const id of ['subscriptionComplete', 'subscriptionCreate', 'subscriptionUpdate']) {
-        expect(operation(id).responses['409']?.description).toContain('REPORTING_CURRENCY_NOT_SUPPORTED');
+      ).toEqual([]);
+      for (const id of ['subscriptionCreate', 'subscriptionUpdate']) {
+        expect(operation(id).responses['422']?.description).toContain('PRICE_NOT_VND');
       }
     });
 

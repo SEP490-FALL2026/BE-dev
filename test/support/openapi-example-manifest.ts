@@ -24,7 +24,6 @@ import { SUCCESS_MESSAGES_DEVICES } from './openapi-example-messages-devices';
 import { SUCCESS_MESSAGES_OPTIMIZATION } from './openapi-example-messages-optimization';
 import { SUCCESS_MESSAGES_USAGE } from './openapi-example-messages-usage';
 import { ROUTE_ERROR_CODES_DEVICES } from './openapi-example-route-codes-devices';
-import { ROUTE_ERROR_CODES_FINANCE } from './openapi-example-route-codes-finance';
 import { ROUTE_ERROR_CODES_HEALTH } from './openapi-example-route-codes-health';
 import { ROUTE_ERROR_CODES_IDENTITY_ACCESS } from './openapi-example-route-codes-identity-access';
 import { ROUTE_ERROR_CODES_LICENSING } from './openapi-example-route-codes-licensing';
@@ -201,8 +200,6 @@ export const SUCCESS_MESSAGES: Readonly<Record<string, string>> = {
   employeeImportUpload: 'EMPLOYEE_IMPORT.UPLOADED',
   employeeList: 'EMPLOYEE.LISTED',
   employeeUpdateOfficialFields: 'EMPLOYEE.UPDATED',
-  exchangeRateList: 'EXCHANGE_RATE.LISTED',
-  exchangeRateRecord: 'EXCHANGE_RATE.RECORDED',
   functionalGroupCreate: 'FUNCTIONAL_GROUP.CREATED',
   functionalGroupList: 'FUNCTIONAL_GROUP.LISTED',
   functionalGroupUpdate: 'FUNCTIONAL_GROUP.UPDATED',
@@ -294,7 +291,6 @@ export const SUCCESS_MESSAGES: Readonly<Record<string, string>> = {
   provisioningTaskReportFailure: 'PROVISIONING_TASK.FAILED',
   provisioningTaskRetry: 'PROVISIONING_TASK.RETRY_REQUESTED',
   reportingCurrencyGet: 'REPORTING_CURRENCY.FETCHED',
-  reportingCurrencySet: 'REPORTING_CURRENCY.SET',
   requestableApplicationGet: 'REQUESTABLE_APPLICATION.FETCHED',
   requestableApplicationList: 'REQUESTABLE_APPLICATION.LISTED',
   requestablePlanGet: 'REQUESTABLE_PLAN.FETCHED',
@@ -381,7 +377,6 @@ const PARTS = [
   ROUTE_ERROR_CODES_CATALOG,
   ROUTE_ERROR_CODES_DATA_IMPORT,
   ROUTE_ERROR_CODES_DEVICES,
-  ROUTE_ERROR_CODES_FINANCE,
   ROUTE_ERROR_CODES_HEALTH,
   ROUTE_ERROR_CODES_IDENTITY_ACCESS,
   ROUTE_ERROR_CODES_LICENSING,

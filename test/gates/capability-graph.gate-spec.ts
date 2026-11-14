@@ -290,13 +290,7 @@ describe('an errors file does not import the policy of another capability (spec 
  * one area imports is that area's concept and belongs in its folder. The few that stay in `core` are listed with the reason; the
  * list only shrinks, and an entry that is no longer true fails like a new file.
  */
-const CORE_PRIMITIVES_OF_ONE_AREA: Readonly<Record<string, string>> = {
-  'core/money/convert.ts':
-    'The exact integer conversion of `Money` at a `ScaledRate` into the reporting currency: the last primitive of the money family, ' +
-    'whose other files (`money.ts`, `rate.ts`, `money.errors.ts`, `tax-estimate.ts`) catalog, finance and requests share. Only the ' +
-    'finance facade records a conversion (G3, ADR-0013), and the rounding rule and the range limits are read beside the types they ' +
-    'are made of.',
-};
+const CORE_PRIMITIVES_OF_ONE_AREA: Readonly<Record<string, string>> = {};
 
 /** The core files that fewer than two areas import and are not listed as primitives, each with who imports it. */
 function coreFilesOfFewerThanTwoAreas(

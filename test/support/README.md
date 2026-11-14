@@ -245,8 +245,8 @@ fixture SQL không chứng minh workflow tạo tài khoản. Dùng `bodyOf(respo
   `support/query-count.ts`: `QueryCounter.on(relay).run(work)` trả `{ result, statements }`; `dataStatements` bỏ
   BEGIN/COMMIT/SET; `tablesOf` liệt kê bảng sau FROM/JOIN. Test collection của hạng mục capability nối ứng dụng qua relay,
   dựng fixture qua URL trực tiếp, rồi khẳng định số câu lệnh bằng nhau trên hai cỡ dữ liệu, không câu lệnh nào đọc bảng chỉ
-  detail cần, và không có giá trị bind. Mẫu: `query-count-harness.integration-spec.ts` (đặc tả `exchangeRateList`: 12 câu
-  lệnh cho 5 và 60 tỷ giá). Không thêm instrumentation vào `PrismaService` hay dependency mới.
+  detail cần, và không có giá trị bind. Mẫu: `query-count-harness.integration-spec.ts` (đặc tả `currencyList`: cùng
+  số câu lệnh cho 5 và 60 tiền tệ thêm). Không thêm instrumentation vào `PrismaService` hay dependency mới.
 - `pnpm test:mutation` chạy control + đúng ba mutant trên disposable copy, cần cùng role thường/DB riêng;
   xem [runner guide](../../scripts/README.md#targeted-mutation-verification). Không sửa checkout trong lúc runner chạy;
   exit/setup failure không được tính là killed và mọi mutant phải restore bytes/hash trước khi dọn copy.

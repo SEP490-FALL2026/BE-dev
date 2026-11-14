@@ -2,8 +2,6 @@
 export const API_COVERAGE_MANIFEST: readonly string[] = [
   'GET /api/v1/cost-centers',
   'GET /api/v1/currencies',
-  'GET /api/v1/exchange-rates',
-  'POST /api/v1/exchange-rates',
   'GET /api/v1/subscriptions',
   'POST /api/v1/subscriptions',
   'GET /api/v1/subscriptions/{id}',
@@ -15,7 +13,6 @@ export const API_COVERAGE_MANIFEST: readonly string[] = [
   'POST /api/v1/seat-baseline-imports/{id}/confirm',
   'POST /api/v1/seat-baseline-imports/{id}/cancel',
   'GET /api/v1/reporting-currency',
-  'PUT /api/v1/reporting-currency',
   'POST /api/v1/contracts',
   'GET /api/v1/contracts/{id}',
   'POST /api/v1/documents',
