@@ -21,9 +21,14 @@ import {
   type RefusedLine,
 } from '../group-request/group-request.policy';
 
-/** What a request that is fine for the plan can still refuse a person for: they have a term and the group gives no months, or none for a right with no end. */
+/**
+ * What a request that is fine for the plan can still refuse a person for: they have a term and the group gives no months, or none for a right
+ * with no end, or their contract ended before the term begins.
+ */
 const personTermRefusal = (refusal: TermRefusal | null): LineFacts['termRefusal'] =>
-  refusal === 'TERM_REQUIRED' || refusal === 'TERM_LONG_TERM_NOT_ALLOWED' ? refusal : null;
+  refusal === 'TERM_REQUIRED' || refusal === 'TERM_LONG_TERM_NOT_ALLOWED' || refusal === 'TERM_CONTRACT_ENDED'
+    ? refusal
+    : null;
 
 export interface GroupLineInput {
   employeeId: string;
@@ -167,6 +172,8 @@ export class GroupSubmissionFactsService {
                 kind: target.provisioningType,
                 termMonths: input.termMonths,
                 fixedTermPerson: (person?.employmentType ?? 'STAFF') !== 'STAFF',
+                contractEndDate: person?.contractEndDate ?? null,
+                termStart: today,
               })
             : null,
         ),

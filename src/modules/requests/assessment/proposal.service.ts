@@ -1,5 +1,6 @@
 import { SpendRoutingService } from '../spend/spend-routing.service';
 import { Injectable } from '@nestjs/common';
+import type { BusinessDate } from '../../../core/business-date';
 import type { TermRefusal } from '../../../core/term-limit';
 import { TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
@@ -19,8 +20,10 @@ import type { ProposalBodyDto } from './assessment.dto';
 import { RequestLimitsService } from '../request-limits/request-limits.service';
 
 /** Throws AccessRequestTermRefusedError (`QĐ-111i`, `FR-2.8`). */
-function assertTermAllowed(assessed: { termRefusal: TermRefusal | null }): void {
-  if (assessed.termRefusal !== null) throw new AccessRequestTermRefusedError(assessed.termRefusal);
+function assertTermAllowed(assessed: { termRefusal: TermRefusal | null; contractEndDate: BusinessDate | null }): void {
+  if (assessed.termRefusal !== null) {
+    throw new AccessRequestTermRefusedError(assessed.termRefusal, assessed.contractEndDate);
+  }
 }
 
 /** What the audit says of a short proposal (`QĐ-111a`): the application it names and the plan it asks for; null for both when the software is new. */

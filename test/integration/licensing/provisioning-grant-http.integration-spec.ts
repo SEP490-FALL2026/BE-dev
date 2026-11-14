@@ -391,6 +391,30 @@ describe('the grant of a seat over HTTP (integration, real PostgreSQL)', () => {
       expect(await seatEndOf(staff)).toEqual([null]);
     });
 
+    it('B-R1 (INV-07): a person with a term whose contract ended before the day of the grant gets no seat: 409 PROVISIONING.CONTRACT_ENDED, nothing written', async () => {
+      const { subscriptionId, planId } = await k2();
+      const person = await h.member('P-DES', 'E-END-GONE', designer);
+      const contractEnd = addDays(h.today(), -1);
+      await h.ctx.sql.query(`UPDATE employees SET hire_date = '2020-01-01' WHERE id = $1`, [person]);
+      await h.ctx.sql.query(`UPDATE employees SET employment_type = 'INTERN', contract_end_date = $2 WHERE id = $1`, [
+        person,
+        contractEnd,
+      ]);
+      const requestId = h.gate.grantable(person, planId);
+      const before = await count(`SELECT count(*) AS n FROM license_assignments`);
+
+      const refused = await h.grant({ requestId, subscriptionId }).expect(409);
+
+      expect(h.codeOf(refused)).toBe('PROVISIONING.CONTRACT_ENDED');
+      expect(h.detailsOf(refused)).toEqual({ requestId, contractEndDate: contractEnd });
+      expect(await seatEndOf(person)).toEqual([]);
+      expect(await count(`SELECT count(*) AS n FROM license_assignments`)).toBe(before);
+      // The day the contract ends is still a day of the right: the seat is granted and ends there.
+      await h.ctx.sql.query(`UPDATE employees SET contract_end_date = $2 WHERE id = $1`, [person, h.today()]);
+      await h.grant({ requestId, subscriptionId }).expect(201);
+      expect(await seatEndOf(person)).toEqual([h.today()]);
+    });
+
     it('gives the seat of free internal software no end by term: it costs nothing and has no term to bind (R-H1)', async () => {
       const planId = await h.plan('K5');
       const person = await h.member('P-DES', 'E-END-FREE', designer);

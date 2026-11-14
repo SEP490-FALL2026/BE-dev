@@ -93,14 +93,20 @@ const TERM_MESSAGES: Readonly<Record<TermRefusal, string>> = {
   TERM_NOT_ASKED: 'This plan is bought once: it takes no time of use.',
   TERM_LONG_TERM_NOT_ALLOWED:
     'A contractor, a freelancer or an intern gets access for a term: give the months, not a right with no end.',
+  TERM_CONTRACT_ENDED: 'The contract of the person ended before the time of use begins: no access is given beyond it.',
 };
 
 /**
  * The time of use the request gives is refused (`QĐ-111i`, `FR-2.8`, `INV-07`): it is missing, outside what the kind of plan takes, given to a
- * plan that asks none, or no end for a person who has a term. A term that runs past the end of the contract is not refused: it is cut (R-38).
+ * plan that asks none, no end for a person who has a term, or a contract that ended before the time of use begins (`contractEndDate` says
+ * when). A term that runs past the end of the contract is not refused: it is cut (R-38).
  */
 export class AccessRequestTermRefusedError extends Error {
-  constructor(readonly reason: TermRefusal) {
+  constructor(
+    readonly reason: TermRefusal,
+    /** The last day of the contract, for `TERM_CONTRACT_ENDED`. */
+    readonly contractEndDate: BusinessDate | null = null,
+  ) {
     super(TERM_MESSAGES[reason]);
     this.name = 'AccessRequestTermRefusedError';
   }

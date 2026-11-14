@@ -73,6 +73,7 @@ export type LineReason =
   | BeneficiaryRefusal
   | 'TERM_REQUIRED'
   | 'TERM_LONG_TERM_NOT_ALLOWED'
+  | 'TERM_CONTRACT_ENDED'
   | 'HAS_ACCESS'
   | 'HAS_OPEN_REQUEST'
   | 'OPEN_LIMIT_REACHED';
@@ -96,9 +97,10 @@ export interface LineFacts {
   isDepartmentHead?: boolean;
   /**
    * A person with a term (a contractor, a freelancer, an intern) gets access for a term (`FR-2.8`, `INV-07`): the group gives no months
-   * (`TERM_REQUIRED`) or none for a right with no end (`TERM_LONG_TERM_NOT_ALLOWED`). Null for anybody else.
+   * (`TERM_REQUIRED`), none for a right with no end (`TERM_LONG_TERM_NOT_ALLOWED`), or their contract ended before the term begins
+   * (`TERM_CONTRACT_ENDED`, `INV-07`). Null for anybody else.
    */
-  termRefusal: 'TERM_REQUIRED' | 'TERM_LONG_TERM_NOT_ALLOWED' | null;
+  termRefusal: 'TERM_REQUIRED' | 'TERM_LONG_TERM_NOT_ALLOWED' | 'TERM_CONTRACT_ENDED' | null;
   /** The person holds the spending approver role: they are no party of a Request, and the reason comes before any other. */
   spendingApprover: boolean;
 }

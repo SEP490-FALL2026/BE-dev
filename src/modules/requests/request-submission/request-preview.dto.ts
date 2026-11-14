@@ -44,11 +44,18 @@ const previewSchema = z.strictObject({
   /** The time of use in months as the sender gave it; null for a right with no end or a plan that asks none. */
   termMonths: z.number().int().nullable(),
   /**
-   * Why the time of use cannot be sent as it is, or null: missing, outside what the kind of plan takes, given to a plan bought once, or no end
-   * for a contractor, a freelancer or an intern. A term that runs past the end of a contract is not refused: it is cut (`cost.termCutAt`).
+   * Why the time of use cannot be sent as it is, or null: missing, outside what the kind of plan takes, given to a plan bought once, no end
+   * for a contractor, a freelancer or an intern, or a contract that ended before the day the term begins. A term that runs past the end of a
+   * contract is not refused: it is cut (`cost.termCutAt`).
    */
   termRefusal: z
-    .enum(['TERM_REQUIRED', 'TERM_MONTHS_OUT_OF_RANGE', 'TERM_NOT_ASKED', 'TERM_LONG_TERM_NOT_ALLOWED'])
+    .enum([
+      'TERM_REQUIRED',
+      'TERM_MONTHS_OUT_OF_RANGE',
+      'TERM_NOT_ASKED',
+      'TERM_LONG_TERM_NOT_ALLOWED',
+      'TERM_CONTRACT_ENDED',
+    ])
     .nullable(),
   department: z.strictObject({ id: z.uuid(), code: z.string(), name: z.string() }),
   /**

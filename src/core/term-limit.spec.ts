@@ -136,6 +136,65 @@ describe('the time of use a kind of grant asks for (QĐ-111i, FR-2.8)', () => {
   });
 });
 
+describe('B-R1: a person with a term whose contract ended before the term begins is given no right (INV-07, R-38)', () => {
+  /** An intern whose contract ends on 31/12/2026, asking for a term that begins on `termStart`. */
+  const intern = (
+    kind: TermKind,
+    termStart: string,
+    extra: Partial<Parameters<typeof checkTermMonths>[0]> = {},
+  ): ReturnType<typeof checkTermMonths> =>
+    checkTermMonths({
+      kind,
+      termMonths: kind === 'K4' ? null : 3,
+      fixedTermPerson: true,
+      contractEndKnown: true,
+      contractEndDate: '2026-12-31',
+      termStart,
+      ...extra,
+    });
+
+  it('refuses a term that begins the day after the contract ends, whatever the kind of plan', () => {
+    for (const kind of ['K1', 'K2', 'K4', 'K5'] as const) {
+      expect(intern(kind, '2027-01-01')).toBe('TERM_CONTRACT_ENDED');
+    }
+  });
+
+  it('refuses a request to go on using that begins after the contract ends, K4 included', () => {
+    expect(intern('K2', '2027-01-01', { renewing: true })).toBe('TERM_CONTRACT_ENDED');
+    expect(intern('K4', '2027-01-01', { renewing: true, termMonths: 3 })).toBe('TERM_CONTRACT_ENDED');
+  });
+
+  it('takes a term that begins on the last day of the contract or before it: one day of it is still a term', () => {
+    expect(intern('K2', '2026-12-31')).toBeNull();
+    expect(intern('K2', '2026-12-30')).toBeNull();
+    expect(intern('K4', '2026-12-31')).toBeNull();
+  });
+
+  it('judges the months as ever when the contract has not ended, and for staff and a contract that is not known', () => {
+    expect(intern('K1', '2026-11-10', { termMonths: 10 })).toBe('TERM_MONTHS_OUT_OF_RANGE');
+    expect(intern('K2', '2026-11-10', { termMonths: null })).toBe('TERM_LONG_TERM_NOT_ALLOWED');
+    expect(
+      checkTermMonths({
+        kind: 'K2',
+        termMonths: 3,
+        fixedTermPerson: false,
+        contractEndDate: null,
+        termStart: '2027-01-01',
+      }),
+    ).toBeNull();
+    expect(
+      checkTermMonths({
+        kind: 'K2',
+        termMonths: 3,
+        fixedTermPerson: true,
+        contractEndKnown: false,
+        contractEndDate: null,
+        termStart: '2027-01-01',
+      }),
+    ).toBeNull();
+  });
+});
+
 describe('the run of a term: the months that begin, the end, and the cut at the end of a contract (R-38, R-39)', () => {
   it('ends the day before the same day N months later, and counts one month for each month that begins', () => {
     expect(termRunOf({ start: '2026-11-15', months: 9, contractEndDate: null })).toEqual({

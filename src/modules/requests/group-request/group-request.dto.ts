@@ -45,6 +45,7 @@ const LINE_REASONS = [
   'HAS_OPEN_REQUEST',
   'TERM_REQUIRED',
   'TERM_LONG_TERM_NOT_ALLOWED',
+  'TERM_CONTRACT_ENDED',
   'OPEN_LIMIT_REACHED',
 ] as const;
 
@@ -60,7 +61,8 @@ const checkSchema = z.strictObject({
   tooFewLines: z.strictObject({ min: z.number().int().positive() }).nullable(),
   /**
    * What is wrong with the time of use for the plan as a whole, or null (`QĐ-111i`); a person with a term who gets no months, or no end, is
-   * refused on their own line (`TERM_REQUIRED`, `TERM_LONG_TERM_NOT_ALLOWED`), and one whose contract ends sooner is cut, not refused.
+   * refused on their own line (`TERM_REQUIRED`, `TERM_LONG_TERM_NOT_ALLOWED`), and so is one whose contract ended before today
+   * (`TERM_CONTRACT_ENDED`); one whose contract ends sooner than the months is cut, not refused.
    */
   termRefusal: z
     .enum(['TERM_REQUIRED', 'TERM_MONTHS_OUT_OF_RANGE', 'TERM_NOT_ASKED', 'TERM_LONG_TERM_NOT_ALLOWED'])

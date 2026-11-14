@@ -319,6 +319,33 @@ describe('the end of the time of use and the renewal of the right (T-RQ3, integr
     expect(request.pricing).toMatchObject({ months: 2, nextYearAmount: null });
   });
 
+  it('B-R1 (INV-07, R-38): a person with a term whose contract ends before the new period begins is refused, and nothing is written; one whose contract ends the day it begins is cut there', async () => {
+    const ended = await holder(k1, '2026-12-31');
+    const lastDay = await holder(k1, '2026-12-31');
+    await h.ctx.sql.query(
+      `UPDATE employees SET employment_type = 'INTERN', contract_end_date = '2026-12-31' WHERE id = $1`,
+      [ended.unit.member.employeeId],
+    );
+    await h.ctx.sql.query(
+      `UPDATE employees SET employment_type = 'INTERN', contract_end_date = '2027-01-01' WHERE id = $1`,
+      [lastDay.unit.member.employeeId],
+    );
+    // The window opens 30 days before 31/12: on 01/12 the period that follows would begin on 01/01/2027, after the contract of the first.
+    on('2026-12-01');
+    const before = await h.requestRows();
+
+    const refused = await h.renew(months(ended.assignmentId, 3), ended.unit.member.account).expect(422);
+    const { request } = await h.renewed(lastDay.unit.member.account, months(lastDay.assignmentId, 3));
+
+    expect(h.codeOf(refused)).toBe('ACCESS_REQUEST.TERM_CONTRACT_ENDED');
+    expect(h.detailsOf(refused)).toEqual({ contractEndDate: '2026-12-31' });
+    expect(await h.requestRows()).toBe(before + 1);
+    // The contract ends on the day the period begins: that day is the whole of it, and the one month that begins on it is of 2027.
+    expect(request).toMatchObject({ termMonths: 3, expectedEndDate: '2027-01-01' });
+    expect(request.pricing).toMatchObject({ months: 0 });
+    expect(request.pricing.nextYearAmount).not.toBeNull();
+  });
+
   describe('R-27, by the real reader of the renewals (no stand-in): the reminder follows the end the right has', () => {
     /** What the module of requests tells licensing of the renewal that waits for a seat, as the real reader answers it. */
     const waitingOf = async (assignmentId: string) =>

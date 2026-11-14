@@ -40,7 +40,11 @@ export const K1_TERM_LIMIT_MONTHS = 9;
 
 /** Why the time of use a request gives is refused (`QĐ-111i`, `FR-2.8`, `INV-07`). */
 export type TermRefusal =
-  'TERM_REQUIRED' | 'TERM_MONTHS_OUT_OF_RANGE' | 'TERM_NOT_ASKED' | 'TERM_LONG_TERM_NOT_ALLOWED';
+  | 'TERM_REQUIRED'
+  | 'TERM_MONTHS_OUT_OF_RANGE'
+  | 'TERM_NOT_ASKED'
+  | 'TERM_LONG_TERM_NOT_ALLOWED'
+  | 'TERM_CONTRACT_ENDED';
 
 /**
  * Whether the time of use is asked for a kind of grant, and how long it may be: `K1` asks 1 to 9 months and takes no right without an end;
@@ -72,7 +76,14 @@ export function checkTermMonths(facts: {
    * whoever asks and whatever they answer, and is refused as a plan that asks no time of use.
    */
   renewing?: boolean;
+  /**
+   * The last day of the contract of the person with a term, and the day the term begins: a contract that ended before it leaves no day of
+   * the right to give, so nothing is granted or carried on whatever the kind of plan (`INV-07`, R-38). The day the contract ends is still a day.
+   */
+  contractEndDate?: BusinessDate | null;
+  termStart?: BusinessDate;
 }): TermRefusal | null {
+  if (contractEnded(facts)) return 'TERM_CONTRACT_ENDED';
   const rule = termRuleOf(facts.kind);
   const { termMonths } = facts;
   if (!rule.asked) {
@@ -87,6 +98,18 @@ export function checkTermMonths(facts: {
   }
 
   return checkNoMonths(rule.longTermAllowed, termMonths, facts.fixedTermPerson);
+}
+
+/** Whether the contract of a person with a term ended before the day the term begins: no day of the right is left to give. */
+function contractEnded(facts: {
+  fixedTermPerson: boolean;
+  contractEndDate?: BusinessDate | null;
+  termStart?: BusinessDate;
+}): boolean {
+  const { contractEndDate, termStart } = facts;
+  if (!facts.fixedTermPerson || contractEndDate === undefined || contractEndDate === null) return false;
+
+  return termStart !== undefined && contractEndDate < termStart;
 }
 
 /**
@@ -120,7 +143,9 @@ export interface TermRun {
  * The run of `months` months from `start` for a person whose contract ends on `contractEndDate` (null: none known). The last day is the day
  * before the same day `months` later, cut at the end of the contract when that comes first (R-38: the person is not refused, the term is
  * cut); a month counts as soon as it begins (R-39): month k begins `k − 1` months after `start`. A contract that ended already still leaves
- * the day the right begins and one month, so no right ends before it begins. A right with no end is never cut.
+ * the day the right begins and one month, so no right ends before it begins: a request is never judged on such a run, it is refused first
+ * (`checkTermMonths`, `TERM_CONTRACT_ENDED`), and this is what the readings made later (a check of the budget) give a person whose contract
+ * ended after the request was sent. A right with no end is never cut.
  */
 export function termRunOf(facts: {
   start: BusinessDate;

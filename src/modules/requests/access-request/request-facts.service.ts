@@ -56,6 +56,8 @@ export interface Assessment {
   /** What is wrong with the time of use asked for, or null (`QĐ-111i`, `FR-2.8`); and the run it has for the person from today (R-38, R-39). */
   termRefusal: TermRefusal | null;
   term: TermRun;
+  /** The last day of the contract of the person with a term; null for anybody else or a contract not known (`TERM_CONTRACT_ENDED` says it). */
+  contractEndDate: BusinessDate | null;
 }
 
 /** What a proposal of software that is not in the catalog is judged by: there is no plan, so no price or seat. */
@@ -70,6 +72,7 @@ export interface ProposalAssessment {
   /** What is wrong with the time of use asked for, or null; and the run it has for the person from today (`QĐ-111i`). */
   termRefusal: TermRefusal | null;
   term: TermRun;
+  contractEndDate: BusinessDate | null;
 }
 
 export interface AssessmentInput {
@@ -248,20 +251,24 @@ export class RequestFactsService {
     employee: { employmentType: string; contractEndDate?: BusinessDate | null } | null;
     /** The time of use is the one of a request to go on using a right: a plan bought once has no end to move, so it is never renewed (`QĐ-111l`). */
     renewing?: boolean;
-  }): Pick<Assessment, 'termRefusal' | 'term'> {
+  }): Pick<Assessment, 'termRefusal' | 'term' | 'contractEndDate'> {
     const fixedTermPerson = (facts.employee?.employmentType ?? 'STAFF') !== 'STAFF';
+    const contractEndDate = facts.employee?.contractEndDate ?? null;
     const termRefusal = checkTermMonths({
       kind: facts.kind,
       termMonths: facts.termMonths,
       fixedTermPerson,
-      contractEndKnown: (facts.employee?.contractEndDate ?? null) !== null,
+      contractEndKnown: contractEndDate !== null,
       renewing: facts.renewing === true,
+      contractEndDate,
+      termStart: facts.today,
     });
     const months = termRefusal === null && typeof facts.termMonths === 'number' ? facts.termMonths : null;
 
     return {
       termRefusal,
-      term: termRunOf({ start: facts.today, months, contractEndDate: facts.employee?.contractEndDate ?? null }),
+      term: termRunOf({ start: facts.today, months, contractEndDate }),
+      contractEndDate,
     };
   }
 

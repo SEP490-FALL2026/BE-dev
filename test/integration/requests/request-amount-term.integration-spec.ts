@@ -268,6 +268,37 @@ describe('the amount and the term of a request (integration, real PostgreSQL)', 
         expect(preview).toMatchObject({ canSubmit: false, termRefusal: 'TERM_LONG_TERM_NOT_ALLOWED' });
       });
 
+      it('B-R1 (INV-07, R-38): a contract that ended before the day of sending gives no right, on a plan of months and on a plan bought once', async () => {
+        const gone = await h.staff(design.department, 'AMT-GONE');
+        const lastDay = await h.staff(design.department, 'AMT-LAST');
+        await h.ctx.sql.query(`UPDATE employees SET hire_date = '2020-01-01' WHERE id = ANY($1::uuid[])`, [
+          [gone.employeeId, lastDay.employeeId],
+        ]);
+        await h.ctx.sql.query(`UPDATE employees SET employment_type = 'INTERN', contract_end_date = $2 WHERE id = $1`, [
+          gone.employeeId,
+          addDays(h.today(), -1),
+        ]);
+        await h.ctx.sql.query(`UPDATE employees SET employment_type = 'INTERN', contract_end_date = $2 WHERE id = $1`, [
+          lastDay.employeeId,
+          h.today(),
+        ]);
+        const key = await keyPlan();
+        const before = await h.requestRows();
+
+        const months = await h.submit(h.form(plan, { termMonths: 3 }), gone.account).expect(422);
+        const bought = await h.submit(h.form(key), gone.account).expect(422);
+        const preview = await h.previewed(gone, plan, { termMonths: 3 });
+        const onTheLastDay = await h.submit(h.form(plan, { termMonths: 3 }), lastDay.account);
+
+        // Nothing is kept for the person whose contract is over; the one whose contract ends today still has the day.
+        expect(h.codeOf(months)).toBe('ACCESS_REQUEST.TERM_CONTRACT_ENDED');
+        expect(h.detailsOf(months)).toEqual({ contractEndDate: addDays(h.today(), -1) });
+        expect(h.codeOf(bought)).toBe('ACCESS_REQUEST.TERM_CONTRACT_ENDED');
+        expect(preview).toMatchObject({ canSubmit: false, termRefusal: 'TERM_CONTRACT_ENDED' });
+        expect(onTheLastDay.status).toBe(201);
+        expect(await h.requestRows()).toBe(before + 1);
+      });
+
       it('no end for a person with a term is refused: nothing said is a missing field, null is the answer that is refused (INV-07)', async () => {
         const missing = await h.submit(h.form(plan), intern.account).expect(422);
         const longTerm = await h.submit(h.form(plan, { termMonths: null }), intern.account).expect(422);

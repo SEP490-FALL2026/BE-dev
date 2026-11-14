@@ -215,6 +215,17 @@ export class ProvisioningBeneficiaryNotStartedError extends Error {
   }
 }
 
+/** The contract of a beneficiary with a term ended before the day of the grant: no seat is granted beyond it (`INV-07`, R-38). */
+export class ProvisioningContractEndedError extends Error {
+  constructor(
+    readonly requestId: string,
+    readonly contractEndDate: string,
+  ) {
+    super('The contract of the beneficiary ended: no seat is granted beyond it.');
+    this.name = 'ProvisioningContractEndedError';
+  }
+}
+
 export class ProvisioningTaskNotFoundError extends Error {
   constructor() {
     super('The provisioning task does not exist.');

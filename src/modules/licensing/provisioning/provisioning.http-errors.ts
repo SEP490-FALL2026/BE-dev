@@ -14,6 +14,7 @@ import {
   ProvisioningAnotherItAdminNeededError,
   ProvisioningBeneficiaryDepartedError,
   ProvisioningBeneficiaryNotStartedError,
+  ProvisioningContractEndedError,
   ProvisioningEvidenceRequiredError,
   ProvisioningPersonalAccountError,
   ProvisioningReasonRequiredError,
@@ -106,6 +107,12 @@ export function toProvisioningApiException(error: unknown): unknown {
       requestId: error.requestId,
       cause: error.reason,
       nextStep: 'CANCEL_REQUEST',
+    });
+  }
+  if (error instanceof ProvisioningContractEndedError) {
+    return refuse(CONFLICT, 'PROVISIONING.CONTRACT_ENDED', error.message, {
+      requestId: error.requestId,
+      contractEndDate: error.contractEndDate,
     });
   }
   if (error instanceof ProvisioningBeneficiaryNotStartedError) {
@@ -247,6 +254,7 @@ export const PROVISIONING_GRANT_EXAMPLES = {
     example(new ProvisioningTypeNotSupportedError('K3')),
     PROVISIONING_ERROR_EXAMPLES.BENEFICIARY_DEPARTED,
     example(new ProvisioningBeneficiaryNotStartedError('<request-id>', '2026-01-01')),
+    example(new ProvisioningContractEndedError('<request-id>', '2026-01-01')),
     example(new SeatApplicationRetiredError()),
     example(new AssignmentConflictError('SEAT_CAPACITY', 0, 2)),
     example(new PurchaseNotAllowedError(2, ['<subscription-id>'])),

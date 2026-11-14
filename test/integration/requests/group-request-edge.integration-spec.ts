@@ -200,6 +200,26 @@ describe('the edges of a request for a group over PostgreSQL (US-05-17 AC-5, AC-
     });
   });
 
+  it('B-R1, INV-07: a person whose contract ended before the day of sending is refused on their own line, the check shows it and nothing is written', async () => {
+    const u = await unit();
+    const plan = await h.planOf(await h.subscription(10));
+    const [e1, e2] = await h.colleagues(u, 2);
+    await h.ctx.sql.query(`UPDATE employees SET hire_date = '2020-01-01' WHERE id = $1`, [e2.employeeId]);
+    await h.ctx.sql.query(`UPDATE employees SET employment_type = 'INTERN', contract_end_date = $2 WHERE id = $1`, [
+      e2.employeeId,
+      addDays(h.today(), -1),
+    ]);
+    const rows = await h.requestRows();
+
+    const refused = await h.submitGroup(h.groupBody(plan, [e1, e2], { termMonths: 3 }), u.head.account).expect(422);
+
+    expect(h.codeOf(refused)).toBe('GROUP_REQUEST.LINES_REFUSED');
+    expect(h.detailsOf(refused)).toEqual({
+      lines: [{ employeeId: e2.employeeId, reason: 'TERM_CONTRACT_ENDED' }],
+    });
+    expect(await h.requestRows()).toBe(rows);
+  });
+
   it('MF1-D: refuses the head as a line of the group, so no head declares their own line in a step (AC-16, BR-MF1-02)', async () => {
     const u = await unit();
     const plan = await h.planOf(await h.subscription(10));

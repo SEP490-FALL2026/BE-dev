@@ -81,7 +81,11 @@ export function toAccessRequestApiException(error: unknown): unknown {
   }
 
   if (error instanceof AccessRequestTermRefusedError) {
-    return refuse(HttpStatus.UNPROCESSABLE_ENTITY, `ACCESS_REQUEST.${error.reason}`, error.message);
+    return new ApiException(HttpStatus.UNPROCESSABLE_ENTITY, {
+      code: `ACCESS_REQUEST.${error.reason}`,
+      message: error.message,
+      ...(error.reason === 'TERM_CONTRACT_ENDED' ? { details: { contractEndDate: error.contractEndDate } } : {}),
+    });
   }
   if (error instanceof AccessRequestAlreadyHoldsAccessError) {
     return new ApiException(HttpStatus.CONFLICT, {
@@ -169,6 +173,7 @@ export const ACCESS_REQUEST_ERROR_EXAMPLES = {
   TERM_MONTHS_OUT_OF_RANGE: example(new AccessRequestTermRefusedError('TERM_MONTHS_OUT_OF_RANGE')),
   TERM_NOT_ASKED: example(new AccessRequestTermRefusedError('TERM_NOT_ASKED')),
   TERM_LONG_TERM_NOT_ALLOWED: example(new AccessRequestTermRefusedError('TERM_LONG_TERM_NOT_ALLOWED')),
+  TERM_CONTRACT_ENDED: example(new AccessRequestTermRefusedError('TERM_CONTRACT_ENDED', '2026-10-31')),
   NO_DEPARTMENT: example(new AccessRequestNoDepartmentError()),
   REQUEST_PARTY_INELIGIBLE: example(
     new RequestPartyIneligibleError({
@@ -215,10 +220,11 @@ export const ACCESS_REQUEST_ERROR_EXAMPLES = {
   EVIDENCE_REQUIRED: cancellation('EVIDENCE_REQUIRED'),
 } as const;
 
-/** The four answers of a time of use that is refused, for the routes that take one (`QĐ-111i`). */
+/** The five answers of a time of use that is refused, for the routes that take one (`QĐ-111i`, `INV-07`). */
 export const TERM_ERROR_EXAMPLES = [
   ACCESS_REQUEST_ERROR_EXAMPLES.TERM_REQUIRED,
   ACCESS_REQUEST_ERROR_EXAMPLES.TERM_MONTHS_OUT_OF_RANGE,
   ACCESS_REQUEST_ERROR_EXAMPLES.TERM_NOT_ASKED,
   ACCESS_REQUEST_ERROR_EXAMPLES.TERM_LONG_TERM_NOT_ALLOWED,
+  ACCESS_REQUEST_ERROR_EXAMPLES.TERM_CONTRACT_ENDED,
 ] as const;

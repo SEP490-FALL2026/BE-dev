@@ -68,7 +68,9 @@ export class RenewalRequestWriter {
       settings: input.settings,
       lockDepartment: true,
     });
-    if (assessed.termRefusal !== null) throw new AccessRequestTermRefusedError(assessed.termRefusal);
+    if (assessed.termRefusal !== null) {
+      throw new AccessRequestTermRefusedError(assessed.termRefusal, assessed.contractEndDate);
+    }
     const newEnd = assessed.term.end;
     // Counted to the end of the new period, or to the end the right has when it goes on with no end: a stay is never less than a month.
     const consecutiveMonths = Math.max(1, monthsBetween(facts.chainStartsOn, newEnd ?? input.previousEnd));
