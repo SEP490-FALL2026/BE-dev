@@ -43621,7 +43621,7 @@
             }
           },
           "409": {
-            "description": "The sender belongs to no department (ACCESS_REQUEST.NO_DEPARTMENT) or the department has no Cost Center in use yet (FINANCE.SETUP_INCOMPLETE).",
+            "description": "The sender belongs to no department (ACCESS_REQUEST.NO_DEPARTMENT), the department has no Cost Center in use yet (FINANCE.SETUP_INCOMPLETE), the catalog has this software already by its name or by the domain of its page, or has the plan asked for of the application named (ACCESS_REQUEST.SOFTWARE_IN_CATALOG: details.existing is the application with at most twenty of its plans and details.matchedBy says why; ask for it from the catalog instead), or the application named has left the catalog (ACCESS_REQUEST.APPLICATION_RETIRED). Nothing is written.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -43644,6 +43644,37 @@
                       "error": {
                         "code": "FINANCE.SETUP_INCOMPLETE",
                         "message": "The department has no Cost Center in use yet: Finance has to create one for it first.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "ACCESS_REQUEST.SOFTWARE_IN_CATALOG": {
+                    "summary": "The catalog already has this software: ask for it from the catalog.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "ACCESS_REQUEST.SOFTWARE_IN_CATALOG",
+                        "message": "The catalog already has this software: ask for it from the catalog.",
+                        "details": {
+                          "matchedBy": "NAME",
+                          "existing": {
+                            "applicationId": "application-id",
+                            "name": "ChatGPT",
+                            "plans": [{ "planId": "plan-id", "name": "Plus", "provisioningType": "K1" }],
+                            "planTotal": 1
+                          }
+                        },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "ACCESS_REQUEST.APPLICATION_RETIRED": {
+                    "summary": "The application of the plan is retired: no access is asked for it.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "ACCESS_REQUEST.APPLICATION_RETIRED",
+                        "message": "The application of the plan is retired: no access is asked for it.",
                         "requestId": "req_example"
                       }
                     }
@@ -43695,7 +43726,7 @@
             }
           },
           "422": {
-            "description": "The form is incomplete or invalid (VALIDATION_ERROR): the name, the homepage, the purpose, the company data that will go through the software and the term are required. The sender is the spending approver (REQUEST_PARTY.INELIGIBLE). A proposal counts as a request for new access: a person who was already named in as many requests for new access this calendar week (Monday to Sunday, organization time zone; a request withdrawn or refused still counts) as the weekly limit allows is refused until the next Monday (ACCESS_REQUEST.OPEN_LIMIT_REACHED, details.limit and details.resetsOn; GH-2, BR-MF1-01f). Nothing is written.",
+            "description": "The form is incomplete or invalid (VALIDATION_ERROR): the name, the homepage, the purpose, the company data that will go through the software and the term are required; existingApplicationId and plannedPlanName go together. The application named does not exist (ASSESSMENT.REFERENCE_NOT_FOUND, details.field existingApplicationId). The sender is the spending approver (REQUEST_PARTY.INELIGIBLE). A proposal counts as a request for new access: a person who was already named in as many requests for new access this calendar week (Monday to Sunday, organization time zone; a request withdrawn or refused still counts) as the weekly limit allows is refused until the next Monday (ACCESS_REQUEST.OPEN_LIMIT_REACHED, details.limit and details.resetsOn; GH-2, BR-MF1-01f). Nothing is written.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -43708,6 +43739,18 @@
                         "code": "VALIDATION_ERROR",
                         "message": "Request validation failed.",
                         "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "ASSESSMENT.REFERENCE_NOT_FOUND": {
+                    "summary": "The vendorId of the assessment does not exist.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "ASSESSMENT.REFERENCE_NOT_FOUND",
+                        "message": "The vendorId of the assessment does not exist.",
+                        "details": { "field": "vendorId" },
                         "requestId": "req_example"
                       }
                     }
@@ -45259,12 +45302,12 @@
         },
         "responses": {
           "200": {
-            "description": "After the spending approver has decided the request, the IT Admin links it to the plan registered in the catalog. The grant is possible only after this.",
+            "description": "After the spending approver has decided the request, the IT Admin links it to the plan registered in the catalog; the plan may be one the catalog already had, when the IT Admin was told the software is there and the request goes on as a request for what the catalog has. The grant is possible only after this. With addToDepartmentList the application and the plan are also put in the list of software of the department of the request (departmentList.added is false when they were listed already); the list only guides, nothing it holds grants anything.",
             "content": {
               "application/json": {
                 "schema": {
                   "allOf": [
-                    { "$ref": "#/components/schemas/AccessRequestResponseDto" },
+                    { "$ref": "#/components/schemas/CatalogLinkResponseDto" },
                     { "properties": { "message": { "example": "ACCESS_REQUEST.CATALOG_LINKED" } } }
                   ]
                 }
@@ -45325,7 +45368,7 @@
             }
           },
           "403": {
-            "description": "Only an IT Admin does this, and not for a request they asked for or are given (ACCESS_REQUEST.OWN_REQUEST).",
+            "description": "Only an IT Admin does this, and not for a request they asked for or are given (ACCESS_REQUEST.OWN_REQUEST). With addToDepartmentList, the department of the request must be one the IT Admin is in charge of (DEPARTMENT.OUT_OF_SCOPE); nothing is written.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -45340,13 +45383,24 @@
                         "requestId": "req_example"
                       }
                     }
+                  },
+                  "DEPARTMENT.OUT_OF_SCOPE": {
+                    "summary": "The request cannot be linked to the plan: DEPARTMENT_OUT_OF_SCOPE.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "DEPARTMENT.OUT_OF_SCOPE",
+                        "message": "The request cannot be linked to the plan: DEPARTMENT_OUT_OF_SCOPE.",
+                        "requestId": "req_example"
+                      }
+                    }
                   }
                 }
               }
             }
           },
           "404": {
-            "description": "The request does not exist, is not a proposal, or the caller has no part in it (ACCESS_REQUEST.NOT_FOUND).",
+            "description": "The request does not exist, is not a proposal, or the caller has no part in it (ACCESS_REQUEST.NOT_FOUND). Or the plan does not exist (ACCESS_REQUEST.PLAN_NOT_FOUND), or the department of the request does not (DEPARTMENT.NOT_FOUND).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -45369,6 +45423,17 @@
                       "error": {
                         "code": "ACCESS_REQUEST.PLAN_NOT_FOUND",
                         "message": "The plan does not exist.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "DEPARTMENT.NOT_FOUND": {
+                    "summary": "The department does not exist.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "DEPARTMENT.NOT_FOUND",
+                        "message": "The department does not exist.",
                         "requestId": "req_example"
                       }
                     }
@@ -45452,7 +45517,7 @@
             }
           },
           "422": {
-            "description": "The body is invalid (VALIDATION_ERROR).",
+            "description": "The body is invalid (VALIDATION_ERROR), or the catalog no longer offers what the list of the department would hold (DEPARTMENT_SOFTWARE.NOT_IN_CATALOG). Nothing is written.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -45465,6 +45530,18 @@
                         "code": "VALIDATION_ERROR",
                         "message": "Request validation failed.",
                         "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "DEPARTMENT_SOFTWARE.NOT_IN_CATALOG": {
+                    "summary": "The software is not in the catalog: ask for it as new software.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "DEPARTMENT_SOFTWARE.NOT_IN_CATALOG",
+                        "message": "The software is not in the catalog: ask for it as new software.",
+                        "details": { "places": [{ "applicationId": "application-id", "planId": "plan-id" }] },
                         "requestId": "req_example"
                       }
                     }
@@ -48876,6 +48953,13 @@
             "required": false,
             "in": "query",
             "schema": { "maximum": 100, "exclusiveMinimum": true, "default": 20, "type": "integer", "minimum": 0 }
+          },
+          {
+            "name": "departmentId",
+            "required": false,
+            "in": "query",
+            "description": "Only the proposals of this department; a department outside the departments the caller reads gives an empty page, not an error.",
+            "schema": { "format": "uuid", "type": "string" }
           }
         ],
         "responses": {
@@ -49023,6 +49107,355 @@
         },
         "security": [{ "bearer": [] }],
         "summary": "List the proposals waiting for IT assessment",
+        "tags": ["access-requests"]
+      }
+    },
+    "/api/v1/assessment-queue/departments": {
+      "get": {
+        "operationId": "assessmentQueueDepartmentList",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maximum": 9007199254740991,
+              "exclusiveMinimum": true,
+              "default": 1,
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": { "maximum": 100, "exclusiveMinimum": true, "default": 20, "type": "integer", "minimum": 0 }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The departments the caller reads (the ones they are IT Admin in charge of and the ones nobody who works is in charge of) that have proposals waiting for IT assessment, each with how many, the department with the most first. A department with none waiting is not listed. The same proposals as the list, counted: filter the list by departmentId to read one.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/AssessmentQueueDepartmentsResponseDto" },
+                    { "properties": { "message": { "example": "ASSESSMENT_QUEUE.DEPARTMENTS_LISTED" } } }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHENTICATION_REQUIRED": {
+                    "summary": "A Bearer access token is required.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHENTICATION_REQUIRED",
+                        "message": "A Bearer access token is required.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "INVALID_ACCESS_TOKEN": {
+                    "summary": "The access token is invalid.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "INVALID_ACCESS_TOKEN",
+                        "message": "The access token is invalid.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only an IT Admin reads the proposals that wait for IT assessment.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHORIZATION.FORBIDDEN": {
+                    "summary": "You do not have permission to perform this action.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHORIZATION.FORBIDDEN",
+                        "message": "You do not have permission to perform this action.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The query is invalid (VALIDATION_ERROR).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "VALIDATION_ERROR": {
+                    "summary": "Request validation failed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "VALIDATION_ERROR",
+                        "message": "Request validation failed.",
+                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_TOO_MANY_REQUESTS": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_TOO_MANY_REQUESTS",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "TOKEN_VERIFICATION_UNAVAILABLE": {
+                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
+                        "message": "Authentication is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SERVICE_UNAVAILABLE": {
+                    "summary": "The service is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SERVICE_UNAVAILABLE",
+                        "message": "The service is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "bearer": [] }],
+        "summary": "Count the proposals waiting for IT assessment by department",
+        "tags": ["access-requests"]
+      }
+    },
+    "/api/v1/assessment-decisions": {
+      "get": {
+        "operationId": "assessmentDecisionList",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maximum": 9007199254740991,
+              "exclusiveMinimum": true,
+              "default": 1,
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": { "maximum": 100, "exclusiveMinimum": true, "default": 20, "type": "integer", "minimum": 0 }
+          },
+          {
+            "name": "departmentId",
+            "required": false,
+            "in": "query",
+            "description": "Only the proposals of this department; a department outside the departments the caller reads gives an empty page.",
+            "schema": { "format": "uuid", "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The proposals whose assessment has been decided, in the departments the caller reads, the newest decision first: completed (the request went on to the spend decision) or refused at the gate. Each says what the software is, who asked, who decided and when, how it ended and, for a refusal, its kind and the reason. The assessment itself is read by the route of the request.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/AssessmentDecisionsResponseDto" },
+                    { "properties": { "message": { "example": "ASSESSMENT_DECISIONS.LISTED" } } }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHENTICATION_REQUIRED": {
+                    "summary": "A Bearer access token is required.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHENTICATION_REQUIRED",
+                        "message": "A Bearer access token is required.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "INVALID_ACCESS_TOKEN": {
+                    "summary": "The access token is invalid.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "INVALID_ACCESS_TOKEN",
+                        "message": "The access token is invalid.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only an IT Admin reads the decided assessments.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHORIZATION.FORBIDDEN": {
+                    "summary": "You do not have permission to perform this action.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHORIZATION.FORBIDDEN",
+                        "message": "You do not have permission to perform this action.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The query is invalid (VALIDATION_ERROR).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "VALIDATION_ERROR": {
+                    "summary": "Request validation failed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "VALIDATION_ERROR",
+                        "message": "Request validation failed.",
+                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_TOO_MANY_REQUESTS": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_TOO_MANY_REQUESTS",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "TOKEN_VERIFICATION_UNAVAILABLE": {
+                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
+                        "message": "Authentication is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SERVICE_UNAVAILABLE": {
+                    "summary": "The service is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SERVICE_UNAVAILABLE",
+                        "message": "The service is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "bearer": [] }],
+        "summary": "List the assessments IT has decided",
         "tags": ["access-requests"]
       }
     },
@@ -98912,9 +99345,17 @@
                         "exclusiveMinimum": true,
                         "maximum": 9007199254740991,
                         "minimum": 0
-                      }
+                      },
+                      "existingApplicationId": { "type": "string", "format": "uuid", "nullable": true }
                     },
-                    "required": ["softwareName", "homepageUrl", "purpose", "dataDescription", "expectedUsers"],
+                    "required": [
+                      "softwareName",
+                      "homepageUrl",
+                      "purpose",
+                      "dataDescription",
+                      "expectedUsers",
+                      "existingApplicationId"
+                    ],
                     "additionalProperties": false,
                     "nullable": true
                   },
@@ -99486,9 +99927,17 @@
                         "exclusiveMinimum": true,
                         "maximum": 9007199254740991,
                         "minimum": 0
-                      }
+                      },
+                      "existingApplicationId": { "type": "string", "format": "uuid", "nullable": true }
                     },
-                    "required": ["softwareName", "homepageUrl", "purpose", "dataDescription", "expectedUsers"],
+                    "required": [
+                      "softwareName",
+                      "homepageUrl",
+                      "purpose",
+                      "dataDescription",
+                      "expectedUsers",
+                      "existingApplicationId"
+                    ],
                     "additionalProperties": false,
                     "nullable": true
                   },
@@ -100463,9 +100912,17 @@
                             "exclusiveMinimum": true,
                             "maximum": 9007199254740991,
                             "minimum": 0
-                          }
+                          },
+                          "existingApplicationId": { "type": "string", "format": "uuid", "nullable": true }
                         },
-                        "required": ["softwareName", "homepageUrl", "purpose", "dataDescription", "expectedUsers"],
+                        "required": [
+                          "softwareName",
+                          "homepageUrl",
+                          "purpose",
+                          "dataDescription",
+                          "expectedUsers",
+                          "existingApplicationId"
+                        ],
                         "additionalProperties": false,
                         "nullable": true
                       },
@@ -101087,6 +101544,17 @@
             "maximum": 9007199254740991,
             "description": "The time of use in whole months: required for a plan bought by the month (1 to 9); 1 to 12, or null for a right with no end, for a plan of seats or internal software (not for a contractor, a freelancer or an intern); none for a plan bought once.",
             "nullable": true
+          },
+          "existingApplicationId": {
+            "description": "Case B, short: the application of the catalog the software is already in, when only the plan asked for is missing; give it with plannedPlanName. Left out, the software is new to the company and is refused when the catalog already has it (ACCESS_REQUEST.SOFTWARE_IN_CATALOG).",
+            "type": "string",
+            "format": "uuid"
+          },
+          "plannedPlanName": {
+            "description": "Case B, short: the name of the plan asked for, which the application does not have yet; give it with existingApplicationId.",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
           }
         },
         "required": ["softwareName", "homepageUrl", "purpose", "dataDescription", "expectedUsers"],
@@ -101117,11 +101585,20 @@
                         "exclusiveMinimum": true,
                         "maximum": 9007199254740991,
                         "minimum": 0
-                      }
+                      },
+                      "existingApplicationId": { "type": "string", "format": "uuid", "nullable": true }
                     },
-                    "required": ["softwareName", "homepageUrl", "purpose", "dataDescription", "expectedUsers"],
+                    "required": [
+                      "softwareName",
+                      "homepageUrl",
+                      "purpose",
+                      "dataDescription",
+                      "expectedUsers",
+                      "existingApplicationId"
+                    ],
                     "additionalProperties": false
                   },
+                  "scope": { "type": "string", "enum": ["FULL", "PLAN_ONLY"] },
                   "step": {
                     "type": "object",
                     "properties": {
@@ -101401,6 +101878,7 @@
                   "requestId",
                   "status",
                   "proposal",
+                  "scope",
                   "step",
                   "classification",
                   "vendor",
@@ -101577,8 +102055,587 @@
       },
       "CatalogLinkBodyDto": {
         "type": "object",
-        "properties": { "planId": { "type": "string", "format": "uuid" } },
+        "properties": {
+          "planId": { "type": "string", "format": "uuid" },
+          "addToDepartmentList": {
+            "description": "True puts the application and the plan in the list of software of the department of the request, a guide for the next people who ask: the IT Admin must be in charge of that department. False or left out lists nothing.",
+            "type": "boolean"
+          }
+        },
         "required": ["planId"],
+        "additionalProperties": false
+      },
+      "CatalogLinkResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "enum": [true] },
+          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "request": {
+                "type": "object",
+                "properties": {
+                  "id": { "type": "string", "format": "uuid" },
+                  "type": { "type": "string", "enum": ["GRANT", "SERVICE_ACCOUNT", "RENEWAL", "GROUP_GRANT"] },
+                  "branch": { "type": "string", "enum": ["INTERNAL_FREE", "PAID_IN_CATALOG", "NEW_SOFTWARE"] },
+                  "state": {
+                    "type": "string",
+                    "enum": [
+                      "PENDING",
+                      "WAITING_CONTROLLED",
+                      "AWAITING_EXECUTION",
+                      "AWAITING_IT_ASSESSMENT",
+                      "AWAITING_SPEND_SUBMISSION",
+                      "AWAITING_SPEND_DECISION",
+                      "AWAITING_REQUESTER_REVISION",
+                      "REJECTED",
+                      "IT_REJECTED",
+                      "EXECUTING",
+                      "COMPLETED",
+                      "FAILED",
+                      "AWAITING_IT_CLOSE",
+                      "WITHDRAWN",
+                      "CANCELLED"
+                    ]
+                  },
+                  "routing": {
+                    "type": "object",
+                    "properties": {
+                      "mode": { "type": "string", "enum": ["VIA_HEAD", "ONE_STEP"] },
+                      "oneStepReason": {
+                        "type": "string",
+                        "enum": ["REQUESTER_IS_HEAD", "NO_DEPARTMENT_HEAD", "HEAD_LEFT", null],
+                        "nullable": true
+                      }
+                    },
+                    "required": ["mode", "oneStepReason"],
+                    "additionalProperties": false
+                  },
+                  "plan": {
+                    "type": "object",
+                    "properties": {
+                      "planId": { "type": "string", "format": "uuid" },
+                      "planName": { "type": "string" },
+                      "applicationId": { "type": "string", "format": "uuid" },
+                      "applicationName": { "type": "string" }
+                    },
+                    "required": ["planId", "planName", "applicationId", "applicationName"],
+                    "additionalProperties": false,
+                    "nullable": true
+                  },
+                  "proposal": {
+                    "type": "object",
+                    "properties": {
+                      "softwareName": { "type": "string" },
+                      "homepageUrl": { "type": "string" },
+                      "purpose": { "type": "string" },
+                      "dataDescription": { "type": "string" },
+                      "expectedUsers": {
+                        "type": "integer",
+                        "exclusiveMinimum": true,
+                        "maximum": 9007199254740991,
+                        "minimum": 0
+                      },
+                      "existingApplicationId": { "type": "string", "format": "uuid", "nullable": true }
+                    },
+                    "required": [
+                      "softwareName",
+                      "homepageUrl",
+                      "purpose",
+                      "dataDescription",
+                      "expectedUsers",
+                      "existingApplicationId"
+                    ],
+                    "additionalProperties": false,
+                    "nullable": true
+                  },
+                  "department": {
+                    "type": "object",
+                    "properties": {
+                      "id": { "type": "string", "format": "uuid" },
+                      "code": { "type": "string" },
+                      "name": { "type": "string" }
+                    },
+                    "required": ["id", "code", "name"],
+                    "additionalProperties": false
+                  },
+                  "costCenter": {
+                    "type": "object",
+                    "properties": { "id": { "type": "string", "format": "uuid" }, "code": { "type": "string" } },
+                    "required": ["id", "code"],
+                    "additionalProperties": false,
+                    "nullable": true
+                  },
+                  "requester": {
+                    "type": "object",
+                    "properties": {
+                      "employeeId": { "type": "string", "format": "uuid" },
+                      "employeeCode": { "type": "string" },
+                      "fullName": { "type": "string" }
+                    },
+                    "required": ["employeeId", "employeeCode", "fullName"],
+                    "additionalProperties": false
+                  },
+                  "beneficiary": {
+                    "type": "object",
+                    "properties": {
+                      "employeeId": { "type": "string", "format": "uuid" },
+                      "employeeCode": { "type": "string" },
+                      "fullName": { "type": "string" }
+                    },
+                    "required": ["employeeId", "employeeCode", "fullName"],
+                    "additionalProperties": false,
+                    "nullable": true
+                  },
+                  "lineCount": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "maximum": 9007199254740991,
+                    "minimum": 0
+                  },
+                  "businessReason": { "type": "string" },
+                  "termMonths": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "maximum": 9007199254740991,
+                    "nullable": true,
+                    "minimum": 0
+                  },
+                  "expectedEndDate": { "type": "string", "nullable": true },
+                  "serviceAccount": {
+                    "type": "object",
+                    "properties": {
+                      "purpose": { "type": "string" },
+                      "expectedIdentifier": { "type": "string" },
+                      "responsible": {
+                        "type": "object",
+                        "properties": {
+                          "employeeId": { "type": "string", "format": "uuid" },
+                          "employeeCode": { "type": "string" },
+                          "fullName": { "type": "string" }
+                        },
+                        "required": ["employeeId", "employeeCode", "fullName"],
+                        "additionalProperties": false
+                      },
+                      "boundary": {
+                        "type": "object",
+                        "properties": {
+                          "state": { "type": "string", "enum": ["PENDING", "ACCEPTED", "REJECTED"] },
+                          "reason": { "type": "string", "nullable": true },
+                          "decidedBy": {
+                            "type": "object",
+                            "properties": {
+                              "employeeId": { "type": "string", "format": "uuid" },
+                              "employeeCode": { "type": "string" },
+                              "fullName": { "type": "string" }
+                            },
+                            "required": ["employeeId", "employeeCode", "fullName"],
+                            "additionalProperties": false,
+                            "nullable": true
+                          },
+                          "decidedAt": { "type": "string", "format": "date-time", "nullable": true },
+                          "selfExecuted": { "type": "boolean" }
+                        },
+                        "required": ["state", "reason", "decidedBy", "decidedAt", "selfExecuted"],
+                        "additionalProperties": false
+                      }
+                    },
+                    "required": ["purpose", "expectedIdentifier", "responsible", "boundary"],
+                    "additionalProperties": false,
+                    "nullable": true
+                  },
+                  "limitExemption": {
+                    "type": "string",
+                    "enum": ["TRANSFER_GRACE", "ROLE_ENDED", null],
+                    "nullable": true
+                  },
+                  "renewal": {
+                    "type": "object",
+                    "properties": {
+                      "assignmentId": { "type": "string", "format": "uuid" },
+                      "previousExpectedEndDate": { "type": "string" },
+                      "newExpectedEndDate": { "type": "string", "nullable": true },
+                      "consecutiveMonths": {
+                        "type": "integer",
+                        "exclusiveMinimum": true,
+                        "maximum": 9007199254740991,
+                        "minimum": 0
+                      },
+                      "applied": {
+                        "type": "object",
+                        "properties": {
+                          "successorAssignmentId": { "type": "string", "format": "uuid" },
+                          "appliedAt": { "type": "string", "format": "date-time" }
+                        },
+                        "required": ["successorAssignmentId", "appliedAt"],
+                        "additionalProperties": false,
+                        "nullable": true
+                      }
+                    },
+                    "required": [
+                      "assignmentId",
+                      "previousExpectedEndDate",
+                      "newExpectedEndDate",
+                      "consecutiveMonths",
+                      "applied"
+                    ],
+                    "additionalProperties": false,
+                    "nullable": true
+                  },
+                  "spend": {
+                    "type": "object",
+                    "properties": {
+                      "stage": {
+                        "type": "string",
+                        "enum": [
+                          "NOT_SUBMITTED",
+                          "RETURNED_TO_REQUESTER",
+                          "RESERVE_CONFIRMATION",
+                          "BLOCKED",
+                          "WAITING_SPEND_DECISION",
+                          "REFUSED"
+                        ]
+                      },
+                      "blockedReasons": {
+                        "maxItems": 3,
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "enum": ["PRICE_EXPIRED", "NO_APPROVED_BUDGET", "OVER_RESERVE", "PRICE_MISSING"]
+                        }
+                      },
+                      "overBy": {
+                        "type": "object",
+                        "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                        "required": ["amount", "currency"],
+                        "additionalProperties": false,
+                        "nullable": true
+                      },
+                      "refusalReason": { "type": "string", "nullable": true }
+                    },
+                    "required": ["stage", "blockedReasons", "overBy", "refusalReason"],
+                    "additionalProperties": false,
+                    "nullable": true
+                  },
+                  "budgetYear": {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991,
+                    "nullable": true
+                  },
+                  "pricing": {
+                    "type": "object",
+                    "properties": {
+                      "status": { "type": "string", "enum": ["NOT_APPLICABLE", "PRICED", "MISSING"] },
+                      "missingReason": {
+                        "type": "string",
+                        "enum": ["NO_PRICED_SUBSCRIPTION", "CYCLE_UNKNOWN", "AMOUNT_TOO_LARGE", "AWAITING_QUOTE", null],
+                        "nullable": true
+                      },
+                      "amount": {
+                        "type": "object",
+                        "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                        "required": ["amount", "currency"],
+                        "additionalProperties": false,
+                        "nullable": true
+                      },
+                      "unitPrice": {
+                        "type": "object",
+                        "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                        "required": ["amount", "currency"],
+                        "additionalProperties": false,
+                        "nullable": true
+                      },
+                      "billingCycle": {
+                        "type": "string",
+                        "enum": ["MONTHLY", "QUARTERLY", "ANNUAL", "OTHER", null],
+                        "nullable": true
+                      },
+                      "kind": { "type": "string", "enum": ["RECURRING", "ONE_TIME", null], "nullable": true },
+                      "months": { "type": "integer", "minimum": 0, "maximum": 12, "nullable": true },
+                      "monthlyPrice": {
+                        "type": "object",
+                        "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                        "required": ["amount", "currency"],
+                        "additionalProperties": false,
+                        "nullable": true
+                      },
+                      "nextYearAmount": {
+                        "type": "object",
+                        "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                        "required": ["amount", "currency"],
+                        "additionalProperties": false,
+                        "nullable": true
+                      }
+                    },
+                    "required": [
+                      "status",
+                      "missingReason",
+                      "amount",
+                      "unitPrice",
+                      "billingCycle",
+                      "kind",
+                      "months",
+                      "monthlyPrice",
+                      "nextYearAmount"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "cost": {
+                    "type": "object",
+                    "properties": {
+                      "currentYear": {
+                        "type": "object",
+                        "properties": {
+                          "year": { "type": "integer", "minimum": -9007199254740991, "maximum": 9007199254740991 },
+                          "months": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "nullable": true
+                          },
+                          "amount": {
+                            "type": "object",
+                            "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                            "required": ["amount", "currency"],
+                            "additionalProperties": false
+                          }
+                        },
+                        "required": ["year", "months", "amount"],
+                        "additionalProperties": false
+                      },
+                      "nextYear": {
+                        "type": "object",
+                        "properties": {
+                          "from": { "type": "string", "description": "The first day of the year after, YYYY-MM-DD." },
+                          "months": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "nullable": true
+                          },
+                          "amount": {
+                            "type": "object",
+                            "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                            "required": ["amount", "currency"],
+                            "additionalProperties": false
+                          },
+                          "estimate": { "type": "boolean", "enum": [true] }
+                        },
+                        "required": ["from", "months", "amount", "estimate"],
+                        "additionalProperties": false,
+                        "nullable": true
+                      },
+                      "termCutAt": {
+                        "description": "The last day of the contract of a person with a term, when it cut the time of use short.",
+                        "type": "string",
+                        "nullable": true
+                      },
+                      "months": {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991,
+                        "description": "The months that have begun by the end of the term, each counted whole; null for a right with no end.",
+                        "nullable": true
+                      }
+                    },
+                    "required": ["currentYear", "nextYear", "termCutAt", "months"],
+                    "additionalProperties": false,
+                    "nullable": true
+                  },
+                  "policy": {
+                    "type": "object",
+                    "properties": {
+                      "version": {
+                        "type": "integer",
+                        "exclusiveMinimum": true,
+                        "maximum": 9007199254740991,
+                        "minimum": 0
+                      },
+                      "hasSpendStep": { "type": "boolean" },
+                      "slaWorkingDays": {
+                        "type": "integer",
+                        "exclusiveMinimum": true,
+                        "maximum": 9007199254740991,
+                        "minimum": 0
+                      }
+                    },
+                    "required": ["version", "hasSpendStep", "slaWorkingDays"],
+                    "additionalProperties": false
+                  },
+                  "submittedAt": { "type": "string", "format": "date-time" },
+                  "needStep": {
+                    "type": "object",
+                    "properties": {
+                      "id": { "type": "string", "format": "uuid" },
+                      "state": {
+                        "type": "string",
+                        "enum": ["PENDING", "WAITING", "APPROVED", "REJECTED", "CLOSED", "NOT_REQUIRED"]
+                      },
+                      "assignee": {
+                        "type": "object",
+                        "properties": {
+                          "employeeId": { "type": "string", "format": "uuid" },
+                          "employeeCode": { "type": "string" },
+                          "fullName": { "type": "string" }
+                        },
+                        "required": ["employeeId", "employeeCode", "fullName"],
+                        "additionalProperties": false,
+                        "nullable": true
+                      },
+                      "routingRow": { "type": "integer", "minimum": 1, "maximum": 9 },
+                      "waitingReason": {
+                        "type": "string",
+                        "enum": ["NO_SPENDING_APPROVER", "NO_DEPARTMENT_HEAD", null],
+                        "nullable": true
+                      },
+                      "slaWorkingDays": {
+                        "type": "integer",
+                        "exclusiveMinimum": true,
+                        "maximum": 9007199254740991,
+                        "nullable": true,
+                        "minimum": 0
+                      },
+                      "createdAt": { "type": "string", "format": "date-time" },
+                      "assignedAt": { "type": "string", "format": "date-time", "nullable": true },
+                      "decidedAt": { "type": "string", "format": "date-time", "nullable": true }
+                    },
+                    "required": [
+                      "id",
+                      "state",
+                      "assignee",
+                      "routingRow",
+                      "waitingReason",
+                      "slaWorkingDays",
+                      "createdAt",
+                      "assignedAt",
+                      "decidedAt"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "needDecision": {
+                    "type": "object",
+                    "properties": {
+                      "decision": { "type": "string", "enum": ["APPROVED", "REJECTED"] },
+                      "decidedBy": {
+                        "type": "object",
+                        "properties": {
+                          "employeeId": { "type": "string", "format": "uuid" },
+                          "employeeCode": { "type": "string" },
+                          "fullName": { "type": "string" }
+                        },
+                        "required": ["employeeId", "employeeCode", "fullName"],
+                        "additionalProperties": false
+                      },
+                      "deciderRole": { "type": "string", "enum": ["MANAGER", "SPENDING_APPROVER"] },
+                      "reason": { "type": "string", "nullable": true },
+                      "decidedAt": { "type": "string", "format": "date-time" }
+                    },
+                    "required": ["decision", "decidedBy", "deciderRole", "reason", "decidedAt"],
+                    "additionalProperties": false,
+                    "nullable": true
+                  },
+                  "withdrawal": {
+                    "type": "object",
+                    "properties": {
+                      "requestedBy": {
+                        "type": "object",
+                        "properties": {
+                          "employeeId": { "type": "string", "format": "uuid" },
+                          "employeeCode": { "type": "string" },
+                          "fullName": { "type": "string" }
+                        },
+                        "required": ["employeeId", "employeeCode", "fullName"],
+                        "additionalProperties": false
+                      },
+                      "requestedAt": { "type": "string", "format": "date-time" },
+                      "reason": { "type": "string", "nullable": true },
+                      "withdrawnAt": { "type": "string", "format": "date-time", "nullable": true }
+                    },
+                    "required": ["requestedBy", "requestedAt", "reason", "withdrawnAt"],
+                    "additionalProperties": false,
+                    "nullable": true
+                  },
+                  "cancellation": {
+                    "type": "object",
+                    "properties": {
+                      "cancelledBy": {
+                        "type": "object",
+                        "properties": {
+                          "employeeId": { "type": "string", "format": "uuid" },
+                          "employeeCode": { "type": "string" },
+                          "fullName": { "type": "string" }
+                        },
+                        "required": ["employeeId", "employeeCode", "fullName"],
+                        "additionalProperties": false,
+                        "nullable": true
+                      },
+                      "cancelledAt": { "type": "string", "format": "date-time" },
+                      "cause": {
+                        "type": "string",
+                        "enum": [
+                          "BENEFICIARY_LEFT",
+                          "BENEFICIARY_TRANSFERRED",
+                          "SYSTEM_BENEFICIARY_LEFT",
+                          "SYSTEM_BENEFICIARY_TRANSFERRED",
+                          "SYSTEM_SCOPE_REMOVED",
+                          "SPENDING_APPROVER_PARTY"
+                        ]
+                      },
+                      "note": { "type": "string", "nullable": true }
+                    },
+                    "required": ["cancelledBy", "cancelledAt", "cause", "note"],
+                    "additionalProperties": false,
+                    "nullable": true
+                  }
+                },
+                "required": [
+                  "id",
+                  "type",
+                  "branch",
+                  "state",
+                  "routing",
+                  "plan",
+                  "proposal",
+                  "department",
+                  "costCenter",
+                  "requester",
+                  "beneficiary",
+                  "lineCount",
+                  "businessReason",
+                  "termMonths",
+                  "expectedEndDate",
+                  "serviceAccount",
+                  "limitExemption",
+                  "renewal",
+                  "spend",
+                  "budgetYear",
+                  "pricing",
+                  "cost",
+                  "policy",
+                  "submittedAt",
+                  "needStep",
+                  "needDecision",
+                  "withdrawal",
+                  "cancellation"
+                ],
+                "additionalProperties": false
+              },
+              "departmentList": {
+                "type": "object",
+                "properties": { "entryId": { "type": "string", "format": "uuid" }, "added": { "type": "boolean" } },
+                "required": ["entryId", "added"],
+                "additionalProperties": false,
+                "nullable": true
+              }
+            },
+            "required": ["request", "departmentList"],
+            "additionalProperties": false,
+            "nullable": true
+          }
+        },
+        "required": ["success", "message", "data"],
         "additionalProperties": false
       },
       "BudgetCheckResponseDto": {
@@ -103656,6 +104713,7 @@
                       "enum": ["INTERNAL", "PAID_LICENSED", null],
                       "nullable": true
                     },
+                    "scope": { "type": "string", "enum": ["FULL", "PLAN_ONLY"] },
                     "readiness": {
                       "type": "string",
                       "enum": ["COMPLETABLE", "INCOMPLETE", "INTERNAL_BY_REGISTRATION", "UNCONTROLLABLE"]
@@ -103681,11 +104739,163 @@
                     "canAct",
                     "started",
                     "classification",
+                    "scope",
                     "readiness",
                     "missingCount",
                     "quote",
                     "slaWorkingDays",
                     "waitingSince"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "pagination": {
+                "type": "object",
+                "properties": {
+                  "page": { "type": "integer", "exclusiveMinimum": true, "maximum": 9007199254740991, "minimum": 0 },
+                  "pageSize": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "maximum": 9007199254740991,
+                    "minimum": 0
+                  },
+                  "totalItems": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                  "totalPages": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+                },
+                "required": ["page", "pageSize", "totalItems", "totalPages"],
+                "additionalProperties": false
+              }
+            },
+            "required": ["items", "pagination"],
+            "additionalProperties": false,
+            "nullable": true
+          }
+        },
+        "required": ["success", "message", "data"],
+        "additionalProperties": false
+      },
+      "AssessmentQueueDepartmentsResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "enum": [true] },
+          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "items": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "department": {
+                      "type": "object",
+                      "properties": { "id": { "type": "string", "format": "uuid" }, "name": { "type": "string" } },
+                      "required": ["id", "name"],
+                      "additionalProperties": false
+                    },
+                    "waiting": {
+                      "type": "integer",
+                      "exclusiveMinimum": true,
+                      "maximum": 9007199254740991,
+                      "minimum": 0
+                    }
+                  },
+                  "required": ["department", "waiting"],
+                  "additionalProperties": false
+                }
+              },
+              "pagination": {
+                "type": "object",
+                "properties": {
+                  "page": { "type": "integer", "exclusiveMinimum": true, "maximum": 9007199254740991, "minimum": 0 },
+                  "pageSize": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "maximum": 9007199254740991,
+                    "minimum": 0
+                  },
+                  "totalItems": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                  "totalPages": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+                },
+                "required": ["page", "pageSize", "totalItems", "totalPages"],
+                "additionalProperties": false
+              }
+            },
+            "required": ["items", "pagination"],
+            "additionalProperties": false,
+            "nullable": true
+          }
+        },
+        "required": ["success", "message", "data"],
+        "additionalProperties": false
+      },
+      "AssessmentDecisionsResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "enum": [true] },
+          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "items": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "requestId": { "type": "string", "format": "uuid" },
+                    "software": {
+                      "type": "object",
+                      "properties": { "name": { "type": "string" } },
+                      "required": ["name"],
+                      "additionalProperties": false
+                    },
+                    "requester": {
+                      "type": "object",
+                      "properties": {
+                        "employeeId": { "type": "string", "format": "uuid" },
+                        "employeeCode": { "type": "string" },
+                        "fullName": { "type": "string" }
+                      },
+                      "required": ["employeeId", "employeeCode", "fullName"],
+                      "additionalProperties": false
+                    },
+                    "department": {
+                      "type": "object",
+                      "properties": { "id": { "type": "string", "format": "uuid" }, "name": { "type": "string" } },
+                      "required": ["id", "name"],
+                      "additionalProperties": false
+                    },
+                    "scope": { "type": "string", "enum": ["FULL", "PLAN_ONLY"] },
+                    "result": { "type": "string", "enum": ["COMPLETED", "REJECTED"] },
+                    "rejectionKind": {
+                      "type": "string",
+                      "enum": ["UNCONTROLLABLE", "NOT_ELIGIBLE", null],
+                      "nullable": true
+                    },
+                    "reason": { "type": "string", "nullable": true },
+                    "decidedBy": {
+                      "type": "object",
+                      "properties": {
+                        "employeeId": { "type": "string", "format": "uuid" },
+                        "employeeCode": { "type": "string" },
+                        "fullName": { "type": "string" }
+                      },
+                      "required": ["employeeId", "employeeCode", "fullName"],
+                      "additionalProperties": false
+                    },
+                    "decidedAt": { "type": "string", "format": "date-time" }
+                  },
+                  "required": [
+                    "requestId",
+                    "software",
+                    "requester",
+                    "department",
+                    "scope",
+                    "result",
+                    "rejectionKind",
+                    "reason",
+                    "decidedBy",
+                    "decidedAt"
                   ],
                   "additionalProperties": false
                 }
@@ -104045,9 +105255,17 @@
                         "exclusiveMinimum": true,
                         "maximum": 9007199254740991,
                         "minimum": 0
-                      }
+                      },
+                      "existingApplicationId": { "type": "string", "format": "uuid", "nullable": true }
                     },
-                    "required": ["softwareName", "homepageUrl", "purpose", "dataDescription", "expectedUsers"],
+                    "required": [
+                      "softwareName",
+                      "homepageUrl",
+                      "purpose",
+                      "dataDescription",
+                      "expectedUsers",
+                      "existingApplicationId"
+                    ],
                     "additionalProperties": false,
                     "nullable": true
                   },
@@ -105235,9 +106453,17 @@
                         "exclusiveMinimum": true,
                         "maximum": 9007199254740991,
                         "minimum": 0
-                      }
+                      },
+                      "existingApplicationId": { "type": "string", "format": "uuid", "nullable": true }
                     },
-                    "required": ["softwareName", "homepageUrl", "purpose", "dataDescription", "expectedUsers"],
+                    "required": [
+                      "softwareName",
+                      "homepageUrl",
+                      "purpose",
+                      "dataDescription",
+                      "expectedUsers",
+                      "existingApplicationId"
+                    ],
                     "additionalProperties": false,
                     "nullable": true
                   },
