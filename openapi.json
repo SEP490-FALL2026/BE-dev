@@ -49600,7 +49600,7 @@
         },
         "responses": {
           "201": {
-            "description": "The holder of a right that has an end date, or the head of their department, asks for a later end. The end the right has is never edited: a request of its own is made for the same tool and the person, decided like any request (the need step and, for paid software, the spend step), and approval ends the old record at its end and begins a new one that follows it, so the seats taken on any day do not change. Sent up to the end of the right, today included, the right stays as it is until the request is decided, and a refusal or a withdrawal leaves it for the revocation that follows its end. A stay over twelve months in all, counting the records that followed one another, needs the confirmation of whoever confirms the need. Sent after the end, what is made is a request for the tool like any other (outcome NEW_REQUEST), sent by the person it is for.",
+            "description": "The holder of a right that has an end date asks to go on using it, for a number of months or with no end (a plan of seats or internal software, not for a person with a term). The end the right has is never edited: a request of its own is made for the same tool and the person, decided like any request (the need step and, for paid software, the spend step), and approval ends the old record at its end and begins a new one that follows it, so the seats taken on any day do not change. Sent up to the end of the right, today included, the right stays as it is until the request is decided, and a refusal or a withdrawal leaves it for the revocation that follows its end. A stay over twelve months in all, counting the records that followed one another, needs the confirmation of whoever confirms the need. Sent after the end, what is made is a request for the tool like any other (outcome NEW_REQUEST), sent by the person it is for.",
             "content": {
               "application/json": {
                 "schema": {
@@ -49719,7 +49719,7 @@
             }
           },
           "409": {
-            "description": "The seat cannot be renewed (RENEWAL_REQUEST.ASSIGNMENT_NOT_RENEWABLE, with the reason in details: it is a service account, another record follows it, it has ended, it has no end date, its grant is not done, or it is being revoked), it already has a renewal waiting (RENEWAL_REQUEST.ALREADY_REQUESTED), its window is not open yet (RENEWAL_REQUEST.WINDOW_NOT_OPEN, with details.opensOn and details.windowDays: a renewal is sent from RENEWAL_WINDOW_DAYS days before the approved end, BR-MF1-08a), the application is retired (ACCESS_REQUEST.APPLICATION_RETIRED) or, after the end, the person holds another seat of the tool (ACCESS_REQUEST.ALREADY_HOLDS_ACCESS). After the end the ask is a request for new access, so GH-1 judges it too (ACCESS_REQUEST.OPEN_REQUEST_EXISTS). Nothing is written.",
+            "description": "The seat cannot be renewed (RENEWAL_REQUEST.ASSIGNMENT_NOT_RENEWABLE, with the reason in details: it is a service account, another record follows it, it has ended, it has no end date, its grant is not done, or it is being revoked), it already has a renewal waiting (RENEWAL_REQUEST.ALREADY_REQUESTED), the application is retired (ACCESS_REQUEST.APPLICATION_RETIRED) or, after the end, the person holds another seat of the tool (ACCESS_REQUEST.ALREADY_HOLDS_ACCESS). After the end the ask is a request for new access, so GH-1 judges it too (ACCESS_REQUEST.OPEN_REQUEST_EXISTS). Nothing is written.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -49743,18 +49743,6 @@
                       "error": {
                         "code": "RENEWAL_REQUEST.ALREADY_REQUESTED",
                         "message": "The renewal is refused: ALREADY_REQUESTED.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "RENEWAL_REQUEST.WINDOW_NOT_OPEN": {
-                    "summary": "The renewal can be sent only from the day its window opens.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "RENEWAL_REQUEST.WINDOW_NOT_OPEN",
-                        "message": "The renewal can be sent only from the day its window opens.",
-                        "details": { "opensOn": "2026-12-01", "windowDays": 30 },
                         "requestId": "req_example"
                       }
                     }
@@ -49869,7 +49857,7 @@
             }
           },
           "422": {
-            "description": "The form is incomplete or invalid (VALIDATION_ERROR): the seat, the new end date (newEndDate; or, deprecated, the months more extensionMonths 1 to 12, exactly one of the two) and the reason are required, and nothing else is taken. The new end must be after the end the right has and at most twelve months after it (RENEWAL_REQUEST.END_DATE_OUT_OF_RANGE, with details.previousEndDate and details.maxEndDate). The sender or the holder of the seat is the spending approver (REQUEST_PARTY.INELIGIBLE). After the end the ask is a request for new access, so GH-2 judges it too: a person who was already named in as many requests for new access this calendar week (Monday to Sunday, organization time zone; a request withdrawn or refused still counts) as the weekly limit allows is refused until the next Monday (ACCESS_REQUEST.OPEN_LIMIT_REACHED, details.limit and details.resetsOn; GH-2, BR-MF1-01f). Nothing is written.",
+            "description": "The form is incomplete or invalid (VALIDATION_ERROR): the seat, the reason and exactly one of the months of use to go on (extensionMonths) and a right with no end (longTerm: true) are required, and nothing else is taken (an end date is not given: the system works it out). The window of the renewal is not open yet (RENEWAL_REQUEST.WINDOW_NOT_OPEN, with details.opensOn and details.windowDays: a renewal is sent from RENEWAL_WINDOW_DAYS days before the approved end, BR-MF1-08a). The months follow the kind of the plan: 1 to 9 for a plan bought by the month (ACCESS_REQUEST.TERM_MONTHS_OUT_OF_RANGE), 1 to 12 for the others; a right with no end is for a plan of seats or internal software only (ACCESS_REQUEST.TERM_REQUIRED for a plan bought by the month) and never for a contractor, a freelancer or an intern (ACCESS_REQUEST.TERM_LONG_TERM_NOT_ALLOWED), whose new period is cut at the end of their contract instead; a plan bought once is not renewed (ACCESS_REQUEST.TERM_NOT_ASKED). The sender or the holder of the seat is the spending approver (REQUEST_PARTY.INELIGIBLE). After the end the ask is a request for new access, so GH-2 judges it too: a person who was already named in as many requests for new access this calendar week (Monday to Sunday, organization time zone; a request withdrawn or refused still counts) as the weekly limit allows is refused until the next Monday (ACCESS_REQUEST.OPEN_LIMIT_REACHED, details.limit and details.resetsOn; GH-2, BR-MF1-01f). A renewal sent in time is not counted by GH-2. Nothing is written.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -49882,6 +49870,62 @@
                         "code": "VALIDATION_ERROR",
                         "message": "Request validation failed.",
                         "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "RENEWAL_REQUEST.WINDOW_NOT_OPEN": {
+                    "summary": "The renewal can be sent only from the day its window opens.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "RENEWAL_REQUEST.WINDOW_NOT_OPEN",
+                        "message": "The renewal can be sent only from the day its window opens.",
+                        "details": { "opensOn": "2026-12-01", "windowDays": 30 },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "ACCESS_REQUEST.TERM_REQUIRED": {
+                    "summary": "Give the time of use in months.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "ACCESS_REQUEST.TERM_REQUIRED",
+                        "message": "Give the time of use in months.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "ACCESS_REQUEST.TERM_MONTHS_OUT_OF_RANGE": {
+                    "summary": "The time of use is a whole number of months: from 1 to 9 for a plan bought by the month, from 1 to 12 for the others.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "ACCESS_REQUEST.TERM_MONTHS_OUT_OF_RANGE",
+                        "message": "The time of use is a whole number of months: from 1 to 9 for a plan bought by the month, from 1 to 12 for the others.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "ACCESS_REQUEST.TERM_NOT_ASKED": {
+                    "summary": "This plan is bought once: it takes no time of use.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "ACCESS_REQUEST.TERM_NOT_ASKED",
+                        "message": "This plan is bought once: it takes no time of use.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "ACCESS_REQUEST.TERM_LONG_TERM_NOT_ALLOWED": {
+                    "summary": "A contractor, a freelancer or an intern gets access for a term: give the months, not a right with no end.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "ACCESS_REQUEST.TERM_LONG_TERM_NOT_ALLOWED",
+                        "message": "A contractor, a freelancer or an intern gets access for a term: give the months, not a right with no end.",
                         "requestId": "req_example"
                       }
                     }
@@ -49910,18 +49954,6 @@
                         "code": "ACCESS_REQUEST.OPEN_LIMIT_REACHED",
                         "message": "The person was already named in as many requests for new access this week as they may.",
                         "details": { "limit": 10, "resetsOn": "2026-11-16" },
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "RENEWAL_REQUEST.END_DATE_OUT_OF_RANGE": {
-                    "summary": "The new end date must be after the current end date and at most twelve months after it.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "RENEWAL_REQUEST.END_DATE_OUT_OF_RANGE",
-                        "message": "The new end date must be after the current end date and at most twelve months after it.",
-                        "details": { "previousEndDate": "2026-12-31", "maxEndDate": "2027-12-31" },
                         "requestId": "req_example"
                       }
                     }
@@ -98726,7 +98758,7 @@
                     "properties": {
                       "assignmentId": { "type": "string", "format": "uuid" },
                       "previousExpectedEndDate": { "type": "string" },
-                      "newExpectedEndDate": { "type": "string" },
+                      "newExpectedEndDate": { "type": "string", "nullable": true },
                       "consecutiveMonths": {
                         "type": "integer",
                         "exclusiveMinimum": true,
@@ -99300,7 +99332,7 @@
                     "properties": {
                       "assignmentId": { "type": "string", "format": "uuid" },
                       "previousExpectedEndDate": { "type": "string" },
-                      "newExpectedEndDate": { "type": "string" },
+                      "newExpectedEndDate": { "type": "string", "nullable": true },
                       "consecutiveMonths": {
                         "type": "integer",
                         "exclusiveMinimum": true,
@@ -100277,7 +100309,7 @@
                         "properties": {
                           "assignmentId": { "type": "string", "format": "uuid" },
                           "previousExpectedEndDate": { "type": "string" },
-                          "newExpectedEndDate": { "type": "string" },
+                          "newExpectedEndDate": { "type": "string", "nullable": true },
                           "consecutiveMonths": {
                             "type": "integer",
                             "exclusiveMinimum": true,
@@ -103573,12 +103605,8 @@
         "type": "object",
         "properties": {
           "assignmentId": { "type": "string", "format": "uuid" },
-          "newEndDate": {
-            "type": "string",
-            "format": "date",
-            "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."
-          },
-          "extensionMonths": { "type": "integer", "minimum": 1, "maximum": 12 },
+          "extensionMonths": { "type": "integer", "minimum": -9007199254740991, "maximum": 9007199254740991 },
+          "longTerm": { "type": "boolean", "enum": [true] },
           "businessReason": { "type": "string", "minLength": 1, "maxLength": 1000 }
         },
         "required": ["assignmentId", "businessReason"],
@@ -103767,7 +103795,7 @@
                     "properties": {
                       "assignmentId": { "type": "string", "format": "uuid" },
                       "previousExpectedEndDate": { "type": "string" },
-                      "newExpectedEndDate": { "type": "string" },
+                      "newExpectedEndDate": { "type": "string", "nullable": true },
                       "consecutiveMonths": {
                         "type": "integer",
                         "exclusiveMinimum": true,
@@ -104957,7 +104985,7 @@
                     "properties": {
                       "assignmentId": { "type": "string", "format": "uuid" },
                       "previousExpectedEndDate": { "type": "string" },
-                      "newExpectedEndDate": { "type": "string" },
+                      "newExpectedEndDate": { "type": "string", "nullable": true },
                       "consecutiveMonths": {
                         "type": "integer",
                         "exclusiveMinimum": true,
