@@ -19,6 +19,9 @@
   **`test:e2e`** · `test:integration:timing` · `test:flows` · `seed:local` DB sạch. Suite đỏ do tải ⟹ chạy lại đúng suite `--maxWorkers=2`,
   ghi cả hai. Báo bảng job → lệnh → kết quả → commit; job chưa chạy phải nói rõ. (Đêm 13–14/11 tôi bỏ sót `test:e2e` và không chạy lại sau
   commit seed ⟹ CI đỏ, Owner phải sửa.)
+- **Owner chỉ đọc `OVERNIGHT-DECISIONS.md` của từng SPEC** (mf2-mf3, fe-feedback). Các file khác trong `docs/reviews/…` (AUDIT*, HANDOFF*,
+  SPEC/PLAN, R*) là tài liệu làm việc của chat Opus/Sonnet — Owner không đọc. Vì vậy mọi thứ Owner cần quyết hoặc cần biết (điểm chờ chốt,
+  điểm audit đã sửa, lưu ý demo, lỗ hổng sản phẩm) phải được chép/tóm vào đầu `OVERNIGHT-DECISIONS.md` của SPEC đó.
 - **Ghi chép một chỗ:** mọi điểm Sonnet tự chốt (D-n), câu hỏi tự trả lời, finding Optional/Nit để lại, "chưa làm" ⟹ **một file**
   `OVERNIGHT-DECISIONS.md` của SPEC đó (section "Bảng review cho Owner" + "Optional và việc để lại"), để Owner review và FE tra lỗi.
 - **Review từng đợt** (Owner 14/11): sau mỗi nhóm gói ⟹ review/verify kỹ (5 trục: nghiệp vụ/luồng/BR theo QĐ mới nhất, đúng đắn, kiến trúc,
@@ -77,7 +80,8 @@ POLICY-SEED-DRAFT, **PROMPT-3-NIGHT.md**, SONNET-PROMPTS, file này), `be-bugfix
      `audit-tools/review-brief.md` (đọc qua `git diff/show`, file `AUDIT-P3-Bn-x.md`), tự đọc migration/phân quyền, gửi FIX-Bn.
   4. Khi "PROMPT 3 XONG": rà D-n còn lại + file OVERNIGHT, full CI (§1) trên `feat/fe-feedback`, viết `fe-feedback-2026-11-11/AUDIT.md`, sinh
      lại tài liệu API FE (Docs, commit), cập nhật memory.
-- **Prompt 4 (rút gọn, soạn khi prompt 3 xong, Owner duyệt):** Z2 seed (ngân sách mới, chính sách, hóa đơn, logo; sửa seed đỏ do bỏ tỷ giá),
+- **Prompt 4 = audit TOÀN BỘ code + chức năng đã làm theo cả ba SPEC (bug-fix, MF-2/MF-3, feedback FE): logic, nghiệp vụ, luồng/BR theo QĐ
+  mới nhất, kiến trúc** — rồi các việc pha cuối. Soạn khi prompt 3 xong, Owner duyệt: Z2 seed (ngân sách mới, chính sách, hóa đơn, logo; sửa seed đỏ do bỏ tỷ giá),
   sửa test đỏ, gọi API thật theo DEMO-1…15 + kịch bản MF-2/MF-3, full CI một lần, `HANDOFF-REVIEW.md`. Phần MF-2/MF-3 và seed Z đã xong.
 
 ## 5. Chờ Owner chốt (sáng)
