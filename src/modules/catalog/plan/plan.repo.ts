@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '../../../generated/prisma/client';
 import { fromDateColumn, toDateColumn } from '../../../core/business-date';
-import type { PlanRevocationInfo, PlanSummary, WorkspaceDuty } from '../public/catalog.types';
+import type { PlanRevocationInfo, PlanSummary, PlanSummaryWithLogo, WorkspaceDuty } from '../public/catalog.types';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { escapeLikePattern } from '../../../core/search-key';
@@ -232,6 +232,17 @@ export class PlanRepo {
 
   /** The plans with these ids, as far as they exist, with the name and the logo of their application; `tx` reads in the caller's transaction, which sees the plans it made. */
   async findSummaries(ids: readonly string[], tx?: DbTx): Promise<PlanSummary[]> {
+    // Only the fields of a summary: a view that answers the object whole must not carry the logo it did not ask for.
+    return (await this.findSummariesWithLogo(ids, tx)).map((row) => ({
+      planId: row.planId,
+      planName: row.planName,
+      applicationId: row.applicationId,
+      applicationName: row.applicationName,
+    }));
+  }
+
+  /** The same with the logo of the application, for a view that shows it beside the name (`CT-1`). */
+  async findSummariesWithLogo(ids: readonly string[], tx?: DbTx): Promise<PlanSummaryWithLogo[]> {
     if (ids.length === 0) return [];
     const rows = await (tx ?? this.prisma).plan.findMany({
       where: { id: { in: [...ids] } },

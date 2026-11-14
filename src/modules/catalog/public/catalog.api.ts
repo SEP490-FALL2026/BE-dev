@@ -10,6 +10,7 @@ import type {
   CatalogOnboardingFacts,
   PlanRevocationInfo,
   PlanSummary,
+  PlanSummaryWithLogo,
   PlanUsageRate,
   PoolSubscription,
   RuleSubscription,
@@ -133,6 +134,11 @@ export class CatalogApi {
   /** The plans with these ids by name, with their application, as far as they exist; `tx` reads in the caller's transaction, which sees the plans it made. */
   getPlanSummaries(ids: readonly string[], tx?: DbTx): Promise<PlanSummary[]> {
     return this.onboarding.planSummaries(ids, tx);
+  }
+
+  /** The same with the logo of the application of each plan (the https link the IT Admin pasted, or null), in the same read. */
+  getPlanSummariesWithLogo(ids: readonly string[], tx?: DbTx): Promise<PlanSummaryWithLogo[]> {
+    return this.plans.summariesWithLogo(ids, tx);
   }
 
   /**

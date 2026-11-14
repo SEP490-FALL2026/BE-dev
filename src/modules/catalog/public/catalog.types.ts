@@ -117,12 +117,16 @@ export interface CatalogEntryMatch {
   entry: CatalogEntry;
 }
 
-/** A plan and the application it belongs to, by name, for the views that list seats; the logo link is the one the IT Admin pasted, never checked. */
+/** A plan and the application it belongs to, by name, for the views that list seats. */
 export interface PlanSummary {
   planId: string;
   planName: string;
   applicationId: string;
   applicationName: string;
+}
+
+/** A plan summary with the logo of its application: the https link the IT Admin pasted, never checked, or null (`CT-1`). */
+export interface PlanSummaryWithLogo extends PlanSummary {
   applicationLogoUrl: string | null;
 }
 

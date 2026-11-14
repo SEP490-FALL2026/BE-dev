@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { Page, pageOf } from '../../../core/application/pagination';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { CatalogApi } from '../../catalog/public/catalog.api';
-import type { PlanSummary } from '../../catalog/public/catalog.types';
+import type { PlanSummaryWithLogo } from '../../catalog/public/catalog.types';
 import { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
 import type { GrantExecution } from '../../licensing/public/licensing-open-grants.types';
 import { LicensingOpenGrantsApi } from '../../licensing/public/licensing-open-grants.api';
@@ -15,7 +15,7 @@ import { executionOf } from './grant-queue.mapper';
 import { GrantQueueRepo, type GrantQueueState, type WaitingRequestRow } from './grant-queue.repo';
 
 const emptyLookups = {
-  plans: new Map<string, PlanSummary>(),
+  plans: new Map<string, PlanSummaryWithLogo>(),
   departments: new Map<string, DepartmentBrief>(),
   stocks: new Map<string, PlanStock>(),
   tasks: new Map<string, GrantExecution[]>(),
@@ -104,7 +104,7 @@ export class GrantQueueService {
     const planIds = [...new Set(rows.map((row) => row.planId))];
     const begun = [...new Set(rows.filter((row) => row.state !== 'WAITING').map((row) => row.id))];
     const [plans, people, departments, stocks, executions] = await Promise.all([
-      this.catalog.getPlanSummaries(planIds),
+      this.catalog.getPlanSummariesWithLogo(planIds),
       this.organizationReads.getEmployees([
         ...new Set(rows.flatMap((row) => [row.requesterEmployeeId, row.beneficiaryEmployeeId])),
       ]),
