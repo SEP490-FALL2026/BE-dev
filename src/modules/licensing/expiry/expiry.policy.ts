@@ -37,6 +37,45 @@ export function reminderRange(today: BusinessDate): { from: BusinessDate; to: Bu
   return { from: today, to: addDays(today, REMINDER_LEAD_DAYS) };
 }
 
+/** The day the reminder of an end date is due: seven days before it (`US-03-05` AC-1, `QĐ-111l`). A pass that comes later still tells, up to the end. */
+export function reminderDayOf(expectedEndDate: BusinessDate): BusinessDate {
+  return addDays(expectedEndDate, -REMINDER_LEAD_DAYS);
+}
+
+/** The day the system opens the revocation of a right that was not renewed: the day after its end, at the start of it (`US-03-05` AC-2, `QĐ-111l`). */
+export function revocationOpensOn(expectedEndDate: BusinessDate): BusinessDate {
+  return addDays(expectedEndDate, 1);
+}
+
+/** What the expiry needs to know of a renewal request that has not ended: whether it was approved (the IT Admin has still to extend the right). */
+export interface RenewalFacts {
+  approved: boolean;
+}
+
+/**
+ * Whether the reminder of the end the right has is held back (R-27): a renewal that was approved moves the end, so the reminder of the
+ * old end would tell the wrong day; the reminders follow the new end once the right is extended. A renewal still waiting for its decision
+ * holds nothing back: the holder and the head are still told, with the choice to renew or let the right end (`US-03-05` AC-1, AC-12).
+ */
+export function reminderHeldBack(renewal: RenewalFacts | null): boolean {
+  return renewal !== null && renewal.approved;
+}
+
+/**
+ * Whether the system opens the revocation of a right today (`US-03-05` AC-2, AC-14, `QĐ-111l`, R-13): its end day has passed, no renewal waits
+ * for a decision or for the IT Admin to extend the right (a renewal sent in time keeps the right as `QĐ-108*` says, and the revocation
+ * follows if it is refused or withdrawn), and no revocation of the expiry was ever opened for it: the system asks once, and what the IT Admin
+ * made of that task (closed as failed, for one) is theirs, who may start it again by the queue.
+ */
+export function systemRevocationOwed(input: {
+  expectedEndDate: BusinessDate;
+  today: BusinessDate;
+  renewal: RenewalFacts | null;
+  revocationEver: boolean;
+}): boolean {
+  return isExpired(input.expectedEndDate, input.today) && input.renewal === null && !input.revocationEver;
+}
+
 export interface ReminderRecipients {
   holderEmployeeId: string;
   /** The head of the department of the holder today; null when it has none: then nobody takes the part of the head (`QĐ-62c`). */

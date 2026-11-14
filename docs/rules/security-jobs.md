@@ -87,6 +87,16 @@
   a failed pass only logs. It only tells: the right stays in force, nothing is revoked or renewed
   by the calendar, and the queue of the rights that have ended is read from the assignments, not stored. Run one by hand with
   `ExpiryReminderService.noticeDue(now)`.
+  The API also runs `ExpiryRevocationSweeper` once an hour (the first pass five minutes after start, unreferenced timer): the start of the day after the end
+  of a right (`QĐ-111l`, `US-03-05` AC-2, AC-14) it asks the one gate that opens a revocation (`RevocationService.open`) for every open personal right whose end
+  day has passed and for which no revocation of the expiry was ever opened and no live revocation of another source is working: the source
+  `TIME_LIMITED_EXPIRY`, the system as the actor (`SystemActor`, the task is marked `created_by_system` and the audit event `PROVISIONING_TASK.REVOCATION_OPENED` says
+  `SYSTEM`), `referenceKind ASSIGNMENT_END_DATE` and the right as the reference, in the queue of the IT Admin in charge of the holder's department today. A right whose
+  renewal waits for its decision or for the IT Admin to extend it (`RenewalHoldHook.pendingRenewalsOf`) is left alone (R-13); when the renewal is refused or withdrawn the
+  next pass opens the task. The key that makes it once for a right is the reason row of the task (`provisioning_task_reasons`, source `TIME_LIMITED_EXPIRY`), so two
+  instances, a pass run again and the IT Admin who starts the task from the queue never make a second task or reason (the gate locks the seat and adds none), and a task
+  the IT Admin closed as failed is not opened again by the pass. Each right has a transaction of its own; one that fails is logged and tried again at the next pass without
+  stopping the others. It takes nothing away (`SoD-6`): the right stays in force until the IT Admin completes the task. Run one by hand with `ExpiryRevocationService.openDue(now)`.
   The API also runs `NoticeOverdueSweeper` once an hour (the first pass five minutes after start, unreferenced timer): for each notice of a
   department head that still waits for the IT Admin past its day (`personnel_notices.due_on`, fixed when it was sent from
   `PERSONNEL_NOTICE_REVIEW_WORKING_DAYS`) it sets `overdue_noticed_at` and writes the audit event `PERSONNEL_NOTICE.OVERDUE` in one

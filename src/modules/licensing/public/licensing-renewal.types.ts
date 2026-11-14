@@ -48,4 +48,6 @@ export interface PendingRenewal {
   requestId: string;
   /** The state of the request, as the module of requests names it. */
   state: string;
+  /** The request was approved and the IT Admin has still to extend the right: the end it moves to is not written yet (R-27). */
+  approved: boolean;
 }

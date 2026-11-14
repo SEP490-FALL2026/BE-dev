@@ -1,5 +1,6 @@
 import request from 'supertest';
 import { ExpiryReminderService } from '../../src/modules/licensing/expiry/expiry-reminder.service';
+import { ExpiryRevocationService } from '../../src/modules/licensing/expiry/expiry-revocation.service';
 import type { PendingRenewal } from '../../src/modules/licensing/public/licensing-renewal.types';
 import { RenewalHoldReader } from '../../src/modules/requests/renewal-request/renewal-hold.listener';
 import type { ApiAccount } from './api-accounts';
@@ -53,6 +54,9 @@ export class ExpiryHarness extends ReturnHarness {
 
   /** The hourly pass, run by hand as if it were `now`; returns how many reminders were new. */
   noticeDue = (now?: Date): Promise<number> => this.ctx.app.get(ExpiryReminderService).noticeDue(now);
+
+  /** The pass that opens the revocation of the rights that ended, run by hand as if it were `now`; returns how many tasks it opened or added a reason to. */
+  openDue = (now?: Date): Promise<number> => this.ctx.app.get(ExpiryRevocationService).openDue(now);
 
   /** The rows of the queue, every page, as the route answers for the IT Admin. */
   async queueRows(query = ''): Promise<ExpiredRightWire[]> {

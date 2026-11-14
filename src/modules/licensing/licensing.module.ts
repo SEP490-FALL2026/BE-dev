@@ -50,6 +50,9 @@ import { ExpiryReminderSweeper } from './expiry/expiry-reminder.job';
 import { ExpiryRenewalWindowSweeper } from './expiry/expiry-renewal-window.job';
 import { ExpiryRenewalWindowRepo } from './expiry/expiry-renewal-window.repo';
 import { ExpiryRenewalWindowService } from './expiry/expiry-renewal-window.service';
+import { ExpiryRevocationRepo } from './expiry/expiry-revocation.repo';
+import { ExpiryRevocationService } from './expiry/expiry-revocation.service';
+import { ExpiryRevocationSweeper } from './expiry/expiry-revocation.job';
 import { ProvisioningExtensionService } from './provisioning/tasks/provisioning-extension.service';
 import { LicensingAlerts } from './licensing-alerts.service';
 import { LicenseKeyCipher, parsePreviousVaultKeys } from './license-key/license-key-cipher.service';
@@ -241,6 +244,9 @@ import { SubscriptionRenewalsController } from './subscription-renewal/subscript
     ExpiryRenewalWindowRepo,
     ExpiryRenewalWindowService,
     ExpiryRenewalWindowSweeper,
+    ExpiryRevocationRepo,
+    ExpiryRevocationService,
+    ExpiryRevocationSweeper,
     ProvisioningExtensionService,
     ExpiryQueueRepo,
     ExpiryQueueService,

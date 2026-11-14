@@ -155,7 +155,7 @@ describe('the rights that ended and the IT Admin queue (integration, real Postgr
   describe('a renewal sent in time keeps the right waiting (AC-6, AC-7, AC-8)', () => {
     it('waits while the renewal is undecided, refuses to start, and starts once it is refused or withdrawn (AC-6, AC-7)', async () => {
       const { unit, assignmentId } = await right(2);
-      const waiting = new Map([[assignmentId, { requestId: randomUUID(), state: 'PENDING' }]]);
+      const waiting = new Map([[assignmentId, { requestId: randomUUID(), state: 'PENDING', approved: false }]]);
       const restore = h.waitingRenewals(waiting);
       try {
         const row = await h.queueRowOf(assignmentId);

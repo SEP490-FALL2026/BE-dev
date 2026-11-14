@@ -130,7 +130,10 @@ dịch vụ nào đọc cả ghế lẫn thu hồi thì đứng trên cả hai (
   (`revocation-tasks.controller.ts`), `grant-cancellation/`, `open-grants/`, `department-use/`, `k1-checklist/` (checklist thu hồi `K1`,
   `QĐ-111az`: biến thể `DEPARTURE` 6 mục / `STILL_EMPLOYED` 2 mục suy từ các lý do còn đứng, kiểm đủ tick + bằng chứng + `doneAt` không giảm theo
   `order`; cột `provisioning_tasks.k1_checklist`, codec `provisioning-k1-checklist.json.ts`; `RevocationAftermath.keepChecklist` gọi lúc hoàn tất).
-- `expiry/` — quyền đã hết hạn, nhắc trước 7 ngày (US-03-05); `expiry.controller.ts`; `expiry-reminder.job.ts`.
+- `expiry/` — quyền đã hết hạn, nhắc trước 7 ngày (US-03-05); `expiry.controller.ts`; `expiry-reminder.job.ts` (không nhắc quyền có Request tiếp tục
+  đã duyệt đang chờ IT kéo dài: ngày kết thúc sắp dời, R-27). Đầu ngày sau ngày kết thúc `expiry-revocation.job.ts` mở tác vụ thu hồi
+  `TIME_LIMITED_EXPIRY` do hệ thống tạo (`SystemActor`, `created_by_system`) qua cổng `RevocationService.open`: một lần cho mỗi quyền (khóa là dòng
+  lý do của tác vụ), bỏ qua quyền đang có Request tiếp tục chờ (R-13), IT Admin vẫn mở sớm được ở `POST /assignment-expiry-queue/{id}/revocation`.
   Cửa sổ Request tiếp tục (BR-MF1-08a): `expiry-renewal-window.job.ts` mỗi giờ ghi `assignment_renewal_windows` (số ngày lúc mở, bất biến)
   và báo người giữ + trưởng phòng một lần (`RENEWAL_WINDOW_OPENED`). Tác vụ `EXTEND` (`provisioning/tasks/provisioning-extension.service.ts`,
   mở qua `LicensingRenewalApi.openExtension`) hoàn tất ⟹ `GrantRequestGate.reportExtended`.
