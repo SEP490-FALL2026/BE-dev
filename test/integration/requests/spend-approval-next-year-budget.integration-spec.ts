@@ -130,6 +130,19 @@ describe('the budget of the year after on the spend step of a request (QĐ-111al
     expect(await nextYearBudgetOf(third)).toMatchObject({ remaining: vnd(1_600_000), warning: true });
   });
 
+  it('R-15: only what the approvals of this year kept of the year after is taken from it: a request approved the year before kept its part for this year, not the next', async () => {
+    const u = await unit({ total: 8 * M, reserve: 2 * M });
+    const lastYear = await waiting(u, 9);
+    await h.decideSpend(lastYear, { decision: 'APPROVE' }, h.boss.account).expect(200);
+    await h.ctx.sql.query(`UPDATE access_requests SET budget_year = $2 WHERE id = $1`, [lastYear, h.year - 1]);
+    const thisYear = await waiting(u, 9);
+    await h.decideSpend(thisYear, { decision: 'APPROVE' }, h.boss.account).expect(200);
+    const probe = await waiting(u, 9);
+
+    // Only the request approved this year counts: 10.000.000 − 4.200.000. Counting the one of last year too would leave 1.600.000.
+    expect(await nextYearBudgetOf(probe)).toMatchObject({ remaining: vnd(5_800_000), remainingAfter: vnd(1_600_000) });
+  });
+
   it('R-46: a right with no end keeps twelve months of the year after, so it counts for the warning of the others', async () => {
     const u = await unit({ total: 8 * M, reserve: 2 * M });
     pretendBusinessToday(h.ctx.app, `${h.year}-11-20`);
