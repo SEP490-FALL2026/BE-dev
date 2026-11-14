@@ -35,8 +35,11 @@ export class RevocationCompletedFactsReader {
       provisioningType: RevocationCompletedFacts['provisioningType'];
     },
   ): Promise<RevocationCompletedFacts> {
+    const grant = await this.chains.grantOfChain(tx, task.assignmentId);
+
     return {
-      grantRequestId: await this.chains.grantRequestOfChain(tx, task.assignmentId),
+      grantRequestId: grant?.requestId ?? null,
+      grantedEndDate: grant?.endDate ?? null,
       chainAssignmentIds: await this.chains.chainOf(tx, task.assignmentId),
       provisioningType: done.provisioningType,
       endedOn: done.endedOn,

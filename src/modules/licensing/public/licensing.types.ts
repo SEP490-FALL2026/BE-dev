@@ -427,6 +427,11 @@ export interface RevocationCompletedFacts {
    * the money held for the right by such a request is found too (G4-01, G9-02).
    */
   chainAssignmentIds: string[];
+  /**
+   * The day the seat that grant made ends (its `expected_end_date`): a request with months of use records no end date, so this is the last
+   * day it pays for the right; null when the seat has no end (B-C1).
+   */
+  grantedEndDate: BusinessDate | null;
   provisioningType: ProvisioningKind;
   /** The day the right ends: it holds the seat on every day before it (`valid_until`). */
   endedOn: BusinessDate | null;
@@ -448,6 +453,8 @@ export interface GrantOutcomeFacts {
   provisioningType: ProvisioningKind;
   grantedOn: BusinessDate;
   assignmentId: string;
+  /** The day the seat ends, as it stands once granted; null when the seat has no end (B-C1). */
+  expectedEndDate: BusinessDate | null;
 }
 
 /**
@@ -458,6 +465,8 @@ export interface RightChain {
   assignmentId: string;
   grantRequestId: string | null;
   chainAssignmentIds: string[];
+  /** The end of the seat the request's grant made, as in {@link RevocationCompletedFacts.grantedEndDate}. */
+  grantedEndDate: BusinessDate | null;
 }
 
 /** The facts of a revocation task its listeners are told. */

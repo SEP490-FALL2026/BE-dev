@@ -55,6 +55,7 @@ export class SeatReleaseService {
     const coverages = await this.repo.coverageOf(tx, {
       requestIds: completed.grantRequestId === null ? [] : [completed.grantRequestId],
       assignmentIds: completed.chainAssignmentIds,
+      grant: { requestId: completed.grantRequestId, endDate: completed.grantedEndDate },
     });
     await this.give(tx, coverages, now, {
       reason: 'REVOKED',
@@ -87,6 +88,7 @@ export class SeatReleaseService {
       const coverages = await this.repo.coverageOf(tx, {
         requestIds: chain.grantRequestId === null ? [] : [chain.grantRequestId],
         assignmentIds: chain.chainAssignmentIds,
+        grant: { requestId: chain.grantRequestId, endDate: chain.grantedEndDate },
       });
       const released = await this.give(tx, coverages, now, {
         reason: 'TRANSFER_EFFECTIVE',
@@ -118,6 +120,7 @@ export class SeatReleaseService {
     const coverages = await this.repo.coverageOf(tx, {
       requestIds: chain.grantRequestId === null ? [] : [chain.grantRequestId],
       assignmentIds: chain.chainAssignmentIds,
+      grant: { requestId: chain.grantRequestId, endDate: chain.grantedEndDate },
     });
     await this.give(tx, coverages, input.now, {
       reason: 'TRANSFER_EFFECTIVE',
@@ -133,7 +136,11 @@ export class SeatReleaseService {
   async afterGrant(tx: DbTx, requestId: string, facts: GrantOutcomeFacts, now: Date): Promise<void> {
     if (!releasesBeforeGrant(facts.provisioningType)) return;
     const grantedOn: BusinessDate = facts.grantedOn;
-    const coverages = await this.repo.coverageOf(tx, { requestIds: [requestId], assignmentIds: [] });
+    const coverages = await this.repo.coverageOf(tx, {
+      requestIds: [requestId],
+      assignmentIds: [],
+      grant: { requestId, endDate: facts.expectedEndDate },
+    });
     await this.give(tx, coverages, now, {
       reason: 'LATE_GRANT',
       reference: `grantAssignment:${facts.assignmentId}`,

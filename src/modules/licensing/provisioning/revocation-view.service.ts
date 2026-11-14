@@ -148,9 +148,11 @@ export class RevocationViewService {
   async rightChainsOf(tx: DbTx, assignmentIds: readonly string[]): Promise<RightChain[]> {
     const found: RightChain[] = [];
     for (const assignmentId of assignmentIds) {
+      const grant = await this.chains.grantOfChain(tx, assignmentId);
       found.push({
         assignmentId,
-        grantRequestId: await this.chains.grantRequestOfChain(tx, assignmentId),
+        grantRequestId: grant?.requestId ?? null,
+        grantedEndDate: grant?.endDate ?? null,
         chainAssignmentIds: await this.chains.chainOf(tx, assignmentId),
       });
     }

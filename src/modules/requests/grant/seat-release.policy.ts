@@ -25,6 +25,21 @@ export interface SeatCoverage {
   amountMonths: number | null;
 }
 
+/**
+ * The last day a request pays for the right (`SeatCoverage.endDate`). A request records its own end when it is an older one or one to go on
+ * using. A request with months of use records none (the end is worked out when the seat is granted, `RQ-2`), so its end is that of the seat its
+ * grant made; a right with no months of use (long-term, a one-time price) has none, whatever seat it made.
+ */
+export function coverageEndOf(input: {
+  recordedEnd: BusinessDate | null;
+  termMonths: number | null;
+  grantedEnd: BusinessDate | null;
+}): BusinessDate | null {
+  if (input.recordedEnd !== null) return input.recordedEnd;
+
+  return input.termMonths !== null && input.termMonths > 0 ? input.grantedEnd : null;
+}
+
 const monthOf = (day: BusinessDate): number => Number(day.slice(5, 7));
 
 const smaller = (a: bigint, b: bigint): bigint => (a < b ? a : b);
@@ -88,6 +103,8 @@ export function revocationShare(input: {
 }): bigint {
   const { commitment, coverage, endsOn } = input;
   if (!releasable(commitment, input.currentYear)) return 0n;
+  // The request pays to its end date included: a right that ended after it was used to the last day (an expiry taken back on time).
+  if (coverage.endDate !== null && endsOn > coverage.endDate) return 0n;
   const endYear = fiscalYearOf(endsOn);
   if (commitment.year < endYear) return 0n;
   const first = firstMonthOf(commitment, coverage);

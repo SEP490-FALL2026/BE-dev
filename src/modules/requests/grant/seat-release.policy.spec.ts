@@ -1,5 +1,6 @@
 import type { SeatCommitment } from '../../budgets/public/budgets.types';
 import {
+  coverageEndOf,
   firstMonthOf,
   lastMonthOf,
   lateGrantShare,
@@ -106,6 +107,21 @@ describe('seat-release policy (RV-07, M-06, M-10)', () => {
       ).toBe(0n);
     });
 
+    it('a right that ends the day after a mid-month end was used to the last day: nothing goes back (the revocation that comes on time)', () => {
+      // K1, 15/03 to 14/06, three months held: the revocation is completed on 15/06, after the term, so no day of June was left unused.
+      const limited = coverage({ endDate: '2026-06-14', amountMonths: 3 });
+      expect(
+        revocationShare({ commitment: commitment(), coverage: limited, endsOn: '2026-06-15', currentYear: 2026 }),
+      ).toBe(0n);
+      expect(
+        revocationShare({ commitment: commitment(), coverage: limited, endsOn: '2026-06-20', currentYear: 2026 }),
+      ).toBe(0n);
+      // On the last day of the term itself the day 14/06 was not held: one day of June goes back with the rest of the month.
+      expect(
+        revocationShare({ commitment: commitment(), coverage: limited, endsOn: '2026-06-14', currentYear: 2026 }),
+      ).toBe(1500n - (1500n * 13n * 2n + 30n) / 60n);
+    });
+
     it('a request to go on using whose months begin after the end gives back all of them, the one before only its own months', () => {
       // R6 covers March to June, R7 (going on using) July to December; the right ends on 01/05.
       const r6 = coverage({ endDate: '2026-06-30', amountMonths: 4 });
@@ -197,6 +213,21 @@ describe('seat-release policy (RV-07, M-06, M-10)', () => {
       expect(releasesBeforeGrant('K2')).toBe(true);
       expect(releasesBeforeGrant('K1')).toBe(false);
       expect(releasesBeforeGrant('K4')).toBe(false);
+    });
+  });
+
+  describe('coverageEndOf (B-C1: a request with months of use records no end, the seat its grant made has it)', () => {
+    it('a request with months of use ends where the seat its grant made ends', () => {
+      expect(coverageEndOf({ recordedEnd: null, termMonths: 3, grantedEnd: '2026-06-14' })).toBe('2026-06-14');
+    });
+
+    it('a right with no months of use has no end, whatever seat it made (a long-term right, a one-time price)', () => {
+      expect(coverageEndOf({ recordedEnd: null, termMonths: null, grantedEnd: '2026-06-14' })).toBeNull();
+      expect(coverageEndOf({ recordedEnd: null, termMonths: 3, grantedEnd: null })).toBeNull();
+    });
+
+    it('the end a request records (an older request, one to go on using) is never replaced', () => {
+      expect(coverageEndOf({ recordedEnd: '2026-09-30', termMonths: 3, grantedEnd: '2026-06-14' })).toBe('2026-09-30');
     });
   });
 

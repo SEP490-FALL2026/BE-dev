@@ -55,17 +55,49 @@ describe('the money held for a seat goes back by the day (RV-07, M-06, M-10; int
 
     return u;
   };
-  /** A request for one person approved for the whole year at 1 000 000 a month, with no end. */
+  /** A request for one person approved for the whole year at 1 000 000 a month, with no end and no months of use (a long-term right). */
   const approved = async (u: Unit, months = 12) => {
     const id = await h.waitingForApprover(u, plan, { amount: months * M });
     await h.ctx.sql.query(
-      `UPDATE access_requests SET amount_months = $2, price_kind = 'RECURRING', expected_end_date = NULL, budget_year = $3 WHERE id = $1`,
+      `UPDATE access_requests SET amount_months = $2, price_kind = 'RECURRING', term_months = NULL, expected_end_date = NULL, budget_year = $3 WHERE id = $1`,
       [id, months, h.year],
     );
     await h.decideSpend(id, { decision: 'APPROVE' }, h.boss.account).expect(200);
 
     return id;
   };
+  /**
+   * A request of the version with months of use (RQ-2) approved for `months`: it records the months and no end date (`term_months` set,
+   * `expected_end_date` NULL); the end of its seat is worked out at the grant.
+   */
+  const approvedWithTerm = async (u: Unit, months: number) => {
+    const id = await approved(u, months);
+    await h.ctx.sql.query(`UPDATE access_requests SET term_months = $2 WHERE id = $1`, [id, months]);
+
+    return id;
+  };
+  /** The facts of a completed revocation of a right the request made, the way licensing tells them. */
+  const revocationOf = (
+    requestId: string,
+    completed: Partial<NonNullable<RevocationTaskFacts['completed']>>,
+  ): RevocationTaskFacts => ({
+    id: randomUUID(),
+    assignmentId: randomUUID(),
+    employeeId: randomUUID(),
+    planId: plan,
+    status: 'COMPLETED',
+    completed: {
+      grantRequestId: requestId,
+      chainAssignmentIds: [],
+      grantedEndDate: null,
+      provisioningType: 'K2',
+      endedOn: `${h.year}-06-15`,
+      paidThroughOn: null,
+      sources: ['MANAGER_NOT_NEEDED'],
+      k1Checklist: null,
+      ...completed,
+    },
+  });
   const commitmentOf = async (requestId: string) =>
     (
       await h.ctx.sql.query<CommitmentRow>(
@@ -224,6 +256,7 @@ describe('the money held for a seat goes back by the day (RV-07, M-06, M-10; int
       completed: {
         grantRequestId: first,
         chainAssignmentIds: [assignmentId],
+        grantedEndDate: null,
         provisioningType: 'K2',
         endedOn: `${h.year}-05-01`,
         paidThroughOn: null,
@@ -248,6 +281,113 @@ describe('the money held for a seat goes back by the day (RV-07, M-06, M-10; int
     expect((await ledger(r6.id)).filter((row) => row.reason === 'REVOKED')).toHaveLength(r6Share === 0n ? 0 : 1);
   });
 
+  it('B-C1: a K1 right of a request with months of use is used to its last day: the revocation that comes on time gives nothing back', async () => {
+    // Three months from 15/03: the request records no end, the seat its grant made ends on 14/06 and the revocation is completed on 15/06.
+    const id = await approvedWithTerm(await unit(), 3);
+    await setSeatMonthly(id, MONTHLY);
+
+    await runAfterRevocation(
+      revocationOf(id, {
+        provisioningType: 'K1',
+        grantedEndDate: `${h.year}-06-14`,
+        endedOn: `${h.year}-06-15`,
+        paidThroughOn: `${h.year}-06-14`,
+      }),
+    );
+
+    const commitment = await commitmentOf(id);
+    expect(commitment).toMatchObject({ state: 'HELD', released_minor: '0' });
+    expect(await ledger(commitment.id)).toEqual([]);
+  });
+
+  it('B-C1: the same right taken back in the middle of its term gives back the days from that day to its end, not the whole commitment', async () => {
+    const id = await approvedWithTerm(await unit(), 3);
+    await setSeatMonthly(id, MONTHLY);
+    const task = revocationOf(id, { grantedEndDate: `${h.year}-06-14`, endedOn: `${h.year}-04-20` });
+
+    await runAfterRevocation(task);
+
+    // April (less the 19 days before 20/04), May and June of the three months held.
+    const expected = MONTHLY * 3n - usedBefore(MONTHLY, `${h.year}-04-20`);
+    const after = await commitmentOf(id);
+    expect(after).toMatchObject({ state: 'HELD', released_minor: expected.toString() });
+    expect(await ledger(after.id)).toEqual([
+      { amount_minor: expected.toString(), reason: 'REVOKED', reason_text: `revocationTask:${task.id}` },
+    ]);
+  });
+
+  it('B-C1: a long-term request (no months of use) keeps counting to December, whatever end its seat has', async () => {
+    const id = await approved(await unit(), 12);
+    await setSeatMonthly(id, MONTHLY);
+
+    await runAfterRevocation(revocationOf(id, { grantedEndDate: `${h.year}-06-14`, endedOn: `${h.year}-04-20` }));
+
+    const expected = MONTHLY * 9n - usedBefore(MONTHLY, `${h.year}-04-20`);
+    expect((await commitmentOf(id)).released_minor).toBe(expected.toString());
+  });
+
+  /** The end the seat of an assignment has, read from the table. */
+  const seatEndOf = async (assignmentId: string): Promise<string> =>
+    (
+      await h.ctx.sql.query<{ end: string }>(
+        `SELECT to_char(expected_end_date, 'YYYY-MM-DD') AS "end" FROM license_assignments WHERE id = $1`,
+        [assignmentId],
+      )
+    ).rows[0].end;
+  /** The last of the three months a request with months of use covers in `h.year`: the month its seat ends in, December when it ends later. */
+  const lastMonthOfSeat = (seatEnd: string): number => {
+    const endYear = Number(seatEnd.slice(0, 4));
+
+    return endYear < h.year ? 0 : endYear === h.year ? monthOf(seatEnd) : 12;
+  };
+
+  it('B-C1: licensing tells the end of the seat the request made, in the chain and in the revocation', async () => {
+    const id = await approvedWithTerm(await unit(), 3);
+    // Nothing is kept at the grant, so the release that follows is the one of the revocation only.
+    await setSeatMonthly(id, null);
+    const { assignmentId } = await grantedSeat(id);
+    await setSeatMonthly(id, MONTHLY);
+    const seatEnd = await seatEndOf(assignmentId);
+
+    const [chain] = await h.ctx.app
+      .get(TransactionRunner)
+      .run((tx) => h.ctx.app.get(LicensingApi).listRightChainsOf(tx, [assignmentId]));
+    expect(chain).toMatchObject({ assignmentId, grantRequestId: id, grantedEndDate: seatEnd });
+
+    const { taskId, endsOn } = await revoked(assignmentId);
+    // What the revocation gave back is the share of the months counted back from the month the seat ends in, worked out here apart from the code.
+    const last = lastMonthOfSeat(seatEnd);
+    const first = Math.max(1, last - 3 + 1);
+    const expected =
+      Number(endsOn.slice(0, 4)) > h.year || endsOn > seatEnd || last < first
+        ? 0n
+        : monthOf(endsOn) < first
+          ? MONTHLY * BigInt(last - first + 1)
+          : MONTHLY * BigInt(last - monthOf(endsOn) + 1) - usedBefore(MONTHLY, endsOn);
+    const capped = expected > MONTHLY * 3n ? MONTHLY * 3n : expected;
+    const after = await commitmentOf(id);
+    expect(after.released_minor).toBe(capped.toString());
+    expect((await ledger(after.id)).filter((row) => row.reason === 'REVOKED')).toEqual(
+      capped === 0n
+        ? []
+        : [{ amount_minor: capped.toString(), reason: 'REVOKED', reason_text: `revocationTask:${taskId}` }],
+    );
+  });
+
+  it('B-C1: a K2 seat of a request with months of use granted late gives back nothing before the months its end counts back to', async () => {
+    const id = await approvedWithTerm(await unit(), 3);
+    await setSeatMonthly(id, MONTHLY);
+
+    const { assignmentId, grantedOn } = await grantedSeat(id);
+
+    // The three months are the last three before the month the seat ends in: a grant before them used none of them.
+    const first = Math.max(1, lastMonthOfSeat(await seatEndOf(assignmentId)) - 3 + 1);
+    const expected =
+      monthOf(grantedOn) < first ? 0n : MONTHLY * BigInt(monthOf(grantedOn) - first) + usedBefore(MONTHLY, grantedOn);
+    const commitment = await commitmentOf(id);
+    expect(commitment.released_minor).toBe((expected > MONTHLY * 3n ? MONTHLY * 3n : expected).toString());
+  });
+
   it('gives nothing back for a one-time price (K4), a task not completed, or a right no request made', async () => {
     const id = await approved(await unit());
     await setSeatMonthly(id, MONTHLY);
@@ -260,6 +400,7 @@ describe('the money held for a seat goes back by the day (RV-07, M-06, M-10; int
       completed: {
         grantRequestId: id,
         chainAssignmentIds: [],
+        grantedEndDate: null,
         provisioningType: 'K4',
         endedOn: `${h.year}-05-01`,
         paidThroughOn: null,
