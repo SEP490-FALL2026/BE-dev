@@ -86,10 +86,19 @@ describe('RequestsAiSourceApi: the open steps a person holds (integration, real 
         softwareName: applicationName,
         beneficiaryDisplayName: await fullNameOf(design.member),
         reason: 'The project needs a wiki',
-        termMonths: null,
+        termMonths: 6,
         estimatedCost: null,
       });
       expect(total).toBe(steps.length);
+    });
+
+    it('gives no months for a request of use for as long as wanted, which keeps none (the column is empty, not zero)', async () => {
+      const u = await unit();
+      const sent = await h.sent(u.member, internal);
+
+      const step = (await open(u.head)).steps.find((one) => one.requestId === sent.id);
+
+      expect(step).toMatchObject({ stepKind: 'NEED_APPROVAL', termMonths: null });
     });
 
     it('agrees with the queue of the need steps of the head, step for step', async () => {
@@ -135,7 +144,7 @@ describe('RequestsAiSourceApi: the open steps a person holds (integration, real 
         softwareName: applicationName,
         beneficiaryDisplayName: await fullNameOf(design.member),
         reason: expect.any(String) as string,
-        termMonths: null,
+        termMonths: 1,
         estimatedCost: spendQueueItem?.amount ?? null,
       });
       expect(spendQueueItem?.amount).toEqual({
