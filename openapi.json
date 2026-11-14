@@ -40770,7 +40770,7 @@
             }
           },
           "422": {
-            "description": "The id is invalid (VALIDATION_ERROR), the sender is the spending approver (REQUEST_PARTY.INELIGIBLE), or the draft was saved with an end date that no longer fits, before today or more than a year from today: ACCESS_REQUEST.END_DATE_OUT_OF_RANGE (GROUP_REQUEST.TERM_BEYOND_LIMIT for a group), with details { maxEndDate }, or without the end date a contractor, freelancer or intern needs: ACCESS_REQUEST.TERM_REQUIRED. A group draft with fewer than two different people is refused as GROUP_REQUEST.TOO_FEW_LINES. A person who was already named in as many requests for new access this calendar week (Monday to Sunday, organization time zone; a request withdrawn or refused still counts) as the weekly limit allows is refused until the next Monday (ACCESS_REQUEST.OPEN_LIMIT_REACHED, details.limit and details.resetsOn; GH-2, BR-MF1-01f). Nothing changes: the draft stays, to be saved again with a shorter term.",
+            "description": "The id is invalid (VALIDATION_ERROR), the sender is the spending approver (REQUEST_PARTY.INELIGIBLE), or the time of use the draft was saved with is refused: ACCESS_REQUEST.TERM_REQUIRED (a plan bought by the month, or a contractor, freelancer or intern, with no months), TERM_MONTHS_OUT_OF_RANGE (1 to 9 for a plan bought by the month, 1 to 12 for the others), TERM_NOT_ASKED (a plan bought once takes none) or TERM_LONG_TERM_NOT_ALLOWED (no end for a contractor, freelancer or intern; for a group, that person is named on their own line). A group draft with fewer than two different people is refused as GROUP_REQUEST.TOO_FEW_LINES. A person who was already named in as many requests for new access this calendar week (Monday to Sunday, organization time zone; a request withdrawn or refused still counts) as the weekly limit allows is refused until the next Monday (ACCESS_REQUEST.OPEN_LIMIT_REACHED, details.limit and details.resetsOn; GH-2, BR-MF1-01f). Nothing changes: the draft stays, to be saved again with another time of use.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -40803,25 +40803,46 @@
                       }
                     }
                   },
-                  "ACCESS_REQUEST.END_DATE_OUT_OF_RANGE": {
-                    "summary": "The end date is before today or more than a year from today. A draft saved with such a date must be saved again with a date inside the year.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "ACCESS_REQUEST.END_DATE_OUT_OF_RANGE",
-                        "message": "The end date is before today or more than a year from today. A draft saved with such a date must be saved again with a date inside the year.",
-                        "details": { "maxEndDate": "2027-11-09" },
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
                   "ACCESS_REQUEST.TERM_REQUIRED": {
-                    "summary": "A contractor, a freelancer or an intern gets access for a term: give the end date.",
+                    "summary": "Give the time of use in months.",
                     "value": {
                       "success": false,
                       "error": {
                         "code": "ACCESS_REQUEST.TERM_REQUIRED",
-                        "message": "A contractor, a freelancer or an intern gets access for a term: give the end date.",
+                        "message": "Give the time of use in months.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "ACCESS_REQUEST.TERM_MONTHS_OUT_OF_RANGE": {
+                    "summary": "The time of use is a whole number of months: from 1 to 9 for a plan bought by the month, from 1 to 12 for the others.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "ACCESS_REQUEST.TERM_MONTHS_OUT_OF_RANGE",
+                        "message": "The time of use is a whole number of months: from 1 to 9 for a plan bought by the month, from 1 to 12 for the others.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "ACCESS_REQUEST.TERM_NOT_ASKED": {
+                    "summary": "This plan is bought once: it takes no time of use.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "ACCESS_REQUEST.TERM_NOT_ASKED",
+                        "message": "This plan is bought once: it takes no time of use.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "ACCESS_REQUEST.TERM_LONG_TERM_NOT_ALLOWED": {
+                    "summary": "A contractor, a freelancer or an intern gets access for a term: give the months, not a right with no end.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "ACCESS_REQUEST.TERM_LONG_TERM_NOT_ALLOWED",
+                        "message": "A contractor, a freelancer or an intern gets access for a term: give the months, not a right with no end.",
                         "requestId": "req_example"
                       }
                     }
@@ -40834,18 +40855,6 @@
                         "code": "ACCESS_REQUEST.OPEN_LIMIT_REACHED",
                         "message": "The person was already named in as many requests for new access this week as they may.",
                         "details": { "limit": 10, "resetsOn": "2026-11-16" },
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "GROUP_REQUEST.TERM_BEYOND_LIMIT": {
-                    "summary": "The end date is before today or more than a year from today.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "GROUP_REQUEST.TERM_BEYOND_LIMIT",
-                        "message": "The end date is before today or more than a year from today.",
-                        "details": { "maxEndDate": "2027-11-09" },
                         "requestId": "req_example"
                       }
                     }
@@ -47167,7 +47176,7 @@
             }
           },
           "409": {
-            "description": "The request is not back in the queue (SPEND.SUPPLEMENT_NOT_IN_QUEUE), has no price (SPEND.SUPPLEMENT_NOT_PRICED), nothing changes (SPEND.SUPPLEMENT_NO_CHANGE), the end date is not earlier than the one the request has (SPEND.SUPPLEMENT_TERM_NOT_REDUCED), the end date is before today or more than a year from today (SPEND.SUPPLEMENT_END_DATE_OUT_OF_RANGE), cannot be priced for it (ACCESS_REQUEST.NOT_PRICEABLE), or a person to leave out is not a line whose need is confirmed (SUPPLEMENT.LINE_NOT_DROPPABLE).",
+            "description": "The request is not back in the queue (SPEND.SUPPLEMENT_NOT_IN_QUEUE), has no price (SPEND.SUPPLEMENT_NOT_PRICED), nothing changes (SPEND.SUPPLEMENT_NO_CHANGE), the time of use is not shorter than the one the request has (SPEND.SUPPLEMENT_TERM_NOT_REDUCED), the time of use is not 1 to 12 whole months (SPEND.SUPPLEMENT_TERM_MONTHS_OUT_OF_RANGE), cannot be priced for it (ACCESS_REQUEST.NOT_PRICEABLE), or a person to leave out is not a line whose need is confirmed (SUPPLEMENT.LINE_NOT_DROPPABLE).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -47216,13 +47225,13 @@
                       }
                     }
                   },
-                  "SPEND.SUPPLEMENT_END_DATE_OUT_OF_RANGE": {
-                    "summary": "The supplementary file cannot be made: END_DATE_OUT_OF_RANGE.",
+                  "SPEND.SUPPLEMENT_TERM_MONTHS_OUT_OF_RANGE": {
+                    "summary": "The supplementary file cannot be made: TERM_MONTHS_OUT_OF_RANGE.",
                     "value": {
                       "success": false,
                       "error": {
-                        "code": "SPEND.SUPPLEMENT_END_DATE_OUT_OF_RANGE",
-                        "message": "The supplementary file cannot be made: END_DATE_OUT_OF_RANGE.",
+                        "code": "SPEND.SUPPLEMENT_TERM_MONTHS_OUT_OF_RANGE",
+                        "message": "The supplementary file cannot be made: TERM_MONTHS_OUT_OF_RANGE.",
                         "requestId": "req_example"
                       }
                     }
@@ -51532,7 +51541,7 @@
             }
           },
           "422": {
-            "description": "The body is invalid (VALIDATION_ERROR); the plan does not take a group (GROUP_REQUEST.PLAN_NOT_ELIGIBLE); too many people are named (GROUP_REQUEST.TOO_MANY_LINES), fewer than two different people (GROUP_REQUEST.TOO_FEW_LINES, with min), a term beyond the plan (GROUP_REQUEST.TERM_BEYOND_LIMIT) or a person twice (GROUP_REQUEST.DUPLICATE_LINE); a person cannot be in it (GROUP_REQUEST.LINES_REFUSED, with each person and the reason); the sender is the spending approver (REQUEST_PARTY.INELIGIBLE), and a line that is the spending approver is refused as a line with the reason SPENDING_APPROVER. Nothing is written.",
+            "description": "The body is invalid (VALIDATION_ERROR); the plan does not take a group (GROUP_REQUEST.PLAN_NOT_ELIGIBLE); too many people are named (GROUP_REQUEST.TOO_MANY_LINES), fewer than two different people (GROUP_REQUEST.TOO_FEW_LINES, with min), a time of use the plan refuses (ACCESS_REQUEST.TERM_REQUIRED, TERM_MONTHS_OUT_OF_RANGE or TERM_NOT_ASKED) or a person twice (GROUP_REQUEST.DUPLICATE_LINE); a person cannot be in it (GROUP_REQUEST.LINES_REFUSED, with each person and the reason); the sender is the spending approver (REQUEST_PARTY.INELIGIBLE), and a line that is the spending approver is refused as a line with the reason SPENDING_APPROVER. Nothing is written.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -51585,14 +51594,35 @@
                       }
                     }
                   },
-                  "GROUP_REQUEST.TERM_BEYOND_LIMIT": {
-                    "summary": "The end date is before today or more than a year from today.",
+                  "ACCESS_REQUEST.TERM_REQUIRED": {
+                    "summary": "Give the time of use in months.",
                     "value": {
                       "success": false,
                       "error": {
-                        "code": "GROUP_REQUEST.TERM_BEYOND_LIMIT",
-                        "message": "The end date is before today or more than a year from today.",
-                        "details": { "maxEndDate": "2027-11-09" },
+                        "code": "ACCESS_REQUEST.TERM_REQUIRED",
+                        "message": "Give the time of use in months.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "ACCESS_REQUEST.TERM_MONTHS_OUT_OF_RANGE": {
+                    "summary": "The time of use is a whole number of months: from 1 to 9 for a plan bought by the month, from 1 to 12 for the others.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "ACCESS_REQUEST.TERM_MONTHS_OUT_OF_RANGE",
+                        "message": "The time of use is a whole number of months: from 1 to 9 for a plan bought by the month, from 1 to 12 for the others.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "ACCESS_REQUEST.TERM_NOT_ASKED": {
+                    "summary": "This plan is bought once: it takes no time of use.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "ACCESS_REQUEST.TERM_NOT_ASKED",
+                        "message": "This plan is bought once: it takes no time of use.",
                         "requestId": "req_example"
                       }
                     }
@@ -95821,6 +95851,12 @@
                     "additionalProperties": false,
                     "nullable": true
                   },
+                  "termCutAt": {
+                    "type": "string",
+                    "format": "date",
+                    "description": "A calendar date as YYYY-MM-DD.",
+                    "nullable": true
+                  },
                   "elapsedSeconds": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
                   "steps": {
                     "type": "array",
@@ -95944,6 +95980,7 @@
                   "closedAt",
                   "revocation",
                   "purchase",
+                  "termCutAt",
                   "elapsedSeconds",
                   "steps",
                   "doneWhen",
@@ -96150,6 +96187,12 @@
                       "additionalProperties": false,
                       "nullable": true
                     },
+                    "termCutAt": {
+                      "type": "string",
+                      "format": "date",
+                      "description": "A calendar date as YYYY-MM-DD.",
+                      "nullable": true
+                    },
                     "elapsedSeconds": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
                   },
                   "required": [
@@ -96181,6 +96224,7 @@
                     "closedAt",
                     "revocation",
                     "purchase",
+                    "termCutAt",
                     "elapsedSeconds"
                   ],
                   "additionalProperties": false
@@ -96425,6 +96469,12 @@
                     "additionalProperties": false,
                     "nullable": true
                   },
+                  "termCutAt": {
+                    "type": "string",
+                    "format": "date",
+                    "description": "A calendar date as YYYY-MM-DD.",
+                    "nullable": true
+                  },
                   "elapsedSeconds": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
                   "steps": {
                     "type": "array",
@@ -96548,6 +96598,7 @@
                   "closedAt",
                   "revocation",
                   "purchase",
+                  "termCutAt",
                   "elapsedSeconds",
                   "steps",
                   "doneWhen",
@@ -98334,10 +98385,12 @@
             "properties": {
               "planId": { "type": "string", "format": "uuid" },
               "businessReason": { "type": "string", "minLength": 1, "maxLength": 1000 },
-              "expectedEndDate": {
-                "type": "string",
-                "format": "date",
-                "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."
+              "termMonths": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991,
+                "description": "The time of use in whole months: required for a plan bought by the month (1 to 9); 1 to 12, or null for a right with no end, for a plan of seats or internal software (not for a contractor, a freelancer or an intern); none for a plan bought once.",
+                "nullable": true
               },
               "kind": { "type": "string", "enum": ["INDIVIDUAL"] }
             },
@@ -98360,10 +98413,12 @@
                 }
               },
               "businessReason": { "type": "string", "minLength": 1, "maxLength": 1000 },
-              "expectedEndDate": {
-                "type": "string",
-                "format": "date",
-                "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."
+              "termMonths": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991,
+                "description": "The time of use in whole months: required for a plan bought by the month (1 to 9); 1 to 12, or null for a right with no end, for a plan of seats or internal software (not for a contractor, a freelancer or an intern); none for a plan bought once.",
+                "nullable": true
               },
               "kind": { "type": "string", "enum": ["GROUP"] }
             },
@@ -98771,6 +98826,68 @@
                     ],
                     "additionalProperties": false
                   },
+                  "cost": {
+                    "type": "object",
+                    "properties": {
+                      "currentYear": {
+                        "type": "object",
+                        "properties": {
+                          "year": { "type": "integer", "minimum": -9007199254740991, "maximum": 9007199254740991 },
+                          "months": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "nullable": true
+                          },
+                          "amount": {
+                            "type": "object",
+                            "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                            "required": ["amount", "currency"],
+                            "additionalProperties": false
+                          }
+                        },
+                        "required": ["year", "months", "amount"],
+                        "additionalProperties": false
+                      },
+                      "nextYear": {
+                        "type": "object",
+                        "properties": {
+                          "from": { "type": "string", "description": "The first day of the year after, YYYY-MM-DD." },
+                          "months": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "nullable": true
+                          },
+                          "amount": {
+                            "type": "object",
+                            "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                            "required": ["amount", "currency"],
+                            "additionalProperties": false
+                          },
+                          "estimate": { "type": "boolean", "enum": [true] }
+                        },
+                        "required": ["from", "months", "amount", "estimate"],
+                        "additionalProperties": false,
+                        "nullable": true
+                      },
+                      "termCutAt": {
+                        "description": "The last day of the contract of a person with a term, when it cut the time of use short.",
+                        "type": "string",
+                        "nullable": true
+                      },
+                      "months": {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991,
+                        "description": "The months that have begun by the end of the term, each counted whole; null for a right with no end.",
+                        "nullable": true
+                      }
+                    },
+                    "required": ["currentYear", "nextYear", "termCutAt", "months"],
+                    "additionalProperties": false,
+                    "nullable": true
+                  },
                   "policy": {
                     "type": "object",
                     "properties": {
@@ -98939,6 +99056,7 @@
                   "spend",
                   "budgetYear",
                   "pricing",
+                  "cost",
                   "policy",
                   "submittedAt",
                   "needStep",
@@ -98962,10 +99080,12 @@
         "properties": {
           "planId": { "type": "string", "format": "uuid" },
           "businessReason": { "type": "string", "minLength": 1, "maxLength": 1000 },
-          "expectedEndDate": {
-            "type": "string",
-            "format": "date",
-            "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."
+          "termMonths": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991,
+            "description": "The time of use in whole months: required for a plan bought by the month (1 to 9); 1 to 12, or null for a right with no end, for a plan of seats or internal software (not for a contractor, a freelancer or an intern); none for a plan bought once.",
+            "nullable": true
           }
         },
         "required": ["planId", "businessReason"],
@@ -99280,6 +99400,68 @@
                     ],
                     "additionalProperties": false
                   },
+                  "cost": {
+                    "type": "object",
+                    "properties": {
+                      "currentYear": {
+                        "type": "object",
+                        "properties": {
+                          "year": { "type": "integer", "minimum": -9007199254740991, "maximum": 9007199254740991 },
+                          "months": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "nullable": true
+                          },
+                          "amount": {
+                            "type": "object",
+                            "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                            "required": ["amount", "currency"],
+                            "additionalProperties": false
+                          }
+                        },
+                        "required": ["year", "months", "amount"],
+                        "additionalProperties": false
+                      },
+                      "nextYear": {
+                        "type": "object",
+                        "properties": {
+                          "from": { "type": "string", "description": "The first day of the year after, YYYY-MM-DD." },
+                          "months": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "nullable": true
+                          },
+                          "amount": {
+                            "type": "object",
+                            "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                            "required": ["amount", "currency"],
+                            "additionalProperties": false
+                          },
+                          "estimate": { "type": "boolean", "enum": [true] }
+                        },
+                        "required": ["from", "months", "amount", "estimate"],
+                        "additionalProperties": false,
+                        "nullable": true
+                      },
+                      "termCutAt": {
+                        "description": "The last day of the contract of a person with a term, when it cut the time of use short.",
+                        "type": "string",
+                        "nullable": true
+                      },
+                      "months": {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991,
+                        "description": "The months that have begun by the end of the term, each counted whole; null for a right with no end.",
+                        "nullable": true
+                      }
+                    },
+                    "required": ["currentYear", "nextYear", "termCutAt", "months"],
+                    "additionalProperties": false,
+                    "nullable": true
+                  },
                   "policy": {
                     "type": "object",
                     "properties": {
@@ -99448,6 +99630,7 @@
                   "spend",
                   "budgetYear",
                   "pricing",
+                  "cost",
                   "policy",
                   "submittedAt",
                   "needStep",
@@ -99470,10 +99653,12 @@
         "type": "object",
         "properties": {
           "planId": { "type": "string", "format": "uuid" },
-          "expectedEndDate": {
-            "type": "string",
-            "format": "date",
-            "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."
+          "termMonths": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991,
+            "description": "The time of use in whole months: required for a plan bought by the month (1 to 9); 1 to 12, or null for a right with no end, for a plan of seats or internal software (not for a contractor, a freelancer or an intern); none for a plan bought once.",
+            "nullable": true
           }
         },
         "required": ["planId"],
@@ -99502,7 +99687,23 @@
                     "additionalProperties": false
                   },
                   "branch": { "type": "string", "enum": ["INTERNAL_FREE", "PAID_IN_CATALOG"] },
-                  "expectedEndDate": { "type": "string", "nullable": true },
+                  "termMonths": {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991,
+                    "nullable": true
+                  },
+                  "termRefusal": {
+                    "type": "string",
+                    "enum": [
+                      "TERM_REQUIRED",
+                      "TERM_MONTHS_OUT_OF_RANGE",
+                      "TERM_NOT_ASKED",
+                      "TERM_LONG_TERM_NOT_ALLOWED",
+                      null
+                    ],
+                    "nullable": true
+                  },
                   "department": {
                     "type": "object",
                     "properties": {
@@ -99524,8 +99725,6 @@
                     "additionalProperties": false,
                     "nullable": true
                   },
-                  "maxEndDate": { "type": "string" },
-                  "termRequired": { "type": "boolean" },
                   "annualVendorAmount": {
                     "type": "object",
                     "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
@@ -99645,6 +99844,68 @@
                       "nextYearAmount"
                     ],
                     "additionalProperties": false
+                  },
+                  "cost": {
+                    "type": "object",
+                    "properties": {
+                      "currentYear": {
+                        "type": "object",
+                        "properties": {
+                          "year": { "type": "integer", "minimum": -9007199254740991, "maximum": 9007199254740991 },
+                          "months": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "nullable": true
+                          },
+                          "amount": {
+                            "type": "object",
+                            "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                            "required": ["amount", "currency"],
+                            "additionalProperties": false
+                          }
+                        },
+                        "required": ["year", "months", "amount"],
+                        "additionalProperties": false
+                      },
+                      "nextYear": {
+                        "type": "object",
+                        "properties": {
+                          "from": { "type": "string", "description": "The first day of the year after, YYYY-MM-DD." },
+                          "months": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "nullable": true
+                          },
+                          "amount": {
+                            "type": "object",
+                            "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                            "required": ["amount", "currency"],
+                            "additionalProperties": false
+                          },
+                          "estimate": { "type": "boolean", "enum": [true] }
+                        },
+                        "required": ["from", "months", "amount", "estimate"],
+                        "additionalProperties": false,
+                        "nullable": true
+                      },
+                      "termCutAt": {
+                        "description": "The last day of the contract of a person with a term, when it cut the time of use short.",
+                        "type": "string",
+                        "nullable": true
+                      },
+                      "months": {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991,
+                        "description": "The months that have begun by the end of the term, each counted whole; null for a right with no end.",
+                        "nullable": true
+                      }
+                    },
+                    "required": ["currentYear", "nextYear", "termCutAt", "months"],
+                    "additionalProperties": false,
+                    "nullable": true
                   },
                   "costEstimate": {
                     "type": "object",
@@ -99776,11 +100037,10 @@
                 "required": [
                   "plan",
                   "branch",
-                  "expectedEndDate",
+                  "termMonths",
+                  "termRefusal",
                   "department",
                   "costCenter",
-                  "maxEndDate",
-                  "termRequired",
                   "annualVendorAmount",
                   "existingAccess",
                   "blockedBy",
@@ -99789,6 +100049,7 @@
                   "canSubmit",
                   "budgetYear",
                   "pricing",
+                  "cost",
                   "costEstimate",
                   "spendSubmission",
                   "chain",
@@ -100122,6 +100383,71 @@
                         ],
                         "additionalProperties": false
                       },
+                      "cost": {
+                        "type": "object",
+                        "properties": {
+                          "currentYear": {
+                            "type": "object",
+                            "properties": {
+                              "year": { "type": "integer", "minimum": -9007199254740991, "maximum": 9007199254740991 },
+                              "months": {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991,
+                                "nullable": true
+                              },
+                              "amount": {
+                                "type": "object",
+                                "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                                "required": ["amount", "currency"],
+                                "additionalProperties": false
+                              }
+                            },
+                            "required": ["year", "months", "amount"],
+                            "additionalProperties": false
+                          },
+                          "nextYear": {
+                            "type": "object",
+                            "properties": {
+                              "from": {
+                                "type": "string",
+                                "description": "The first day of the year after, YYYY-MM-DD."
+                              },
+                              "months": {
+                                "type": "integer",
+                                "minimum": -9007199254740991,
+                                "maximum": 9007199254740991,
+                                "nullable": true
+                              },
+                              "amount": {
+                                "type": "object",
+                                "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                                "required": ["amount", "currency"],
+                                "additionalProperties": false
+                              },
+                              "estimate": { "type": "boolean", "enum": [true] }
+                            },
+                            "required": ["from", "months", "amount", "estimate"],
+                            "additionalProperties": false,
+                            "nullable": true
+                          },
+                          "termCutAt": {
+                            "description": "The last day of the contract of a person with a term, when it cut the time of use short.",
+                            "type": "string",
+                            "nullable": true
+                          },
+                          "months": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "description": "The months that have begun by the end of the term, each counted whole; null for a right with no end.",
+                            "nullable": true
+                          }
+                        },
+                        "required": ["currentYear", "nextYear", "termCutAt", "months"],
+                        "additionalProperties": false,
+                        "nullable": true
+                      },
                       "policy": {
                         "type": "object",
                         "properties": {
@@ -100290,6 +100616,7 @@
                       "spend",
                       "budgetYear",
                       "pricing",
+                      "cost",
                       "policy",
                       "submittedAt",
                       "needStep",
@@ -100430,10 +100757,12 @@
           "purpose": { "type": "string", "minLength": 1, "maxLength": 1000 },
           "dataDescription": { "type": "string", "minLength": 1, "maxLength": 1000 },
           "expectedUsers": { "type": "integer", "minimum": 1, "maximum": 1000000 },
-          "expectedEndDate": {
-            "type": "string",
-            "format": "date",
-            "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."
+          "termMonths": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991,
+            "description": "The time of use in whole months: required for a plan bought by the month (1 to 9); 1 to 12, or null for a right with no end, for a plan of seats or internal software (not for a contractor, a freelancer or an intern); none for a plan bought once.",
+            "nullable": true
           }
         },
         "required": ["softwareName", "homepageUrl", "purpose", "dataDescription", "expectedUsers"],
@@ -101681,15 +102010,11 @@
             "items": { "type": "string", "format": "uuid" },
             "uniqueItems": true
           },
-          "expectedEndDate": {
-            "type": "string",
-            "format": "date",
-            "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."
-          },
+          "termMonths": { "type": "integer", "minimum": -9007199254740991, "maximum": 9007199254740991 },
           "reason": { "type": "string", "minLength": 1, "maxLength": 1000 }
         },
         "required": ["reason"],
-        "description": "The people of the group the head leaves out and/or an earlier end date, and why.",
+        "description": "The people of the group the head leaves out and/or a shorter time of use in months, and why.",
         "additionalProperties": false
       },
       "SupplementResponseDto": {
@@ -102255,6 +102580,68 @@
                     "additionalProperties": false,
                     "nullable": true
                   },
+                  "termCost": {
+                    "type": "object",
+                    "properties": {
+                      "currentYear": {
+                        "type": "object",
+                        "properties": {
+                          "year": { "type": "integer", "minimum": -9007199254740991, "maximum": 9007199254740991 },
+                          "months": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "nullable": true
+                          },
+                          "amount": {
+                            "type": "object",
+                            "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                            "required": ["amount", "currency"],
+                            "additionalProperties": false
+                          }
+                        },
+                        "required": ["year", "months", "amount"],
+                        "additionalProperties": false
+                      },
+                      "nextYear": {
+                        "type": "object",
+                        "properties": {
+                          "from": { "type": "string", "description": "The first day of the year after, YYYY-MM-DD." },
+                          "months": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "nullable": true
+                          },
+                          "amount": {
+                            "type": "object",
+                            "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                            "required": ["amount", "currency"],
+                            "additionalProperties": false
+                          },
+                          "estimate": { "type": "boolean", "enum": [true] }
+                        },
+                        "required": ["from", "months", "amount", "estimate"],
+                        "additionalProperties": false,
+                        "nullable": true
+                      },
+                      "termCutAt": {
+                        "description": "The last day of the contract of a person with a term, when it cut the time of use short.",
+                        "type": "string",
+                        "nullable": true
+                      },
+                      "months": {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991,
+                        "description": "The months that have begun by the end of the term, each counted whole; null for a right with no end.",
+                        "nullable": true
+                      }
+                    },
+                    "required": ["currentYear", "nextYear", "termCutAt", "months"],
+                    "additionalProperties": false,
+                    "nullable": true
+                  },
                   "assessment": {
                     "type": "object",
                     "properties": {
@@ -102443,6 +102830,7 @@
                   "request",
                   "need",
                   "cost",
+                  "termCost",
                   "assessment",
                   "decision",
                   "budgetSnapshot",
@@ -103479,6 +103867,68 @@
                     ],
                     "additionalProperties": false
                   },
+                  "cost": {
+                    "type": "object",
+                    "properties": {
+                      "currentYear": {
+                        "type": "object",
+                        "properties": {
+                          "year": { "type": "integer", "minimum": -9007199254740991, "maximum": 9007199254740991 },
+                          "months": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "nullable": true
+                          },
+                          "amount": {
+                            "type": "object",
+                            "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                            "required": ["amount", "currency"],
+                            "additionalProperties": false
+                          }
+                        },
+                        "required": ["year", "months", "amount"],
+                        "additionalProperties": false
+                      },
+                      "nextYear": {
+                        "type": "object",
+                        "properties": {
+                          "from": { "type": "string", "description": "The first day of the year after, YYYY-MM-DD." },
+                          "months": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "nullable": true
+                          },
+                          "amount": {
+                            "type": "object",
+                            "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                            "required": ["amount", "currency"],
+                            "additionalProperties": false
+                          },
+                          "estimate": { "type": "boolean", "enum": [true] }
+                        },
+                        "required": ["from", "months", "amount", "estimate"],
+                        "additionalProperties": false,
+                        "nullable": true
+                      },
+                      "termCutAt": {
+                        "description": "The last day of the contract of a person with a term, when it cut the time of use short.",
+                        "type": "string",
+                        "nullable": true
+                      },
+                      "months": {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991,
+                        "description": "The months that have begun by the end of the term, each counted whole; null for a right with no end.",
+                        "nullable": true
+                      }
+                    },
+                    "required": ["currentYear", "nextYear", "termCutAt", "months"],
+                    "additionalProperties": false,
+                    "nullable": true
+                  },
                   "policy": {
                     "type": "object",
                     "properties": {
@@ -103647,6 +104097,7 @@
                   "spend",
                   "budgetYear",
                   "pricing",
+                  "cost",
                   "policy",
                   "submittedAt",
                   "needStep",
@@ -104120,10 +104571,12 @@
             }
           },
           "businessReason": { "type": "string", "minLength": 1, "maxLength": 1000 },
-          "expectedEndDate": {
-            "type": "string",
-            "format": "date",
-            "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."
+          "termMonths": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991,
+            "description": "The time of use in whole months: required for a plan bought by the month (1 to 9); 1 to 12, or null for a right with no end, for a plan of seats or internal software (not for a contractor, a freelancer or an intern); none for a plan bought once.",
+            "nullable": true
           }
         },
         "required": ["planId", "lines", "businessReason"],
@@ -104168,8 +104621,17 @@
                 "additionalProperties": false,
                 "nullable": true
               },
-              "maxEndDate": { "type": "string" },
-              "endDateOutOfRange": { "type": "boolean" },
+              "termRefusal": {
+                "type": "string",
+                "enum": [
+                  "TERM_REQUIRED",
+                  "TERM_MONTHS_OUT_OF_RANGE",
+                  "TERM_NOT_ASKED",
+                  "TERM_LONG_TERM_NOT_ALLOWED",
+                  null
+                ],
+                "nullable": true
+              },
               "lines": {
                 "type": "array",
                 "items": {
@@ -104188,6 +104650,7 @@
                         "HAS_ACCESS",
                         "HAS_OPEN_REQUEST",
                         "TERM_REQUIRED",
+                        "TERM_LONG_TERM_NOT_ALLOWED",
                         "OPEN_LIMIT_REACHED",
                         "DUPLICATE_LINE",
                         null
@@ -104271,8 +104734,7 @@
               "plan",
               "tooManyLines",
               "tooFewLines",
-              "maxEndDate",
-              "endDateOutOfRange",
+              "termRefusal",
               "lines",
               "lineCount",
               "hasSpendStep",
@@ -104595,6 +105057,68 @@
                     ],
                     "additionalProperties": false
                   },
+                  "cost": {
+                    "type": "object",
+                    "properties": {
+                      "currentYear": {
+                        "type": "object",
+                        "properties": {
+                          "year": { "type": "integer", "minimum": -9007199254740991, "maximum": 9007199254740991 },
+                          "months": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "nullable": true
+                          },
+                          "amount": {
+                            "type": "object",
+                            "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                            "required": ["amount", "currency"],
+                            "additionalProperties": false
+                          }
+                        },
+                        "required": ["year", "months", "amount"],
+                        "additionalProperties": false
+                      },
+                      "nextYear": {
+                        "type": "object",
+                        "properties": {
+                          "from": { "type": "string", "description": "The first day of the year after, YYYY-MM-DD." },
+                          "months": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991,
+                            "nullable": true
+                          },
+                          "amount": {
+                            "type": "object",
+                            "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                            "required": ["amount", "currency"],
+                            "additionalProperties": false
+                          },
+                          "estimate": { "type": "boolean", "enum": [true] }
+                        },
+                        "required": ["from", "months", "amount", "estimate"],
+                        "additionalProperties": false,
+                        "nullable": true
+                      },
+                      "termCutAt": {
+                        "description": "The last day of the contract of a person with a term, when it cut the time of use short.",
+                        "type": "string",
+                        "nullable": true
+                      },
+                      "months": {
+                        "type": "integer",
+                        "minimum": -9007199254740991,
+                        "maximum": 9007199254740991,
+                        "description": "The months that have begun by the end of the term, each counted whole; null for a right with no end.",
+                        "nullable": true
+                      }
+                    },
+                    "required": ["currentYear", "nextYear", "termCutAt", "months"],
+                    "additionalProperties": false,
+                    "nullable": true
+                  },
                   "policy": {
                     "type": "object",
                     "properties": {
@@ -104763,6 +105287,7 @@
                   "spend",
                   "budgetYear",
                   "pricing",
+                  "cost",
                   "policy",
                   "submittedAt",
                   "needStep",
