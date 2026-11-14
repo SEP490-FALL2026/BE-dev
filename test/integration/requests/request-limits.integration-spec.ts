@@ -171,6 +171,17 @@ describe('the limits of a request for new access (integration, real PostgreSQL, 
       });
     });
 
+    it('two requests sent at once by a person with one slot left: one is sent and the other refused, the lock of the person puts them in a line', async () => {
+      const e13 = await person('GH-E13');
+      await open(e13, plans[0]).expect(201);
+      await open(e13, plans[1]).expect(201);
+
+      const [first, second] = await Promise.all([open(e13, plans[2]), open(e13, plans[3])]);
+
+      expect([first.status, second.status].sort()).toEqual([201, 422]);
+      expect(codeOf(first.status === 422 ? first : second)).toBe('ACCESS_REQUEST.OPEN_LIMIT_REACHED');
+    });
+
     it('US-01-04 AC-7: the Super Admin raises GH-2 to four and the fourth request is sent', async () => {
       const e6 = await person('GH-E6');
       await sendThree(e6);
@@ -200,12 +211,13 @@ describe('the limits of a request for new access (integration, real PostgreSQL, 
     let limits: RequestLimitsService;
     let runner: TransactionRunner;
     let who: Person;
+    let edge: Person;
     let probePlan: string;
 
-    const judgedAt = (now: Date) =>
+    const judgedAt = (now: Date, employeeId: string = who.employeeId) =>
       runner.run((tx) =>
         limits.judgeOne(tx, {
-          employeeId: who.employeeId,
+          employeeId,
           planId: probePlan,
           now,
           settings: { weeklyLimit: 10 },
@@ -271,6 +283,19 @@ describe('the limits of a request for new access (integration, real PostgreSQL, 
         [ids[11]],
       );
       await asRenewal(ids[12], '2026-11-11T04:00:00.000Z');
+
+      // Another person, with a request sent on each edge of the week of Monday 09/11 on the clock of Ho Chi Minh (Monday 00:00 is Sunday 17:00 in UTC).
+      edge = await person('GH-T2');
+      const edges = [
+        '2026-11-15T16:59:59.999Z', // the last millisecond of Sunday 15/11: the week of 09/11
+        '2026-11-15T17:00:00.000Z', // Monday 16/11 00:00:00.000: the week of 16/11
+        '2026-11-08T17:00:00.000Z', // Monday 09/11 00:00:00.000: the week of 09/11
+      ];
+      for (const sentAt of edges) {
+        const planId = await h.planOf(await h.subscription(20));
+        const id = idOf(await open(edge, planId).expect(201));
+        await h.ctx.sql.query(`UPDATE access_requests SET submitted_at = $2 WHERE id = $1`, [id, sentAt]);
+      }
     }, 240000);
 
     afterAll(async () => {
@@ -304,6 +329,16 @@ describe('the limits of a request for new access (integration, real PostgreSQL, 
       const verdict = await judgedAt(new Date('2026-11-08T16:30:00.000Z'));
 
       expect(verdict).toMatchObject({ sentThisWeek: 1, resetsOn: '2026-11-09' });
+    });
+
+    it('a request sent on the first instant of the week and one on the last millisecond of it belong to it, one sent on the first instant of the next week does not', async () => {
+      const weekOf0911 = await judgedAt(new Date('2026-11-12T03:00:00.000Z'), edge.employeeId);
+      const weekOf1611 = await judgedAt(new Date('2026-11-15T17:30:00.000Z'), edge.employeeId);
+      const weekOf0211 = await judgedAt(new Date('2026-11-08T16:30:00.000Z'), edge.employeeId);
+
+      expect(weekOf0911.sentThisWeek).toBe(2);
+      expect(weekOf1611.sentThisWeek).toBe(1);
+      expect(weekOf0211.sentThisWeek).toBe(0);
     });
   });
 
@@ -355,6 +390,47 @@ describe('the limits of a request for new access (integration, real PostgreSQL, 
       const refused = await open(e8, fresh, { manyPaidSoftwareReason: 'Just in case' }).expect(422);
 
       expect(codeOf(refused)).toBe('VALIDATION_ERROR');
+    });
+  });
+
+  describe('QĐ-111h: the line of a person in a request for a group is a request named for them', () => {
+    const sendGroup = async (planId: string, people: Person[]): Promise<string> =>
+      idOf(
+        await request(h.server())
+          .post('/api/v1/group-requests')
+          .set(h.as(head.account))
+          .send({ planId, businessReason: 'The team', lines: people.map((who) => ({ employeeId: who.employeeId })) })
+          .expect(201),
+      );
+    /** Three requests for a group, each naming the person and a colleague of theirs, on three plans. */
+    const threeGroups = async (code: string): Promise<{ named: Person; groups: string[] }> => {
+      const named = await person(code);
+      const groups: string[] = [];
+      for (const [index, planId] of plans.slice(0, 3).entries()) {
+        groups.push(await sendGroup(planId, [named, await person(`${code}-P${index}`)]));
+      }
+
+      return { named, groups };
+    };
+
+    it('three lines sent this week are three of the three the person may be named in: their own request is refused', async () => {
+      const { named } = await threeGroups('GH-L1');
+
+      const fourth = await open(named, plans[3]).expect(422);
+
+      expect(codeOf(fourth)).toBe('ACCESS_REQUEST.OPEN_LIMIT_REACHED');
+      expect(detailsOf(fourth)).toMatchObject({ limit: 3 });
+      expect(String(detailsOf(fourth).resetsOn)).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    });
+
+    it('a line left out of the limits (a role ended) is not counted: the person still has a slot', async () => {
+      const { named, groups } = await threeGroups('GH-L2');
+      await h.ctx.sql.query(
+        `UPDATE access_request_lines SET limit_exemption = 'ROLE_ENDED' WHERE request_id = $1 AND employee_id = $2`,
+        [groups[0], named.employeeId],
+      );
+
+      await open(named, plans[3]).expect(201);
     });
   });
 
