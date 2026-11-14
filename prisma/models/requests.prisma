@@ -387,6 +387,8 @@ model AccessRequestLineAmount {
   budgetYear  Int       @map("budget_year")
   amountMinor BigInt    @map("amount_minor")
   currency    String    @db.Char(3)
+  // False for the part of the year after, kept at the approval for the commitment of 01/01 (QĐ-111k): no commitment holds it, so nothing is given back.
+  held        Boolean   @default(true)
   releasedAt  DateTime? @map("released_at") @db.Timestamptz(3)
 
   request        AccessRequest     @relation(fields: [requestId], references: [id], onDelete: Restrict)

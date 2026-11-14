@@ -270,6 +270,60 @@ describe('the amount and the term of a request (integration, real PostgreSQL)', 
     });
   });
 
+  describe('RQ-2.4: the part of the year after is kept when the spend is approved (QĐ-111k, R-46)', () => {
+    const year = Number(h.today().slice(0, 4));
+    const approved = async (body: Record<string, unknown>): Promise<string> => {
+      const sent = await h.sent(design.member, plan, body);
+      await h.decide(sent.id, { decision: 'APPROVE' }, design.head.account).expect(200);
+      // What the request kept when it was sent is made stale, as if the approval came on another day.
+      await h.ctx.sql.query(`UPDATE access_requests SET next_year_amount_minor = 1 WHERE id = $1`, [sent.id]);
+      await h.route(sent.id, design.head.account);
+      await h.decideSpend(sent.id, { decision: 'APPROVE' }, h.boss.account).expect(200);
+
+      return sent.id;
+    };
+    const keptOf = async (id: string): Promise<string | null> =>
+      (
+        await h.ctx.sql.query<{ kept: string | null }>(
+          `SELECT next_year_amount_minor::text AS kept FROM access_requests WHERE id = $1`,
+          [id],
+        )
+      ).rows[0].kept;
+
+    it('a time of use of 6 months keeps the price of a month times the months that begin the year after, or nothing when none does', async () => {
+      const run = termRunOf({ start: h.today(), months: 6, contractEndsOn: null });
+      const nextMonths = monthsBeginningIn({ start: h.today(), end: run.end, year: year + 1 });
+
+      const id = await approved({ termMonths: 6 });
+
+      expect(await keptOf(id)).toBe(nextMonths > 0 ? String(M * nextMonths) : null);
+    });
+
+    it('a right with no end keeps twelve months at the price of the day it is approved, even when it is the same amount for this year (R-46)', async () => {
+      const id = await approved({ termMonths: null });
+
+      expect(await keptOf(id)).toBe(String(12 * M));
+    });
+
+    it('the spending approver reads the cost by the year beside the estimate of tax, the part of the year after included', async () => {
+      const sent = await h.sent(design.member, plan, { termMonths: null });
+      await h.decide(sent.id, { decision: 'APPROVE' }, design.head.account).expect(200);
+      await h.route(sent.id, design.head.account);
+
+      const detail = h.dataOf<{ spendApproval: { termCost: unknown; cost: unknown } }>(
+        await h.approvalOf(sent.id, h.boss.account).expect(200),
+      ).spendApproval;
+
+      expect(detail.termCost).toMatchObject({
+        currentYear: { year, months: monthsLeft },
+        nextYear: { from: `${year + 1}-01-01`, months: 12, amount: { amount: String(12 * M) }, estimate: true },
+        termCutAt: null,
+        months: null,
+      });
+      expect(Object.keys(detail)).toEqual(expect.arrayContaining(['cost', 'termCost']));
+    });
+  });
+
   describe('the amount is worked out again at every check of the budget (QĐ-109e, M-18)', () => {
     it('BR-MF1-06a: a check writes the amount of its day over the amount sent, and says so in the audit trail', async () => {
       const sent = await h.sent(design.member, plan);

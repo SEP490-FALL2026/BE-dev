@@ -104,6 +104,8 @@ export interface LineAmountRecord {
   budgetYear: number;
   amountMinor: bigint;
   currency: string;
+  /** False for the part of the year after, kept at the approval for the commitment of 01/01: no commitment holds it (`QĐ-111k`). */
+  held: boolean;
   releasedAt: Date | null;
 }
 

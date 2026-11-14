@@ -41,12 +41,15 @@ export function scaleAmount(amountMinor: bigint, priced: number, scoped: number)
   return (amountMinor * BigInt(scoped) + divisor - 1n) / divisor;
 }
 
-/** The shares that go back when a person is withdrawn: all they hold that was not yet given back. */
-export function shareToRelease<T extends { releasedAt: Date | null; budgetYear: number; amountMinor: bigint }>(
-  shares: readonly T[],
-): YearShare[] {
+/**
+ * The shares that go back when a person is withdrawn: all they hold in a commitment that was not yet given back. The part of the year after
+ * that is only kept for 01/01 is not held by any commitment, so there is nothing of it to give back (`QĐ-111k`).
+ */
+export function shareToRelease<
+  T extends { releasedAt: Date | null; budgetYear: number; amountMinor: bigint; held: boolean },
+>(shares: readonly T[]): YearShare[] {
   return shares
-    .filter((share) => share.releasedAt === null)
+    .filter((share) => share.releasedAt === null && share.held)
     .map((share) => ({ year: share.budgetYear, amountMinor: share.amountMinor }));
 }
 

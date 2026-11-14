@@ -132,7 +132,25 @@ export class GroupHarness extends StatusHarness {
         released_at: Date | null;
       }>(
         `SELECT employee_id, budget_year, amount_minor::text, released_at FROM access_request_line_amounts
-          WHERE request_id = $1 ORDER BY employee_id, budget_year`,
+          WHERE request_id = $1 AND held ORDER BY employee_id, budget_year`,
+        [requestId],
+      )
+    ).rows;
+  }
+
+  /** The part of the year after that each person of the request keeps (`QĐ-111k`): no commitment holds it, so it is never given back. */
+  async nextYearShares(
+    requestId: string,
+  ): Promise<Array<{ employee_id: string; budget_year: number; amount_minor: string; released_at: Date | null }>> {
+    return (
+      await this.ctx.sql.query<{
+        employee_id: string;
+        budget_year: number;
+        amount_minor: string;
+        released_at: Date | null;
+      }>(
+        `SELECT employee_id, budget_year, amount_minor::text, released_at FROM access_request_line_amounts
+          WHERE request_id = $1 AND NOT held ORDER BY employee_id, budget_year`,
         [requestId],
       )
     ).rows;

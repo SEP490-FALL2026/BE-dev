@@ -32,14 +32,23 @@ export class RequestTermEndsService {
       request.type === 'GROUP_GRANT'
         ? pricedPeopleIds(request.lines.map((line) => ({ employeeId: line.employeeId, state: line.state })))
         : request.beneficiaryEmployeeIds;
+
+    return this.endsOfPeople(tx, request.termMonths, ids, asOf);
+  }
+
+  /** The last day of the right of each of these people if `months` months of use began on `asOf`: cut at the end of the contract of a person who has one. */
+  async endsOfPeople(
+    tx: DbTx,
+    months: number | null,
+    employeeIds: readonly string[],
+    asOf: BusinessDate,
+  ): Promise<(BusinessDate | null)[]> {
     const people = new Map(
-      (await this.organizationReads.getEmployees([...ids], tx)).map((person) => [person.id, person]),
+      (await this.organizationReads.getEmployees([...employeeIds], tx)).map((person) => [person.id, person]),
     );
 
-    return ids.map(
-      (id) =>
-        termRunOf({ start: asOf, months: request.termMonths, contractEndsOn: people.get(id)?.contractEndsOn ?? null })
-          .end,
+    return employeeIds.map(
+      (id) => termRunOf({ start: asOf, months, contractEndsOn: people.get(id)?.contractEndsOn ?? null }).end,
     );
   }
 }

@@ -95,6 +95,34 @@ describe('the spend of the people of a request for a group, decided one by one o
       expect(u.head.employeeId).toBeDefined();
     });
 
+    it('QĐ-111k, R-46, M-13: keeps for each person approved twelve months of the year after (a right with no end), as a row that no commitment holds, and the request keeps their sum', async () => {
+      const { people, id } = await waiting(3);
+      const [e1, e2, e3] = people;
+
+      await h
+        .decideSpendLines(
+          id,
+          { lines: [approve(e1.employeeId), approve(e2.employeeId), refuse(e3.employeeId)] },
+          h.boss.account,
+        )
+        .expect(200);
+
+      const kept = await h.nextYearShares(id);
+      expect(kept.map((row) => [row.employee_id, row.budget_year, row.amount_minor, row.released_at])).toEqual(
+        [e1, e2]
+          .map((person) => [person.employeeId, h.year + 1, String(12 * M), null])
+          .sort((a, b) => String(a[0]).localeCompare(String(b[0]))),
+      );
+      // The commitment holds the year of the check only, and what is held adds up to it as before.
+      expect((await h.commitments(id)).map((commitment) => commitment.year)).toEqual([h.year]);
+      expect(total(await h.shares(id))).toBe(total(await h.commitments(id)));
+      const stored = await h.ctx.sql.query<{ next_year_amount_minor: string }>(
+        `SELECT next_year_amount_minor::text FROM access_requests WHERE id = $1`,
+        [id],
+      );
+      expect(stored.rows[0].next_year_amount_minor).toBe(String(2 * 12 * M));
+    });
+
     it('holds nothing when every person is refused, and ends the request as refused', async () => {
       const { people, id } = await waiting(3);
 

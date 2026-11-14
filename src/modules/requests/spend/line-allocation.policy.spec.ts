@@ -85,9 +85,9 @@ describe('the amount of a request for the people that stay (US-06-14 AC-13, US-0
 describe('what goes back when one person leaves a request (US-05-17 AC-10)', () => {
   it('is what they held and had not given back', () => {
     const shares = [
-      { budgetYear: 2026, amountMinor: 3n, releasedAt: null },
-      { budgetYear: 2027, amountMinor: 1n, releasedAt: null },
-      { budgetYear: 2028, amountMinor: 9n, releasedAt: new Date('2026-10-24T00:00:00Z') },
+      { budgetYear: 2026, amountMinor: 3n, held: true, releasedAt: null },
+      { budgetYear: 2027, amountMinor: 1n, held: true, releasedAt: null },
+      { budgetYear: 2028, amountMinor: 9n, held: true, releasedAt: new Date('2026-10-24T00:00:00Z') },
     ];
 
     expect(shareToRelease(shares)).toEqual([
@@ -95,6 +95,15 @@ describe('what goes back when one person leaves a request (US-05-17 AC-10)', () 
       { year: 2027, amountMinor: 1n },
     ]);
     expect(shareToRelease([])).toEqual([]);
+  });
+
+  it('QĐ-111k: never includes the part of the year after that is only kept for 01/01: no commitment holds it yet', () => {
+    const shares = [
+      { budgetYear: 2026, amountMinor: 1_200_000n, held: true, releasedAt: null },
+      { budgetYear: 2027, amountMinor: 4_200_000n, held: false, releasedAt: null },
+    ];
+
+    expect(shareToRelease(shares)).toEqual([{ year: 2026, amountMinor: 1_200_000n }]);
   });
 });
 
