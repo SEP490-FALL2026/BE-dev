@@ -48,8 +48,11 @@ describe('MF-1 request contract: field cũ, sai vai, gọi lại @MF1 @D1', () =
           expectedSpendOn: call().today(),
         }),
       );
-      await refusedWithNothingWritten('access_requests', () =>
-        call().post('NV-DEV3', '/access-requests', { planId: figma, businessReason: 'x', termMonths: 12 }),
+      // Figma is a plan of seats (K2): it takes up to 12 months, so 13 is the first that is refused (not a schema error: the rule of the plan).
+      await refusedWithNothingWritten(
+        'access_requests',
+        () => call().post('NV-DEV3', '/access-requests', { planId: figma, businessReason: 'x', termMonths: 13 }),
+        { status: 422, code: 'ACCESS_REQUEST.TERM_MONTHS_OUT_OF_RANGE' },
       );
       const preview = await call().post('NV-DEV3', '/access-requests/preview', {
         planId: figma,

@@ -209,9 +209,10 @@ describe('MF-4 ngân sách năm: đề xuất → phiên bản → duyệt @MF4 
   });
 
   describe('F4-01b dataset có ngân sách năm nay và năm sau @MF4 @D1', () => {
-    it('Request 12 tháng của phòng Kỹ thuật đi thẳng tới duyệt chi, giữ chỗ một khoản cho năm của số tiền (QĐ-109) #14 @B1', async () => {
+    it('Request 9 tháng (mức tối đa của gói mua theo tháng) của phòng Kỹ thuật đi thẳng tới duyệt chi, giữ chỗ một khoản cho năm của số tiền (QĐ-109) #14 @B1', async () => {
       const chatgpt = await call().planId('ChatGPT Plus');
-      const id = await call().submitRequest('NV-DEV2', chatgpt, { termMonths: 12 });
+      // ChatGPT Plus is bought by the month (K1): it takes 1 to 9 months and never more (QĐ-111i).
+      const id = await call().submitRequest('NV-DEV2', chatgpt, { termMonths: 9 });
       expect((await call().approveNeed('NV-ENGH', id)).status).toBe(200);
       expect((await call().submitBatch('NV-ENGH', [id])).status).toBe(201);
 

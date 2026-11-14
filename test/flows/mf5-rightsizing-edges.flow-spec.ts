@@ -25,7 +25,8 @@ describe('MF-5 giảm, hủy và đề xuất lỗi thời: các biên của F5-
   /** One seat through the whole flow: need, batch, spend decision, the grant task of the IT Admin. Returns the assignment id. */
   const grantSeat = async (employeeCode: string, planName: string, subscriptionName: string): Promise<string> => {
     const plan = await call().planId(planName);
-    const requestId = await call().submitRequest(employeeCode, plan);
+    // The plans of this file are bought by the month (K1): a request for one takes 1 to 9 months and never none (QĐ-111i); the most, so the seat outlasts the file.
+    const requestId = await call().submitRequest(employeeCode, plan, { termMonths: 9 });
     expect((await call().approveNeed('NV-ENGH', requestId)).status).toBe(200);
     expect((await call().submitBatch('NV-ENGH', [requestId])).status).toBe(201);
     const approved = await call().post('NV-CEO', `/access-requests/${requestId}/spend-approval`, {
