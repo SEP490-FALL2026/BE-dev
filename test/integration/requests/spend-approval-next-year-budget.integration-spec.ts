@@ -177,6 +177,31 @@ describe('the budget of the year after on the spend step of a request (QĐ-111al
     expect(page.items.find((item) => item.requestId === short)?.nextYearBudget).toBeNull();
   });
 
+  it('S-3: Finance, the other reader of the check of a request, reads the same figures there, before and after the decision; the head and the sender are answered as if there were none', async () => {
+    const u = await unit({ total: 8 * M, reserve: 2 * M });
+    const id = await waiting(u, 9);
+    const asFinance = async () =>
+      h.dataOf<{ budgetCheck: { nextYearBudget?: NextYearBudget | null } }>(await h.checkOf(id, h.finance).expect(200))
+        .budgetCheck.nextYearBudget;
+    const figures = {
+      year: h.next,
+      approved: vnd(10 * M),
+      remaining: vnd(10 * M),
+      remainingAfter: vnd(5_800_000),
+      warning: false,
+    };
+
+    expect(await asFinance()).toEqual(figures);
+    expect(await asFinance()).toEqual(await nextYearBudgetOf(id));
+    await h.decideSpend(id, { decision: 'APPROVE' }, h.boss.account).expect(200);
+    // The request is compared with the others, not with itself, so what Finance reads does not move with the decision.
+    expect(await asFinance()).toEqual(figures);
+    for (const account of [u.head.account, u.member.account]) {
+      const refused = await h.checkOf(id, account).expect(404);
+      expect(JSON.stringify(refused.body)).not.toContain('nextYearBudget');
+    }
+  });
+
   it('S-3: the sender and the head never read a figure of the budget of the year after: the preview and the request carry only the part of the request, as an estimate', async () => {
     const u = await unit({ total: 8 * M, reserve: 2 * M });
     pretendBusinessToday(h.ctx.app, `${h.year}-11-15`);

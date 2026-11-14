@@ -121,7 +121,7 @@ const budgetSnapshotSchema = z.strictObject({
  * null while the Cost Center has no approved budget of the year after; the whole is null when the request keeps nothing of that year. Money
  * in the currency of the budget.
  */
-const nextYearBudgetSchema = z
+export const nextYearBudgetSchema = z
   .strictObject({
     year: z.number().int(),
     approved: money.nullable(),

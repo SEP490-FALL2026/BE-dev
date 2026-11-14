@@ -9,9 +9,10 @@ import { clientShape } from '../../support/openapi-semantics';
 type Json = Record<string, unknown>;
 
 /**
- * S-3, `QĐ-111al`: the figures of the budget of the year after (`nextYearBudget`) are for the person who holds the spend step only. The
- * document says it: the two routes of the approver carry the key, nothing the sender or the head reads does (the preview, the request, its
- * lines, its history). Read off the in-process document, so a new response that copies the key fails here before any reader sees it.
+ * S-3, `QĐ-111al`: the figures of the budget of the year after (`nextYearBudget`) are for the spending approver and Finance only. The document
+ * says it: the routes of the spending approver and the check of a request (read by Finance and by the holder of the spend step) carry the key,
+ * nothing the sender or the head reads does (the preview, the request, its lines, its history). Read off the in-process document, so a new
+ * response that copies the key fails here before any reader sees it.
  */
 describe('who reads the budget of the year after (S-3, QĐ-111al, http contract)', () => {
   let app: INestApplication<App>;
@@ -47,7 +48,7 @@ describe('who reads the budget of the year after (S-3, QĐ-111al, http contract)
       }),
     );
 
-  it('the detail and the queue of the spending approver, and the decisions that answer with the detail, carry it', () => {
+  it('the detail and the queue of the spending approver, the decisions that answer with the detail, and the check that Finance reads, carry it', () => {
     const carrying = new Set(
       responses()
         .filter((response) => response.shape.includes('"nextYearBudget"'))
@@ -55,6 +56,7 @@ describe('who reads the budget of the year after (S-3, QĐ-111al, http contract)
     );
 
     expect([...carrying].sort()).toEqual([
+      'budgetCheckGet',
       'spendApprovalDecide',
       'spendApprovalGet',
       'spendApprovalLineDecide',

@@ -1,6 +1,7 @@
 import { createZodDto } from '../../../infrastructure/http/dto/zod-dto';
 import { z } from 'zod';
 import { successEnvelopeSchema } from '../../../infrastructure/http/dto/success-envelope.dto';
+import { nextYearBudgetSchema } from '../spend-approval-view/spend-approval.dto';
 
 const money = z.strictObject({ amount: z.string(), currency: z.string() });
 /** The codes a check gave: a year's own, and the two of the data that checks made before the three outcomes still carry. */
@@ -58,6 +59,11 @@ const checkSchema = z.strictObject({
   /** What binds the company in all, in the reporting currency; it is never compared with the budget of one year. */
   bindingTotal: money,
   yearCount: z.number().int().positive(),
+  /**
+   * What is left of the budget of the year after for the request, with the part of it the request keeps (\`QĐ-111al\`): what Finance and the person
+   * who holds the spend step read, as the spend step does. Null when the request keeps nothing of that year.
+   */
+  nextYearBudget: nextYearBudgetSchema,
   ranAt: z.iso.datetime(),
 });
 
