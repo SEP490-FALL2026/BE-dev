@@ -122,7 +122,7 @@ flowchart BT
   personnel -->|8| requests
   requests -->|58| audit
   requests -->|23| budgets
-  requests -->|29| catalog
+  requests -->|30| catalog
   requests -->|7| finance
   requests -->|31| identity_access
   requests -->|50| licensing

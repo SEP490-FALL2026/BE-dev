@@ -47176,7 +47176,7 @@
             }
           },
           "409": {
-            "description": "The request is not back in the queue (SPEND.SUPPLEMENT_NOT_IN_QUEUE), has no price (SPEND.SUPPLEMENT_NOT_PRICED), nothing changes (SPEND.SUPPLEMENT_NO_CHANGE), the time of use is not shorter than the one the request has (SPEND.SUPPLEMENT_TERM_NOT_REDUCED), the time of use is not 1 to 12 whole months (SPEND.SUPPLEMENT_TERM_MONTHS_OUT_OF_RANGE), cannot be priced for it (ACCESS_REQUEST.NOT_PRICEABLE), or a person to leave out is not a line whose need is confirmed (SUPPLEMENT.LINE_NOT_DROPPABLE).",
+            "description": "The request is not back in the queue (SPEND.SUPPLEMENT_NOT_IN_QUEUE), has no price (SPEND.SUPPLEMENT_NOT_PRICED), nothing changes (SPEND.SUPPLEMENT_NO_CHANGE), the time of use is not shorter than the one the request has (SPEND.SUPPLEMENT_TERM_NOT_REDUCED), the time of use is not 1 to 12 whole months, 1 to 9 for a plan bought by the month (SPEND.SUPPLEMENT_TERM_MONTHS_OUT_OF_RANGE), or the plan is bought once and takes none (SPEND.SUPPLEMENT_TERM_NOT_ASKED), cannot be priced for it (ACCESS_REQUEST.NOT_PRICEABLE), or a person to leave out is not a line whose need is confirmed (SUPPLEMENT.LINE_NOT_DROPPABLE).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -47232,6 +47232,17 @@
                       "error": {
                         "code": "SPEND.SUPPLEMENT_TERM_MONTHS_OUT_OF_RANGE",
                         "message": "The supplementary file cannot be made: TERM_MONTHS_OUT_OF_RANGE.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SPEND.SUPPLEMENT_TERM_NOT_ASKED": {
+                    "summary": "The supplementary file cannot be made: TERM_NOT_ASKED.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SPEND.SUPPLEMENT_TERM_NOT_ASKED",
+                        "message": "The supplementary file cannot be made: TERM_NOT_ASKED.",
                         "requestId": "req_example"
                       }
                     }
@@ -87600,6 +87611,7 @@
               "workEmail": { "type": "string", "nullable": true },
               "employmentType": { "type": "string", "enum": ["STAFF", "CONTRACTOR", "FREELANCER", "INTERN"] },
               "hireDate": { "type": "string" },
+              "contractEndDate": { "type": "string", "nullable": true },
               "status": { "type": "string", "enum": ["ACTIVE"] },
               "workState": { "type": "string", "enum": ["WORKING", "ON_LONG_LEAVE", "HANDING_OVER", "LEFT"] },
               "memberSince": { "type": "string", "nullable": true },
@@ -87624,6 +87636,7 @@
               "workEmail",
               "employmentType",
               "hireDate",
+              "contractEndDate",
               "status",
               "workState",
               "memberSince",
@@ -87661,6 +87674,12 @@
             "type": "string",
             "format": "date",
             "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."
+          },
+          "contractEndDate": {
+            "type": "string",
+            "format": "date",
+            "description": "A date that must exist, as YYYY-MM-DD: the last day of the contract of a contractor, a freelancer or an intern, not before the hire date; null or omitted for none. Staff has none (EMPLOYEE.ROW_INVALID, CONTRACT_END_NOT_APPLICABLE). A time of use that runs past it is cut there.",
+            "nullable": true
           },
           "departmentCode": {
             "type": "string",
@@ -87878,6 +87897,12 @@
             "format": "date",
             "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."
           },
+          "contractEndDate": {
+            "type": "string",
+            "format": "date",
+            "description": "A date that must exist, as YYYY-MM-DD: the last day of the contract of a contractor, a freelancer or an intern; null clears it. Refused for staff, before the hire date, and when a change of kind to staff leaves one (EMPLOYEE.ROW_INVALID: CONTRACT_END_NOT_APPLICABLE, CONTRACT_END_BEFORE_HIRE).",
+            "nullable": true
+          },
           "jobTitle": { "type": "string", "maxLength": 1000, "nullable": true }
         },
         "additionalProperties": false
@@ -87896,6 +87921,7 @@
               "workEmail": { "type": "string", "nullable": true },
               "employmentType": { "type": "string", "enum": ["STAFF", "CONTRACTOR", "FREELANCER", "INTERN"] },
               "hireDate": { "type": "string" },
+              "contractEndDate": { "type": "string", "nullable": true },
               "jobTitle": { "type": "string", "nullable": true },
               "status": { "type": "string", "enum": ["ACTIVE", "TERMINATED"] },
               "workState": { "type": "string", "enum": ["WORKING", "ON_LONG_LEAVE", "HANDING_OVER", "LEFT"] }
@@ -87907,6 +87933,7 @@
               "workEmail",
               "employmentType",
               "hireDate",
+              "contractEndDate",
               "jobTitle",
               "status",
               "workState"
