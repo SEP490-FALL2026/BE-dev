@@ -143,12 +143,12 @@ export class RenewalRequestService {
     // The end the holder entered becomes the end of the new request; a client of before it gave months, counted from today.
     const expectedEndDate =
       body.newEndDate ?? effectiveEndOf({ start: input.today, months: body.extensionMonths ?? 12 });
-    const termMonths = monthsBetween(input.today, expectedEndDate);
-    // A late ask is a request for new access: GH-1/GH-2 judge it as any other (BR-MF1-01).
+    const termMonths = body.extensionMonths ?? monthsBetween(input.today, expectedEndDate);
+    // A late ask is a request for new access: GH-1/GH-2 judge it as any other (BR-MF1-01), and it gives its time of use in months (`QĐ-111i`).
     const record = await this.accessRequests.submitWithin(
       tx,
       actor,
-      { planId: facts.planId, businessReason: body.businessReason, expectedEndDate },
+      { planId: facts.planId, businessReason: body.businessReason, termMonths },
       input.settings,
       { toleratedSeatId: facts.assignmentId },
     );

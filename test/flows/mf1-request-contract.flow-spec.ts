@@ -65,7 +65,7 @@ describe('MF-1 request contract: field cũ, sai vai, gọi lại @MF1 @D1', () =
           await call().post('NV-DEV3', '/access-requests', {
             planId: jira,
             businessReason: 'x',
-            expectedEndDate: call().inDays(60),
+            termMonths: 2,
           })
         ).status,
       ).toBe(201);

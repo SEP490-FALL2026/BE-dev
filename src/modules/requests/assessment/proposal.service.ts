@@ -1,13 +1,13 @@
 import { SpendRoutingService } from '../spend/spend-routing.service';
 import { Injectable } from '@nestjs/common';
+import type { TermRefusal } from '../../../core/term-limit';
 import { TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../../audit/public/audit.api';
 import { accessRequestAuditEvent } from '../access-request/access-request-audit-event.mapper';
 import {
-  AccessRequestEndDateOutOfRangeError,
   AccessRequestSuperAdminCannotRequestError,
-  AccessRequestTermRequiredError,
+  AccessRequestTermRefusedError,
 } from '../access-request/access-request.errors';
 import { hasSpendStep, mayRequest } from '../access-request/access-request.policy';
 import { AccessRequestRepo } from '../access-request/access-request.repo';
@@ -18,10 +18,9 @@ import { RequestFactsService } from '../access-request/request-facts.service';
 import type { ProposalBodyDto } from './assessment.dto';
 import { RequestLimitsService } from '../request-limits/request-limits.service';
 
-/** Throws AccessRequestEndDateOutOfRangeError and AccessRequestTermRequiredError (`US-05-23` AC-9, `FR-2.8`). */
-function assertTermAllowed(assessed: { endDateOutOfRange: boolean; maxEndDate: string; termRequired: boolean }): void {
-  if (assessed.endDateOutOfRange) throw new AccessRequestEndDateOutOfRangeError(assessed.maxEndDate);
-  if (assessed.termRequired) throw new AccessRequestTermRequiredError();
+/** Throws AccessRequestTermRefusedError (`QĐ-111i`, `FR-2.8`). */
+function assertTermAllowed(assessed: { termRefusal: TermRefusal | null }): void {
+  if (assessed.termRefusal !== null) throw new AccessRequestTermRefusedError(assessed.termRefusal);
 }
 
 /**
@@ -55,10 +54,9 @@ export class ProposalService {
       await this.limits.lock(tx, [actor.employeeId]);
 
       const now = new Date();
-      const expectedEndDate = body.expectedEndDate ?? null;
       const assessed = await this.assessment.assessProposal(tx, {
         employeeId: actor.employeeId,
-        expectedEndDate: expectedEndDate,
+        termMonths: body.termMonths,
         now,
         settings,
         lockDepartment: true,
@@ -81,8 +79,7 @@ export class ProposalService {
         departmentId: unit.departmentId,
         costCenterId: unit.costCenter.id,
         businessReason: body.purpose,
-        termMonths: null,
-        expectedEndDate: expectedEndDate,
+        termMonths: assessed.term.months,
         pricing,
         policy,
         createdByAppUserId: actor.appUserId,
@@ -117,7 +114,8 @@ export class ProposalService {
             planId: null,
             softwareName: body.softwareName,
             expectedUsers: body.expectedUsers,
-            expectedEndDate: expectedEndDate,
+            termMonths: assessed.term.months,
+            termCutAt: assessed.term.cutAt,
             requesterEmployeeId: actor.employeeId,
             beneficiaryEmployeeIds: [actor.employeeId],
             departmentId: unit.departmentId,

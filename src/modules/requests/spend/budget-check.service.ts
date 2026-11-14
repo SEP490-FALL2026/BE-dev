@@ -15,12 +15,13 @@ import { scaleAmount } from './line-allocation.policy';
 import { checkBudget, costInDong, type CheckResult, type YearBudget } from './budget-check.policy';
 import { BudgetCheckRepo, type CheckRecord, type CheckTrigger } from './budget-check.repo';
 
-/** The same amount for the same year and months: nothing to write. */
+/** The same amount for the same year and months, and the same part of the year after: nothing to write. */
 const isSameAmount = (before: PricingRecord, after: PricingRecord): boolean =>
   before.status === 'PRICED' &&
   before.amount?.amountMinor === after.amount?.amountMinor &&
   before.budgetYear === after.budgetYear &&
   before.amountMonths === after.amountMonths &&
+  before.nextYearAmount?.amountMinor === after.nextYearAmount?.amountMinor &&
   before.kind === after.kind;
 
 /** Why a request cannot be checked at all: it is not a case for the check, but for whoever gives it its price in dong. */

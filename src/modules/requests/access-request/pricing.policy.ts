@@ -1,6 +1,6 @@
 import type { BillingCycleCode, MissingPriceReason, PricingRecord } from './access-request.types';
-import { addDays, type BusinessDate } from '../../../core/business-date';
-import { addMonths, fiscalYearOf } from '../../../core/fiscal-year';
+import type { BusinessDate } from '../../../core/business-date';
+import { fiscalYearOf } from '../../../core/fiscal-year';
 import { MAX_AMOUNT_MINOR, type Money } from '../../../core/money/money';
 import { monthsBeginningIn } from '../../../core/term-limit';
 
@@ -73,9 +73,6 @@ export function seatMonthlyOf(input: {
 
   return ceilDiv(input.costMinor, BigInt(input.months) * BigInt(input.seats));
 }
-
-/** The latest day a right asked for may end: a year from `today`, the day before the same day twelve months later (`QĐ-104a`, `US-05-23` AC-9). */
-export const maxEndDateOf = (today: BusinessDate): BusinessDate => addDays(addMonths(today, 12), -1);
 
 /** What one person costs a month, rounded up, for showing only: the price of a recurring plan over the months of its billing cycle. */
 export function monthlyPriceOf(price: { unitPrice: Money; billingCycle: BillingCycleCode | null }): Money | null {

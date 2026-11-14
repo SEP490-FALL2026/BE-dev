@@ -15,17 +15,16 @@ import { annualVendorAmountOf } from '../access-request/pricing.policy';
 import { RequestLimitsService } from '../request-limits/request-limits.service';
 import type { LimitVerdict } from '../request-limits/request-limits.policy';
 
-/** The request can be sent as it is: nobody holds it already, nothing blocks the parties, and the end date fits (`FR-2.8`, `US-05-23` AC-9). */
+/** The request can be sent as it is: nobody holds it already, nothing blocks the parties, and the time of use is one the plan takes (`FR-2.8`, `QĐ-111i`). */
 const canSubmitOf = (
-  assessed: { heldAccess: unknown; graceHold: unknown; endDateOutOfRange: boolean; termRequired: boolean },
+  assessed: { heldAccess: unknown; graceHold: unknown; termRefusal: string | null },
   blockedBy: unknown,
   limits: Pick<LimitVerdict, 'refusal'>,
 ): boolean =>
   // A right held from before a transfer in its grace does not stop the person asking for it again (`QĐ-110q`).
   (assessed.heldAccess === null || assessed.graceHold !== null) &&
   blockedBy === null &&
-  !assessed.endDateOutOfRange &&
-  !assessed.termRequired &&
+  assessed.termRefusal === null &&
   limits.refusal === null;
 
 /**
@@ -77,11 +76,10 @@ export class RequestPreviewService {
         applicationName: target.applicationName,
       },
       branch: policy.branch,
-      expectedEndDate: body.expectedEndDate ?? null,
+      termMonths: assessed.term.months,
+      termRefusal: assessed.termRefusal,
       department: { id: department.id, code: department.code, name: department.name },
       costCenter: costCenter && { id: costCenter.id, code: costCenter.code, name: costCenter.name },
-      maxEndDate: assessed.maxEndDate,
-      termRequired: assessed.termRequired,
       annualVendorAmount: await this.annualVendorAmountOf(pricing),
       existingAccess: assessed.heldAccess,
       blockedBy,
@@ -96,6 +94,7 @@ export class RequestPreviewService {
       canSubmit: canSubmitOf(assessed, blockedBy, limits),
       budgetYear: pricing.budgetYear,
       pricing: priceView,
+      cost: await this.pricing.costView(pricing, assessed.term),
       costEstimate,
       spendSubmission: spendSubmissionOf(policy, pricing.status),
       chain: chain.map(({ assigneeEmployeeId, ...step }) => ({ ...step, assignee: person(assigneeEmployeeId) })),
@@ -130,7 +129,7 @@ export class RequestPreviewService {
       const assessed = await this.assessment.assess(tx, {
         employeeId: actor.employeeId,
         planId: body.planId,
-        expectedEndDate: body.expectedEndDate ?? null,
+        termMonths: body.termMonths,
         now,
         settings,
         lockDepartment: false,

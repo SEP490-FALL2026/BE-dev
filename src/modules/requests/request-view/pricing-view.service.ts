@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { formatAmount } from '../../../core/money/money';
+import { monthsBeginningIn, type TermRun } from '../../../core/term-limit';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { FinanceApi } from '../../finance/public/finance.api';
 import type { TaxEstimateBasis, TaxGroup } from '../../finance/public/finance.types';
@@ -26,6 +27,20 @@ export interface PricingView {
   monthlyPrice: MoneyView | null;
   /** The first year of a request to go on using that begins in the year after the day it is judged, shown and never held (`QĐ-109b`). */
   nextYearAmount: MoneyView | null;
+}
+
+/**
+ * What a request costs by the year as a reader of the request or the preview sees it (`QĐ-111j`, `QĐ-111k`, R-39, R-46), before tax: the
+ * months that begin in the year it is judged in, and the part of the year after, which is an estimate: it is kept when the spend is approved and
+ * becomes the commitment of 01/01. `months` is the months that have begun by the end of the term, the cut at the end of a contract (`termCutAt`) included;
+ * null for a right with no end. A price that is not by the month (a key) or that is missing has no such cost.
+ */
+export interface CostView {
+  currentYear: { year: number; months: number | null; amount: MoneyView };
+  nextYear: { from: string; months: number | null; amount: MoneyView; estimate: true } | null;
+  /** The last day of the contract when it cut the term short; null when nothing was cut. */
+  termCutAt: string | null;
+  months: number | null;
 }
 
 /**
@@ -68,6 +83,32 @@ export class PricingViewService {
           ? money(monthlyPriceOf({ unitPrice: pricing.unitPrice, billingCycle: pricing.billingCycle }))
           : null,
       nextYearAmount: money(pricing.nextYearAmount),
+    };
+  }
+
+  /** The cost by the year of a priced request, with the run its time of use has (`QĐ-111j`); null when nothing is priced by the month. */
+  async costView(pricing: PricingRecord, run: TermRun | null): Promise<CostView | null> {
+    if (pricing.status !== 'PRICED' || pricing.amount === null || pricing.budgetYear === null) return null;
+    if (pricing.kind !== 'RECURRING') return null;
+    const year = pricing.budgetYear;
+    const { nextYearAmount } = pricing;
+    const nextMonths =
+      run === null
+        ? null
+        : run.end === null
+          ? 12
+          : monthsBeginningIn({ start: run.start, end: run.end, year: year + 1 });
+
+    return {
+      currentYear: { year, months: pricing.amountMonths, amount: await this.moneyView(pricing.amount) },
+      nextYear: nextYearAmount && {
+        from: `${year + 1}-01-01`,
+        months: nextMonths,
+        amount: await this.moneyView(nextYearAmount),
+        estimate: true,
+      },
+      termCutAt: run?.cutAt ?? null,
+      months: run?.startedMonths ?? null,
     };
   }
 

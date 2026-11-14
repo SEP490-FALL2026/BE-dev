@@ -102,7 +102,8 @@ describe('requests over HTTP: software that is not in the catalog (integration, 
       ['no purpose', { purpose: undefined }],
       ['a homepage that is not a web address', { homepageUrl: 'miro.com' }],
       ['nobody to use it', { expectedUsers: 0 }],
-      ['an end date that is not a date', { expectedEndDate: 'next month' }],
+      ['an end date, which is not asked any more', { expectedEndDate: '2027-03-31' }],
+      ['months that are not a whole number', { termMonths: 2.5 }],
       ['a Cost Center chosen by hand', { costCenterId: '00000000-0000-4000-8000-000000000001' }],
       ['an amount given by hand', { amount: { amount: '1', currency: 'USD' } }],
     ])('is not sent with %s, and nothing is written', async (_name, over) => {
@@ -506,8 +507,8 @@ describe('requests over HTTP: software that is not in the catalog (integration, 
         expect(done).toMatchObject({ budgetYear: year });
       });
 
-      it('BR-MF1-06c: stops in the month of the end date the proposal asked for', async () => {
-        const proposed = await awaiting({ expectedEndDate: h.today() });
+      it('BR-MF1-06c, R-39: counts the months of use the proposal asked for, each month that begins', async () => {
+        const proposed = await awaiting({ termMonths: 1 });
         await save(proposed.id, h.assessmentBody({ quote: monthly })).expect(200);
 
         const done = h.dataOf<{ request: AccessRequestWire }>(await complete(proposed.id).expect(200)).request;
@@ -516,14 +517,14 @@ describe('requests over HTTP: software that is not in the catalog (integration, 
       });
 
       it('BR-MF1-06d: a quarterly or an annual price is a third or a twelfth a month', async () => {
-        const quarterly = await awaiting({ expectedEndDate: h.today() });
+        const quarterly = await awaiting({ termMonths: 1 });
         await save(
           quarterly.id,
           h.assessmentBody({
             quote: { ...monthly, billingCycle: 'QUARTERLY', unitPrice: { amount: '600000', currency: 'VND' } },
           }),
         ).expect(200);
-        const annual = await awaiting({ expectedEndDate: h.today() });
+        const annual = await awaiting({ termMonths: 1 });
         await save(
           annual.id,
           h.assessmentBody({

@@ -59,8 +59,11 @@ describe('the drafts of a request, and the Super Admin (e2e, no database)', () =
     ['a kind that is none of the two', { ...INDIVIDUAL, kind: 'RENEWAL' }],
     ['a draft of an individual with no reason', { kind: 'INDIVIDUAL', planId: PLAN }],
     ['a draft of an individual with a plan that is not an id', { ...INDIVIDUAL, planId: 'not-an-id' }],
-    ['a draft of an individual with an end date that is not a date', { ...INDIVIDUAL, expectedEndDate: 'tomorrow' }],
-    ['a draft of an individual with the term in months, which is not asked any more', { ...INDIVIDUAL, termMonths: 6 }],
+    [
+      'a draft of an individual with an end date, which is not asked any more',
+      { ...INDIVIDUAL, expectedEndDate: '2027-03-31' },
+    ],
+    ['a draft of an individual with months that are not a whole number', { ...INDIVIDUAL, termMonths: 2.5 }],
     [
       'a draft of an individual with an amount, which is nobody’s to give',
       { ...INDIVIDUAL, amount: { amount: '1', currency: 'VND' } },

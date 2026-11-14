@@ -72,6 +72,7 @@ export type LineReason =
   | 'OUTSIDE_DEPARTMENT'
   | BeneficiaryRefusal
   | 'TERM_REQUIRED'
+  | 'TERM_LONG_TERM_NOT_ALLOWED'
   | 'HAS_ACCESS'
   | 'HAS_OPEN_REQUEST'
   | 'OPEN_LIMIT_REACHED';
@@ -93,8 +94,11 @@ export interface LineFacts {
   openLimitReached?: boolean;
   /** The sender heads the department and this is their own line: it asks for no email and no end day. */
   isDepartmentHead?: boolean;
-  /** The person is not staff and the group names no end date: a contractor, a freelancer or an intern gets access for a term (`FR-2.8`). */
-  termRequired: boolean;
+  /**
+   * A person with a term (a contractor, a freelancer, an intern) gets access for a term (`FR-2.8`, `INV-07`): the group gives no months
+   * (`TERM_REQUIRED`) or none for a right with no end (`TERM_LONG_TERM_NOT_ALLOWED`). Null for anybody else.
+   */
+  termRefusal: 'TERM_REQUIRED' | 'TERM_LONG_TERM_NOT_ALLOWED' | null;
   /** The person holds the spending approver role: they are no party of a Request, and the reason comes before any other. */
   spendingApprover: boolean;
 }
@@ -131,7 +135,7 @@ function reasonFor(departmentId: string, person: LineFacts): LineReason | null {
     { skipContact: false },
   );
   if (refusal !== null) return refusal;
-  if (person.termRequired) return 'TERM_REQUIRED';
+  if (person.termRefusal !== null) return person.termRefusal;
   if (person.holdsAccess) return 'HAS_ACCESS';
   if (person.hasOpenRequest) return 'HAS_OPEN_REQUEST';
 

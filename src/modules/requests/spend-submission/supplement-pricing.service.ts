@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import type { BusinessDate } from '../../../core/business-date';
+import { termEndOf } from '../../../core/term-limit';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { AccessRequestNotPriceableError } from '../access-request/access-request.errors';
@@ -25,22 +25,37 @@ export class SupplementPricing {
   async repriceFor(
     tx: DbTx,
     request: AccessRequestRecord,
-    input: { dropped: readonly string[]; expectedEndDate?: BusinessDate; now: Date },
+    input: { dropped: readonly string[]; termMonths?: number; now: Date },
   ): Promise<{ repriced: PricingRecord; change: NonNullable<ReturnType<typeof supplementChangeOf>> }> {
     const { pricing } = request;
     const today = await this.organizationReads.businessToday(input.now, tx);
-    if (input.dropped.length === 0 && input.expectedEndDate === undefined) {
+    if (input.dropped.length === 0 && input.termMonths === undefined) {
       throw new SpendSupplementRefusedError('NO_CHANGE');
     }
     const remaining = this.groups.withoutPeople(request, input.dropped);
+    // The file keeps the months of use it asks for and no end date: the request is worked out from today, each person for their own end (`QĐ-111i`).
     const repriced = await this.repricing.reprice(
       tx,
-      input.expectedEndDate === undefined ? remaining : { ...remaining, expectedEndDate: input.expectedEndDate },
+      input.termMonths === undefined
+        ? remaining
+        : { ...remaining, termMonths: input.termMonths, expectedEndDate: null },
       today,
     );
     const change = supplementChangeOf(pricing, repriced);
     if (change === null) throw new AccessRequestNotPriceableError();
+    if (input.termMonths === undefined) return { repriced, change };
 
-    return { repriced, change };
+    // What the file says of the end is the day the time of use ends if it began today, before and after (the contract is not read: it is a statement of the file).
+    const beforeMonths = request.expectedEndDate === null ? request.termMonths : null;
+
+    return {
+      repriced,
+      change: {
+        ...change,
+        beforeExpectedEndDate:
+          request.expectedEndDate ?? (beforeMonths === null ? null : termEndOf(today, beforeMonths)),
+        afterExpectedEndDate: termEndOf(today, input.termMonths),
+      },
+    };
   }
 }

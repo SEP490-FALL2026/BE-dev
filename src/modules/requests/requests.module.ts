@@ -77,6 +77,7 @@ import { RequestEndService } from './request-end/request-end.service';
 import { RequestsApi } from './public/requests.api';
 import { RequestsAiSourceApi } from './public/requests-ai-source.api';
 import { PricingViewService } from './request-view/pricing-view.service';
+import { RequestCostViewService } from './request-view/request-cost-view.service';
 import { RequestPreviewService } from './request-submission/request-preview.service';
 import { SimilarSeatsService } from './need-decision/similar-seats.service';
 import { GroupCandidateService } from './group-request-submission/group-candidate.service';
@@ -238,6 +239,7 @@ import { MyRequestsService } from './my-requests/my-requests.service';
     AssessmentRepo,
     AssessmentStepRepo,
     PricingViewService,
+    RequestCostViewService,
     RequestPreviewService,
     AccessRequestService,
     RequestLimitsRepo,

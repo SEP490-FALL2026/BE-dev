@@ -1,7 +1,13 @@
 import { createZodDto } from '../../../infrastructure/http/dto/zod-dto';
 import { z } from 'zod';
 import { successEnvelopeSchema } from '../../../infrastructure/http/dto/success-envelope.dto';
-import { REASON_MAX_LENGTH, employeeRef, moneySchema, pricingSchema } from '../access-request/access-request.dto';
+import {
+  REASON_MAX_LENGTH,
+  employeeRef,
+  moneySchema,
+  pricingSchema,
+  termMonthsSchema,
+} from '../access-request/access-request.dto';
 import { businessDate } from '../../../infrastructure/http/dto/business-date.dto';
 
 /** A web address with a host: the homepage of the software, which a screen links to. */
@@ -30,8 +36,8 @@ export const proposalBodySchema = z.strictObject({
   purpose: text(REASON_MAX_LENGTH),
   dataDescription: text(REASON_MAX_LENGTH),
   expectedUsers: z.number().int().min(1).max(1_000_000),
-  /** The day the right ends; optional, at most a year from today, and required for a contractor, a freelancer or an intern. */
-  expectedEndDate: businessDate.optional(),
+  /** The time of use in months, 1 to 12, or null for a right with no end; a contractor, a freelancer or an intern gives the months. */
+  termMonths: termMonthsSchema.optional(),
 });
 
 const moneyInput = z.strictObject({ amount: z.string().max(40), currency: z.string().regex(/^[A-Z]{3}$/) });

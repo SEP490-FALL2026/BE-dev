@@ -1,5 +1,5 @@
 import { termRunOf } from '../../../core/term-limit';
-import { maxEndDateOf, pricingRecordFor, requestAmountOf, seatMonthlyOf, type PricingInput } from './pricing.policy';
+import { pricingRecordFor, requestAmountOf, seatMonthlyOf, type PricingInput } from './pricing.policy';
 
 const SEAT = { amountMinor: 2000n, currency: 'USD' }; // 20.00 per seat per month
 
@@ -227,13 +227,6 @@ describe('what is not priced (US-05-02 AC-4, QĐ-84e)', () => {
     expect(
       requestAmountOf(input({ unitPrice: { amountMinor: 10n ** 18n, currency: 'USD' }, beneficiaries: 1000 })),
     ).toMatchObject({ status: 'MISSING', reason: 'AMOUNT_TOO_LARGE' });
-  });
-});
-
-describe('the last day a right may end', () => {
-  it('is the day before the same day twelve months later (US-05-23 AC-9)', () => {
-    expect(maxEndDateOf('2026-11-10')).toBe('2027-11-09');
-    expect(maxEndDateOf('2028-02-29')).toBe('2029-02-27');
   });
 });
 

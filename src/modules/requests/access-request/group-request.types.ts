@@ -120,3 +120,7 @@ export const PRICED_LINE_STATES: readonly LineState[] = [
 
 export const pricedPeople = (lines: readonly LineState[]): number =>
   lines.filter((state) => PRICED_LINE_STATES.includes(state)).length;
+
+/** The people the request is priced for, in the order of their lines. */
+export const pricedPeopleIds = (lines: readonly { employeeId: string; state: LineState }[]): string[] =>
+  lines.filter((line) => PRICED_LINE_STATES.includes(line.state)).map((line) => line.employeeId);

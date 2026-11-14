@@ -48,7 +48,8 @@ export class QuoteService {
    */
   price(
     quote: Quote,
-    request: { beneficiaries: number; endDate: BusinessDate | null },
+    /** `endIsDerived`: the end was worked out from the months of use asked, as of `checkDate`; the request carries no end date (`QĐ-111i`). */
+    request: { beneficiaries: number; endDate: BusinessDate | null; endIsDerived?: boolean },
     context: { checkDate: BusinessDate },
   ): PricingRecord {
     const priced = priceFromQuote({
@@ -62,6 +63,6 @@ export class QuoteService {
       throw new AssessmentQuoteRefusedError(priced.reason);
     }
 
-    return pricingRecordOfQuote(priced, request.endDate);
+    return pricingRecordOfQuote(priced, request.endIsDerived === true ? null : request.endDate);
   }
 }

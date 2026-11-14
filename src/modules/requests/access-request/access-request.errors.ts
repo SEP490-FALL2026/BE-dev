@@ -1,4 +1,5 @@
 import type { BusinessDate } from '../../../core/business-date';
+import type { TermRefusal } from '../../../core/term-limit';
 import type { WithdrawalRefusal } from './withdrawal.policy';
 import type { CancellationRefusal, HeldAccess } from './access-request.types';
 
@@ -85,24 +86,23 @@ export class AccessRequestNotPriceableError extends Error {
   }
 }
 
-/**
- * The end date asked for is before today or later than a year from today (`US-05-23` AC-9, `QĐ-104a`): the last day a right may
- * end is the day before the same day twelve months later. A draft saved with a date that no longer fits must be saved again.
- */
-export class AccessRequestEndDateOutOfRangeError extends Error {
-  constructor(readonly maxEndDate: string) {
-    super(
-      'The end date is before today or more than a year from today. A draft saved with such a date must be saved again with a date inside the year.',
-    );
-    this.name = 'AccessRequestEndDateOutOfRangeError';
-  }
-}
+const TERM_MESSAGES: Readonly<Record<TermRefusal, string>> = {
+  TERM_REQUIRED: 'Give the time of use in months.',
+  TERM_MONTHS_OUT_OF_RANGE:
+    'The time of use is a whole number of months: from 1 to 9 for a plan bought by the month, from 1 to 12 for the others.',
+  TERM_NOT_ASKED: 'This plan is bought once: it takes no time of use.',
+  TERM_LONG_TERM_NOT_ALLOWED:
+    'A contractor, a freelancer or an intern gets access for a term: give the months, not a right with no end.',
+};
 
-/** The person it is for is not staff (a contractor, a freelancer, an intern) and the request names no end date (`FR-2.8`). */
-export class AccessRequestTermRequiredError extends Error {
-  constructor() {
-    super('A contractor, a freelancer or an intern gets access for a term: give the end date.');
-    this.name = 'AccessRequestTermRequiredError';
+/**
+ * The time of use the request gives is refused (`QĐ-111i`, `FR-2.8`, `INV-07`): it is missing, outside what the kind of plan takes, given to a
+ * plan that asks none, or no end for a person who has a term. A term that runs past the end of the contract is not refused: it is cut (R-38).
+ */
+export class AccessRequestTermRefusedError extends Error {
+  constructor(readonly reason: TermRefusal) {
+    super(TERM_MESSAGES[reason]);
+    this.name = 'AccessRequestTermRefusedError';
   }
 }
 

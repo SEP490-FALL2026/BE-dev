@@ -9,8 +9,8 @@ import type { TransferGraceHolding } from '../public/requests.extension-points';
 export interface SubmittedRequest {
   actor: { employeeId: string; appUserId: string };
   organizationId: string;
-  body: Pick<SubmitBodyDto, 'planId' | 'expectedEndDate' | 'businessReason'>;
-  assessed: Pick<Assessment, 'unit' | 'policy' | 'pricing' | 'routing'>;
+  body: Pick<SubmitBodyDto, 'planId' | 'businessReason'>;
+  assessed: Pick<Assessment, 'unit' | 'policy' | 'pricing' | 'routing' | 'term'>;
   now: Date;
   /** The draft the request is sent from: its row becomes the request. */
   draftId?: string;
@@ -39,8 +39,9 @@ export function newRequestOf(facts: SubmittedRequest): NewAccessRequest {
     departmentId: unit.departmentId,
     costCenterId: unit.costCenter?.id ?? null,
     businessReason: body.businessReason,
-    termMonths: null,
-    expectedEndDate: body.expectedEndDate ?? null,
+    // The time of use asked for; the end of the seat is worked out from the day it is granted (`QĐ-111i`), so the request carries no end date.
+    termMonths: assessed.term.months,
+    expectedEndDate: null,
     pricing,
     policy,
     createdByAppUserId: actor.appUserId,
@@ -68,7 +69,8 @@ export function submittedAuditDetail(facts: SubmittedRequest): { [key: string]: 
     branch: policy.branch,
     state: startState(assessed.routing),
     planId: body.planId,
-    expectedEndDate: body.expectedEndDate ?? null,
+    termMonths: assessed.term.months,
+    termCutAt: assessed.term.cutAt,
     requesterEmployeeId: actor.employeeId,
     beneficiaryEmployeeIds: [actor.employeeId],
     departmentId: unit.departmentId,

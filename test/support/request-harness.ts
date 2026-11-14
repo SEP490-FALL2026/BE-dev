@@ -1,8 +1,6 @@
 import type { AssessmentWire } from '../../src/modules/requests/assessment/assessment.dto';
 import type { PreviewWire } from '../../src/modules/requests/request-submission/request-preview.dto';
 import request from 'supertest';
-import { addDays } from '../../src/core/business-date';
-import { addMonths } from '../../src/core/fiscal-year';
 import { ApiAccount } from './api-accounts';
 import { clearSpendingApprover, insertEmployeeWithoutPlacement, setSpendingApprover } from './builders/account.builder';
 import { assignHead } from './builders/organization.builder';
@@ -312,21 +310,15 @@ export class RequestHarness extends ProvisioningHarness {
       .send({ group: 'T2', lines });
 
   /**
-   * A test that still says how long in months, said in the way the API takes it: the last day of the `termMonths`th month from the month
-   * of today (`QĐ-104a`; the month of today and the month of the end are counted whole, `BR-MF1-06`). No `termMonths` is no end date.
+   * A test says how long in months, as the API takes it: `termMonths` goes in the body as it is (`QĐ-111i`); there is no end date to give.
+   * Kept as one place so a test names the time of use the same way for every form.
    */
-  endDated = <T extends object>(extra: T): Record<string, unknown> => {
-    const { termMonths, ...rest } = extra as Record<string, unknown>;
-
-    return typeof termMonths === 'number'
-      ? { ...rest, expectedEndDate: addDays(addMonths(`${this.today().slice(0, 8)}01`, termMonths), -1) }
-      : rest;
-  };
+  endDated = <T extends object>(extra: T): Record<string, unknown> => ({ ...(extra as Record<string, unknown>) });
 
   /** The months of the amount of a request that runs `months` months from the month of today: the months left of the year at most (`BR-MF1-06`). */
   monthsOf = (months: number): number => Math.min(months, 12 - Number(this.today().slice(5, 7)) + 1);
 
-  /** A form of `BM-01` for the plan, complete: a right with no end unless `extra` gives an end date or `termMonths`. */
+  /** A form of `BM-01` for the plan, complete: a right with no end unless `extra` gives `termMonths`. */
   form = (planId: string, extra: Record<string, unknown> = {}) => ({
     planId,
     businessReason: 'Design the new brand',

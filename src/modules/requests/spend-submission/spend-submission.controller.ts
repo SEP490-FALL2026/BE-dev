@@ -254,13 +254,13 @@ export class SpendSubmissionController {
     {
       status: HttpStatus.CONFLICT,
       description:
-        'The request is not back in the queue (SPEND.SUPPLEMENT_NOT_IN_QUEUE), has no price (SPEND.SUPPLEMENT_NOT_PRICED), nothing changes (SPEND.SUPPLEMENT_NO_CHANGE), the end date is not earlier than the one the request has (SPEND.SUPPLEMENT_TERM_NOT_REDUCED), the end date is before today or more than a year from today (SPEND.SUPPLEMENT_END_DATE_OUT_OF_RANGE), cannot be priced for it (ACCESS_REQUEST.NOT_PRICEABLE), or a person to leave out is not a line whose need is confirmed (SUPPLEMENT.LINE_NOT_DROPPABLE).',
+        'The request is not back in the queue (SPEND.SUPPLEMENT_NOT_IN_QUEUE), has no price (SPEND.SUPPLEMENT_NOT_PRICED), nothing changes (SPEND.SUPPLEMENT_NO_CHANGE), the time of use is not shorter than the one the request has (SPEND.SUPPLEMENT_TERM_NOT_REDUCED), the time of use is not 1 to 12 whole months (SPEND.SUPPLEMENT_TERM_MONTHS_OUT_OF_RANGE), cannot be priced for it (ACCESS_REQUEST.NOT_PRICEABLE), or a person to leave out is not a line whose need is confirmed (SUPPLEMENT.LINE_NOT_DROPPABLE).',
       examples: [
         GROUP_REQUEST_ERROR_EXAMPLES.SUPPLEMENT_NOT_IN_QUEUE,
         GROUP_REQUEST_ERROR_EXAMPLES.SUPPLEMENT_NOT_PRICED,
         GROUP_REQUEST_ERROR_EXAMPLES.SUPPLEMENT_NO_CHANGE,
         GROUP_REQUEST_ERROR_EXAMPLES.SUPPLEMENT_TERM_NOT_REDUCED,
-        GROUP_REQUEST_ERROR_EXAMPLES.SUPPLEMENT_END_DATE_OUT_OF_RANGE,
+        GROUP_REQUEST_ERROR_EXAMPLES.SUPPLEMENT_TERM_MONTHS_OUT_OF_RANGE,
         GROUP_REQUEST_ERROR_EXAMPLES.NOT_PRICEABLE,
         GROUP_REQUEST_ERROR_EXAMPLES.LINE_NOT_DROPPABLE,
       ],

@@ -1,6 +1,4 @@
 import { Injectable } from '@nestjs/common';
-import { OrganizationReadApi } from '../../organization/public/organization-read.api';
-import { maxEndDateOf } from '../access-request/pricing.policy';
 import { TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AccessRequestNotFoundError, AccessRequestNotRequesterError } from '../access-request/access-request.errors';
@@ -14,6 +12,18 @@ import { SpendHeadService } from './spend-head.service';
 import { SupplementPricing } from './supplement-pricing.service';
 import { SupplementQueryService } from './supplement-query.service';
 import { SupplementRecorder } from './supplement-recorder.service';
+
+/**
+ * The months the file asks for and the months the request has. A request of an older release that carries an end date has no months to compare:
+ * any time of use of the file is shorter (`QĐ-111i`).
+ */
+const termFactsOf = (
+  body: SupplementBodyDto,
+  request: { termMonths: number | null; expectedEndDate: string | null },
+) =>
+  body.termMonths === undefined
+    ? undefined
+    : { requested: body.termMonths, current: request.expectedEndDate === null ? request.termMonths : null };
 
 /**
  * The supplementary file of the head (`QĐ-82n`, `US-06-14` AC-13, AC-15, `L2-38`): once a request is sent, its term is shortened (an
@@ -32,7 +42,6 @@ export class SupplementService {
     private readonly pricing: SupplementPricing,
     private readonly recorder: SupplementRecorder,
     private readonly queries: SupplementQueryService,
-    private readonly organizationReads: OrganizationReadApi,
   ) {}
 
   /**
@@ -52,30 +61,28 @@ export class SupplementService {
       // The people of a group the head leaves out are judged first: a request for one person has none to leave out.
       const dropped = this.groups.check(request, body.dropEmployeeIds ?? []);
       const now = new Date();
-      const today = await this.organizationReads.businessToday(now, tx);
       const refusal = checkSupplement({
         state: request.state,
         priced: pricing.status === 'PRICED' && pricing.amount !== null,
         leavesPeopleOut: dropped.length > 0,
-        term:
-          body.expectedEndDate === undefined
-            ? undefined
-            : {
-                requested: body.expectedEndDate,
-                current: request.expectedEndDate,
-                today,
-                maxEndDate: maxEndDateOf(today),
-              },
+        term: termFactsOf(body, request),
       });
       if (refusal) throw new SpendSupplementRefusedError(refusal);
 
       const { repriced, change } = await this.pricing.repriceFor(tx, request, {
         dropped,
-        expectedEndDate: body.expectedEndDate,
+        termMonths: body.termMonths,
         now,
       });
 
-      return this.recorder.record(tx, actor, request, { reason: body.reason, repriced, change, dropped, now });
+      return this.recorder.record(tx, actor, request, {
+        reason: body.reason,
+        repriced,
+        change,
+        dropped,
+        termMonths: body.termMonths,
+        now,
+      });
     });
 
     return (await this.queries.wires(requestId, [record]))[0];

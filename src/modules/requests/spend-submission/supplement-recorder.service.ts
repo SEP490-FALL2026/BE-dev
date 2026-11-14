@@ -32,11 +32,14 @@ export class SupplementRecorder {
       repriced: PricingRecord;
       change: NonNullable<ReturnType<typeof supplementChangeOf>>;
       dropped: readonly string[];
+      /** The shorter time of use the file gives, kept on the request in place of the one it had. */
+      termMonths?: number;
       now: Date;
     },
   ): Promise<SupplementRecord> {
     const { repriced, change, dropped, now } = written;
     await this.requests.setPricing(tx, request.id, repriced);
+    if (written.termMonths !== undefined) await this.requests.setTermMonths(tx, request.id, written.termMonths);
     const saved = await this.supplements.insert(tx, {
       organizationId: request.organizationId,
       requestId: request.id,

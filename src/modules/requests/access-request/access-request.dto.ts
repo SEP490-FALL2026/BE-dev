@@ -1,7 +1,6 @@
 import { createZodDto } from '../../../infrastructure/http/dto/zod-dto';
 import { z } from 'zod';
 import { successEnvelopeSchema } from '../../../infrastructure/http/dto/success-envelope.dto';
-import { businessDate } from '../../../infrastructure/http/dto/business-date.dto';
 import { READABLE_CANCEL_CAUSES } from './group-request.types';
 import { LIMIT_EXEMPTIONS } from './access-request.types';
 
@@ -15,15 +14,24 @@ export const limitExemptionSchema = z.enum(LIMIT_EXEMPTIONS);
 export const REASON_MAX_LENGTH = 1000;
 
 /**
- * `BM-01` as the person sending it fills it (`US-01-12` AC-1, `US-05-02` AC-6): the plan and the reason are required, the day the
- * right ends is optional (a right has no end unless the sender gives one, at most a year away, and a contractor, a freelancer or an
- * intern must give it, `QĐ-104a`, `FR-2.8`). Nothing here chooses the branch, the Cost Center or who decides: the system fixes
- * them from the plan and the department.
+ * The time of use, in whole months (`QĐ-111i`, `FR-2.8`): a plan bought by the month (`K1`) needs it, 1 to 9; a plan of seats (`K2`) or
+ * internal software (`K5`) takes 1 to 12, or null for a right with no end (_Dùng lâu dài_), which a contractor, a freelancer or an intern
+ * never gets; a plan bought once (`K4`) takes none. The rule of the kind of plan is judged when the request is sent or looked at.
+ */
+export const termMonthsSchema = z.number().int().nullable().meta({
+  description:
+    'The time of use in whole months: required for a plan bought by the month (1 to 9); 1 to 12, or null for a right with no end, for a plan of seats or internal software (not for a contractor, a freelancer or an intern); none for a plan bought once.',
+});
+
+/**
+ * `BM-01` as the person sending it fills it (`US-01-12` AC-1, `US-05-02` AC-6): the plan and the reason are required, and the time of use
+ * in months when the kind of plan asks for it (`QĐ-111i`): there is no end date to give. Nothing here chooses the branch, the Cost Center
+ * or who decides: the system fixes them from the plan and the department.
  */
 export const submitBodySchema = z.strictObject({
   planId: z.uuid(),
   businessReason: z.string().trim().min(1).max(REASON_MAX_LENGTH),
-  expectedEndDate: businessDate.optional(),
+  termMonths: termMonthsSchema.optional(),
 });
 /**
  * The decision of the need step: a refusal gives its reason (`BR-07.5`), and nothing else is accepted: there is no signature or certificate to attach
@@ -92,6 +100,30 @@ export const costEstimateSchema = z.strictObject({
   estimatedCost: moneySchema,
   totalPayable: moneySchema,
 });
+/**
+ * What a request costs by the year, before tax (`QĐ-111j`, `QĐ-111k`): the months that begin in the year it is judged in, and the part of
+ * the year after, an estimate that is kept when the spend is approved. Null when nothing is priced by the month. This is never a budget
+ * figure: nobody but the spending approver and Finance sees what is left of a budget.
+ */
+export const costViewSchema = z.strictObject({
+  currentYear: z.strictObject({ year: z.number().int(), months: z.number().int().nullable(), amount: moneySchema }),
+  nextYear: z
+    .strictObject({
+      from: z.string().meta({ description: 'The first day of the year after, YYYY-MM-DD.' }),
+      months: z.number().int().nullable(),
+      amount: moneySchema,
+      estimate: z.literal(true),
+    })
+    .nullable(),
+  termCutAt: z
+    .string()
+    .nullable()
+    .meta({ description: 'The last day of the contract of a person with a term, when it cut the time of use short.' }),
+  months: z.number().int().nullable().meta({
+    description: 'The months that have begun by the end of the term, each counted whole; null for a right with no end.',
+  }),
+});
+
 export const pricingSchema = z.strictObject({
   status: z.enum(['NOT_APPLICABLE', 'PRICED', 'MISSING']),
   missingReason: z.enum(['NO_PRICED_SUBSCRIPTION', 'CYCLE_UNKNOWN', 'AMOUNT_TOO_LARGE', 'AWAITING_QUOTE']).nullable(),
@@ -223,6 +255,8 @@ export const requestSchema = z.strictObject({
   /** The fiscal year the cost is charged to: a provisional year from today until the spend is decided; null for internal software. */
   budgetYear: z.number().int().nullable(),
   pricing: pricingSchema,
+  /** The cost by the year before tax, with the part of the year after (`QĐ-111j`, `QĐ-111k`); null when nothing is priced by the month. */
+  cost: costViewSchema.nullable(),
   policy: z.strictObject({
     version: z.number().int().positive(),
     hasSpendStep: z.boolean(),

@@ -41,6 +41,8 @@ export type QuotePricing =
       billingCycle: QuoteCycle;
       months: number | null;
       budgetYear: number;
+      /** The cost of the months that begin in the year after (`QĐ-111k`); null when none does. */
+      nextYearAmount: Money | null;
     }
   | ({ status: 'REFUSED' } & QuoteRefusal);
 
@@ -72,6 +74,7 @@ export function priceFromQuote(input: QuotePricingInput): QuotePricing {
     billingCycle: quote.billingCycle,
     months: priced.months,
     budgetYear: priced.budgetYear,
+    nextYearAmount: priced.nextYearAmount,
   };
 }
 
@@ -90,6 +93,6 @@ export function pricingRecordOfQuote(
     amount: priced.amount,
     unitPrice: priced.unitPrice,
     billingCycle: priced.billingCycle,
-    nextYearAmount: null,
+    nextYearAmount: priced.nextYearAmount,
   };
 }

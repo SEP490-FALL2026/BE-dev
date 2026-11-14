@@ -15,8 +15,7 @@ import {
   AccessRequestNotDraftError,
   AccessRequestRoleRequiredError,
   AccessRequestSuperAdminCannotRequestError,
-  AccessRequestEndDateOutOfRangeError,
-  AccessRequestTermRequiredError,
+  AccessRequestTermRefusedError,
   AccessRequestGroupUsesLinesError,
   AccessRequestApplicationRetiredError,
   AccessRequestDecisionRefusedError,
@@ -81,15 +80,8 @@ export function toAccessRequestApiException(error: unknown): unknown {
     );
   }
 
-  if (error instanceof AccessRequestEndDateOutOfRangeError) {
-    return new ApiException(HttpStatus.UNPROCESSABLE_ENTITY, {
-      code: 'ACCESS_REQUEST.END_DATE_OUT_OF_RANGE',
-      message: error.message,
-      details: { maxEndDate: error.maxEndDate },
-    });
-  }
-  if (error instanceof AccessRequestTermRequiredError) {
-    return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'ACCESS_REQUEST.TERM_REQUIRED', error.message);
+  if (error instanceof AccessRequestTermRefusedError) {
+    return refuse(HttpStatus.UNPROCESSABLE_ENTITY, `ACCESS_REQUEST.${error.reason}`, error.message);
   }
   if (error instanceof AccessRequestAlreadyHoldsAccessError) {
     return new ApiException(HttpStatus.CONFLICT, {
@@ -173,8 +165,10 @@ export const ACCESS_REQUEST_ERROR_EXAMPLES = {
   NOT_FOUND: example(new AccessRequestNotFoundError()),
   PLAN_NOT_FOUND: example(new AccessRequestPlanNotFoundError()),
   APPLICATION_RETIRED: example(new AccessRequestApplicationRetiredError()),
-  END_DATE_OUT_OF_RANGE: example(new AccessRequestEndDateOutOfRangeError('2027-11-09')),
-  TERM_REQUIRED: example(new AccessRequestTermRequiredError()),
+  TERM_REQUIRED: example(new AccessRequestTermRefusedError('TERM_REQUIRED')),
+  TERM_MONTHS_OUT_OF_RANGE: example(new AccessRequestTermRefusedError('TERM_MONTHS_OUT_OF_RANGE')),
+  TERM_NOT_ASKED: example(new AccessRequestTermRefusedError('TERM_NOT_ASKED')),
+  TERM_LONG_TERM_NOT_ALLOWED: example(new AccessRequestTermRefusedError('TERM_LONG_TERM_NOT_ALLOWED')),
   NO_DEPARTMENT: example(new AccessRequestNoDepartmentError()),
   REQUEST_PARTY_INELIGIBLE: example(
     new RequestPartyIneligibleError({
@@ -220,3 +214,11 @@ export const ACCESS_REQUEST_ERROR_EXAMPLES = {
   BENEFICIARY_NOT_TRANSFERRED: cancellation('BENEFICIARY_NOT_TRANSFERRED'),
   EVIDENCE_REQUIRED: cancellation('EVIDENCE_REQUIRED'),
 } as const;
+
+/** The four answers of a time of use that is refused, for the routes that take one (`QĐ-111i`). */
+export const TERM_ERROR_EXAMPLES = [
+  ACCESS_REQUEST_ERROR_EXAMPLES.TERM_REQUIRED,
+  ACCESS_REQUEST_ERROR_EXAMPLES.TERM_MONTHS_OUT_OF_RANGE,
+  ACCESS_REQUEST_ERROR_EXAMPLES.TERM_NOT_ASKED,
+  ACCESS_REQUEST_ERROR_EXAMPLES.TERM_LONG_TERM_NOT_ALLOWED,
+] as const;

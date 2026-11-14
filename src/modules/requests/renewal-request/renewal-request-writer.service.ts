@@ -62,7 +62,7 @@ export class RenewalRequestWriter {
       requesterEmployeeId: actor.employeeId,
       planId: facts.planId,
       // The new period is priced from the day it begins to the end it asks for, in the year it is judged in (`QĐ-109b`, `QĐ-109e`).
-      expectedEndDate: newEnd,
+      renewalEnd: newEnd,
       pricingFrom: input.spendStartsOn,
       now,
       settings: input.settings,

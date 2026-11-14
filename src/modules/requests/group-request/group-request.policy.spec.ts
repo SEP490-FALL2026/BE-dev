@@ -18,7 +18,7 @@ const person = (over: Partial<LineFacts> = {}): LineFacts => ({
   holdsAccess: false,
   hasOpenRequest: false,
   isDepartmentHead: false,
-  termRequired: false,
+  termRefusal: null,
   spendingApprover: false,
   ...over,
 });
@@ -108,6 +108,19 @@ describe('what each person named must have (US-05-17 AC-2, AC-8, AC-12, AC-15)',
 
   it('takes an intern with no day of their own: the system works it out', () => {
     expect(check([person({ employmentType: 'INTERN' })])).toEqual([]);
+  });
+
+  it('T-R38, INV-07: refuses on their own line a person with a term when the group gives no months or no end, and nobody else', () => {
+    const refused = check([
+      person({ employeeId: 'staff' }),
+      person({ employeeId: 'intern', employmentType: 'INTERN', termRefusal: 'TERM_LONG_TERM_NOT_ALLOWED' }),
+      person({ employeeId: 'contractor', employmentType: 'CONTRACTOR', termRefusal: 'TERM_REQUIRED' }),
+    ]);
+
+    expect(refused).toEqual([
+      { employeeId: 'intern', reason: 'TERM_LONG_TERM_NOT_ALLOWED' },
+      { employeeId: 'contractor', reason: 'TERM_REQUIRED' },
+    ]);
   });
 
   it('gives the first reason of a person in the order a caller should learn it', () => {

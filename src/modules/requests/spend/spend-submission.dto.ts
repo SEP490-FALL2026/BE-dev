@@ -1,7 +1,6 @@
 import { createZodDto } from '../../../infrastructure/http/dto/zod-dto';
 import { z } from 'zod';
 import { successEnvelopeSchema } from '../../../infrastructure/http/dto/success-envelope.dto';
-import { businessDate } from '../../../infrastructure/http/dto/business-date.dto';
 import { requestStateSchema } from '../access-request/access-request.dto';
 
 const text = (max: number) => z.string().trim().min(1).max(max);
@@ -51,14 +50,16 @@ export const supplementBodySchema = z
       .refine((ids) => new Set(ids).size === ids.length, { message: 'A person is named once.' })
       .meta({ uniqueItems: true })
       .optional(),
-    /** An earlier day the right ends than the request has (a request with no end may be given one); the price is made again for it. */
-    expectedEndDate: businessDate.optional(),
+    /** A shorter time of use than the request has, in months (a request with no end may be given one); the price is made again for it. */
+    termMonths: z.number().int().optional(),
     reason: text(1000),
   })
-  .refine((body) => body.dropEmployeeIds !== undefined || body.expectedEndDate !== undefined, {
-    message: 'Name the people to leave out, an earlier end date, or both.',
+  .refine((body) => body.dropEmployeeIds !== undefined || body.termMonths !== undefined, {
+    message: 'Name the people to leave out, a shorter time of use, or both.',
   })
-  .meta({ description: 'The people of the group the head leaves out and/or an earlier end date, and why.' });
+  .meta({
+    description: 'The people of the group the head leaves out and/or a shorter time of use in months, and why.',
+  });
 
 const pageQuery = {
   page: z.coerce.number().int().positive().default(1),

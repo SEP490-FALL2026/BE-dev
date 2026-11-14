@@ -3,6 +3,7 @@ import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import type { AccessRequestRecord, PricingRecord } from '../access-request/access-request.types';
 import type { Quote } from '../access-request/assessment-record.types';
+import { RequestTermEndsService } from '../repricing/request-term-ends.service';
 import { QuoteService } from './quote.service';
 
 const NOT_APPLICABLE: PricingRecord = {
@@ -28,7 +29,17 @@ export class AssessmentPricingService {
   constructor(
     private readonly organizationReads: OrganizationReadApi,
     private readonly quotes: QuoteService,
+    private readonly termEnds: RequestTermEndsService,
   ) {}
+
+  /** The end the quote prices to: worked out from the months of use of a request of this release, the end date of an older one otherwise. */
+  private async endOf(tx: DbTx, request: AccessRequestRecord, today: string) {
+    const ends = await this.termEnds.of(tx, request, today);
+
+    return ends === null
+      ? { endDate: request.expectedEndDate }
+      : { endDate: ends[0] ?? null, endIsDerived: true as const };
+  }
 
   async priceCompleted(
     tx: DbTx,
@@ -40,7 +51,7 @@ export class AssessmentPricingService {
 
     return this.quotes.price(
       quote,
-      { beneficiaries: request.beneficiaryEmployeeIds.length, endDate: request.expectedEndDate },
+      { beneficiaries: request.beneficiaryEmployeeIds.length, ...(await this.endOf(tx, request, today)) },
       { checkDate: today },
     );
   }
@@ -60,7 +71,7 @@ export class AssessmentPricingService {
     if (!quote) return { quote, pricing: NOT_APPLICABLE };
     const pricing = this.quotes.price(
       quote,
-      { beneficiaries: request.beneficiaryEmployeeIds.length, endDate: request.expectedEndDate },
+      { beneficiaries: request.beneficiaryEmployeeIds.length, ...(await this.endOf(tx, request, today)) },
       { checkDate: today },
     );
 

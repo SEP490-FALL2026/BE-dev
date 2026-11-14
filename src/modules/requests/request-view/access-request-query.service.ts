@@ -4,7 +4,8 @@ import { CatalogApi } from '../../catalog/public/catalog.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { AssessmentReadRepo } from '../access-request/assessment-read.repo';
 import type { ProposalRecord } from '../access-request/assessment-record.types';
-import { PricingViewService, type MoneyView, type PricingView } from './pricing-view.service';
+import { PricingViewService, type CostView, type MoneyView, type PricingView } from './pricing-view.service';
+import { RequestCostViewService } from './request-cost-view.service';
 import type { BlockReason } from '../spend/budget-check.policy';
 import type { SpendStage } from '../access-request/access-request.types';
 import { SpendStatusService, type SpendStatusView } from '../spend/spend-status.service';
@@ -83,6 +84,8 @@ export interface AccessRequestView extends Omit<
   policy: { version: number; hasSpendStep: boolean; slaWorkingDays: number };
   budgetYear: number | null;
   pricing: PricingView;
+  /** The cost by the year before tax, with the part of the year after (`QĐ-111j`, `QĐ-111k`); null when nothing is priced by the month. */
+  cost: CostView | null;
   /** Where the request stands on its way to the spending approver, for a request that costs money; never what is left of the budget. */
   spend: SpendView | null;
   needStep: NeedStepView;
@@ -146,6 +149,7 @@ export class AccessRequestQueryService {
     private readonly organizationReads: OrganizationReadApi,
     private readonly catalog: CatalogApi,
     private readonly pricing: PricingViewService,
+    private readonly costs: RequestCostViewService,
     private readonly assessments: AssessmentReadRepo,
     private readonly spendStatus: SpendStatusService,
     private readonly readAccess: RequestReadAccessService,
@@ -240,6 +244,7 @@ export class AccessRequestQueryService {
       spend: spendView,
       budgetYear: record.pricing.budgetYear,
       pricing: await this.pricing.view(record.pricing),
+      cost: await this.costs.of(record, record.pricing),
       policy: {
         version: record.policy.version,
         hasSpendStep: hasSpendStep(record.policy),

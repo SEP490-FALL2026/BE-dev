@@ -24,7 +24,6 @@ import {
   GroupRequestLinesMismatchError,
   GroupRequestLinesRefusedError,
   GroupRequestPlanNotEligibleError,
-  GroupRequestTermBeyondLimitError,
   GroupRequestTooFewLinesError,
   GroupRequestTooManyLinesError,
   GroupSupplementDropRefusedError,
@@ -49,13 +48,6 @@ export function toGroupRequestApiException(error: unknown): unknown {
       code: 'GROUP_REQUEST.TOO_MANY_LINES',
       message: error.message,
       details: { max: error.max },
-    });
-  }
-  if (error instanceof GroupRequestTermBeyondLimitError) {
-    return new ApiException(HttpStatus.UNPROCESSABLE_ENTITY, {
-      code: 'GROUP_REQUEST.TERM_BEYOND_LIMIT',
-      message: error.message,
-      details: { maxEndDate: error.maxEndDate },
     });
   }
   if (error instanceof GroupRequestTooFewLinesError) {
@@ -125,7 +117,6 @@ export const GROUP_REQUEST_ERROR_EXAMPLES = {
   PLAN_NOT_ELIGIBLE: example(new GroupRequestPlanNotEligibleError('KIND_NOT_MULTI_SEAT')),
   TOO_MANY_LINES: example(new GroupRequestTooManyLinesError(GROUP_EMPLOYEE_MAX)),
   TOO_FEW_LINES: example(new GroupRequestTooFewLinesError(GROUP_LINES_MIN)),
-  TERM_BEYOND_LIMIT: example(new GroupRequestTermBeyondLimitError('2027-11-09')),
   DUPLICATE_LINE: example(new GroupRequestDuplicateLineError([PERSON])),
   LINES_REFUSED: example(new GroupRequestLinesRefusedError([{ employeeId: PERSON, reason: 'OUTSIDE_DEPARTMENT' }])),
   REQUEST_NOT_FOUND: example(new AccessRequestNotFoundError()),
@@ -156,7 +147,7 @@ export const GROUP_REQUEST_ERROR_EXAMPLES = {
   SUPPLEMENT_NOT_PRICED: example(new SpendSupplementRefusedError('NOT_PRICED')),
   SUPPLEMENT_NO_CHANGE: example(new SpendSupplementRefusedError('NO_CHANGE')),
   SUPPLEMENT_TERM_NOT_REDUCED: example(new SpendSupplementRefusedError('TERM_NOT_REDUCED')),
-  SUPPLEMENT_END_DATE_OUT_OF_RANGE: example(new SpendSupplementRefusedError('END_DATE_OUT_OF_RANGE')),
+  SUPPLEMENT_TERM_MONTHS_OUT_OF_RANGE: example(new SpendSupplementRefusedError('TERM_MONTHS_OUT_OF_RANGE')),
   NOT_PRICEABLE: example(new AccessRequestNotPriceableError()),
   LINE_NOT_DROPPABLE: example(new GroupSupplementDropRefusedError('LINE_NOT_DROPPABLE', [PERSON])),
   CANNOT_DROP_LAST_LINE: example(new GroupSupplementDropRefusedError('CANNOT_DROP_LAST_LINE')),

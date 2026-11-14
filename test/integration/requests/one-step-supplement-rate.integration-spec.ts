@@ -1,4 +1,5 @@
 import request from 'supertest';
+import { termEndOf } from '../../../src/core/term-limit';
 import { GroupHarness } from '../../support/group-harness';
 import type { AccessRequestWire } from '../../support/request-harness';
 
@@ -47,14 +48,14 @@ describe('BR-MF1-02 one-step reserve, supplementary files and a price left outsi
     const sent = await h.sent(u.head, plan);
     expect(sent.state).toBe('AWAITING_REQUESTER_REVISION');
     await h
-      .addSupplement(sent.id, { reason: 'Only need access until today', expectedEndDate: h.today() }, u.member.account)
+      .addSupplement(sent.id, { reason: 'Only need access for a month', termMonths: 1 }, u.member.account)
       .expect(403);
     const response = await h
       .addSupplement(
         sent.id,
         {
-          reason: 'Only need access until today',
-          expectedEndDate: h.today(),
+          reason: 'Only need access for a month',
+          termMonths: 1,
         },
         u.head.account,
       )
@@ -64,13 +65,14 @@ describe('BR-MF1-02 one-step reserve, supplementary files and a price left outsi
     }>(response).supplement;
     expect(file).toMatchObject({
       changedBy: { employeeId: u.head.employeeId },
-      expectedEndDate: { before: null, after: h.today() },
+      expectedEndDate: { before: null, after: termEndOf(h.today(), 1) },
     });
     await h.budgetFor(u, { total: 10 * M });
     await resubmit(sent.id, u.head.account).expect(200);
     expect(await fetch(sent.id, u.head.account)).toMatchObject({
       state: 'AWAITING_SPEND_DECISION',
-      expectedEndDate: h.today(),
+      termMonths: 1,
+      expectedEndDate: null,
     });
   });
 

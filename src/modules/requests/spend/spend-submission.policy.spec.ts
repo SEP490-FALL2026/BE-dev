@@ -5,12 +5,7 @@ describe('the supplementary file (US-06-14 AC-13, AC-15; US-05-04 AC-16; L2-38)'
     state: 'AWAITING_SPEND_SUBMISSION',
     priced: true,
   };
-  const term = (requested: string, current: string | null) => ({
-    requested,
-    current,
-    today: '2026-11-10',
-    maxEndDate: '2027-11-09',
-  });
+  const term = (requested: number, current: number | null) => ({ requested, current });
 
   it('leaves people of a group out of a request back in the queue', () => {
     expect(checkSupplement({ ...facts, leavesPeopleOut: true })).toBeNull();
@@ -28,19 +23,19 @@ describe('the supplementary file (US-06-14 AC-13, AC-15; US-05-04 AC-16; L2-38)'
     expect(checkSupplement({ ...facts })).toBe('NO_CHANGE');
   });
 
-  it('L2-38: shortens a term to an earlier end date, and gives an end to a right that had none', () => {
-    expect(checkSupplement({ ...facts, term: term('2026-12-31', '2027-03-31') })).toBeNull();
-    expect(checkSupplement({ ...facts, term: term('2027-09-30', null) })).toBeNull();
+  it('L2-38, QĐ-111i: shortens the time of use to fewer months, and gives an end to a right that had none', () => {
+    expect(checkSupplement({ ...facts, term: term(3, 6) })).toBeNull();
+    expect(checkSupplement({ ...facts, term: term(12, null) })).toBeNull();
   });
 
-  it('L2-38: refuses an end date that is not earlier than the one the request has', () => {
-    expect(checkSupplement({ ...facts, term: term('2027-03-31', '2027-03-31') })).toBe('TERM_NOT_REDUCED');
-    expect(checkSupplement({ ...facts, term: term('2027-06-30', '2027-03-31') })).toBe('TERM_NOT_REDUCED');
+  it('L2-38: refuses a time of use that is not shorter than the one the request has', () => {
+    expect(checkSupplement({ ...facts, term: term(6, 6) })).toBe('TERM_NOT_REDUCED');
+    expect(checkSupplement({ ...facts, term: term(9, 6) })).toBe('TERM_NOT_REDUCED');
   });
 
-  it('L2-38: refuses an end date before today or more than a year from today', () => {
-    expect(checkSupplement({ ...facts, term: term('2026-11-09', null) })).toBe('END_DATE_OUT_OF_RANGE');
-    expect(checkSupplement({ ...facts, term: term('2027-11-10', null) })).toBe('END_DATE_OUT_OF_RANGE');
+  it('QĐ-111i: refuses a time of use that is not 1 to 12 whole months', () => {
+    expect(checkSupplement({ ...facts, term: term(0, null) })).toBe('TERM_MONTHS_OUT_OF_RANGE');
+    expect(checkSupplement({ ...facts, term: term(13, null) })).toBe('TERM_MONTHS_OUT_OF_RANGE');
   });
 });
 

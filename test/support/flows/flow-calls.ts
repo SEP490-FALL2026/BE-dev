@@ -1,7 +1,6 @@
 import type { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import type { App } from 'supertest/types';
-import { termEndOf } from '../../../src/core/term-limit';
 import { bodyOf } from '../api-body';
 import type { FlowActors } from './flow-actors';
 import type { FlowClock } from './flow-clock';
@@ -89,13 +88,11 @@ export class FlowCalls {
 
   /** An employee sends a Request for a plan and the id of it is returned, failing on anything but 201. */
   async submitRequest(code: string, planId: string, extra: Record<string, unknown> = {}): Promise<string> {
-    // A flow that still says how long in months says it as the API takes it: the day the right ends (`QĐ-104a`).
-    const { termMonths, ...rest } = extra;
+    // A flow says how long in months, as the API takes it (`QĐ-111i`): `termMonths` goes in the body as it is.
     const response = await this.post(code, '/access-requests', {
       planId,
       businessReason: 'Cần cho công việc của nhóm',
-      ...rest,
-      ...(typeof termMonths === 'number' ? { expectedEndDate: termEndOf(this.today(), termMonths) } : {}),
+      ...extra,
     });
     if (response.status !== 201)
       throw new Error(`submit answered ${response.status}: ${JSON.stringify(response.body)}`);

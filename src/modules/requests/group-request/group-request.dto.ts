@@ -1,13 +1,13 @@
 import { createZodDto } from '../../../infrastructure/http/dto/zod-dto';
 import { z } from 'zod';
 import { successEnvelopeSchema } from '../../../infrastructure/http/dto/success-envelope.dto';
-import { businessDate } from '../../../infrastructure/http/dto/business-date.dto';
 import {
   REASON_MAX_LENGTH,
   employeeRef,
   moneySchema,
   pricingSchema,
   requestSchema,
+  termMonthsSchema,
 } from '../access-request/access-request.dto';
 import { LINE_STATES, READABLE_CANCEL_CAUSES } from '../access-request/group-request.types';
 
@@ -20,9 +20,9 @@ export const GROUP_BODY_LINES_MAX = 1000;
 const reason = z.string().trim().min(1).max(REASON_MAX_LENGTH);
 
 /**
- * What the sender gives for a group (`US-05-17`, `US-05-02` AC-2): the plan, the people with the day the access of each ends when
- * they are not staff, and the reason, the term and the project they share. The branch, the Cost Center, the amount and who decides
- * are fixed by the system; a head confirms a term over twelve months in so many words when sending.
+ * What the sender gives for a group (`US-05-17`, `US-05-02` AC-2): the plan, the people, and the reason and the time of use in months
+ * they share (`QĐ-111i`). The branch, the Cost Center, the amount and who decides are fixed by the system; a person with a term whose
+ * contract ends sooner is cut at the end of it, on their own line (R-38).
  */
 export const groupBodySchema = z.strictObject({
   planId: z.uuid(),
@@ -31,8 +31,8 @@ export const groupBodySchema = z.strictObject({
     .min(1)
     .max(GROUP_BODY_LINES_MAX),
   businessReason: reason,
-  /** The day the access of every person named ends; absent for no end, and then each person who is not staff is refused (`FR-2.8`). */
-  expectedEndDate: businessDate.optional(),
+  /** The time of use of every person named, in months; null for no end, and then each person who has a term is refused (`FR-2.8`, `INV-07`). */
+  termMonths: termMonthsSchema.optional(),
 });
 
 const LINE_REASONS = [
@@ -44,6 +44,7 @@ const LINE_REASONS = [
   'HAS_ACCESS',
   'HAS_OPEN_REQUEST',
   'TERM_REQUIRED',
+  'TERM_LONG_TERM_NOT_ALLOWED',
   'OPEN_LIMIT_REACHED',
 ] as const;
 
@@ -57,9 +58,13 @@ const checkSchema = z.strictObject({
   tooManyLines: z.strictObject({ max: z.number().int().positive() }).nullable(),
   /** The fewest different people a request for a group names, when fewer were named. */
   tooFewLines: z.strictObject({ min: z.number().int().positive() }).nullable(),
-  /** The last day a right asked for today may end, and whether the end date asked for is outside it (`US-05-23` AC-9). */
-  maxEndDate: z.string(),
-  endDateOutOfRange: z.boolean(),
+  /**
+   * What is wrong with the time of use for the plan as a whole, or null (`QĐ-111i`); a person with a term who gets no months, or no end, is
+   * refused on their own line (`TERM_REQUIRED`, `TERM_LONG_TERM_NOT_ALLOWED`), and one whose contract ends sooner is cut, not refused.
+   */
+  termRefusal: z
+    .enum(['TERM_REQUIRED', 'TERM_MONTHS_OUT_OF_RANGE', 'TERM_NOT_ASKED', 'TERM_LONG_TERM_NOT_ALLOWED'])
+    .nullable(),
   lines: z.array(
     z.strictObject({
       employeeId: z.uuid(),

@@ -9,8 +9,7 @@ import {
   AccessRequestNotDraftError,
   AccessRequestNotFoundError,
   AccessRequestSuperAdminCannotRequestError,
-  AccessRequestEndDateOutOfRangeError,
-  AccessRequestTermRequiredError,
+  AccessRequestTermRefusedError,
 } from '../access-request/access-request.errors';
 import { mayRequest } from '../access-request/access-request.policy';
 import { AccessRequestRepo } from '../access-request/access-request.repo';
@@ -97,14 +96,13 @@ export class AccessRequestService {
     const assessed = await this.assessment.assess(tx, {
       employeeId: actor.employeeId,
       planId: body.planId,
-      expectedEndDate: body.expectedEndDate ?? null,
+      termMonths: body.termMonths,
       now,
       settings,
       lockDepartment: true,
     });
     this.requireNotHeld(assessed, options.toleratedSeatId);
-    if (assessed.endDateOutOfRange) throw new AccessRequestEndDateOutOfRangeError(assessed.maxEndDate);
-    if (assessed.termRequired) throw new AccessRequestTermRequiredError();
+    if (assessed.termRefusal !== null) throw new AccessRequestTermRefusedError(assessed.termRefusal);
     await this.limits.requireForOne(tx, {
       employeeId: actor.employeeId,
       planId: body.planId,

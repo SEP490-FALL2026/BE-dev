@@ -148,7 +148,7 @@ describe('F1-08 Request nhóm: nhu cầu → trình lô → duyệt chi → cấ
     const sent = await call().post('NV-ENGH', '/group-requests', {
       planId: figma,
       businessReason: 'Nhà thầu và một đồng nghiệp cần Figma',
-      expectedEndDate: end,
+      termMonths: 1,
       lines: [{ employeeId: contractor }, { employeeId: dev1 }],
     });
     expect(sent.status).toBe(201);

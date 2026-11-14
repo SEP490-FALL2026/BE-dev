@@ -1,3 +1,4 @@
+import { TERM_LIMIT_MONTHS } from '../../../core/term-limit';
 import { currentMissingReasonOf } from '../access-request/access-request.policy';
 
 /**
@@ -31,29 +32,30 @@ export type SupplementRefusal =
   | 'NOT_PRICED'
   /** The file changes nothing: no person left out and no earlier end date. */
   | 'NO_CHANGE'
-  /** The end date is not earlier than the one the request has (a right with no end is later than any day). */
+  /** The time of use is not shorter than the one the request has (a right with no end is longer than any). */
   | 'TERM_NOT_REDUCED'
-  /** The end date is before today, or more than a year from today. */
-  | 'END_DATE_OUT_OF_RANGE';
+  /** The time of use is not 1 to 12 whole months. */
+  | 'TERM_MONTHS_OUT_OF_RANGE';
 
 /**
  * The head shortens the term, or leaves people of a group out, only on a request that is back in their queue, priced, and only
- * when something is reduced: an earlier end date, or fewer people (`L2-38`, `P1-06`).
+ * when something is reduced: fewer months of use, or fewer people (`L2-38`, `P1-06`, `QĐ-111i`).
  */
 export function checkSupplement(facts: {
   state: string;
   priced: boolean;
   /** The file leaves people of a request for a group out. */
   leavesPeopleOut?: boolean;
-  /** The end date the file asks for, when it asks for one, with the end date and the limits the request has. */
-  term?: { requested: string; current: string | null; today: string; maxEndDate: string };
+  /** The months of use the file asks for, when it asks for them, and the months the request has (null: a right with no end). */
+  term?: { requested: number; current: number | null };
 }): SupplementRefusal | null {
   if (facts.state !== 'AWAITING_SPEND_SUBMISSION' && facts.state !== 'AWAITING_REQUESTER_REVISION')
     return 'NOT_IN_QUEUE';
   if (!facts.priced) return 'NOT_PRICED';
   if (facts.term) {
-    const { requested, current, today, maxEndDate } = facts.term;
-    if (requested < today || requested > maxEndDate) return 'END_DATE_OUT_OF_RANGE';
+    const { requested, current } = facts.term;
+    if (!Number.isInteger(requested) || requested < 1 || requested > TERM_LIMIT_MONTHS)
+      return 'TERM_MONTHS_OUT_OF_RANGE';
     if (current !== null && requested >= current) return 'TERM_NOT_REDUCED';
 
     return null;
