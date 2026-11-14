@@ -253,6 +253,25 @@ describe('POST /applications: the application and its first plan in one command 
     });
   });
 
+  it('lets exactly one of two simultaneous declarations of the same name under different vendors through: the duplicate check is made under a lock', async () => {
+    for (let round = 0; round < 4; round += 1) {
+      const name = unique('Race');
+
+      const [first, second] = await Promise.all([
+        create({ name, vendorName: unique('Race vendor A'), plan: k2() }),
+        create({ name, vendorName: unique('Race vendor B'), plan: k2() }),
+      ]);
+
+      expect([first.status, second.status].sort()).toEqual([201, 409]);
+      const refused = first.status === 409 ? first : second;
+      expect(errorOf(refused).code).toBe('APPLICATION.DUPLICATE');
+      expect(
+        (await ctx.sql.query<{ n: number }>(`SELECT count(*)::int AS n FROM applications WHERE name = $1`, [name]))
+          .rows[0].n,
+      ).toBe(1);
+    }
+  });
+
   it('does not count a retired application as software the catalog has', async () => {
     const retired = dataOf<CreatedWire>(
       await create({ name: unique('Old tool'), vendorName: unique('Old vendor'), plan: k2() }).expect(201),

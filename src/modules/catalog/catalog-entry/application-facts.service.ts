@@ -20,6 +20,11 @@ export class ApplicationFactsService {
     return this.applications.lockShared(tx, id);
   }
 
+  /** Queues the duplicate checks of an organization one behind the other until the transaction ends (the check and the write are one step, `database-business.md`). */
+  lockDuplicateCheck(tx: DbTx, organizationId: string): Promise<void> {
+    return this.applications.lockDuplicateCheck(tx, organizationId);
+  }
+
   /** The approved applications that may be the same software as a candidate, for the duplicate rule (`QĐ-111b`): see `ApplicationRepo.duplicateCandidates`. */
   duplicateCandidates(tx: DbTx, normalizedName: string, hosts: readonly string[]) {
     return this.applications.duplicateCandidates(tx, normalizedName, hosts);

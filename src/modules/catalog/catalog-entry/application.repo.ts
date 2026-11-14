@@ -94,6 +94,14 @@ export class ApplicationRepo {
   }
 
   /**
+   * Takes the lock of the duplicate check of the organization for the rest of the transaction: two declarations of the same software queue up, so the
+   * second one sees the first and is refused with it instead of both passing a check that neither has seen the other through.
+   */
+  async lockDuplicateCheck(tx: DbTx, organizationId: string): Promise<void> {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtextextended(${`application-duplicate:${organizationId}`}, 0))`;
+  }
+
+  /**
    * The approved applications that may be the same software as a candidate: the same normalized name, or a domain in common (the hosts are as the catalog
    * stores them). The caller's rule (`duplicateOf`) says which one it is; at most twenty, by name.
    */

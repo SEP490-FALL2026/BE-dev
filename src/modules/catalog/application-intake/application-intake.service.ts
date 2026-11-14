@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { searchKey } from '../../../core/search-key';
 import { TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { ApplicationFactsService } from '../catalog-entry/application-facts.service';
 import { ApplicationDuplicateError } from '../catalog-entry/application.errors';
 import { cleanApplicationDomains, cleanApplicationName, vendorSourceOf } from '../catalog-entry/application.policy';
@@ -37,6 +38,7 @@ export class ApplicationIntakeService {
     private readonly facts: ApplicationFactsService,
     private readonly plans: PlanService,
     private readonly runner: TransactionRunner,
+    private readonly organizationReads: OrganizationReadApi,
   ) {}
 
   /**
@@ -62,7 +64,11 @@ export class ApplicationIntakeService {
       ...(input.domains ?? []),
     ]);
 
+    const organizationId = (await this.organizationReads.getOrganization())?.id;
+    if (!organizationId) throw new Error('The application catalog was used before installation');
+
     const made = await this.runner.run(async (tx) => {
+      await this.facts.lockDuplicateCheck(tx, organizationId);
       const candidates = await this.facts.duplicateCandidates(tx, searchKey(name), domains);
       const duplicate = duplicateOf({ name, domains }, candidates);
       if (duplicate) {
