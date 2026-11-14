@@ -13,7 +13,7 @@ import { hasSpendStep, mayRequest } from '../access-request/access-request.polic
 import { AccessRequestRepo } from '../access-request/access-request.repo';
 import type { AccessRequestRecord } from '../access-request/access-request.types';
 import { RequestSenderService } from '../request-intake/request-sender.service';
-import { AssessmentRepo } from './assessment.repo';
+import { ProposalDeclarationService, type ShortProposalBasis } from './proposal-declaration.service';
 import { RequestFactsService } from '../access-request/request-facts.service';
 import type { ProposalBodyDto } from './assessment.dto';
 import { RequestLimitsService } from '../request-limits/request-limits.service';
@@ -21,6 +21,14 @@ import { RequestLimitsService } from '../request-limits/request-limits.service';
 /** Throws AccessRequestTermRefusedError (`QĐ-111i`, `FR-2.8`). */
 function assertTermAllowed(assessed: { termRefusal: TermRefusal | null }): void {
   if (assessed.termRefusal !== null) throw new AccessRequestTermRefusedError(assessed.termRefusal);
+}
+
+/** What the audit says of a short proposal (`QĐ-111a`): the application it names and the plan it asks for; null for both when the software is new. */
+function shortProposalFacts(basis: ShortProposalBasis | null) {
+  return {
+    existingApplicationId: basis?.existingApplicationId ?? null,
+    plannedPlanName: basis?.plannedPlanName ?? null,
+  };
 }
 
 /**
@@ -36,7 +44,7 @@ export class ProposalService {
     private readonly spendRouting: SpendRoutingService,
     private readonly runner: TransactionRunner,
     private readonly repo: AccessRequestRepo,
-    private readonly assessments: AssessmentRepo,
+    private readonly declaration: ProposalDeclarationService,
     private readonly sender: RequestSenderService,
     private readonly assessment: RequestFactsService,
     private readonly audit: AuditApi,
@@ -62,6 +70,8 @@ export class ProposalService {
         lockDepartment: true,
       });
       assertTermAllowed(assessed);
+      // Software the catalog has already is asked for as case A (`QĐ-111b`); a plan it lacks of software it has is a short proposal (`QĐ-111a`).
+      const basis = await this.declaration.judge(tx, body);
       // A proposal names no plan: GH-1 has nothing to match, and GH-2 counts it (`BR-MF1-01`).
       await this.limits.requireForOne(tx, { employeeId: actor.employeeId, planId: null, now, settings: limitSettings });
       const { unit, policy, pricing, routing } = assessed;
@@ -92,13 +102,7 @@ export class ProposalService {
           slaWorkingDays: policy.slaWorkingDays,
         },
       });
-      await this.assessments.open(tx, created.id, {
-        softwareName: body.softwareName,
-        homepageUrl: body.homepageUrl,
-        purpose: body.purpose,
-        dataDescription: body.dataDescription,
-        expectedUsers: body.expectedUsers,
-      });
+      await this.declaration.open(tx, created.id, body, basis);
 
       await this.audit.record(
         tx,
@@ -113,6 +117,7 @@ export class ProposalService {
             state,
             planId: null,
             softwareName: body.softwareName,
+            ...shortProposalFacts(basis),
             expectedUsers: body.expectedUsers,
             termMonths: assessed.term.months,
             termCutAt: assessed.term.cutAt,

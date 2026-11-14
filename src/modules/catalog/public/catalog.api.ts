@@ -1,9 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import type { BusinessDate } from '../../../core/business-date';
+import { searchKey } from '../../../core/search-key';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import type {
   BaselineSubscription,
+  CatalogEntry,
+  CatalogEntryMatch,
   CatalogOnboardingFacts,
   PlanRevocationInfo,
   PlanSummary,
@@ -86,6 +89,45 @@ export class CatalogApi {
    */
   getWorkspaceDutiesOf(employeeIds: readonly string[], tx?: DbTx): Promise<WorkspaceDuty[]> {
     return this.plans.workspaceDutiesOf(employeeIds, tx);
+  }
+
+  /**
+   * The application of the catalog that is the same software as a declaration by its name and its web page, with its plans (`QĐ-111b`): what a person who
+   * proposes software the catalog already has is told, so they ask for it as case A. Null when the catalog has nothing like it. The rule is the one of
+   * `duplicateOf`, shared with the IT Admin who declares an application.
+   */
+  async findCatalogEntryOfSoftware(
+    tx: DbTx,
+    declared: { name: string; homepageUrl: string },
+  ): Promise<CatalogEntryMatch | null> {
+    const found = await this.applicationLookup.duplicateOfDeclared(tx, declared);
+    const entry = found && (await this.getCatalogEntry(tx, found.applicationId));
+
+    return found && entry ? { by: found.by, entry } : null;
+  }
+
+  /**
+   * One application of the catalog with its plans, for a proposal that names it (case B, short: `QĐ-111a`); `planName` finds the plan of that name, if the
+   * application has it. Null when the application does not exist.
+   */
+  async getCatalogEntry(tx: DbTx, applicationId: string, planName?: string): Promise<CatalogEntry | null> {
+    const facts = await this.applicationLookup.entryFacts(tx, applicationId);
+    if (!facts) return null;
+    const plans = await this.plans.plansOfApplication(applicationId, tx);
+    const named =
+      planName === undefined ? undefined : plans.find((plan) => searchKey(plan.name) === searchKey(planName));
+
+    return {
+      applicationId: facts.id,
+      name: facts.name,
+      status: facts.catalogStatus,
+      vendor: facts.vendor,
+      plans: plans
+        .slice(0, 20)
+        .map((plan) => ({ planId: plan.id, name: plan.name, provisioningType: plan.provisioningType })),
+      planTotal: plans.length,
+      planNamed: named ? { planId: named.id, name: named.name } : null,
+    };
   }
 
   /** The plans with these ids by name, with their application, as far as they exist; `tx` reads in the caller's transaction, which sees the plans it made. */

@@ -5,7 +5,7 @@ import { OrganizationReadApi } from '../../organization/public/organization-read
 import type { AccessRequestRecord } from '../access-request/access-request.types';
 import { AssessmentReadRepo } from '../access-request/assessment-read.repo';
 import type { AssessmentRecord, ProposalRecord, Quote } from '../access-request/assessment-record.types';
-import { judgeCompletion } from './assessment.policy';
+import { assessmentScopeOf, judgeCompletion } from './assessment.policy';
 import { AssessmentStepRepo, type AssessmentStepRecord } from './assessment-step.repo';
 import { PricingViewService } from '../request-view/pricing-view.service';
 import type { AssessmentWire } from './assessment.dto';
@@ -49,6 +49,7 @@ export class AssessmentViewService {
       requestId: request.id,
       status: assessment.status,
       proposal: toProposalWire(proposal),
+      scope: assessmentScopeOf(proposal),
       step: step && toStepWire(step, person(step.assigneeEmployeeId)),
       classification: assessment.classification,
       vendor: { vendorId: assessment.vendorId, name: assessment.vendorName },
@@ -66,7 +67,7 @@ export class AssessmentViewService {
       controlLevel: assessment.controlLevel,
       controlRiskNote: assessment.controlRiskNote,
       quote,
-      complete: judgeCompletion(assessment).kind === 'OK',
+      complete: judgeCompletion(assessment, assessmentScopeOf(proposal)).kind === 'OK',
       pricing: priceView,
       costEstimate,
       completedBy: person(assessment.completedByEmployeeId),

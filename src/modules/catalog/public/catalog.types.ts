@@ -99,6 +99,24 @@ export interface RuleSubscription {
   purchasedQuantity: number | null;
 }
 
+/** What the catalog holds of one application for a person who asks for software: the application and up to twenty of its plans by name (`planTotal` says how many there are). */
+export interface CatalogEntry {
+  applicationId: string;
+  name: string;
+  status: 'APPROVED' | 'RETIRED';
+  vendor: { id: string; name: string } | null;
+  plans: { planId: string; name: string; provisioningType: 'K1' | 'K2' | 'K3' | 'K4' | 'K5' }[];
+  planTotal: number;
+  /** The plan of the application that has the name asked for (names compared ignoring case, accents and blanks); null when there is none or none was asked. */
+  planNamed: { planId: string; name: string } | null;
+}
+
+/** The entry of the catalog that is the same software as a declaration, and what made it the same: the name or a domain (`QĐ-111b`). */
+export interface CatalogEntryMatch {
+  by: 'NAME' | 'DOMAIN';
+  entry: CatalogEntry;
+}
+
 /** A plan and the application it belongs to, by name, for the views that list seats. */
 export interface PlanSummary {
   planId: string;

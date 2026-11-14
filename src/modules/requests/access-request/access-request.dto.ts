@@ -180,6 +180,8 @@ export const requestSchema = z.strictObject({
       purpose: z.string(),
       dataDescription: z.string(),
       expectedUsers: z.number().int().positive(),
+      /** The application of the catalog the software is already in, when only the plan asked for is missing (case B, short); null for software that is new. */
+      existingApplicationId: z.uuid().nullable(),
     })
     .nullable(),
   department: z.strictObject({ id: z.uuid(), code: z.string(), name: z.string() }),

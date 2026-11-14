@@ -1,3 +1,4 @@
+import type { CatalogEntry } from '../../catalog/public/catalog.types';
 import type { AssessorRefusal } from './assessment.policy';
 
 /** The person may not fill or complete the assessment of this request now (`US-05-06`, `US-01-12` AC-2). */
@@ -52,15 +53,32 @@ export class InternalRegistrationRefusedError extends Error {
 
 /** A vendor, plan or person the assessment names does not exist. */
 export class AssessmentReferenceNotFoundError extends Error {
-  constructor(readonly field: 'vendorId' | 'equivalentPlanId' | 'alternativePlanId') {
+  constructor(readonly field: 'vendorId' | 'equivalentPlanId' | 'alternativePlanId' | 'existingApplicationId') {
     super(`The ${field} of the assessment does not exist.`);
     this.name = 'AssessmentReferenceNotFoundError';
   }
 }
 
-/** The request cannot be linked to the plan: it is not waiting for its grant (`US-05-06` AC-4, AC-8). */
+/**
+ * The software proposed is in the catalog already (`QĐ-111b`): the same name or a domain the catalog has, or the plan asked for of an application the catalog
+ * has. `existing` is the entry, so the person asks for it as case A instead.
+ */
+export class ProposalSoftwareInCatalogError extends Error {
+  constructor(
+    readonly existing: CatalogEntry,
+    readonly matchedBy: 'NAME' | 'DOMAIN' | 'PLAN',
+  ) {
+    super('The catalog already has this software: ask for it from the catalog.');
+    this.name = 'ProposalSoftwareInCatalogError';
+  }
+}
+
+/**
+ * The request cannot be linked to the plan: it is not waiting for its grant (`US-05-06` AC-4, AC-8), or the IT Admin asked to list the software in a
+ * department they are not in charge of (`QĐ-111c`).
+ */
 export class CatalogLinkRefusedError extends Error {
-  constructor(readonly reason: 'NOT_LINKABLE') {
+  constructor(readonly reason: 'NOT_LINKABLE' | 'DEPARTMENT_OUT_OF_SCOPE') {
     super(`The request cannot be linked to the plan: ${reason}.`);
     this.name = 'CatalogLinkRefusedError';
   }

@@ -45,6 +45,7 @@ import { AssessmentStepRepo } from './assessment/assessment-step.repo';
 import { CatalogLinkService } from './assessment/catalog-link.service';
 import { QuoteService } from './assessment/quote.service';
 import { InternalRegistrationService } from './assessment/internal-registration.service';
+import { ProposalDeclarationService } from './assessment/proposal-declaration.service';
 import { ProposalService } from './assessment/proposal.service';
 import { ProposalsController } from './proposal-review/proposals.controller';
 import { AccessRequestQueryService } from './request-view/access-request-query.service';
@@ -258,6 +259,7 @@ import { MyRequestsService } from './my-requests/my-requests.service';
     // The listeners of the outcome of a request, the extension point this module opens, and the service that tells them.
     RequestOutcomeListeners,
     RequestOutcomeService,
+    ProposalDeclarationService,
     ProposalService,
     QuoteService,
     AssessmentViewService,

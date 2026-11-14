@@ -12,7 +12,7 @@ import {
   AssessmentInternalByRegistrationError,
   AssessmentUncontrollableError,
 } from './assessment.errors';
-import { judgeCompletion } from './assessment.policy';
+import { assessmentScopeOf, judgeCompletion, type AssessmentScope } from './assessment.policy';
 import { AssessmentRepo } from './assessment.repo';
 import { AssessmentGate } from './assessment-gate.service';
 import { AssessmentPricingService } from './assessment-pricing.service';
@@ -42,14 +42,18 @@ export class AssessmentCompletionService {
     return this.runner.run(async (tx) => {
       const request = await this.gate.lockProposal(tx, requestId);
       this.gate.requireAssessor(actor, request);
-      const assessment = await this.gate.requireAssessment(requestId, tx);
-      const quote = this.completableQuote(assessment);
+      const { assessment, proposal } = await this.gate.requireProposalFacts(tx, requestId);
+      const scope = assessmentScopeOf(proposal);
+      const quote = this.completableQuote(assessment, scope);
+      // A plan alone is never classified by the IT Admin (the application is in the catalog) and is always paid or licensed: a completed assessment says so.
+      const concluded: AssessmentRecord =
+        scope === 'PLAN_ONLY' ? { ...assessment, classification: 'PAID_LICENSED' } : assessment;
 
       const now = new Date();
       const pricing = await this.pricing.priceCompleted(tx, request, quote, { now });
       await this.requests.setPriced(tx, requestId, pricing, 'AWAITING_SPEND_SUBMISSION');
       const standsIn = await this.gate.finishStep(tx, requestId, actor, { now });
-      await this.assessments.complete(tx, requestId, actor.employeeId, now);
+      await this.assessments.complete(tx, requestId, actor.employeeId, now, concluded.classification);
       await this.audit.record(
         tx,
         accessRequestAuditEvent(
@@ -58,7 +62,7 @@ export class AssessmentCompletionService {
           'ACCESS_REQUEST.ASSESSMENT_COMPLETED',
           'ACCESS_REQUEST',
           requestId,
-          completedAuditDetail(requestId, assessment, pricing, standsIn),
+          completedAuditDetail(requestId, concluded, pricing, standsIn),
         ),
       );
 
@@ -67,8 +71,8 @@ export class AssessmentCompletionService {
   }
 
   /** The quote that prices the request, when the assessment may be completed here; the errors say what stops it. */
-  private completableQuote(assessment: AssessmentRecord): Quote {
-    const verdict = judgeCompletion(assessment);
+  private completableQuote(assessment: AssessmentRecord, scope: AssessmentScope): Quote {
+    const verdict = judgeCompletion(assessment, scope);
     if (verdict.kind === 'INCOMPLETE') throw new AssessmentIncompleteError(verdict.missing);
     if (verdict.kind === 'INTERNAL_BY_REGISTRATION') throw new AssessmentInternalByRegistrationError();
     if (verdict.kind === 'UNCONTROLLABLE') throw new AssessmentUncontrollableError();

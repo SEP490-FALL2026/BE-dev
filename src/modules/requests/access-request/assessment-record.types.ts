@@ -50,6 +50,8 @@ export interface ProposalRecord {
   purpose: string;
   dataDescription: string;
   expectedUsers: number;
+  /** Case B, short (`QĐ-111a`): the application of the catalog the software is already in, when only the plan asked for is missing; null when the whole is new. */
+  existingApplicationId: string | null;
 }
 
 /** The assessment as kept: the fields the rules judge and the ones that are only recorded. */

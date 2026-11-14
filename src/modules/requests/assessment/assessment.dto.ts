@@ -6,6 +6,7 @@ import {
   employeeRef,
   moneySchema,
   pricingSchema,
+  requestSchema,
   termMonthsSchema,
 } from '../access-request/access-request.dto';
 import { businessDate } from '../../../infrastructure/http/dto/business-date.dto';
@@ -28,17 +29,48 @@ const text = (max: number) => z.string().trim().min(1).max(max);
  * purpose, the data of the company that will go through it (required) and how many people will use it, with the term
  * asked for. The purpose is the reason of the request. Nothing here chooses the branch, the amount or who decides.
  */
-export const proposalBodySchema = z.strictObject({
-  softwareName: text(200),
-  homepageUrl: z.string().trim().max(500).refine(isWebAddress, { message: 'Must be an http or https address.' }).meta({
-    description: 'An absolute web address, http or https, with a host; surrounding whitespace is trimmed first.',
-  }),
-  purpose: text(REASON_MAX_LENGTH),
-  dataDescription: text(REASON_MAX_LENGTH),
-  expectedUsers: z.number().int().min(1).max(1_000_000),
-  /** The time of use in months, 1 to 12, or null for a right with no end; a contractor, a freelancer or an intern gives the months. */
-  termMonths: termMonthsSchema.optional(),
-});
+export const proposalBodySchema = z
+  .strictObject({
+    softwareName: text(200),
+    homepageUrl: z
+      .string()
+      .trim()
+      .max(500)
+      .refine(isWebAddress, { message: 'Must be an http or https address.' })
+      .meta({
+        description: 'An absolute web address, http or https, with a host; surrounding whitespace is trimmed first.',
+      }),
+    purpose: text(REASON_MAX_LENGTH),
+    dataDescription: text(REASON_MAX_LENGTH),
+    expectedUsers: z.number().int().min(1).max(1_000_000),
+    /** The time of use in months, 1 to 12, or null for a right with no end; a contractor, a freelancer or an intern gives the months. */
+    termMonths: termMonthsSchema.optional(),
+    existingApplicationId: z.uuid().optional().meta({
+      description:
+        'Case B, short: the application of the catalog the software is already in, when only the plan asked for is missing; give it with plannedPlanName. Left out, the software is new to the company and is refused when the catalog already has it (ACCESS_REQUEST.SOFTWARE_IN_CATALOG).',
+    }),
+    plannedPlanName: text(200).optional().meta({
+      description:
+        'Case B, short: the name of the plan asked for, which the application does not have yet; give it with existingApplicationId.',
+    }),
+  })
+  .superRefine((body, context) => {
+    // The application and the plan are one ask: either alone says nothing the IT Admin could assess.
+    if (body.existingApplicationId !== undefined && body.plannedPlanName === undefined) {
+      context.addIssue({
+        code: 'custom',
+        path: ['plannedPlanName'],
+        message: 'Give the plan asked for with the application.',
+      });
+    }
+    if (body.plannedPlanName !== undefined && body.existingApplicationId === undefined) {
+      context.addIssue({
+        code: 'custom',
+        path: ['existingApplicationId'],
+        message: 'Give the application the plan is for.',
+      });
+    }
+  });
 
 const moneyInput = z.strictObject({ amount: z.string().max(40), currency: z.string().regex(/^[A-Z]{3}$/) });
 
@@ -93,7 +125,13 @@ export const assessmentPatchSchema = z
       'Give at least one field; a field that is present is written, and the ones that can be cleared take null.',
   });
 
-export const catalogLinkBodySchema = z.strictObject({ planId: z.uuid() });
+export const catalogLinkBodySchema = z.strictObject({
+  planId: z.uuid(),
+  addToDepartmentList: z.boolean().optional().meta({
+    description:
+      'True puts the application and the plan in the list of software of the department of the request, a guide for the next people who ask: the IT Admin must be in charge of that department. False or left out lists nothing.',
+  }),
+});
 
 /**
  * The refusal at the gate of the assessment (`US-05-18`): the kind, which is either a tool that cannot be controlled or
@@ -145,7 +183,11 @@ const assessmentSchema = z.strictObject({
     purpose: z.string(),
     dataDescription: z.string(),
     expectedUsers: z.number().int().positive(),
+    /** The application of the catalog the software is already in, when only the plan asked for is missing (case B, short); null for software that is new. */
+    existingApplicationId: z.uuid().nullable(),
   }),
+  /** What the IT Admin assesses: FULL is the software and its plan, PLAN_ONLY the plan alone (the proposal names an application of the catalog). */
+  scope: z.enum(['FULL', 'PLAN_ONLY']),
   /** The step of the IT Admin: who holds it, how long it may wait, and when it was done. */
   step: z
     .strictObject({
@@ -211,6 +253,15 @@ const assessmentSchema = z.strictObject({
 export class ProposalBodyDto extends createZodDto(proposalBodySchema) {}
 export class AssessmentPatchDto extends createZodDto(assessmentPatchSchema) {}
 export class CatalogLinkBodyDto extends createZodDto(catalogLinkBodySchema) {}
+/** The request with its plan, and the place of the list of software of the department when the IT Admin asked for one (`added` is false when the place was listed already). */
+export class CatalogLinkResponseDto extends createZodDto(
+  successEnvelopeSchema(
+    z.strictObject({
+      request: requestSchema,
+      departmentList: z.strictObject({ entryId: z.uuid(), added: z.boolean() }).nullable(),
+    }),
+  ),
+) {}
 export class AssessmentRejectionBodyDto extends createZodDto(assessmentRejectionBodySchema) {}
 export class InternalRegistrationBodyDto extends createZodDto(internalRegistrationBodySchema) {}
 export class AssessmentResponseDto extends createZodDto(

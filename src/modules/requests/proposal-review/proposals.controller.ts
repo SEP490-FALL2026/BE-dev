@@ -19,6 +19,7 @@ import {
   AssessmentRejectionBodyDto,
   AssessmentResponseDto,
   CatalogLinkBodyDto,
+  CatalogLinkResponseDto,
   InternalRegistrationBodyDto,
   ProposalBodyDto,
 } from '../assessment/assessment.dto';
@@ -96,14 +97,24 @@ export class ProposalsController {
     {
       status: HttpStatus.CONFLICT,
       description:
-        'The sender belongs to no department (ACCESS_REQUEST.NO_DEPARTMENT) or the department has no Cost Center in use yet (FINANCE.SETUP_INCOMPLETE).',
-      examples: [EXAMPLES.NO_DEPARTMENT, EXAMPLES.FINANCE_SETUP_INCOMPLETE],
+        'The sender belongs to no department (ACCESS_REQUEST.NO_DEPARTMENT), the department has no Cost Center in use yet (FINANCE.SETUP_INCOMPLETE), the catalog has this software already by its name or by the domain of its page, or has the plan asked for of the application named (ACCESS_REQUEST.SOFTWARE_IN_CATALOG: details.existing is the application with at most twenty of its plans and details.matchedBy says why; ask for it from the catalog instead), or the application named has left the catalog (ACCESS_REQUEST.APPLICATION_RETIRED). Nothing is written.',
+      examples: [
+        EXAMPLES.NO_DEPARTMENT,
+        EXAMPLES.FINANCE_SETUP_INCOMPLETE,
+        EXAMPLES.SOFTWARE_IN_CATALOG,
+        EXAMPLES.APPLICATION_RETIRED,
+      ],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
-        'The form is incomplete or invalid (VALIDATION_ERROR): the name, the homepage, the purpose, the company data that will go through the software and the term are required. The sender is the spending approver (REQUEST_PARTY.INELIGIBLE). A proposal counts as a request for new access: a person who was already named in as many requests for new access this calendar week (Monday to Sunday, organization time zone; a request withdrawn or refused still counts) as the weekly limit allows is refused until the next Monday (ACCESS_REQUEST.OPEN_LIMIT_REACHED, details.limit and details.resetsOn; GH-2, BR-MF1-01f). Nothing is written.',
-      examples: [VALIDATION_EXAMPLE, EXAMPLES.REQUEST_PARTY_INELIGIBLE, ACCESS_EXAMPLES.OPEN_LIMIT_REACHED],
+        'The form is incomplete or invalid (VALIDATION_ERROR): the name, the homepage, the purpose, the company data that will go through the software and the term are required; existingApplicationId and plannedPlanName go together. The application named does not exist (ASSESSMENT.REFERENCE_NOT_FOUND, details.field existingApplicationId). The sender is the spending approver (REQUEST_PARTY.INELIGIBLE). A proposal counts as a request for new access: a person who was already named in as many requests for new access this calendar week (Monday to Sunday, organization time zone; a request withdrawn or refused still counts) as the weekly limit allows is refused until the next Monday (ACCESS_REQUEST.OPEN_LIMIT_REACHED, details.limit and details.resetsOn; GH-2, BR-MF1-01f). Nothing is written.',
+      examples: [
+        VALIDATION_EXAMPLE,
+        EXAMPLES.REFERENCE_NOT_FOUND,
+        EXAMPLES.REQUEST_PARTY_INELIGIBLE,
+        ACCESS_EXAMPLES.OPEN_LIMIT_REACHED,
+      ],
     },
   )
   async propose(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Body() body: ProposalBodyDto) {
@@ -295,19 +306,23 @@ export class ProposalsController {
   @Post(':id/catalog-link')
   @RequireRoles('IT_ADMIN')
   @ApiOperation({ operationId: 'accessRequestCatalogLink', summary: 'Link a proposal to its registered plan' })
-  @ApiSuccessResponse(AccessRequestResponseDto, {
+  @ApiSuccessResponse(CatalogLinkResponseDto, {
     message: 'ACCESS_REQUEST.CATALOG_LINKED',
     description:
-      'After the spending approver has decided the request, the IT Admin links it to the plan registered in the catalog. The grant is possible only after this.',
+      'After the spending approver has decided the request, the IT Admin links it to the plan registered in the catalog; the plan may be one the catalog already had, when the IT Admin was told the software is there and the request goes on as a request for what the catalog has. The grant is possible only after this. With addToDepartmentList the application and the plan are also put in the list of software of the department of the request (departmentList.added is false when they were listed already); the list only guides, nothing it holds grants anything.',
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,
     // The link checks no assessor, so OWN_REQUEST is not reachable; a plan that does not exist is (PLAN_NOT_FOUND).
-    { status: HttpStatus.FORBIDDEN, description: IT_ONLY_DESCRIPTION, examples: [FORBIDDEN_EXAMPLE] },
+    {
+      status: HttpStatus.FORBIDDEN,
+      description: `${IT_ONLY_DESCRIPTION} With addToDepartmentList, the department of the request must be one the IT Admin is in charge of (DEPARTMENT.OUT_OF_SCOPE); nothing is written.`,
+      examples: [FORBIDDEN_EXAMPLE, EXAMPLES.DEPARTMENT_OUT_OF_SCOPE],
+    },
     {
       status: HttpStatus.NOT_FOUND,
-      description: NOT_FOUND_DESCRIPTION,
-      examples: [EXAMPLES.NOT_FOUND, EXAMPLES.PLAN_NOT_FOUND],
+      description: `${NOT_FOUND_DESCRIPTION} Or the plan does not exist (ACCESS_REQUEST.PLAN_NOT_FOUND), or the department of the request does not (DEPARTMENT.NOT_FOUND).`,
+      examples: [EXAMPLES.NOT_FOUND, EXAMPLES.PLAN_NOT_FOUND, EXAMPLES.DEPARTMENT_NOT_FOUND],
     },
     {
       status: HttpStatus.CONFLICT,
@@ -317,8 +332,9 @@ export class ProposalsController {
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
-      description: 'The body is invalid (VALIDATION_ERROR).',
-      examples: [VALIDATION_EXAMPLE],
+      description:
+        'The body is invalid (VALIDATION_ERROR), or the catalog no longer offers what the list of the department would hold (DEPARTMENT_SOFTWARE.NOT_IN_CATALOG). Nothing is written.',
+      examples: [VALIDATION_EXAMPLE, EXAMPLES.DEPARTMENT_SOFTWARE_NOT_IN_CATALOG],
     },
   )
   async linkCatalogPlan(
@@ -327,9 +343,9 @@ export class ProposalsController {
     @Body() body: CatalogLinkBodyDto,
   ) {
     try {
-      const record = await this.links.link(actor, params.id, body.planId);
+      const linked = await this.links.link(actor, params.id, body);
 
-      return { request: toWire(await this.queries.view(record)) };
+      return { request: toWire(await this.queries.view(linked.request)), departmentList: linked.departmentList };
     } catch (error) {
       throw toAssessmentApiException(error);
     }

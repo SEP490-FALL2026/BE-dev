@@ -101,6 +101,8 @@ const PUBLIC_CONTRACT_EXPORTS: ReadonlySet<string> = new Set([
   // qd103-ghost-seat-g3-g4: the extension point the rules of wasted seats bind to deny a recommendation when a report is confirmed.
   'UsageModule: UsageImportListeners',
   'LicensingModule: LicensingOpenGrantsApi',
+  // IN-1.2 (QĐ-111c): the list of software of a department, which the link of a request to the catalog writes when the IT Admin ticks it (DS.4).
+  'LicensingModule: LicensingDepartmentToolsApi',
   'OptimizationModule: OptimizationApi',
   'LicensingModule: LicensingSeatBaselineApi',
   // G8 (US-12-15): the counts of licensing the role overviews read.

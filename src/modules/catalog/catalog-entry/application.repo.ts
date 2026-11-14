@@ -298,6 +298,22 @@ export class ApplicationRepo {
     );
   }
 
+  /** What a proposal that names an application of the catalog needs to know of it: its name, whether it is still in the catalog, and its vendor; null when it does not exist. */
+  async entryFacts(
+    id: string,
+    tx?: DbTx,
+  ): Promise<{
+    id: string;
+    name: string;
+    catalogStatus: 'APPROVED' | 'RETIRED';
+    vendor: { id: string; name: string } | null;
+  } | null> {
+    return (tx ?? this.prisma).application.findUnique({
+      where: { id },
+      select: { id: true, name: true, catalogStatus: true, vendor: { select: { id: true, name: true } } },
+    });
+  }
+
   /**
    * The applications with these ids, for a decision on what a collector may report; those that do not exist are absent. An application is a
    * communication service when it stands in the group Liên lạc (`QĐ-111e`): the group says it, no flag of the row is read.

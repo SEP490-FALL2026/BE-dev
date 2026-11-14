@@ -15,6 +15,11 @@ import {
   AccessRequestSuperAdminCannotRequestError,
 } from '../access-request/access-request.errors';
 import { FinanceSetupIncompleteError } from '../../organization/public/organization.errors';
+import {
+  DepartmentSoftwareNoteInvalidError,
+  DepartmentSoftwareNotInCatalogError,
+  ToolsDepartmentNotFoundError,
+} from '../../licensing/public/licensing.errors';
 import { RequestPartyIneligibleError } from '../../identity-access/public/request-party.errors';
 import { toAccessRequestApiException } from '../access-request/access-request.http-errors';
 import {
@@ -26,6 +31,7 @@ import {
   AssessmentUncontrollableError,
   CatalogLinkRefusedError,
   InternalRegistrationRefusedError,
+  ProposalSoftwareInCatalogError,
 } from './assessment.errors';
 
 const refuse = (
@@ -59,8 +65,35 @@ export function toAssessmentApiException(error: unknown): unknown {
       field: error.field,
     });
   }
+  if (error instanceof ProposalSoftwareInCatalogError) {
+    return refuse(HttpStatus.CONFLICT, 'ACCESS_REQUEST.SOFTWARE_IN_CATALOG', error.message, {
+      matchedBy: error.matchedBy,
+      existing: {
+        applicationId: error.existing.applicationId,
+        name: error.existing.name,
+        plans: error.existing.plans.map((plan) => ({ ...plan })),
+        planTotal: error.existing.planTotal,
+      },
+    });
+  }
   if (error instanceof CatalogLinkRefusedError) {
-    return refuse(HttpStatus.CONFLICT, 'ACCESS_REQUEST.CATALOG_LINK_NOT_ALLOWED', error.message);
+    return error.reason === 'DEPARTMENT_OUT_OF_SCOPE'
+      ? refuse(HttpStatus.FORBIDDEN, 'DEPARTMENT.OUT_OF_SCOPE', error.message)
+      : refuse(HttpStatus.CONFLICT, 'ACCESS_REQUEST.CATALOG_LINK_NOT_ALLOWED', error.message);
+  }
+  // The refusals of the list of software of the department that the link asks to write (`QĐ-111c`): the same codes the routes of that list answer with.
+  if (error instanceof DepartmentSoftwareNotInCatalogError) {
+    return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'DEPARTMENT_SOFTWARE.NOT_IN_CATALOG', error.message, {
+      places: error.places.map((place) => ({ ...place })),
+    });
+  }
+  if (error instanceof DepartmentSoftwareNoteInvalidError) {
+    return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'DEPARTMENT_SOFTWARE.NOTE_INVALID', error.message, {
+      reason: error.reason,
+    });
+  }
+  if (error instanceof ToolsDepartmentNotFoundError) {
+    return refuse(HttpStatus.NOT_FOUND, 'DEPARTMENT.NOT_FOUND', error.message);
   }
   if (error instanceof InternalRegistrationRefusedError) {
     if (error.reason === 'NOT_INTERNAL') return refuse(HttpStatus.CONFLICT, 'ASSESSMENT.NOT_INTERNAL', error.message);
@@ -106,6 +139,25 @@ export const ASSESSMENT_ERROR_EXAMPLES = {
   // One message template whose field varies (details.field names it): the vendor stands for the fields of the save.
   REFERENCE_NOT_FOUND: example(new AssessmentReferenceNotFoundError('vendorId')),
   CATALOG_LINK_NOT_ALLOWED: example(new CatalogLinkRefusedError('NOT_LINKABLE')),
+  DEPARTMENT_OUT_OF_SCOPE: example(new CatalogLinkRefusedError('DEPARTMENT_OUT_OF_SCOPE')),
+  DEPARTMENT_NOT_FOUND: example(new ToolsDepartmentNotFoundError()),
+  DEPARTMENT_SOFTWARE_NOT_IN_CATALOG: example(
+    new DepartmentSoftwareNotInCatalogError([{ applicationId: 'application-id', planId: 'plan-id' }]),
+  ),
+  SOFTWARE_IN_CATALOG: example(
+    new ProposalSoftwareInCatalogError(
+      {
+        applicationId: 'application-id',
+        name: 'ChatGPT',
+        status: 'APPROVED',
+        vendor: null,
+        plans: [{ planId: 'plan-id', name: 'Plus', provisioningType: 'K1' }],
+        planTotal: 1,
+        planNamed: null,
+      },
+      'NAME',
+    ),
+  ),
   NOT_INTERNAL: example(new InternalRegistrationRefusedError('NOT_INTERNAL')),
   NAME_TAKEN: example(new InternalRegistrationRefusedError('NAME_TAKEN')),
   MONEY_SCALE_EXCEEDED: example(new MoneyScaleExceededError(2)),

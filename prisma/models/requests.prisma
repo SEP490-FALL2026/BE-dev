@@ -507,9 +507,14 @@ model AccessRequestProposal {
   // The kinds of company data the software will hold: required, so the IT Admin judges the risk (AC-1).
   dataDescription String @map("data_description")
   expectedUsers   Int    @map("expected_users")
+  // IN-1 (QĐ-111a): case B, short: the application of the catalog the software is already in, when only the plan asked for is missing. Null for software
+  // the company does not have at all (the whole is assessed).
+  existingApplicationId String? @map("existing_application_id") @db.Uuid
 
-  request AccessRequest @relation(fields: [requestId], references: [id], onDelete: Restrict)
+  request             AccessRequest @relation(fields: [requestId], references: [id], onDelete: Restrict)
+  existingApplication Application?  @relation("ProposalExistingApplication", fields: [existingApplicationId], references: [id], onDelete: Restrict)
 
+  @@index([existingApplicationId])
   @@map("access_request_proposals")
 }
 
