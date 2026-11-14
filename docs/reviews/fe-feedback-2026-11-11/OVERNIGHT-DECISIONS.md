@@ -131,13 +131,13 @@
 - **File/commit:** `operating-parameters/parameter-definitions.policy.ts` (+ spec, integration `operating-parameters-http`: 30 ⟹ 29 khóa), `licensing/public/licensing.api.ts`, `licensing/provisioning/revocation-view.service.ts`, `revocation-read.repo.ts` — `0a2c6d0c`, `965056d4`.
 - **Đổi lại:** thêm lại định nghĩa vào `PARAMETER_DEFINITIONS` (cột giá trị cũ vẫn còn); khôi phục ba hàm licensing từ `git show 0a2c6d0c^`.
 
-### D-16 — Ngày hết hợp đồng của nhân sự có thời hạn: cột mới `employees.contract_ends_on` (đọc được, chưa có đường ghi qua API)
+### D-16 — Ngày hết hợp đồng của nhân sự có thời hạn: cột mới `employees.contract_end_date` (đọc được, chưa có đường ghi qua API)
 
 - **Câu hỏi:** R-38/`INV-07`/`FR-2.8` bắt hệ thống "cắt tại ngày hết hợp đồng" và US-05-23 nêu tiền đề "nhân sự có thời hạn có ngày hết hợp đồng", nhưng SPEC RQ-2 ghi "không cột mới" và code không có ngày hết hợp đồng ở đâu (bảng `employees` chỉ có `hire_date`; `expectedEndDate` của body cũ là ngày người xin tự nhập, nay bị bỏ).
-- **Phương án:** (a) cột nullable `employees.contract_ends_on` (CHECK ≥ `hire_date`), đọc qua `EmployeeRecord.contractEndsOn`; (b) không có dữ liệu ⟹ không bao giờ cắt (T-R38 không kiểm được); (c) FE gửi kèm ngày hết hợp đồng (trái `QĐ-111i`: không còn ô ngày).
+- **Phương án:** (a) cột nullable `employees.contract_end_date` (CHECK ≥ `hire_date`), đọc qua `EmployeeRecord.contractEndDate`; (b) không có dữ liệu ⟹ không bao giờ cắt (T-R38 không kiểm được); (c) FE gửi kèm ngày hết hợp đồng (trái `QĐ-111i`: không còn ô ngày).
 - **Đã chọn (tạm chốt):** (a). Căn cứ: BRD `FR-2.8`/`INV-07`, R-38, US-05-23 AC-2; expand-only, nullable, không drop, chạy lại an toàn. **Hở còn lại (Owner quyết, ngoài RQ-2):** chưa có đường ghi qua API (`PATCH/POST /employees`, import `BM-09`) — hiện chỉ SQL/seed; nếu Owner muốn Super Admin nhập ngày này thì thêm vào trường chính thức của hồ sơ nhân sự (gói PF/Z2).
 - **File/commit:** `prisma/migrations/20261113003000_rq2_employee_contract_end`, `prisma/models/organization.prisma`, `organization/employee/employee.repo.ts`, `organization/public/organization.types.ts` — `ff5d4529`.
-- **Đổi lại:** thôi đọc `contractEndsOn` ở `RequestFactsService.termOf`, `RequestTermEndsService`, `ProvisioningGrantPlanner`; cột để nguyên (không drop).
+- **Đổi lại:** thôi đọc `contractEndDate` ở `RequestFactsService.termOf`, `RequestTermEndsService`, `ProvisioningGrantPlanner`; cột để nguyên (không drop).
 
 ### D-17 — Luật chi tiết của _Thời gian dùng_: vắng/`null`, hợp đồng đã hết, request không giữ ngày kết thúc
 

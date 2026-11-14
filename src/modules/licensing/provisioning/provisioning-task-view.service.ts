@@ -130,7 +130,7 @@ export type TaskView = Omit<TaskSummaryView, 'revocation'> & TaskDetailFields;
 interface ViewContext {
   employees: Map<
     string,
-    { id: string; employeeCode: string; fullName: string; status: string; contractEndsOn?: string | null }
+    { id: string; employeeCode: string; fullName: string; status: string; contractEndDate?: string | null }
   >;
   plans: Map<string, SeatTarget>;
   /** The note of each plan of a revocation about what to do before the seat is taken away (`QĐ-110g`: read only, nobody confirms it). */
@@ -146,11 +146,11 @@ interface ViewContext {
 /** The seat of a grant that ends on the last day of the contract of its holder: the time of use was cut there (R-38, `INV-07`). */
 function termCutAtOf(
   task: ProvisioningTaskRecord,
-  holder: { contractEndsOn?: string | null } | undefined,
+  holder: { contractEndDate?: string | null } | undefined,
 ): string | null {
   const { validUntil } = task.assignment;
 
-  return task.kind === 'GRANT' && validUntil !== null && validUntil === holder?.contractEndsOn ? validUntil : null;
+  return task.kind === 'GRANT' && validUntil !== null && validUntil === holder?.contractEndDate ? validUntil : null;
 }
 
 function planCardOf(plan: SeatTarget | undefined, note: string | null | undefined): TaskSummaryView['plan'] {

@@ -36,6 +36,8 @@ export interface CreateEmployeeWithPlacementInput {
   workEmail?: string | null;
   employmentType: EmploymentType;
   hireDate: BusinessDate;
+  /** The last day of the contract of a person with a term (R-38); null or absent for none. */
+  contractEndDate?: BusinessDate | null;
   /**
    * The day the person becomes a member of the department (`QĐ-66ak`). Left out, it is the hire date: only
    * the installation command does that (`QĐ-67a`). Every path inside the application passes the day the person is
@@ -53,6 +55,8 @@ export interface OfficialFieldsPatch {
   workEmail?: string | null;
   employmentType?: EmploymentType;
   hireDate?: BusinessDate;
+  /** The last day of the contract of a person with a term, null to clear it (R-38). */
+  contractEndDate?: BusinessDate | null;
   /** Free text, null to clear it (`QĐ-87e`): its display form is what is stored. */
   jobTitle?: string | null;
 }
@@ -68,7 +72,7 @@ export interface EmployeeRecord {
   workState: EmployeeWorkState;
   hireDate: BusinessDate;
   /** The last day of the contract of a person with a term, when it is known (R-38): a time of use that runs past it is cut there. */
-  contractEndsOn?: BusinessDate | null;
+  contractEndDate?: BusinessDate | null;
   /** The free-text title on the record (`QĐ-87e`); null when there is none. */
   jobTitle?: string | null;
 }

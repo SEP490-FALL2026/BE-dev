@@ -26,15 +26,15 @@ export class RequestCostViewService {
   ): Promise<CostView | null> {
     if (pricing.status !== 'PRICED' || request.expectedEndDate !== null) return this.pricing.costView(pricing, null);
     const today = await this.organizationReads.businessToday(new Date(), tx);
-    const contractEndsOn =
+    const contractEndDate =
       request.type === 'GROUP_GRANT' ? null : await this.contractEndOf(request.beneficiaryEmployeeIds[0], tx);
 
-    return this.pricing.costView(pricing, termRunOf({ start: today, months: request.termMonths, contractEndsOn }));
+    return this.pricing.costView(pricing, termRunOf({ start: today, months: request.termMonths, contractEndDate }));
   }
 
   private async contractEndOf(employeeId: string | undefined, tx?: DbTx): Promise<BusinessDate | null> {
     if (employeeId === undefined) return null;
 
-    return (await this.organizationReads.getEmployee(employeeId, tx))?.contractEndsOn ?? null;
+    return (await this.organizationReads.getEmployee(employeeId, tx))?.contractEndDate ?? null;
   }
 }

@@ -194,14 +194,14 @@ describe('the amount and the term of a request (integration, real PostgreSQL)', 
       beforeAll(async () => {
         intern = await h.staff(design.department, 'AMT-INTERN');
         contractEnd = addDays(h.today(), 75);
-        await h.ctx.sql.query(`UPDATE employees SET employment_type = 'INTERN', contract_ends_on = $2 WHERE id = $1`, [
+        await h.ctx.sql.query(`UPDATE employees SET employment_type = 'INTERN', contract_end_date = $2 WHERE id = $1`, [
           intern.employeeId,
           contractEnd,
         ]);
       });
 
       it('9 months of K2 run past the contract: 201, cut at the contract, the months that have begun counted, the amount by the year', async () => {
-        const run = termRunOf({ start: h.today(), months: 9, contractEndsOn: contractEnd });
+        const run = termRunOf({ start: h.today(), months: 9, contractEndDate: contractEnd });
         const thisYear = monthsBeginningIn({ start: h.today(), end: run.end, year });
         const nextYear = monthsBeginningIn({ start: h.today(), end: run.end, year: year + 1 });
 
@@ -305,7 +305,7 @@ describe('the amount and the term of a request (integration, real PostgreSQL)', 
       ).rows[0].kept;
 
     it('a time of use of 6 months keeps the price of a month times the months that begin the year after, or nothing when none does', async () => {
-      const run = termRunOf({ start: h.today(), months: 6, contractEndsOn: null });
+      const run = termRunOf({ start: h.today(), months: 6, contractEndDate: null });
       const nextMonths = monthsBeginningIn({ start: h.today(), end: run.end, year: year + 1 });
 
       const id = await approved({ termMonths: 6 });

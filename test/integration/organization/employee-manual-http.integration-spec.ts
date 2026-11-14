@@ -136,6 +136,7 @@ describe('manual employee entry over HTTP (integration, real PostgreSQL)', () =>
       });
       expect(Object.keys(dataOf(response)).sort()).toEqual(
         [
+          'contractEndDate',
           'department',
           'employeeCode',
           'employmentType',

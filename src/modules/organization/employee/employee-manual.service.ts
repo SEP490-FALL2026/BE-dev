@@ -10,6 +10,7 @@ import { isDepartmentCodeValid, isEmployeeCodeValid } from '../public/organizati
 import { EmployeeCodeTakenError, EmployeeEmailTakenError } from '../public/organization.errors';
 import { EmployeeRowInvalidError } from './employee.errors';
 import { assertMayEnterEmployees } from './employee.policy';
+import { contractEndReason } from './employee-correction.policy';
 import { validateEmployeeRow } from './employee-row.policy';
 import { organizationAuditEvent } from '../organization-audit-event.mapper';
 import { OrganizationContextService } from '../organization-context.service';
@@ -24,6 +25,8 @@ export interface ManualEmployeeInput {
   workEmail?: string | null;
   employmentType: EmploymentType;
   hireDate: BusinessDate;
+  /** The last day of the contract of a person with a term (R-38); staff has none. */
+  contractEndDate?: BusinessDate | null;
   departmentCode?: string | null;
   /** Free text (`QĐ-87e`): its display form is stored on the person. */
   jobTitle?: string | null;
@@ -36,6 +39,7 @@ export interface ManualEmployeeView {
   workEmail: string | null;
   employmentType: EmploymentType;
   hireDate: BusinessDate;
+  contractEndDate: BusinessDate | null;
   status: 'ACTIVE';
   /** A person just entered works. */
   workState: 'WORKING';
@@ -114,7 +118,17 @@ export class EmployeeManualService {
             ownEmail,
           },
         );
-        if (reasons.length > 0) throw new EmployeeRowInvalidError(reasons);
+        const contractEndDate = input.contractEndDate ?? null;
+        const contractReason = contractEndReason({
+          employmentType: input.employmentType,
+          hireDate: input.hireDate,
+          contractEndDate,
+        });
+        const allReasons = [
+          ...reasons,
+          ...(contractReason ? [{ field: 'contractEndDate', code: contractReason }] : []),
+        ];
+        if (allReasons.length > 0) throw new EmployeeRowInvalidError(allReasons);
 
         const { id } = await this.employees.createWithPlacement(tx, {
           organizationId: organization.id,
@@ -123,6 +137,7 @@ export class EmployeeManualService {
           workEmail,
           employmentType: input.employmentType,
           hireDate: input.hireDate,
+          contractEndDate,
           memberSince,
           departmentId: department?.id ?? null,
           jobTitle,
@@ -135,6 +150,7 @@ export class EmployeeManualService {
             workEmail,
             employmentType: input.employmentType,
             hireDate: input.hireDate,
+            ...(contractEndDate === null ? {} : { contractEndDate }),
             department: department?.code ?? null,
             jobTitle,
             memberSince,
@@ -157,6 +173,7 @@ export class EmployeeManualService {
           workEmail,
           employmentType: input.employmentType,
           hireDate: input.hireDate,
+          contractEndDate,
           status: 'ACTIVE' as const,
           workState: 'WORKING' as const,
           memberSince: department ? memberSince : null,

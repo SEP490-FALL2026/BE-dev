@@ -48,7 +48,7 @@ export class RequestTermEndsService {
     );
 
     return employeeIds.map(
-      (id) => termRunOf({ start: asOf, months, contractEndsOn: people.get(id)?.contractEndsOn ?? null }).end,
+      (id) => termRunOf({ start: asOf, months, contractEndDate: people.get(id)?.contractEndDate ?? null }).end,
     );
   }
 }

@@ -368,7 +368,7 @@ describe('the grant of a seat over HTTP (integration, real PostgreSQL)', () => {
       const { subscriptionId, planId } = await k2();
       const intern = await h.member('P-DES', 'E-END-KEY-I', designer);
       const staff = await h.member('P-DES', 'E-END-KEY-S', designer);
-      await h.ctx.sql.query(`UPDATE employees SET employment_type = 'INTERN', contract_ends_on = $2 WHERE id = $1`, [
+      await h.ctx.sql.query(`UPDATE employees SET employment_type = 'INTERN', contract_end_date = $2 WHERE id = $1`, [
         intern,
         addDays(h.today(), 90),
       ]);

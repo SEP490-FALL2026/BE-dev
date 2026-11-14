@@ -235,7 +235,7 @@ describe('T-RQ2: the commitment is the price of a month times the months that be
   const k1 = { kind: 'RECURRING' as const, unitPrice: dong(600_000n), billingCycle: 'MONTHLY' as const };
 
   it('K1 600.000 for 9 months, approved 15/11/2026: 2026 is 1.200.000 and the part of next year is 4.200.000', () => {
-    const run = termRunOf({ start: '2026-11-15', months: 9, contractEndsOn: null });
+    const run = termRunOf({ start: '2026-11-15', months: 9, contractEndDate: null });
 
     expect(requestAmountOf({ ...k1, beneficiaries: 1, checkDate: '2026-11-15', endDate: run.end })).toMatchObject({
       status: 'PRICED',
@@ -264,7 +264,7 @@ describe('T-RQ2: the commitment is the price of a month times the months that be
   });
 
   it('a term that ends inside the year has no part of next year', () => {
-    const run = termRunOf({ start: '2026-03-10', months: 6, contractEndsOn: null });
+    const run = termRunOf({ start: '2026-03-10', months: 6, contractEndDate: null });
 
     expect(requestAmountOf({ ...k1, beneficiaries: 1, checkDate: '2026-03-10', endDate: run.end })).toMatchObject({
       months: 6,
@@ -294,7 +294,7 @@ describe('T-R38: a person with a term is cut at the end of the contract and each
     unitPrice: { amountMinor: 600_000n, currency: 'VND' },
     billingCycle: 'MONTHLY' as const,
   };
-  const endOf = (contractEndsOn: string | null) => termRunOf({ start: '2026-11-10', months: 9, contractEndsOn }).end;
+  const endOf = (contractEndDate: string | null) => termRunOf({ start: '2026-11-10', months: 9, contractEndDate }).end;
 
   it('an intern whose contract ends 31/01/2027, K1 for 9 months sent 10/11/2026: 3 months begin, 1.800.000 in all (2026: 1.200.000, next year 600.000)', () => {
     expect(pricingRecordFor({ ...k1, beneficiaries: 1, endDate: endOf('2027-01-31') }, price)).toMatchObject({

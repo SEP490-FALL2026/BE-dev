@@ -210,7 +210,7 @@ describe('RequestFactsService.assess', () => {
 
     it('R-38: a person with a term whose contract ends before the time of use is cut at it, and not refused', async () => {
       given(COST_CENTER, 'SAAS');
-      organization.getEmployee.mockResolvedValue({ employmentType: 'INTERN', contractEndsOn: '2026-12-31' });
+      organization.getEmployee.mockResolvedValue({ employmentType: 'INTERN', contractEndDate: '2026-12-31' });
       catalog.getPlanPrice.mockResolvedValue(monthly);
 
       const assessed = await service.assess(tx, input({ termMonths: 9 }));
@@ -265,10 +265,10 @@ describe('RequestFactsService.assess', () => {
       catalog.findPlanSeatTargets.mockResolvedValue([
         { planId: 'p-1', applicationKind: 'SAAS', applicationStatus: 'ACTIVE', provisioningType: 'K4' },
       ]);
-      organization.getEmployee.mockResolvedValue({ employmentType: 'INTERN', contractEndsOn: null });
+      organization.getEmployee.mockResolvedValue({ employmentType: 'INTERN', contractEndDate: null });
       expect((await service.assess(tx, input())).termRefusal).toBe('TERM_LONG_TERM_NOT_ALLOWED');
 
-      organization.getEmployee.mockResolvedValue({ employmentType: 'INTERN', contractEndsOn: '2027-01-31' });
+      organization.getEmployee.mockResolvedValue({ employmentType: 'INTERN', contractEndDate: '2027-01-31' });
       expect((await service.assess(tx, input())).termRefusal).toBeNull();
     });
   });

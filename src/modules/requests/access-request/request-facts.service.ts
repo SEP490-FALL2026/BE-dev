@@ -148,7 +148,7 @@ export class RequestFactsService {
     const judged =
       input.renewalEnd === undefined
         ? this.termOf({ today, kind: target.provisioningType, termMonths: input.termMonths, employee })
-        : { termRefusal: null, term: termRunOf({ start: today, months: null, contractEndsOn: null }) };
+        : { termRefusal: null, term: termRunOf({ start: today, months: null, contractEndDate: null }) };
     const pricing = await this.priceFor(tx, {
       planId: input.planId,
       free: policy.branch === 'INTERNAL_FREE',
@@ -239,20 +239,20 @@ export class RequestFactsService {
     today: BusinessDate;
     kind: TermKind;
     termMonths: number | null | undefined;
-    employee: { employmentType: string; contractEndsOn?: BusinessDate | null } | null;
+    employee: { employmentType: string; contractEndDate?: BusinessDate | null } | null;
   }): Pick<Assessment, 'termRefusal' | 'term'> {
     const fixedTermPerson = (facts.employee?.employmentType ?? 'STAFF') !== 'STAFF';
     const termRefusal = checkTermMonths({
       kind: facts.kind,
       termMonths: facts.termMonths,
       fixedTermPerson,
-      contractEndKnown: (facts.employee?.contractEndsOn ?? null) !== null,
+      contractEndKnown: (facts.employee?.contractEndDate ?? null) !== null,
     });
     const months = termRefusal === null && typeof facts.termMonths === 'number' ? facts.termMonths : null;
 
     return {
       termRefusal,
-      term: termRunOf({ start: facts.today, months, contractEndsOn: facts.employee?.contractEndsOn ?? null }),
+      term: termRunOf({ start: facts.today, months, contractEndDate: facts.employee?.contractEndDate ?? null }),
     };
   }
 

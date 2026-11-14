@@ -262,7 +262,7 @@ model Employee {
   employmentType      EmploymentType    @map("employment_type")
   hireDate            DateTime          @map("hire_date") @db.Date
   // The last day of the contract of a contractor, a freelancer or an intern, when it is known (R-38, INV-07): a time of use that would run past it is cut here.
-  contractEndsOn      DateTime?         @map("contract_ends_on") @db.Date
+  contractEndDate      DateTime?         @map("contract_end_date") @db.Date
   status              EmployeeStatus    @default(ACTIVE)
   workState           EmployeeWorkState @default(WORKING) @map("work_state")
   createdAt           DateTime          @default(now()) @map("created_at") @db.Timestamptz(3)

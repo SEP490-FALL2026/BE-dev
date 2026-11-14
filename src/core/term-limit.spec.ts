@@ -121,7 +121,7 @@ describe('the time of use a kind of grant asks for (QĐ-111i, FR-2.8)', () => {
 
 describe('the run of a term: the months that begin, the end, and the cut at the end of a contract (R-38, R-39)', () => {
   it('ends the day before the same day N months later, and counts one month for each month that begins', () => {
-    expect(termRunOf({ start: '2026-11-15', months: 9, contractEndsOn: null })).toEqual({
+    expect(termRunOf({ start: '2026-11-15', months: 9, contractEndDate: null })).toEqual({
       start: '2026-11-15',
       months: 9,
       end: '2027-08-14',
@@ -131,7 +131,7 @@ describe('the run of a term: the months that begin, the end, and the cut at the 
   });
 
   it('T-R38: an intern whose contract ends 31/01/2027, sent 10/11/2026 for 9 months, is cut to 31/01/2027 with 3 months begun', () => {
-    expect(termRunOf({ start: '2026-11-10', months: 9, contractEndsOn: '2027-01-31' })).toEqual({
+    expect(termRunOf({ start: '2026-11-10', months: 9, contractEndDate: '2027-01-31' })).toEqual({
       start: '2026-11-10',
       months: 9,
       end: '2027-01-31',
@@ -141,30 +141,30 @@ describe('the run of a term: the months that begin, the end, and the cut at the 
   });
 
   it('counts a month that has begun even if the contract ends the day after it begins (10/01 begins, 11/01 ends)', () => {
-    expect(termRunOf({ start: '2026-11-10', months: 9, contractEndsOn: '2027-01-11' })).toMatchObject({
+    expect(termRunOf({ start: '2026-11-10', months: 9, contractEndDate: '2027-01-11' })).toMatchObject({
       end: '2027-01-11',
       startedMonths: 3,
     });
-    expect(termRunOf({ start: '2026-11-10', months: 9, contractEndsOn: '2027-01-09' })).toMatchObject({
+    expect(termRunOf({ start: '2026-11-10', months: 9, contractEndDate: '2027-01-09' })).toMatchObject({
       end: '2027-01-09',
       startedMonths: 2,
     });
   });
 
   it('does not cut a term that ends on the day of the contract or before it', () => {
-    expect(termRunOf({ start: '2026-11-10', months: 3, contractEndsOn: '2027-02-09' })).toMatchObject({
+    expect(termRunOf({ start: '2026-11-10', months: 3, contractEndDate: '2027-02-09' })).toMatchObject({
       end: '2027-02-09',
       cutAt: null,
       startedMonths: 3,
     });
-    expect(termRunOf({ start: '2026-11-10', months: 3, contractEndsOn: '2027-12-31' })).toMatchObject({
+    expect(termRunOf({ start: '2026-11-10', months: 3, contractEndDate: '2027-12-31' })).toMatchObject({
       end: '2027-02-09',
       cutAt: null,
     });
   });
 
   it('a right that has no end has no cut and no count of months', () => {
-    expect(termRunOf({ start: '2026-11-20', months: null, contractEndsOn: null })).toEqual({
+    expect(termRunOf({ start: '2026-11-20', months: null, contractEndDate: null })).toEqual({
       start: '2026-11-20',
       months: null,
       end: null,
@@ -174,7 +174,7 @@ describe('the run of a term: the months that begin, the end, and the cut at the 
   });
 
   it('a contract already over still gives the day it starts: one month begun, never an end before the start', () => {
-    expect(termRunOf({ start: '2026-11-10', months: 3, contractEndsOn: '2026-10-31' })).toMatchObject({
+    expect(termRunOf({ start: '2026-11-10', months: 3, contractEndDate: '2026-10-31' })).toMatchObject({
       end: '2026-11-10',
       cutAt: '2026-11-10',
       startedMonths: 1,
@@ -182,7 +182,7 @@ describe('the run of a term: the months that begin, the end, and the cut at the 
   });
 
   it('a month that begins on the 31st begins on the last day of a shorter month', () => {
-    expect(termRunOf({ start: '2026-01-31', months: 3, contractEndsOn: null })).toMatchObject({
+    expect(termRunOf({ start: '2026-01-31', months: 3, contractEndDate: null })).toMatchObject({
       end: '2026-04-29',
       startedMonths: 3,
     });

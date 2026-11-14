@@ -42,7 +42,7 @@ describe('requests over HTTP: the preview before sending (integration, real Post
   describe('paid software that has a price (AC-1, AC-3)', () => {
     it('shows the amount, the chain with who holds each step, and the time of every step', async () => {
       const today = h.today();
-      const { end } = termRunOf({ start: today, months: 6, contractEndsOn: null });
+      const { end } = termRunOf({ start: today, months: 6, contractEndDate: null });
       // BR-MF1-06, R-39: the months that begin this year, to the end of the 6 months at the latest.
       const months = monthsBeginningIn({ start: today, end, year: Number(today.slice(0, 4)) });
       const preview = await h.previewed(designer, paidPlan, { termMonths: 6 });

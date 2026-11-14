@@ -24,6 +24,8 @@ export interface OfficialFieldsInput {
   workEmail?: string | null;
   employmentType?: EmploymentType;
   hireDate?: BusinessDate;
+  /** The last day of the contract of a person with a term (R-38, `INV-07`); null clears it; staff has none. */
+  contractEndDate?: BusinessDate | null;
   /** Free text (`QĐ-87e`); null or blank clears it. */
   jobTitle?: string | null;
 }
@@ -35,6 +37,7 @@ export interface MaintainedEmployeeView {
   workEmail: string | null;
   employmentType: EmploymentType;
   hireDate: BusinessDate;
+  contractEndDate: BusinessDate | null;
   jobTitle: string | null;
   status: 'ACTIVE' | 'TERMINATED';
   workState: EmployeeWorkState;
@@ -152,6 +155,8 @@ function viewOf(current: EmployeeRecord, correction: Correction, input: Official
     workEmail: typedWorkEmail === undefined ? current.workEmail : typedWorkEmail,
     employmentType: input.employmentType ?? current.employmentType,
     hireDate: changes.hireDate ?? current.hireDate,
+    contractEndDate:
+      'contractEndDate' in changes ? (changes.contractEndDate ?? null) : (current.contractEndDate ?? null),
     jobTitle: 'jobTitle' in changes ? (changes.jobTitle ?? null) : (current.jobTitle ?? null),
     status: current.status,
     workState: current.workState,

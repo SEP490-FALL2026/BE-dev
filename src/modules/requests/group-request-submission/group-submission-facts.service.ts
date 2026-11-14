@@ -180,7 +180,7 @@ export class GroupSubmissionFactsService {
         termRunOf({
           start: today,
           months: termMonths,
-          contractEndsOn: known.get(line.employeeId)?.contractEndsOn ?? null,
+          contractEndDate: known.get(line.employeeId)?.contractEndDate ?? null,
         }),
       ]),
     );

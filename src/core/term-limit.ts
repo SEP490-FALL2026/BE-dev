@@ -100,7 +100,7 @@ export interface TermRun {
 }
 
 /**
- * The run of `months` months from `start` for a person whose contract ends on `contractEndsOn` (null: none known). The last day is the day
+ * The run of `months` months from `start` for a person whose contract ends on `contractEndDate` (null: none known). The last day is the day
  * before the same day `months` later, cut at the end of the contract when that comes first (R-38: the person is not refused, the term is
  * cut); a month counts as soon as it begins (R-39): month k begins `k − 1` months after `start`. A contract that ended already still leaves
  * the day the right begins and one month, so no right ends before it begins. A right with no end is never cut.
@@ -108,13 +108,13 @@ export interface TermRun {
 export function termRunOf(facts: {
   start: BusinessDate;
   months: number | null;
-  contractEndsOn: BusinessDate | null;
+  contractEndDate: BusinessDate | null;
 }): TermRun {
-  const { start, months, contractEndsOn } = facts;
+  const { start, months, contractEndDate } = facts;
   if (months === null) return { start, months, end: null, cutAt: null, startedMonths: null };
   const derived = termEndOf(start, months);
-  const cut = contractEndsOn !== null && contractEndsOn < derived;
-  const end = cut ? (contractEndsOn > start ? contractEndsOn : start) : derived;
+  const cut = contractEndDate !== null && contractEndDate < derived;
+  const end = cut ? (contractEndDate > start ? contractEndDate : start) : derived;
   let startedMonths = 0;
   for (let month = 0; month < months && addMonths(start, month) <= end; month += 1) startedMonths += 1;
 

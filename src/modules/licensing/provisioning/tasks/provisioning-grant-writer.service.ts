@@ -301,7 +301,7 @@ export class ProvisioningGrantWriter {
     // A right with no months still ends for a person with a term: at the end of their contract (`INV-07`, R-38).
     if (!claimed.termBound) return holder.hasTerm ? holder.contractEnd : null;
 
-    return termRunOf({ start: today, months: claimed.termMonths, contractEndsOn: holder.contractEnd }).end;
+    return termRunOf({ start: today, months: claimed.termMonths, contractEndDate: holder.contractEnd }).end;
   }
 
   /** K5: the plan itself (no seat); K1 and K2: the subscription, which must be of the plan and have a quantity. */

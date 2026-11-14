@@ -135,7 +135,7 @@ describe('the edges of a request for a group over PostgreSQL (US-05-17 AC-5, AC-
     const plan = await h.planOf(subscription);
     const [e1, e2] = await h.colleagues(u, 2);
     const contractEnd = addDays(h.today(), 40);
-    await h.ctx.sql.query(`UPDATE employees SET employment_type = 'INTERN', contract_ends_on = $2 WHERE id = $1`, [
+    await h.ctx.sql.query(`UPDATE employees SET employment_type = 'INTERN', contract_end_date = $2 WHERE id = $1`, [
       e2.employeeId,
       contractEnd,
     ]);
@@ -143,8 +143,8 @@ describe('the edges of a request for a group over PostgreSQL (US-05-17 AC-5, AC-
       ...h.groupBody(plan, [e1, e2]),
       lines: [{ employeeId: e1.employeeId }, { employeeId: e2.employeeId, expectedEndDate: '2099-12-31' }],
     };
-    const full = termRunOf({ start: h.today(), months: 3, contractEndsOn: null });
-    const cut = termRunOf({ start: h.today(), months: 3, contractEndsOn: contractEnd });
+    const full = termRunOf({ start: h.today(), months: 3, contractEndDate: null });
+    const cut = termRunOf({ start: h.today(), months: 3, contractEndDate: contractEnd });
     const year = Number(h.today().slice(0, 4));
     const months = (run: typeof full, inYear: number) =>
       monthsBeginningIn({ start: h.today(), end: run.end, year: inYear });
