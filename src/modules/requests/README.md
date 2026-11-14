@@ -54,7 +54,7 @@ controller) và `requests-work-facade.module.ts` (phần worker chạy, API dùn
   phát qua `outcome/request-outcome.service.ts`.
 - Mở: `TransferGraceHoldContributions` (`requests.transfer-grace-hold`, Contributions 0..n, MF3-C.3, P10) — `personnel` bind ở `personnel/transfer-grace/transfer-grace-hold.listener.ts`:
   quyền đang giữ có phải quyền cũ của điều chuyển còn ân hạn không. `access-request/request-facts.service.ts` hỏi nó (`Assessment.graceHold`); có ⟹ `request-intake/access-request.service.ts` không ném
-  `ALREADY_HOLDS_ACCESS`, `request-limits` bỏ GH-1/GH-2 (`limitExemption = TRANSFER_GRACE`, GH-3 vẫn áp) và Request lưu `access_requests.replaces_assignment_id` (nội bộ, R-49);
+  `ALREADY_HOLDS_ACCESS`, `request-limits` bỏ GH-2 (`limitExemption = TRANSFER_GRACE`; trùng gói GH-1 vẫn chặn) và Request lưu `access_requests.replaces_assignment_id` (nội bộ, R-49);
   preview trả `limitExemption`, Request trả `limitExemption`. Không `Hook` vì worker nạp requests mà không nạp personnel. Chỉ Request cá nhân (không dòng nhóm, không gia hạn).
 - Đăng ký vào licensing: `licensing.grant-request-gate` ← `grant/access-request-grant.listener.ts`;
   `licensing.revocation` ← `return-request/return-revocation.listener.ts` và `grant/seat-revocation.listener.ts` (G9-02: hoàn tất
@@ -200,7 +200,7 @@ cùng cần; phần ghi nằm ở `assessment/assessment.repo.ts`.
 | Request được gửi thế nào                            | `request-intake/access-request.service.ts` (cá nhân), `group-request-submission/` (nhóm)                  |
 | Bước nhu cầu: quyết định, ghế tương tự, rút         | `need-decision/`, `withdraw/` (controller cạnh service)                                                   |
 | Kiểm tra ngân sách của một request                  | `spend/budget-check.service.ts`                                                                           |
-| Giới hạn GH-1/GH-2/GH-3 theo người thụ hưởng        | `request-limits/` (policy thuần, repo đếm + khóa tư vấn theo người, service gọi từ mọi đường gửi cấp mới) |
+| Giới hạn GH-1 (trùng gói), GH-2 (tuần lịch)         | `request-limits/` (policy thuần + tuần lịch, múi giờ tổ chức; repo đếm `submitted_at` và khóa theo người) |
 | Khoản cam kết tự tạo ngày 01/01 (job, luật số tiền) | `year-start-commitments/` (`*.service.ts` điều phối, `*-batch.service.ts` một lô, `*.policy.ts` số tiền)  |
 | Ai giữ một bước, chuyển bước                        | `access-request/routing.policy.ts`, `step-routing/`, `reassignment/`                                      |
 | Kết thúc request và phát `requests.outcome`         | `outcome/request-outcome.service.ts`, `request-end/request-end.service.ts`                                |
