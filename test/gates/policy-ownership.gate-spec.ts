@@ -26,6 +26,15 @@ interface PolicyContract {
 /** The exact public policy files another module shares, with their consumers: the single registry of shared policies. */
 const PUBLIC_ROOT_POLICY_FILES: ReadonlyMap<string, PolicyContract> = new Map([
   [
+    'catalog/public/catalog-duplicate.policy.ts',
+    {
+      reason:
+        'the IT Admin who declares an application and the employee who proposes software outside the catalog share what makes two entries the same software: the same name or the same domain',
+      entry: 'duplicateOf',
+      consumers: [],
+    },
+  ],
+  [
     'organization/public/employee-placement.policy.ts',
     {
       reason:
