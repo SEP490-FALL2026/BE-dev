@@ -19,7 +19,7 @@ import {
   PlanUpdateEmptyError,
   PlanWorkspaceProfileBlocksTypeChangeError,
 } from './plan.errors';
-import { assertPlanShape, cleanPlanName, cleanRevocationNote } from './plan.policy';
+import { assertPlanShape, cleanPlanName, cleanRevocationNote, derivedPricingModel } from './plan.policy';
 import { PlanRepo } from './plan.repo';
 import { assertAdminConsoleApplicable } from './plan-vendor-admins.policy';
 import { PlanWorkspaceService } from './plan-workspace.service';
@@ -131,7 +131,7 @@ export class PlanService {
           applicationId: application.id,
           name,
           provisioningType: input.provisioningType,
-          pricingModel: input.pricingModel ?? null,
+          pricingModel: input.pricingModel ?? derivedPricingModel(input.provisioningType),
           controlLevel: input.controlLevel ?? null,
           revocationNote,
           dataLossOnRemoval: input.dataLossOnRemoval ?? false,
@@ -154,7 +154,7 @@ export class PlanService {
     try {
       return await (outer ? write(outer) : this.runner.run(write));
     } catch (error) {
-      throw this.mapWriteError(error);
+      throw await this.mapWriteError(error, { applicationId: input.applicationId, name });
     }
   }
 
@@ -176,7 +176,7 @@ export class PlanService {
         const next = {
           name: name ?? current.name,
           provisioningType: input.provisioningType ?? current.provisioningType,
-          pricingModel: input.pricingModel === undefined ? current.pricingModel : input.pricingModel,
+          pricingModel: this.pricingModelOf(current, input),
           controlLevel: input.controlLevel === undefined ? current.controlLevel : input.controlLevel,
           revocationNote: revocationNote === undefined ? current.revocationNote : revocationNote,
           dataLossOnRemoval: input.dataLossOnRemoval ?? current.dataLossOnRemoval,
@@ -217,18 +217,41 @@ export class PlanService {
         return updated;
       });
     } catch (error) {
-      throw this.mapWriteError(error);
+      throw await this.mapWriteError(error, { planId: id, name });
     }
   }
 
-  private mapWriteError(error: unknown): unknown {
-    if (isUniqueViolation(error, 'normalized_name')) return new PlanNameTakenError();
+  /** The pricing model after an update: the one named, else the one the plan has, else (the kind changed) the one the new kind implies (`B-5`). */
+  private pricingModelOf(current: PlanRecord, input: UpdatePlanInput): PricingModel | null {
+    if (input.pricingModel !== undefined) return input.pricingModel;
+    if (input.provisioningType === undefined || input.provisioningType === current.provisioningType) {
+      return current.pricingModel;
+    }
+
+    return derivedPricingModel(input.provisioningType);
+  }
+
+  /** What the database refused, as a rule of the catalog; a name already taken carries the plan that has it. */
+  private async mapWriteError(
+    error: unknown,
+    context: { applicationId?: string; planId?: string; name?: string },
+  ): Promise<unknown> {
+    if (isUniqueViolation(error, 'normalized_name')) return new PlanNameTakenError(await this.planNamed(context));
     if (isCheckViolation(error, 'keeps a numeric install limit')) return new PlanTermsBlockTypeChangeError();
     const blocked = changeBlockOf(error);
     if (blocked) return new PlanInUseBlocksChangeError(blocked);
     if (isCheckViolation(error)) return new PlanProvisioningTypeMismatchError();
 
     return error;
+  }
+
+  /** The plan that holds the name a write wanted, read after the write failed; null when it cannot be found. */
+  private async planNamed(context: { applicationId?: string; planId?: string; name?: string }) {
+    if (context.name === undefined) return null;
+    const applicationId =
+      context.applicationId ?? (context.planId ? (await this.plans.find(context.planId))?.applicationId : undefined);
+
+    return applicationId ? this.plans.findByName(applicationId, context.name) : null;
   }
 
   private async requireOrganizationId(): Promise<string> {

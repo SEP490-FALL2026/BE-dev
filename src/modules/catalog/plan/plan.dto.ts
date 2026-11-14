@@ -108,7 +108,7 @@ const planSummarySchema = z.strictObject({
   createdAt: z.iso.datetime(),
   updatedAt: z.iso.datetime(),
 });
-const planSchema = planSummarySchema.extend({ revocationNote: z.string().nullable() });
+export const planSchema = planSummarySchema.extend({ revocationNote: z.string().nullable() });
 const planDetailSchema = planSchema.extend({ workspaceProfile: workspaceProfileSchema.nullable() });
 
 export class DeclarePlanBodyDto extends createZodDto(declarePlanBodySchema) {}

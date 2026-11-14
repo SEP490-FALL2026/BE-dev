@@ -123,10 +123,12 @@ describe('plans and workspace profiles (integration, PostgreSQL constraints)', (
   });
 
   describe('plans', () => {
-    it('ties the pricing model to the kind: K1, K2, K4 have one, K3 and K5 have none', async () => {
+    it('ties the pricing model to the kind: K1 and K2 have one, K3 and K5 have none, K4 either (it is bought once, B-5)', async () => {
       expect(await insertPlan({ type: 'K1', pricing: 'FLAT_RATE' })).toBeNull();
       expect(await insertPlan({ type: 'K2', pricing: 'PER_SEAT' })).toBeNull();
       expect(await insertPlan({ type: 'K4', pricing: 'PER_HOST' })).toBeNull();
+      expect(await insertPlan({ type: 'K4', pricing: null, name: 'K4 bought once' })).toBeNull();
+      expect(await insertPlan({ type: 'K2', pricing: null })).toBe('23514');
       expect(await insertPlan({ type: 'K1', pricing: null })).toBe('23514');
       expect(await insertPlan({ type: 'K5', applicationId: internalId, pricing: 'PER_SEAT' })).toBe('23514');
       expect(await insertPlan({ type: 'K3', pricing: 'PER_SEAT' })).toBe('23514');

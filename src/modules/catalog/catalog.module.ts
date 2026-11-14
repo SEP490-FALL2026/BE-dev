@@ -11,6 +11,8 @@ import { OrganizationModule } from '../organization/organization.module';
 import { CatalogApi } from './public/catalog.api';
 import { CatalogResponsibilityApi } from './public/catalog-responsibility.api';
 import { SeatBaselinePhaseHook, SeatOccupancyHook } from './public/catalog.extension-points';
+import { ApplicationIntakeController } from './application-intake/application-intake.controller';
+import { ApplicationIntakeService } from './application-intake/application-intake.service';
 import { ApplicationFactsService } from './catalog-entry/application-facts.service';
 import { ApplicationRetirementController } from './application-retirement/application-retirement.controller';
 import { ApplicationResponsibilityController } from './application-responsibility/application-responsibility.controller';
@@ -105,6 +107,7 @@ import { VendorRepo } from './vendor/vendor.repo';
   controllers: [
     VendorDictionaryController,
     ApplicationsController,
+    ApplicationIntakeController,
     FunctionalGroupsController,
     PlansController,
     PlanTermsController,
@@ -135,6 +138,7 @@ import { VendorRepo } from './vendor/vendor.repo';
     FunctionalGroupFactsService,
     ApplicationWriteGuards,
     ApplicationService,
+    ApplicationIntakeService,
     ApplicationViewService,
     ApplicationListService,
     ApplicationVendorLinkService,

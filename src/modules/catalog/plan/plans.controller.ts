@@ -23,9 +23,9 @@ import {
   WorkspaceProfileResponseDto,
 } from './plan.dto';
 import { PLAN_ERROR_EXAMPLES as EXAMPLES, toPlanApiException } from './plan.http-errors';
-import { seatTrackingOf } from './plan.policy';
+import { toPlanSummaryWire, toPlanWire } from './plan.mapper';
 import { PlanService } from './plan.service';
-import type { PlanRecord, PlanSummaryRecord, WorkspaceProfileView } from './plan.types';
+import type { WorkspaceProfileView } from './plan.types';
 import { PlanWorkspaceService } from './plan-workspace.service';
 
 const AUTH_ERRORS = [UNAUTHENTICATED_RESPONSE, GUARDED_SERVICE_UNAVAILABLE_RESPONSE] as const;
@@ -85,28 +85,6 @@ const NOT_FOUND = {
   description: 'The plan does not exist (PLAN.NOT_FOUND).',
   examples: [EXAMPLES.NOT_FOUND],
 } as const;
-
-function toPlanSummaryWire(plan: PlanSummaryRecord) {
-  return {
-    id: plan.id,
-    applicationId: plan.applicationId,
-    applicationName: plan.applicationName,
-    name: plan.name,
-    provisioningType: plan.provisioningType,
-    pricingModel: plan.pricingModel,
-    controlLevel: plan.controlLevel,
-    dataLossOnRemoval: plan.dataLossOnRemoval,
-    sharingPolicy: plan.sharingPolicy,
-    hasAdminConsole: plan.hasAdminConsole,
-    seatTracking: seatTrackingOf(plan.pricingModel),
-    createdAt: plan.createdAt.toISOString(),
-    updatedAt: plan.updatedAt.toISOString(),
-  };
-}
-
-function toPlanWire(plan: PlanRecord) {
-  return { ...toPlanSummaryWire(plan), revocationNote: plan.revocationNote };
-}
 
 function toProfileWire(profile: WorkspaceProfileView) {
   return { ...profile, updatedAt: profile.updatedAt.toISOString() };

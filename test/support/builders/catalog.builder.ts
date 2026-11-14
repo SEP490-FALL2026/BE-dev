@@ -1,5 +1,7 @@
-import { DeclareApplicationBodyDto } from '../../../src/modules/catalog/catalog-entry/application.dto';
-import { ApplicationService } from '../../../src/modules/catalog/catalog-entry/application.service';
+import {
+  ApplicationService,
+  type DeclareApplicationInput,
+} from '../../../src/modules/catalog/catalog-entry/application.service';
 import { DeclarePlanBodyDto } from '../../../src/modules/catalog/plan/plan.dto';
 import { PlanService } from '../../../src/modules/catalog/plan/plan.service';
 import { DeclareSubscriptionBodyDto } from '../../../src/modules/catalog/subscription/subscription.dto';
@@ -14,12 +16,16 @@ import { principalOf, sent } from './account.builder';
  * assertion lives here.
  */
 
-/** The IT Admin declares an application (`POST /applications`) and gets its id. */
+/**
+ * The IT Admin declares an application and gets its id. The application alone, with no plan (the plan is `declarePlan`): the one command of the
+ * route (`POST /applications`, application and first plan) is proved by its own suite. A suite states the kind it needs (a LICENSED
+ * application, which the route no longer makes) and, for an older suite, the answers about communication, which nothing reads any more.
+ */
 export async function declareApplication(ctx: HttpTestApp, itAdminToken: string, body: object): Promise<string> {
   const actor = await principalOf(ctx, itAdminToken);
-  const { application } = await ctx.app
-    .get(ApplicationService, { strict: false })
-    .declare(actor, DeclareApplicationBodyDto.create(sent(body)));
+  const input = sent(body) as DeclareApplicationInput & { communication?: unknown };
+  delete input.communication;
+  const { application } = await ctx.app.get(ApplicationService, { strict: false }).declare(actor, input);
 
   return application.id;
 }

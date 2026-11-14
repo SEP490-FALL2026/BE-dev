@@ -1,19 +1,11 @@
 import { applicationChangesOf } from './application-state.policy';
 
-const communication = {
-  personToPersonMessaging: false,
-  callsOrMeetings: false,
-  mailbox: false,
-  isCommunicationService: false,
-  note: null as string | null,
-};
 const current = {
   name: 'Slack',
   domains: ['slack.com'],
   dataSensitivity: 'MEDIUM' as const,
   functionalGroup: { id: 'grp-1' } as { id: string } | null,
   dictionaryServiceLineId: 'line-1' as string | null,
-  communication,
 };
 
 describe('what an update of an application changes (US-04-01, US-04-02)', () => {
@@ -52,27 +44,17 @@ describe('what an update of an application changes (US-04-01, US-04-02)', () => 
     });
   });
 
-  it('clears the functional group or the dictionary line when the update says null and there is one', () => {
-    expect(applicationChangesOf(current, { functionalGroupId: null, dictionaryServiceLineId: null }, {})).toEqual({
-      functionalGroupId: null,
+  it('clears the dictionary line when the update says null and there is one; the functional group is never cleared (QĐ-111d)', () => {
+    expect(applicationChangesOf(current, { dictionaryServiceLineId: null }, {})).toEqual({
       dictionaryServiceLineId: null,
     });
     expect(
-      applicationChangesOf(
-        { ...current, functionalGroup: null, dictionaryServiceLineId: null },
-        { functionalGroupId: null, dictionaryServiceLineId: null },
-        {},
-      ),
+      applicationChangesOf({ ...current, dictionaryServiceLineId: null }, { dictionaryServiceLineId: null }, {}),
     ).toEqual({});
   });
 
-  it('merges the answers about communication and the note, and notes them only when they differ', () => {
-    expect(applicationChangesOf(current, { communication: { mailbox: true } }, {})).toEqual({
-      communication: { ...communication, mailbox: true, isCommunicationService: true },
-    });
-    expect(applicationChangesOf(current, { communication: { mailbox: false } }, {})).toEqual({});
-    expect(applicationChangesOf(current, { communication: {} }, { note: 'ghi chú' })).toEqual({
-      communication: { ...communication, note: 'ghi chú' },
-    });
+  it('rates the data, or clears the rating with null (QĐ-111f), and notes it only when it differs', () => {
+    expect(applicationChangesOf(current, { dataSensitivity: null }, {})).toEqual({ dataSensitivity: null });
+    expect(applicationChangesOf({ ...current, dataSensitivity: null }, { dataSensitivity: null }, {})).toEqual({});
   });
 });

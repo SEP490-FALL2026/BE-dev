@@ -20,7 +20,8 @@ export class PlanNotFoundError extends Error {
 }
 
 export class PlanNameTakenError extends Error {
-  constructor() {
+  /** `existing` is the plan of the application that has the name, when it could be read (`QĐ-111b`). */
+  constructor(readonly existing: { id: string; name: string; provisioningType: string } | null = null) {
     super('The application already has a plan with this name.');
     this.name = 'PlanNameTakenError';
   }

@@ -30,6 +30,11 @@ export class ApplicationWriteGuards {
     return group;
   }
 
+  /** The group an application with none is put in: `Khác`. Null when the organization has none, which only an organization made by hand can lack. */
+  findDefaultGroup(tx: DbTx, organizationId: string): Promise<{ id: string; name: string } | null> {
+    return this.functionalGroups.findDefault(tx, organizationId);
+  }
+
   mapWriteError(error: unknown): unknown {
     if (error instanceof VendorNameHeldByAnotherGroupError) return new ApplicationDictionaryLineMismatchError();
     if (error instanceof VendorDictionaryGroupChangedError) return new ApplicationVendorGroupChangedError();

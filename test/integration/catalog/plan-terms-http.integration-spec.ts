@@ -4,6 +4,7 @@ import { pretendBusinessToday } from '../../support/pretend-today';
 import { ensureVendorAdmins } from '../../support/builders/catalog.builder';
 import { ApiAccount, adminToken, createActivatedAccount } from '../../support/api-accounts';
 import { HttpTestApp, SeededInstallation, createHttpTestApp, seedInstallation } from '../../support/http-test-app';
+import { intakeBodyOf } from '../../support/application-body';
 
 interface TermsWire {
   termsUrl: string | null;
@@ -100,13 +101,15 @@ describe('plan terms and review alerts over HTTP (integration, real PostgreSQL)'
       await request(server())
         .post('/api/v1/applications')
         .set(as(it1))
-        .send({
-          name: unique('App'),
-          kind,
-          ...(kind === 'INTERNAL' ? {} : { vendorName: unique('Vendor') }),
-          dataSensitivity: 'LOW',
-          communication: NO,
-        })
+        .send(
+          intakeBodyOf({
+            name: unique('App'),
+            kind,
+            ...(kind === 'INTERNAL' ? {} : { vendorName: unique('Vendor') }),
+            dataSensitivity: 'LOW',
+            communication: NO,
+          }),
+        )
         .expect(201),
     );
     const type = setup.type ?? (kind === 'INTERNAL' ? 'K5' : 'K2');

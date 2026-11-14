@@ -8,6 +8,7 @@ import {
   insertEmployeeFixture,
   seedInstallation,
 } from '../../support/http-test-app';
+import { intakeBodyOf } from '../../support/application-body';
 
 interface LineWire {
   taxType: string;
@@ -85,13 +86,15 @@ describe('vendor tax profiles over HTTP (integration, real PostgreSQL)', () => {
       await request(server())
         .post('/api/v1/applications')
         .set(as(it1))
-        .send({
-          name: unique('App'),
-          kind: 'SAAS',
-          vendorName: name,
-          dataSensitivity: 'LOW',
-          communication: NO,
-        })
+        .send(
+          intakeBodyOf({
+            name: unique('App'),
+            kind: 'SAAS',
+            vendorName: name,
+            dataSensitivity: 'LOW',
+            communication: NO,
+          }),
+        )
         .expect(201),
     ).vendor.id;
   const declare = (id: string, body: object, account: ApiAccount = finance) =>

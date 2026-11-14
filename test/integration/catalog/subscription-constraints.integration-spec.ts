@@ -45,6 +45,7 @@ describe('subscriptions (integration, PostgreSQL constraints)', () => {
   let perSeatPlan: string;
   let flatPlan: string;
   let licensedPlan: string;
+  let boughtOncePlan: string;
   let internalPlan: string;
   let rateId: string;
 
@@ -158,6 +159,8 @@ describe('subscriptions (integration, PostgreSQL constraints)', () => {
     flatPlan = await newPlan('SAAS', 'Zoom', 'K1', 'FLAT_RATE', 'PARTIAL');
     licensedPlan = await newPlan('LICENSED', 'Office', 'K4', 'PER_SEAT', 'FULL');
     internalPlan = await newPlan('INTERNAL', 'Portal', 'K5', null, null);
+    // B-5: a K4 plan of an application that is not LICENSED, with no pricing model: what the one-command declaration makes.
+    boughtOncePlan = await newPlan('SAAS', 'Acrobat', 'K4', null, 'FULL');
   }, 60000);
 
   afterAll(async () => {
@@ -262,6 +265,10 @@ describe('subscriptions (integration, PostgreSQL constraints)', () => {
       '23514',
     );
     expect(await insert({ price: null, kind: 'PERPETUAL', planId: licensedPlan, startDate: '2026-03-15' })).toBeNull();
+    // A K4 plan is the plan bought once, whatever kind its application has (B-5).
+    expect(
+      await insert({ price: null, kind: 'PERPETUAL', planId: boughtOncePlan, startDate: '2026-03-15' }),
+    ).toBeNull();
   });
 
   it('refuses a subscription for a plan that does not exist (foreign key)', async () => {

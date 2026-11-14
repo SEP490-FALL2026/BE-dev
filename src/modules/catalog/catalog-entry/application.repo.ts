@@ -27,13 +27,7 @@ const toRecord = (row: Row): ApplicationRecord => ({
   domains: row.domains,
   dataSensitivity: row.dataSensitivity,
   responsibleItAdminEmployeeId: row.responsibleItAdminEmployeeId,
-  communication: {
-    personToPersonMessaging: row.commPersonToPersonMessaging,
-    callsOrMeetings: row.commCallsOrMeetings,
-    mailbox: row.commMailbox,
-    isCommunicationService: row.isCommunicationService,
-    note: row.communicationNote,
-  },
+  isCommunicationService: row.functionalGroup?.systemKey === 'COMMUNICATION',
   functionalGroup: row.functionalGroup ? { id: row.functionalGroup.id, name: row.functionalGroup.name } : null,
   status: row.catalogStatus,
   createdAt: row.createdAt,
@@ -57,11 +51,6 @@ export class ApplicationRepo {
         functionalGroupId: input.functionalGroupId,
         responsibleItAdminEmployeeId: input.responsibleItAdminEmployeeId,
         dataSensitivity: input.dataSensitivity,
-        commPersonToPersonMessaging: input.communication.personToPersonMessaging,
-        commCallsOrMeetings: input.communication.callsOrMeetings,
-        commMailbox: input.communication.mailbox,
-        isCommunicationService: input.communication.isCommunicationService,
-        communicationNote: input.communication.note,
         domains: input.domains,
       },
       include: WITH_RELATIONS,
@@ -102,6 +91,48 @@ export class ApplicationRepo {
     return new Map(rows.map((row) => [row.employee_id, row.total]));
   }
 
+  /**
+   * The approved applications that may be the same software as a candidate: the same normalized name, or a domain in common (the hosts are as the catalog
+   * stores them). The caller's rule (`duplicateOf`) says which one it is; at most twenty, by name.
+   */
+  async duplicateCandidates(
+    tx: DbTx,
+    normalizedName: string,
+    hosts: readonly string[],
+  ): Promise<
+    {
+      id: string;
+      name: string;
+      domains: string[];
+      vendorName: string | null;
+      functionalGroup: { id: string; name: string } | null;
+    }[]
+  > {
+    const rows = await tx.application.findMany({
+      where: {
+        catalogStatus: 'APPROVED',
+        OR: [{ normalizedName }, ...(hosts.length > 0 ? [{ domains: { hasSome: [...hosts] } }] : [])],
+      },
+      select: {
+        id: true,
+        name: true,
+        domains: true,
+        vendor: { select: { name: true } },
+        functionalGroup: { select: { id: true, name: true } },
+      },
+      orderBy: [{ normalizedName: 'asc' }, { id: 'asc' }],
+      take: 20,
+    });
+
+    return rows.map((row) => ({
+      id: row.id,
+      name: row.name,
+      domains: row.domains,
+      vendorName: row.vendor?.name ?? null,
+      functionalGroup: row.functionalGroup,
+    }));
+  }
+
   /** The application, locked for the rest of the transaction, or null. */
   async lock(tx: DbTx, id: string): Promise<ApplicationRecord | null> {
     const locked = await tx.$queryRaw<{ id: string }[]>`SELECT id FROM applications WHERE id = ${id}::uuid FOR UPDATE`;
@@ -121,7 +152,6 @@ export class ApplicationRepo {
   }
 
   async update(tx: DbTx, id: string, changes: ApplicationChanges): Promise<ApplicationRecord> {
-    const communication = changes.communication;
     const row = await tx.application.update({
       where: { id },
       data: {
@@ -130,15 +160,6 @@ export class ApplicationRepo {
         ...(changes.functionalGroupId !== undefined ? { functionalGroupId: changes.functionalGroupId } : {}),
         ...(changes.dataSensitivity !== undefined ? { dataSensitivity: changes.dataSensitivity } : {}),
         ...(changes.domains !== undefined ? { domains: changes.domains } : {}),
-        ...(communication
-          ? {
-              commPersonToPersonMessaging: communication.personToPersonMessaging,
-              commCallsOrMeetings: communication.callsOrMeetings,
-              commMailbox: communication.mailbox,
-              isCommunicationService: communication.isCommunicationService,
-              communicationNote: communication.note,
-            }
-          : {}),
       },
       include: WITH_RELATIONS,
     });
@@ -234,11 +255,10 @@ export class ApplicationRepo {
             kind: true,
             catalogStatus: true,
             dataSensitivity: true,
-            isCommunicationService: true,
             responsibleItAdminEmployeeId: true,
             updatedAt: true,
             vendor: { select: { id: true, name: true } },
-            functionalGroup: { select: { id: true, name: true } },
+            functionalGroup: { select: { id: true, name: true, systemKey: true } },
           },
           orderBy: [{ normalizedName: 'asc' }, { id: 'asc' }],
           skip: filter.skip,
@@ -253,8 +273,10 @@ export class ApplicationRepo {
             vendor: row.vendor,
             dataSensitivity: row.dataSensitivity,
             responsibleItAdminEmployeeId: row.responsibleItAdminEmployeeId,
-            isCommunicationService: row.isCommunicationService,
-            functionalGroup: row.functionalGroup,
+            isCommunicationService: row.functionalGroup?.systemKey === 'COMMUNICATION',
+            functionalGroup: row.functionalGroup
+              ? { id: row.functionalGroup.id, name: row.functionalGroup.name }
+              : null,
             status: row.catalogStatus,
             updatedAt: row.updatedAt,
           })),

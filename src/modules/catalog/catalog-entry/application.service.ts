@@ -14,11 +14,8 @@ import {
 import {
   cleanApplicationDomains,
   cleanApplicationName,
-  cleanNote,
-  isCommunicationService,
   SIMILAR_APPLICATION_LIMIT,
   vendorSourceOf,
-  type CommunicationAnswers,
 } from './application.policy';
 import { ApplicationRepo } from './application.repo';
 import { ApplicationVendorLinkService } from './application-vendor-link.service';
@@ -34,23 +31,23 @@ export interface DeclareApplicationInput {
   vendorName?: string;
   dictionaryServiceLineId?: string;
   domains?: string[];
-  dataSensitivity: DataSensitivity;
-  communication: CommunicationAnswers & { note?: string | null };
+  /** `QĐ-111f`: may be left out. */
+  dataSensitivity?: DataSensitivity | null;
+  /** Left out, the application stands in `Khác` (`QĐ-111d`). */
   functionalGroupId?: string;
 }
 
 export interface UpdateApplicationInput {
   name?: string;
   domains?: string[];
-  dataSensitivity?: DataSensitivity;
-  communication?: Partial<CommunicationAnswers> & { note?: string | null };
-  functionalGroupId?: string | null;
+  dataSensitivity?: DataSensitivity | null;
+  functionalGroupId?: string;
   dictionaryServiceLineId?: string | null;
 }
 
 /**
  * The application catalog the IT Admin keeps (`US-04-01`). Declaring or changing an application is one transaction:
- * the vendor and the functional group are found or checked, the application is written with the IT Admin who declares it
+ * the vendor and the functional group are found or checked (`Khác` when none is named), the application is written with the IT Admin who declares it
  * as the one responsible (`QĐ-111g`), a proposal to the dictionary is raised when the software is outside it, and the audit events are recorded.
  * A unique violation aborts the transaction, so it is caught outside it and mapped by the column it names.
  */
@@ -102,7 +99,7 @@ export class ApplicationService {
 
   /**
    * Declares an application. Throws the vendor errors of `vendorSourceOf`, the
-   * name, domain and note errors of the policy,
+   * name and domain errors of the policy,
    * ApplicationFunctionalGroupInvalidError, ApplicationDictionaryLineNotFoundError, ApplicationNameTakenError,
    * ApplicationDictionaryLineTakenError, ApplicationDictionaryLineMismatchError (a vendor of the group's name holds
    * another group) and ApplicationVendorGroupChangedError (a simultaneous change took the group first, `DB-03`).
@@ -117,6 +114,11 @@ export class ApplicationService {
     return { application, proposed: vendorSourceOf(input).type === 'NAME' };
   }
 
+  /** A record as it is answered: with the IT Admin who answers for it, read from the organization. */
+  async viewOf(record: ApplicationRecord): Promise<ApplicationView> {
+    return (await this.views.withResponsible([record]))[0];
+  }
+
   /** The same declaration, returning the record; with `outer` it is written in the caller's transaction (`US-05-20`). */
   async declareRecord(actor: AuthenticatedPrincipal, input: DeclareApplicationInput, outer?: DbTx) {
     const source = vendorSourceOf(input);
@@ -124,7 +126,6 @@ export class ApplicationService {
       source,
       name: cleanApplicationName(input.name),
       domains: cleanApplicationDomains(input.domains ?? []),
-      note: cleanNote(input.communication.note),
       organizationId: await this.guards.requireOrganizationId(),
     };
     const write = (tx: DbTx): Promise<ApplicationRecord> => this.writeDeclaration(tx, actor, input, prepared);
@@ -145,12 +146,13 @@ export class ApplicationService {
       source: ReturnType<typeof vendorSourceOf>;
       name: string;
       domains: string[];
-      note: string | null;
       organizationId: string;
     },
   ): Promise<ApplicationRecord> {
-    const { source, name, domains, note, organizationId } = prepared;
-    const group = input.functionalGroupId ? await this.guards.requireActiveGroup(tx, input.functionalGroupId) : null;
+    const { source, name, domains, organizationId } = prepared;
+    const group = input.functionalGroupId
+      ? await this.guards.requireActiveGroup(tx, input.functionalGroupId)
+      : await this.guards.findDefaultGroup(tx, organizationId);
     const { ensured, dictionaryServiceLineId } = await this.ensureVendor(tx, organizationId, source);
 
     const created = await this.applications.insert(tx, {
@@ -162,14 +164,7 @@ export class ApplicationService {
       functionalGroupId: group?.id ?? null,
       // QĐ-111g: the IT Admin who declares the application answers for it; there is no field to choose another.
       responsibleItAdminEmployeeId: actor.employeeId,
-      dataSensitivity: input.dataSensitivity,
-      communication: {
-        personToPersonMessaging: input.communication.personToPersonMessaging,
-        callsOrMeetings: input.communication.callsOrMeetings,
-        mailbox: input.communication.mailbox,
-        isCommunicationService: isCommunicationService(input.communication),
-        note,
-      },
+      dataSensitivity: input.dataSensitivity ?? null,
       domains,
     });
     await this.auditCreated(tx, actor, created, { ensured, source, name, domains, organizationId });
@@ -265,7 +260,6 @@ export class ApplicationService {
     const cleaned = {
       name: input.name === undefined ? undefined : cleanApplicationName(input.name),
       domains: input.domains === undefined ? undefined : cleanApplicationDomains(input.domains),
-      note: input.communication?.note === undefined ? undefined : cleanNote(input.communication.note),
     };
     const organizationId = await this.guards.requireOrganizationId();
 
@@ -283,7 +277,7 @@ export class ApplicationService {
     actor: AuthenticatedPrincipal,
     id: string,
     input: UpdateApplicationInput,
-    ctx: { cleaned: { name?: string; domains?: string[]; note?: string | null }; organizationId: string },
+    ctx: { cleaned: { name?: string; domains?: string[] }; organizationId: string },
   ): Promise<ApplicationRecord> {
     const { organizationId } = ctx;
     const current = await this.applications.lock(tx, id);

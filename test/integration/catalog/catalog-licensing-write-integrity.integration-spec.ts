@@ -6,6 +6,7 @@ import { VendorRecordService } from '../../../src/modules/catalog/vendor/vendor-
 import { bodyOf } from '../../support/api-body';
 import { SeatHarness } from '../../support/seat-baseline-harness';
 import { waitForLockWaiters } from '../../support/lock-wait';
+import { intakeBodyOf } from '../../support/application-body';
 
 const h = new SeatHarness();
 const NO = { personToPersonMessaging: false, callsOrMeetings: false, mailbox: false };
@@ -77,12 +78,14 @@ describe('write integrity of catalog, finance and licensing (integration, DB-03,
     request(h.server())
       .post('/api/v1/applications')
       .set(as())
-      .send({
-        kind: 'SAAS',
-        dataSensitivity: 'LOW',
-        communication: NO,
-        ...body,
-      });
+      .send(
+        intakeBodyOf({
+          kind: 'SAAS',
+          dataSensitivity: 'LOW',
+          communication: NO,
+          ...body,
+        }),
+      );
   const dictionary = async (groupName: string, lineName: string) => {
     const created = h.dataOf<{ id: string }>(
       await request(h.server())

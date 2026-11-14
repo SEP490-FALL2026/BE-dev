@@ -211,7 +211,8 @@ describe('the software a person may request (integration, real PostgreSQL)', () 
         name: 'Sel Autodesk',
         kind: 'LICENSED',
         vendorName: 'Sel Autodesk Vendor',
-        functionalGroup: null,
+        // QĐ-111d: an application declared with no group stands in Khác.
+        functionalGroup: { id: expect.any(String) as unknown, name: 'Khác' },
         planCount: 1,
         costsMoney: true,
         canSubmit: true,

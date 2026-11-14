@@ -2,14 +2,6 @@ export type ApplicationKind = 'SAAS' | 'LICENSED' | 'INTERNAL';
 export type DataSensitivity = 'LOW' | 'MEDIUM' | 'HIGH';
 export type CatalogStatus = 'APPROVED' | 'RETIRED';
 
-export interface ApplicationCommunication {
-  personToPersonMessaging: boolean;
-  callsOrMeetings: boolean;
-  mailbox: boolean;
-  isCommunicationService: boolean;
-  note: string | null;
-}
-
 export interface ApplicationRecord {
   id: string;
   name: string;
@@ -21,7 +13,8 @@ export interface ApplicationRecord {
   dataSensitivity: DataSensitivity | null;
   /** QĐ-111g: the IT Admin who answers for the application; null when the creator was not a usable IT Admin and nobody took it over. */
   responsibleItAdminEmployeeId: string | null;
-  communication: ApplicationCommunication;
+  /** `QĐ-111e`: an application is a communication service when it stands in the group Liên lạc; nobody answers three questions any more. */
+  isCommunicationService: boolean;
   functionalGroup: { id: string; name: string } | null;
   status: CatalogStatus;
   createdAt: Date;
@@ -78,7 +71,6 @@ export interface NewApplication {
   functionalGroupId: string | null;
   responsibleItAdminEmployeeId: string | null;
   dataSensitivity: DataSensitivity | null;
-  communication: ApplicationCommunication;
   domains: string[];
 }
 
@@ -87,6 +79,5 @@ export interface ApplicationChanges {
   dictionaryServiceLineId?: string | null;
   functionalGroupId?: string | null;
   dataSensitivity?: DataSensitivity | null;
-  communication?: ApplicationCommunication;
   domains?: string[];
 }

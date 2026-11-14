@@ -11,6 +11,7 @@ import {
   insertEmployeeFixture,
   seedInstallation,
 } from './http-test-app';
+import { intakeBodyOf } from './application-body';
 
 /** Subscriptions and perpetual purchases over HTTP: the set-up the subscription specs share. */
 export interface SubscriptionWire {
@@ -135,13 +136,15 @@ export class SubscriptionHttpHarness {
       await request(this.server())
         .post('/api/v1/applications')
         .set(this.as(this.it1))
-        .send({
-          name: this.unique('App'),
-          kind,
-          ...(kind === 'INTERNAL' ? {} : { vendorName: setup.vendorName ?? this.unique('Vendor') }),
-          dataSensitivity: 'LOW',
-          communication: NO,
-        })
+        .send(
+          intakeBodyOf({
+            name: this.unique('App'),
+            kind,
+            ...(kind === 'INTERNAL' ? {} : { vendorName: setup.vendorName ?? this.unique('Vendor') }),
+            dataSensitivity: 'LOW',
+            communication: NO,
+          }),
+        )
         .expect(201),
     );
     const type = setup.type ?? (kind === 'INTERNAL' ? 'K5' : 'K2');

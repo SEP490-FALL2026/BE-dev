@@ -40,7 +40,14 @@ export function toPlanApiException(error: unknown): unknown {
   if (error instanceof PlanNoteInvalidError)
     return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'PLAN.NOTE_INVALID', error.message);
   if (error instanceof PlanNotFoundError) return refuse(HttpStatus.NOT_FOUND, 'PLAN.NOT_FOUND', error.message);
-  if (error instanceof PlanNameTakenError) return refuse(HttpStatus.CONFLICT, 'PLAN.NAME_TAKEN', error.message);
+  if (error instanceof PlanNameTakenError) {
+    return refuse(
+      HttpStatus.CONFLICT,
+      'PLAN.NAME_TAKEN',
+      error.message,
+      error.existing ? { existing: error.existing } : undefined,
+    );
+  }
   if (error instanceof PlanApplicationNotFoundError)
     return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'PLAN.APPLICATION_NOT_FOUND', error.message);
   if (error instanceof PlanApplicationRetiredError)
@@ -101,7 +108,7 @@ const example = (error: Error) => errorExampleOf(toPlanApiException(error));
 /** The answers above as OpenAPI examples, each produced by the mapper that gives it at runtime. */
 export const PLAN_ERROR_EXAMPLES = {
   NOT_FOUND: example(new PlanNotFoundError()),
-  NAME_TAKEN: example(new PlanNameTakenError()),
+  NAME_TAKEN: example(new PlanNameTakenError({ id: '<plan-id>', name: 'Team', provisioningType: 'K2' })),
   NAME_INVALID: example(new PlanNameInvalidError()),
   NOTE_INVALID: example(new PlanNoteInvalidError()),
   APPLICATION_NOT_FOUND: example(new PlanApplicationNotFoundError()),

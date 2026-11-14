@@ -35,13 +35,7 @@ const record = (overrides: Partial<ApplicationRecord> = {}): ApplicationRecord =
   domains: [],
   dataSensitivity: 'LOW',
   responsibleItAdminEmployeeId: 'owner-1',
-  communication: {
-    personToPersonMessaging: false,
-    callsOrMeetings: false,
-    mailbox: false,
-    isCommunicationService: false,
-    note: null,
-  },
+  isCommunicationService: false,
   functionalGroup: { id: 'group-1', name: 'Design' },
   status: 'APPROVED',
   createdAt: new Date('2026-01-01T00:00:00.000Z'),
@@ -117,7 +111,10 @@ function serviceWith(input: {
     runner as unknown as TransactionRunner,
     new ApplicationWriteGuards(
       organization as unknown as OrganizationReadApi,
-      { findActive: jest.fn() } as unknown as FunctionalGroupFactsService,
+      {
+        findActive: jest.fn(),
+        findDefault: jest.fn().mockResolvedValue(null),
+      } as unknown as FunctionalGroupFactsService,
     ),
   );
 
@@ -201,7 +198,6 @@ describe('ApplicationService writes answer with the responsible IT Admin (QĐ-11
         name: 'Design Tool',
         kind: 'INTERNAL',
         dataSensitivity: 'LOW',
-        communication: { personToPersonMessaging: false, callsOrMeetings: false, mailbox: false },
       }),
     ).resolves.toEqual({
       application: { ...record(), responsibleItAdmin: RESPONSIBLE, needsResponsible: false },
@@ -216,7 +212,6 @@ describe('ApplicationService writes answer with the responsible IT Admin (QĐ-11
       name: 'Design Tool',
       kind: 'INTERNAL',
       dataSensitivity: 'LOW',
-      communication: { personToPersonMessaging: false, callsOrMeetings: false, mailbox: false },
     });
 
     expect(applications.insert).toHaveBeenCalledWith(

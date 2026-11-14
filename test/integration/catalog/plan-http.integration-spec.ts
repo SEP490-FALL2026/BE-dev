@@ -8,6 +8,7 @@ import {
   insertEmployeeFixture,
   seedInstallation,
 } from '../../support/http-test-app';
+import { declareApplication } from '../../support/builders/catalog.builder';
 
 interface PlanWire {
   id: string;
@@ -38,7 +39,6 @@ interface ProfileWire {
   } | null;
 }
 
-const NO = { personToPersonMessaging: false, callsOrMeetings: false, mailbox: false };
 const omit = (source: Record<string, unknown>, key: string) =>
   Object.fromEntries(Object.entries(source).filter(([name]) => name !== key));
 
@@ -91,19 +91,12 @@ describe('plans and workspace profiles over HTTP (integration, real PostgreSQL)'
   const putProfile = (id: string, body: object, account: ApiAccount = it1) =>
     request(server()).put(`/api/v1/plans/${id}/workspace-profile`).set(as(account)).send(body);
   const application = async (kind: 'SAAS' | 'LICENSED' | 'INTERNAL' = 'SAAS', name = unique('App')): Promise<string> =>
-    dataOf<{ id: string }>(
-      await request(server())
-        .post('/api/v1/applications')
-        .set(as(it1))
-        .send({
-          name,
-          kind,
-          ...(kind === 'INTERNAL' ? {} : { vendorName: unique('Vendor') }),
-          dataSensitivity: 'LOW',
-          communication: NO,
-        })
-        .expect(201),
-    ).id;
+    declareApplication(ctx, it1.accessToken, {
+      name,
+      kind,
+      ...(kind === 'INTERNAL' ? {} : { vendorName: unique('Vendor') }),
+      dataSensitivity: 'LOW',
+    });
   const k2 = (applicationId: string, extra: object = {}) => ({
     applicationId,
     name: unique('Organization'),
@@ -170,21 +163,24 @@ describe('plans and workspace profiles over HTTP (integration, real PostgreSQL)'
       ]);
     });
 
-    it('AC-2: refuses a K1, K2 or K4 plan without a pricing model, storing nothing', async () => {
+    it('AC-2, B-5: a plan sent with no pricing model gets the one its kind implies: K1 and K2 per seat, K4 (bought once) none', async () => {
       const app = await application();
-      const before = await n('plans');
 
-      for (const provisioningType of ['K1', 'K2', 'K4']) {
-        const response = await createPlan({
-          applicationId: app,
-          name: unique('No model'),
-          provisioningType,
-          controlLevel: 'FULL',
-        }).expect(422);
-        expect(codeOf(response)).toBe('PLAN.PRICING_MODEL_REQUIRED');
+      for (const [provisioningType, expected] of [
+        ['K1', 'PER_SEAT'],
+        ['K2', 'PER_SEAT'],
+        ['K4', null],
+      ] as const) {
+        const created = dataOf<PlanWire>(
+          await createPlan({
+            applicationId: app,
+            name: unique('No model'),
+            provisioningType,
+            controlLevel: 'FULL',
+          }).expect(201),
+        );
+        expect(created.pricingModel).toBe(expected);
       }
-
-      expect(await n('plans')).toBe(before);
     });
 
     it('AC-3: a plan that is not per seat shows seats as not applicable, never as zero', async () => {

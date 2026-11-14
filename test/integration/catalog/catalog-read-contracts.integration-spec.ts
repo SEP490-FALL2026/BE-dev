@@ -2,6 +2,7 @@ import request from 'supertest';
 import { PgRelay } from '../../support/pg-relay';
 import { QueryCounter, dataStatements } from '../../support/query-count';
 import { SeatHarness } from '../../support/seat-baseline-harness';
+import { intakeBodyOf } from '../../support/application-body';
 
 const h = new SeatHarness();
 const NO = { personToPersonMessaging: false, callsOrMeetings: false, mailbox: false };
@@ -54,14 +55,16 @@ describe('catalog read contracts (integration, real PostgreSQL)', () => {
       await request(h.server())
         .post('/api/v1/applications')
         .set(as())
-        .send({
-          name,
-          kind: 'SAAS',
-          vendorName: `${name} Inc`,
-          dataSensitivity: 'LOW',
-          communication: { ...NO, note: 'n'.repeat(1000) },
-          domains: domains(`${counter_}`),
-        })
+        .send(
+          intakeBodyOf({
+            name,
+            kind: 'SAAS',
+            vendorName: `${name} Inc`,
+            dataSensitivity: 'LOW',
+            communication: { ...NO, note: 'n'.repeat(1000) },
+            domains: domains(`${counter_}`),
+          }),
+        )
         .expect(201),
     );
   };
@@ -82,7 +85,6 @@ describe('catalog read contracts (integration, real PostgreSQL)', () => {
       expect(detail).toMatchObject({
         id: first.id,
         domains: expect.any(Array) as unknown,
-        communication: expect.objectContaining({ note: 'n'.repeat(1000) }) as unknown,
         dictionaryServiceLineId: null,
       });
       expect(Object.keys(detail)).toEqual(expect.arrayContaining(SUMMARY_KEYS));
@@ -120,14 +122,16 @@ describe('catalog read contracts (integration, real PostgreSQL)', () => {
           await request(h.server())
             .post('/api/v1/applications')
             .set(as())
-            .send({
-              name: `Similar ${index}`,
-              kind: 'SAAS',
-              vendorName: `Similar Vendor ${index}`,
-              dataSensitivity: 'LOW',
-              communication: NO,
-              functionalGroupId: group.id,
-            })
+            .send(
+              intakeBodyOf({
+                name: `Similar ${index}`,
+                kind: 'SAAS',
+                vendorName: `Similar Vendor ${index}`,
+                dataSensitivity: 'LOW',
+                communication: NO,
+                functionalGroupId: group.id,
+              }),
+            )
             .expect(201),
         );
         if (index === 0) first = created.id;

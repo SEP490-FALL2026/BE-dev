@@ -16,6 +16,7 @@ import {
   assertPlanShape,
   assertWorkspaceShape,
   cleanPlanName,
+  derivedPricingModel,
   cleanRevocationNote,
   cleanWorkspaceText,
   kpi3Percent,
@@ -90,12 +91,15 @@ describe('assertPlanShape', () => {
     },
   );
 
-  it('needs a pricing model for K1, K2 and K4 and forbids one for K5', () => {
-    for (const type of ['K1', 'K2', 'K4'] as const) {
+  it('needs a pricing model for K1 and K2, lets K4 have none (it is bought once, B-5) and forbids one for K5', () => {
+    for (const type of ['K1', 'K2'] as const) {
       expect(() =>
         assertPlanShape({ ...saas, provisioningType: type, pricingModel: null, controlLevel: 'FULL' }),
       ).toThrow(PlanPricingModelRequiredError);
     }
+    expect(() =>
+      assertPlanShape({ ...saas, provisioningType: 'K4', pricingModel: null, controlLevel: 'FULL' }),
+    ).not.toThrow();
     expect(() =>
       assertPlanShape({
         ...saas,
@@ -260,5 +264,18 @@ describe('kpi3Percent (AF-08, QĐ-109d): the seats used over the seats bought', 
 
   it('gives none when nothing was bought', () => {
     expect(kpi3Percent(3, 0)).toBeNull();
+  });
+});
+
+describe('derivedPricingModel (B-5: the kind of provisioning says how a plan is priced)', () => {
+  it('prices K1 and K2 per seat, and K4 (bought once) and K5 (no price) by no model at all', () => {
+    expect(derivedPricingModel('K1')).toBe('PER_SEAT');
+    expect(derivedPricingModel('K2')).toBe('PER_SEAT');
+    expect(derivedPricingModel('K4')).toBeNull();
+    expect(derivedPricingModel('K5')).toBeNull();
+  });
+
+  it('leaves K3, which cannot be declared yet, with none', () => {
+    expect(derivedPricingModel('K3')).toBeNull();
   });
 });

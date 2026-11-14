@@ -49,17 +49,28 @@ async function oneApplication(
     return { status: 'present', label };
   }
   if (ctx.mode === 'plan') return { status: 'planned', label };
+  // QĐ-111f: one command makes the application with its first plan (the kind of the application follows the plan, the pricing model follows the
+  // kind of provisioning); the other plans of the fixture are made by the next step. No group is named: the application stands in Khác.
+  const [first] = application.plans;
   const created = await ctx.api.call<ApplicationRow>(admin, 'POST', '/applications', {
     name: application.name,
-    kind: application.kind,
     ...(application.vendorName ? { vendorName: application.vendorName } : {}),
     dataSensitivity: application.dataSensitivity,
-    communication: { personToPersonMessaging: false, callsOrMeetings: false, mailbox: false },
+    plan: firstPlanBody(first),
   });
   ctx.ids.applications.set(application.key, created.id);
   if (created.vendor) ctx.ids.vendors.set(application.key, created.vendor.id);
 
   return { status: 'done', label };
+}
+
+/** The plan of the one command: the body of a plan without its application and without the pricing model, which the system works out. */
+function firstPlanBody(plan: DemoPlan): Record<string, unknown> {
+  const body = planBody('', plan);
+  delete body.applicationId;
+  delete body.pricingModel;
+
+  return body;
 }
 
 function planBody(applicationId: string, plan: DemoPlan): Record<string, unknown> {

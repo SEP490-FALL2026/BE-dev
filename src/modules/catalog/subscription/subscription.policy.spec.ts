@@ -198,10 +198,10 @@ describe('assertSubscriptionShape', () => {
     );
   });
 
-  it('keeps a perpetual purchase to licensed software', () => {
-    expect(() => assertSubscriptionShape({ ...perpetual, applicationKind: 'SAAS' })).toThrow(
-      SubscriptionPerpetualNeedsLicensedApplicationError,
-    );
+  it('keeps a perpetual purchase to licensed software or to a K4 plan, the plan bought once (B-5)', () => {
+    const saas = { ...perpetual, applicationKind: 'SAAS' as const };
+    expect(() => assertSubscriptionShape(saas)).toThrow(SubscriptionPerpetualNeedsLicensedApplicationError);
+    expect(() => assertSubscriptionShape({ ...saas, planProvisioningType: 'K4' })).not.toThrow();
   });
 
   it.each([

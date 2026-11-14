@@ -112,12 +112,13 @@ export interface ShapeInput {
 
 /**
  * The rules a subscription meets whatever its state, in a fixed order: a K5 plan has none; a perpetual purchase belongs
- * to licensed software and carries no term; the dates are in order. Throws the first that fails.
+ * to licensed software or to a K4 plan (the plan bought once, `B-5`) and carries no term; the dates are in order. Throws the first that fails.
  */
 export function assertSubscriptionShape(input: ShapeInput): void {
   if (input.planProvisioningType === 'K5') throw new SubscriptionPlanHasNoSubscriptionError();
   if (input.kind === 'PERPETUAL') {
-    if (input.applicationKind !== 'LICENSED') throw new SubscriptionPerpetualNeedsLicensedApplicationError();
+    if (input.applicationKind !== 'LICENSED' && input.planProvisioningType !== 'K4')
+      throw new SubscriptionPerpetualNeedsLicensedApplicationError();
     const fields = [
       input.endDate !== null ? 'endDate' : null,
       input.renewalDate !== null ? 'renewalDate' : null,

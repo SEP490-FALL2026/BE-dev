@@ -111,6 +111,17 @@ export class PlanRepo {
     return rows;
   }
 
+  /** The plan of the application with this name (compared as the unique index does), or null: what a 409 on a name shows. */
+  async findByName(
+    applicationId: string,
+    name: string,
+  ): Promise<{ id: string; name: string; provisioningType: ProvisioningType } | null> {
+    return this.prisma.plan.findFirst({
+      where: { applicationId, normalizedName: searchKey(name) },
+      select: { id: true, name: true, provisioningType: true },
+    });
+  }
+
   async count(): Promise<number> {
     return this.prisma.plan.count();
   }

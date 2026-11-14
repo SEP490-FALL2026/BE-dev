@@ -12,6 +12,7 @@ import {
   insertEmployeeFixture,
   seedInstallation,
 } from '../../support/http-test-app';
+import { intakeBodyOf } from '../../support/application-body';
 
 const NO = { personToPersonMessaging: false, callsOrMeetings: false, mailbox: false };
 
@@ -50,13 +51,15 @@ describe('what licensing reads of catalog and organization (integration, real Po
       await request(server())
         .post('/api/v1/applications')
         .set(as(it1))
-        .send({
-          name: unique('App'),
-          kind,
-          ...(kind === 'INTERNAL' ? {} : { vendorName: unique('Vendor') }),
-          dataSensitivity: 'LOW',
-          communication: NO,
-        })
+        .send(
+          intakeBodyOf({
+            name: unique('App'),
+            kind,
+            ...(kind === 'INTERNAL' ? {} : { vendorName: unique('Vendor') }),
+            dataSensitivity: 'LOW',
+            communication: NO,
+          }),
+        )
         .expect(201),
     );
   const plan = async (applicationId: string, type: string, pricing?: string) => {

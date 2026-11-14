@@ -20,6 +20,11 @@ export class ApplicationFactsService {
     return this.applications.lockShared(tx, id);
   }
 
+  /** The approved applications that may be the same software as a candidate, for the duplicate rule (`QĐ-111b`): see `ApplicationRepo.duplicateCandidates`. */
+  duplicateCandidates(tx: DbTx, normalizedName: string, hosts: readonly string[]) {
+    return this.applications.duplicateCandidates(tx, normalizedName, hosts);
+  }
+
   /** How many applications the catalog holds. */
   count(): Promise<number> {
     return this.applications.count();

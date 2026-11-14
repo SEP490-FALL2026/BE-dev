@@ -3,7 +3,7 @@ import { Prisma } from '../../../generated/prisma/client';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { searchKey } from '../vendor-dictionary/vendor-matcher.policy';
-import { STANDARD_FUNCTIONAL_GROUPS } from './functional-group-standard.policy';
+import { STANDARD_FUNCTIONAL_GROUPS, type FunctionalGroupSystemKey } from './functional-group-standard.policy';
 import type { FunctionalGroupListFilter, FunctionalGroupRecord, FunctionalGroupStatus } from './functional-group.types';
 
 type Row = Prisma.FunctionalGroupGetPayload<object>;
@@ -76,6 +76,19 @@ export class FunctionalGroupRepo {
   async findActiveShared(tx: DbTx, id: string): Promise<{ id: string; name: string } | null> {
     const rows = await tx.$queryRaw<{ id: string; name: string }[]>`
       SELECT id, name FROM functional_groups WHERE id = ${id}::uuid AND status = 'ACTIVE' FOR SHARE`;
+
+    return rows.length === 0 ? null : rows[0];
+  }
+
+  /** The fixed group of the organization with this key, locked `FOR SHARE`: where an application declared with no group goes. Null when the organization has none. */
+  async findFixedShared(
+    tx: DbTx,
+    organizationId: string,
+    key: FunctionalGroupSystemKey,
+  ): Promise<{ id: string; name: string } | null> {
+    const rows = await tx.$queryRaw<{ id: string; name: string }[]>`
+      SELECT id, name FROM functional_groups
+       WHERE organization_id = ${organizationId}::uuid AND system_key = ${key} FOR SHARE`;
 
     return rows.length === 0 ? null : rows[0];
   }

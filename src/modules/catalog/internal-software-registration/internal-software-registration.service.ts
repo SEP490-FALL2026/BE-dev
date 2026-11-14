@@ -10,7 +10,7 @@ export type InternalRegistration =
 
 /**
  * Registering software the company built itself in the catalog on behalf of a request (`US-05-20`): the application, with
- * the IT Admin who registers it as the one responsible (`QĐ-111g`), and one plan of the kind that is granted by hand and has no pricing
+ * the IT Admin who registers it as the one responsible (`QĐ-111g`), in the group Khác (`QĐ-111d`), and one plan of the kind that is granted by hand and has no pricing
  * model (`K5`). It writes in the transaction of the caller, so it is committed or undone together with the request that
  * asked for it, and it creates no vendor, contract, subscription, invoice or seat (`US-05-20` AC-5).
  */
@@ -25,7 +25,7 @@ export class InternalSoftwareRegistrationService {
   async register(
     tx: DbTx,
     actor: AuthenticatedPrincipal,
-    input: { name: string; dataSensitivity: 'LOW' | 'MEDIUM' | 'HIGH' },
+    input: { name: string; dataSensitivity: 'LOW' | 'MEDIUM' | 'HIGH' | null },
   ): Promise<InternalRegistration> {
     try {
       const application = await this.applications.declareRecord(
@@ -34,7 +34,6 @@ export class InternalSoftwareRegistrationService {
           name: input.name,
           kind: 'INTERNAL',
           dataSensitivity: input.dataSensitivity,
-          communication: { personToPersonMessaging: false, callsOrMeetings: false, mailbox: false },
         },
         tx,
       );

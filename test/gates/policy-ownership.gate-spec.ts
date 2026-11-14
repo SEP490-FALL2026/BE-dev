@@ -31,7 +31,7 @@ const PUBLIC_ROOT_POLICY_FILES: ReadonlyMap<string, PolicyContract> = new Map([
       reason:
         'the IT Admin who declares an application and the employee who proposes software outside the catalog share what makes two entries the same software: the same name or the same domain',
       entry: 'duplicateOf',
-      consumers: [],
+      consumers: ['catalog/application-intake/application-intake.service.ts'],
     },
   ],
   [

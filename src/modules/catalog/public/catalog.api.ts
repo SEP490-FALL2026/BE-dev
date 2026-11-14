@@ -204,7 +204,7 @@ export class CatalogApi {
   registerInternalSoftware(
     tx: DbTx,
     actor: AuthenticatedPrincipal,
-    input: { name: string; dataSensitivity: 'LOW' | 'MEDIUM' | 'HIGH' },
+    input: { name: string; dataSensitivity: 'LOW' | 'MEDIUM' | 'HIGH' | null },
   ): Promise<InternalRegistration> {
     return this.internalRegistration.register(tx, actor, input);
   }
