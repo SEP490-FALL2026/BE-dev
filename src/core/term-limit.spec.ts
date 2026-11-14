@@ -74,7 +74,8 @@ describe('the time of use a kind of grant asks for (QĐ-111i, FR-2.8)', () => {
     kind: TermKind,
     termMonths: number | null | undefined,
     fixedTermPerson = false,
-  ): ReturnType<typeof checkTermMonths> => checkTermMonths({ kind, termMonths, fixedTermPerson });
+    contractEndKnown = false,
+  ): ReturnType<typeof checkTermMonths> => checkTermMonths({ kind, termMonths, fixedTermPerson, contractEndKnown });
 
   it('K1 asks for 1 to 9 months and never takes a right with no end', () => {
     expect(asked('K1', 1)).toBeNull();
@@ -107,7 +108,14 @@ describe('the time of use a kind of grant asks for (QĐ-111i, FR-2.8)', () => {
     expect(asked('K2', undefined, true)).toBe('TERM_REQUIRED');
     expect(asked('K2', 6, true)).toBeNull();
     expect(asked('K1', null, true)).toBe('TERM_REQUIRED');
-    expect(asked('K4', null, true)).toBeNull();
+  });
+
+  it('INV-07: a plan bought once (K4) has no months, so a person with a term gets the key only up to the end of their contract, and none when it is not known', () => {
+    expect(asked('K4', null, true, true)).toBeNull();
+    expect(asked('K4', undefined, true, true)).toBeNull();
+    expect(asked('K4', null, true, false)).toBe('TERM_LONG_TERM_NOT_ALLOWED');
+    expect(asked('K4', 3, true, true)).toBe('TERM_NOT_ASKED');
+    expect(asked('K4', null, false, false)).toBeNull();
   });
 });
 

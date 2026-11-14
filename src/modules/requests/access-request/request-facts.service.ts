@@ -242,7 +242,12 @@ export class RequestFactsService {
     employee: { employmentType: string; contractEndsOn?: BusinessDate | null } | null;
   }): Pick<Assessment, 'termRefusal' | 'term'> {
     const fixedTermPerson = (facts.employee?.employmentType ?? 'STAFF') !== 'STAFF';
-    const termRefusal = checkTermMonths({ kind: facts.kind, termMonths: facts.termMonths, fixedTermPerson });
+    const termRefusal = checkTermMonths({
+      kind: facts.kind,
+      termMonths: facts.termMonths,
+      fixedTermPerson,
+      contractEndKnown: (facts.employee?.contractEndsOn ?? null) !== null,
+    });
     const months = termRefusal === null && typeof facts.termMonths === 'number' ? facts.termMonths : null;
 
     return {

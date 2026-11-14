@@ -52,7 +52,7 @@ export class ProvisioningGrantWriter {
     planned: Planned,
   ): Promise<ProvisioningTaskRecord> {
     const { answer, plan, serviceIdentifier, organization, today, inCharge, maxAttempts } = planned;
-    const { holderContractEnd } = planned;
+    const { holderContractEnd, holderHasTerm } = planned;
     // The request is locked and moved to "being carried out" here, in the transaction of the grant: a second grant of
     // the same request finds it no longer grantable, and a request that changed since the read above is refused.
     const claimed = await this.gate.get().claimForGrant(tx, input.requestId, input.beneficiaryEmployeeId);
@@ -79,7 +79,7 @@ export class ProvisioningGrantWriter {
       target,
       holder,
       effectiveFrom: today,
-      expectedEndDate: this.endOfSeat(claimed, today, holderContractEnd),
+      expectedEndDate: this.endOfSeat(claimed, today, { contractEnd: holderContractEnd, hasTerm: holderHasTerm }),
       replacesAssignmentId: replaced,
     });
 
@@ -295,12 +295,13 @@ export class ProvisioningGrantWriter {
   private endOfSeat(
     claimed: Extract<GrantRequestAnswer, { status: 'GRANTABLE' }>,
     today: string,
-    holderContractEnd: string | null,
+    holder: { contractEnd: string | null; hasTerm: boolean },
   ): string | null {
     if (claimed.expectedEndDate !== null) return claimed.expectedEndDate;
-    if (!claimed.termBound) return null;
+    // A right with no months still ends for a person with a term: at the end of their contract (`INV-07`, R-38).
+    if (!claimed.termBound) return holder.hasTerm ? holder.contractEnd : null;
 
-    return termRunOf({ start: today, months: claimed.termMonths, contractEndsOn: holderContractEnd }).end;
+    return termRunOf({ start: today, months: claimed.termMonths, contractEndsOn: holder.contractEnd }).end;
   }
 
   /** K5: the plan itself (no seat); K1 and K2: the subscription, which must be of the plan and have a quantity. */

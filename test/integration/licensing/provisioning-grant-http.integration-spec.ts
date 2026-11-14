@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import request from 'supertest';
 import { ApiAccount } from '../../support/api-accounts';
+import { addDays } from '../../../src/core/business-date';
 import { effectiveEndOf } from '../../../src/core/term-limit';
 import { pretendBusinessToday } from '../../support/pretend-today';
 import { ProvisioningHarness } from '../../support/provisioning-harness';
@@ -361,6 +362,33 @@ describe('the grant of a seat over HTTP (integration, real PostgreSQL)', () => {
       await h.grant({ requestId: h.gate.grantable(person, planId), subscriptionId }).expect(201);
 
       expect(await seatEndOf(person)).toEqual([termEnd()]);
+    });
+
+    it('INV-07: a right with no months (a key bought once) gives the seat of a person with a term the end of their contract, and one of staff none', async () => {
+      const { subscriptionId, planId } = await k2();
+      const intern = await h.member('P-DES', 'E-END-KEY-I', designer);
+      const staff = await h.member('P-DES', 'E-END-KEY-S', designer);
+      await h.ctx.sql.query(`UPDATE employees SET employment_type = 'INTERN', contract_ends_on = $2 WHERE id = $1`, [
+        intern,
+        addDays(h.today(), 90),
+      ]);
+      const notBound = (employeeId: string) =>
+        h.gate.answer({
+          status: 'GRANTABLE',
+          seat: 'PERSONAL',
+          employeeId,
+          planId,
+          departmentId: h.gate.defaultDepartmentId,
+          expectedEndDate: null,
+          termMonths: 0,
+          termBound: false,
+        });
+
+      await h.grant({ requestId: notBound(intern), subscriptionId }).expect(201);
+      await h.grant({ requestId: notBound(staff), subscriptionId }).expect(201);
+
+      expect(await seatEndOf(intern)).toEqual([addDays(h.today(), 90)]);
+      expect(await seatEndOf(staff)).toEqual([null]);
     });
 
     it('gives the seat of free internal software no end by term: it costs nothing and has no term to bind (R-H1)', async () => {

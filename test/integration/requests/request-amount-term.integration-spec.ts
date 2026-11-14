@@ -240,6 +240,20 @@ describe('the amount and the term of a request (integration, real PostgreSQL)', 
         expect(preview.cost).toMatchObject({ termCutAt: null, months: 1 });
       });
 
+      it('INV-07: a plan bought once asks no months, so a person with a term gets it with the end of their contract known, and is refused when it is not', async () => {
+        const key = await keyPlan();
+        const unknown = await h.staff(design.department, 'AMT-INTERN2');
+        await h.ctx.sql.query(`UPDATE employees SET employment_type = 'INTERN' WHERE id = $1`, [unknown.employeeId]);
+
+        const known = await h.submit(h.form(key), intern.account);
+        const refused = await h.submit(h.form(key), unknown.account).expect(422);
+        const preview = await h.previewed(unknown, key);
+
+        expect(known.status).toBe(201);
+        expect(h.codeOf(refused)).toBe('ACCESS_REQUEST.TERM_LONG_TERM_NOT_ALLOWED');
+        expect(preview).toMatchObject({ canSubmit: false, termRefusal: 'TERM_LONG_TERM_NOT_ALLOWED' });
+      });
+
       it('no end for a person with a term is refused: nothing said is a missing field, null is the answer that is refused (INV-07)', async () => {
         const missing = await h.submit(h.form(plan), intern.account).expect(422);
         const longTerm = await h.submit(h.form(plan, { termMonths: null }), intern.account).expect(422);

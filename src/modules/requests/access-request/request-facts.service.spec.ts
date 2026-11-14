@@ -259,5 +259,17 @@ describe('RequestFactsService.assess', () => {
       expect((await service.assess(tx, input({ termMonths: 3 }))).termRefusal).toBe('TERM_NOT_ASKED');
       expect((await service.assess(tx, input({ termMonths: null }))).termRefusal).toBeNull();
     });
+
+    it('INV-07: a person with a term asks a plan bought once only with the end of their contract known, since the seat ends there', async () => {
+      given(COST_CENTER, 'SAAS');
+      catalog.findPlanSeatTargets.mockResolvedValue([
+        { planId: 'p-1', applicationKind: 'SAAS', applicationStatus: 'ACTIVE', provisioningType: 'K4' },
+      ]);
+      organization.getEmployee.mockResolvedValue({ employmentType: 'INTERN', contractEndsOn: null });
+      expect((await service.assess(tx, input())).termRefusal).toBe('TERM_LONG_TERM_NOT_ALLOWED');
+
+      organization.getEmployee.mockResolvedValue({ employmentType: 'INTERN', contractEndsOn: '2027-01-31' });
+      expect((await service.assess(tx, input())).termRefusal).toBeNull();
+    });
   });
 });

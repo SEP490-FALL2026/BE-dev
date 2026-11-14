@@ -62,10 +62,19 @@ export function checkTermMonths(facts: {
   kind: TermKind;
   termMonths: number | null | undefined;
   fixedTermPerson: boolean;
+  /**
+   * The end of the contract of the person is known. A plan bought once asks no months, so the seat of a person with a term can end only
+   * there (`INV-07`): without it the right would have no end, which is refused as any right with no end for them.
+   */
+  contractEndKnown?: boolean;
 }): TermRefusal | null {
   const rule = termRuleOf(facts.kind);
   const { termMonths } = facts;
-  if (!rule.asked) return typeof termMonths === 'number' ? 'TERM_NOT_ASKED' : null;
+  if (!rule.asked) {
+    if (typeof termMonths === 'number') return 'TERM_NOT_ASKED';
+
+    return facts.fixedTermPerson && facts.contractEndKnown !== true ? 'TERM_LONG_TERM_NOT_ALLOWED' : null;
+  }
   if (typeof termMonths === 'number') {
     return Number.isInteger(termMonths) && termMonths >= 1 && termMonths <= rule.maxMonths
       ? null
