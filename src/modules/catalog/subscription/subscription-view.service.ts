@@ -8,10 +8,11 @@ import { OrganizationReadApi } from '../../organization/public/organization-read
 import { SeatOccupancyHook } from '../public/catalog.extension-points';
 import { PlanFactsService } from '../plan/plan-facts.service';
 import { needsVendorAdmins } from '../plan/plan-vendor-admins.policy';
-import { adjustmentPointOf, expiryReading } from './obligation/subscription-obligation.policy';
+import { adjustmentPointOf, expiryReading, runsAPeriod } from './obligation/subscription-obligation.policy';
 import { alertDates, deriveNotice, missingData, noticeInputOf, noticeWarnings } from './subscription.policy';
 import { isPricedInDong } from './price/subscription-price.policy';
 import { liveIdsByPlan, liveSiblingsOf, poolWarnings, vendorAdminFlags } from './pool/subscription-pool.policy';
+import { SubscriptionGrantingRepo } from './subscription-granting.repo';
 import { SubscriptionRepo } from './subscription.repo';
 import type {
   DeadlineKind,
@@ -69,6 +70,7 @@ export class SubscriptionViewService {
     private readonly organizationReads: OrganizationReadApi,
     private readonly planFacts: PlanFactsService,
     private readonly occupancy: SeatOccupancyHook,
+    private readonly periods: SubscriptionGrantingRepo,
   ) {}
 
   /**
@@ -77,21 +79,30 @@ export class SubscriptionViewService {
    */
   async expiryReadings(records: readonly SubscriptionRecord[]): Promise<Map<string, ExpiryReadingView>> {
     const today = await this.organizationReads.businessToday();
+    const [seats, continued] = await Promise.all([this.seatsOf(records, today), this.continuedAmong(records)]);
 
-    return this.readingsOf(records, today, await this.seatsOf(records, today));
+    return this.readingsOf(records, today, seats, continued);
+  }
+
+  /** Which of these subscriptions a later period continues: one read for all of them. */
+  private continuedAmong(records: readonly SubscriptionRecord[]): Promise<ReadonlySet<string>> {
+    return this.periods.idsWithSuccessor(records.map((record) => record.id));
   }
 
   private readingsOf(
     records: readonly SubscriptionRecord[],
     today: BusinessDate,
     seats: SeatCounts,
+    continued: ReadonlySet<string>,
   ): Map<string, ExpiryReadingView> {
     return new Map(
       records.map((record) => {
-        const point = adjustmentPointOf(record);
-        const { state, daysLeft } = expiryReading(point, today, (seats.get(record.id)?.occupied ?? 0) > 0);
+        // Only a subscription that runs a period has a point: the rule of the filter by expiry, so a badge and the filter never disagree.
+        const point = runsAPeriod({ ...record, hasSuccessor: continued.has(record.id) })
+          ? adjustmentPointOf(record)
+          : null;
 
-        return [record.id, { state, daysLeft, deadlineKind: point?.kind ?? null }];
+        return [record.id, expiryReading(point, today, (seats.get(record.id)?.occupied ?? 0) > 0)];
       }),
     );
   }
@@ -162,7 +173,7 @@ export class SubscriptionViewService {
     const vendorAdmins = await this.vendorAdminsOf(records);
     const today = await this.organizationReads.businessToday();
     const seatCounts = await this.seatsOf(records, today);
-    const readings = this.readingsOf(records, today, seatCounts);
+    const readings = this.readingsOf(records, today, seatCounts, await this.continuedAmong(records));
     const answerer = await this.answerersOf(records);
     const adjustment = (record: SubscriptionRecord) => ({
       logoUrl: record.applicationLogoUrl,

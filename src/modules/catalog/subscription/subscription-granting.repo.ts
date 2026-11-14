@@ -21,6 +21,17 @@ export const notTakenOverOn = (today: BusinessDate): Prisma.SubscriptionWhereInp
 export class SubscriptionGrantingRepo {
   constructor(private readonly prisma: PrismaService) {}
 
+  /** Which of these subscriptions a later period continues (`renewed_from_id`): they are no longer the period that runs. One statement. */
+  async idsWithSuccessor(ids: readonly string[]): Promise<ReadonlySet<string>> {
+    if (ids.length === 0) return new Set();
+    const rows = await this.prisma.subscription.findMany({
+      where: { renewedFromId: { in: [...ids] } },
+      select: { renewedFromId: true },
+    });
+
+    return new Set(rows.flatMap((row) => (row.renewedFromId === null ? [] : [row.renewedFromId])));
+  }
+
   /**
    * The subscriptions that grant seats on `day`: active, not taken over by a later period on `day` (`notTakenOverOn`, the same reading
    * as the shared pool), not ended before `day`. One statement, by id; the plan decides the rules (`PER_SEAT`, the kind of provisioning).

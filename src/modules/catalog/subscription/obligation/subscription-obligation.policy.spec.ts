@@ -2,6 +2,7 @@ import {
   adjustmentPointOf,
   expiryReading,
   increasesObligation,
+  runsAPeriod,
   type AdjustmentInput,
   type ObligationState,
 } from './subscription-obligation.policy';
@@ -109,11 +110,13 @@ const monthly = (extra: Partial<AdjustmentInput> = {}): AdjustmentInput => ({
 
 describe('adjustmentPointOf: where the IT Admin adjusts a subscription before its next period (`FR-1.4`, `QĐ-111o`)', () => {
   describe('a plan bought by the year', () => {
-    it('opens 30 days before the deadline to cancel (a figure the IT Admin declared)', () => {
+    it('opens 30 days before the deadline to cancel (one the IT Admin declared) and runs to the renewal day', () => {
       expect(adjustmentPointOf(annual({ noticeDeadline: '2026-12-20' }))).toEqual({
         kind: 'NOTICE_DEADLINE',
         deadline: '2026-12-20',
         point: '2026-11-20',
+        end: '2026-12-31',
+        endKind: 'RENEWAL_DATE',
       });
     });
 
@@ -122,6 +125,8 @@ describe('adjustmentPointOf: where the IT Admin adjusts a subscription before it
         kind: 'NOTICE_DEADLINE',
         deadline: '2026-12-01',
         point: '2026-11-01',
+        end: '2026-12-31',
+        endKind: 'RENEWAL_DATE',
       });
     });
 
@@ -130,6 +135,8 @@ describe('adjustmentPointOf: where the IT Admin adjusts a subscription before it
         kind: 'RENEWAL_DATE',
         deadline: '2026-12-31',
         point: '2026-12-01',
+        end: '2026-12-31',
+        endKind: 'RENEWAL_DATE',
       });
     });
 
@@ -138,6 +145,18 @@ describe('adjustmentPointOf: where the IT Admin adjusts a subscription before it
         kind: 'END_DATE',
         deadline: '2026-12-31',
         point: '2026-12-01',
+        end: '2026-12-31',
+        endKind: 'END_DATE',
+      });
+    });
+
+    it('ends the period on the deadline itself when no renewal or end day is known, or when one comes before the deadline', () => {
+      expect(
+        adjustmentPointOf(annual({ noticeDeadline: '2026-12-20', renewalDate: null, endDate: null })),
+      ).toMatchObject({ end: '2026-12-20', endKind: 'NOTICE_DEADLINE' });
+      expect(adjustmentPointOf(annual({ noticeDeadline: '2026-12-20', renewalDate: '2026-12-10' }))).toMatchObject({
+        end: '2026-12-20',
+        endKind: 'NOTICE_DEADLINE',
       });
     });
 
@@ -148,11 +167,13 @@ describe('adjustmentPointOf: where the IT Admin adjusts a subscription before it
   });
 
   describe('a plan bought by the month', () => {
-    it('opens 7 days before the payment day, whatever the deadline to cancel says', () => {
+    it('opens 7 days before the payment day and ends on it, whatever the deadline to cancel says', () => {
       expect(adjustmentPointOf(monthly({ noticeDeadline: '2026-12-01' }))).toEqual({
         kind: 'PAYMENT_DATE',
         deadline: '2026-12-15',
         point: '2026-12-08',
+        end: '2026-12-15',
+        endKind: 'PAYMENT_DATE',
       });
     });
 
@@ -184,28 +205,93 @@ describe('adjustmentPointOf: where the IT Admin adjusts a subscription before it
   });
 });
 
-describe('expiryReading: whether a subscription is near or past its point today', () => {
-  const point = { kind: 'NOTICE_DEADLINE' as const, deadline: '2026-12-20', point: '2026-11-20' };
+describe('runsAPeriod: the subscriptions that have a point of adjustment at all', () => {
+  const running = { kind: 'TERM' as const, status: 'ACTIVE' as const, hasSuccessor: false };
 
-  it('says nothing before the point, with the days that are left', () => {
-    expect(expiryReading(point, '2026-11-19', true)).toEqual({ state: null, daysLeft: 31 });
+  it('is an active subscription by term that no later period continues', () => {
+    expect(runsAPeriod(running)).toBe(true);
   });
 
-  it('is SOON from the day of the point to the day of the deadline, with the days left to it', () => {
-    expect(expiryReading(point, '2026-11-20', true)).toEqual({ state: 'SOON', daysLeft: 30 });
-    expect(expiryReading(point, '2026-12-20', false)).toEqual({ state: 'SOON', daysLeft: 0 });
+  it('is not a draft, a purchase made once, or a period a later one continues', () => {
+    expect(runsAPeriod({ ...running, status: 'DRAFT' })).toBe(false);
+    expect(runsAPeriod({ ...running, kind: 'PERPETUAL' })).toBe(false);
+    expect(runsAPeriod({ ...running, hasSuccessor: true })).toBe(false);
+  });
+});
+
+describe('expiryReading: whether a subscription is near or past its period today (`QĐ-98e`, `QĐ-111o`)', () => {
+  const year = {
+    kind: 'NOTICE_DEADLINE' as const,
+    deadline: '2026-12-20',
+    point: '2026-11-20',
+    end: '2026-12-31',
+    endKind: 'RENEWAL_DATE' as const,
+  };
+  const month = {
+    kind: 'PAYMENT_DATE' as const,
+    deadline: '2026-12-15',
+    point: '2026-12-08',
+    end: '2026-12-15',
+    endKind: 'PAYMENT_DATE' as const,
+  };
+
+  it('says nothing before the point, with the days that are left to the deadline', () => {
+    expect(expiryReading(year, '2026-11-19', true)).toEqual({
+      state: null,
+      daysLeft: 31,
+      deadlineKind: 'NOTICE_DEADLINE',
+    });
   });
 
-  it('is EXPIRED the day after the deadline, as many days past as negative days left, while seats are still held', () => {
-    expect(expiryReading(point, '2026-12-21', true)).toEqual({ state: 'EXPIRED', daysLeft: -1 });
-    expect(expiryReading(point, '2027-01-05', true)).toEqual({ state: 'EXPIRED', daysLeft: -16 });
+  it('is SOON from the day of the point, with the days left to the deadline that day', () => {
+    expect(expiryReading(year, '2026-11-20', true)).toEqual({
+      state: 'SOON',
+      daysLeft: 30,
+      deadlineKind: 'NOTICE_DEADLINE',
+    });
+    expect(expiryReading(year, '2026-12-20', false)).toEqual({
+      state: 'SOON',
+      daysLeft: 0,
+      deadlineKind: 'NOTICE_DEADLINE',
+    });
+  });
+
+  it('stays SOON after the deadline to cancel and up to the last day of the period: the contract still runs (QĐ-98e: past the renewal day)', () => {
+    expect(expiryReading(year, '2026-12-21', true)).toEqual({
+      state: 'SOON',
+      daysLeft: -1,
+      deadlineKind: 'NOTICE_DEADLINE',
+    });
+    expect(expiryReading(year, '2026-12-31', true).state).toBe('SOON');
+  });
+
+  it('is EXPIRED the day after the renewal day while seats are still held, counting the days past from the renewal day', () => {
+    expect(expiryReading(year, '2027-01-01', true)).toEqual({
+      state: 'EXPIRED',
+      daysLeft: -1,
+      deadlineKind: 'RENEWAL_DATE',
+    });
+    expect(expiryReading(year, '2027-01-06', true)).toMatchObject({ state: 'EXPIRED', daysLeft: -6 });
+  });
+
+  it('is EXPIRED the day after the payment day of a plan by the month, which has no later end than the point', () => {
+    expect(expiryReading(month, '2026-12-15', true).state).toBe('SOON');
+    expect(expiryReading(month, '2026-12-16', true)).toEqual({
+      state: 'EXPIRED',
+      daysLeft: -1,
+      deadlineKind: 'PAYMENT_DATE',
+    });
   });
 
   it('is not EXPIRED when nobody holds a seat any more: nothing is left to adjust (QĐ-98e)', () => {
-    expect(expiryReading(point, '2026-12-21', false)).toEqual({ state: null, daysLeft: -1 });
+    expect(expiryReading(year, '2027-01-01', false)).toEqual({
+      state: null,
+      daysLeft: -1,
+      deadlineKind: 'RENEWAL_DATE',
+    });
   });
 
   it('says nothing, with no days, when there is no point', () => {
-    expect(expiryReading(null, '2026-11-15', true)).toEqual({ state: null, daysLeft: null });
+    expect(expiryReading(null, '2026-11-15', true)).toEqual({ state: null, daysLeft: null, deadlineKind: null });
   });
 });
