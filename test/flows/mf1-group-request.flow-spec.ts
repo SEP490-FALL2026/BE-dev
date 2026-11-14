@@ -3,7 +3,8 @@ import { FlowWorld } from '../support/flows/flow-world';
 /**
  * MF-1, F1-08 (the part of Wave 1): a Request for a group of at least two people goes through the need of the head, the spend of the
  * spending approver and the grant of the IT Admin line by line, without the client ever sending a date; and a contractor can be
- * granted, the Assignment carrying an end date worked out from the term of the Request (finding R1 of the review of steps 6 and 7).
+ * granted, the Assignment carrying an end date worked out from the term of the Request (finding R1 of the review of steps 6 and 7), or the end of
+ * the contract when that comes first for a person with a term (R-38).
  */
 describe('F1-08 Request nhóm: nhu cầu → trình lô → duyệt chi → cấp từng dòng @MF1 @D1', () => {
   let world: FlowWorld;
@@ -140,11 +141,17 @@ describe('F1-08 Request nhóm: nhu cầu → trình lô → duyệt chi → cấ
     expect(await world.facts.count('provisioning_tasks', "request_id = $1 AND status = 'COMPLETED'", [id])).toBe(2);
   });
 
-  it('nhà thầu được cấp quyền, Assignment có ngày kết thúc = hôm nay + thời hạn − 1 ngày (R1) #20 @B3', async () => {
+  it('nhà thầu được cấp quyền, Assignment bị cắt ở ngày hết hợp đồng (R-38) còn đồng nghiệp có ngày kết thúc = hôm nay + thời hạn − 1 ngày (R1) #20 @B3', async () => {
     // NV-CTR1 is the contractor of Engineering the dataset already has (Jira, R16); no Figma, so a Request for it is not a duplicate.
     const [contractor, dev1] = [await world.facts.employeeId('NV-CTR1'), await world.facts.employeeId('NV-DEV1')];
+    // The dataset gives the contractor a contract that ends in 20 days, before the month the group asks for is over.
+    const { contractEnd } = await world.facts.one<{ contractEnd: string }>(
+      `SELECT to_char(contract_end_date, 'YYYY-MM-DD') AS "contractEnd" FROM employees WHERE id = $1`,
+      [contractor],
+    );
 
     const end = await oneMonthTerm();
+    expect(contractEnd < end).toBe(true);
     const sent = await call().post('NV-ENGH', '/group-requests', {
       planId: figma,
       businessReason: 'Nhà thầu và một đồng nghiệp cần Figma',
@@ -169,12 +176,20 @@ describe('F1-08 Request nhóm: nhu cầu → trình lô → duyệt chi → cấ
     await grantLine(id, subscription, contractor);
     await grantLine(id, subscription, dev1);
 
-    const rows = await world.facts.rows<{ employment_type: string; expected_end_date: string | null }>(
-      `SELECT e.employment_type::text, to_char(a.expected_end_date, 'YYYY-MM-DD') AS expected_end_date
+    const rows = await world.facts.rows<{
+      employee_code: string;
+      employment_type: string;
+      expected_end_date: string | null;
+    }>(
+      `SELECT e.employee_code, e.employment_type::text, to_char(a.expected_end_date, 'YYYY-MM-DD') AS expected_end_date
          FROM license_assignments a JOIN employees e ON e.id = a.employee_id
-        WHERE a.employee_id = $1 AND a.plan_id = $2`,
-      [contractor, figma],
+        WHERE a.employee_id = ANY($1::uuid[]) AND a.plan_id = $2 ORDER BY e.employee_code`,
+      [[contractor, dev1], figma],
     );
-    expect(rows).toEqual([{ employment_type: 'CONTRACTOR', expected_end_date: end }]);
+    // The contractor is cut at the end of the contract; the colleague with no term keeps the whole month.
+    expect(rows).toEqual([
+      { employee_code: 'NV-CTR1', employment_type: 'CONTRACTOR', expected_end_date: contractEnd },
+      { employee_code: 'NV-DEV1', employment_type: 'STAFF', expected_end_date: end },
+    ]);
   });
 });
