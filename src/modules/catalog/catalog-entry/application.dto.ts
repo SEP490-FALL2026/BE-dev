@@ -15,7 +15,7 @@ const kind = z.enum(['SAAS', 'LICENSED', 'INTERNAL']);
 
 /** The longest link a logo may be: the column and its CHECK say the same. */
 export const MAX_LOGO_URL_LENGTH = 500;
-const HTTPS_LINK = /^https:\/\/\S+$/i;
+const HTTPS_LINK = /^https:\/\/\S+$/;
 const isHttpsLink = (value: string): boolean => {
   try {
     const url = new URL(value);

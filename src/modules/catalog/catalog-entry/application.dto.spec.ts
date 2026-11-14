@@ -13,7 +13,6 @@ describe('the logo of an application is a link to an image, https only (CT-1.L1)
   it.each([
     'https://cdn.example.com/figma.png',
     'https://cdn.example.com/a/b/figma.svg?size=64&v=2',
-    'HTTPS://CDN.EXAMPLE.COM/LOGO.PNG',
     `https://cdn.example.com/${'a'.repeat(500 - 'https://cdn.example.com/'.length)}`,
   ])('takes %s', (link) => {
     expect(logoUrlSchema.safeParse(link).success).toBe(true);
@@ -27,6 +26,7 @@ describe('the logo of an application is a link to an image, https only (CT-1.L1)
     ['a link with another scheme', 'ftp://cdn.example.com/figma.png'],
     ['no scheme at all', 'cdn.example.com/figma.png'],
     ['a scheme with no host', 'https://'],
+    ['an upper-case scheme, which the published pattern does not take', 'HTTPS://cdn.example.com/logo.png'],
     ['https with no slashes, which the URL parser repairs', 'https:example.com/figma.png'],
     ['https with one slash, which the URL parser repairs', 'https:/example.com/figma.png'],
     ['a link with a blank in it', 'https://example.com/fig ma.png'],
