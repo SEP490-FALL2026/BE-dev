@@ -58,11 +58,14 @@ describe('who holds a step when the organization or a role changes, over Postgre
 
     return h.staff(unit.department, `${label}-${counter}`);
   };
-  /** An internal request already waiting when its department loses its head, rather than a new one-step request. */
-  const waitingInternal = async (department: Department, requester: Person) => {
+  /**
+   * A paid request already waiting when its department loses its head, rather than a new one-step request. Free internal software does not
+   * wait for a head any more: it goes straight to the IT Admin (`QĐ-111bc`, D-78; `department-head-loss.integration-spec.ts`).
+   */
+  const waitingForHead = async (department: Department, requester: Person) => {
     const temporary = await h.staff(department, `WAIT-H${++counter}`);
     await h.makeHead(department, temporary);
-    const sent = await h.sent(requester, internal);
+    const sent = await h.sent(requester, paid);
     await h.vacateHead(department.id).expect(200);
     return sent;
   };
@@ -225,7 +228,7 @@ describe('who holds a step when the organization or a role changes, over Postgre
       const opsNew = await h.staff(opsDepartment, `OPS-N${counter}`);
       const h3 = await person(des, 'DES-H3');
       const underHead = await h.sent(des.member, internal);
-      const underNobody = await waitingInternal(opsDepartment, opsMember);
+      const underNobody = await waitingForHead(opsDepartment, opsMember);
       const elsewhere = await h.sent(other.member, internal);
       expect(await h.stepOf(underNobody.id, 'NEED')).toMatchObject({
         state: 'WAITING',
@@ -258,14 +261,14 @@ describe('who holds a step when the organization or a role changes, over Postgre
       const headless = await h.departmentWithUnit(`P-HW${counter}`);
       const requester = await h.staff(headless, `HW-E${counter}`);
       const newHead = await h.staff(headless, `HW-H${counter}`);
-      const sent = await waitingInternal(headless, requester);
+      const sent = await waitingForHead(headless, requester);
       // Three days of waiting for a head: the step is as old as the request, and the stretch of waiting is its own.
       await h.ctx.sql.query(
         `UPDATE access_request_steps SET created_at = created_at - interval '3 days' WHERE request_id = $1`,
         [sent.id],
       );
       const waiting = await h.stepOf(sent.id, 'NEED');
-      // This internal request was sent while a head held row 1; losing that head preserves its original routing row.
+      // This request was sent while a head held row 1; losing that head preserves its original routing row.
       expect(waiting).toMatchObject({ state: 'WAITING', waiting_reason: 'NO_DEPARTMENT_HEAD', routing_row: 1 });
 
       await h.makeHead(headless, newHead);
@@ -301,7 +304,7 @@ describe('who holds a step when the organization or a role changes, over Postgre
       // A member who holds MANAGER and heads nothing is not a head: the step does not go to them (US-01-02 AC-10).
       const manager = await h.staff(headless, `FD-M${counter}`);
       await changeRoleTo(h.ctx, h.admin, manager.employeeId, 'MANAGER');
-      const sent = await waitingInternal(headless, requester);
+      const sent = await waitingForHead(headless, requester);
       expect(await h.stepOf(sent.id, 'NEED')).toMatchObject({ state: 'WAITING', waiting_reason: 'NO_DEPARTMENT_HEAD' });
 
       // The head is named from tomorrow: nothing changes today, not for the one who holds MANAGER either.
@@ -336,7 +339,7 @@ describe('who holds a step when the organization or a role changes, over Postgre
 
     it('waits for a head when the head goes and nobody follows: nobody takes the step in place of one', async () => {
       const unit = await scene();
-      const sent = await h.sent(unit.member, internal);
+      const sent = await h.sent(unit.member, paid);
 
       await h.vacateHead(unit.department.id).expect(200);
 
@@ -352,7 +355,7 @@ describe('who holds a step when the organization or a role changes, over Postgre
       counter += 1;
       const headless = await h.departmentWithUnit(`P-RW${counter}`);
       const requester = await h.staff(headless, `RW-E${counter}`);
-      const sent = await waitingInternal(headless, requester);
+      const sent = await waitingForHead(headless, requester);
       const step = await h.stepOf(sent.id, 'NEED');
       // The step waits for the spending approver, as a step of a head who sent it did; now the department has no head: the table
       // names nobody again, but for another reason.
@@ -411,7 +414,7 @@ describe('who holds a step when the organization or a role changes, over Postgre
     it('makes the need step wait for a head, then gives it to the head who is named, with the deadline unchanged', async () => {
       const unit = await scene();
       const successor = await person(unit, 'LV-N');
-      const sent = await h.sent(unit.member, internal);
+      const sent = await h.sent(unit.member, paid);
       const created = (await h.stepOf(sent.id, 'NEED')).created_at;
 
       await h.leave(unit.head.employeeId);

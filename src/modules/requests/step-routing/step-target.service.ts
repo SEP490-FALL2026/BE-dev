@@ -6,7 +6,7 @@ import { OrganizationReadApi } from '../../organization/public/organization-read
 import { RoutingFactsService } from '../access-request/routing-facts.service';
 import { routeNeedStep } from '../access-request/routing.policy';
 import { routeSpendStep } from './spend-routing.policy';
-import type { StepTarget } from './reassignment.policy';
+import { needStepTarget, type StepTarget } from './reassignment.policy';
 import type { ReassignableRequest, ReassignableStep } from './step-reassignment.repo';
 
 /** What the tables read on one day, once for a pass over many requests: the spending approver who can act today. */
@@ -80,14 +80,8 @@ export class StepTargetService {
         const head = gathered.departmentHeadEmployeeId;
         const holdsHead =
           head !== null && request.lines.some((line) => line.needStepId === step.id && line.employeeId === head);
-        const decision = routeNeedStep(holdsHead ? { ...gathered, requesterEmployeeId: head } : gathered);
 
-        return decision.outcome === 'ASSIGNED'
-          ? { assigneeEmployeeId: decision.assigneeEmployeeId, routingRow: decision.row }
-          : {
-              assigneeEmployeeId: null,
-              reason: decision.outcome === 'NOT_REQUIRED' ? 'NO_DEPARTMENT_HEAD' : decision.reason,
-            };
+        return needStepTarget(routeNeedStep(holdsHead ? { ...gathered, requesterEmployeeId: head } : gathered));
       }
       case 'SPEND_APPROVAL': {
         const assignment = routeSpendStep(people, facts.spendingApproverEmployeeId);

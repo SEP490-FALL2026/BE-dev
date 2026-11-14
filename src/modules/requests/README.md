@@ -226,7 +226,8 @@ cùng cần; phần ghi nằm ở `assessment/assessment.repo.ts`.
 - Bước nhu cầu không bao giờ giao cho chính người xin (`SoD-4`, `INV-08`); không ai chọn tay người giữ bước
   (`access-request/routing.policy.ts`). Bước nhu cầu chỉ giao cho trưởng phòng hoặc Người duyệt chi (dòng 1, 2, 5, 9); phòng
   chưa có trưởng phòng thì bước **chờ có kiểm soát** `NO_DEPARTMENT_HEAD` (dòng 4, Super Admin nhận cảnh báo) và được giao khi
-  Super Admin gán trưởng phòng, tuổi bước không đặt lại (`REWAIT`/`ASSIGN` ở `step-routing/reassignment.policy.ts`).
+  Super Admin gán trưởng phòng, tuổi bước không đặt lại (`REWAIT`/`ASSIGN` ở `step-routing/reassignment.policy.ts`). Ngoại lệ duy nhất là
+  `K5` miễn phí: bước kết thúc `NOT_REQUIRED` và Request sang IT như Request gửi mới (`END_NOT_REQUIRED`, `QĐ-111bc`).
 - Bước chi chỉ giao cho Người duyệt chi (`step-routing/spend-routing.policy.ts`): không ai thay khi họ là bên của Request
   (Request đó không tồn tại: hợp đồng D-S21, `REQUEST_PARTY.INELIGIBLE` 422) hay vắng; chưa có người giữ vai thì chờ
   `NO_SPENDING_APPROVER`. Mở bước chi khóa dòng grant `FOR SHARE` trước khi đọc (M6). Bước cũ do approver dự phòng/người thay thế
@@ -265,6 +266,13 @@ không sang IT đánh giá vì chưa biết sẽ miễn phí hay trả phí; (3)
 cầu `NOT_REQUIRED` không có người giữ/SLA; (4) `K5` miễn phí đã có trong danh mục đi thẳng IT (`ONE_STEP`, `NO_DEPARTMENT_HEAD`), audit
 `ACCESS_REQUEST.NO_NEED_APPROVER` là cờ cho Super Admin; (5) phòng có trưởng phòng: bước nhu cầu giao cho trưởng phòng như cũ. Bảng chỉ cần biết
 chuỗi bước có bước chi hay không (trả phí và case B luôn có, `K5` không có).
+
+Phòng **mất** trưởng phòng khi Request `K5` đang chờ (hết kỳ, trưởng phòng nghỉ việc hay Super Admin ghi trống chức vụ): lượt xét lại bước
+(`StepReassignmentService`) chạy lại bảng trên dữ liệu hôm nay, và với `K5` nó nói "không ai cần quyết nhu cầu" (`needStepTarget`) nên bước nhu cầu
+(đang giữ hoặc đang chờ) kết thúc `NOT_REQUIRED` dòng 4, Request thành `ONE_STEP` lý do `NO_DEPARTMENT_HEAD`, chuỗi bước bỏ `NEED`, sang
+`AWAITING_EXECUTION` qua `SpendRoutingService.start` (audit `ACCESS_REQUEST.NO_NEED_APPROVER` giống Request gửi mới, thêm
+`ACCESS_REQUEST.STEP_NOT_REQUIRED` ở bước). Bước hết mở nên các lượt sau không đụng lại (chạy lại không ghi gì). Request trả phí và case B vẫn chờ
+(`QĐ-110i`). Gửi mới và xét lại cùng đọc `routeNeedStep`, nên ngày giữa lúc trưởng phòng đi và lúc kế nhiệm bắt đầu cũng đi IT.
 
 Request một bước trả phí (trưởng phòng gửi cho chính mình) kiểm ngân sách ngay khi gửi bằng `BudgetCheckService`: đủ số cơ sở hoặc dùng dự phòng
 mở bước chi; bị chặn hoặc thiếu giá thì lưu `AWAITING_REQUESTER_REVISION`. Người yêu cầu bổ sung qua `accessRequestSupplementAdd`, gửi lại qua

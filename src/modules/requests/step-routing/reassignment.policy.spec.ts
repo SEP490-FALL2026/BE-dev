@@ -2,6 +2,7 @@ import {
   alertRecipientsOf,
   configurationHintOf,
   decideReassignment,
+  needStepTarget,
   REASSIGNMENT_TRIGGERS,
   requestStateFor,
   touchesHeldStep,
@@ -176,6 +177,67 @@ describe('keep, give or wait', () => {
       action: 'WAIT',
       reason: 'NO_SPENDING_APPROVER',
     });
+  });
+});
+
+describe('free internal software of a department that lost its head (QĐ-110i, QĐ-111bc, D-78)', () => {
+  // The table names nobody and says nobody needs to decide: the need step of free software ends, as it would for a new request.
+  const noNeedApprover: StepTarget = { assigneeEmployeeId: null, notRequired: 'NO_DEPARTMENT_HEAD', routingRow: 4 };
+  const ends = { action: 'END_NOT_REQUIRED', oneStepReason: 'NO_DEPARTMENT_HEAD', routingRow: 4 };
+
+  it.each(['DEPARTMENT_CHANGED', 'HEAD_CHANGED', 'EFFECTIVE_DATE_REACHED', 'HOLDER_LEFT'] as const)(
+    'ends a held need step as not required on %s when the table says nobody needs to decide it',
+    (trigger) => {
+      const step = held('NEED', trigger === 'HOLDER_LEFT' ? { holderGone: true } : {});
+
+      expect(decideReassignment(step, on(trigger), noNeedApprover)).toEqual(ends);
+    },
+  );
+
+  it('ends a need step that waits, on any event: the request of before the rule is put right by the next pass', () => {
+    for (const trigger of EVERYDAY_TRIGGERS) {
+      expect(decideReassignment(waiting('NEED', 'NO_DEPARTMENT_HEAD'), on(trigger), noNeedApprover)).toEqual(ends);
+    }
+  });
+
+  it('leaves a held need step alone when the event may not touch it, so the table is not even asked to move it', () => {
+    expect(decideReassignment(held('NEED'), on('WAITING_RETRY'), noNeedApprover)).toEqual({ action: 'KEEP' });
+  });
+
+  it('still makes a held need step wait when the table names nobody and does not say it is not required (a paid request)', () => {
+    expect(decideReassignment(held('NEED'), on('HEAD_CHANGED'), nobody)).toEqual({
+      action: 'WAIT',
+      reason: 'NO_DEPARTMENT_HEAD',
+    });
+    expect(decideReassignment(waiting('NEED', 'NO_DEPARTMENT_HEAD'), on('WAITING_RETRY'), nobody)).toEqual({
+      action: 'KEEP',
+    });
+  });
+});
+
+describe('who the need step is given to by the routing table (needStepTarget)', () => {
+  it('names the head when the table assigns the step', () => {
+    expect(needStepTarget({ outcome: 'ASSIGNED', row: 1, assigneeEmployeeId: NEW, role: 'MANAGER' })).toEqual({
+      assigneeEmployeeId: NEW,
+      routingRow: 1,
+    });
+  });
+
+  it('says nobody needs to decide the step of free software when the department has no head, on the row of a new request', () => {
+    expect(
+      needStepTarget({ outcome: 'NOT_REQUIRED', row: 4, reason: null, oneStepReason: 'NO_DEPARTMENT_HEAD' }),
+    ).toEqual({ assigneeEmployeeId: null, notRequired: 'NO_DEPARTMENT_HEAD', routingRow: 4 });
+  });
+
+  it('keeps making a step wait for the reason the table gives, and for a head when the requester is the head (not an end of the step)', () => {
+    expect(needStepTarget({ outcome: 'WAITING', row: 4, reason: 'NO_DEPARTMENT_HEAD' })).toEqual(nobody);
+    expect(needStepTarget({ outcome: 'WAITING', row: 8, reason: 'NO_SPENDING_APPROVER' })).toEqual({
+      assigneeEmployeeId: null,
+      reason: 'NO_SPENDING_APPROVER',
+    });
+    expect(
+      needStepTarget({ outcome: 'NOT_REQUIRED', row: 2, reason: null, oneStepReason: 'REQUESTER_IS_HEAD' }),
+    ).toEqual(nobody);
   });
 });
 

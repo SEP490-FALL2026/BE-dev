@@ -1,4 +1,5 @@
 import { SpendRoutingService } from '../../../src/modules/requests/spend/spend-routing.service';
+import type { Unit } from '../../support/spend-harness';
 import { StatusHarness } from '../../support/status-harness';
 import type { AccessRequestWire } from '../../support/request-harness';
 import { changeRoleTo } from '../../support/builders/account.builder';
@@ -44,6 +45,38 @@ describe('a department with no head: paid requests and case B wait for one, over
   /** The wire of a request as its requester reads it. */
   const readBy = async (id: string, person: { account: Parameters<StatusHarness['fetch']>[1] }) =>
     h.dataOf<{ request: AccessRequestWire }>(await h.fetch(id, person.account).expect(200)).request;
+
+  /**
+   * The head period of the department ends today and a successor is recorded to start tomorrow: the day in between has no head who can act
+   * (a successor named for a later day does not hold the department today).
+   */
+  const recordSuccessorForTomorrow = async (unit: Unit, code: string) => {
+    const next = await h.staff(unit.department, code);
+    await changeRoleTo(h.ctx, h.admin, next.employeeId, 'MANAGER');
+    const [{ id: endedPeriodId }] = (
+      await h.ctx.sql.query<{ id: string }>(`SELECT id FROM department_head_periods WHERE department_id = $1`, [
+        unit.department.id,
+      ])
+    ).rows;
+    // The head stays a member for the whole period (INV-20): the placement of the head moves back with the period.
+    await h.ctx.sql.query(
+      `UPDATE employee_placements SET valid_from = valid_from - 1 WHERE department_id = $1 AND employee_id = $2`,
+      [unit.department.id, unit.head.employeeId],
+    );
+    await h.ctx.sql.query(`UPDATE department_head_periods SET valid_from = valid_from - 1 WHERE id = $1`, [
+      endedPeriodId,
+    ]);
+    await h.ctx.sql.query(`UPDATE department_head_periods SET valid_to = $2 WHERE id = $1`, [endedPeriodId, h.today()]);
+    const [{ id: successorPeriodId }] = (
+      await h.ctx.sql.query<{ id: string }>(
+        `INSERT INTO department_head_periods (id, organization_id, department_id, employee_id, valid_from)
+         SELECT gen_random_uuid(), organization_id, id, $2, $3 FROM departments WHERE id = $1 RETURNING id`,
+        [unit.department.id, next.employeeId, h.tomorrow()],
+      )
+    ).rows;
+
+    return { next, endedPeriodId, successorPeriodId };
+  };
 
   describe('a request sent into a department that has no head (MF1-X.1)', () => {
     it('makes a paid request and a case B proposal wait at the need step; free internal software goes in one step and is flagged', async () => {
@@ -161,33 +194,7 @@ describe('a department with no head: paid requests and case B wait for one, over
       const unit = await h.departmentWithHead(`P-XG${n}`);
       const existing = await h.sent(unit.member, paid);
       const before = await h.stepOf(existing.id, 'NEED');
-      const next = await h.staff(unit.department, `XG-H${n}`);
-      await changeRoleTo(h.ctx, h.admin, next.employeeId, 'MANAGER');
-      const [{ id: endedPeriodId }] = (
-        await h.ctx.sql.query<{ id: string }>(`SELECT id FROM department_head_periods WHERE department_id = $1`, [
-          unit.department.id,
-        ])
-      ).rows;
-      // The head stays a member for the whole period (INV-20): the placement of the head moves back with the period.
-      await h.ctx.sql.query(
-        `UPDATE employee_placements SET valid_from = valid_from - 1 WHERE department_id = $1 AND employee_id = $2`,
-        [unit.department.id, unit.head.employeeId],
-      );
-      await h.ctx.sql.query(`UPDATE department_head_periods SET valid_from = valid_from - 1 WHERE id = $1`, [
-        endedPeriodId,
-      ]);
-      await h.ctx.sql.query(`UPDATE department_head_periods SET valid_to = $2 WHERE id = $1`, [
-        endedPeriodId,
-        h.today(),
-      ]);
-      const [{ id: successorPeriodId }] = (
-        await h.ctx.sql.query<{ id: string }>(
-          `INSERT INTO department_head_periods (id, organization_id, department_id, employee_id, valid_from)
-           SELECT gen_random_uuid(), organization_id, id, $2, $3 FROM departments WHERE id = $1 RETURNING id`,
-          [unit.department.id, next.employeeId, h.tomorrow()],
-        )
-      ).rows;
-
+      const { next, endedPeriodId, successorPeriodId } = await recordSuccessorForTomorrow(unit, `XG-H${n}`);
       await h.emit({
         kind: 'HEAD_PERIOD_END',
         periodId: endedPeriodId,
@@ -227,6 +234,155 @@ describe('a department with no head: paid requests and case B wait for one, over
       });
       expect(await h.stepOf(gap.id, 'NEED')).toMatchObject({ state: 'PENDING', assignee_employee_id: next.employeeId });
       expect(await withoutHeadNotices(unit.department.id)).toEqual([]);
+    });
+  });
+
+  describe('free internal software when the department loses its head (D-78, QĐ-111bc)', () => {
+    /** What a request of free internal software sent into a department that has no head looks like: the shape the reassignment must give. */
+    const oneStepShape = {
+      state: 'AWAITING_EXECUTION',
+      routing: { mode: 'ONE_STEP', oneStepReason: 'NO_DEPARTMENT_HEAD' },
+      needStep: { state: 'NOT_REQUIRED', assignee: null, routingRow: 4 },
+    };
+
+    it('goes straight to the IT Admin like one sent now, flagged and audited once, while a paid request of the same department keeps waiting', async () => {
+      n += 1;
+      const unit = await h.departmentWithHead(`P-XF${n}`);
+      const free = await h.sent(unit.member, internal);
+      const sentPaid = await h.sent(unit.member, paid);
+      const before = await h.stepOf(free.id, 'NEED');
+      expect(before).toMatchObject({ state: 'PENDING', assignee_employee_id: unit.head.employeeId });
+      expect(await requestRow(free.id)).toEqual({ routing_mode: 'VIA_HEAD', one_step_reason: null, state: 'PENDING' });
+
+      await h.vacateHead(unit.department.id).expect(200);
+
+      expect(await h.stepOf(free.id, 'NEED')).toMatchObject({
+        state: 'NOT_REQUIRED',
+        assignee_employee_id: null,
+        assigned_at: null,
+        waiting_reason: null,
+        waiting_since: null,
+        routing_row: 4,
+        created_at: before.created_at,
+      });
+      expect(await requestRow(free.id)).toEqual({
+        routing_mode: 'ONE_STEP',
+        one_step_reason: 'NO_DEPARTMENT_HEAD',
+        state: 'AWAITING_EXECUTION',
+      });
+      // The chain is the one a request sent now has: no need step in it.
+      expect((await h.requestRow(free.id)).policy).toMatchObject({ chain: ['IT_EXECUTION'] });
+      expect(await readBy(free.id, unit.member)).toMatchObject(oneStepShape);
+      // The same answer the requester of a request sent into the department now reads.
+      const newcomer = await h.staff(unit.department, `XF-E${n}`);
+      expect(await h.sent(newcomer, internal)).toMatchObject(oneStepShape);
+
+      const flagged = await h.audit('ACCESS_REQUEST.NO_NEED_APPROVER', free.id);
+      expect(flagged).toHaveLength(1);
+      expect(flagged[0].after).toMatchObject({ routingMode: 'ONE_STEP', oneStepReason: 'NO_DEPARTMENT_HEAD' });
+      const ended = await h.audit('ACCESS_REQUEST.STEP_NOT_REQUIRED', before.id);
+      expect(ended).toHaveLength(1);
+      expect(ended[0]).toMatchObject({
+        actor_kind: 'SYSTEM',
+        before: { assigneeEmployeeId: unit.head.employeeId },
+        after: { requestId: free.id, stepKind: 'NEED', oneStepReason: 'NO_DEPARTMENT_HEAD' },
+      });
+
+      // A paid request is not free: it still has a spend step, so it waits for the next head (QĐ-110i) and is the only one the notice counts.
+      expect(await h.stepOf(sentPaid.id, 'NEED')).toMatchObject({
+        state: 'WAITING',
+        waiting_reason: 'NO_DEPARTMENT_HEAD',
+      });
+      expect(await requestRow(sentPaid.id)).toEqual({
+        routing_mode: 'VIA_HEAD',
+        one_step_reason: null,
+        state: 'WAITING_CONTROLLED',
+      });
+      expect(await h.audit('ACCESS_REQUEST.NO_NEED_APPROVER', sentPaid.id)).toEqual([]);
+      expect((await withoutHeadNotices(unit.department.id))[0].params).toMatchObject({ waitingCount: 1 });
+    });
+
+    it('is moved once: the passes of the worker that come after find nothing to move and write nothing', async () => {
+      n += 1;
+      const unit = await h.departmentWithHead(`P-XI${n}`);
+      const free = await h.sent(unit.member, internal);
+      const step = await h.stepOf(free.id, 'NEED');
+      await h.vacateHead(unit.department.id).expect(200);
+      const moved = await requestRow(free.id);
+      expect(moved).toMatchObject({ routing_mode: 'ONE_STEP', state: 'AWAITING_EXECUTION' });
+
+      const first = await h.sweep();
+      const second = await h.sweep();
+
+      expect([first.oneStepFinished, second.oneStepFinished]).toEqual([0, 0]);
+      expect(await requestRow(free.id)).toEqual(moved);
+      expect(await h.stepOf(free.id, 'NEED')).toMatchObject({ id: step.id, state: 'NOT_REQUIRED' });
+      expect(await h.audit('ACCESS_REQUEST.STEP_NOT_REQUIRED', step.id)).toHaveLength(1);
+      expect(await h.audit('ACCESS_REQUEST.NO_NEED_APPROVER', free.id)).toHaveLength(1);
+    });
+
+    it('is moved on the day the head leaves, not on the day a successor starts, as a request sent in that gap would go', async () => {
+      n += 1;
+      const unit = await h.departmentWithHead(`P-XJ${n}`);
+      const free = await h.sent(unit.member, internal);
+      const sentPaid = await h.sent(unit.member, paid);
+      const { endedPeriodId } = await recordSuccessorForTomorrow(unit, `XJ-H${n}`);
+
+      await h.emit({
+        kind: 'HEAD_PERIOD_END',
+        periodId: endedPeriodId,
+        departmentId: unit.department.id,
+        headEmployeeId: unit.head.employeeId,
+        effectiveOn: h.today(),
+      });
+
+      expect(await readBy(free.id, unit.member)).toMatchObject(oneStepShape);
+      const gapMember = await h.staff(unit.department, `XJ-E${n}`);
+      expect(await h.sent(gapMember, internal)).toMatchObject(oneStepShape);
+      // The paid one waits for the head who starts tomorrow, as before.
+      expect(await h.stepOf(sentPaid.id, 'NEED')).toMatchObject({
+        state: 'WAITING',
+        waiting_reason: 'NO_DEPARTMENT_HEAD',
+      });
+    });
+
+    it('also puts right a request that waited for a head under the rule before this one: the next pass of the worker sends it on', async () => {
+      n += 1;
+      const department = await h.departmentWithUnit(`P-XW${n}`);
+      const member = await h.staff(department, `XW-E${n}`);
+      const free = await h.sent(member, internal);
+      // What the earlier rule left: the request sent through the head (so with a need step in its chain), waiting for one.
+      await h.ctx.sql.query(
+        `UPDATE access_requests SET routing_mode = 'VIA_HEAD', one_step_reason = NULL, state = 'WAITING_CONTROLLED',
+                policy = jsonb_set(policy, '{chain}', '["NEED","IT_EXECUTION"]'::jsonb) WHERE id = $1`,
+        [free.id],
+      );
+      await h.ctx.sql.query(
+        `UPDATE access_request_steps SET state = 'WAITING', waiting_reason = 'NO_DEPARTMENT_HEAD' WHERE request_id = $1 AND kind = 'NEED'`,
+        [free.id],
+      );
+      const waiting = await h.stepOf(free.id, 'NEED');
+      expect(waiting).toMatchObject({ state: 'WAITING', waiting_reason: 'NO_DEPARTMENT_HEAD' });
+
+      await h.sweep();
+
+      expect(await h.stepOf(free.id, 'NEED')).toMatchObject({
+        id: waiting.id,
+        state: 'NOT_REQUIRED',
+        waiting_reason: null,
+      });
+      expect(await requestRow(free.id)).toEqual({
+        routing_mode: 'ONE_STEP',
+        one_step_reason: 'NO_DEPARTMENT_HEAD',
+        state: 'AWAITING_EXECUTION',
+      });
+      expect((await h.requestRow(free.id)).policy).toMatchObject({ chain: ['IT_EXECUTION'] });
+      // The flag the pass wrote, besides the one the sending wrote before the test put the request back to the old shape.
+      const flags = () => h.audit('ACCESS_REQUEST.NO_NEED_APPROVER', free.id);
+      expect((await flags()).map((event) => event.actor_kind)).toEqual(['USER', 'SYSTEM']);
+      await h.sweep();
+      expect(await flags()).toHaveLength(2);
+      expect(await h.audit('ACCESS_REQUEST.STEP_NOT_REQUIRED', waiting.id)).toHaveLength(1);
     });
   });
 

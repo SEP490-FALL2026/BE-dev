@@ -220,18 +220,19 @@ describe('my requests: whose they are and what a row says (integration, real Pos
     it('says who a request waits for and lets the sender withdraw it, and says who it waits for after the head is changed', async () => {
       const unit = await h.departmentWithHead('P-MR-W');
       const person = await h.staff(unit.department, 'MR-W1', 'EMPLOYEE');
-      const sent = await h.sent(person, internal);
+      // A paid request: free internal software does not wait for the next head, it goes to the IT Admin when the head leaves (QĐ-111bc).
+      const sent = await h.sent(person, paid, { termMonths: 1 });
 
       const before = await rowOf(person.account, sent.id);
       expect(before).toMatchObject({
         state: 'PENDING',
-        branch: 'INTERNAL_FREE',
+        branch: 'PAID_IN_CATALOG',
         needStep: { state: 'PENDING', assignee: ref(unit.head), waitingReason: null },
         spend: null,
         outcome: null,
         withdrawal: null,
         canWithdraw: true,
-        plan: { planId: internal },
+        plan: { planId: paid },
         softwareName: null,
         beneficiary: ref(person),
         lineCount: 1,
@@ -250,7 +251,7 @@ describe('my requests: whose they are and what a row says (integration, real Pos
     it('says a request waits under control with nobody to hold it, and the reason', async () => {
       const unit = await h.departmentWithHead('P-MR-V');
       const person = await h.staff(unit.department, 'MR-V1', 'EMPLOYEE');
-      const sent = await h.sent(person, internal);
+      const sent = await h.sent(person, paid, { termMonths: 1 });
       await h.vacateHead(unit.department.id).expect(200);
 
       const row = await rowOf(person.account, sent.id);

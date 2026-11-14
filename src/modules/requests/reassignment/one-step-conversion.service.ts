@@ -7,7 +7,8 @@ import { SpendRoutingService } from '../spend/spend-routing.service';
 /**
  * Finishes the requests an earlier rule turned into one-step when their department lost its head. Since `QĐ-110i` nothing turns a request into
  * one-step because of a missing head any more, neither the end of a head period (`organization-change.listener.ts`) nor the sweep: a paid
- * request and a case B proposal wait for the next head (`routing.policy.ts`). What is left is the second phase of a conversion marked before: the
+ * request and a case B proposal wait for the next head (`routing.policy.ts`), and free internal software ends its need step at once in
+ * `StepReassignmentService` (`QĐ-111bc`), which starts the one-step route itself. What is left here is the second phase of a conversion marked before: the
  * sweep completes it, one transaction for each request, with the standard budget check, and a request that is not marked is left alone.
  */
 @Injectable()

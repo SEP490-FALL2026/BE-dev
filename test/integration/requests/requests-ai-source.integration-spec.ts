@@ -292,7 +292,8 @@ describe('RequestsAiSourceApi: the open steps a person holds (integration, real 
 
     it('drops a step handed over to the next head, which the next head now holds', async () => {
       const u = await unit();
-      const sent = await h.sent(u.member, internal, { termMonths: 1 });
+      // A paid request: free internal software does not wait for the next head, it goes to the IT Admin (QĐ-111bc).
+      const sent = await h.sent(u.member, plan, { termMonths: 1 });
       expect(await api.stillHeldBy(u.head.employeeId, [sent.needStep.id])).toEqual(new Set([sent.needStep.id]));
       number += 1;
       const successor = await h.staff(u.department, `${u.department.code}-S${number}`);

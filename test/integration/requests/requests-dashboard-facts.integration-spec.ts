@@ -205,9 +205,9 @@ describe('RequestsDashboardApi facts agree with source lists (integration, real 
 
     it('moves a step from the head who held it to the one who holds it now', async () => {
       const u = await unit();
-      const member = await employeeOf(u);
-      await h.sent(member, await freshInternal());
-      await h.sent(member, await freshInternal());
+      // Paid requests: free internal software goes to the IT Admin when the department has no head (QĐ-111bc), so it does not wait for one.
+      await h.sent(await employeeOf(u), paid, { termMonths: 1 });
+      await h.sent(await employeeOf(u), paid, { termMonths: 1 });
       expect(await needCounts(u.head)).toEqual({ facade: 2, list: 2 });
       const successor = await h.staff(u.department, `${u.department.code}-S${number}`);
 

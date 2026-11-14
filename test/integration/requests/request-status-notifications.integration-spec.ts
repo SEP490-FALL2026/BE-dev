@@ -15,7 +15,6 @@ const said = (rows: NoticeRow[]) => rows.map((row) => row.code);
 describe('the status of a request told to the people it concerns, over PostgreSQL (US-05-15)', () => {
   let plan: string;
   let figma: string;
-  let internalPlan: string;
   let subscriptionId: string;
   let counter = 0;
   let superAdminEmployeeId: string;
@@ -26,7 +25,6 @@ describe('the status of a request told to the people it concerns, over PostgreSQ
     subscriptionId = await h.subscription(10);
     plan = await h.planOf(subscriptionId);
     figma = await h.planOf(await h.subscription(10));
-    internalPlan = await h.plan('K5');
     await h
       .declareTaxProfile((await h.vendorOf(plan)).id, [{ taxType: 'GTGT', ratePercent: '10', deductible: true }])
       .expect(200);
@@ -322,8 +320,8 @@ describe('the status of a request told to the people it concerns, over PostgreSQ
     it('tells the requester that a step they were waiting on waits for a head, the Super Admin alone of the alert and nobody else, and then that it is given', async () => {
       const u = await example();
       const successor = await h.staff(u.department, `NW-S${counter}`);
-      // An internal request keeps waiting for the successor; a paid one is turned into a one-step request instead (BR-MF1-02).
-      const sent = await h.sent(u.member, internalPlan, { termMonths: 1 });
+      // A paid request keeps waiting for the successor; free internal software goes on to the IT Admin instead (QĐ-111bc, D-78).
+      const sent = await h.sent(u.member, plan, { termMonths: 1 });
       await h.vacateHead(u.department.id).expect(200);
       await h.project();
 

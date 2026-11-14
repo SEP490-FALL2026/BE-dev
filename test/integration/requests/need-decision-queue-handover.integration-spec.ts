@@ -99,13 +99,14 @@ describe('the queue of the need steps when the person who holds a step changes (
       assignee_employee_id: null,
       waiting_reason: 'NO_DEPARTMENT_HEAD',
     });
-    // Nobody takes the need step of an internal request in place of a head (QĐ-93c, Q-33): it waits, and is in nobody's queue, the
-    // spending approver's included.
+    // Free internal software needs nobody to decide it once the department has no head (QĐ-111bc, D-78): its need step ends and the request
+    // goes to the IT Admin, so it is in nobody's queue of need, the spending approver's included.
     expect(await h.stepOf(other.id, 'NEED')).toMatchObject({
-      state: 'WAITING',
+      state: 'NOT_REQUIRED',
       assignee_employee_id: null,
-      waiting_reason: 'NO_DEPARTMENT_HEAD',
+      waiting_reason: null,
     });
+    expect(await h.state(other.id)).toBe('AWAITING_EXECUTION');
     for (const account of [h.boss.account, bystander.account, u.member.account, h.it1, h.finance]) {
       const ids = await idsOf(account);
       expect(ids).not.toContain(r1.id);
@@ -117,7 +118,7 @@ describe('the queue of the need steps when the person who holds a step changes (
 
   it('hands a step to the new head when the Super Admin names one, with the step keeping its age', async () => {
     const u = await unit();
-    const r1 = await h.sent(u.member, internal, { termMonths: 1 });
+    const r1 = await h.sent(u.member, plan, { termMonths: 1 });
     const [before] = await queue(u.head.account);
     const successor = await h.staff(u.department, `${u.department.code}-S`);
 
