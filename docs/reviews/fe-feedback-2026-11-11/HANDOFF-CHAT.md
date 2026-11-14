@@ -76,7 +76,13 @@ Thư mục kế hoạch BE (`docs/reviews/…`):
    mutation đề xuất. Tự đọc migration/SQL/phân quyền/test bị sửa.
 3. Điểm nghiệp vụ ⟹ hỏi Owner A/B. Sửa nhỏ tự làm (không commit) + test; sửa lớn ⟹ prompt cho Sonnet.
 4. Mutation thủ công (script `mutate.py`: thay chuỗi, chạy test, khôi phục) cho từng chỗ sửa.
-5. Full test **sau khi agent dừng chạy jest**. Môi trường:
+5. Full test **sau khi agent dừng chạy jest**. **Luật CI (Owner, 14/11, sau khi CI đỏ ở seed spec + e2e):** "full test" = **đủ mọi job của
+   `.github/workflows/ci.yml`** + các lệnh pha cuối, chạy lại **sau commit CUỐI CÙNG** (mọi commit code/test/seed/fixture/migration, kể cả
+   commit của agent seed hay sửa tài liệu có chạm `src/`/`test/`), không chỉ phần mình chạm, rồi mới báo xong / đưa lệnh push:
+   `pnpm check` · `pnpm test:http` · `pnpm test:integration` (toàn bộ) · `pnpm test:integration:serial` (export `TEST_DATABASE_BOOTSTRAP_URL`
+   riêng lệnh này) · **`pnpm test:e2e`** · `pnpm test:integration:timing` · `pnpm test:flows` · `seed:local` trên DB sạch. Suite đỏ do tải DB
+   ⟹ chạy lại đúng suite đó `--maxWorkers=2`, ghi cả hai kết quả; suite đỏ thật ⟹ sửa rồi chạy lại **toàn bộ** job bị ảnh hưởng. Báo cáo ghi
+   bảng job ⟹ lệnh ⟹ kết quả ⟹ commit đã chạy. Thiếu job nào phải nói rõ là chưa chạy. Môi trường:
    - DB test: `docker run --name slm-test-db -d -p 127.0.0.1:35432:5432 -e POSTGRES_USER=ci_bootstrap -e POSTGRES_PASSWORD=ci-bootstrap-only -e POSTGRES_DB=postgres postgres:17-alpine -c fsync=off -c synchronous_commit=off -c full_page_writes=off`
      rồi `CREATE ROLE ci_integration LOGIN NOSUPERUSER CREATEDB … PASSWORD 'ci-integration-only'` (test/README.md). Cổng 55432 **bị
      Windows chặn**.
