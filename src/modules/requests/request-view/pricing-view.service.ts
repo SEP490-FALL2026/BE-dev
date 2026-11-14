@@ -35,6 +35,22 @@ export interface PricingView {
  * becomes the commitment of 01/01. `months` is the months that have begun by the end of the term, the cut at the end of a contract (`termCutAt`) included;
  * null for a right with no end. A price that is not by the month (a key) or that is missing has no such cost.
  */
+/** What is known of the months of a cost by the year: those of this year, of the year after, all that have begun, and the day a contract cut the term. */
+export interface CostTerm {
+  currentMonths: number | null;
+  nextMonths: number | null;
+  startedMonths: number | null;
+  cutAt: string | null;
+}
+
+/** The months of a preview, from the run its time of use would have if it began today: the months that begin this year and the next, and the cut. */
+export const costTermOf = (run: TermRun, year: number, currentMonths: number | null): CostTerm => ({
+  currentMonths,
+  nextMonths: run.end === null ? 12 : monthsBeginningIn({ start: run.start, end: run.end, year: year + 1 }),
+  startedMonths: run.startedMonths,
+  cutAt: run.cutAt,
+});
+
 export interface CostView {
   currentYear: { year: number; months: number | null; amount: MoneyView };
   nextYear: { from: string; months: number | null; amount: MoneyView; estimate: true } | null;
@@ -86,29 +102,30 @@ export class PricingViewService {
     };
   }
 
-  /** The cost by the year of a priced request, with the run its time of use has (`QĐ-111j`); null when nothing is priced by the month. */
-  async costView(pricing: PricingRecord, run: TermRun | null): Promise<CostView | null> {
+  /**
+   * The cost by the year of a priced request, with the months its time of use has (`QĐ-111j`); null when nothing is priced by the month. `term`
+   * is what is known of the months: the run of a preview, or what a request that was sent kept; null shows the amounts and no months.
+   */
+  async costView(pricing: PricingRecord, term: CostTerm | null): Promise<CostView | null> {
     if (pricing.status !== 'PRICED' || pricing.amount === null || pricing.budgetYear === null) return null;
     if (pricing.kind !== 'RECURRING') return null;
     const year = pricing.budgetYear;
     const { nextYearAmount } = pricing;
-    const nextMonths =
-      run === null
-        ? null
-        : run.end === null
-          ? 12
-          : monthsBeginningIn({ start: run.start, end: run.end, year: year + 1 });
 
     return {
-      currentYear: { year, months: pricing.amountMonths, amount: await this.moneyView(pricing.amount) },
+      currentYear: {
+        year,
+        months: term === null ? pricing.amountMonths : term.currentMonths,
+        amount: await this.moneyView(pricing.amount),
+      },
       nextYear: nextYearAmount && {
         from: `${year + 1}-01-01`,
-        months: nextMonths,
+        months: term?.nextMonths ?? null,
         amount: await this.moneyView(nextYearAmount),
         estimate: true,
       },
-      termCutAt: run?.cutAt ?? null,
-      months: run?.startedMonths ?? null,
+      termCutAt: term?.cutAt ?? null,
+      months: term?.startedMonths ?? null,
     };
   }
 

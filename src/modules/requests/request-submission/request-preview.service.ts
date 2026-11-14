@@ -8,7 +8,7 @@ import { OrganizationReadApi } from '../../organization/public/organization-read
 import { AccessRequestNoDepartmentError } from '../access-request/access-request.errors';
 import type { PreviewBodyDto, PreviewWire } from './request-preview.dto';
 import { buildChain, spendSubmissionOf } from './request-preview.policy';
-import { PricingViewService } from '../request-view/pricing-view.service';
+import { PricingViewService, costTermOf } from '../request-view/pricing-view.service';
 import { RequestFactsService } from '../access-request/request-facts.service';
 import type { PricingRecord } from '../access-request/access-request.types';
 import { annualVendorAmountOf } from '../access-request/pricing.policy';
@@ -94,7 +94,10 @@ export class RequestPreviewService {
       canSubmit: canSubmitOf(assessed, blockedBy, limits),
       budgetYear: pricing.budgetYear,
       pricing: priceView,
-      cost: await this.pricing.costView(pricing, assessed.term),
+      cost: await this.pricing.costView(
+        pricing,
+        pricing.budgetYear === null ? null : costTermOf(assessed.term, pricing.budgetYear, pricing.amountMonths),
+      ),
       costEstimate,
       spendSubmission: spendSubmissionOf(policy, pricing.status),
       chain: chain.map(({ assigneeEmployeeId, ...step }) => ({ ...step, assignee: person(assigneeEmployeeId) })),
