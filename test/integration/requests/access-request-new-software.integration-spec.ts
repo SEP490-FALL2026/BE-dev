@@ -426,6 +426,77 @@ describe('requests over HTTP: software that is not in the catalog (integration, 
       });
     });
 
+    describe('B-R2 (QĐ-111i): the time of use the person gave is judged again by the kind of grant the IT Admin concludes', () => {
+      const termOf = async (id: string) =>
+        (
+          await h.ctx.sql.query<{ term_months: number | null }>(
+            `SELECT term_months FROM access_requests WHERE id = $1`,
+            [id],
+          )
+        ).rows[0].term_months;
+
+      it('refuses to complete a plan bought by the month (K1) for more than 9 months: 422 ASSESSMENT.TERM_NOT_FIT_KIND, nothing written', async () => {
+        // The proposal did not know the kind of plan, so it took 12 months (the rule of K2).
+        const proposed = await awaiting({ termMonths: 12 });
+        await save(proposed.id, h.assessmentBody({ provisioningType: 'K1' })).expect(200);
+
+        const refused = await complete(proposed.id).expect(422);
+
+        expect(h.codeOf(refused)).toBe('ASSESSMENT.TERM_NOT_FIT_KIND');
+        expect(h.detailsOf(refused)).toEqual({
+          provisioningType: 'K1',
+          termMonths: 12,
+          maxMonths: 9,
+          reason: 'TERM_MONTHS_OUT_OF_RANGE',
+        });
+        expect(await stateOf(proposed.id)).toBe('AWAITING_IT_ASSESSMENT');
+        expect(await termOf(proposed.id)).toBe(12);
+        expect((await h.assessmentWire(proposed.id, itInCharge.account)).status).toBe('DRAFT');
+      });
+
+      it('refuses a plan bought by the month (K1) when the proposal gave no months, and takes 9 months, the most it has', async () => {
+        const none = await awaiting();
+        const nine = await awaiting({ termMonths: 9 });
+        await save(none.id, h.assessmentBody({ provisioningType: 'K1' })).expect(200);
+        await save(nine.id, h.assessmentBody({ provisioningType: 'K1' })).expect(200);
+
+        const refused = await complete(none.id).expect(422);
+        const taken = await complete(nine.id).expect(200);
+
+        expect(h.codeOf(refused)).toBe('ASSESSMENT.TERM_NOT_FIT_KIND');
+        expect(h.detailsOf(refused)).toMatchObject({
+          provisioningType: 'K1',
+          termMonths: null,
+          reason: 'TERM_REQUIRED',
+        });
+        expect(h.dataOf<{ request: AccessRequestWire }>(taken).request.state).toBe('AWAITING_SPEND_SUBMISSION');
+        expect(await termOf(nine.id)).toBe(9);
+      });
+
+      it('a plan bought once (K4) asks no months: completing it clears them from the request, and the audit trail says so', async () => {
+        const proposed = await awaiting({ termMonths: 6 });
+        await save(proposed.id, h.assessmentBody({ provisioningType: 'K4' })).expect(200);
+
+        const done = h.dataOf<{ request: AccessRequestWire }>(await complete(proposed.id).expect(200)).request;
+
+        expect(done.state).toBe('AWAITING_SPEND_SUBMISSION');
+        expect(await termOf(proposed.id)).toBeNull();
+        const completed = (await h.auditEvents('ACCESS_REQUEST', proposed.id)).find(
+          (event) => event.action === 'ACCESS_REQUEST.ASSESSMENT_COMPLETED',
+        );
+        expect(completed?.after).toMatchObject({ termMonths: null, termMonthsCleared: 6 });
+      });
+
+      it('a plan of seats (K2) keeps the months the person gave', async () => {
+        const proposed = await awaiting({ termMonths: 12 });
+        await save(proposed.id, h.assessmentBody({ provisioningType: 'K2' })).expect(200);
+
+        await complete(proposed.id).expect(200);
+
+        expect(await termOf(proposed.id)).toBe(12);
+      });
+    });
+
     it('names what it lacks and writes nothing when the way a seat is granted and revoked is missing (AC-3)', async () => {
       const proposed = await awaiting();
       await save(proposed.id, h.assessmentBody({ grantRevokeMethod: undefined })).expect(200);

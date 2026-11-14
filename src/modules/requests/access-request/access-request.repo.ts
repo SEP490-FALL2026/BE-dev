@@ -294,8 +294,11 @@ export class AccessRequestRepo {
     await tx.accessRequest.update({ where: { id }, data: pricingColumns(pricing) });
   }
 
-  /** The time of use of the request, in months, after a supplementary file shortened it (`QĐ-111i`); the price is written by `setPricing`. */
-  async setTermMonths(tx: DbTx, id: string, termMonths: number): Promise<void> {
+  /**
+   * The time of use of the request, in months, after a supplementary file shortened it (`QĐ-111i`) or null when the plan concluded for a proposal
+   * is bought once and takes none; the price is written by `setPricing`.
+   */
+  async setTermMonths(tx: DbTx, id: string, termMonths: number | null): Promise<void> {
     await tx.accessRequest.update({ where: { id }, data: { termMonths } });
   }
 

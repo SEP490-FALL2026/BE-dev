@@ -28,6 +28,7 @@ import {
   AssessmentQuoteRefusedError,
   AssessmentReferenceNotFoundError,
   AssessmentRefusedError,
+  AssessmentTermNotFitError,
   AssessmentUncontrollableError,
   CatalogLinkRefusedError,
   InternalRegistrationRefusedError,
@@ -59,6 +60,14 @@ export function toAssessmentApiException(error: unknown): unknown {
   }
   if (error instanceof AssessmentQuoteRefusedError) {
     return refuse(HttpStatus.UNPROCESSABLE_ENTITY, `ASSESSMENT.${error.reason}`, error.message);
+  }
+  if (error instanceof AssessmentTermNotFitError) {
+    return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'ASSESSMENT.TERM_NOT_FIT_KIND', error.message, {
+      provisioningType: error.provisioningType,
+      termMonths: error.termMonths,
+      maxMonths: error.maxMonths,
+      reason: error.reason,
+    });
   }
   if (error instanceof AssessmentReferenceNotFoundError) {
     return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'ASSESSMENT.REFERENCE_NOT_FOUND', error.message, {
@@ -135,6 +144,7 @@ export const ASSESSMENT_ERROR_EXAMPLES = {
   QUOTE_PERIOD_INVALID: quote('QUOTE_PERIOD_INVALID'),
   QUOTE_PRICE_NOT_VND: quote('QUOTE_PRICE_NOT_VND'),
   AMOUNT_TOO_LARGE: quote('AMOUNT_TOO_LARGE'),
+  TERM_NOT_FIT_KIND: example(new AssessmentTermNotFitError('TERM_MONTHS_OUT_OF_RANGE', 'K1', 12, 9)),
   ALTERNATIVE_PLAN_NOT_FOUND: example(new AssessmentReferenceNotFoundError('alternativePlanId')),
   // One message template whose field varies (details.field names it): the vendor stands for the fields of the save.
   REFERENCE_NOT_FOUND: example(new AssessmentReferenceNotFoundError('vendorId')),

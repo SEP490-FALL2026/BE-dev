@@ -25,6 +25,7 @@ export const ROUTE_ERROR_CODES_REQUESTS: Readonly<
       'ASSESSMENT.INCOMPLETE',
       'ASSESSMENT.QUOTE_NOT_IN_FORCE',
       'ASSESSMENT.QUOTE_PRICE_NOT_VND',
+      'ASSESSMENT.TERM_NOT_FIT_KIND',
     ],
   },
   accessRequestAssessmentGet: {

@@ -1,3 +1,4 @@
+import type { TermKind, TermRefusal } from '../../../core/term-limit';
 import type { CatalogEntry } from '../../catalog/public/catalog.types';
 import type { AssessorRefusal } from './assessment.policy';
 
@@ -40,6 +41,24 @@ export class AssessmentQuoteRefusedError extends Error {
   ) {
     super(`The quote cannot price the request: ${reason}.`);
     this.name = 'AssessmentQuoteRefusedError';
+  }
+}
+
+/**
+ * The time of use the person gave does not fit the kind of grant the IT Admin concluded (`QĐ-111i`): a proposal does not know the kind of plan
+ * when it is made, so it took the rule of `K2`; the kind is known at the completion, where a plan bought by the month takes 1 to 9 months and a
+ * right with no end is refused for a person with a term. `reason` is the refusal of `checkTermMonths`; the request stays with the IT Admin, who
+ * rejects it for the person to propose again with months that fit.
+ */
+export class AssessmentTermNotFitError extends Error {
+  constructor(
+    readonly reason: TermRefusal,
+    readonly provisioningType: TermKind,
+    readonly termMonths: number | null,
+    readonly maxMonths: number,
+  ) {
+    super(`The time of use the proposal gave does not fit a plan of kind ${provisioningType}: ${reason}.`);
+    this.name = 'AssessmentTermNotFitError';
   }
 }
 

@@ -203,13 +203,14 @@ export class ProposalsController {
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
-        'The assessment lacks fields, with the names in details.missing (ASSESSMENT.INCOMPLETE), or the quote cannot price the request (ASSESSMENT.QUOTE_NOT_IN_FORCE, AMOUNT_TOO_LARGE, or QUOTE_PRICE_NOT_VND when the stored quote is not in dong: record it again in dong). Nothing is written and the request stays with the IT Admin.',
+        'The assessment lacks fields, with the names in details.missing (ASSESSMENT.INCOMPLETE), the quote cannot price the request (ASSESSMENT.QUOTE_NOT_IN_FORCE, AMOUNT_TOO_LARGE, or QUOTE_PRICE_NOT_VND when the stored quote is not in dong: record it again in dong), or the time of use the person gave does not fit the kind of plan concluded (ASSESSMENT.TERM_NOT_FIT_KIND, with details.provisioningType, termMonths, maxMonths and the reason: a plan bought by the month takes 1 to 9 months; reject the request for the person to propose again with months that fit). Nothing is written and the request stays with the IT Admin. A plan bought once takes no months: completing it clears any the person gave.',
       examples: [
         VALIDATION_EXAMPLE,
         EXAMPLES.INCOMPLETE,
         EXAMPLES.QUOTE_NOT_IN_FORCE,
         EXAMPLES.AMOUNT_TOO_LARGE,
         EXAMPLES.QUOTE_PRICE_NOT_VND,
+        EXAMPLES.TERM_NOT_FIT_KIND,
       ],
     },
   )
