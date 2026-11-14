@@ -101,7 +101,16 @@ Theo [AUDIT-C.md](AUDIT-C.md) Phần 2, Z1–Z8, Z10–Z12 (Z9 chờ Owner chố
 | K5 ở phòng không trưởng phòng | R28 NV-LGL1 `hr-portal-access` | `GET /access-request-audit-flags` |
 | Nghỉ việc chặn ngay theo luồng mới | NV-OFF1 (Figma, Jira, GitHub, Grammarly K1), dừng trước (1a) | ITA1: (1a) → mở thu hồi → hoàn tất (K1 checklist 6 bước) → (1b) tự ghi → đóng sau lượt quét |
 
-Bỏ: ca m-17 (không dựng được qua route). Kiểm: `typecheck`, `format:check`, `rules:check` 0 lỗi; `jest src/cli/seed` 154/154;
+Bỏ: ca m-17 (không dựng được qua route). Lưu ý khi demo (từ lượt rà tài liệu demo):
+
+- **Lỗ hổng sản phẩm (cần Owner/prompt sau):** IT Admin nghỉ việc mà không phụ trách phòng nào (NV-ITA4) **không tự tìm được id hồ sơ nghỉ
+  việc của mình** để gọi P5 — danh sách hồ sơ chỉ trả hồ sơ của phòng IT phụ trách, `GET /me/departure-notice` không trả id. Demo: Super Admin
+  đọc id rồi đưa. Đề xuất A: P5 có route `/me/...` hoặc danh sách cho phép người đó thấy hồ sơ của chính mình.
+- Request R22 của NV-DEV4 bị hệ thống hủy khi điều chuyển có hiệu lực (ngày sau ngày seed, `SYSTEM_BENEFICIARY_TRANSFERRED`, đúng luật): bước
+  IT cấp R22 của demo MF-1 chỉ làm được trong ngày seed.
+- Preview P23 cho NV-ITA4 trả 409 `ALREADY_HANDING_OVER` (đã có hồ sơ); demo preview trên người khác.
+
+Tài liệu demo FE đã sửa theo seed: Docs `4fbaf06` (chưa push), gồm tài liệu API theo BE `67a1abeb`. Kiểm: `typecheck`, `format:check`, `rules:check` 0 lỗi; `jest src/cli/seed` 154/154;
 `test:gates` 331/331; `seed:local -- --continue` trên DB sạch `slm_smoke` (cổng 35432) 54 bước exit 0, chạy lại 54 "đã có" exit 2;
 `test:flows` 60 xanh, 9 skip có sẵn; `test:integration:serial` 96 xanh.
 
