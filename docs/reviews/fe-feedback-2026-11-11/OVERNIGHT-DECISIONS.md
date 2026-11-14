@@ -98,3 +98,11 @@
 - **Đã chọn:** sửa manifest (`openapi-example-route-codes-catalog/requests`), đổi test "REPORTING_CURRENCY_NOT_SUPPORTED đúng chỗ quy đổi" thành "không route nào khai mã đó", đếm 379 → 376. Căn cứ: brief ("không để test đỏ ở gate"), D1.
 - **File/commit:** `d5b6ec29`.
 - **Đổi lại:** không cần; lỗi `REPORTING_CURRENCY_NOT_SUPPORTED` (lớp ở `core/money/money.errors.ts` + ánh xạ ở `infrastructure/http/errors/money-errors.ts`) hiện không còn nơi ném — dọn ở đợt sau cùng tài liệu API.
+
+### D-12 — Lệnh cài đặt chỉ nhận `VND` làm tiền tệ báo cáo (đóng hở của D-9)
+
+- **Câu hỏi:** `installationInputSchema.reportingCurrency` (và `--currency` của CLI, `BOOTSTRAP_CURRENCY` của script) nhận mọi mã ISO, trái R-4/D2 "tiền báo cáo cố định VND": cài đặt khác VND làm hỏng luồng (trigger giá thuê bao 23514, kiểm ngân sách so số VND với ngân sách khác tiền, lô 01/01 ném lỗi D-9).
+- **Phương án:** (a) để nguyên, ghi cảnh báo; (b) DTO chỉ nhận `VND` (refine `=== DONG`), giữ nguyên kiểm danh mục tiền tệ cho `VND`, CLI/script vẫn truyền `--currency` nhưng mã khác bị từ chối ở DTO; (c) bỏ hẳn `--currency`/`BOOTSTRAP_CURRENCY` (đổi contract của script đã triển khai).
+- **Đã chọn (tạm chốt):** (b). Căn cứ: QĐ-111an, R-4, D2; rẻ, không migration (FX-1 đã `RAISE` với tổ chức không VND), cấu hình cũ `BOOTSTRAP_CURRENCY=VND` vẫn chạy. Lỗi: `InstallationInputError` `reportingCurrency: must be VND: every amount is in dong and nothing is converted`. Test: `installation.dto.spec` (USD/MYR/EUR), `installation.api.spec` (mã khác VND bị từ chối trước khi băm/khóa; `VND` thiếu trong danh mục vẫn bị từ chối), integration `installation`, `installation-cli` xanh.
+- **File/commit:** `modules/installation/installation.dto.ts`, `public/installation.api.ts`, `cli/bootstrap/bootstrap.arguments.ts` (help), `scripts/verify/bootstrap-installation.test.mjs` (mẫu `VND`), `docs/guides/bootstrap-installation.md`, `.env.bootstrap.example` — `a667451d`.
+- **Đổi lại:** nới lại `reportingCurrency` về `regex(/^[A-Z]{3}$/)`; không đụng DB.
