@@ -85,9 +85,7 @@ export class ApplicationService {
     const record = await this.applications.find(id);
     if (!record) throw new ApplicationNotFoundError();
     const [application] = await this.views.withResponsible([record]);
-    const similar = record.functionalGroup
-      ? await this.applications.similarTo(record.functionalGroup.id, id, SIMILAR_APPLICATION_LIMIT)
-      : { items: [], total: 0 };
+    const similar = await this.applications.similarTo(record.functionalGroup.id, id, SIMILAR_APPLICATION_LIMIT);
 
     return {
       application,
@@ -152,7 +150,7 @@ export class ApplicationService {
     const { source, name, domains, organizationId } = prepared;
     const group = input.functionalGroupId
       ? await this.guards.requireActiveGroup(tx, input.functionalGroupId)
-      : await this.guards.findDefaultGroup(tx, organizationId);
+      : await this.guards.defaultGroup(tx, organizationId);
     const { ensured, dictionaryServiceLineId } = await this.ensureVendor(tx, organizationId, source);
 
     const created = await this.applications.insert(tx, {
@@ -161,7 +159,7 @@ export class ApplicationService {
       kind: input.kind,
       vendorId: ensured?.vendor.id ?? null,
       dictionaryServiceLineId,
-      functionalGroupId: group?.id ?? null,
+      functionalGroupId: group.id,
       // QĐ-111g: the IT Admin who declares the application answers for it; there is no field to choose another.
       responsibleItAdminEmployeeId: actor.employeeId,
       dataSensitivity: input.dataSensitivity ?? null,

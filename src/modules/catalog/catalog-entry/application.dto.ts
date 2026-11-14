@@ -55,7 +55,7 @@ const applicationSummarySchema = z.strictObject({
       'True when nobody is responsible, or the one named is no longer a working IT Admin: any IT Admin may take it over with the responsibility transfer.',
   }),
   usageCollectionDefault: z.literal('NOT_COLLECTED').nullable(),
-  functionalGroup: z.strictObject({ id: z.uuid(), name: z.string() }).nullable(),
+  functionalGroup: z.strictObject({ id: z.uuid(), name: z.string() }),
   status: z.enum(['APPROVED', 'RETIRED']),
   updatedAt: z.iso.datetime(),
 });

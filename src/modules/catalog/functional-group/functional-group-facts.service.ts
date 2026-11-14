@@ -1,6 +1,5 @@
 import { Injectable } from '@nestjs/common';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
-import { DEFAULT_GROUP_KEY } from './functional-group-standard.policy';
 import { FunctionalGroupRepo } from './functional-group.repo';
 
 /** What an application declaration needs from the functional groups: one that can be chosen and stays active. */
@@ -13,8 +12,8 @@ export class FunctionalGroupFactsService {
     return this.groups.findActiveShared(tx, id);
   }
 
-  /** The group an application declared with none is put in (`Khác`, `QĐ-111d`), locked `FOR SHARE`; null when the organization has none yet. */
-  findDefault(tx: DbTx, organizationId: string): Promise<{ id: string; name: string } | null> {
-    return this.groups.findFixedShared(tx, organizationId, DEFAULT_GROUP_KEY);
+  /** The group an application declared with none is put in (`Khác`, `QĐ-111d`), locked `FOR SHARE`; the organization is given one when it has none. */
+  ensureDefault(tx: DbTx, organizationId: string): Promise<{ id: string; name: string }> {
+    return this.groups.ensureOtherShared(tx, organizationId);
   }
 }

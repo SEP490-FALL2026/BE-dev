@@ -3,7 +3,7 @@ import { Prisma } from '../../../generated/prisma/client';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { searchKey } from '../vendor-dictionary/vendor-matcher.policy';
-import { STANDARD_FUNCTIONAL_GROUPS, type FunctionalGroupSystemKey } from './functional-group-standard.policy';
+import { STANDARD_FUNCTIONAL_GROUPS } from './functional-group-standard.policy';
 import type { FunctionalGroupListFilter, FunctionalGroupRecord, FunctionalGroupStatus } from './functional-group.types';
 
 type Row = Prisma.FunctionalGroupGetPayload<object>;
@@ -80,17 +80,18 @@ export class FunctionalGroupRepo {
     return rows.length === 0 ? null : rows[0];
   }
 
-  /** The fixed group of the organization with this key, locked `FOR SHARE`: where an application declared with no group goes. Null when the organization has none. */
-  async findFixedShared(
-    tx: DbTx,
-    organizationId: string,
-    key: FunctionalGroupSystemKey,
-  ): Promise<{ id: string; name: string } | null> {
-    const rows = await tx.$queryRaw<{ id: string; name: string }[]>`
-      SELECT id, name FROM functional_groups
-       WHERE organization_id = ${organizationId}::uuid AND system_key = ${key} FOR SHARE`;
+  /**
+   * The group Khác of the organization, where an application declared with no group goes, locked `FOR SHARE`. The database function finds it, adopts
+   * an older group called Khác or makes it (migration `…_ct1_application_group_required`), so an organization made by hand has one.
+   */
+  async ensureOtherShared(tx: DbTx, organizationId: string): Promise<{ id: string; name: string }> {
+    const [made] = await tx.$queryRaw<
+      { id: string }[]
+    >`SELECT ensure_other_functional_group(${organizationId}::uuid) AS id`;
+    const [group] = await tx.$queryRaw<{ id: string; name: string }[]>`
+      SELECT id, name FROM functional_groups WHERE id = ${made.id}::uuid FOR SHARE`;
 
-    return rows.length === 0 ? null : rows[0];
+    return group;
   }
 
   /** One page by name and the total for the same filter, from one snapshot. */

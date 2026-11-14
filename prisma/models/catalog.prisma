@@ -135,7 +135,8 @@ model Application {
   name                        String
   normalizedName              String          @map("normalized_name")
   dictionaryLineId            String?         @map("dictionary_line_id") @db.Uuid
-  functionalGroupId           String?         @map("functional_group_id") @db.Uuid
+  // QĐ-111d: always one; an application declared with none stands in the fixed group Khác.
+  functionalGroupId           String          @map("functional_group_id") @db.Uuid
   // QĐ-104 removed the Business Owner: null for an application declared since; older rows keep the person they named.
   businessOwnerEmployeeId     String?         @map("business_owner_employee_id") @db.Uuid
   // QĐ-111g: the IT Admin who answers for the application: the one who declared it, changed by a transfer of responsibility.
@@ -161,7 +162,7 @@ model Application {
   organization              Organization                        @relation(fields: [organizationId], references: [id])
   vendor                    Vendor?                             @relation(fields: [vendorId], references: [id], onDelete: Restrict)
   dictionaryLine            VendorServiceLine?                  @relation(fields: [dictionaryLineId], references: [id], onDelete: Restrict)
-  functionalGroup           FunctionalGroup?                    @relation(fields: [functionalGroupId], references: [id], onDelete: Restrict)
+  functionalGroup           FunctionalGroup                     @relation(fields: [functionalGroupId], references: [id], onDelete: Restrict)
   businessOwner             Employee?                           @relation("ApplicationLegacyBusinessOwner", fields: [businessOwnerEmployeeId], references: [id], onDelete: Restrict)
   responsibleItAdmin        Employee?                           @relation("ApplicationResponsibleItAdmin", fields: [responsibleItAdminEmployeeId], references: [id], onDelete: Restrict)
   proposals                 VendorDictionaryProposal[]

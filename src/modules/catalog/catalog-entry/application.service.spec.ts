@@ -113,7 +113,7 @@ function serviceWith(input: {
       organization as unknown as OrganizationReadApi,
       {
         findActive: jest.fn(),
-        findDefault: jest.fn().mockResolvedValue(null),
+        ensureDefault: jest.fn().mockResolvedValue({ id: 'group-1', name: 'Khác' }),
       } as unknown as FunctionalGroupFactsService,
     ),
   );
@@ -163,20 +163,15 @@ describe('ApplicationService.get (US-04-01, US-04-02 AC-9)', () => {
     expect(detail.application.needsResponsible).toBe(true);
   });
 
-  it('recommends nothing under three holders, and reads no similar tool without a functional group', async () => {
-    const { service, applications } = serviceWith({
-      found: record({ functionalGroup: null }),
+  it('recommends nothing under three holders', async () => {
+    const { service } = serviceWith({
+      found: record(),
       employees: [employee('owner-1', 'ACTIVE')],
       plans: [{ id: 'plan-k1', provisioningType: 'K1' }],
       k1Holders: 2,
     });
 
-    await expect(service.get('application-1')).resolves.toMatchObject({
-      similar: [],
-      similarTotal: 0,
-      recommendations: [],
-    });
-    expect(applications.similarTo).not.toHaveBeenCalled();
+    await expect(service.get('application-1')).resolves.toMatchObject({ recommendations: [] });
   });
 
   it('refuses an application that does not exist, and a responsible IT Admin who is not an employee', async () => {

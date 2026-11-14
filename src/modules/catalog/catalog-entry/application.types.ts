@@ -15,7 +15,7 @@ export interface ApplicationRecord {
   responsibleItAdminEmployeeId: string | null;
   /** `QĐ-111e`: an application is a communication service when it stands in the group Liên lạc; nobody answers three questions any more. */
   isCommunicationService: boolean;
-  functionalGroup: { id: string; name: string } | null;
+  functionalGroup: { id: string; name: string };
   status: CatalogStatus;
   createdAt: Date;
   updatedAt: Date;
@@ -30,7 +30,7 @@ export interface ApplicationSummaryRecord {
   dataSensitivity: DataSensitivity | null;
   responsibleItAdminEmployeeId: string | null;
   isCommunicationService: boolean;
-  functionalGroup: { id: string; name: string } | null;
+  functionalGroup: { id: string; name: string };
   status: CatalogStatus;
   updatedAt: Date;
 }
@@ -68,7 +68,7 @@ export interface NewApplication {
   kind: ApplicationKind;
   vendorId: string | null;
   dictionaryServiceLineId: string | null;
-  functionalGroupId: string | null;
+  functionalGroupId: string;
   responsibleItAdminEmployeeId: string | null;
   dataSensitivity: DataSensitivity | null;
   domains: string[];
@@ -77,7 +77,7 @@ export interface NewApplication {
 export interface ApplicationChanges {
   name?: string;
   dictionaryServiceLineId?: string | null;
-  functionalGroupId?: string | null;
+  functionalGroupId?: string;
   dataSensitivity?: DataSensitivity | null;
   domains?: string[];
 }

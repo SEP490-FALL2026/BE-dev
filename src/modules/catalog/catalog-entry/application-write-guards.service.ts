@@ -30,9 +30,9 @@ export class ApplicationWriteGuards {
     return group;
   }
 
-  /** The group an application with none is put in: `Khác`. Null when the organization has none, which only an organization made by hand can lack. */
-  findDefaultGroup(tx: DbTx, organizationId: string): Promise<{ id: string; name: string } | null> {
-    return this.functionalGroups.findDefault(tx, organizationId);
+  /** The group an application with none is put in: `Khác`. */
+  defaultGroup(tx: DbTx, organizationId: string): Promise<{ id: string; name: string }> {
+    return this.functionalGroups.ensureDefault(tx, organizationId);
   }
 
   mapWriteError(error: unknown): unknown {

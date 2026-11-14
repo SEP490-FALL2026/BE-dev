@@ -27,8 +27,8 @@ const toRecord = (row: Row): ApplicationRecord => ({
   domains: row.domains,
   dataSensitivity: row.dataSensitivity,
   responsibleItAdminEmployeeId: row.responsibleItAdminEmployeeId,
-  isCommunicationService: row.functionalGroup?.systemKey === 'COMMUNICATION',
-  functionalGroup: row.functionalGroup ? { id: row.functionalGroup.id, name: row.functionalGroup.name } : null,
+  isCommunicationService: row.functionalGroup.systemKey === 'COMMUNICATION',
+  functionalGroup: { id: row.functionalGroup.id, name: row.functionalGroup.name },
   status: row.catalogStatus,
   createdAt: row.createdAt,
   updatedAt: row.updatedAt,
@@ -105,7 +105,7 @@ export class ApplicationRepo {
       name: string;
       domains: string[];
       vendorName: string | null;
-      functionalGroup: { id: string; name: string } | null;
+      functionalGroup: { id: string; name: string };
     }[]
   > {
     const rows = await tx.application.findMany({
@@ -273,10 +273,8 @@ export class ApplicationRepo {
             vendor: row.vendor,
             dataSensitivity: row.dataSensitivity,
             responsibleItAdminEmployeeId: row.responsibleItAdminEmployeeId,
-            isCommunicationService: row.functionalGroup?.systemKey === 'COMMUNICATION',
-            functionalGroup: row.functionalGroup
-              ? { id: row.functionalGroup.id, name: row.functionalGroup.name }
-              : null,
+            isCommunicationService: row.functionalGroup.systemKey === 'COMMUNICATION',
+            functionalGroup: { id: row.functionalGroup.id, name: row.functionalGroup.name },
             status: row.catalogStatus,
             updatedAt: row.updatedAt,
           })),
