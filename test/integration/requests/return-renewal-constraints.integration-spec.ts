@@ -173,9 +173,12 @@ describe('what the database refuses about a return and a renewal (US-05-13, US-0
           [asked.id],
         ),
       ).toBeNull();
-      expect(await sqlState(`UPDATE return_requests SET handover_confirmed_at = now() WHERE id = $1`, [asked.id])).toBe(
-        FINAL,
-      );
+      // A different instant: `now()` alone can equal the stored one when both statements fall in the same millisecond (the column keeps three digits).
+      expect(
+        await sqlState(`UPDATE return_requests SET handover_confirmed_at = now() + interval '1 hour' WHERE id = $1`, [
+          asked.id,
+        ]),
+      ).toBe(FINAL);
       expect(
         await sqlState(
           `UPDATE return_requests SET handover_confirmed_at = NULL, handover_confirmed_by_employee_id = NULL WHERE id = $1`,
