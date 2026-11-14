@@ -41476,7 +41476,7 @@
             }
           },
           "422": {
-            "description": "The form is incomplete or invalid (VALIDATION_ERROR): the reason and the term are required. The sender is the spending approver (REQUEST_PARTY.INELIGIBLE, with the sender in details.employeeIds). A person who was already named in as many requests for new access this calendar week (Monday to Sunday, organization time zone; a request withdrawn or refused still counts) as the weekly limit allows is refused until the next Monday (ACCESS_REQUEST.OPEN_LIMIT_REACHED, details.limit and details.resetsOn; GH-2, BR-MF1-01f). Nothing is written.",
+            "description": "The form is incomplete or invalid (VALIDATION_ERROR): the reason and the term are required. The sender is the spending approver (REQUEST_PARTY.INELIGIBLE, with the sender in details.employeeIds). A person who was already named in as many requests for new access this calendar week (Monday to Sunday, organization time zone; a request withdrawn or refused still counts) as the weekly limit allows is refused until the next Monday (ACCESS_REQUEST.OPEN_LIMIT_REACHED, details.limit and details.resetsOn; GH-2, BR-MF1-01f). The time of use follows the kind of the plan: 1 to 9 months for a plan bought by the month (ACCESS_REQUEST.TERM_MONTHS_OUT_OF_RANGE, TERM_REQUIRED when none is given), 1 to 12 for the others, none for a plan bought once (ACCESS_REQUEST.TERM_NOT_ASKED); a contractor, a freelancer or an intern gives the months and never a right with no end (ACCESS_REQUEST.TERM_LONG_TERM_NOT_ALLOWED), and one whose contract ended before today gets no access (ACCESS_REQUEST.TERM_CONTRACT_ENDED, details.contractEndDate). Nothing is written.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -41517,6 +41517,62 @@
                         "code": "ACCESS_REQUEST.OPEN_LIMIT_REACHED",
                         "message": "The person was already named in as many requests for new access this week as they may.",
                         "details": { "limit": 10, "resetsOn": "2026-11-16" },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "ACCESS_REQUEST.TERM_REQUIRED": {
+                    "summary": "Give the time of use in months.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "ACCESS_REQUEST.TERM_REQUIRED",
+                        "message": "Give the time of use in months.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "ACCESS_REQUEST.TERM_MONTHS_OUT_OF_RANGE": {
+                    "summary": "The time of use is a whole number of months: from 1 to 9 for a plan bought by the month, from 1 to 12 for the others.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "ACCESS_REQUEST.TERM_MONTHS_OUT_OF_RANGE",
+                        "message": "The time of use is a whole number of months: from 1 to 9 for a plan bought by the month, from 1 to 12 for the others.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "ACCESS_REQUEST.TERM_NOT_ASKED": {
+                    "summary": "This plan is bought once: it takes no time of use.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "ACCESS_REQUEST.TERM_NOT_ASKED",
+                        "message": "This plan is bought once: it takes no time of use.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "ACCESS_REQUEST.TERM_LONG_TERM_NOT_ALLOWED": {
+                    "summary": "A contractor, a freelancer or an intern gets access for a term: give the months, not a right with no end.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "ACCESS_REQUEST.TERM_LONG_TERM_NOT_ALLOWED",
+                        "message": "A contractor, a freelancer or an intern gets access for a term: give the months, not a right with no end.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "ACCESS_REQUEST.TERM_CONTRACT_ENDED": {
+                    "summary": "The contract of the person ended before the time of use begins: no access is given beyond it.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "ACCESS_REQUEST.TERM_CONTRACT_ENDED",
+                        "message": "The contract of the person ended before the time of use begins: no access is given beyond it.",
+                        "details": { "contractEndDate": "2026-10-31" },
                         "requestId": "req_example"
                       }
                     }
@@ -43750,7 +43806,7 @@
             }
           },
           "422": {
-            "description": "The form is incomplete or invalid (VALIDATION_ERROR): the name, the homepage, the purpose, the company data that will go through the software and the term are required; existingApplicationId and plannedPlanName go together. The application named does not exist (ASSESSMENT.REFERENCE_NOT_FOUND, details.field existingApplicationId). The sender is the spending approver (REQUEST_PARTY.INELIGIBLE). A proposal counts as a request for new access: a person who was already named in as many requests for new access this calendar week (Monday to Sunday, organization time zone; a request withdrawn or refused still counts) as the weekly limit allows is refused until the next Monday (ACCESS_REQUEST.OPEN_LIMIT_REACHED, details.limit and details.resetsOn; GH-2, BR-MF1-01f). Nothing is written.",
+            "description": "The form is incomplete or invalid (VALIDATION_ERROR): the name, the homepage, the purpose, the company data that will go through the software and the term are required; existingApplicationId and plannedPlanName go together. The application named does not exist (ASSESSMENT.REFERENCE_NOT_FOUND, details.field existingApplicationId). The sender is the spending approver (REQUEST_PARTY.INELIGIBLE). A proposal counts as a request for new access: a person who was already named in as many requests for new access this calendar week (Monday to Sunday, organization time zone; a request withdrawn or refused still counts) as the weekly limit allows is refused until the next Monday (ACCESS_REQUEST.OPEN_LIMIT_REACHED, details.limit and details.resetsOn; GH-2, BR-MF1-01f). The kind of plan is not known yet, so the term takes 1 to 12 months or none (ACCESS_REQUEST.TERM_MONTHS_OUT_OF_RANGE); a contractor, a freelancer or an intern gives the months (ACCESS_REQUEST.TERM_REQUIRED, and TERM_LONG_TERM_NOT_ALLOWED for a right with no end), and one whose contract ended before today gets no access (ACCESS_REQUEST.TERM_CONTRACT_ENDED, details.contractEndDate). Nothing is written.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -43803,6 +43859,51 @@
                         "code": "ACCESS_REQUEST.OPEN_LIMIT_REACHED",
                         "message": "The person was already named in as many requests for new access this week as they may.",
                         "details": { "limit": 10, "resetsOn": "2026-11-16" },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "ACCESS_REQUEST.TERM_REQUIRED": {
+                    "summary": "Give the time of use in months.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "ACCESS_REQUEST.TERM_REQUIRED",
+                        "message": "Give the time of use in months.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "ACCESS_REQUEST.TERM_MONTHS_OUT_OF_RANGE": {
+                    "summary": "The time of use is a whole number of months: from 1 to 9 for a plan bought by the month, from 1 to 12 for the others.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "ACCESS_REQUEST.TERM_MONTHS_OUT_OF_RANGE",
+                        "message": "The time of use is a whole number of months: from 1 to 9 for a plan bought by the month, from 1 to 12 for the others.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "ACCESS_REQUEST.TERM_LONG_TERM_NOT_ALLOWED": {
+                    "summary": "A contractor, a freelancer or an intern gets access for a term: give the months, not a right with no end.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "ACCESS_REQUEST.TERM_LONG_TERM_NOT_ALLOWED",
+                        "message": "A contractor, a freelancer or an intern gets access for a term: give the months, not a right with no end.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "ACCESS_REQUEST.TERM_CONTRACT_ENDED": {
+                    "summary": "The contract of the person ended before the time of use begins: no access is given beyond it.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "ACCESS_REQUEST.TERM_CONTRACT_ENDED",
+                        "message": "The contract of the person ended before the time of use begins: no access is given beyond it.",
+                        "details": { "contractEndDate": "2026-10-31" },
                         "requestId": "req_example"
                       }
                     }
