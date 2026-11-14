@@ -17,7 +17,7 @@ export interface LeaveWire {
   approvedReturnOn: string;
   endedOn: string | null;
   overdueReturn: boolean;
-  grounds: { type: string; reference: string; issuer: string; issuedOn: string } | null;
+  groundsNote: string | null;
   endKind: 'RETURNED' | 'DEPARTURE_STARTED' | null;
   resumesLeaveId: string | null;
   startedByAppUserId: string | null;
@@ -31,25 +31,16 @@ export interface LeaveChangeWire {
   newReturnOn: string | null;
   returnedOn: string | null;
   onSchedule: boolean | null;
-  grounds: { type: string; reference: string; issuer: string; issuedOn: string } | null;
+  groundsNote: string | null;
   recordedByAppUserId: string | null;
   recordedByProcedure: boolean;
 }
 
 /** The people, the calls of the routes of the long leaves and what a leave leaves in the database. No assertion lives here. */
 export class LeaveHarness extends TransferHarness {
-  readonly approval = {
-    type: 'APPROVED_APPLICATION',
-    reference: 'DN-05/2026',
-    issuer: 'HR Department',
-    issuedOn: '2026-05-25',
-  };
-  readonly extension = {
-    type: 'APPROVED_APPLICATION',
-    reference: 'GH-09/2026',
-    issuer: 'HR Department',
-    issuedOn: '2026-08-20',
-  };
+  /** The basis in one box (QĐ-110a): what a form for an approved leave and for an extension of it would send. */
+  readonly approval = 'Đơn xin nghỉ dài hạn số DN-05/2026';
+  readonly extension = 'Đơn gia hạn nghỉ số GH-09/2026';
 
   /** A person of the department who joined long ago, so a leave may begin on any recent day. */
   async worker(department: Department, code: string, roles: string[] = []): Promise<Person> {

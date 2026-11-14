@@ -4,6 +4,7 @@ import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { offboardingHeadHandoverJson } from '../personnel-head-handover.json';
 import type { RoleFlag } from '../public/personnel.types';
+import { knownFlags } from './role-duties.policy';
 
 /** What the flows of the roles read of a case of a person who leaves. */
 export interface RoleDutyCase {
@@ -68,7 +69,7 @@ export class RoleDutiesRepo {
     headHandover: unknown;
     departmentId: string | null;
     closedAt: Date | null;
-    roleFlags: RoleFlag[];
+    roleFlags: readonly string[];
   }): RoleDutyCase {
     return {
       id: row.id,
@@ -78,7 +79,7 @@ export class RoleDutiesRepo {
       headSuccessor: offboardingHeadHandoverJson.decode(row.headHandover)?.successor ?? null,
       departmentId: row.departmentId,
       closed: row.closedAt !== null,
-      roleFlags: row.roleFlags,
+      roleFlags: knownFlags(row.roleFlags),
     };
   }
 }

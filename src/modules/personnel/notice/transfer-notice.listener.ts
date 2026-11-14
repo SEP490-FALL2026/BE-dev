@@ -47,7 +47,7 @@ export class TransferNoticeRecorder implements OnModuleInit, NoticeEventRecorder
           employeeId: notice.employeeId,
           toDepartmentId: event.toDepartmentId ?? notice.targetDepartmentId ?? undefined,
           effectiveOn,
-          grounds: request.grounds,
+          groundsNote: request.groundsNote,
           successor: event.successor,
           noticeId: notice.id,
         }),

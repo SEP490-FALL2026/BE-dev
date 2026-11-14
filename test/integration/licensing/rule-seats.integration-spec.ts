@@ -1,5 +1,6 @@
 import { LicensingGhostSeatApi } from '../../../src/modules/licensing/public/licensing-ghost-seat.api';
 import { GhostSeatWorld } from '../../support/ghost-seat-world';
+import { k1Checklist } from '../../support/k1-checklist';
 
 const w = new GhostSeatWorld();
 
@@ -48,6 +49,7 @@ describe('what the rules of wasted seats read of licensing (integration, real Po
         evidence: 'x',
         paidThroughOn: until,
         accessState: 'UNTIL_PAID_END',
+        k1Checklist: k1Checklist('DEPARTURE'),
       })
       .expect(200);
 

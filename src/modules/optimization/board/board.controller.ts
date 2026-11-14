@@ -72,7 +72,7 @@ export class BoardController {
   @ApiSuccessResponse(RecommendationPageResponseDto, {
     message: 'GHOST_SEAT_RECOMMENDATIONS.LISTED',
     description:
-      'One page of recommendations (G1, G2), newest first, filtered by group, tier, state, application, department scope (MINE = the departments of the IT Admin, ALL = the organization), one department and one holder; a department or a holder outside the scope reads an empty page. A holder is shown by code, never by name.',
+      'One page of recommendations (G1, G2), newest first, filtered by group, tier, state, application, one department (the one that owned the seat when it was recommended) and one holder; both values of the department scope read only the departments of the IT Admin, and a department or a holder outside the scope reads an empty page. A holder is shown by code, never by name.',
   })
   @ApiErrorResponses(...AUTH_ERRORS, forbidden('an IT Admin'), QUERY_INVALID)
   async list(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Query() query: RecommendationListQueryDto) {
@@ -112,7 +112,7 @@ export class BoardController {
   @ApiSuccessResponse(SeatStatePageResponseDto, {
     message: 'GHOST_SEAT_SEAT_STATES.LISTED',
     description:
-      'One page of seats, each with exactly one state (active, inactive, no data, identity not matched, insufficient evidence or excluded) and the gate that left it out; a seat with no data or an identity not matched has no days.',
+      'One page of seats, each with exactly one state (active, inactive, no data, identity not matched, insufficient evidence or excluded) and the gate that left it out; a seat with no data or an identity not matched has no days. Filtered by application, status, one department (where the holder is placed today) and one holder; a department or a holder outside the scope reads an empty page.',
   })
   @ApiErrorResponses(...AUTH_ERRORS, forbidden('an IT Admin'), QUERY_INVALID)
   async seatStates(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Query() query: SeatStateListQueryDto) {

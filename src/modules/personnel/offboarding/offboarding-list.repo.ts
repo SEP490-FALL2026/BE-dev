@@ -11,11 +11,30 @@ const SUMMARY = {
   accessBlockMode: true,
   lastWorkingDay: true,
   leftOn: true,
-  handoverDueOn: true,
+  revocationDueOn: true,
   accountLockAt: true,
   closedAt: true,
   roleFlags: true,
 } as const;
+
+/**
+ * The last working day in a range of days, both ends included: the calendar of the next working days (R5 E2). Put in an AND of its own so it adds to
+ * `pastLastDay`, which also speaks of the last working day.
+ */
+function lastWorkingDayRange(filter: OffboardingListFilter): Prisma.OffboardingCaseWhereInput {
+  if (!filter.lastWorkingDayFrom && !filter.lastWorkingDayTo) return {};
+
+  return {
+    AND: [
+      {
+        lastWorkingDay: {
+          ...(filter.lastWorkingDayFrom ? { gte: toDateColumn(filter.lastWorkingDayFrom) } : {}),
+          ...(filter.lastWorkingDayTo ? { lte: toDateColumn(filter.lastWorkingDayTo) } : {}),
+        },
+      },
+    ],
+  };
+}
 
 /** The reader of the list of cases: the page and the total from one snapshot, ordered by the last working day and the id. */
 @Injectable()
@@ -33,6 +52,10 @@ export class OffboardingListRepo {
       ...(filter.pastLastDay ? { state: 'HANDING_OVER', lastWorkingDay: { lt: toDateColumn(filter.today) } } : {}),
       // A person who has left whose company account nobody has recorded as locked yet, and whose case is still open.
       ...(filter.accountLockMissing ? { state: 'LEFT', accountLockAt: null, closedAt: null } : {}),
+      // The cases the service worked out as past the deadline of their revocations (the seats are `licensing`'s, so the table cannot say), or all the others.
+      ...(filter.onlyIds ? { id: { in: [...filter.onlyIds] } } : {}),
+      ...(filter.exceptIds && filter.exceptIds.length > 0 ? { id: { notIn: [...filter.exceptIds] } } : {}),
+      ...lastWorkingDayRange(filter),
       // The roles the person held when the departure was recorded or its day moved (`US-03-04` AC-12): a snapshot to find the cases by.
       ...(filter.roleFlag ? { roleFlags: { has: filter.roleFlag } } : {}),
     };
@@ -55,7 +78,7 @@ export class OffboardingListRepo {
             accessBlockMode: row.accessBlockMode,
             lastWorkingDay: fromDateColumn(row.lastWorkingDay),
             leftOn: row.leftOn ? fromDateColumn(row.leftOn) : null,
-            handoverDueOn: row.handoverDueOn ? fromDateColumn(row.handoverDueOn) : null,
+            revocationDueOn: row.revocationDueOn ? fromDateColumn(row.revocationDueOn) : null,
             accountLocked: row.accountLockAt !== null,
             closed: row.closedAt !== null,
             // Whether the person headed the department they leave is told by the snapshot, so the list never reads the handover of the head.

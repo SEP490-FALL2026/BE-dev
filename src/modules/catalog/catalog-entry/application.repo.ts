@@ -75,6 +75,33 @@ export class ApplicationRepo {
     await tx.application.update({ where: { id }, data: { responsibleItAdminEmployeeId: employeeId } });
   }
 
+  /**
+   * Hands every application that names `fromEmployeeId` responsible to `toEmployeeId` (`QĐ-111g`), in one statement: the rows are locked in
+   * id order first, so a handing over and the transfer of one application queue up. Returns the ids it moved, in id order.
+   */
+  async reassignResponsible(tx: DbTx, fromEmployeeId: string, toEmployeeId: string): Promise<string[]> {
+    const rows = await tx.$queryRaw<{ id: string }[]>`
+      WITH held AS (
+        SELECT id FROM applications WHERE responsible_it_admin_employee_id = ${fromEmployeeId}::uuid ORDER BY id FOR UPDATE)
+      UPDATE applications a
+         SET responsible_it_admin_employee_id = ${toEmployeeId}::uuid, updated_at = now()
+        FROM held WHERE a.id = held.id
+      RETURNING a.id`;
+
+    return rows.map((row) => row.id).sort();
+  }
+
+  /** How many applications name each of these IT Admins responsible (`QĐ-111g`); one who answers for none is absent. */
+  async countResponsibleOf(employeeIds: readonly string[], tx?: DbTx): Promise<Map<string, number>> {
+    if (employeeIds.length === 0) return new Map();
+    const rows = await (tx ?? this.prisma).$queryRaw<{ employee_id: string; total: number }[]>`
+      SELECT responsible_it_admin_employee_id AS employee_id, count(*)::int AS total
+        FROM applications WHERE responsible_it_admin_employee_id = ANY(${[...employeeIds]}::uuid[])
+       GROUP BY responsible_it_admin_employee_id`;
+
+    return new Map(rows.map((row) => [row.employee_id, row.total]));
+  }
+
   /** The application, locked for the rest of the transaction, or null. */
   async lock(tx: DbTx, id: string): Promise<ApplicationRecord | null> {
     const locked = await tx.$queryRaw<{ id: string }[]>`SELECT id FROM applications WHERE id = ${id}::uuid FOR UPDATE`;

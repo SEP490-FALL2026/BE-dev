@@ -71,7 +71,7 @@ export const needsEvidenceAtOnce = (
 /** What the audit entry `ACCESS_REQUEST.LINE_CANCELLED` says: the line from its state to cancelled, why, by whom, and the task and money that went with it. */
 export function lineCancelledDetail(
   request: { id: string; requesterEmployeeId: string },
-  line: { employeeId: string; from: LineState; cause: string; actorEmployeeId: string },
+  line: { employeeId: string; from: LineState; cause: string; actorEmployeeId: string | null },
   task: { taskId: string; taskStatus: string } | null,
   released: boolean,
 ): { [key: string]: string | boolean | null } {

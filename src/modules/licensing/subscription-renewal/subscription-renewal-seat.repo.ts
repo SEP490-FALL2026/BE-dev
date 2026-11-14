@@ -79,7 +79,8 @@ export class SubscriptionRenewalSeatRepo {
 
   /**
    * Carries the seats to the new period in the caller's transaction: a new seat on the new subscription from its first day for
-   * each, naming the seat it continues and keeping its person, account, Cost Center and expected end; then each old seat ends that
+   * each, naming the seat it continues and keeping its person, account, Cost Center, expected end and the flag of a machine account with its
+   * reason (a flagged seat that lost its flag would break INV-02 beside the personal seat of the same IT Admin); then each old seat ends that
    * day, so no day has the person twice or not at all. Returns how many were carried.
    */
   async carry(
@@ -96,12 +97,13 @@ export class SubscriptionRenewalSeatRepo {
     const inserted = await tx.$executeRaw`
       INSERT INTO license_assignments (id, organization_id, kind, source, plan_id, subscription_id, employee_id,
              account_identifier, normalized_account_identifier, reason, cost_center_id, owning_department_id, valid_from,
-             valid_from_basis, valid_until, expected_end_date, predecessor_id, created_by_app_user_id)
+             valid_from_basis, valid_until, expected_end_date, predecessor_id, created_by_app_user_id, is_machine_account,
+             machine_account_note)
       SELECT gen_random_uuid(), a.organization_id, a.kind, 'RENEWAL_CARRY', a.plan_id, ${input.nextSubscriptionId}::uuid,
              a.employee_id, a.account_identifier, a.normalized_account_identifier, a.reason, a.cost_center_id,
              a.owning_department_id, ${input.startDate}::date, 'RECORDED',
              CASE WHEN a.valid_until > ${input.startDate}::date THEN a.valid_until END, a.expected_end_date, a.id,
-             ${input.actorAppUserId}::uuid
+             ${input.actorAppUserId}::uuid, a.is_machine_account, a.machine_account_note
         FROM license_assignments a
        WHERE a.id = ANY(${ids}::uuid[])
        ORDER BY a.valid_from, a.id`;

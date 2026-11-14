@@ -132,6 +132,13 @@ export interface RetiredKindFacts {
   pendingTransferIds: string[];
   /** A proposal to move a service account to another department that still waits for the receiving head (`QĐ-89c`). */
   pendingMoveIds: string[];
+  /**
+   * A service account (`kind = 'SERVICE'`) still in force that no record continues (`QĐ-110m`, review of X-SA): the migration
+   * `20261113000900_licensing_service_accounts_converted` writes each one it can as the flagged seat of an IT Admin and keeps the
+   * others as they were, and this release has no operation that ends or converts one. In force: not failed, not cancelled, no end
+   * day or one after today in the calendar of its organization.
+   */
+  serviceAccountIds: string[];
 }
 
 /**
@@ -151,11 +158,9 @@ export interface DirectRoleFacts {
 }
 
 /** A row that needs attention later but does not stop the deploy. Ids only: no name, no amount, no basis. */
-export type PreflightInformation = {
-  code: 'BUDGET_PROPOSAL_LEGACY_RETURN_RECONCILE';
-  proposalId: string;
-  rule: 'R1' | 'R2';
-};
+export type PreflightInformation =
+  | { code: 'BUDGET_PROPOSAL_LEGACY_RETURN_RECONCILE'; proposalId: string; rule: 'R1' | 'R2' }
+  | { code: 'SERVICE_ACCOUNT_STILL_IN_FORCE'; assignmentId: string };
 
 export type PreflightBlocker =
   | { code: 'MIGRATION_FAILED'; migration: string }

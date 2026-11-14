@@ -1,3 +1,4 @@
+import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import type { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
 import type { OrganizationReadApi } from '../../organization/public/organization-read.api';
@@ -35,5 +36,79 @@ describe('the read scope of the renewals', () => {
       kind: 'ALL',
       itAdmin: false,
     });
+  });
+});
+
+describe('the IT Admin of a renewal period (QĐ-111g, BB-9)', () => {
+  const period = { ownerDepartmentId: 'D1', responsibleItAdminEmployeeId: 'it-sub' as string | null };
+
+  const world = (input: { inCharge: string | null; usable: readonly string[]; firstUsable?: string | null }) => {
+    const getItAdminInChargeOfDepartment = jest.fn().mockResolvedValue(input.inCharge);
+    const findUsableItAdminEmployeeIds = jest.fn().mockResolvedValue(new Set(input.usable));
+    const findFirstUsableItAdminEmployeeId = jest.fn().mockResolvedValue(input.firstUsable ?? null);
+    const service = new RenewalPartiesService(
+      { getItAdminInChargeOfDepartment } as unknown as OrganizationReadApi,
+      { findUsableItAdminEmployeeIds, findFirstUsableItAdminEmployeeId } as unknown as IdentityAccessApi,
+    );
+
+    return { service, getItAdminInChargeOfDepartment, findUsableItAdminEmployeeIds, findFirstUsableItAdminEmployeeId };
+  };
+
+  it('asks whether the responsible IT Admin and the one in charge are usable in ONE read, and never reads the first usable one when the responsible one is usable', async () => {
+    const w = world({ inCharge: 'it-dept', usable: ['it-sub', 'it-dept'], firstUsable: 'it-first' });
+
+    expect(await w.service.itAdminOf(period)).toBe('it-sub');
+    expect(w.findUsableItAdminEmployeeIds).toHaveBeenCalledTimes(1);
+    expect(w.findUsableItAdminEmployeeIds).toHaveBeenCalledWith(['it-sub', 'it-dept'], undefined);
+    expect(w.findFirstUsableItAdminEmployeeId).not.toHaveBeenCalled();
+  });
+
+  it('answers with the IT Admin in charge of the department when the responsible one is not usable, without the last branch', async () => {
+    const w = world({ inCharge: 'it-dept', usable: ['it-dept'], firstUsable: 'it-first' });
+
+    expect(await w.service.itAdminOf(period)).toBe('it-dept');
+    expect(w.findUsableItAdminEmployeeIds).toHaveBeenCalledTimes(1);
+    expect(w.findFirstUsableItAdminEmployeeId).not.toHaveBeenCalled();
+  });
+
+  it('does not take the IT Admin in charge of the department when they have left and are not locked yet: the first usable one answers', async () => {
+    const w = world({ inCharge: 'it-left', usable: [], firstUsable: 'it-first' });
+
+    expect(await w.service.itAdminOf(period)).toBe('it-first');
+    expect(w.findUsableItAdminEmployeeIds).toHaveBeenCalledTimes(1);
+    expect(w.findUsableItAdminEmployeeIds).toHaveBeenCalledWith(['it-sub', 'it-left'], undefined);
+    expect(w.findFirstUsableItAdminEmployeeId).toHaveBeenCalledTimes(1);
+  });
+
+  it('reads the first usable IT Admin when the department names none and the subscription names none', async () => {
+    const w = world({ inCharge: null, usable: [], firstUsable: 'it-first' });
+
+    expect(await w.service.itAdminOf({ ...period, responsibleItAdminEmployeeId: null })).toBe('it-first');
+    expect(w.findUsableItAdminEmployeeIds).toHaveBeenCalledWith([], undefined);
+    expect(w.findFirstUsableItAdminEmployeeId).toHaveBeenCalledTimes(1);
+  });
+
+  it('is nobody when none of the three is usable', async () => {
+    const w = world({ inCharge: 'it-left', usable: [], firstUsable: null });
+
+    expect(await w.service.itAdminOf(period)).toBeNull();
+  });
+
+  it('reads the department first and hands the transaction of the caller to every read', async () => {
+    const tx = {} as unknown as DbTx;
+    const w = world({ inCharge: 'it-dept', usable: [], firstUsable: 'it-first' });
+
+    await w.service.itAdminOf(period, tx);
+
+    expect(w.getItAdminInChargeOfDepartment).toHaveBeenCalledWith('D1', tx);
+    expect(w.findUsableItAdminEmployeeIds).toHaveBeenCalledWith(['it-sub', 'it-dept'], tx);
+    expect(w.findFirstUsableItAdminEmployeeId).toHaveBeenCalledWith(tx);
+  });
+
+  it('names the same IT Admin once when the responsible one is also in charge of the department', async () => {
+    const w = world({ inCharge: 'it-sub', usable: ['it-sub'] });
+
+    expect(await w.service.itAdminOf(period)).toBe('it-sub');
+    expect(w.findUsableItAdminEmployeeIds).toHaveBeenCalledWith(['it-sub'], undefined);
   });
 });

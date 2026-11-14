@@ -200,7 +200,7 @@ describe('the controlled procedure for an event about the Super Admin (integrati
         employeeId: other.employeeId,
         toDepartmentId: fin.id,
         effectiveOn: h.day(30),
-        grounds: h.grounds,
+        groundsNote: h.groundsNote,
       });
       const before = await counts();
 
@@ -360,79 +360,6 @@ describe('the controlled procedure for an event about the Super Admin (integrati
       expect(await counts()).toBe(before);
       await h.ctx.sql.query('DELETE FROM department_head_periods WHERE employee_id = $1', [saEmployee()]);
       await clearSpendingApprover(h.ctx, h.admin);
-    });
-  });
-
-  describe('the handover duties of a Super Admin who holds a personal seat (spec L.2, Audit Trail)', () => {
-    it('audits every HANDOVER_DUTY event of the departure as OPERATOR with no account and the ticket as the reference; the stand-in account only fills the NOT NULL column', async () => {
-      const subscription = await h.subscription(40, 'K2');
-      const seat = await h.seatOf(
-        { employeeId: saEmployee(), account: h.sa },
-        { subscriptionId: subscription },
-        SUBJECT_CODE,
-      );
-      const refs: string[] = [];
-      const ticketed = async (parameters: SuperAdminEventParameters) => {
-        const ctx = context();
-        refs.push(ctx.ticketRef);
-
-        return service().run({ context: ctx, parameters });
-      };
-
-      const recorded = await ticketed({ mode: 'departure-record', lastWorkingDay: h.day(12) });
-      await ticketed({
-        mode: 'departure-change',
-        caseId: recorded.recordId,
-        lastWorkingDay: h.day(18),
-        reason: 'The handover takes longer',
-      });
-      await ticketed({ mode: 'departure-cancel', caseId: recorded.recordId, reason: 'The person stays' });
-
-      const duties = await h.dutyRows(seat);
-      expect(duties).toHaveLength(1);
-      expect(duties[0].cancelled_at).not.toBeNull();
-      const { rows } = await h.ctx.sql.query<{
-        action: string;
-        actor_kind: string;
-        actor_app_user_id: string | null;
-        actor_roles: string[];
-        operator_reference: string | null;
-        correlation_id: string;
-        after: Record<string, unknown> | null;
-      }>(
-        `SELECT action, actor_kind::text AS actor_kind, actor_app_user_id, actor_roles, operator_reference, correlation_id, after
-           FROM audit_events WHERE resource_type = 'HandoverDuty' AND resource_id = $1 ORDER BY occurred_at, id`,
-        [duties[0].id],
-      );
-      expect(rows.map((row) => row.action)).toEqual([
-        'HANDOVER_DUTY.OPENED',
-        'HANDOVER_DUTY.DUE_CHANGED',
-        'HANDOVER_DUTY.CANCELLED',
-      ]);
-      for (const [index, row] of rows.entries()) {
-        expect(row).toMatchObject({ actor_kind: 'OPERATOR', actor_app_user_id: null, actor_roles: [] });
-        expect(row.operator_reference).toBe(refs[index]);
-        expect(row.after).toMatchObject({
-          ticket: refs[index],
-          mode: ['departure-record', 'departure-change', 'departure-cancel'][index],
-        });
-        expect((await ticketOf(refs[index])).id).toBe(row.correlation_id);
-      }
-      const events = await h.ctx.sql.query<{ n: string }>(
-        `SELECT count(*)::text AS n FROM audit_events
-          WHERE action LIKE 'HANDOVER_DUTY.%' AND resource_id = $1 AND (actor_kind <> 'OPERATOR' OR actor_app_user_id IS NOT NULL)`,
-        [duties[0].id],
-      );
-      expect(events.rows[0].n).toBe('0');
-      // The column the database still demands is filled with the account of the Super Admin the procedure serves, and says nothing else.
-      expect(
-        (
-          await h.ctx.sql.query<{ created_by_app_user_id: string }>(
-            `SELECT created_by_app_user_id FROM handover_duties WHERE id = $1`,
-            [duties[0].id],
-          )
-        ).rows[0].created_by_app_user_id,
-      ).toBe(h.sa.appUserId);
     });
   });
 
@@ -674,8 +601,8 @@ describe('the controlled procedure for an event about the Super Admin (integrati
   // Last in the file: once the Super Admin has left, the application refuses their token (401) and a correction of their record
   // tells them nothing, so nothing that needs a working Super Admin can follow it.
   describe('an abrupt departure of the Super Admin', () => {
-    it('an abrupt departure already over is recorded the same way, as the last write about the person', async () => {
-      const abrupt = await run({ mode: 'abrupt-departure-record', lastWorkingDay: h.day(-2) });
+    it('an abrupt departure is recorded the same way, as the last write about the person, with the day it is recorded as its last working day', async () => {
+      const abrupt = await run({ mode: 'abrupt-departure-record', lastWorkingDay: h.today() });
 
       expect(abrupt.outcome).toBe('RECORDED');
       const { rows } = await h.ctx.sql.query<{ by_user: string | null; by_ticket: string | null; mode: string }>(

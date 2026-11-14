@@ -1,4 +1,6 @@
 import { Injectable } from '@nestjs/common';
+import type { BusinessDate } from '../../../core/business-date';
+import { Contributions } from '../../../core/extension/contributions';
 import { Listeners } from '../../../core/extension/listeners';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 
@@ -32,5 +34,40 @@ export interface RequestOutcomeEvent {
 export class RequestOutcomeListeners extends Listeners<RequestOutcomeEvent, DbTx> {
   constructor() {
     super('requests.outcome');
+  }
+}
+
+/** What a right held in the grace of a transfer says to the request that asks for it again: the transfer, and the old right it is part of. */
+export interface TransferGraceHolding {
+  transferId: string;
+  /** The right held from before the transfer, in the grace of which the person asks for the same software again. */
+  assignmentId: string;
+}
+
+/**
+ * The contexts that know a person is in the grace of a transfer and holds a right from before it (`QĐ-110q`, `R-49`, SPEC P10): the personnel context.
+ * Asked by the request of a person for software they already hold; the answer lets the request through the check of the seat held and the count of the limits
+ * (GH-2; a duplicate of the plan stays refused), and names the old right it replaces. With none added, nobody is in a grace and a seat held refuses the request as it always did.
+ */
+export interface TransferGraceHoldContribution {
+  /**
+   * Whether the held right `assignmentId` (begun on `effectiveFrom`) of the person is a right of the old department of a transfer whose grace
+   * still lasts on `today`; null when it is not, or the person has no transfer in its grace.
+   */
+  holdingOf(
+    input: { employeeId: string; assignmentId: string; effectiveFrom: BusinessDate; today: BusinessDate },
+    tx?: DbTx,
+  ): Promise<TransferGraceHolding | null>;
+}
+
+/**
+ * The contributions of the grace of a transfer, added when their module starts so requests never import personnel (ADR-0019: a lower module that needs
+ * a higher one opens an extension point). A `Contributions` and not a `Hook` because the worker graph loads requests without personnel: with none,
+ * the answer is no grace. The first contribution that knows the right answers.
+ */
+@Injectable()
+export class TransferGraceHoldContributions extends Contributions<TransferGraceHoldContribution> {
+  constructor() {
+    super('requests.transfer-grace-hold');
   }
 }

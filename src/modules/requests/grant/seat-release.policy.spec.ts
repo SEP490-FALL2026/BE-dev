@@ -3,9 +3,12 @@ import {
   firstMonthOf,
   lastMonthOf,
   lateGrantShare,
+  givenAtTransfer,
   releasesBeforeGrant,
   revocationEndsOn,
   revocationShare,
+  transferReleaseEndsOn,
+  transferReleaseReference,
   type SeatCoverage,
 } from './seat-release.policy';
 
@@ -15,6 +18,7 @@ const commitment = (over: Partial<SeatCommitment> = {}): SeatCommitment => ({
   origin: 'APPROVAL',
   seatMonthlyMinor: 1500n,
   heldMinor: 4500n,
+  transferReleases: [],
   ...over,
 });
 
@@ -211,6 +215,62 @@ describe('seat-release policy (RV-07, M-06, M-10)', () => {
       ).toBe(3);
       expect(firstMonthOf({ year: 2027, origin: 'YEAR_START' }, coverage())).toBe(1);
       expect(firstMonthOf({ year: 2027, origin: 'APPROVAL' }, coverage())).toBe(1);
+    });
+  });
+
+  describe('transferReleaseEndsOn (QĐ-111bg: the commitment of the old right goes back the day the transfer takes effect)', () => {
+    it.each([
+      ['K2', '2026-11-16'],
+      ['K1', '2026-11-16'],
+    ] as const)(
+      'a %s right is not paid for by the old department from the day the transfer takes effect',
+      (kind, expected) => {
+        expect(transferReleaseEndsOn(kind, '2026-11-16')).toBe(expected);
+      },
+    );
+
+    it('K1 ignores the last day paid for: the old department stops paying the day the person moves, what was spent stays spent', () => {
+      expect(transferReleaseEndsOn('K1', '2026-11-16')).toBe('2026-11-16');
+      expect(revocationEndsOn({ provisioningType: 'K1', endedOn: '2026-11-20', paidThroughOn: '2026-11-30' })).toBe(
+        '2026-12-01',
+      );
+    });
+
+    it.each(['K3', 'K4', 'K5'] as const)('a %s right has no price a month: nothing goes back by the day', (kind) => {
+      expect(transferReleaseEndsOn(kind, '2026-11-16')).toBeNull();
+    });
+
+    it('works out to the same share as a revocation on the same day (the one rule of the release by day)', () => {
+      const input = { commitment: commitment(), coverage: coverage(), currentYear: 2026 };
+
+      expect(revocationShare({ ...input, endsOn: transferReleaseEndsOn('K2', '2026-11-16') ?? '' })).toBe(
+        revocationShare({ ...input, endsOn: '2026-11-16' }),
+      );
+    });
+  });
+
+  describe('givenAtTransfer (BLK-3, D-86: a commitment goes back once for the transfer, decided by its own ledger)', () => {
+    const released = (...references: string[]) => commitment({ transferReleases: references });
+    const reference = transferReleaseReference('t1', 'a1');
+
+    it('names a release by the transfer and the right', () => {
+      expect(reference).toBe('transfer:t1:assignment:a1');
+    });
+
+    it.each([
+      ['a release for the right that is taken away', [reference], ['a1'], true],
+      [
+        'a release for a right the one taken away continues (a renewal carries the right on)',
+        [reference],
+        ['a2', 'a1'],
+        true,
+      ],
+      ['one of several releases', [transferReleaseReference('t0', 'a9'), reference], ['a1'], true],
+      ['a release for another right of the person', [reference], ['a2'], false],
+      ['no release at all: a transfer from before the release, or a year that began in the grace', [], ['a1'], false],
+      ['a reference that is not the one of a transfer', ['revocationTask:a1'], ['a1'], false],
+    ])('%s ⟹ the revocation gives nothing back again: %s', (_name, references, chain, expected) => {
+      expect(givenAtTransfer(released(...references), chain)).toBe(expected);
     });
   });
 });

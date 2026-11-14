@@ -15,11 +15,15 @@ describe('operating parameter definitions (US-01-04)', () => {
     expect(defaults.APPROVAL_SLA_WORKING_DAYS).toBe(2);
     expect(defaults.ACTIVITY_WINDOW_MINUTES).toBe(5);
     expect(defaults.SPEND_SUBMISSION_WAIT_WORKING_DAYS).toBe(2);
-    expect(defaults.TRANSFER_REVIEW_WORKING_DAYS).toBe(5);
+    // The new head reviews nothing after a transfer, so there is no deadline for it (QĐ-110p).
+    expect(defaults).not.toHaveProperty('TRANSFER_REVIEW_WORKING_DAYS');
+    expect(definitionOf('TRANSFER_REVIEW_WORKING_DAYS')).toBeUndefined();
     expect(defaults.PERSONNEL_NOTICE_REVIEW_WORKING_DAYS).toBe(2);
     expect(defaults.SAAS_ISSUE_RESPONSE_WORKING_DAYS).toBe(1);
     expect(defaults.SAAS_ISSUE_REOPEN_WORKING_DAYS).toBe(5);
-    expect(defaults.ABRUPT_DEPARTURE_HOLD_WORKING_DAYS).toBe(1);
+    expect(defaults.DEPARTURE_REVOCATION_WORKING_DAYS).toBe(1);
+    expect(defaults.TRANSFER_GRACE_WORKING_DAYS).toBe(5);
+    expect(defaults.TRANSFER_GRACE_REMINDER_WORKING_DAYS).toBe(2);
     expect(defaults.BACKLOG_ALERT_THRESHOLD).toBe(10);
     expect(defaults.DETECTION_THRESHOLD_DAYS).toEqual([30, 60, 90]);
     expect(defaults.RENEWAL_ALERT_DAYS_BEFORE_DEADLINE).toEqual([15, 7]);
@@ -120,10 +124,10 @@ const EXPECTED_KEYS = [
   'BUDGET_RESERVE_DEFAULT_PERCENT',
   'BUDGET_ZBB_KPI3_BELOW_PERCENT',
   'BUDGET_ZBB_PRICE_INCREASE_PERCENT',
-  'TRANSFER_REVIEW_WORKING_DAYS',
   'PERSONNEL_NOTICE_REVIEW_WORKING_DAYS',
-  'ABRUPT_DEPARTURE_HOLD_WORKING_DAYS',
-  'HANDOVER_SHORT_DEADLINE_WORKING_DAYS',
+  'DEPARTURE_REVOCATION_WORKING_DAYS',
+  'TRANSFER_GRACE_WORKING_DAYS',
+  'TRANSFER_GRACE_REMINDER_WORKING_DAYS',
   'PROVISIONING_RETRY_COUNT',
   'SAAS_ISSUE_RESPONSE_WORKING_DAYS',
   'SAAS_ISSUE_REOPEN_WORKING_DAYS',
@@ -143,7 +147,7 @@ const EXPECTED_KEYS = [
 ];
 
 describe('operating parameter labels and groups (QĐ93-PARAM-LABEL)', () => {
-  it('pins the twenty-six keys, ordered by group and, inside a group, as the spec table lists them', () => {
+  it('pins the twenty-nine keys, ordered by group and, inside a group, as the spec table lists them', () => {
     expect(PARAMETER_DEFINITIONS.map((definition) => definition.key)).toEqual(EXPECTED_KEYS);
   });
 
@@ -223,13 +227,6 @@ describe('operating parameter labels and groups (QĐ93-PARAM-LABEL)', () => {
       ],
       ['BUDGET_ZBB_PRICE_INCREASE_PERCENT', 'Ngưỡng tăng đơn giá cần giải trình ZBB', 'BUDGET', 'percent', '%'],
       [
-        'TRANSFER_REVIEW_WORKING_DAYS',
-        'Hạn rà soát quyền sau điều chuyển',
-        'PERSONNEL',
-        'working days',
-        'ngày làm việc',
-      ],
-      [
         'PERSONNEL_NOTICE_REVIEW_WORKING_DAYS',
         'Hạn xử lý thông báo biến động nhân sự',
         'PERSONNEL',
@@ -237,15 +234,22 @@ describe('operating parameter labels and groups (QĐ93-PARAM-LABEL)', () => {
         'ngày làm việc',
       ],
       [
-        'ABRUPT_DEPARTURE_HOLD_WORKING_DAYS',
-        'Thời gian giữ công cụ khi nghỉ đột xuất',
+        'DEPARTURE_REVOCATION_WORKING_DAYS',
+        'Hạn thu hồi quyền sau khi chặn người nghỉ việc',
         'PERSONNEL',
         'working days',
         'ngày làm việc',
       ],
       [
-        'HANDOVER_SHORT_DEADLINE_WORKING_DAYS',
-        'Hạn ngắn xác nhận bàn giao dữ liệu',
+        'TRANSFER_GRACE_WORKING_DAYS',
+        'Thời gian ân hạn quyền cũ sau điều chuyển',
+        'PERSONNEL',
+        'working days',
+        'ngày làm việc',
+      ],
+      [
+        'TRANSFER_GRACE_REMINDER_WORKING_DAYS',
+        'Nhắc người chuyển trước khi hết ân hạn',
         'PERSONNEL',
         'working days',
         'ngày làm việc',
@@ -321,12 +325,9 @@ describe('operating parameter labels and groups (QĐ93-PARAM-LABEL)', () => {
     expect(definitionOf('AI_FINANCE_NARRATIVE_ENABLED')).toBeUndefined();
   });
 
-  it('describes the notice review as the Super Admin task and the transfer review as every right a person holds (API-DOC-F07)', () => {
+  it('describes the notice review as the Super Admin task (API-DOC-F07)', () => {
     expect(definitionOf('PERSONNEL_NOTICE_REVIEW_WORKING_DAYS')?.description).toBe(
       'How long the Super Admin has to verify and record, or reject, the notice of a department head about a change coming for one of their people.',
-    );
-    expect(definitionOf('TRANSFER_REVIEW_WORKING_DAYS')?.description).toBe(
-      'How long the new head of a department has to review every right a transferred person holds, paid or internal, counted in working days from the day the transfer takes effect.',
     );
     for (const definition of PARAMETER_DEFINITIONS) {
       expect(definition.description).not.toMatch(

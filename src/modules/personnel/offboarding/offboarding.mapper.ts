@@ -1,24 +1,20 @@
 import type { EmployeeRecord, DepartmentBrief } from '../../organization/public/organization.types';
 import type { PersonalSeat } from '../../licensing/public/licensing.types';
-import type { HandoverDutyBrief } from '../../licensing/public/licensing-handover.types';
 import type {
   OffboardingChangeWire,
   OffboardingDetailWire,
   OffboardingRightWire,
   OffboardingSummaryWire,
 } from './offboarding.dto';
+import type { ItHandoverWire } from '../it-handover/it-handover.dto';
+import { groundsNoteOf } from '../personnel-grounds.policy';
 import type { ReadAccess } from '../personnel-self-action.policy';
 import { ROLE_FLAGS, type RoleFlagMap } from '../public/personnel.types';
 import type { Checklist } from './offboarding.policy';
+import { isRevocationOverdue } from '../departure-deadline/departure-deadline.policy';
+import { isRevocableType } from '../departure-deadline/departure-impact.policy';
 import type { OffboardingChangeRecord, OffboardingRecord, OffboardingSummaryRecord } from './offboarding.types';
-import {
-  accessBlockedFrom,
-  isBlocked,
-  isPastLastDay,
-  isRevocableType,
-  ownBlock,
-  type DepartureBlock,
-} from './offboarding.policy';
+import { accessBlockedFrom, isBlocked, isPastLastDay, ownBlock, type DepartureBlock } from './offboarding.policy';
 
 const UNKNOWN = '';
 
@@ -37,6 +33,8 @@ export function toSummary(
   facts: {
     today: string;
     heldRights: number;
+    /** The personal seats of the person with no task of revocation completed (0 for a cancelled case). */
+    rightsWithoutCompletedTask: number;
     roleFlags?: RoleFlagMap | undefined;
     /** The block the departure put on the access of the person, if any. */
     block?: DepartureBlock | null | undefined;
@@ -50,13 +48,26 @@ export function toSummary(
     employee: brief(employees, record.employeeId),
     state: record.state,
     accessBlockMode: record.accessBlockMode,
-    abrupt: record.accessBlockMode === 'BLOCK_NOW',
     lastWorkingDay: record.lastWorkingDay,
-    handoverDueOn: record.handoverDueOn,
+    // No deadline of a handover is told any more (`QĐ-110g`): the key stays, always null, until the clients stop reading it.
+    handoverDueOn: null,
     pastLastDay: isPastLastDay(record.state, record.lastWorkingDay, facts.today),
     accessBlocked,
     accessBlockedFrom: accessBlockedFrom(record, block),
     heldRights: facts.heldRights,
+    revocation: {
+      dueOn: record.revocationDueOn,
+      rightsWithoutCompletedTask: facts.rightsWithoutCompletedTask,
+      overdue: isRevocationOverdue(
+        {
+          state: record.state,
+          closed: record.closed,
+          dueOn: record.revocationDueOn,
+          rightsWithoutCompletedTask: facts.rightsWithoutCompletedTask,
+        },
+        facts.today,
+      ),
+    },
     // A handover that is already blocked is waiting for the IT Admin to lock the account like a departure that has happened (L3).
     accountLockMissing: (record.state === 'LEFT' || accessBlocked) && !record.accountLocked && !record.closed,
     closed: record.closed,
@@ -67,6 +78,7 @@ export function toSummary(
 export interface DetailFacts {
   today: string;
   heldRights: number;
+  rightsWithoutCompletedTask: number;
   roleFlags?: RoleFlagMap | undefined;
   block?: DepartureBlock | null | undefined;
   /** The workspaces of K2 plans the person owns or administers, by plan id with the names. */
@@ -74,6 +86,8 @@ export interface DetailFacts {
   checklist: Checklist | null;
   blockers: Record<string, number>;
   registeredWarnings: Record<string, number>;
+  /** What the person answers for in the catalog and the hand-over of it (`R-8`); null when there is nothing. */
+  itHandover?: ItHandoverWire | null | undefined;
 }
 
 /** Both moments are taken inside one transaction when the person is left as the departure is recorded. */
@@ -120,7 +134,7 @@ export function toDetail(
         accessBlockMode: record.accessBlockMode,
         lastWorkingDay: record.lastWorkingDay,
         leftOn: record.leftOn,
-        handoverDueOn: record.handoverDueOn,
+        revocationDueOn: record.revocationDueOn,
         accountLocked: locked,
         closed: record.closedAt !== null,
         headsDepartment: record.headHandover !== null,
@@ -137,7 +151,7 @@ export function toDetail(
       : null,
     priorWorkState: record.priorWorkState,
     departureEffectiveOn: record.departureEffectiveOn,
-    grounds: full ? { ...record.grounds } : null,
+    groundsNote: full ? groundsNoteOf(record.grounds) : null,
     headSuccessor:
       full && handover
         ? {
@@ -166,10 +180,22 @@ export function toDetail(
             note: record.accountLockNote,
           }
         : null,
-    closure:
-      record.closedAt && record.closedByAppUserId
-        ? { closedAt: record.closedAt.toISOString(), closedByAppUserId: record.closedByAppUserId }
-        : null,
+    mailboxLock: record.mailboxLockAt
+      ? {
+          recordedAt: record.mailboxLockAt.toISOString(),
+          recordedByAppUserId: record.mailboxLockByAppUserId,
+          recordedBySystem: record.mailboxLockByAppUserId === null,
+          note: record.mailboxLockNote,
+        }
+      : null,
+    itHandover: facts.itHandover ?? null,
+    closure: record.closedAt
+      ? {
+          closedAt: record.closedAt.toISOString(),
+          closedByAppUserId: record.closedByAppUserId,
+          closedBySystem: record.closedByAppUserId === null,
+        }
+      : null,
     checklist: facts.checklist,
     blockers: facts.blockers,
     warnings: {
@@ -182,16 +208,7 @@ export function toDetail(
   };
 }
 
-export function toRight(
-  seat: PersonalSeat,
-  facts: {
-    duty: HandoverDutyBrief | undefined;
-    accessRunsOnUntil: string | undefined;
-    employees: ReadonlyMap<string, EmployeeRecord>;
-  },
-): OffboardingRightWire {
-  const duty = facts.duty;
-
+export function toRight(seat: PersonalSeat, facts: { accessRunsOnUntil: string | undefined }): OffboardingRightWire {
   return {
     assignmentId: seat.assignmentId,
     application: { id: seat.applicationId, name: seat.applicationName },
@@ -209,18 +226,8 @@ export function toRight(
       source: seat.revocation.source,
     },
     accessRunsOnUntil: facts.accessRunsOnUntil ?? null,
-    handover: duty
-      ? {
-          dutyId: duty.dutyId,
-          status: duty.status,
-          role: duty.role,
-          confirmer: duty.confirmerEmployeeId ? brief(facts.employees, duty.confirmerEmployeeId) : null,
-          waitingReason: duty.waitingReason,
-          dueOn: duty.dueOn,
-          overdue: duty.overdue,
-          flaggedUnconfirmed: duty.flaggedUnconfirmed,
-        }
-      : null,
+    // No confirmation of a handover is asked (`QĐ-110g`): the key stays, always null, until the clients stop reading it.
+    handover: null,
   };
 }
 
@@ -236,6 +243,7 @@ export function toChange(change: OffboardingChangeRecord): OffboardingChangeWire
     count: change.kind === 'REVOCATIONS_OPENED' && typeof count === 'number' ? count : null,
     changedByAppUserId: change.changedByAppUserId,
     changedByProcedure: change.changedByTicketId !== null,
+    changedBySystem: change.changedByAppUserId === null && change.changedByTicketId === null,
     changedAt: change.changedAt.toISOString(),
   };
 }

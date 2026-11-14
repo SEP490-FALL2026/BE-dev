@@ -164,6 +164,8 @@ model Application {
   applicationBusinessOwners ApplicationBusinessOwner[]
   retirementConfirmation    ApplicationRetirementConfirmation?  @relation("ApplicationRetiredOn", fields: [retirementConfirmationId], references: [id], onDelete: Restrict)
   retirementConfirmations   ApplicationRetirementConfirmation[] @relation("ApplicationConfirmed")
+  departmentSoftwareEntries   DepartmentSoftwareEntry[]
+  departmentSoftwareProposals DepartmentSoftwareProposal[]
 
   @@unique([organizationId, dictionaryLineId])
   @@index([functionalGroupId])
@@ -217,6 +219,8 @@ model Plan {
   revocationNote    String?          @map("revocation_note")
   dataLossOnRemoval Boolean          @default(false) @map("data_loss_on_removal")
   sharingPolicy     SharingPolicy?   @map("sharing_policy")
+  // R-53: a K4 plan the company administers through a console of the vendor needs two admins there (QĐ-110k). Only K4 may be true (a CHECK).
+  hasAdminConsole   Boolean          @default(false) @map("has_admin_console")
   createdAt         DateTime         @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt         DateTime         @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
 
@@ -236,6 +240,8 @@ model Plan {
   assessmentsAlternative AccessRequestAssessment[] @relation("AssessmentAlternativePlan")
   budgetProposalLines    BudgetProposalLine[]      @relation("BudgetProposalLinePlan")
   budgetVersionLines     BudgetVersionLine[]       @relation("BudgetVersionLinePlan")
+  departmentSoftwareEntries   DepartmentSoftwareEntry[]
+  departmentSoftwareProposals DepartmentSoftwareProposal[]
 
   @@unique([organizationId, applicationId, normalizedName])
   @@index([applicationId])
@@ -272,6 +278,9 @@ model PlanWorkspaceProfile {
   emergencyOccupiesSeat     Boolean?  @map("emergency_occupies_seat")
   emergencyHolderEmployeeId String?   @map("emergency_holder_employee_id") @db.Uuid
   emergencyLastReviewedOn   DateTime? @map("emergency_last_reviewed_on") @db.Date
+  // QĐ-110u: the email of the company account that stands as owner of the plan at the vendor (never a password), and a free note.
+  ownerAccountEmail         String?   @map("owner_account_email")
+  adminNote                 String?   @map("admin_note")
   createdAt                 DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt                 DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
 

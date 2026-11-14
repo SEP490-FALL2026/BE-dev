@@ -1,49 +1,45 @@
-import { renewalItAdminOf } from './renewal-it-admin.policy';
+import { renewalNamedItAdminOf } from './renewal-it-admin.policy';
 
-describe('the IT Admin a renewal concerns (QĐ-111g, BB-9, CO-6)', () => {
-  it('is the IT Admin responsible for the subscription while they are a usable IT Admin', () => {
-    expect(
-      renewalItAdminOf({
-        responsibleItAdminEmployeeId: 'it-sub',
-        responsibleIsUsable: true,
-        departmentFallback: 'it-dept',
-      }),
-    ).toBe('it-sub');
+/** The two IT Admins a renewal names (the one responsible for the subscription, the one in charge of the owner department), and who of them is usable. */
+const named = (input: {
+  responsible: string | null;
+  inCharge: string | null;
+  usable: readonly string[];
+}): string | null =>
+  renewalNamedItAdminOf({
+    responsibleItAdminEmployeeId: input.responsible,
+    departmentItAdminEmployeeId: input.inCharge,
+    usableItAdminEmployeeIds: new Set(input.usable),
   });
 
-  it('falls back to the IT Admin in charge of the owner department when the subscription names none', () => {
-    expect(
-      renewalItAdminOf({
-        responsibleItAdminEmployeeId: null,
-        responsibleIsUsable: false,
-        departmentFallback: 'it-dept',
-      }),
-    ).toBe('it-dept');
+describe('the IT Admin a renewal names (QĐ-111g, BB-9, CO-6)', () => {
+  it.each([
+    // responsible, in charge, usable ⟹ expected
+    ['the responsible IT Admin is usable', 'it-sub', 'it-dept', ['it-sub', 'it-dept'], 'it-sub'],
+    ['the responsible IT Admin is usable and the department names none', 'it-sub', null, ['it-sub'], 'it-sub'],
+    ['both are usable, the responsible one still wins', 'it-sub', 'it-dept', ['it-dept', 'it-sub'], 'it-sub'],
+    ['the responsible one is usable and the one in charge is not', 'it-sub', 'it-dept', ['it-sub'], 'it-sub'],
+    ['the subscription names none and the one in charge is usable', null, 'it-dept', ['it-dept'], 'it-dept'],
+    ['the responsible one is not usable and the one in charge is', 'it-gone', 'it-dept', ['it-dept'], 'it-dept'],
+  ] as const)('is the right one when %s', (_case, responsible, inCharge, usable, expected) => {
+    expect(named({ responsible, inCharge, usable })).toBe(expected);
   });
 
-  it('falls back to it too when the one named is no longer a usable IT Admin (left, locked, lost the role)', () => {
-    expect(
-      renewalItAdminOf({
-        responsibleItAdminEmployeeId: 'it-gone',
-        responsibleIsUsable: false,
-        departmentFallback: 'it-dept',
-      }),
-    ).toBe('it-dept');
-  });
+  it.each([
+    ['the one in charge has left and is not locked yet (not usable)', null, 'it-left', []],
+    ['both have left or lost the role', 'it-gone', 'it-left', []],
+    ['the department names none and the subscription names none', null, null, []],
+    ['the responsible one is not usable and the department names none', 'it-gone', null, []],
+    ['the one in charge is not usable although another usable id is known', null, 'it-left', ['somebody-else']],
+  ] as const)(
+    'is nobody named, so the caller reads the first usable IT Admin, when %s',
+    (_case, responsible, inCharge, usable) => {
+      expect(named({ responsible, inCharge, usable })).toBeNull();
+    },
+  );
 
-  it('is nobody when nobody is named and the department has no usable IT Admin either', () => {
-    expect(
-      renewalItAdminOf({ responsibleItAdminEmployeeId: null, responsibleIsUsable: false, departmentFallback: null }),
-    ).toBeNull();
-  });
-
-  it('keeps the old rule for a subscription of the shared pool (no responsible IT Admin to read, department fallback only)', () => {
-    expect(
-      renewalItAdminOf({
-        responsibleItAdminEmployeeId: null,
-        responsibleIsUsable: false,
-        departmentFallback: 'first-usable',
-      }),
-    ).toBe('first-usable');
+  it('never returns an IT Admin the usable set does not hold, whatever they are named for', () => {
+    expect(named({ responsible: 'it-sub', inCharge: 'it-dept', usable: [] })).toBeNull();
+    expect(named({ responsible: 'it-sub', inCharge: 'it-dept', usable: ['unrelated'] })).toBeNull();
   });
 });

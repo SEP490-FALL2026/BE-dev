@@ -158,6 +158,34 @@ export const PARAM_KEYS_BY_CODE: Readonly<Record<InAppNotificationCode, readonly
   USAGE_TRACKING_NOTICE: ['applicationId', 'activityDefinition', 'dataKinds', 'purpose', 'retentionMonths', 'viewPath'],
   // The application by id (the interface turns it into a name: no key may be a name), the source by its label, the last day the source covers and how old it is: words and days, no person.
   USAGE_SOURCE_STALE: ['applicationId', 'source', 'coverageTo', 'freshnessDays'],
+  // MF-2 (`QĐ-110b`–`QĐ-110e`): the people and the days of a departure, how many rights wait. `DEPARTURE_ACCESS_BLOCKED` is told at the block moment, once for
+  // each `audience`: `SUPER_ADMIN` to mark the person as left; `IT_ADMIN` to **block** the company account (item 1a of `BM-08`: reset the password of the
+  // mailbox and sign out every session; the mailbox is not locked yet, that is item 1b) and to open the revocation by `revocationDueOn`. `blockedOn` is the
+  // first day the person is refused. `ACCOUNT_LOCK_OVERDUE` says item 1a of a departure blocked now was still not recorded at the end of the day `blockedOn`.
+  REVOCATION_OVERDUE: ['caseId', 'employeeId', 'dueOn', 'rightCount'],
+  DEPARTURE_ACCESS_BLOCKED: ['caseId', 'employeeId', 'departmentId', 'blockedOn', 'revocationDueOn', 'audience'],
+  ACCOUNT_LOCK_OVERDUE: ['caseId', 'employeeId', 'blockedOn'],
+  // MF-3 (`QĐ-110p`): the grace of a transfer; `audience` is the mover, a head or an IT Admin of one of the two departments.
+  TRANSFER_GRACE_STARTED: ['transferId', 'employeeId', 'fromDepartmentId', 'toDepartmentId', 'graceEndsOn', 'audience'],
+  TRANSFER_GRACE_ENDING: ['transferId', 'employeeId', 'graceEndsOn'],
+  TRANSFER_RIGHTS_REVOKING: ['transferId', 'employeeId', 'toDepartmentId', 'rightCount'],
+  // A request closed because its beneficiary left or moved (`QĐ-110d`, `QĐ-110o`): `reasonKind` is DEPARTURE or TRANSFER.
+  REQUEST_CANCELLED_BENEFICIARY_GONE: ['requestId', 'beneficiaryEmployeeId', 'reasonKind'],
+  // The same, for the request the system left to the IT Admin because its grant is being carried out (`QĐ-110d`).
+  REQUEST_BENEFICIARY_GONE_IT_CHECK: ['requestId', 'beneficiaryEmployeeId', 'reasonKind'],
+  // The list of software of a department (`QĐ-110s`, `QĐ-110t`).
+  DEPARTMENT_SOFTWARE_PROPOSED: ['proposalId', 'departmentId', 'applicationId', 'planId'],
+  DEPARTMENT_SOFTWARE_PROPOSAL_DECIDED: ['proposalId', 'departmentId', 'applicationId', 'planId', 'decision', 'reason'],
+  // The admins a plan keeps at the vendor (`QĐ-110k`): how many are left; and a subscription that gained seats (`QĐ-110v`).
+  VENDOR_ADMINS_BELOW_MINIMUM: ['planId', 'applicationId', 'adminCount'],
+  DEPARTMENT_WITHOUT_HEAD: ['departmentId', 'waitingCount'],
+  SUBSCRIPTION_SEATS_INCREASED: ['subscriptionId', 'fromQuantity', 'toQuantity', 'requestId', 'changedByEmployeeId'],
+  // What an IT Admin who leaves still answers for, once the day has come and the handover is not done (`QĐ-110j`, `R-26`).
+  IT_ADMIN_HANDOVER_PENDING: ['sourceKind', 'sourceId', 'employeeId', 'dueOn'],
+  // The same, told to the IT Admin who took it all: from whom, and how many of each (`QĐ-110j`, SPEC P5).
+  IT_ADMIN_HANDOVER_RECEIVED: ['sourceKind', 'sourceId', 'fromEmployeeId', 'subscriptions', 'applications'],
+  // A departure cancelled after the last working day: how many revocation tasks in progress the IT Admin closes by hand (`QĐ-110c`).
+  DEPARTURE_REVOCATION_IT_CLOSE: ['caseId', 'employeeId', 'taskCount'],
 };
 
 /** Whether the code is one of the closed table. */

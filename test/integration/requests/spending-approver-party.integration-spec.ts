@@ -4,7 +4,6 @@ import type { Person } from '../../support/request-harness';
 import type { Unit } from '../../support/spend-harness';
 
 const h = new ReturnHarness();
-const M = 1_000_000;
 const DRAFTS = '/api/v1/access-requests/drafts';
 const MESSAGE =
   'The spending approver and an employee who is not placed in a department cannot ask for or be given access through a request.';
@@ -12,8 +11,6 @@ const MESSAGE =
 describe('the spending approver is no party of a Request, on every way to make one (D-S21, integration, real PostgreSQL)', () => {
   let paidPlan: string;
   let internalPlan: string;
-  let servicePlan: string;
-  let servicePlanSubscription: string;
   let renewalSeat: string;
   let returnedSeat: string;
   let counter = 0;
@@ -23,13 +20,7 @@ describe('the spending approver is no party of a Request, on every way to make o
     await h.withApprover();
     paidPlan = await h.planOf(await h.subscription(100));
     internalPlan = await h.plan('K5');
-    servicePlanSubscription = await h.subscription(10, 'K2');
-    servicePlan = await h.planOf(servicePlanSubscription);
-    await h
-      .declareTaxProfile((await h.vendorOf(servicePlan)).id, [{ taxType: 'GTGT', ratePercent: '10', deductible: true }])
-      .expect(200);
-    // The spending approver holds two seats (a baseline records them, no request does) while the baseline is open; then it is closed,
-    // which a request for a service account waits for.
+    // The spending approver holds two seats (a baseline records them, no request does) while the baseline is open; then it is closed.
     renewalSeat = await h.seatOf(
       h.boss,
       { subscriptionId: await h.subscription(10, 'K2') },
@@ -82,7 +73,6 @@ describe('the spending approver is no party of a Request, on every way to make o
       await h.submit(h.form(paidPlan), sentAs.account),
       await h.submit(h.form(internalPlan), sentAs.account),
       await h.propose(h.proposeBody(), sentAs.account),
-      await h.submitService(h.serviceForm(servicePlan), sentAs.account),
     ];
 
     for (const refused of calls) {
@@ -138,15 +128,7 @@ describe('the spending approver is no party of a Request, on every way to make o
         lines: [{ employeeId: h.boss.employeeId }],
         businessReason: 'The new brand needs the shared workspace',
       };
-      const service = {
-        kind: 'SERVICE_ACCOUNT',
-        planId: servicePlan,
-        purpose: 'Build bot of the CI pipeline',
-        expectedIdentifier: 'ci-bot-9',
-        businessReason: 'Run the builds',
-      };
-
-      for (const body of [individual(), group, service]) {
+      for (const body of [individual(), group]) {
         const refused = await saveDraft(body, h.boss);
 
         expect(refused.status).toBe(422);
@@ -210,31 +192,6 @@ describe('the spending approver is no party of a Request, on every way to make o
       expect(byHead.status).toBe(422);
       expect(h.detailsOf(byHead)).toEqual(refusal('BENEFICIARY', h.boss.employeeId));
       expect(await h.count('return_requests')).toBe(returns);
-      expect(await written()).toEqual(before);
-    });
-  });
-
-  describe('the person the IT Admin names as responsible for a service account (US-05-21 AC-8)', () => {
-    it('is never the spending approver, and the department is not looked at first', async () => {
-      const u = await unit();
-      await h.budgetFor(u, { total: 100 * M, held: 20 * M, spent: 40 * M });
-      const id = await h.approvedService(u, u.member, servicePlan, 10 * M);
-      await h.reviewService(id, { decision: 'ACCEPT' }).expect(200);
-      const before = await written();
-
-      // The spending approver is of another department: outside the department would be the answer of a department check.
-      const refused = await h
-        .grant({
-          requestId: id,
-          subscriptionId: servicePlanSubscription,
-          accountIdentifier: 'party-bot',
-          responsibleEmployeeId: h.boss.employeeId,
-        })
-        .expect(422);
-
-      expect(h.codeOf(refused)).toBe('REQUEST_PARTY.INELIGIBLE');
-      expect(h.detailsOf(refused)).toEqual(refusal('BENEFICIARY', h.boss.employeeId));
-      expect(await h.state(id)).toBe('AWAITING_EXECUTION');
       expect(await written()).toEqual(before);
     });
   });

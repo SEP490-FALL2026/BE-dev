@@ -5,7 +5,8 @@ import { isUniqueViolation } from '../../../infrastructure/database/unique-viola
 import { OrganizationApi } from '../../organization/public/organization.api';
 import { PersonnelNotifier } from '../event-notice/personnel-notifier.service';
 import { PersonnelFileHooks } from '../event-notice/personnel-file-hooks.service';
-import { groundsSnapshot, normalizedGrounds } from '../personnel-grounds.policy';
+import { groundsSnapshot, normalizedGroundsNote } from '../personnel-grounds.policy';
+import type { DepartureImpact } from '../departure-deadline/departure-impact.types';
 import { actorColumns, type PersonnelActor } from '../public/personnel.types';
 import { TransferGuardService } from '../transfer/transfer-guard.service';
 import { headSuccessorLabel } from '../transfer/transfer.policy';
@@ -24,14 +25,28 @@ export interface DepartureWritten {
   seen: DepartureSeen;
   held: DepartureHeld;
   scheduled: ScheduledDeparture;
+  /** What the departure was read to do before it was written: kept with the record, not re-read. */
+  impact: DepartureImpact;
   organizationId: string;
   today: BusinessDate;
 }
 
+/** What the record keeps of the impact read before it: how many of each, what goes back to the budget and the deadline (the lists are read again from the sources). */
+function impactSummary(
+  impact: DepartureImpact,
+): Record<string, string | number | { currency: string; amountMinor: string }[]> {
+  return {
+    rights: impact.rightsToRevoke.length,
+    requestsToCancel: impact.openRequestsToCancel.length,
+    provisioningInFlight: impact.provisioningInFlight.length,
+    commitmentToRelease: impact.commitmentToRelease,
+    revocationDueOn: impact.revocationDueOn,
+  };
+}
+
 /**
  * Writes the case of a departure and what follows it, in one transaction after the endings (`US-03-04` AC-2, AC-8, AC-23, AC-29): the
- * row (one blocked now with a last working day that is not ahead is `LEFT` at once), its first change, the audit entries, the hook of the file, the confirmation of the handover
- * for every tool, and the notices. Returns the case as it is read back, with what the database filled in.
+ * row (one blocked now with a last working day that is not ahead is `LEFT` at once), its first change, the audit entries, the hook of the file, the refusal of the person after the last day, and the notices. Returns the case as it is read back, with what the database filled in.
  */
 @Injectable()
 export class OffboardingCaseWriter {
@@ -114,7 +129,9 @@ export class OffboardingCaseWriter {
       lastWorkingDay: input.lastWorkingDay as BusinessDate,
       departureEffectiveOn: seen.endsOn,
       handoverDueOn,
-      grounds: normalizedGrounds(input.grounds ?? {}),
+      // Kept on the case from the day it is written, for both modes: the sweeper that announces the block writes it again from the same rule.
+      revocationDueOn: written.impact.revocationDueOn,
+      grounds: normalizedGroundsNote(input.groundsNote ?? ''),
       headHandover: scheduled.headHandover,
       placementClosedId: scheduled.placementClosedId,
       cancelledPlacementId: cancelled?.placementId ?? null,
@@ -147,6 +164,7 @@ export class OffboardingCaseWriter {
         departureEffectiveOn: seen.endsOn,
         headSuccessor,
         transferCancelled,
+        impact: impactSummary(done.impact),
       },
       changedByAppUserId: by.appUserId,
       changedByTicketId: by.ticketId,
@@ -157,7 +175,7 @@ export class OffboardingCaseWriter {
       lastWorkingDay: record.lastWorkingDay,
       departureEffectiveOn: seen.endsOn,
       handoverDueOn: record.handoverDueOn,
-      grounds: groundsSnapshot(normalizedGrounds(input.grounds ?? {})),
+      grounds: groundsSnapshot(normalizedGroundsNote(input.groundsNote ?? '')),
       headSuccessor,
       departmentWithoutHeadFrom: departmentWithoutHeadFrom(scheduled.headHandover, seen.endsOn),
       transferCancelled,
@@ -173,7 +191,7 @@ export class OffboardingCaseWriter {
     });
   }
 
-  /** The hook of the file, the confirmation of the handover, the leaving of a departure blocked now, and the notices. */
+  /** The hook of the file, the refusal of the person after the last day, the leaving of a departure blocked now, and the notices. */
   private async announce(
     tx: DbTx,
     actor: PersonnelActor,
@@ -188,7 +206,6 @@ export class OffboardingCaseWriter {
       employeeId: record.employeeId,
       dueOn: record.departureEffectiveOn,
     });
-    if (seen.before) await this.handovers.open(tx, actor, record, { leaverIsHead: seen.leavesAsHead, today });
     const leftAtOnce = this.leavesAtOnce(input, done);
     if (input.accessBlockMode === 'WITH_LAST_DAY') {
       // From the day after the last working day the person is refused, whatever the state of the case (QĐ-100q).

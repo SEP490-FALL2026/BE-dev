@@ -2,7 +2,16 @@ import { createZodDto } from '../../../infrastructure/http/dto/zod-dto';
 import { z } from 'zod';
 import { successEnvelopeSchema } from '../../../infrastructure/http/dto/success-envelope.dto';
 import { businessDay } from '../../../infrastructure/http/dto/business-date.dto';
-import { groundsBodySchema } from '../personnel-grounds.dto';
+import { groundsNoteBodySchema } from '../personnel-grounds.dto';
+import { itHandoverSchema } from '../it-handover/it-handover.dto';
+import {
+  OLD_RIGHTS_MAX,
+  graceSchema,
+  oldRightSchema,
+  releasedMoneySchema,
+  transferPhaseSchema,
+  transferSnapshotSchema,
+} from '../transfer-grace/transfer-grace.dto';
 
 const successorBodySchema = z.discriminatedUnion('kind', [
   z.strictObject({ kind: z.literal('EMPLOYEE'), employeeId: z.uuid() }),
@@ -14,20 +23,20 @@ const recordBodySchema = z.strictObject({
   employeeId: z.uuid(),
   toDepartmentId: z.uuid(),
   effectiveOn: businessDay,
-  grounds: groundsBodySchema,
+  groundsNote: groundsNoteBodySchema,
   successor: successorBodySchema.optional(),
 });
 
 const rescheduleBodySchema = z.strictObject({
   newEffectiveOn: businessDay,
   reason: z.string().trim().min(1).max(1000),
-  grounds: groundsBodySchema,
+  groundsNote: groundsNoteBodySchema,
   successor: successorBodySchema.optional(),
 });
 
 const cancelBodySchema = z.strictObject({
   reason: z.string().trim().min(1).max(1000),
-  grounds: groundsBodySchema,
+  groundsNote: groundsNoteBodySchema,
 });
 
 const listQuerySchema = z.strictObject({
@@ -35,6 +44,10 @@ const listQuerySchema = z.strictObject({
   status: z.enum(['PENDING', 'EFFECTIVE', 'CANCELLED']).optional(),
   effectiveFrom: businessDay.optional(),
   effectiveTo: businessDay.optional(),
+  /** The transfers whose grace ends before this day (P7): the ones about to end, or over and not closed. */
+  graceEndsBefore: businessDay.optional(),
+  /** The transfers whose grace ends on or after this day (P7): with `graceEndsBefore` the calendar of the graces that end in the next working days. */
+  graceEndsFrom: businessDay.optional(),
   page: z.coerce.number().int().positive().default(1),
   pageSize: z.coerce.number().int().positive().max(100).default(20),
 });
@@ -56,13 +69,6 @@ const pagination = z.strictObject({
 const employeeBrief = z.strictObject({ id: z.uuid(), employeeCode: z.string(), fullName: z.string() });
 const departmentBrief = z.strictObject({ id: z.uuid(), code: z.string(), name: z.string() });
 const place = z.strictObject({ department: departmentBrief });
-const groundsSchema = z.strictObject({
-  type: z.string(),
-  reference: z.string(),
-  issuer: z.string(),
-  issuedOn: z.string(),
-});
-
 /** The row of the list: who, from where to where, when, and where it stands. */
 export const transferSummarySchema = z.strictObject({
   id: z.uuid(),
@@ -71,11 +77,15 @@ export const transferSummarySchema = z.strictObject({
   to: place,
   effectiveOn: z.string(),
   status: z.enum(['PENDING', 'EFFECTIVE', 'CANCELLED']),
+  /** Where it stands: waiting, in grace (the person keeps the old rights), revoking (the grace is over), closed, cancelled. */
+  phase: transferPhaseSchema,
+  /** The last day the person keeps the rights of the old department and the day they are told once more; null until the transfer took effect. */
+  grace: graceSchema.nullable(),
 });
 
 export const transferDetailSchema = transferSummarySchema.extend({
-  /** The basis of the transfer. Null in the minimal projection an IT Admin reads. */
-  grounds: groundsSchema.nullable(),
+  /** The basis of the transfer in one box, what a form fills in again. Null in the minimal projection an IT Admin reads. */
+  groundsNote: z.string().nullable(),
   /** Who follows the head of the old department; null when the person did not head the department they leave, and in the minimal projection. */
   headSuccessor: z.strictObject({ kind: z.enum(['EMPLOYEE', 'NONE']), employee: employeeBrief.nullable() }).nullable(),
   /** The account that recorded it; null when the controlled procedure did (`recordedByProcedure`). */
@@ -93,8 +103,24 @@ export const transferDetailSchema = transferSummarySchema.extend({
       reason: z.string(),
     })
     .nullable(),
-  /** Set when the IT Admin closed the transfer after the people who answer for the service accounts of the person were named. */
-  closure: z.strictObject({ closedAt: z.iso.datetime(), closedByAppUserId: z.uuid() }).nullable(),
+  /** Set once the transfer is closed: by the system when every right of the old department was taken back, or, for one closed before that rule, by the account of an IT Admin. */
+  closure: z
+    .strictObject({
+      closedAt: z.iso.datetime(),
+      closedByAppUserId: z.uuid().nullable(),
+      closedBySystem: z.boolean(),
+      /** The departure that took the old rights over while the grace lasted (the phase is then `SUPERSEDED`); null for every other closing. */
+      supersededByCaseId: z.uuid().nullable(),
+    })
+    .nullable(),
+  /** The rights of the old department with where each stands; empty before the transfer took effect. Bounded by the rights of one person. */
+  oldRights: z.array(oldRightSchema).max(OLD_RIGHTS_MAX),
+  /** What went back to the budget of the old department the day the transfer took effect, by currency; empty in the minimal projection an IT Admin reads. */
+  commitmentsReleased: z.array(releasedMoneySchema).max(OLD_RIGHTS_MAX),
+  /** The picture of the rights the day it took effect and, once closed, what became of them; null when there is none. */
+  snapshot: transferSnapshotSchema.nullable(),
+  /** What the person still answers for in the catalog and the hand-over of all of it to one IT Admin (`R-8`, `QĐ-110j`); null when there is nothing. It never holds the transfer back. */
+  itHandover: itHandoverSchema.nullable(),
 });
 
 /** What recording a transfer answers with: the transfer as the detail shows it (the warning about Business Owner applications is gone, `QĐ-111g`). */
@@ -106,7 +132,7 @@ const changeSchema = z.strictObject({
   oldEffectiveOn: z.string(),
   newEffectiveOn: z.string().nullable(),
   reason: z.string(),
-  grounds: groundsSchema,
+  groundsNote: z.string(),
   /** The account that changed it; null when the controlled procedure did (`changedByProcedure`). */
   changedByAppUserId: z.uuid().nullable(),
   changedByProcedure: z.boolean(),

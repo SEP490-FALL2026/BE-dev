@@ -1,3 +1,5 @@
+import type { ApiAccount } from '../../support/api-accounts';
+import { buildActivatedAccount } from '../../support/builders/account.builder';
 import { declareSubscription } from '../../support/builders/catalog.builder';
 import { RevocationHarness } from '../../support/revocation-harness';
 
@@ -12,6 +14,7 @@ describe('the purchase recorded with a grant from the shared pool (integration, 
   let counter = 0;
   const code = () => `E-PP-${(counter += 1)}`;
   let people: string[] = [];
+  let answering: ApiAccount;
 
   /** An active K2 subscription of a new plan with `quantity` seats bought. */
   const k2 = async (quantity: number) => {
@@ -57,6 +60,7 @@ describe('the purchase recorded with a grant from the shared pool (integration, 
     await h.start();
     people = [];
     for (let i = 0; i < 30; i += 1) people.push(await h.person(`E-PPX-${i}`));
+    answering = await buildActivatedAccount(h.ctx, h.seed, { code: 'E-IT9', email: 'it9@acme.vn', role: 'IT_ADMIN' });
   }, 300000);
 
   afterAll(async () => {
@@ -223,6 +227,80 @@ describe('the purchase recorded with a grant from the shared pool (integration, 
       )
     ).rows[0];
     expect(seat.owning_department_id).toBe(other.id);
+  });
+
+  /** The notices of a rise of the seats bought of a subscription: the inbox only grows, so each case reads those of its own subscription. */
+  const risesOf = async (subscriptionId: string) =>
+    (
+      await h.ctx.sql.query<{ recipient_employee_id: string; params: Record<string, unknown> }>(
+        `SELECT recipient_employee_id, params FROM in_app_notifications
+          WHERE code = 'SUBSCRIPTION_SEATS_INCREASED' AND subject_id = $1 ORDER BY created_at, id`,
+        [subscriptionId],
+      )
+    ).rows;
+
+  it('X-IT.7 (QĐ-110v): the seat a grant buys on a K2 pool is told once to the IT Admin who answers for it, with the request it was bought for', async () => {
+    const pool = await k2(1);
+    await h.seat({ subscriptionId: pool.subscriptionId }, code());
+    await h.ctx.sql.query(`UPDATE subscriptions SET responsible_it_admin_employee_id = $2 WHERE id = $1`, [
+      pool.subscriptionId,
+      answering.employeeId,
+    ]);
+    const requestId = h.gate.grantable(person(), pool.planId);
+
+    await h.grant({ requestId, subscriptionId: pool.subscriptionId, purchase: {} }).expect(201);
+
+    const notices = await risesOf(pool.subscriptionId);
+    expect(notices).toHaveLength(1);
+    expect(notices[0].recipient_employee_id).toBe(answering.employeeId);
+    expect(notices[0].params).toMatchObject({
+      subscriptionId: pool.subscriptionId,
+      fromQuantity: 1,
+      toQuantity: 2,
+      requestId,
+      changedByEmployeeId: h.it1.employeeId,
+    });
+  });
+
+  it('X-IT.7 (QĐ-110v): a grant that buys no seat, a refused purchase and a purchase made by the IT Admin who answers tell nobody', async () => {
+    const roomy = await k2(3);
+    await h.ctx.sql.query(`UPDATE subscriptions SET responsible_it_admin_employee_id = $2 WHERE id = $1`, [
+      roomy.subscriptionId,
+      answering.employeeId,
+    ]);
+    await h
+      .grant({ requestId: h.gate.grantable(person(), roomy.planId), subscriptionId: roomy.subscriptionId })
+      .expect(201);
+    await h
+      .grant({
+        requestId: h.gate.grantable(person(), roomy.planId),
+        subscriptionId: roomy.subscriptionId,
+        purchase: { reason: 'free seats left' },
+      })
+      .expect(409);
+    const own = await k2(1);
+    await h.seat({ subscriptionId: own.subscriptionId }, code());
+
+    await h
+      .grant({ requestId: h.gate.grantable(person(), own.planId), subscriptionId: own.subscriptionId, purchase: {} })
+      .expect(201);
+
+    expect(await risesOf(roomy.subscriptionId)).toEqual([]);
+    // IT 1 declared `own` and answers for it: the one who bought is not told of their own purchase.
+    expect(await risesOf(own.subscriptionId)).toEqual([]);
+  });
+
+  it('X-IT.7 (S-4): the seat bought by every K1 grant tells nobody', async () => {
+    const k1 = await h.subscription(5, 'K1');
+    await h.ctx.sql.query(`UPDATE subscriptions SET responsible_it_admin_employee_id = $2 WHERE id = $1`, [
+      k1,
+      answering.employeeId,
+    ]);
+
+    await h.grant({ requestId: h.gate.grantable(person(), await h.planOf(k1)), subscriptionId: k1 }).expect(201);
+
+    expect(await quantityOf(k1)).toBe(6);
+    expect(await risesOf(k1)).toEqual([]);
   });
 
   it('the race of two grants for the last seat: one is 201, the other 409 SEAT_CAPACITY (US-07-01 AC-2)', async () => {

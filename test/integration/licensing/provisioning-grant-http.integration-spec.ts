@@ -288,7 +288,7 @@ describe('the grant of a seat over HTTP (integration, real PostgreSQL)', () => {
     const refused = await h.grant({ requestId, subscriptionId }).expect(409);
 
     expect(h.codeOf(refused)).toBe('PROVISIONING.BENEFICIARY_DEPARTED');
-    expect(h.detailsOf(refused)).toEqual({ requestId, nextStep: 'CANCEL_REQUEST' });
+    expect(h.detailsOf(refused)).toEqual({ requestId, cause: 'LEFT', nextStep: 'CANCEL_REQUEST' });
     expect(await assignmentsOf(gone)).toBe(0);
     expect(await tasksOf(subscriptionId)).toBe(0);
   });

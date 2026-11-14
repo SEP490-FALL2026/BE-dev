@@ -98,7 +98,7 @@ describe('a hook of a personnel file and the transaction of the write (integrati
   const loggedText = (): string =>
     (logged.mock.calls as unknown[][]).map((call) => call.map(String).join(' ')).join('\n');
 
-  it('runs the three hooks of the flows that follow a file, in the order their modules add them, then a hook added later', async () => {
+  it('runs the hooks of the flows that follow a file, in the order their modules add them, then a hook added later', async () => {
     const person = await leaver();
     const hooks = h.ctx.app.get(PersonnelFileHookContributions);
     // The hooks are the objects the modules added; a spy on each calls through, so they do what they always do. A hook that has no
@@ -111,13 +111,16 @@ describe('a hook of a personnel file and the transaction of the write (integrati
     const wire = await h.recordedCase(person);
 
     expect(realHooks.filter((name) => name !== 'personnel.device-registration')).toEqual([
+      // X-IT.3 (R-8): what an IT Admin who leaves answers for in the catalog is kept with the file, first of the flows that follow it.
+      'personnel.it-handover',
+      // MF3-C.2 (QĐ-110r): a departure recorded in the grace of a transfer closes it as superseded, before the flows that follow the file.
+      'personnel.transfer-closure',
       'personnel.open-requests',
-      'personnel.service-account-duty',
       'personnel.role-duties',
     ]);
     expect(realHooks).toContain('personnel.device-registration');
     expect(hooks.names()).toEqual([...realHooks, 'test.switch']);
-    expect(spies.map((spy) => spy.mock.calls.length)).toEqual([1, 1, 1, 1]);
+    expect(spies.map((spy) => spy.mock.calls.length)).toEqual([1, 1, 1, 1, 1]);
     const order = spies.map((spy) => spy.mock.invocationCallOrder[0]);
     expect(order).toEqual([...order].sort((first, second) => first - second));
     expect(spies[0].mock.calls[0][1]).toEqual({

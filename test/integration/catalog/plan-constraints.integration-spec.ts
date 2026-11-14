@@ -173,14 +173,14 @@ describe('plans and workspace profiles (integration, PostgreSQL constraints)', (
   });
 
   describe('workspace profiles', () => {
-    it('exists only for a K2 or K3 plan (trigger)', async () => {
+    it('exists only for a K2, K3 or K4 plan (trigger; X-IT.4b lets a K4 plan with an admin console have one)', async () => {
       const k2 = await planWithType('K2');
       const k1 = await planWithType('K1');
       const k4 = await planWithType('K4');
 
       expect(await insertProfile(k2, [null, null, null, null])).toBeNull();
       expect(await insertProfile(k1, [null, null, null, null])).toBe('23514');
-      expect(await insertProfile(k4, [null, null, null, null])).toBe('23514');
+      expect(await insertProfile(k4, [null, null, null, null])).toBeNull();
     });
 
     it('holds the four emergency account fields together or none of them', async () => {

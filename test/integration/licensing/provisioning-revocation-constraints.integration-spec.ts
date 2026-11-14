@@ -401,6 +401,52 @@ describe('the tasks of a revocation (integration, PostgreSQL constraints)', () =
     });
   });
 
+  describe('the checklist of a K1 revocation (QĐ-111az)', () => {
+    const renewal = { completion: 'RENEWAL_CANCELLED', paid_through_on: '2026-11-30', access_state: 'UNTIL_PAID_END' };
+    const checklist = JSON.stringify({
+      variant: 'STILL_EMPLOYED',
+      items: [{ code: 'RENEWAL_DISABLED', order: 1, doneAt: '2026-11-13T08:00:00.000Z' }],
+    });
+
+    it('is kept with the completion as a JSON object, and nothing else is kept', async () => {
+      const id = await claimed();
+
+      expect(await complete(id, { ...renewal, k1_checklist: '[1]' })).toBe('23514');
+      expect(await complete(id, { ...renewal, k1_checklist: '"RENEWAL_DISABLED"' })).toBe('23514');
+      expect(await complete(id, { ...renewal, k1_checklist: checklist })).toBeNull();
+      const { rows } = await sql.query<{ variant: string }>(
+        `SELECT k1_checklist->>'variant' AS variant FROM provisioning_tasks WHERE id = $1`,
+        [id],
+      );
+      expect(rows[0].variant).toBe('STILL_EMPLOYED');
+    });
+
+    it('is written while the task is in progress, and never changed once the task is completed', async () => {
+      const id = await claimed();
+      const set = (target: string) =>
+        sqlState(sql, `UPDATE provisioning_tasks SET k1_checklist = $2::jsonb WHERE id = $1`, [target, checklist]);
+
+      expect(await set(id)).toBeNull();
+      expect(await complete(id, renewal)).toBeNull();
+      expect(await set(id)).toBe('55000');
+    });
+
+    it('belongs to a revocation: a grant has none, and a revocation made before it has NULL', async () => {
+      const { id, code } = await grantWithId(await newAssignment());
+      const { id: revoked } = await revocation();
+
+      expect(code).toBeNull();
+      expect(
+        await sqlState(sql, `UPDATE provisioning_tasks SET k1_checklist = $2::jsonb WHERE id = $1`, [id, checklist]),
+      ).toBe('23514');
+      const { rows } = await sql.query<{ k1_checklist: unknown }>(
+        `SELECT k1_checklist FROM provisioning_tasks WHERE id = $1`,
+        [revoked],
+      );
+      expect(rows[0].k1_checklist).toBeNull();
+    });
+  });
+
   describe('the reasons that asked for a revocation (US-07-05 AC-11)', () => {
     it('keeps one reason for each source and what it refers to', async () => {
       const { id } = await revocation();

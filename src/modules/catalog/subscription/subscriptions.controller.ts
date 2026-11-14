@@ -19,6 +19,7 @@ import {
   SubscriptionResponseDto,
   UpdateSubscriptionBodyDto,
 } from './subscription.dto';
+import { withoutVendorAdminDetail } from './pool/subscription-pool.policy';
 import { SUBSCRIPTION_ERROR_EXAMPLES, toSubscriptionApiException } from './subscription.http-errors';
 import { SubscriptionChangeService } from './subscription-change.service';
 import { SubscriptionService } from './subscription.service';
@@ -45,7 +46,7 @@ const INVALID_UPDATE_NOTE =
 const INVALID = {
   status: HttpStatus.UNPROCESSABLE_ENTITY,
   description:
-    'The request is invalid (VALIDATION_ERROR) or a rule refuses it: SUBSCRIPTION.PLAN_NOT_FOUND, OWNER_DEPARTMENT_INACTIVE and APPLICATION_RETIRED (declaring only), PLAN_HAS_NO_SUBSCRIPTION, PERPETUAL_NEEDS_LICENSED_APPLICATION, PERPETUAL_HAS_NO_TERM, DATES_INVALID or UPDATE_EMPTY; the shared-pool rules refuse COMMITMENT_TERM_REQUIRED (a term that becomes active names 1 or 12 months), COMMITMENT_TERM_NOT_ALLOWED (a perpetual purchase), K1_MONTHLY_ONLY (R-E01), BILLING_LONGER_THAN_COMMITMENT (R-G01), BILLING_CYCLE_UNSUPPORTED (only MONTHLY and ANNUAL are written; QUARTERLY and OTHER stay readable on older data), RESPONSIBLE_REQUIRED (an active subscription names the IT Admin who answers for it) and RESPONSIBLE_NOT_IT_ADMIN, and an update may also be refused with PRIMARY_NOT_ELIGIBLE (details.reason); the price is refused with MONEY_SCALE_EXCEEDED, MONEY_OUT_OF_RANGE or CURRENCY_NOT_SUPPORTED.',
+    'The request is invalid (VALIDATION_ERROR) or a rule refuses it: SUBSCRIPTION.PLAN_NOT_FOUND, OWNER_DEPARTMENT_INACTIVE and APPLICATION_RETIRED (declaring only), PLAN_HAS_NO_SUBSCRIPTION, PERPETUAL_NEEDS_LICENSED_APPLICATION, PERPETUAL_HAS_NO_TERM, DATES_INVALID or UPDATE_EMPTY; the shared-pool rules refuse COMMITMENT_TERM_REQUIRED (a term that becomes active names 1 or 12 months), COMMITMENT_TERM_NOT_ALLOWED (a perpetual purchase), K1_MONTHLY_ONLY (R-E01), BILLING_LONGER_THAN_COMMITMENT (R-G01), BILLING_CYCLE_UNSUPPORTED (only MONTHLY and ANNUAL are written; QUARTERLY and OTHER stay readable on older data), RESPONSIBLE_REQUIRED (an active subscription names the IT Admin who answers for it), RESPONSIBLE_NOT_IT_ADMIN and VENDOR_ADMINS_REQUIRED (a plan that needs admins at the vendor, a K2 plan or a K4 plan with an admin console, is not activated as a new subscription, nor its pool made, while its workspace profile names fewer than two different IT Admins; the period a renewal continues is never asked, it only carries the flag vendorAdminsBelowMinimum), and an update may also be refused with PRIMARY_NOT_ELIGIBLE (details.reason); the price is refused with MONEY_SCALE_EXCEEDED, MONEY_OUT_OF_RANGE or CURRENCY_NOT_SUPPORTED.',
   examples: [
     VALIDATION_EXAMPLE,
     SUBSCRIPTION_ERROR_EXAMPLES.PLAN_NOT_FOUND,
@@ -61,6 +62,7 @@ const INVALID = {
     SUBSCRIPTION_ERROR_EXAMPLES.BILLING_LONGER_THAN_COMMITMENT,
     SUBSCRIPTION_ERROR_EXAMPLES.BILLING_CYCLE_UNSUPPORTED,
     SUBSCRIPTION_ERROR_EXAMPLES.RESPONSIBLE_REQUIRED,
+    SUBSCRIPTION_ERROR_EXAMPLES.VENDOR_ADMINS_REQUIRED,
     SUBSCRIPTION_ERROR_EXAMPLES.RESPONSIBLE_NOT_IT_ADMIN,
     SUBSCRIPTION_ERROR_EXAMPLES.MONEY_SCALE_EXCEEDED,
     SUBSCRIPTION_ERROR_EXAMPLES.MONEY_OUT_OF_RANGE,
@@ -83,6 +85,7 @@ const INVALID_UPDATE = {
     SUBSCRIPTION_ERROR_EXAMPLES.BILLING_LONGER_THAN_COMMITMENT,
     SUBSCRIPTION_ERROR_EXAMPLES.BILLING_CYCLE_UNSUPPORTED,
     SUBSCRIPTION_ERROR_EXAMPLES.RESPONSIBLE_REQUIRED,
+    SUBSCRIPTION_ERROR_EXAMPLES.VENDOR_ADMINS_REQUIRED,
     SUBSCRIPTION_ERROR_EXAMPLES.RESPONSIBLE_NOT_IT_ADMIN,
     SUBSCRIPTION_ERROR_EXAMPLES.PRIMARY_NOT_ELIGIBLE,
     SUBSCRIPTION_ERROR_EXAMPLES.MONEY_SCALE_EXCEEDED,
@@ -116,6 +119,10 @@ const toWire = (view: SubscriptionView) => ({
   updatedAt: view.updatedAt.toISOString(),
 });
 
+/** What the caller reads: the vendor admins, the email and the note are the IT Admin's (SPEC P19); Finance reads the rest and the flags. */
+const toWireFor = (actor: AuthenticatedPrincipal, view: SubscriptionView) =>
+  toWire(actor.roles.includes('IT_ADMIN') ? view : withoutVendorAdminDetail(view));
+
 /**
  * The subscriptions and perpetual purchases of the plans (`US-04-03`, `US-04-05`). The IT Admin declares and changes
  * them; Finance reads them. Finance, the department head, employees, the spending approver and the Super Admin change
@@ -136,19 +143,19 @@ export class SubscriptionsController {
   @ApiSuccessResponse(SubscriptionPageResponseDto, {
     message: 'SUBSCRIPTION.LISTED',
     description:
-      'A page of subscriptions by application, plan and creation, optionally filtered; warning=NO_ALERT_ANCHOR lists those with no date to alert from.',
+      'A page of subscriptions by application, plan and creation, optionally filtered; warning=NO_ALERT_ANCHOR lists those with no date to alert from. Who administers the plan at the vendor (vendorAdmins), the email of the company account that owns it there (ownerAccountEmail) and the note (adminNote) are for the IT Admin: Finance reads them empty, with the two flags.',
   })
   @ApiErrorResponses(...AUTH_ERRORS, READERS, {
     status: HttpStatus.UNPROCESSABLE_ENTITY,
     description: 'The query is invalid (VALIDATION_ERROR).',
     examples: [VALIDATION_EXAMPLE],
   })
-  async list(@Query() query: ListSubscriptionsQueryDto) {
+  async list(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Query() query: ListSubscriptionsQueryDto) {
     try {
       const page = await this.subscriptions.list(query);
       const emptyState = page.items.length === 0 ? await this.subscriptions.emptyState() : null;
 
-      return { items: page.items.map(toWire), pagination: page.pagination, emptyState };
+      return { items: page.items.map((item) => toWireFor(actor, item)), pagination: page.pagination, emptyState };
     } catch (error) {
       throw toSubscriptionApiException(error);
     }
@@ -178,16 +185,16 @@ export class SubscriptionsController {
   @ApiSuccessResponse(SubscriptionResponseDto, {
     message: 'SUBSCRIPTION.FETCHED',
     description:
-      'The subscription with its derived notice deadline and source, alert dates, warning, tax profile and tax estimate.',
+      'The subscription with its derived notice deadline and source, alert dates, warning, tax profile and tax estimate. Who administers the plan at the vendor (vendorAdmins), the email of the company account that owns it there (ownerAccountEmail) and the note (adminNote) are for the IT Admin: Finance reads them empty, with the two flags.',
   })
   @ApiErrorResponses(...AUTH_ERRORS, READERS, NOT_FOUND, {
     status: HttpStatus.UNPROCESSABLE_ENTITY,
     description: 'The id is not a UUID (VALIDATION_ERROR).',
     examples: [VALIDATION_EXAMPLE],
   })
-  async get(@Param() params: SubscriptionIdParamDto) {
+  async get(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Param() params: SubscriptionIdParamDto) {
     try {
-      return toWire(await this.subscriptions.get(params.id));
+      return toWireFor(actor, await this.subscriptions.get(params.id));
     } catch (error) {
       throw toSubscriptionApiException(error);
     }
@@ -225,13 +232,14 @@ export class SubscriptionsController {
   @ApiErrorResponses(...AUTH_ERRORS, IT_ONLY, NOT_FOUND, DUPLICATE_PLAN_CONFLICT, {
     status: HttpStatus.UNPROCESSABLE_ENTITY,
     description:
-      'The id is invalid (VALIDATION_ERROR) or the subscription still lacks data or the rate of its price day (SUBSCRIPTION.STILL_DRAFT, details.missing), or the shared-pool rules refuse it: COMMITMENT_TERM_REQUIRED, K1_MONTHLY_ONLY, RESPONSIBLE_REQUIRED, RESPONSIBLE_NOT_IT_ADMIN.',
+      'The id is invalid (VALIDATION_ERROR) or the subscription still lacks data or the rate of its price day (SUBSCRIPTION.STILL_DRAFT, details.missing), or the shared-pool rules refuse it: COMMITMENT_TERM_REQUIRED, K1_MONTHLY_ONLY, RESPONSIBLE_REQUIRED, RESPONSIBLE_NOT_IT_ADMIN, VENDOR_ADMINS_REQUIRED.',
     examples: [
       VALIDATION_EXAMPLE,
       SUBSCRIPTION_ERROR_EXAMPLES.STILL_DRAFT,
       SUBSCRIPTION_ERROR_EXAMPLES.COMMITMENT_TERM_REQUIRED,
       SUBSCRIPTION_ERROR_EXAMPLES.K1_MONTHLY_ONLY,
       SUBSCRIPTION_ERROR_EXAMPLES.RESPONSIBLE_REQUIRED,
+      SUBSCRIPTION_ERROR_EXAMPLES.VENDOR_ADMINS_REQUIRED,
       SUBSCRIPTION_ERROR_EXAMPLES.RESPONSIBLE_NOT_IT_ADMIN,
       SUBSCRIPTION_ERROR_EXAMPLES.MONEY_OUT_OF_RANGE,
     ],

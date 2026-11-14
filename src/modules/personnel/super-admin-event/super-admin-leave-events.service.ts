@@ -3,6 +3,7 @@ import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { LeaveService } from '../leave/leave.service';
 import type { PersonnelActor } from '../public/personnel.types';
 import type { EventBasis, SuperAdminEventParameters } from '../public/super-admin-event.types';
+import { groundsNoteOfBasis } from '../personnel-grounds.policy';
 import { SuperAdminEventAnchor, type Subject } from './super-admin-event-anchor.service';
 
 export type LeaveEventParameters = Extract<SuperAdminEventParameters, { mode: 'leave-start' | 'leave-return' }>;
@@ -37,7 +38,7 @@ export class SuperAdminLeaveEvents {
             employeeId: subject.id,
             startedOn: parameters.startedOn,
             approvedReturnOn: parameters.approvedReturnOn,
-            grounds: basis,
+            groundsNote: groundsNoteOfBasis(basis),
           })
         ).id;
       }
@@ -48,7 +49,7 @@ export class SuperAdminLeaveEvents {
           await this.leaves.confirmReturn(
             actor,
             parameters.leaveId,
-            { returnedOn: parameters.returnedOn, grounds: basis },
+            { returnedOn: parameters.returnedOn, groundsNote: groundsNoteOfBasis(basis) },
             tx,
           )
         ).id;

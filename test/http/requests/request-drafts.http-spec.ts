@@ -56,7 +56,7 @@ describe('the drafts of a request, and the Super Admin (e2e, no database)', () =
 
   it.each([
     ['no kind', { planId: PLAN, businessReason: 'x' }],
-    ['a kind that is none of the three', { ...INDIVIDUAL, kind: 'RENEWAL' }],
+    ['a kind that is none of the two', { ...INDIVIDUAL, kind: 'RENEWAL' }],
     ['a draft of an individual with no reason', { kind: 'INDIVIDUAL', planId: PLAN }],
     ['a draft of an individual with a plan that is not an id', { ...INDIVIDUAL, planId: 'not-an-id' }],
     ['a draft of an individual with an end date that is not a date', { ...INDIVIDUAL, expectedEndDate: 'tomorrow' }],
@@ -67,8 +67,7 @@ describe('the drafts of a request, and the Super Admin (e2e, no database)', () =
     ],
     ['a draft of a group with no people', { ...GROUP, lines: [] }],
     ['a draft of a group with a person that is not an id', { ...GROUP, lines: [{ employeeId: 'x' }] }],
-    ['a draft of a service account with no purpose', { ...SERVICE_ACCOUNT, purpose: undefined }],
-    ['a draft of a service account with no identifier', { ...SERVICE_ACCOUNT, expectedIdentifier: undefined }],
+    ['a draft of a service account, a kind that is gone (QĐ-110m)', SERVICE_ACCOUNT],
     ['a field the route does not know', { ...INDIVIDUAL, costCenterId: ID }],
   ])('refuses saving %s with 422', async (_name, payload) => {
     const response = await request(app.getHttpServer())
@@ -137,10 +136,6 @@ describe('the drafts of a request, and the Super Admin (e2e, no database)', () =
         }),
     ],
     ['groupRequestSubmit', (agent) => agent.post('/api/v1/group-requests').send({ ...GROUP, kind: undefined })],
-    [
-      'accessRequestServiceAccountSubmit',
-      (agent) => agent.post('/api/v1/access-requests/service-accounts').send({ ...SERVICE_ACCOUNT, kind: undefined }),
-    ],
     [
       'accessRequestRenewalSubmit',
       (agent) =>

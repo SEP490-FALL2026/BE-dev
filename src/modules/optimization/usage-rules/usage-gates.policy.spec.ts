@@ -3,6 +3,7 @@ import { coverageGateOf, endsWithinMonth, seatGateOf, unmatchedGateOf, verdictOf
 
 const base = {
   kind: 'PERSONAL' as const,
+  isMachineAccount: false,
   today: '2026-09-02',
   handingOver: false,
   onLongLeave: false,
@@ -32,7 +33,8 @@ describe('gates 2 to 8 in their order (FR-4.9)', () => {
   it('passes a plain seat', () => expect(seatGateOf(base)).toBeNull());
 
   it.each([
-    ['gate 2: a service account', { kind: 'SERVICE' as const }, 'SERVICE_ACCOUNT'],
+    ['gate 2: a seat flagged as a machine account (QĐ-110m)', { isMachineAccount: true }, 'SERVICE_ACCOUNT'],
+    ['gate 2: a service account of the earlier releases', { kind: 'SERVICE' as const }, 'SERVICE_ACCOUNT'],
     ['gate 3: handing over', { handingOver: true }, 'LEAVE_OR_HANDOVER'],
     ['gate 3: on long leave today', { onLongLeave: true }, 'LEAVE_OR_HANDOVER'],
     ['gate 4: the grant waits', { usableOn: null }, 'NOT_USABLE'],
@@ -55,6 +57,15 @@ describe('gates 2 to 8 in their order (FR-4.9)', () => {
     expect(seatGateOf({ ...base, kind: 'SERVICE', handingOver: true, exemptUntil: '2026-12-31' })?.gate).toBe(
       'SERVICE_ACCOUNT',
     );
+    expect(
+      seatGateOf({ ...base, isMachineAccount: true, handingOver: true, exemptUntil: '2026-12-31', usableOn: null })
+        ?.gate,
+    ).toBe('SERVICE_ACCOUNT');
+  });
+
+  it('says a machine account in the reason of the skip, and leaves the personal seat of the same IT Admin to be judged', () => {
+    expect(seatGateOf({ ...base, isMachineAccount: true })).toMatchObject({ detail: { reason: 'machine account' } });
+    expect(seatGateOf({ ...base, isMachineAccount: false })).toBeNull();
   });
 });
 

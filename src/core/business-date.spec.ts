@@ -4,6 +4,7 @@ import {
   fromDateColumn,
   isBusinessDate,
   isValidTimeZone,
+  monthBoundsOf,
   toDateColumn,
 } from './business-date';
 
@@ -47,5 +48,16 @@ describe('addDays', () => {
     ['2026-01-01', -1, '2025-12-31'],
   ])('%s shifted by %d days is %s', (date, days, expected) => {
     expect(addDays(date, days)).toBe(expected);
+  });
+});
+
+describe('monthBoundsOf (this month up to a day)', () => {
+  it.each<[string, string, string]>([
+    ['2026-11-14', '2026-11-01', '2026-12-01'],
+    ['2026-11-01', '2026-11-01', '2026-12-01'],
+    ['2026-12-31', '2026-12-01', '2027-01-01'],
+    ['2026-02-28', '2026-02-01', '2026-03-01'],
+  ])('%s starts on %s and the next month on %s', (day, start, nextStart) => {
+    expect(monthBoundsOf(day)).toEqual({ start, nextStart });
   });
 });

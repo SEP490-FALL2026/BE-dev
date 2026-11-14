@@ -1,5 +1,4 @@
 import { Body, Controller, Get, HttpStatus, Param, Post, Query } from '@nestjs/common';
-import { PersonnelGroundsDateService } from '../personnel-grounds-date.service';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   ApiErrorResponses,
@@ -51,17 +50,12 @@ const NOT_FOUND = {
 } as const;
 
 /** The refusals of the basis of a day, the same on every write that needs one. */
-const GROUNDS_EXAMPLES = [
-  EXAMPLES.GROUNDS_REQUIRED,
-  EXAMPLES.GROUNDS_INCOMPLETE,
-  EXAMPLES.GROUNDS_IS_NOTICE,
-  PERSONNEL_ACCESS_ERROR_EXAMPLES.GROUNDS_ISSUED_ON_FUTURE,
-] as const;
+const GROUNDS_EXAMPLES = [EXAMPLES.GROUNDS_REQUIRED, EXAMPLES.GROUNDS_TOO_LONG, EXAMPLES.GROUNDS_IS_NOTICE] as const;
 /** The refusal of a write on a leave that has ended. */
 const ENDED_EXAMPLES = [EXAMPLES.NOT_ACTIVE] as const;
 
 const GROUNDS_REFUSALS =
-  'the basis is empty or lacks a part (LONG_LEAVE.GROUNDS_REQUIRED, GROUNDS_INCOMPLETE) or is the code of a notice and not a document (GROUNDS_IS_NOTICE), or is issued after today (PERSONNEL.GROUNDS_ISSUED_ON_FUTURE)';
+  'the basis (groundsNote) is empty (LONG_LEAVE.GROUNDS_REQUIRED), longer than 500 characters (GROUNDS_TOO_LONG) or is only the code of a notice and not a document (GROUNDS_IS_NOTICE)';
 
 /**
  * Long leaves of employees with the day they are due back and the basis of that day. The Super Admin records them (`QĐ-87a`); the
@@ -75,7 +69,6 @@ export class LongLeavesController {
   constructor(
     private readonly leaves: LeaveService,
     private readonly query: LeaveQueryService,
-    private readonly groundsDate: PersonnelGroundsDateService,
   ) {}
 
   @Post()
@@ -112,7 +105,6 @@ export class LongLeavesController {
     },
   )
   async start(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Body() body: StartLeaveBodyDto) {
-    await this.groundsDate.assertNotInFuture(body.grounds);
     try {
       return await this.query.detailOf(await this.leaves.start(userActor(actor), body));
     } catch (error) {
@@ -219,7 +211,6 @@ export class LongLeavesController {
     @Param() params: LeaveIdParamDto,
     @Body() body: ChangeReturnDateBodyDto,
   ) {
-    await this.groundsDate.assertNotInFuture(body.grounds);
     try {
       return await this.query.detailOf(await this.leaves.changeReturnDate(userActor(actor), params.id, body));
     } catch (error) {
@@ -233,7 +224,7 @@ export class LongLeavesController {
   @ApiSuccessResponse(LeaveDetailResponseDto, {
     message: 'LONG_LEAVE.RETURNED',
     description:
-      'The person works again from the day, and is in the evaluation of the recommendations again. On the approved day of return no new document is needed: the Super Admin confirms and the Audit Trail keeps who and when. On any other day, earlier or later, a new authoritative basis is required.',
+      'The person works again from the day, and is in the evaluation of the recommendations again. The basis (groundsNote) is required on any day, the approved one too: the interface fills it from the leave, the Super Admin may edit it, and what is sent is kept on the change RETURNED beside who and when.',
   })
   @ApiErrorResponses(
     ...WRITE_COMMON,
@@ -245,7 +236,7 @@ export class LongLeavesController {
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
-      description: `The body is invalid (VALIDATION_ERROR), the day is before the leave began or in the future (LONG_LEAVE.RETURN_DATE_INVALID), or, on a day other than the approved one, ${GROUNDS_REFUSALS}: nothing is saved and the person stays on long leave.`,
+      description: `The body is invalid (VALIDATION_ERROR), the day is before the leave began or in the future (LONG_LEAVE.RETURN_DATE_INVALID), or ${GROUNDS_REFUSALS}: nothing is saved and the person stays on long leave.`,
       examples: [VALIDATION_EXAMPLE, EXAMPLES.RETURN_DATE_IN_FUTURE, ...GROUNDS_EXAMPLES],
     },
   )
@@ -254,7 +245,6 @@ export class LongLeavesController {
     @Param() params: LeaveIdParamDto,
     @Body() body: ConfirmReturnBodyDto,
   ) {
-    await this.groundsDate.assertNotInFuture(body.grounds);
     try {
       return await this.query.detailOf(await this.leaves.confirmReturn(userActor(actor), params.id, body));
     } catch (error) {

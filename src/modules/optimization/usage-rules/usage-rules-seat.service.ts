@@ -87,6 +87,7 @@ export class UsageRulesSeatService {
     const usableOn = app.usableOn.get(seat.chainRootId) ?? null;
     const gate = seatGateOf({
       kind: seat.kind,
+      isMachineAccount: seat.isMachineAccount,
       today: run.today,
       handingOver: run.handingOver.has(seat.employeeId),
       onLongLeave: leaves.some(

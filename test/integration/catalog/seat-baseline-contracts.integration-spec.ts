@@ -4,6 +4,7 @@ import { OrganizationApi } from '../../../src/modules/organization/public/organi
 import { OrganizationReadApi } from '../../../src/modules/organization/public/organization-read.api';
 import { TransactionRunner } from '../../../src/infrastructure/database/transaction-runner';
 import { ApiAccount, adminToken, createActivatedAccount } from '../../support/api-accounts';
+import { ensureVendorAdmins } from '../../support/builders/catalog.builder';
 import {
   HttpTestApp,
   SeededInstallation,
@@ -58,8 +59,8 @@ describe('what licensing reads of catalog and organization (integration, real Po
         })
         .expect(201),
     );
-  const plan = async (applicationId: string, type: string, pricing?: string) =>
-    dataOf<{ id: string; name: string }>(
+  const plan = async (applicationId: string, type: string, pricing?: string) => {
+    const created = dataOf<{ id: string; name: string }>(
       await request(server())
         .post('/api/v1/plans')
         .set(as(it1))
@@ -71,6 +72,11 @@ describe('what licensing reads of catalog and organization (integration, real Po
         })
         .expect(201),
     );
+    // A plan that needs admins at the vendor gets the two-person profile an active subscription asks for (X-IT.5).
+    await ensureVendorAdmins(ctx, created.id, it1.employeeId);
+
+    return created;
+  };
   const subscription = async (planId: string, extra: object = {}) =>
     dataOf<{ id: string }>(
       await request(server())

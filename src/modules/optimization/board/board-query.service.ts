@@ -209,15 +209,7 @@ export class BoardQueryService {
     const narrowed = narrowToDepartment(await this.scopeOf(actor), query.departmentId);
     if (narrowed === 'OUT_OF_SCOPE') return [];
     const departments = narrowed.departmentId ? [narrowed.departmentId] : narrowed.departmentIds;
-    const members = departments
-      ? [
-          ...new Set(
-            (await Promise.all(departments.map((id) => this.organizationReads.getDepartmentMemberIds(id)))).flatMap(
-              (ids) => ids ?? [],
-            ),
-          ),
-        ]
-      : undefined;
+    const members = departments ? await this.organizationReads.getMemberIdsOfDepartments(departments) : undefined;
     if (query.employeeId === undefined) return members;
 
     return members === undefined || members.includes(query.employeeId) ? [query.employeeId] : [];

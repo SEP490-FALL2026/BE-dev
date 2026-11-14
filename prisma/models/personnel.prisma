@@ -29,10 +29,10 @@ model DepartmentTransfer {
   closesPlacementId    String                   @map("closes_placement_id") @db.Uuid
   opensPlacementId     String                   @map("opens_placement_id") @db.Uuid
   headHandover         Json?                    @map("head_handover")
-  groundsType          String                   @map("grounds_type")
+  groundsType          String?                   @map("grounds_type")
   groundsReference     String                   @map("grounds_reference")
-  groundsIssuer        String                   @map("grounds_issuer")
-  groundsIssuedOn      DateTime                 @map("grounds_issued_on") @db.Date
+  groundsIssuer        String?                   @map("grounds_issuer")
+  groundsIssuedOn      DateTime?                 @map("grounds_issued_on") @db.Date
   selfExecuted         Boolean                  @default(false) @map("self_executed") @ignore
   // Who recorded and who cancelled: an application account OR the ticket of the controlled procedure (spec L.2).
   recordedByAppUserId  String?                  @map("recorded_by_app_user_id") @db.Uuid
@@ -43,14 +43,27 @@ model DepartmentTransfer {
   cancelledByAppUserId String?                  @map("cancelled_by_app_user_id") @db.Uuid
   cancelledByTicketId  String?                  @map("cancelled_by_ticket_id") @db.Uuid
   cancelledReason      String?                  @map("cancelled_reason")
-  // Closed by the IT Admin once the people who answer for the service accounts of the person are named (US-03-08); only an EFFECTIVE transfer.
+  // Closed once every right of the old department is taken back (`QĐ-110r`): by the system (`closedBySystem`, no account), or, for a
+  // transfer closed before that rule, by an IT Admin (`closedByAppUserId`); only an EFFECTIVE transfer.
   closedAt             DateTime?                @map("closed_at") @db.Timestamptz(3)
   closedByAppUserId    String?                  @map("closed_by_app_user_id") @db.Uuid
+  closedBySystem       Boolean                  @default(false) @map("closed_by_system")
+  // A departure recorded while the grace lasts takes the old rights over and closes the transfer (`QĐ-110r`, MF3-C.2): the case that did. Only on a transfer closed by the system.
+  supersededByCaseId   String?                  @map("superseded_by_case_id") @db.Uuid
+  // The grace of the old rights (`QĐ-110p`, MF3-B): the last day the person keeps them, the day they are told once more, and when that was
+  // done; set once, when the transfer takes effect. A transfer that took effect before the release has them from the day of the release.
+  graceEndsOn          DateTime?                @map("grace_ends_on") @db.Date
+  graceReminderOn      DateTime?                @map("grace_reminder_on") @db.Date
+  remindedAt           DateTime?                @map("reminded_at") @db.Timestamptz(3)
+  // The rights the person held when the transfer took effect, and, when it closes, what is left of them (codecs in `transfer-snapshot.json.ts`).
+  snapshotBefore       Json?                    @map("snapshot_before")
+  snapshotAfter        Json?                    @map("snapshot_after")
   // The notice of a head this transfer was recorded from, when there was one (US-03-11).
   noticeId             String?                  @unique @map("notice_id") @db.Uuid
 
   organization      Organization               @relation(fields: [organizationId], references: [id])
   notice            PersonnelNotice?           @relation(fields: [noticeId], references: [id], onDelete: Restrict)
+  supersededByCase  OffboardingCase?           @relation("TransferSupersededByCase", fields: [supersededByCaseId], references: [id], onDelete: Restrict)
   employee          Employee                   @relation(fields: [employeeId], references: [id])
   fromDepartment    Department                 @relation("TransferFromDepartment", fields: [fromDepartmentId], references: [id])
   toDepartment      Department                 @relation("TransferToDepartment", fields: [toDepartmentId], references: [id])
@@ -58,6 +71,7 @@ model DepartmentTransfer {
   cancelledByTicket SuperAdminEventTicket?     @relation("TransferCancelledByTicket", fields: [cancelledByTicketId], references: [id], onDelete: Restrict)
   changes           DepartmentTransferChange[]
   reviews           TransferReview[]
+  itAdminHandover   ItAdminHandover?
 
   @@index([effectiveOn(sort: Desc), id])
   @@index([employeeId])
@@ -73,10 +87,10 @@ model DepartmentTransferChange {
   oldEffectiveOn     DateTime                     @map("old_effective_on") @db.Date
   newEffectiveOn     DateTime?                    @map("new_effective_on") @db.Date
   reason             String
-  groundsType        String                       @map("grounds_type")
+  groundsType        String?                       @map("grounds_type")
   groundsReference   String                       @map("grounds_reference")
-  groundsIssuer      String                       @map("grounds_issuer")
-  groundsIssuedOn    DateTime                     @map("grounds_issued_on") @db.Date
+  groundsIssuer      String?                       @map("grounds_issuer")
+  groundsIssuedOn    DateTime?                     @map("grounds_issued_on") @db.Date
   changedByAppUserId String?                      @map("changed_by_app_user_id") @db.Uuid
   changedByTicketId  String?                      @map("changed_by_ticket_id") @db.Uuid
   changedAt          DateTime                     @default(now()) @map("changed_at") @db.Timestamptz(3)
@@ -192,10 +206,10 @@ model EmployeeLeave {
   endedOn                 DateTime?             @map("ended_on") @db.Date
   endKind                 EmployeeLeaveEndKind? @map("end_kind")
   resumesLeaveId          String?               @map("resumes_leave_id") @db.Uuid
-  groundsType             String                @map("grounds_type")
+  groundsType             String?                @map("grounds_type")
   groundsReference        String                @map("grounds_reference")
-  groundsIssuer           String                @map("grounds_issuer")
-  groundsIssuedOn         DateTime              @map("grounds_issued_on") @db.Date
+  groundsIssuer           String?                @map("grounds_issuer")
+  groundsIssuedOn         DateTime?              @map("grounds_issued_on") @db.Date
   startedByAppUserId      String?               @map("started_by_app_user_id") @db.Uuid
   startedByTicketId       String?               @map("started_by_ticket_id") @db.Uuid
   startedAt               DateTime              @default(now()) @map("started_at") @db.Timestamptz(3)
@@ -275,6 +289,16 @@ enum OffboardingChangeKind {
   ACCOUNT_LOCK_RECORDED
   REVOCATIONS_OPENED
   CLOSED
+  // The system blocked the person's access at the block moment (QĐ-110b, QĐ-110d).
+  ACCESS_BLOCKED
+  // A cancellation after the last day withdrew the revocation tasks not yet done (QĐ-110c, R-41).
+  REVOCATIONS_WITHDRAWN
+  // An IT Admin moved every subscription and application the leaver answered for to another IT Admin (QĐ-110j).
+  IT_ADMIN_HANDED_OVER
+  // The system closed the case: gone, every revocation done, the mailbox locked for good (QĐ-110e).
+  CLOSED_BY_SYSTEM
+  // The IT Admin recorded item (1b) of BM-08, the mailbox locked for good (B-1).
+  MAILBOX_LOCKED
 }
 
 // The record of a person who leaves, from the day it is written until it is closed (g6-offboarding-record): a planned handover
@@ -295,10 +319,16 @@ model OffboardingCase {
   lastWorkingDay         DateTime              @map("last_working_day") @db.Date
   departureEffectiveOn   DateTime              @map("departure_effective_on") @db.Date
   handoverDueOn          DateTime?             @map("handover_due_on") @db.Date
-  groundsType            String                @map("grounds_type")
+  // The day the IT Admin has until to take every right of the person away (QĐ-110c, M-09): null for a case that was closed or cancelled before the rule.
+  revocationDueOn        DateTime?             @map("revocation_due_on") @db.Date
+  // The moment the system announced that the access of the person is blocked (QĐ-110b, QĐ-110d): set once by the sweeper of the block moment, which is what keeps it from telling twice.
+  blockAnnouncedAt       DateTime?             @map("block_announced_at") @db.Timestamptz(3)
+  // The moment the system told that the lock of the company account of a departure blocked now is late (QĐ-94m(12), R-1): set once, so the telling is once for the case whoever the recipients are.
+  accountLockOverdueAt   DateTime?             @map("account_lock_overdue_at") @db.Timestamptz(3)
+  groundsType            String?                @map("grounds_type")
   groundsReference       String                @map("grounds_reference")
-  groundsIssuer          String                @map("grounds_issuer")
-  groundsIssuedOn        DateTime              @map("grounds_issued_on") @db.Date
+  groundsIssuer          String?                @map("grounds_issuer")
+  groundsIssuedOn        DateTime?              @map("grounds_issued_on") @db.Date
   headHandover           Json?                 @map("head_handover")
   placementClosedId      String?               @map("placement_closed_id") @db.Uuid
   leftOn                 DateTime?             @map("left_on") @db.Date
@@ -311,7 +341,12 @@ model OffboardingCase {
   accountLockByAppUserId String?               @map("account_lock_by_app_user_id") @db.Uuid
   accountLockAt          DateTime?             @map("account_lock_at") @db.Timestamptz(3)
   accountLockNote        String?               @map("account_lock_note")
+  // Item (1b) of BM-08, the lock of the mailbox for good (B-1): written once after (1a), by an IT Admin or, with no account, by the system when the last K1 revocation is ticked (MF2-G).
+  mailboxLockAt          DateTime?             @map("mailbox_lock_at") @db.Timestamptz(3)
+  mailboxLockByAppUserId String?               @map("mailbox_lock_by_app_user_id") @db.Uuid
+  mailboxLockNote        String?               @map("mailbox_lock_note")
   closedAt               DateTime?             @map("closed_at") @db.Timestamptz(3)
+  // Null when the system closed the case (QĐ-110e): every revocation done and (1b) written.
   closedByAppUserId      String?               @map("closed_by_app_user_id") @db.Uuid
   selfExecuted           Boolean               @default(false) @map("self_executed") @ignore
   recordedByAppUserId    String?               @map("recorded_by_app_user_id") @db.Uuid
@@ -330,6 +365,8 @@ model OffboardingCase {
   changes           OffboardingCaseChange[]
   recordedByTicket  SuperAdminEventTicket?  @relation("OffboardingRecordedByTicket", fields: [recordedByTicketId], references: [id], onDelete: Restrict)
   cancelledByTicket SuperAdminEventTicket?  @relation("OffboardingCancelledByTicket", fields: [cancelledByTicketId], references: [id], onDelete: Restrict)
+  supersededTransfers DepartmentTransfer[]  @relation("TransferSupersededByCase")
+  itAdminHandover   ItAdminHandover?
 
   @@index([lastWorkingDay, id])
   @@index([employeeId])
@@ -504,4 +541,32 @@ model PersonnelNoticeCounter {
   lastValue Int @map("last_value")
 
   @@map("personnel_notice_counters")
+}
+
+// What an IT Admin who leaves still answers for in the catalog (the subscriptions and the applications that name them responsible), kept once
+// when the departure or the transfer is recorded (`QĐ-110j`, `QĐ-111g`, `R-8`, `R-26`, X-IT.3), and the one hand-over of all of it that an IT
+// Admin makes (the latest one is kept): to whom, when, and how many were moved. Exactly one of the two sources; each has at most one row. A row exists only when the
+// person answered for something when the file was recorded. It never blocks the closing of the file (`QĐ-110e`).
+model ItAdminHandover {
+  id                    String    @id @default(uuid(7)) @db.Uuid
+  organizationId        String    @map("organization_id") @db.Uuid
+  offboardingCaseId     String?   @unique @map("offboarding_case_id") @db.Uuid
+  departmentTransferId  String?   @unique @map("department_transfer_id") @db.Uuid
+  subscriptionsAtRecord Int       @map("subscriptions_at_record")
+  applicationsAtRecord  Int       @map("applications_at_record")
+  createdAt             DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  // Set together when an IT Admin hands everything over (the latest hand-over): the IT Admin who took it, and how many of each were moved.
+  doneAt                DateTime? @map("done_at") @db.Timestamptz(3)
+  doneToEmployeeId      String?   @map("done_to_employee_id") @db.Uuid
+  doneSubscriptions     Int?      @map("done_subscriptions")
+  doneApplications      Int?      @map("done_applications")
+
+  organization       Organization        @relation(fields: [organizationId], references: [id], onDelete: Restrict)
+  offboardingCase    OffboardingCase?    @relation(fields: [offboardingCaseId], references: [id], onDelete: Restrict)
+  departmentTransfer DepartmentTransfer? @relation(fields: [departmentTransferId], references: [id], onDelete: Restrict)
+  doneToEmployee     Employee?           @relation("ItAdminHandoverReceiver", fields: [doneToEmployeeId], references: [id], onDelete: Restrict)
+
+  @@index([organizationId])
+  @@index([doneToEmployeeId])
+  @@map("it_admin_handovers")
 }

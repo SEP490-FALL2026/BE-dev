@@ -16,7 +16,7 @@ export interface LicensingAlert {
 }
 
 /** The sources of a revocation that a person who leaves opens. */
-const DEPARTURE_SOURCES: ReadonlySet<RevocationSource> = new Set(['DEPARTURE', 'ABRUPT_DEPARTURE']);
+export const DEPARTURE_SOURCES: ReadonlySet<RevocationSource> = new Set(['DEPARTURE', 'ABRUPT_DEPARTURE']);
 
 /** The people to tell, each once and in the order given; a missing person (nobody holds the role) is left out, never replaced. */
 export function recipientsOf(people: readonly (string | null | undefined)[]): string[] {
@@ -71,76 +71,6 @@ export function renewalWindowOpenedAlert(input: {
       audience: input.audience,
     },
     eventKey: `RENEWAL_WINDOW_OPENED:${input.assignmentId}:${input.expectedEndDate}:${input.audience}`,
-  };
-}
-
-export type HandoverStage = 'DUE' | 'OVERDUE';
-
-/**
- * Line 12: a handover waits for its confirmation. `DUE` is told once for the duty when it opens or falls to someone new; `OVERDUE`
- * once for each deadline that passed, so a deadline that moved and passed again is told again.
- */
-export function handoverAlert(
-  stage: HandoverStage,
-  duty: { id: string; assignmentId: string; employeeId: string; confirmerRole: string; dueOn: BusinessDate },
-): LicensingAlert {
-  const code = stage === 'DUE' ? 'HANDOVER_CONFIRMATION_DUE' : 'HANDOVER_CONFIRMATION_OVERDUE';
-
-  return {
-    code,
-    subject: { type: 'HandoverDuty', id: duty.id },
-    params: {
-      dutyId: duty.id,
-      assignmentId: duty.assignmentId,
-      employeeId: duty.employeeId,
-      role: duty.confirmerRole,
-      dueOn: duty.dueOn,
-    },
-    eventKey: stage === 'DUE' ? `${code}:${duty.id}` : `${code}:${duty.id}:${duty.dueOn}`,
-  };
-}
-
-/** Line 13, the reminder: the person who answers for service accounts has a file that takes effect on a day; once for the file and day. */
-export function serviceAccountDueAlert(
-  file: { employeeId: string; fileKind: string; fileId: string; dueOn: BusinessDate },
-  accountCount: number,
-): LicensingAlert {
-  return {
-    code: 'SERVICE_ACCOUNT_RESPONSIBLE_DUE',
-    subject: { type: 'Employee', id: file.employeeId },
-    params: {
-      employeeId: file.employeeId,
-      fileKind: file.fileKind,
-      fileId: file.fileId,
-      dueOn: file.dueOn,
-      accountCount,
-    },
-    eventKey: `SERVICE_ACCOUNT_RESPONSIBLE_DUE:${file.fileId}:${file.dueOn}`,
-  };
-}
-
-/** Line 13, the alert: the day came and the account still has nobody new; once for the account and the day. */
-export function serviceAccountOverdueAlert(row: {
-  assignmentId: string;
-  employeeId: string;
-  owningDepartmentId: string | null;
-  fileKind: string;
-  fileId: string;
-  dueOn: BusinessDate;
-}): LicensingAlert {
-  return {
-    code: 'SERVICE_ACCOUNT_RESPONSIBLE_OVERDUE',
-    subject: { type: 'LicenseAssignment', id: row.assignmentId },
-    // Picked one by one: the row a caller holds also carries the identifier of the account, which no notice may say.
-    params: {
-      assignmentId: row.assignmentId,
-      employeeId: row.employeeId,
-      owningDepartmentId: row.owningDepartmentId,
-      fileKind: row.fileKind,
-      fileId: row.fileId,
-      dueOn: row.dueOn,
-    },
-    eventKey: `SERVICE_ACCOUNT_RESPONSIBLE_OVERDUE:${row.assignmentId}:${row.dueOn}`,
   };
 }
 

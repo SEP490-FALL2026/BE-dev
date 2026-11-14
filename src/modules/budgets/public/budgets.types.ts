@@ -83,7 +83,8 @@ export type CommitmentReleaseReason =
   | 'PARTICIPANT_WITHDRAWN'
   | 'REVOKED'
   | 'LATE_GRANT'
-  | 'GRANTED_FROM_POOL';
+  | 'GRANTED_FROM_POOL'
+  | 'TRANSFER_EFFECTIVE';
 
 /** What goes back to the budget when a request ends or a share of it is withdrawn. */
 export interface CommitmentReleaseInput {
@@ -113,6 +114,12 @@ export interface SeatCommitment {
   origin: 'APPROVAL' | 'YEAR_START';
   seatMonthlyMinor: bigint | null;
   heldMinor: bigint;
+  /**
+   * The references of the releases this commitment already gave the day a transfer took effect (reason `TRANSFER_EFFECTIVE`,
+   * `transfer:<transferId>:assignment:<assignmentId>`), read from its ledger under the same lock: what tells the release by day of a right
+   * that this commitment has given back for it already, whoever asks for the revocation (MF3-B review, D-86).
+   */
+  transferReleases: readonly string[];
 }
 
 /** A commitment after money went back: what was released now, what it still holds, and whether none is left. */
@@ -129,4 +136,11 @@ export interface CommittedAmount {
   requestId: string;
   amountMinor: bigint;
   currency: string;
+}
+
+/** What a request still holds and has not spent or given back, in one currency: the part of a commitment that going back to the budget would free. */
+export interface HeldAmount {
+  requestId: string;
+  currency: string;
+  heldMinor: bigint;
 }

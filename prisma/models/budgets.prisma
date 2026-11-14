@@ -286,6 +286,8 @@ enum CommitmentReleaseReason {
   LATE_GRANT
   // A K4 key was given from the pool: the price held is not spent (`QĐ-106d`).
   GRANTED_FROM_POOL
+  // The holder moved to another department: what the seat would cost from the day the transfer takes effect goes back (`QĐ-111bg`).
+  TRANSFER_EFFECTIVE
 }
 
 // The electronic record of the decision of the spending approver on a version (US-06-11 AC-1): who, in which role, what,

@@ -22,6 +22,7 @@ import {
   SubscriptionPrimaryNotEligibleError,
   SubscriptionResponsibleNotItAdminError,
   SubscriptionResponsibleRequiredError,
+  SubscriptionVendorAdminsRequiredError,
   SubscriptionDatesInvalidError,
   SubscriptionDuplicatePlanError,
   SubscriptionNotFoundError,
@@ -108,6 +109,13 @@ export function toSubscriptionApiException(error: unknown): unknown {
       billingCycle: error.billingCycle,
     });
   }
+  if (error instanceof SubscriptionVendorAdminsRequiredError) {
+    return refuse(UNPROCESSABLE, 'SUBSCRIPTION.VENDOR_ADMINS_REQUIRED', error.message, {
+      planId: error.planId,
+      given: error.given,
+      required: error.required,
+    });
+  }
   if (error instanceof SubscriptionResponsibleRequiredError) {
     return refuse(UNPROCESSABLE, 'SUBSCRIPTION.RESPONSIBLE_REQUIRED', error.message);
   }
@@ -152,6 +160,7 @@ export const SUBSCRIPTION_ERROR_EXAMPLES = {
   BILLING_LONGER_THAN_COMMITMENT: example(new SubscriptionBillingLongerThanCommitmentError()),
   BILLING_CYCLE_UNSUPPORTED: example(new SubscriptionBillingCycleUnsupportedError('QUARTERLY')),
   RESPONSIBLE_REQUIRED: example(new SubscriptionResponsibleRequiredError()),
+  VENDOR_ADMINS_REQUIRED: example(new SubscriptionVendorAdminsRequiredError('<plan-id>', 1, 2)),
   RESPONSIBLE_NOT_IT_ADMIN: example(new SubscriptionResponsibleNotItAdminError()),
   PRIMARY_NOT_ELIGIBLE: example(new SubscriptionPrimaryNotEligibleError('NOT_ACTIVE')),
   PRIMARY_CONFLICT: example(new SubscriptionPrimaryConflictError()),

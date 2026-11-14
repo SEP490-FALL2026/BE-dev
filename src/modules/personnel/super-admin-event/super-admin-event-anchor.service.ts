@@ -5,6 +5,7 @@ import type { NoticeEventInput } from '../personnel-notice.types';
 import type { PersonnelActor } from '../public/personnel.types';
 import { SuperAdminEventRefusedError } from '../public/super-admin-event.errors';
 import type { EventBasis, NoticeSource, SuperAdminEventModeName } from '../public/super-admin-event.types';
+import { documentBasisOf } from './super-admin-event.policy';
 import { noticeKindFitsMode } from './super-admin-event.policy';
 import { SuperAdminEventRepo, type RecordKind } from './super-admin-event.repo';
 
@@ -43,9 +44,11 @@ export class SuperAdminEventAnchor {
     subject: Subject,
     mode: SuperAdminEventModeName,
     source: NoticeSource,
-    basis: EventBasis,
+    given: EventBasis,
     event: NoticeEventInput,
   ): Promise<string> {
+    // The notice is checked against the document in four parts: a basis in one box is refused here (BASIS_INVALID).
+    const basis = documentBasisOf(given);
     const notice = await this.tickets.noticeOf(tx, source.noticeId);
     if (!notice || notice.employeeId !== subject.id) throw new SuperAdminEventRefusedError('NOTICE_NOT_ABOUT_SUBJECT');
     if (!noticeKindFitsMode(mode, notice.kind)) throw new SuperAdminEventRefusedError('NOTICE_KIND_MISMATCH');

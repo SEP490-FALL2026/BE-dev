@@ -14,6 +14,7 @@ import { RequestReadAccessService } from './request-read-access.service';
 import { AccessRequestRepo } from '../access-request/access-request.repo';
 import type { AccessRequestRecord, ApprovalRecordRecord, NeedStepRecord } from '../access-request/access-request.types';
 import type { ReadableCancelCause } from '../access-request/group-request.types';
+import type { LimitExemption } from '../request-limits/request-limits.policy';
 
 export interface EmployeeRefView {
   employeeId: string;
@@ -100,6 +101,8 @@ export interface AccessRequestView extends Omit<
    * with how many and why they ask for more; null when it is not flagged. A request for a group carries it on its lines.
    */
   flags: { manyPaidSoftware: { count: number; reason: string } | null };
+  /** Why the request was left out of GH-1/GH-2 when it was sent (`QĐ-110q`); null for every other request. */
+  limitExemption: LimitExemption | null;
 }
 
 export interface RenewalView {
@@ -271,6 +274,7 @@ export class AccessRequestQueryService {
             },
       serviceAccount: this.serviceAccountOf(record.serviceAccount, person),
       flags: { manyPaidSoftware: record.manyPaidSoftware ?? null },
+      limitExemption: record.limitExemption ?? null,
       renewal: this.renewalOf(record.renewal),
       needStep: {
         ...step,

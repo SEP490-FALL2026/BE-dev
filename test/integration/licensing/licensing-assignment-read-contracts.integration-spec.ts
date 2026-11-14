@@ -3,6 +3,7 @@ import { pretendBusinessToday } from '../../support/pretend-today';
 import { PgRelay } from '../../support/pg-relay';
 import { QueryCounter, dataStatements, tablesOf } from '../../support/query-count';
 import { AssignmentWire, SeatHarness } from '../../support/seat-baseline-harness';
+import { legacyServiceAccount } from '../../support/legacy-service-account';
 
 const h = new SeatHarness();
 
@@ -40,23 +41,18 @@ describe('assignment and license key read contracts (integration, real PostgreSQ
   const list = (query: object) =>
     counter.run(() => request(h.server()).get('/api/v1/license-assignments').query(query).set(h.as(h.it1)).expect(200));
   const row = (code: string) => ({ employee_code: code, account_identifier: `${code.toLowerCase()}@acme.vn` });
-  const bot = (code: string, identifier: string) => ({
-    employee_code: code,
-    account_identifier: identifier,
-    kind: 'service',
-    reason: 'CI pipeline',
-  });
 
   it('names the person, the plan and the Cost Center of every row, and takes the same statements for 5 rows as for 40', async () => {
     const subscriptionId = await h.subscription(100);
     await h.crowd('LD10A', 4);
-    await h.written({ subscriptionId }, [
-      row('LD10A0'),
-      row('LD10A1'),
-      row('LD10A2'),
-      bot('LD10A3', 'ld10-bot'),
-      row('E-OWN'),
-    ]);
+    await h.written({ subscriptionId }, [row('LD10A0'), row('LD10A1'), row('LD10A2'), row('E-OWN')]);
+    // A service account of the earlier releases, written by SQL: the list still names the department that owns it and its Cost Center.
+    await legacyServiceAccount(h.ctx.sql, {
+      subscriptionId,
+      employeeId: (await h.ctx.sql.query<{ id: string }>(`SELECT id FROM employees WHERE employee_code = 'LD10A3'`))
+        .rows[0].id,
+      identifier: 'ld10-bot',
+    });
     const few = await list({ subscriptionId, pageSize: 100 });
     await h.crowd('LD10B', 35);
     await h.written(

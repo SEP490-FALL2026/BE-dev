@@ -193,6 +193,7 @@ describe('API inventory (e2e): openapi presentation and wire messages', () => {
       'healthGetReadiness',
       'itAdminDashboardGet',
       'managerDashboardGet',
+      'meDepartmentTransferGet',
       'meDepartureNoticeGet',
       'meGet',
       'monitoringNoticeCurrentGet',
@@ -267,8 +268,8 @@ describe('API inventory (e2e): openapi presentation and wire messages', () => {
         })
         .map((operation) => operation.key);
 
-      // 344 at gói 7; 375 with MF-5 (ghost seats, usage), 381 with K4 withdrawal, the run by hand of G1–G4 and the four routes of the history; 378 with QĐ-111g (five Business Owner routes out, the responsibility transfer and the IT Admin list in).
-      expect(operations).toHaveLength(378);
+      // 344 at gói 7; 375 with MF-5 (ghost seats, usage), 381 with K4 withdrawal, the run by hand of G1–G4 and the four routes of the history; 378 with QĐ-111g (five Business Owner routes out, the responsibility transfer and the IT Admin list in); 374 with QĐ-110g (the four routes of the handover out); 375 with the flag of a machine account (P13) and 371 with QĐ-110m (the four routes of the service accounts out); 372 with MF2-G.1 (the lock of the mailbox for good, P28) and 371 with MF2-G.3 (the closing route of the IT Admin out, P4: the system closes the case); 366 with MF3-A.1 (the closing of a transfer and the four routes of the review of the new head out, P9); 367 with MF3-B.5 (the transfer of the person who asks while the grace lasts, P8); 369 with X-IT.3 (the hand-over of an IT Admin who leaves, P5: one route for a departure, one for a transfer). 372 with DS.2 (the list of software of a department: read, change, and the list of my department, P16 and P17); 376 with DS.3 (the proposals to add to it: propose, list, accept, reject, P18); 377 with RD.2 (the report of the SLA of the revocations, P22); 379 with RD.3 (the preview of a departure and of a transfer, P23).
+      expect(operations).toHaveLength(379);
       expect(missing).toEqual([]);
     });
 
@@ -293,6 +294,23 @@ describe('API inventory (e2e): openapi presentation and wire messages', () => {
         );
 
       expect(routeHandlersOf(app).filter((handler) => skips(handler.target) || skips(handler.controller))).toEqual([]);
+    });
+
+    it('says, on the two tables of wasted seats, which department the filter reads, with no internal code in the words', () => {
+      const departmentFilter = (path: string): string => {
+        const parameters = (document.paths[path]?.get?.parameters ?? []) as { name?: string; description?: string }[];
+
+        return parameters.find((parameter) => parameter.name === 'departmentId')?.description ?? '';
+      };
+      const recommendations = departmentFilter('/api/v1/ghost-seat-recommendations');
+      const seatStates = departmentFilter('/api/v1/ghost-seat-seat-states');
+
+      // The recommendations are filtered by the department that owned the seat when it was recommended, the seat states by where the holder is now.
+      expect(recommendations).toContain('owned the seat when it was recommended');
+      expect(recommendations).toContain('not where the holder is placed now');
+      expect(seatStates).toContain('placed in this department today');
+      expect(seatStates).toContain('not the department of a recommendation');
+      expect([recommendations, seatStates].filter((description) => INTERNAL_CODE.test(description))).toEqual([]);
     });
 
     it('keeps the guard and unavailable codes the client already handles (Q8)', () => {

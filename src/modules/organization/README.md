@@ -15,10 +15,11 @@ operating-parameters, personnel, requests ([module-graph](../../../docs/generate
 - Hai facade, cả hai gọi trong `tx` của bên gọi. Chọn theo việc cần làm: chỉ đọc (kể cả khóa `FOR SHARE` để giữ giá trị đã đọc
   ổn định) thì `OrganizationReadApi`; ghi, khóa `FOR UPDATE` hoặc hỏi "đang được dùng" thì `OrganizationApi`. Một lớp dùng cả hai
   thì inject cả hai, tên trường `organization` và `organizationReads`.
-  - `OrganizationReadApi` ([public/organization-read.api.ts](public/organization-read.api.ts)), 37 phương thức đọc:
+  - `OrganizationReadApi` ([public/organization-read.api.ts](public/organization-read.api.ts)), 38 phương thức đọc:
     - Chung: `businessToday` — hôm nay theo múi giờ của tổ chức; `getOrganization`, `getOrganizationShared` (`FOR SHARE`),
       `getCompanyEmailDomains`, `countUnmarkedChangesAsOf` (cho `ops:inspect`).
     - Phòng ban: `getDepartmentBrief(s)`, `getActiveDepartmentIds`, `lockDepartmentShared`, `lockDepartmentForEntry`, `getDepartmentMemberIds`,
+      `getMemberIdsOfDepartments` (thành viên của nhiều phòng trong một câu lệnh),
       `getDepartmentHeads`, `getHeadedDepartment`, `isDepartmentHead`, `departmentsWithoutHead`; IT Admin phụ trách:
       `getItAdminInCharge`, `getItAdminInChargeOfDepartment`, `getItAdminScope`, `getDepartmentIdsInChargeOf`.
     - Nhân viên: `getEmployee`, `getEmployeeByCode`, `getEmployeesByCodes`, `getEmployeesByWorkEmails` (theo email công việc đã chuẩn hóa, gồm
@@ -53,8 +54,7 @@ operating-parameters, personnel, requests ([module-graph](../../../docs/generate
 
 - Mở ([public/organization.extension-points.ts](public/organization.extension-points.ts)), bên đăng ký `*.listener.ts`:
   - `OrganizationChangeListeners` (`organization.change-listeners`) — organization `department/held-notice-handover`;
-    budgets `proposal/budget-head-change`; personnel `transfer/transfer-effective`,
-    `transfer-review/transfer-review`; requests `reassignment/organization-change`.
+    budgets `proposal/budget-head-change`; personnel `transfer/transfer-effective`; requests `reassignment/organization-change`.
   - `DepartmentUseContributions` (`organization.department-use-readers`) — catalog
     `subscription/subscription-department-use`; licensing `provisioning/department-use/department-open-work`; personnel
     `event-notice/department-open-work`; requests `access-request/open-request/department-open-requests`.

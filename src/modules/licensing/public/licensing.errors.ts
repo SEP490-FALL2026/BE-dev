@@ -1,3 +1,5 @@
+import type { K1ChecklistExpectation } from './licensing.types';
+
 /** The seat baseline is closed: an assignment without a request is no longer taken (`US-02-05` AC-6, `OI-10`). */
 export class SeatBaselineClosedError extends Error {
   constructor() {
@@ -65,42 +67,8 @@ export class AssignmentNotFoundError extends Error {
 
 export class AssignmentNotOpenError extends Error {
   constructor() {
-    super('The assignment has ended or is set to end: only an open one changes hands.');
+    super('The assignment has ended or is set to end: only an open one changes.');
     this.name = 'AssignmentNotOpenError';
-  }
-}
-
-export class AssignmentNotServiceAccountError extends Error {
-  constructor() {
-    super('Only the person responsible for a service account changes by this route.');
-    this.name = 'AssignmentNotServiceAccountError';
-  }
-}
-
-export type ResponsibleProblem =
-  'NOT_FOUND' | 'NOT_ACTIVE' | 'HANDING_OVER' | 'SAME_PERSON' | 'OUTSIDE_OWNING_DEPARTMENT';
-
-export class AssignmentResponsibleInvalidError extends Error {
-  constructor(readonly problem: ResponsibleProblem) {
-    super(`The person named cannot take over the service account: ${problem}.`);
-    this.name = 'AssignmentResponsibleInvalidError';
-  }
-}
-
-export type EffectiveDateProblem = 'NOT_AFTER_START' | 'IN_THE_PAST' | 'EXPECTED_END_BEFORE_START';
-
-export class AssignmentEffectiveDateInvalidError extends Error {
-  constructor(readonly problem: EffectiveDateProblem) {
-    super(`The date the change takes effect is not valid: ${problem}.`);
-    this.name = 'AssignmentEffectiveDateInvalidError';
-  }
-}
-
-/** A contractor, freelancer or intern holds the seat without an expected end date (`INV-07`). */
-export class AssignmentExpectedEndRequiredError extends Error {
-  constructor() {
-    super('A contractor, freelancer or intern needs an expected end date.');
-    this.name = 'AssignmentExpectedEndRequiredError';
   }
 }
 
@@ -121,6 +89,33 @@ export class ToolsDepartmentOutOfScopeError extends Error {
 }
 
 /**
+ * A place proposed for the list of software of a department, or added to it, is not what the catalog offers (`QĐ-110t`): an application that
+ * does not exist or is retired, or a plan that is not one of that application. Every such place is named. What the catalog does not have
+ * is asked for as new software (case B), never listed.
+ */
+export class DepartmentSoftwareNotInCatalogError extends Error {
+  constructor(readonly places: readonly { applicationId: string; planId: string | null }[]) {
+    super('The software is not in the catalog: ask for it as new software.');
+    this.name = 'DepartmentSoftwareNotInCatalogError';
+  }
+}
+
+/**
+ * The note given with a place of the list of software of a department is one the table would refuse: longer than 500 characters, or holding a
+ * NUL. It is judged before any statement, so the transaction of the caller is not aborted; the caller answers it as a 422.
+ */
+export class DepartmentSoftwareNoteInvalidError extends Error {
+  constructor(readonly reason: 'TOO_LONG' | 'ILLEGAL_CHARACTER') {
+    super(
+      reason === 'TOO_LONG'
+        ? 'The note of a place of the list is at most 500 characters.'
+        : 'The note of a place of the list holds a character no text keeps.',
+    );
+    this.name = 'DepartmentSoftwareNoteInvalidError';
+  }
+}
+
+/**
  * The request cannot be granted: the gate that answers for requests does not know it, has not seen it approved, has ended
  * it, it asks for software that is not in the catalog yet (`US-05-06` AC-8), or it is for a service account whose boundary
  * the IT Admin has not accepted (`US-05-21` AC-3).
@@ -135,7 +130,7 @@ export class GrantRequestRefusedError extends Error {
   }
 }
 
-/** The plan is K3 (specified only) or K4 (needs the key store and the company devices): no grant for it yet (`RB-4`). */
+/** The plan is K3 (SSO/SCIM, specified only): no grant for it yet (`RB-4`). K4 is granted from the key pool of its plan (`QĐ-103d`). */
 export class ProvisioningTypeNotSupportedError extends Error {
   constructor(readonly provisioningType: string) {
     super(`A ${provisioningType} plan cannot be granted yet.`);
@@ -190,10 +185,21 @@ export class ProvisioningResponsibleInvalidError extends Error {
   }
 }
 
-/** The beneficiary has left: no task to grant starts for them (`QĐ-77f`). */
+/**
+ * The beneficiary has left, or a departure blocks their access from today: no task to grant starts for them (`QĐ-77f`, `QĐ-110d`). The
+ * reason says which, for a client that tells a person at work from one who is gone (`details.cause` on the wire; the field is not called
+ * `cause`, which would hide `Error.cause`).
+ */
 export class ProvisioningBeneficiaryDepartedError extends Error {
-  constructor(readonly requestId: string) {
-    super('The beneficiary has left the company.');
+  constructor(
+    readonly requestId: string,
+    readonly reason: 'LEFT' | 'ACCESS_BLOCKED' = 'LEFT',
+  ) {
+    super(
+      reason === 'LEFT'
+        ? 'The beneficiary has left the company.'
+        : 'The access of the beneficiary is blocked by their departure.',
+    );
     this.name = 'ProvisioningBeneficiaryDepartedError';
   }
 }
@@ -330,7 +336,7 @@ export type RevocationProblem = 'SOURCE_REQUIRED' | 'ASSIGNMENT_IS_SERVICE_ACCOU
 
 /**
  * The seat cannot be revoked: no source says why, the assignment is a service account (answered for by a person, not part
- * of the personal rights a departure takes away: `US-03-04` AC-17), or its kind of provisioning has no revocation (K3, K4).
+ * of the personal rights a departure takes away: `US-03-04` AC-17), or its kind of provisioning has no revocation (K3, which is specified only; K4 is revoked and its key goes back to the store, `QĐ-103d`).
  */
 export class RevocationRefusedError extends Error {
   constructor(
@@ -366,11 +372,21 @@ export type RevocationCompletionProblem =
   | 'ACCESS_STATE_INVALID'
   | 'WITHDRAWAL_REASON_REQUIRED'
   /** A K4 completion must say where the key goes (`QĐ-111p`). */
-  | 'KEY_DISPOSITION_REQUIRED';
+  | 'KEY_DISPOSITION_REQUIRED'
+  /** A K1 completion lacks a step of its checklist (not ticked, or ticked with no time) or the evidence (`QĐ-111az`). */
+  | 'K1_CHECKLIST_INCOMPLETE'
+  /** The steps of a K1 checklist were not ticked in their order: a step is timed before one that comes first (`QĐ-111az`, m-09). */
+  | 'K1_CHECKLIST_OUT_OF_ORDER';
 
-/** The way a revocation is completed does not fit its kind of provisioning, or lacks what the kind needs to be stored. */
+/**
+ * The way a revocation is completed does not fit its kind of provisioning, or lacks what the kind needs to be stored. A refusal of the checklist
+ * of a K1 revocation also carries what the server expects of it (`expected`, the `details` of the answer).
+ */
 export class RevocationCompletionError extends Error {
-  constructor(readonly problem: RevocationCompletionProblem) {
+  constructor(
+    readonly problem: RevocationCompletionProblem,
+    readonly expected?: K1ChecklistExpectation,
+  ) {
     super(`The completion of the revocation is not valid: ${problem}.`);
     this.name = 'RevocationCompletionError';
   }
@@ -395,8 +411,8 @@ export class AssignmentRenewalRefusedError extends Error {
 
 /**
  * A module that extends a revocation (a listener of `RevocationListeners`) refuses the step: the code is its own and stable, and the
- * refusal is answered as a conflict. Throw it at `BEFORE_WORK` to stop the task being completed (the handover of a return, the
- * confirmation of a departure) so the caller sees a code and not a failure of the server.
+ * refusal is answered as a conflict. Throw it at `BEFORE_WORK` to stop the task being taken or completed so the caller sees a code and not a failure of the
+ * server. No listener does so today: the confirmation of a handover that did is gone (`QĐ-110g`).
  */
 export class RevocationHookRefusedError extends Error {
   constructor(

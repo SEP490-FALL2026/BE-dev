@@ -36,7 +36,7 @@ describe('a transfer that names a successor and the revoke of MANAGER of that su
           employeeId: head.employeeId,
           toDepartmentId: target.id,
           effectiveOn: t.day(30),
-          grounds: t.grounds,
+          groundsNote: t.groundsNote,
           successor: { kind: 'EMPLOYEE', employeeId: heir.employeeId },
         })
         .then((response) => response);

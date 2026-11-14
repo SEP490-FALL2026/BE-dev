@@ -242,7 +242,7 @@ describe('the controlled procedure records the event a notice of a head announce
   it('abrupt-departure-record from a sudden departure notice, the same way; the person is LEFT at once and the case carries the notice', async () => {
     const result = await run({
       mode: 'abrupt-departure-record',
-      lastWorkingDay: h.day(-1),
+      lastWorkingDay: h.today(),
       fromNotice: { noticeId: notices.abrupt.id, ...CHECK },
     });
 

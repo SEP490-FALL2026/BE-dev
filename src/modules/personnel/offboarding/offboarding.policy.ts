@@ -1,6 +1,7 @@
 import { addDays, type BusinessDate } from '../../../core/business-date';
 import { addWorkingDays, type NonWorkingDates } from '../../../core/working-days';
-import { groundsRefusal, type GroundsInput } from '../personnel-grounds.policy';
+import { firstDayRefused } from '../departure-deadline/block-moment.policy';
+import { groundsNoteRefusal } from '../personnel-grounds.policy';
 import type { AccessBlockMode, OffboardingState } from './offboarding.types';
 
 /** What the policy refuses, as a semantic code (`OFFBOARDING_CASE.<code>` on the wire) and the facts a person needs to put it right. */
@@ -27,7 +28,7 @@ export function departureEffectiveOn(facts: {
   return floors.reduce((latest, day) => (day > latest ? day : latest));
 }
 
-/** The day the confirmation of the handover is due: the last working day less one working day (`OI-14c`, `US-03-04` AC-1, AC-7). */
+/** The day the old column `handover_due_on` of a planned departure holds: the last working day less one working day (no handover is confirmed by it any more, `QĐ-110g`). */
 export function handoverDueOn(lastWorkingDay: BusinessDate, nonWorkingDates: NonWorkingDates): BusinessDate {
   return addWorkingDays(lastWorkingDay, -1, nonWorkingDates);
 }
@@ -54,11 +55,49 @@ function plannedDayRefusal(day: BusinessDate | undefined, facts: LastDayFacts): 
   return null;
 }
 
-/** A departure blocked now: its last working day may be past, today or ahead (`Q-04` B), but not before the person came. */
+/**
+ * The last working day a departure is judged on (`QĐ-110b`): one blocked now works to the end of the day it is recorded, so it is today
+ * when none is given; a planned handover has no day to guess, and what was given is judged as it is (a day that is not today is refused
+ * for the departure blocked now by {@link recordRefusal}, not corrected here).
+ */
+export function lastWorkingDayOf(
+  accessBlockMode: AccessBlockMode,
+  given: BusinessDate | undefined,
+  today: BusinessDate,
+): BusinessDate | undefined {
+  if (accessBlockMode === 'WITH_LAST_DAY') return given;
+
+  return given === undefined || given.trim() === '' ? today : given;
+}
+
+/**
+ * The first thing asked of a departure blocked now, before the person is read or anything is locked (`QĐ-110b`, S2): its last working day is
+ * the day it is recorded. A day left out is today; any other day is refused with the reason `BLOCK_NOW_DAY_IS_TODAY`. A planned handover
+ * has nothing to judge here.
+ */
+export function blockNowDayIsTodayRefusal(
+  accessBlockMode: AccessBlockMode,
+  day: BusinessDate | undefined,
+  today: BusinessDate,
+): OffboardingRefusal | null {
+  if (accessBlockMode !== 'BLOCK_NOW') return null;
+  const chosen = day === undefined || day.trim() === '' ? today : day;
+
+  return chosen === today
+    ? null
+    : { code: 'LAST_WORKING_DAY_INVALID', details: { reason: 'BLOCK_NOW_DAY_IS_TODAY', today } };
+}
+
+/**
+ * A departure blocked now: its last working day is the day it is recorded, not before the person came or the placement began (the day
+ * itself is also asked early by {@link blockNowDayIsTodayRefusal}, so this keeps the record policy whole on its own).
+ */
 function blockNowDayRefusal(day: BusinessDate | undefined, facts: LastDayFacts): OffboardingRefusal | null {
-  if (day === undefined || day.trim() === '') return { code: 'LAST_WORKING_DAY_REQUIRED' };
-  if (day < facts.hireDate) return { code: 'LAST_WORKING_DAY_INVALID', details: { reason: 'BEFORE_HIRE_DATE' } };
-  if (facts.placementFrom !== null && day < facts.placementFrom)
+  const early = blockNowDayIsTodayRefusal('BLOCK_NOW', day, facts.today);
+  if (early) return early;
+  const chosen = day === undefined || day.trim() === '' ? facts.today : day;
+  if (chosen < facts.hireDate) return { code: 'LAST_WORKING_DAY_INVALID', details: { reason: 'BEFORE_HIRE_DATE' } };
+  if (facts.placementFrom !== null && chosen < facts.placementFrom)
     return {
       code: 'LAST_WORKING_DAY_INVALID',
       details: { reason: 'BEFORE_PLACEMENT_START', placementFrom: facts.placementFrom },
@@ -71,7 +110,7 @@ export interface RecordFacts extends LastDayFacts {
   lastWorkingDay: BusinessDate | undefined;
   accessBlockMode: AccessBlockMode;
   employee: { status: 'ACTIVE' | 'TERMINATED'; workState: 'WORKING' | 'ON_LONG_LEAVE' | 'HANDING_OVER' | 'LEFT' };
-  grounds: GroundsInput | undefined;
+  groundsNote: string | undefined;
   /** The transfer of the person that waits, if any. */
   pendingTransfer: { effectiveOn: BusinessDate } | null;
   /** The Super Admin confirmed that the transfer that waits is cancelled with the departure. */
@@ -96,13 +135,12 @@ export function recordRefusal(facts: RecordFacts): OffboardingRefusal | null {
       ? blockNowDayRefusal(facts.lastWorkingDay, facts)
       : plannedDayRefusal(facts.lastWorkingDay, facts);
   if (day) return day;
-  const grounds = groundsRefusal(facts.grounds);
-  if (grounds)
-    return { code: grounds.reason, details: 'missing' in grounds ? { missing: grounds.missing } : undefined };
+  const grounds = groundsFault(facts.groundsNote);
+  if (grounds) return grounds;
 
   const transfer = pendingTransferRefusal(
     facts.pendingTransfer,
-    facts.lastWorkingDay as BusinessDate,
+    lastWorkingDayOf(facts.accessBlockMode, facts.lastWorkingDay, facts.today) as BusinessDate,
     facts.cancelPendingTransfer,
   );
   if (transfer) return transfer;
@@ -127,17 +165,17 @@ export function pendingTransferRefusal(
   return cancelRequested ? null : { code: 'TRANSFER_CANCELLATION_REQUIRED' };
 }
 
-/** The basis as a refusal of the departure flow: a part missing, or the code of a notice. Null when it is whole. */
-function groundsFault(grounds: GroundsInput | undefined | null): OffboardingRefusal | null {
-  const found = groundsRefusal(grounds);
-  if (!found) return null;
+/** The basis as a refusal of the departure flow: the box empty or too long, or the code of a notice. Null when it is fine. */
+function groundsFault(groundsNote: string | undefined | null): OffboardingRefusal | null {
+  const found = groundsNoteRefusal(groundsNote);
 
-  return { code: found.reason, ...('missing' in found ? { details: { missing: found.missing } } : {}) };
+  return found ? { code: found.reason } : null;
 }
 
 export interface ChangeLastDayFacts extends LastDayFacts {
   state: OffboardingState;
-  grounds?: GroundsInput | undefined;
+  accessBlockMode: AccessBlockMode;
+  groundsNote?: string | undefined;
   currentLastWorkingDay: BusinessDate;
   newLastWorkingDay: BusinessDate;
   reason: string;
@@ -153,17 +191,20 @@ export function notHandingOverRefusal(state: OffboardingState): OffboardingRefus
 }
 
 /**
- * Whether the last working day of a handover under way may move (`US-03-04` AC-14, AC-22, AC-29): not once today is past the old
- * one (only a cancellation or the departure itself is left), with a reason, to a day that is today or later and not before the person
- * came, and the head of the department is judged again on the new day.
+ * Whether the last working day of a handover under way may move (`US-03-04` AC-14, AC-22, AC-29): not for a case blocked now, whose
+ * last working day is the day it was recorded (`QĐ-110b`, 409 `BLOCK_NOW_LAST_DAY_FIXED`, also once it has left), not once today is past
+ * the old one (only a cancellation or the departure itself is left), with a reason, to a day that is today or later and not before the
+ * person came, and the head of the department is judged again on the new day. A cancelled case is not a handover under way, whatever its mode.
  */
 export function changeLastDayRefusal(facts: ChangeLastDayFacts): OffboardingRefusal | null {
+  if (facts.state === 'CANCELLED') return notHandingOverRefusal(facts.state);
+  if (facts.accessBlockMode === 'BLOCK_NOW') return { code: 'BLOCK_NOW_LAST_DAY_FIXED' };
   const state = notHandingOverRefusal(facts.state);
   if (state) return state;
   if (facts.today > facts.currentLastWorkingDay)
     return { code: 'LAST_DAY_ALREADY_PASSED', details: { lastWorkingDay: facts.currentLastWorkingDay } };
   if (facts.reason.trim() === '') return { code: 'REASON_REQUIRED' };
-  const basis = groundsFault(facts.grounds);
+  const basis = groundsFault(facts.groundsNote);
   if (basis) return basis;
   const day = plannedDayRefusal(facts.newLastWorkingDay, facts);
   if (day) return day;
@@ -176,13 +217,13 @@ export function changeLastDayRefusal(facts: ChangeLastDayFacts): OffboardingRefu
 export function cancelRefusal(facts: {
   state: OffboardingState;
   reason: string;
-  grounds?: GroundsInput | undefined;
+  groundsNote?: string | undefined;
 }): OffboardingRefusal | null {
   const state = notHandingOverRefusal(facts.state);
   if (state) return state;
   if (facts.reason.trim() === '') return { code: 'REASON_REQUIRED' };
 
-  return groundsFault(facts.grounds);
+  return groundsFault(facts.groundsNote);
 }
 
 /**
@@ -245,12 +286,7 @@ export function accessBlockedFrom(
   facts: { state: OffboardingState; leftOn: BusinessDate | null },
   block: DepartureBlock | null,
 ): BusinessDate | null {
-  if (facts.state === 'CANCELLED') return null;
-  const days = [block?.blockedFrom, facts.state === 'LEFT' ? facts.leftOn : null].filter(
-    (day): day is BusinessDate => typeof day === 'string',
-  );
-
-  return days.length === 0 ? null : days.reduce((first, day) => (day < first ? day : first));
+  return firstDayRefused(facts, block);
 }
 
 /** Whether the lock of the account may be written (`US-03-04` AC-20, `QĐ-77i`): the person is blocked and it was not written yet. */
@@ -260,9 +296,10 @@ export function accountLockRefusal(facts: { blocked: boolean; locked: boolean })
   return facts.locked ? { code: 'ALREADY_RECORDED' } : null;
 }
 
-/** K1, K2, K4 (the key goes back to the store) and K5 have a revocation; K3 does not, so a task cannot be made for it. */
-export const isRevocableType = (provisioningType: string): boolean =>
-  provisioningType === 'K1' || provisioningType === 'K2' || provisioningType === 'K4' || provisioningType === 'K5';
+/** The source a departure gives to the revocations it asks for (and takes back when it is cancelled): the mode of the case names it. */
+export function departureRevocationSource(mode: AccessBlockMode): 'DEPARTURE' | 'ABRUPT_DEPARTURE' {
+  return mode === 'BLOCK_NOW' ? 'ABRUPT_DEPARTURE' : 'DEPARTURE';
+}
 
 /** What a revocation of the rights is taken from: the seats the person holds, and which of them can be taken away by a task. */
 export interface RightFacts {
@@ -329,33 +366,26 @@ export interface BlockerFacts {
   state: OffboardingState;
   closed: boolean;
   lockRecorded: boolean;
-  /** Personal seats still held that nothing says are running on to the end of a paid period. */
+  /** Item (1b) of `BM-08`, the lock of the mailbox for good, is written (`B-1`). */
+  mailboxLocked: boolean;
+  /** The personal seats of the person that have no task of revocation completed (`QĐ-110c`): those nobody opened a task for included. */
   openRights: number;
-  /** Seats whose renewal is cancelled and whose access runs on to the end of the paid period. */
-  accessRunsOn: number;
-  /** What the flows that come after register, each with how many things it still waits on. */
-  registered: Readonly<Record<string, number>>;
 }
 
-/** What still keeps a departure open, by code with how many (`US-03-04` AC-20, `QĐ-62i`, `QĐ-75e`); empty when it may be closed. */
+/**
+ * What still keeps a departure from closing, by code with how many (`QĐ-110e`, `B-1`); empty when the system may close it. A person who has left
+ * waits for the lock of the company account (1a), the lock of the mailbox for good (1b) and a completed task of revocation for each personal seat
+ * they hold. Nothing else keeps it: the responsibilities that are not handed over (workspaces, subscriptions, roles) are warnings, never a blocker
+ * (`QĐ-110j`), and a K1 seat whose access runs on to the end of the paid period has its task completed.
+ */
 export function blockersOf(facts: BlockerFacts): Record<string, number> {
   if (facts.state !== 'LEFT' || facts.closed) return {};
   const blockers: Record<string, number> = {};
   if (!facts.lockRecorded) blockers.ACCOUNT_LOCK_NOT_RECORDED = 1;
+  if (!facts.mailboxLocked) blockers.MAILBOX_LOCK_NOT_RECORDED = 1;
   if (facts.openRights > 0) blockers.PERSONAL_RIGHTS_OPEN = facts.openRights;
-  if (facts.accessRunsOn > 0) blockers.ACCESS_RUNS_ON = facts.accessRunsOn;
-  for (const [code, count] of Object.entries(facts.registered)) if (count > 0) blockers[code] = count;
 
   return blockers;
-}
-
-/** Whether the case may be closed now: it is not the state, a closed one, or one with a blocker. */
-export function closeRefusal(facts: BlockerFacts): OffboardingRefusal | null {
-  if (facts.state !== 'LEFT') return { code: 'CASE_NOT_LEFT' };
-  if (facts.closed) return { code: 'CASE_NOT_CLOSEABLE', details: { blockers: ['ALREADY_CLOSED'] } };
-  const blockers = Object.keys(blockersOf(facts));
-
-  return blockers.length > 0 ? { code: 'CASE_NOT_CLOSEABLE', details: { blockers } } : null;
 }
 
 export type StepState = 'PENDING' | 'IN_PROGRESS' | 'DONE';
@@ -370,8 +400,6 @@ export interface Checklist {
 export interface ChecklistFacts {
   blockNow: boolean;
   lockRecorded: boolean;
-  /** Duties that wait for a confirmation and that nobody has gone on without (`AC-7`). */
-  pendingDuties: number;
   heldRights: number;
   withoutTask: number;
   accessRunsOn: number;
@@ -381,7 +409,8 @@ export interface ChecklistFacts {
 }
 
 /**
- * The four steps of the checklist `BM-08` in the order they are done (`US-03-04` AC-20): the handover of the data of each tool, the
+ * The four steps of the checklist `BM-08` in the order they are done (`US-03-04` AC-20): the handover of the data of each tool (always
+ * done: no confirmation of a handover is asked any more, `QĐ-110g`, and the clients still wait on four steps), the
  * lock of the company account (urgent when the departure is blocked now, and it comes before or with the first revocation), the removal
  * of the rights (a K1 whose access runs on to the end of the paid period is not done), and the seats given back, which is written only
  * for a seat whose task completed (`QĐ-62i`).
@@ -392,7 +421,7 @@ export function checklistOf(facts: ChecklistFacts): Checklist {
     facts.heldRights === 0 ? 'DONE' : revoked > 0 || facts.accessRunsOn > 0 ? 'IN_PROGRESS' : 'PENDING';
 
   return {
-    dataHandover: { state: facts.pendingDuties === 0 ? 'DONE' : 'PENDING', pendingDuties: facts.pendingDuties },
+    dataHandover: { state: 'DONE', pendingDuties: 0 },
     accountLock: { state: facts.lockRecorded ? 'DONE' : 'PENDING', urgent: facts.blockNow && !facts.lockRecorded },
     revokeAccess: {
       state: revoking,

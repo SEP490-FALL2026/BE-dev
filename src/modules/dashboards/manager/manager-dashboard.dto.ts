@@ -16,7 +16,6 @@ const managerDashboardSchema = z.strictObject({
     departmentSoftware: section(
       'The seats the department is granted or manages on the business day: a read of the records, not a proof of use.',
     ),
-    transferReviews: section('The reviews of tools after a transfer into the department that are still open.'),
     ghostSeats: section(
       'The recommendations about the seats of the department that wait for the head to decide, or were returned to them.',
     ),

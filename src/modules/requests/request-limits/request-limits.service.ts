@@ -15,6 +15,7 @@ import {
   manyPaidSoftwareReasonOf,
   type LimitExemption,
   type LimitVerdict,
+  type OpenNewRequest,
 } from './request-limits.policy';
 
 /** GH-2 and GH-3 as the Super Admin set them, read before the transaction opens and applied to that sending (`QĐ-106h`(2)). */
@@ -59,6 +60,12 @@ export class RequestLimitsService {
 
   async judge(tx: DbTx, input: LimitInput): Promise<Map<string, LimitVerdict>> {
     const open = await this.repo.openNewRequestsOf(tx, input.employeeIds);
+    // Only a person in the grace of a transfer is judged against the exempt requests too, for the duplicate of a plan.
+    const inGrace = input.employeeIds.filter((employeeId) => input.exemptions?.get(employeeId) === 'TRANSFER_GRACE');
+    const openAll =
+      inGrace.length === 0
+        ? new Map<string, OpenNewRequest[]>()
+        : await this.repo.openNewRequestsOf(tx, inGrace, { includeExempt: true });
     const paid = await this.licensing.listPaidApplicationsOf(input.employeeIds, input.today, tx);
 
     return new Map(
@@ -68,6 +75,7 @@ export class RequestLimitsService {
           planId: input.planId,
           applicationId: input.applicationId,
           openNew: open.get(employeeId) ?? [],
+          ...(openAll.has(employeeId) ? { openIncludingExempt: openAll.get(employeeId) } : {}),
           openLimit: input.settings.openLimit,
           paidApplicationIds: paid.get(employeeId) ?? new Set<string>(),
           paidThreshold: input.settings.paidThreshold,

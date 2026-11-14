@@ -5,6 +5,8 @@ import { LicensingRenewalApi } from '../../../src/modules/licensing/public/licen
 import { ApiAccount, createActivatedAccount } from '../../support/api-accounts';
 import { RevocationHarness } from '../../support/revocation-harness';
 import { changeRoleTo } from '../../support/builders/account.builder';
+import { legacyServiceAccount } from '../../support/legacy-service-account';
+import { k1Checklist } from '../../support/k1-checklist';
 
 const h = new RevocationHarness();
 
@@ -129,10 +131,15 @@ describe('the tools a department uses (US-03-06 AC-13, AC-17, F22, integration, 
       person('F-1'),
       { ...person('D-6'), granted_on: '2025-01-01' },
     ]);
-    await h.written({ subscriptionId: githubSubscription }, [
-      person('D-4'),
-      { employee_code: 'D-5', account_identifier: 'ci-bot', kind: 'service', reason: 'CI' },
-    ]);
+    await h.written({ subscriptionId: githubSubscription }, [person('D-4')]);
+    // A service account of the earlier releases, written by SQL: it stays readable in the tools a department uses.
+    const d5 = await h.ctx.sql.query<{ id: string }>(`SELECT id FROM employees WHERE employee_code = 'D-5'`);
+    await legacyServiceAccount(h.ctx.sql, {
+      subscriptionId: githubSubscription,
+      employeeId: d5.rows[0].id,
+      identifier: 'ci-bot',
+      reason: 'CI',
+    });
     await h.written({ subscriptionId: slackSubscription }, [person('F-1', 'slack-'), person('D-1', 'slack-')]);
     // Internal software has no subscription, so no owner: the seat of a member of finance on it is read through the member.
     await h.written({ planId: await h.plan('K5') }, [person('F-1', 'portal-')]);
@@ -164,7 +171,7 @@ describe('the tools a department uses (US-03-06 AC-13, AC-17, F22, integration, 
     });
     expect(result.items.find((item) => item.employeeCode === 'D-5')).toMatchObject({
       kind: 'SERVICE',
-      source: 'BASELINE',
+      source: 'REQUEST',
       holderStatus: 'ACTIVE',
     });
     expect(result.summary.map((entry) => entry.seats).sort()).toEqual([1, 2, 4]);
@@ -247,6 +254,7 @@ describe('the tools a department uses (US-03-06 AC-13, AC-17, F22, integration, 
           evidence: 'đã hủy',
           paidThroughOn: h.inDays(10),
           accessState: 'UNTIL_PAID_END',
+          k1Checklist: k1Checklist('DEPARTURE'),
         })
         .expect(200);
 
@@ -280,42 +288,6 @@ describe('the tools a department uses (US-03-06 AC-13, AC-17, F22, integration, 
       expect(await validUntilOf(renewing)).toBe(h.inDays(5));
       const renewed = (await itemsOfTrm()).find((item) => item.assignmentId === renewing);
       expect(renewed).toMatchObject({ employeeCode: 'TR-RNW', terminating: false, terminatingUntil: null });
-      expect(await terminatingCodes()).toEqual(['TR-CNL']);
-    });
-
-    it('does not tell a service account whose person responsible changes on a later day', async () => {
-      const first = await enter(trm.code, 'TR-BOT1');
-      const next = await enter(trm.code, 'TR-BOT2');
-      await h.written({ subscriptionId: trmSubscription }, [
-        {
-          employee_code: 'TR-BOT1',
-          account_identifier: 'ci-trm',
-          kind: 'service',
-          reason: 'CI',
-          granted_on: '2026-01-05',
-        },
-      ]);
-      const bot = (await h.assignmentsOf({ subscriptionId: trmSubscription, kind: 'SERVICE' })).find(
-        (assignment) => assignment.employeeId === first,
-      );
-      if (!bot) throw new Error('no service account of TR-BOT1');
-
-      await request(h.server())
-        .post(`/api/v1/license-assignments/${bot.id}/responsible-changes`)
-        .set(h.as(h.it1))
-        .send({ employeeId: next, effectiveFrom: h.inDays(7) })
-        .expect(200);
-
-      expect(await validUntilOf(bot.id)).toBe(h.inDays(7));
-      const items = await itemsOfTrm();
-      expect(items.find((item) => item.assignmentId === bot.id)).toMatchObject({
-        kind: 'SERVICE',
-        employeeCode: 'TR-BOT1',
-        terminating: false,
-        terminatingUntil: null,
-      });
-      // The next record begins in a week: it holds nothing today and is not listed.
-      expect(items.map((item) => item.employeeCode)).not.toContain('TR-BOT2');
       expect(await terminatingCodes()).toEqual(['TR-CNL']);
     });
   });

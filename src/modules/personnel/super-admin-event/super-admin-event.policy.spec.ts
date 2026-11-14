@@ -1,5 +1,11 @@
 import { SuperAdminEventRefusedError } from '../public/super-admin-event.errors';
-import { assertContext, assertSplit, noticeKindFitsMode, parametersDigest } from './super-admin-event.policy';
+import {
+  assertContext,
+  assertSplit,
+  documentBasisOf,
+  noticeKindFitsMode,
+  parametersDigest,
+} from './super-admin-event.policy';
 import type { SuperAdminEventContext, SuperAdminEventParameters } from '../public/super-admin-event.types';
 
 const BASIS = { type: 'DECISION', reference: 'QD-31/2026', issuer: 'Board of Directors', issuedOn: '2026-10-20' };
@@ -46,6 +52,19 @@ describe('what the controlled procedure judges before it opens a transaction (sp
 
   it('leaves the code of a notice as a basis to the event, which refuses it with its own code', () => {
     expect(problem(() => assertContext(context({ basis: { ...BASIS, reference: 'BM09-2026-000001' } })))).toBeNull();
+  });
+});
+
+describe('the basis in one box (QĐ-110a, QĐ-111bd)', () => {
+  it('takes a box of text as the basis, and refuses one that is blank or too long', () => {
+    expect(problem(() => assertContext(context({ basis: { note: 'QĐ nghỉ việc số 12/2026' } })))).toBeNull();
+    expect(problem(() => assertContext(context({ basis: { note: '   ' } })))).toBe('BASIS_INVALID');
+    expect(problem(() => assertContext(context({ basis: { note: 'x'.repeat(501) } })))).toBe('BASIS_INVALID');
+  });
+
+  it('gives the four parts to an event from a notice, and refuses the box there', () => {
+    expect(documentBasisOf(BASIS)).toBe(BASIS);
+    expect(problem(() => documentBasisOf({ note: 'QĐ nghỉ việc số 12/2026' }))).toBe('BASIS_INVALID');
   });
 });
 

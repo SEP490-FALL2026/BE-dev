@@ -5,10 +5,12 @@ import { FinanceApi } from '../../finance/public/finance.api';
 import type { TaxEstimateResult } from '../../finance/public/finance.types';
 import { OperatingParametersApi } from '../../operating-parameters/public/operating-parameters.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
+import { PlanFactsService } from '../plan/plan-facts.service';
+import { needsVendorAdmins } from '../plan/plan-vendor-admins.policy';
 import { alertDates, deriveNotice, missingData, noticeInputOf, noticeWarnings } from './subscription.policy';
-import { liveIdsByPlan, liveSiblingsOf, poolWarnings } from './pool/subscription-pool.policy';
+import { liveIdsByPlan, liveSiblingsOf, poolWarnings, vendorAdminFlags } from './pool/subscription-pool.policy';
 import { SubscriptionRepo } from './subscription.repo';
-import type { SubscriptionRecord, SubscriptionView, TaxEstimateSummary } from './subscription.types';
+import type { SubscriptionRecord, SubscriptionView, TaxEstimateSummary, VendorAdminView } from './subscription.types';
 
 type LiveOfPlans = { byPlan: Map<string, string[]>; has: (id: string) => boolean };
 
@@ -33,6 +35,7 @@ export class SubscriptionViewService {
     private readonly parameters: OperatingParametersApi,
     private readonly subscriptions: SubscriptionRepo,
     private readonly organizationReads: OrganizationReadApi,
+    private readonly planFacts: PlanFactsService,
   ) {}
 
   /** The records as they are answered, with the derived notice, alerts, warnings, tax profile and estimate. */
@@ -70,6 +73,7 @@ export class SubscriptionViewService {
     );
 
     const live = await this.liveOfPooledPlans(records);
+    const vendorAdmins = await this.vendorAdminsOf(records);
     const views: SubscriptionView[] = [];
     for (const record of records) {
       // The rule against a second live subscription of a K2 or K4 plan: answered at every phase of the baseline, so the IT Admin sees what to fold (`QĐ-104k`(3)).
@@ -146,6 +150,7 @@ export class SubscriptionViewService {
         alerts: { baseDate: notice.baseDate, dates: alertDates(notice.baseDate, daysBefore) },
         warnings: [...noticeWarnings(notice.source), ...poolWarnings(record), ...mergeWarnings(mergeCandidateIds)],
         mergeCandidateIds,
+        ...vendorAdmins(record),
         taxProfile: { status: group ? 'DECLARED' : 'MISSING', group },
         taxEstimate,
         createdAt: record.createdAt,
@@ -165,6 +170,43 @@ export class SubscriptionViewService {
     const ids = new Set([...byPlan.values()].flat());
 
     return { byPlan, has: (id: string) => ids.has(id) };
+  }
+
+  /**
+   * Who administers the plan of each record at the vendor, read for all of them at once (`QĐ-110k`, `QĐ-110u`): the profiles of the plans that need
+   * admins, the names of the people and which of them still work as an IT Admin. A plan that needs none answers empty and quiet; a plan that
+   * needs them and has no profile (a subscription older than the rule) answers empty with both flags raised.
+   */
+  private async vendorAdminsOf(records: readonly SubscriptionRecord[]) {
+    const needing = records.filter((record) =>
+      needsVendorAdmins(record.planProvisioningType, record.planHasAdminConsole),
+    );
+    const profiles = await this.planFacts.vendorAdminsOf([...new Set(needing.map((record) => record.planId))]);
+    const ids = [
+      ...new Set([...profiles.values()].flatMap((profile) => profile.members.map((member) => member.employeeId))),
+    ];
+    const usable = await this.planFacts.workingAdminsAmong(ids);
+    const people = new Map((await this.organizationReads.getEmployees(ids)).map((employee) => [employee.id, employee]));
+
+    return (record: SubscriptionRecord) => {
+      const needs = needsVendorAdmins(record.planProvisioningType, record.planHasAdminConsole);
+      const profile = needs ? profiles.get(record.planId) : undefined;
+      const admins: VendorAdminView[] = (profile?.members ?? []).map((member) => ({
+        employeeId: member.employeeId,
+        employeeCode: people.get(member.employeeId)?.employeeCode ?? '',
+        fullName: people.get(member.employeeId)?.fullName ?? '',
+        role: member.role,
+        working: usable.has(member.employeeId),
+      }));
+      const ownerAccountEmail = profile?.ownerAccountEmail ?? null;
+
+      return {
+        vendorAdmins: admins,
+        ownerAccountEmail,
+        adminNote: profile?.adminNote ?? null,
+        ...vendorAdminFlags({ needs, admins, ownerAccountEmail }),
+      };
+    };
   }
 
   /** The days before the deadline an alert falls, as the parameter says now. */

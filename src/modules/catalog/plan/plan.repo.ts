@@ -32,6 +32,7 @@ const toPlan = (row: PlanRow): PlanRecord => ({
   revocationNote: row.revocationNote,
   dataLossOnRemoval: row.dataLossOnRemoval,
   sharingPolicy: row.sharingPolicy,
+  hasAdminConsole: row.hasAdminConsole,
   createdAt: row.createdAt,
   updatedAt: row.updatedAt,
 });
@@ -52,6 +53,8 @@ const toProfile = (row: ProfileRow): WorkspaceProfileRecord => ({
           holderEmployeeId: row.emergencyHolderEmployeeId as string,
           lastReviewedOn: fromDateColumn(row.emergencyLastReviewedOn as Date),
         },
+  ownerAccountEmail: row.ownerAccountEmail,
+  adminNote: row.adminNote,
   updatedAt: row.updatedAt,
 });
 
@@ -73,6 +76,7 @@ export class PlanRepo {
         revocationNote: input.revocationNote,
         dataLossOnRemoval: input.dataLossOnRemoval,
         sharingPolicy: input.sharingPolicy,
+        hasAdminConsole: input.hasAdminConsole,
       },
       include: WITH_APPLICATION,
     });
@@ -128,6 +132,7 @@ export class PlanRepo {
         ...(changes.revocationNote !== undefined ? { revocationNote: changes.revocationNote } : {}),
         ...(changes.dataLossOnRemoval !== undefined ? { dataLossOnRemoval: changes.dataLossOnRemoval } : {}),
         ...(changes.sharingPolicy !== undefined ? { sharingPolicy: changes.sharingPolicy } : {}),
+        ...(changes.hasAdminConsole !== undefined ? { hasAdminConsole: changes.hasAdminConsole } : {}),
       },
       include: WITH_APPLICATION,
     });
@@ -151,6 +156,7 @@ export class PlanRepo {
           provisioningType: row.provisioningType,
           pricingModel: row.pricingModel,
           sharingPolicy: row.sharingPolicy,
+          hasAdminConsole: row.hasAdminConsole,
           applicationId: row.applicationId,
           applicationName: row.application.name,
           applicationKind: row.application.kind,
@@ -175,6 +181,7 @@ export class PlanRepo {
       provisioningType: row.provisioningType,
       pricingModel: row.pricingModel,
       sharingPolicy: row.sharingPolicy,
+      hasAdminConsole: row.hasAdminConsole,
       applicationId: row.applicationId,
       applicationName: row.application.name,
       applicationKind: row.application.kind,
@@ -209,10 +216,10 @@ export class PlanRepo {
     }));
   }
 
-  /** The plans with these ids, as far as they exist, with the name of their application. */
-  async findSummaries(ids: readonly string[]): Promise<PlanSummary[]> {
+  /** The plans with these ids, as far as they exist, with the name of their application; `tx` reads in the caller's transaction, which sees the plans it made. */
+  async findSummaries(ids: readonly string[], tx?: DbTx): Promise<PlanSummary[]> {
     if (ids.length === 0) return [];
-    const rows = await this.prisma.plan.findMany({
+    const rows = await (tx ?? this.prisma).plan.findMany({
       where: { id: { in: [...ids] } },
       select: { id: true, name: true, applicationId: true, application: { select: { name: true } } },
     });
@@ -317,6 +324,7 @@ export class PlanRepo {
             controlLevel: true,
             dataLossOnRemoval: true,
             sharingPolicy: true,
+            hasAdminConsole: true,
             createdAt: true,
             updatedAt: true,
             application: { select: { name: true, kind: true } },
@@ -346,6 +354,34 @@ export class PlanRepo {
     });
 
     return row ? toProfile(row) : null;
+  }
+
+  /**
+   * The plans that need at least two admins at the vendor (a `K2` plan, or a `K4` plan with an admin console, `QĐ-110k`, `R-53`) and have a subscription
+   * in use: the ones whose flag a reader of the subscriptions sees. One read.
+   */
+  async findIdsNeedingVendorAdminsInUse(tx?: DbTx): Promise<string[]> {
+    const rows = await (tx ?? this.prisma).plan.findMany({
+      where: {
+        OR: [{ provisioningType: 'K2' }, { provisioningType: 'K4', hasAdminConsole: true }],
+        subscriptions: { some: { status: 'ACTIVE' } },
+      },
+      select: { id: true },
+      orderBy: { id: 'asc' },
+    });
+
+    return rows.map((row) => row.id);
+  }
+
+  /** The profiles of these plans in one read, by plan; a plan with none is absent. */
+  async findProfilesOf(planIds: readonly string[], tx?: DbTx): Promise<Map<string, WorkspaceProfileRecord>> {
+    if (planIds.length === 0) return new Map();
+    const rows = await (tx ?? this.prisma).planWorkspaceProfile.findMany({
+      where: { planId: { in: [...planIds] } },
+      include: { members: true },
+    });
+
+    return new Map(rows.map((row) => [row.planId, toProfile(row)]));
   }
 
   /** The workspaces these people own or administer, one row for each person and plan, the primary owner first (one read, `US-03-04` AC-28). */
@@ -392,6 +428,8 @@ export class PlanRepo {
       emergencyOccupiesSeat: profile.emergencyAccount?.occupiesSeat ?? null,
       emergencyHolderEmployeeId: profile.emergencyAccount?.holderEmployeeId ?? null,
       emergencyLastReviewedOn: profile.emergencyAccount ? toDateColumn(profile.emergencyAccount.lastReviewedOn) : null,
+      ownerAccountEmail: profile.ownerAccountEmail,
+      adminNote: profile.adminNote,
     };
     await tx.planWorkspaceProfile.upsert({
       where: { planId: profile.planId },

@@ -4,6 +4,7 @@ import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type {
   CommittedAmount,
+  HeldAmount,
   CommitmentHoldInput,
   CommitmentReleaseReason,
   HeldCommitment,
@@ -147,11 +148,12 @@ export class CommitmentRepo {
    * years of each earliest first, as `lockOfRequest` takes them, so two releases queue and never wait for each other in a circle.
    */
   async lockSeatCommitmentsOf(tx: DbTx, requestIds: readonly string[], fromYear: number): Promise<SeatCommitment[]> {
-    const found: SeatCommitment[] = [];
+    const found: (Omit<SeatCommitment, 'transferReleases'> & { id: string })[] = [];
     for (const requestId of [...new Set(requestIds)].sort()) {
       for (const row of await this.lockOfRequest(tx, requestId)) {
         if (row.state !== 'HELD' || row.year < fromYear) continue;
         found.push({
+          id: row.id,
           requestId,
           year: row.year,
           origin: row.origin,
@@ -160,8 +162,29 @@ export class CommitmentRepo {
         });
       }
     }
+    // The ledger is read under the locks just taken: a release of the transfer in this transaction, or one that committed before them, is seen.
+    const transferReleases = await this.transferReleasesOf(
+      tx,
+      found.map((item) => item.id),
+    );
 
-    return found;
+    return found.map(({ id, ...commitment }) => ({ ...commitment, transferReleases: transferReleases.get(id) ?? [] }));
+  }
+
+  /** For each of these commitments, the references of its releases for the day a transfer took effect; a commitment with none is absent. */
+  private async transferReleasesOf(tx: DbTx, commitmentIds: readonly string[]): Promise<Map<string, string[]>> {
+    const byCommitment = new Map<string, string[]>();
+    if (commitmentIds.length === 0) return byCommitment;
+    const rows = await tx.budgetCommitmentRelease.findMany({
+      where: { commitmentId: { in: [...commitmentIds] }, reason: 'TRANSFER_EFFECTIVE' },
+      select: { commitmentId: true, reasonText: true },
+    });
+    for (const row of rows) {
+      if (row.reasonText === null) continue;
+      byCommitment.set(row.commitmentId, [...(byCommitment.get(row.commitmentId) ?? []), row.reasonText]);
+    }
+
+    return byCommitment;
   }
 
   /** The commitments, among these, that already gave money back for this reason and reference. */
@@ -366,15 +389,36 @@ export class CommitmentRepo {
     return rows.map((row) => row.year);
   }
 
-  /** What each of the requests was committed for, one entry for each commitment, in one read. */
-  async amountsOfRequests(requestIds: readonly string[]): Promise<CommittedAmount[]> {
+  /** What each of the requests was committed for, one entry for each commitment, in one read (in `tx` when given: a commitment made in it is seen). */
+  async amountsOfRequests(requestIds: readonly string[], tx?: DbTx): Promise<CommittedAmount[]> {
     if (requestIds.length === 0) return [];
 
-    return this.prisma.budgetCommitment.findMany({
+    return (tx ?? this.prisma).budgetCommitment.findMany({
       where: { requestId: { in: [...requestIds] } },
       select: { requestId: true, amountMinor: true, currency: true },
       orderBy: [{ requestId: 'asc' }, { year: 'asc' }],
     });
+  }
+
+  /**
+   * What each of the requests still holds (the amount less what went back and what became an expense), for the commitments that are held,
+   * in one read that locks nothing: for a preview of what closing the requests would free.
+   */
+  async heldOfRequests(requestIds: readonly string[], tx?: DbTx): Promise<HeldAmount[]> {
+    if (requestIds.length === 0) return [];
+    const rows = await (tx ?? this.prisma).budgetCommitment.findMany({
+      where: { requestId: { in: [...requestIds] }, state: 'HELD' },
+      select: { requestId: true, amountMinor: true, releasedMinor: true, appliedMinor: true, currency: true },
+      orderBy: [{ requestId: 'asc' }, { year: 'asc' }],
+    });
+
+    return rows
+      .map((row) => ({
+        requestId: row.requestId,
+        currency: row.currency,
+        heldMinor: row.amountMinor - row.releasedMinor - row.appliedMinor,
+      }))
+      .filter((row) => row.heldMinor > 0n);
   }
 
   /** Whether the request holds any commitment: Finance reads such a request from the commitment (`US-06-09` AC-2). */

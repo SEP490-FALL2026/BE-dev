@@ -5,7 +5,6 @@ import { toLeaveApiException } from './leave/leave.http-errors';
 import { toNoticeApiException } from './notice/notice.http-errors';
 import { toOffboardingApiException } from './offboarding/offboarding.http-errors';
 import { toTransferApiException } from './transfer/transfer.http-errors';
-import { toTransferReviewApiException } from './transfer-review/transfer-review.http-errors';
 
 const outage = () => new TransientDatabaseError('40001', new Error('connection reset'));
 
@@ -18,7 +17,6 @@ describe.each([
   ['long leaves', toLeaveApiException],
   ['personnel notices', toNoticeApiException],
   ['transfers', toTransferApiException],
-  ['transfer reviews', toTransferReviewApiException],
   ['offboarding cases', toOffboardingApiException],
 ])('the mapper of %s', (_name, toApiException) => {
   it('answers a database outage with 503 SERVICE_UNAVAILABLE', () => {

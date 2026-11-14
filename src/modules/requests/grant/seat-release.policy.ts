@@ -124,3 +124,41 @@ export function lateGrantShare(input: {
 
 /** Whether the grant of this kind gives back the days before it: only a K2 right, whose seat is bought for the year (`M-10`). */
 export const releasesBeforeGrant = (kind: ProvisioningKind): boolean => kind === 'K2';
+
+/**
+ * The first day the old department no longer pays for a right of a person who moved (`QĐ-111bg`): the day the transfer takes effect, for a K1
+ * or K2 right alike (the old department stops paying the day the person leaves it; what was spent stays spent). Null for any other kind,
+ * whose commitment does not go back by day. The share is the one of {@link revocationShare}, so one rule gives back money by the day.
+ */
+export function transferReleaseEndsOn(kind: ProvisioningKind, effectiveOn: BusinessDate): BusinessDate | null {
+  return BY_THE_MONTH.includes(kind) ? effectiveOn : null;
+}
+
+/** The reference of the release a commitment gives for a right the day the transfer takes effect: one for each transfer and right. */
+export const transferReleaseReference = (transferId: string, assignmentId: string): string =>
+  `transfer:${transferId}:assignment:${assignmentId}`;
+
+/** The right a release of a transfer was for, read from its reference; null for any other reference. */
+function assignmentOfTransferReference(reference: string): string | null {
+  const match = /^transfer:[^:]+:assignment:(.+)$/.exec(reference);
+
+  return match === null ? null : match[1];
+}
+
+/**
+ * Whether this commitment gave its money back for the right the day a transfer took effect (BLK-3, D-86): its own ledger has a release of the
+ * transfer for one of the assignments of the right (the one taken away and the ones it continues). Such a commitment gives nothing back when the
+ * right is taken away, whoever asks for it (the grace ending, a departure, a ghost seat, an expiry), because the days after the transfer went
+ * back already. A commitment with no such release goes back at the revocation as ever: a transfer from before the release has none, and the
+ * commitment of a year that began in the grace was held after it. So each commitment goes back once for the transfer, never twice and never not at all.
+ */
+export function givenAtTransfer(
+  commitment: Pick<SeatCommitment, 'transferReleases'>,
+  chainAssignmentIds: readonly string[],
+): boolean {
+  return commitment.transferReleases.some((reference) => {
+    const assignmentId = assignmentOfTransferReference(reference);
+
+    return assignmentId !== null && chainAssignmentIds.includes(assignmentId);
+  });
+}

@@ -1,3 +1,6 @@
+import type { BusinessDate } from '../../../core/business-date';
+import type { ProvisioningKind } from '../../licensing/public/licensing.types';
+
 /** A request a person is the beneficiary of that is not over, as the IT Admin sees it beside the record of their departure (`US-03-04` AC-24). */
 export interface OpenRequestOfBeneficiary {
   requestId: string;
@@ -11,6 +14,74 @@ export interface OpenRequestOfBeneficiary {
   group: boolean;
   /** The IT Admin may close it now: the person has left (their line only, when the request is for a group). */
   cancellable: boolean;
+}
+
+/**
+ * Which requests of a person who is gone the system closes (`QĐ-110d`, `QĐ-110o`):
+ * - `ALL_OPEN` (MF-2, the day access is blocked): every open request of the person, whatever it asks for and costs;
+ * - `PAID_OLD_DEPARTMENT` (MF-3, the day the transfer takes effect): only the paid requests (`GRANT`, `RENEWAL`, a group) sent from the
+ *   department the person left.
+ */
+export type BeneficiaryGoneScope = { kind: 'ALL_OPEN' } | { kind: 'PAID_OLD_DEPARTMENT'; oldDepartmentId: string };
+
+export interface BeneficiaryGoneInput {
+  /** The person who left or was moved. */
+  employeeId: string;
+  scope: BeneficiaryGoneScope;
+  now?: Date;
+}
+
+/** A request, or the line of the person in a request for a group, that the system dealt with. */
+export interface BeneficiaryGoneItem {
+  requestId: string;
+  /** The line of the person in a request for a group, which is all that ends of it. */
+  line: boolean;
+}
+
+/**
+ * What the system did to the open requests of the person. `cancelled` ended as cancelled (what was held for them went back to the budget,
+ * the requester and Finance are told). `needsItCheck` were not touched: the grant is being carried out, so the IT Admin checks the vendor
+ * and closes them by hand, and was told in the inbox. Whatever else the person has open is out of the scope and appears nowhere.
+ */
+export interface BeneficiaryGoneResult {
+  cancelled: BeneficiaryGoneItem[];
+  needsItCheck: BeneficiaryGoneItem[];
+}
+
+/** A request, or the line of the person in a request for a group, that closing would deal with, as the preview tells it. */
+export interface BeneficiaryGonePreviewItem extends BeneficiaryGoneItem {
+  type: string;
+  /** The state of the request; of the line of the person when the request is for a group. */
+  state: string;
+}
+
+/**
+ * What `cancelForBeneficiaryGone` would do, read and never written: `wouldCancel` end as cancelled, `needsItCheck` are left to the IT
+ * Admin because a grant is being carried out. `heldToRelease` is what the requests that end hold and have not spent, one entry for each
+ * commitment (the share of a person in a request for a group is not in it).
+ */
+export interface BeneficiaryGonePreview {
+  wouldCancel: BeneficiaryGonePreviewItem[];
+  needsItCheck: BeneficiaryGonePreviewItem[];
+  heldToRelease: { requestId: string; currency: string; heldMinor: bigint }[];
+}
+
+/**
+ * The old rights of a person whose transfer has taken effect (`QĐ-111bg`, MF3-B.3): the money held for each of them by the department they
+ * left goes back by the day, from the day the transfer takes effect, once. `rights` are the personal rights the person held then; a kind whose
+ * price is not by the month (K3, K4, K5) gives nothing back.
+ */
+export interface TransferReleaseInput {
+  transferId: string;
+  /** The day the transfer takes effect: the first day the old department no longer pays for the rights. */
+  effectiveOn: BusinessDate;
+  rights: readonly { assignmentId: string; provisioningType: ProvisioningKind }[];
+  now?: Date;
+}
+
+/** What went back to the budget for the rights of a transfer, by currency in the smallest unit; nothing when it was released before. */
+export interface TransferReleaseResult {
+  released: { currency: string; amountMinor: bigint }[];
 }
 
 /** The longest reason a step of the summary source carries, in characters (code points): what the summary may read of it (`US-15-05`). */

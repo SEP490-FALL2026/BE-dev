@@ -412,6 +412,18 @@ export class DepartmentRepo {
     return rows.map((row) => row.id);
   }
 
+  /**
+   * How many active departments name this employee IT Admin in charge (`QĐ-110l`). Read after the employee row is locked `FOR UPDATE`, so two
+   * assignments of the same IT Admin count one after the other; whether the employee still works is not asked.
+   */
+  async countActiveInChargeOf(tx: DbTx, employeeId: string): Promise<number> {
+    const rows = await tx.$queryRaw<{ total: number }[]>`
+      SELECT count(*)::int AS total FROM departments d
+       WHERE d.it_admin_employee_id = ${employeeId}::uuid AND d.status = 'ACTIVE'`;
+
+    return rows[0].total;
+  }
+
   /** The active departments that name each of these employees IT Admin in charge, in code order; whether they still work is not asked. */
   inChargeOfMany(employeeIds: readonly string[], tx?: DbTx) {
     return (tx ?? this.prisma).department.findMany({
@@ -427,6 +439,20 @@ export class DepartmentRepo {
     const rows = await (tx ?? this.prisma).$queryRaw<{ employee_id: string }[]>`
       SELECT p.employee_id FROM employee_placements p
        WHERE p.department_id = ${departmentId}::uuid
+         AND p.valid_from <= ${onDate}::date AND (p.valid_to IS NULL OR p.valid_to > ${onDate}::date)`;
+
+    return rows.map((row) => row.employee_id);
+  }
+
+  /**
+   * Everyone placed in any of these departments on `onDate` (the same test of the dates as `memberIdsOn`), each employee once, in ONE
+   * statement whatever the number of departments. A department that does not exist has no placement: it adds nobody and raises nothing.
+   */
+  async memberIdsOfMany(departmentIds: readonly string[], onDate: BusinessDate, tx?: DbTx): Promise<string[]> {
+    if (departmentIds.length === 0) return [];
+    const rows = await (tx ?? this.prisma).$queryRaw<{ employee_id: string }[]>`
+      SELECT DISTINCT p.employee_id FROM employee_placements p
+       WHERE p.department_id = ANY(${[...departmentIds]}::uuid[])
          AND p.valid_from <= ${onDate}::date AND (p.valid_to IS NULL OR p.valid_to > ${onDate}::date)`;
 
     return rows.map((row) => row.employee_id);

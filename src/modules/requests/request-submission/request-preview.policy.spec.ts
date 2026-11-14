@@ -65,14 +65,22 @@ describe('the chain shown before a request is sent (US-05-01)', () => {
         waitingReason: null,
       });
     });
-    it.each([
-      ['head own request', { requesterEmployeeId: HEAD }],
-      ['headless department', { departmentHeadEmployeeId: null }],
-    ])('omits need and submission for %s', (_name, over) => {
-      expect(shape(chainOf(paid, over))).toEqual([
+    it('omits need and submission for the own request of the head', () => {
+      expect(shape(chainOf(paid, { requesterEmployeeId: HEAD }))).toEqual([
         ['SPEND_APPROVAL', APPROVER],
         ['IT_EXECUTION', null],
       ]);
+    });
+    it('QĐ-110i: keeps the need step, waiting for a head, for paid software of a headless department', () => {
+      const steps = chainOf(paid, { departmentHeadEmployeeId: null });
+
+      expect(shape(steps)).toEqual([
+        ['NEED', null],
+        ['SPEND_SUBMISSION', null],
+        ['SPEND_APPROVAL', APPROVER],
+        ['IT_EXECUTION', null],
+      ]);
+      expect(steps[0]).toMatchObject({ explanation: 'WAITS_FOR_DEPARTMENT_HEAD', waitingReason: 'NO_DEPARTMENT_HEAD' });
     });
     it('waits only for the spending approver when none holds that role', () => {
       const steps = chainOf(paid, { requesterEmployeeId: HEAD, spendingApproverEmployeeId: null });
@@ -88,10 +96,11 @@ describe('the chain shown before a request is sent (US-05-01)', () => {
     });
   });
 
-  it('BR-MF1-02 headless paid software without an approver has no head submission placeholder', () => {
+  it('QĐ-110i headless paid software without an approver waits for the head and for the approver, both named', () => {
     const steps = chainOf(paid, { departmentHeadEmployeeId: null, spendingApproverEmployeeId: null });
-    expect(steps.map((step) => step.kind)).toEqual(['SPEND_APPROVAL', 'IT_EXECUTION']);
-    expect(steps[0]).toMatchObject({ assigneeEmployeeId: null, waitingReason: 'NO_SPENDING_APPROVER' });
+    expect(steps.map((step) => step.kind)).toEqual(['NEED', 'SPEND_SUBMISSION', 'SPEND_APPROVAL', 'IT_EXECUTION']);
+    expect(steps[0]).toMatchObject({ assigneeEmployeeId: null, waitingReason: 'NO_DEPARTMENT_HEAD' });
+    expect(steps[2]).toMatchObject({ assigneeEmployeeId: null, waitingReason: 'NO_SPENDING_APPROVER' });
   });
 });
 

@@ -87,6 +87,8 @@ export function decideG1(vacancy: VacancyFacts | null, open: Pick<GhostSeatRecor
 /** A seat that is open today, as the rule of the people who left reads it. */
 export interface SeatFacts {
   kind: 'PERSONAL' | 'SERVICE';
+  /** The seat is flagged as used for a machine account (`QĐ-110m`): it has no `G2`, whoever holds it. */
+  isMachineAccount: boolean;
   provisioningType: Kind;
   pricingModel: Pricing;
   holderLeft: boolean;
@@ -163,9 +165,9 @@ function newG2(seat: SeatFacts, existing: ChainRecommendation | null): G2Step {
   };
 }
 
-/** A seat the rule does not judge: not a personal seat, internal software (`K5`) or a plan that is not `PER_SEAT` (gate 1). Null when it judges it. */
+/** A seat the rule does not judge: not a personal seat, a machine account, internal software (`K5`) or a plan that is not `PER_SEAT` (gate 1). Null when it judges it. */
 function outOfScopeOf(seat: SeatFacts): G2Decision | null {
-  if (seat.kind !== 'PERSONAL') return NO_STEP;
+  if (seat.kind !== 'PERSONAL' || seat.isMachineAccount) return NO_STEP;
   const gate =
     seat.provisioningType === 'K5' ? 'INTERNAL_SOFTWARE' : seat.pricingModel !== 'PER_SEAT' ? 'PER_SEAT' : null;
   if (gate === null) return null;

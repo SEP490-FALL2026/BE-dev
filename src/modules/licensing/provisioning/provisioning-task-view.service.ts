@@ -18,6 +18,8 @@ import type {
 } from '../public/licensing.types';
 import { availableDecisions } from './failure.policy';
 import { doneWhenFor, inGeneralQueue, stepsFor } from './provisioning.policy';
+import type { K1ChecklistCard } from './k1-checklist/provisioning-k1-checklist.policy';
+import { ProvisioningK1Checklist } from './k1-checklist/provisioning-k1-checklist.service';
 import { isTerminating } from './revocation.policy';
 import type { ProvisioningTaskRecord } from './provisioning-task.types';
 import { ProvisioningTaskReasonRepo, type ReasonRecord } from './provisioning-task-reason.repo';
@@ -69,6 +71,8 @@ export interface TaskSummaryView {
     applicationId: string;
     applicationName: string;
     provisioningType: ProvisioningKind;
+    /** What the plan says to do before the seat is taken away, on a revocation; null on a grant and when the plan has none. */
+    preRevocationNote: string | null;
   } | null;
   subscriptionId: string | null;
   accountIdentifier: string;
@@ -115,6 +119,8 @@ export interface TaskDetailFields {
   closedBy: string | null;
   closeReason: string | null;
   revocation: RevocationDetailView | null;
+  /** The checklist of a K1 revocation: the steps to tick while it can be completed, what was ticked once it is (`QĐ-111az`); null on any other task. */
+  k1Checklist: K1ChecklistCard | null;
 }
 
 export type TaskView = Omit<TaskSummaryView, 'revocation'> & TaskDetailFields;
@@ -122,11 +128,27 @@ export type TaskView = Omit<TaskSummaryView, 'revocation'> & TaskDetailFields;
 interface ViewContext {
   employees: Map<string, { id: string; employeeCode: string; fullName: string; status: string }>;
   plans: Map<string, SeatTarget>;
+  /** The note of each plan of a revocation about what to do before the seat is taken away (`QĐ-110g`: read only, nobody confirms it). */
+  notes: Map<string, string | null>;
   /** The reasons of the revocations among the tasks: all of them for a detail, only how many for a row of the list. */
   reasons: Map<string, ReasonRecord[]>;
   reasonCounts: Map<string, number>;
   today: BusinessDate;
   now: number;
+}
+
+/** The plan on a card: its names and kind of provisioning, and, on a revocation, what the plan says to do before the seat goes. */
+function planCardOf(plan: SeatTarget | undefined, note: string | null | undefined): TaskSummaryView['plan'] {
+  return plan
+    ? {
+        planId: plan.planId,
+        planName: plan.planName,
+        applicationId: plan.applicationId,
+        applicationName: plan.applicationName,
+        provisioningType: plan.provisioningType,
+        preRevocationNote: note ?? null,
+      }
+    : null;
 }
 
 /**
@@ -140,6 +162,7 @@ export class ProvisioningTaskViewService {
     private readonly catalog: CatalogApi,
     private readonly organizationReads: OrganizationReadApi,
     private readonly reasons: ProvisioningTaskReasonRepo,
+    private readonly checklists: ProvisioningK1Checklist,
   ) {}
 
   /** The rows of a list: no steps, evidence or errors. */
@@ -152,6 +175,20 @@ export class ProvisioningTaskViewService {
   /** The cards with everything a detail shows. */
   async views(records: readonly ProvisioningTaskRecord[]): Promise<TaskView[]> {
     const context = await this.contextOf(records, true);
+    const checklists = await this.checklists.cardsOf(
+      records
+        .filter(
+          (task) => task.kind === 'REVOKE' && context.plans.get(task.assignment.planId)?.provisioningType === 'K1',
+        )
+        .map((task) => ({
+          id: task.id,
+          assignmentId: task.assignmentId,
+          status: task.status,
+          employeeId: task.assignment.employeeId,
+          revocationSource: task.revocationSource,
+          reasons: (context.reasons.get(task.id) ?? []).filter((reason) => reason.withdrawnAt === null),
+        })),
+    );
 
     return records.map((task) => {
       const plan = context.plans.get(task.assignment.planId);
@@ -172,6 +209,7 @@ export class ProvisioningTaskViewService {
         closedBy: task.closedByAppUserId,
         closeReason: task.closeReason,
         revocation: summary ? this.detailOf(task, summary, context.reasons.get(task.id) ?? []) : null,
+        k1Checklist: checklists.get(task.id) ?? null,
       };
     });
   }
@@ -222,7 +260,15 @@ export class ProvisioningTaskViewService {
     );
     const planIds = [...new Set(records.map((task) => task.assignment.planId))];
     const plans = new Map((await this.catalog.findPlanSeatTargets(planIds)).map((plan) => [plan.planId, plan]));
-    const revocationIds = records.filter((task) => task.kind === 'REVOKE').map((task) => task.id);
+    const revocations = records.filter((task) => task.kind === 'REVOKE');
+    const revocationIds = revocations.map((task) => task.id);
+    const noted = [...new Set(revocations.map((task) => task.assignment.planId))];
+    const notes = new Map(
+      (noted.length > 0 ? await this.catalog.getPlanRevocationInfo(noted) : []).map((info) => [
+        info.planId,
+        info.revocationNote,
+      ]),
+    );
     const reasons = new Map<string, ReasonRecord[]>();
     if (withReasons) {
       for (const reason of await this.reasons.listAllOf(revocationIds)) {
@@ -236,12 +282,12 @@ export class ProvisioningTaskViewService {
       : await this.reasons.countOf(revocationIds);
     const today = revocationIds.length > 0 ? await this.organizationReads.businessToday() : '';
 
-    return { employees, plans, reasons, reasonCounts, today, now: Date.now() };
+    return { employees, plans, notes, reasons, reasonCounts, today, now: Date.now() };
   }
 
   private summaryOf(
     task: ProvisioningTaskRecord,
-    { employees, plans, reasonCounts, today, now }: ViewContext,
+    { employees, plans, notes, reasonCounts, today, now }: ViewContext,
   ): TaskSummaryView {
     const beneficiary = employees.get(task.assignment.employeeId);
     const plan = plans.get(task.assignment.planId);
@@ -260,15 +306,7 @@ export class ProvisioningTaskViewService {
       beneficiary: beneficiary
         ? { employeeId: beneficiary.id, employeeCode: beneficiary.employeeCode, fullName: beneficiary.fullName }
         : null,
-      plan: plan
-        ? {
-            planId: plan.planId,
-            planName: plan.planName,
-            applicationId: plan.applicationId,
-            applicationName: plan.applicationName,
-            provisioningType: plan.provisioningType,
-          }
-        : null,
+      plan: planCardOf(plan, task.kind === 'REVOKE' ? notes.get(task.assignment.planId) : undefined),
       subscriptionId: task.assignment.subscriptionId,
       accountIdentifier: task.assignment.accountIdentifier,
       defaultResponsibleEmployeeId: task.defaultResponsibleEmployeeId,

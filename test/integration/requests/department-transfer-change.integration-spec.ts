@@ -18,10 +18,10 @@ describe('moving, cancelling and telling a transfer (integration, real PostgreSQ
     employeeId,
     toDepartmentId: fin.id,
     effectiveOn: h.day(30),
-    grounds: h.grounds,
+    groundsNote: h.groundsNote,
     ...extra,
   });
-  const why = { reason: 'The department asked for another day', grounds: h.grounds };
+  const why = { reason: 'The department asked for another day', groundsNote: h.groundsNote };
   const outcome = (response: { status: number }) => response.status;
   const headedDepartment = async (name: string) => {
     const department = await h.departmentWithUnit(name);
@@ -67,7 +67,7 @@ describe('moving, cancelling and telling a transfer (integration, real PostgreSQ
           oldEffectiveOn: h.day(30),
           newEffectiveOn: h.day(45),
           reason: why.reason,
-          grounds: h.grounds,
+          groundsNote: h.groundsNote,
         }),
       ]);
       const [event] = await h.auditEventsOf('DEPARTMENT_TRANSFER.RESCHEDULED', wire.id);
@@ -80,7 +80,7 @@ describe('moving, cancelling and telling a transfer (integration, real PostgreSQ
       const move = (extra: object) => h.rescheduleTransfer(wire.id, { newEffectiveOn: h.day(45), ...why, ...extra });
 
       const noReason = await move({ reason: undefined });
-      const noGrounds = await move({ grounds: undefined });
+      const noGrounds = await move({ groundsNote: undefined });
       const same = await move({ newEffectiveOn: h.day(30) });
       const past = await move({ newEffectiveOn: h.day(-2) });
 
@@ -222,7 +222,7 @@ describe('moving, cancelling and telling a transfer (integration, real PostgreSQ
       const person = await h.veteran(des, code('E'));
       const wire = await h.recorded(body(person.employeeId));
 
-      const noReason = await h.cancelTransfer(wire.id, { grounds: h.grounds });
+      const noReason = await h.cancelTransfer(wire.id, { groundsNote: h.groundsNote });
       const noGrounds = await h.cancelTransfer(wire.id, { reason: 'Not needed' });
       expect([noReason.status, h.codeOf(noReason)]).toEqual([422, 'VALIDATION_ERROR']);
       expect([noGrounds.status, h.codeOf(noGrounds)]).toEqual([422, 'VALIDATION_ERROR']);
@@ -405,7 +405,7 @@ describe('moving, cancelling and telling a transfer (integration, real PostgreSQ
       expect((await h.stepOf(sent.id, 'NEED')).assignee_employee_id).toBe(to.head.employeeId);
     });
 
-    it('leaves the spend step and the need step that was decided as they were, and the grant with its task (AC-6)', async () => {
+    it('QĐ-110o: closes the paid request sent from the old department the day the transfer takes effect, as the system, and leaves the need step that was decided as it was (AC-6)', async () => {
       const unit = await h.departmentWithHead(code('P-RQ'));
       const other = await h.departmentWithHead(code('P-RQ'));
       await h.budgetFor(unit, { total: 100 * M });
@@ -415,18 +415,50 @@ describe('moving, cancelling and telling a transfer (integration, real PostgreSQ
       const spendBefore = await h.stepOf(waiting, 'SPEND_APPROVAL');
       expect(spendBefore).toMatchObject({ state: 'PENDING', assignee_employee_id: h.boss.employeeId });
       expect(needBefore.state).toBe('APPROVED');
-      const steps = async () =>
-        JSON.stringify((await h.ctx.sql.query(`SELECT * FROM access_request_steps ORDER BY id`)).rows);
-      const decided = await steps();
+      // A request of another department is not touched: it is not sent from the department the person leaves.
+      const bystander = await member(other, 'B');
+      const elsewhere = await h.sent(bystander, internal);
+      const elsewhereBefore = await h.stepOf(elsewhere.id, 'NEED');
 
       await h
         .recordTransfer(body(requester.employeeId, { toDepartmentId: other.department.id, effectiveOn: h.today() }))
         .expect(201);
 
+      // The decision that was made stays as it was; the step still open is closed with the request, which the system ends as cancelled.
       expect(await h.stepOf(waiting, 'NEED')).toEqual(needBefore);
-      expect(await h.stepOf(waiting, 'SPEND_APPROVAL')).toEqual(spendBefore);
-      expect(await steps()).toBe(decided);
+      expect(await h.stepOf(waiting, 'SPEND_APPROVAL')).toEqual({ ...spendBefore, state: 'CLOSED' });
+      const ended = await h.ctx.sql.query<{ state: string }>(
+        'SELECT state::text AS state FROM access_requests WHERE id = $1',
+        [waiting],
+      );
+      expect(ended.rows[0].state).toBe('CANCELLED');
+      expect(await h.stepOf(elsewhere.id, 'NEED')).toEqual(elsewhereBefore);
       expect(APPROVE.decision).toBe('APPROVE');
+    });
+
+    it('QĐ-110o: the money held for an approved paid request of the old department that the system closes goes back to the budget the day the transfer takes effect', async () => {
+      const unit = await h.departmentWithHead(code('P-RQ'));
+      const other = await h.departmentWithHead(code('P-RQ'));
+      await h.budgetFor(unit, { total: 100 * M });
+      const requester = await member(unit, 'R');
+      const approved = await h.waitingForApprover({ ...unit, member: requester }, paid, { amount: 5 * M });
+      await h.decideSpend(approved, APPROVE, h.boss.account).expect(200);
+      const held = await h.ctx.sql.query<{ amount_minor: string; released_minor: string; state: string }>(
+        'SELECT amount_minor::text, released_minor::text, state::text FROM budget_commitments WHERE request_id = $1',
+        [approved],
+      );
+      expect(held.rows).toEqual([{ amount_minor: String(5 * M), released_minor: '0', state: 'HELD' }]);
+
+      await h
+        .recordTransfer(body(requester.employeeId, { toDepartmentId: other.department.id, effectiveOn: h.today() }))
+        .expect(201);
+
+      const ended = await h.ctx.sql.query<{ state: string; released_minor: string; reason: string }>(
+        `SELECT c.state::text AS state, c.released_minor::text, r.reason::text AS reason FROM budget_commitments c
+           JOIN budget_commitment_releases r ON r.commitment_id = c.id WHERE c.request_id = $1`,
+        [approved],
+      );
+      expect(ended.rows).toEqual([{ state: 'RELEASED', released_minor: String(5 * M), reason: 'REQUEST_CANCELLED' }]);
     });
   });
 });

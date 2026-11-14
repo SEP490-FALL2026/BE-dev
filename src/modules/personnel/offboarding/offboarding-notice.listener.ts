@@ -46,7 +46,7 @@ export class OffboardingNoticeRecorder implements OnModuleInit, NoticeEventRecor
           employeeId: notice.employeeId,
           lastWorkingDay: event.lastWorkingDay,
           accessBlockMode: this.modeOf(event),
-          grounds: request.grounds,
+          groundsNote: request.groundsNote,
           successor: event.successor,
           cancelPendingTransfer: event.cancelPendingTransfer,
           noticeId: notice.id,

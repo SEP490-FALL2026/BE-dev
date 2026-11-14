@@ -74,29 +74,11 @@
   (one line that names the kind of error, the code and whether it can be retried: the bullet after this one).
   A change written for today is told in the transaction that writes it. It runs in the API graph because that is where every
   listener (requests, personnel) is registered. Run one by hand with `OrganizationHistoryService.announceDueChanges(day)`.
-  The API also runs `HandoverDutySweeper` once an hour (the first pass five minutes after start, unreferenced timer): for each
-  handover duty whose deadline has passed unconfirmed it writes `overdue_noticed_at`, the audit event `HANDOVER_DUTY.OVERDUE` and an inbox
-  notice (`HANDOVER_CONFIRMATION_OVERDUE`) to the person who confirms today and the IT Admin in charge in one transaction, so a duty is told
-  once for a deadline however many instances run; a failed pass only logs. Run one by hand with
-  `HandoverOverdueService.noticeOverdue(now)`.
-  The API also runs `TransferReviewSweeper` once an hour (the first pass five minutes after start, unreferenced timer): for each open
-  transfer review past its deadline whose department has a head today it writes `overdue_noticed_at` and the audit event
-  `TRANSFER_REVIEW.OVERDUE` in one transaction, so a review is told once however many instances run; a department without a head is
-  left for a later pass, and a failed pass only logs. It only tells: it never revokes, reassigns or decides. Run one by hand with
-  `TransferReviewOverdueService.noticeOverdue(now)`.
   The API also runs `LeaveReturnSweeper` once an hour (the first pass five minutes after start, unreferenced timer): for each long leave
   that runs past its approved day of return it writes `return_overdue_noticed_for` (that approved day) and the audit event
   `LONG_LEAVE.RETURN_OVERDUE` in one transaction, so a day is told once however many instances run, and told again when the day moves
   and passes; a failed pass only logs. It only tells: the work state of a person never changes by the calendar. Run one by hand with
   `LeaveOverdueService.noticeOverdue(now)`.
-  The API also runs `ServiceAccountDutySweeper` once an hour (the first pass five minutes after start, unreferenced timer): for each open
-  service account whose responsible person has a transfer or a departure that is not closed and whose day has passed it writes a row of
-  `service_account_duty_notices` (unique for the account and the day), the audit event `SERVICE_ACCOUNT_DUTY.OVERDUE` and an inbox notice
-  (`SERVICE_ACCOUNT_RESPONSIBLE_OVERDUE`) to the IT Admin in charge of the owning department in one transaction, so a day is told once however
-  many instances run; a failed pass only logs. It only tells: the transfer or the departure still takes
-  effect, the account keeps its person and nothing is revoked. It reads which people have a file that waits through the provider that the
-  personnel module registers, so it finds nothing in a process that does not load it. Run one by hand with
-  `ServiceAccountDutyService.noticeOverdue(now)`.
   The API also runs `ExpiryReminderSweeper` once an hour (the first pass five minutes after start, unreferenced timer): for each open
   personal right whose end date falls between today and seven days ahead it writes, in one transaction, at most three rows of
   `assignment_expiry_reminders` (unique for the right, the end date and the audience: the holder, the head of their department today, the
@@ -110,6 +92,69 @@
   `PERSONNEL_NOTICE_REVIEW_WORKING_DAYS`) it sets `overdue_noticed_at` and writes the audit event `PERSONNEL_NOTICE.OVERDUE` in one
   transaction, so a notice is told once however many instances run; a failed pass only logs. It only tells: the notice is never recorded or
   rejected by the calendar and the person it is about is not changed. Run one by hand with `NoticeOverdueService.noticeOverdue(now)`.
+  The API also runs `RevocationOverdueSweeper` once an hour (the first pass five minutes after start, unreferenced timer): for each departure that
+  is not cancelled or closed and is past `offboarding_cases.revocation_due_on` (the `DEPARTURE_REVOCATION_WORKING_DAYS`th working day after the last
+  working day, `QĐ-110c`) and whose person still holds a personal seat with **no task of revocation completed** (counted through
+  `LicensingApi.countPersonalSeatsWithoutCompletedTaskOf`, whether or not the IT Admin ever opened a task), on a working day, it writes the
+  notice `REVOCATION_OVERDUE` to the IT Admin in charge of the department (never the person who left; the first IT Admin who can act when none
+  is named) and to the Super Admin, with the audit event `OFFBOARDING_CASE.REVOCATION_OVERDUE` (actor `SYSTEM`) in the same transaction. The key
+  `offboarding:<case>:<day>` is unique for a recipient, so a case is told once for each working day however many instances or passes run; no
+  notice on a Saturday, a Sunday or a non-working date; a failed pass only logs. It only tells: no task is opened, no seat taken away, the case is
+  never changed. It judges departures only: the tasks of revocation a transfer opens when its grace ends (`TRANSFER`) carry no `due_on` and have no case, so it
+  tells nothing about them; their deadline is worked out for the report of the SLA (`GET /reports/revocation-sla`, D-124), which counts them as overdue. Run one
+  by hand with `RevocationOverdueService.noticeOverdue(now)`.
+  The API also runs `BlockMomentSweeper` once an hour (the first pass five minutes after start, unreferenced timer): for each departure that is
+  not cancelled or closed, has `block_announced_at IS NULL` and whose person is refused from today or earlier (the block of the case, or the
+  day they left) it announces the block once (`QĐ-110b`, `QĐ-110d`). Each case has a transaction of its own that locks the employee, then the case
+  `FOR UPDATE`, reads the case and the block again and sets `block_announced_at` before anything else, so a pass on another instance, a pass
+  run again or a cancellation at the same time never both act; a case that fails is logged and tried again at the next pass without
+  stopping the others. In that transaction the system ends the registrations of the machines of the person (cause `DEPARTURE_BLOCKED`), closes
+  every open request of the person through `RequestsApi.cancelForBeneficiaryGone` with the scope `ALL_OPEN` (the ones whose grant is being
+  carried out stay and the IT Admin is told), writes the audit event `OFFBOARDING_CASE.ACCESS_BLOCKED` (actor `SYSTEM`) and the line
+  `ACCESS_BLOCKED` of the log of the case (no account and no ticket wrote it), and tells the Super Admin (only while the person is not yet
+  marked as left) and the IT Admin (`DEPARTURE_ACCESS_BLOCKED`, one key per audience). A deadline of revocation already on the case is never
+  changed; it is written only when the case has none. The same pass then tells the IT Admin and the Super Admin (`ACCOUNT_LOCK_OVERDUE`, key
+  `ACCOUNT_LOCK_OVERDUE:<case>`, once for the case, with the audit event `OFFBOARDING_CASE.ACCOUNT_LOCK_OVERDUE`) when a departure blocked now
+  has no lock of the company account from the day after it was recorded. It revokes nothing and opens no task. Run one by hand with
+  `BlockAnnouncementService.announce(now)` and `AccountLockOverdueService.notice(now)`.
+  The API also runs `DepartureClosureSweeper` once an hour (the first pass five minutes after start, unreferenced timer). It first writes the lock of
+  the mailbox (1b) that the listener of the last K1 revocation could not write because another command held the case (`MailboxLockSettlement`,
+  D-72): for each departure that is not closed and has (1a) and not (1b), when `LicensingApi.listPeopleWithMailboxLockTicked` says a completed K1
+  revocation of the person kept a departure checklist with the step `MAILBOX_LOCKED` ticked, and the person holds no K1 seat without a completed
+  revocation, it writes (1b) by the system (the line `MAILBOX_LOCKED` with no account, the audit event `OFFBOARDING_CASE.MAILBOX_LOCK_RECORDED`, actor
+  `SYSTEM`) and closes the case if that was the last thing it waited for, in a transaction of its own that locks the employee, then the case. Then,
+  for each departure whose person has left, that is not closed and has the lock of the mailbox (1b) written (`offboarding_cases.mailbox_lock_at`), it
+  closes the case when
+  nothing keeps it open (`QĐ-110e`, `B-1`): every personal seat of the person has a completed task of revocation (counted through
+  `LicensingApi.countPersonalSeatsWithoutCompletedTaskOf`) and the lock of the company account (1a) is written. Each case has a transaction of
+  its own that locks the employee, then the case `FOR UPDATE`, reads it again and writes `closed_at` with no account (`closed_by_app_user_id`
+  NULL), the line `CLOSED_BY_SYSTEM` of the log of the case and the audit event `OFFBOARDING_CASE.CLOSED` (actor `SYSTEM`), so a pass on another
+  instance, a pass run again or a command at the same time never both act; a case that fails is logged and tried again at the next pass without
+  stopping the others. The same closing is asked for at the moment a fact that closes the case is written (the last revocation of the person
+  completed, (1b) recorded on the route), so the hourly pass only settles what those did not reach. It revokes nothing and opens no task. Run one by
+  hand with `MailboxLockSettlement.settle(now)` and `DepartureClosureService.sweep(now)`.
+  The API also runs `TransferGraceSweeper` once an hour (the first pass five minutes after start, unreferenced timer): the grace of the old rights of a
+  person who moved (`QĐ-110p`, `QĐ-110r`, SPEC MF3-C.1). It (1) tells the start of the grace (`TRANSFER_GRACE_STARTED`) of a transfer that took effect
+  before the grace existed (the migration of m-17 gave it one and nobody was told; it has no `snapshot_before`, and the picture of the rights is kept
+  in the same transaction, so it is told once), (2) reminds the person who moved (`TRANSFER_GRACE_ENDING`, event key `TRANSFER_GRACE_ENDING:{transfer}`)
+  from `grace_reminder_on` to the last day of the grace, once for the transfer (`reminded_at` is claimed first; a person who holds nothing to lose is
+  not told), and (3) the day after `grace_ends_on` asks `LicensingApi.openRevocation` for a revocation with the source `TRANSFER`, the system as the
+  actor (`SystemActor`, the task is made by the system), `referenceKind DEPARTMENT_TRANSFER` and the transfer as the reference, for every personal
+  right the person held from the day the transfer took effect or before that is still in force and has a revocation (K3 has none), in the queue of
+  the IT Admin in charge of the new department; it writes the audit event `DEPARTMENT_TRANSFER.REVOCATION_OPENED` (actor `SYSTEM`) and tells the person
+  and that IT Admin (`TRANSFER_RIGHTS_REVOKING`) once. Asking again changes nothing (the gate adds no second task and no second reason, and a seat that
+  has a live task of another source is given the reason besides). Each transfer has a transaction of its own that locks the employee, then the transfer
+  `FOR UPDATE`, reads it again and acts, so two instances, a pass run again or a command at the same time never both act; one that fails is logged and
+  tried again at the next pass without stopping the others. Run one by hand with `TransferTellingService.announceUnannounced(now)`,
+  `TransferTellingService.remind(now)` and `TransferRevocationService.sweep(now)`. At the end of its transaction for a transfer whose grace is over, the pass
+  asks `TransferClosureService.closeIfDue`: when no right of the old department is left to take back (every task completed, the person held nothing, or
+  the rights ended another way) the system closes the transfer (`closed_at`, `closed_by_system`, no account, `snapshot_after`, the audit event
+  `DEPARTMENT_TRANSFER.CLOSED`, actor `SYSTEM`), so a person whose transfer had nothing to revoke can be moved again (`QĐ-110r`). The same closing is asked
+  the moment a task of revocation of the person is completed (a listener of `RevocationListeners`), and a departure recorded while the grace lasts
+  closes the transfer as superseded (`DEPARTMENT_TRANSFER.SUPERSEDED`, `superseded_by_case_id`) so the sweep opens nothing for it. When that departure is
+  cancelled the transfer opens again, whole (`DEPARTMENT_TRANSFER.REOPENED`: no closing, no `snapshot_after`, no `superseded_by_case_id`), unless the person was moved
+  again since; nothing is taken back at the cancellation, the sweep does it when the grace is over. A transfer is not closed while a grant of a right the person
+  asked for again (R-49) still waits, because a grant that fails gives its old right back.
   The API also runs `SaasIssueSweeper` once an hour (the first pass five minutes after start, unreferenced timer): it closes each resolved
   report of an error in a SaaS right whose last day to reopen (`saas_issues.reopen_until`, fixed when it was resolved from
   `SAAS_ISSUE_REOPEN_WORKING_DAYS`) has passed (state `CLOSED`, a `SYSTEM` entry and the audit event `SAAS_ISSUE.CLOSED`, under the row lock),

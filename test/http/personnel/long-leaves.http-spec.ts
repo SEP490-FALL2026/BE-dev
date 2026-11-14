@@ -5,7 +5,7 @@ import { bodyOf } from '../../support/api-body';
 import { bearer, createHttpContractApp, principal } from '../../support/http-contract-app';
 
 const ID = '3f0c7d54-9e1b-4f6a-8d2c-5b7a1e9c0d11';
-const GROUNDS = { type: 'HR_DECISION', reference: 'QD-12/2026', issuer: 'HR Department', issuedOn: '2026-10-01' };
+const NOTE = 'Quyết định số QD-12/2026 của phòng Nhân sự';
 
 type Call = (server: App) => request.Test;
 
@@ -15,7 +15,7 @@ const ROUTES: Array<[string, Call]> = [
     (server) =>
       request(server)
         .post('/api/v1/long-leaves')
-        .send({ employeeId: ID, startedOn: '2026-06-01', approvedReturnOn: '2026-09-01', grounds: GROUNDS }),
+        .send({ employeeId: ID, startedOn: '2026-06-01', approvedReturnOn: '2026-09-01', groundsNote: NOTE }),
   ],
   ['GET /long-leaves', (server) => request(server).get('/api/v1/long-leaves')],
   ['GET /long-leaves/{id}', (server) => request(server).get(`/api/v1/long-leaves/${ID}`)],
@@ -25,7 +25,7 @@ const ROUTES: Array<[string, Call]> = [
     (server) =>
       request(server)
         .post(`/api/v1/long-leaves/${ID}/return-date-changes`)
-        .send({ newApprovedReturnOn: '2026-09-30', grounds: GROUNDS }),
+        .send({ newApprovedReturnOn: '2026-09-30', groundsNote: NOTE }),
   ],
   [
     'POST /long-leaves/{id}/returns',
@@ -90,18 +90,19 @@ describe('long leave routes (e2e, no database)', () => {
 
   describe('validation before any work', () => {
     const asAdmin = () => ({ Authorization: bearer(principal(['SUPER_ADMIN'])) });
-    const START = { employeeId: ID, startedOn: '2026-06-01', approvedReturnOn: '2026-09-01', grounds: GROUNDS };
+    const START = { employeeId: ID, startedOn: '2026-06-01', approvedReturnOn: '2026-09-01', groundsNote: NOTE };
 
     it.each([
-      ['no day of return', { employeeId: ID, startedOn: '2026-06-01', grounds: GROUNDS }],
+      ['no day of return', { employeeId: ID, startedOn: '2026-06-01', groundsNote: NOTE }],
       ['a start that is not a date', { ...START, startedOn: '01/06/2026' }],
       ['no basis', { employeeId: ID, startedOn: '2026-06-01', approvedReturnOn: '2026-09-01' }],
-      ['a basis of a kind outside the list', { ...START, grounds: { ...GROUNDS, type: 'DECISION' } }],
-      ['a basis with a day that is not a date', { ...START, grounds: { ...GROUNDS, issuedOn: 'yesterday' } }],
+      ['a blank basis', { ...START, groundsNote: '   ' }],
+      ['a basis of 501 characters', { ...START, groundsNote: 'a'.repeat(501) }],
+      ['a basis that is not a sentence', { ...START, groundsNote: { reference: 'QD-12/2026' } }],
+      ['the old four-part basis', { ...START, grounds: { type: 'HR_DECISION', reference: 'QD-12/2026' } }],
       ['an employee that is not an id', { ...START, employeeId: 'E1' }],
       ['the reason for the leave', { ...START, reason: 'Family' }],
       ['a medical field', { ...START, medical: 'x' }],
-      ['a field inside the basis the route does not know', { ...START, grounds: { ...GROUNDS, note: 'x' } }],
     ])('refuses %s with 422', async (_name, payload) => {
       const response = await request(app.getHttpServer())
         .post('/api/v1/long-leaves')
@@ -135,11 +136,15 @@ describe('long leave routes (e2e, no database)', () => {
             .send({ newApprovedReturnOn: '2026-10-01' }),
       ],
       [
-        'a return with a basis of a kind outside the list',
+        'a return without the basis, on the approved day too (R-32)',
+        (server: App) => request(server).post(`/api/v1/long-leaves/${ID}/returns`).send({ returnedOn: '2026-09-01' }),
+      ],
+      [
+        'a return with a basis that is not a sentence',
         (server: App) =>
           request(server)
             .post(`/api/v1/long-leaves/${ID}/returns`)
-            .send({ returnedOn: '2026-09-01', grounds: { ...GROUNDS, type: 'DECISION' } }),
+            .send({ returnedOn: '2026-09-01', groundsNote: { reference: 'QD-12/2026' } }),
       ],
       [
         'a return with the reason for the leave',

@@ -117,6 +117,18 @@ export class SubscriptionChangeService {
 
     const updated = await this.subscriptions.update(tx, id, state);
     await this.auditChange(tx, actor, { current, updated, organizationId });
+    // A rise of the seats of a K2 or K4 pool is told to the IT Admin who answers for it, whoever changed the number (`QĐ-110v`, SPEC P24).
+    await this.guard.tellSeatIncrease(tx, {
+      organizationId,
+      subscriptionId: id,
+      planProvisioningType: current.planProvisioningType,
+      status: current.status,
+      responsibleItAdminEmployeeId: updated.responsibleItAdminEmployeeId,
+      from: current.purchasedQuantity,
+      to: updated.purchasedQuantity,
+      requestId: null,
+      actor,
+    });
 
     return updated;
   }

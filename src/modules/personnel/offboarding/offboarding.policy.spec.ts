@@ -3,9 +3,9 @@ import {
   cancelRefusal,
   changeLastDayRefusal,
   checklistOf,
-  closeRefusal,
   departmentWithoutHeadFrom,
   departureEffectiveOn,
+  departureRevocationSource,
   handoverDueOn,
   isPastLastDay,
   namedRightsRefusal,
@@ -18,7 +18,7 @@ import {
   type RightFacts,
 } from './offboarding.policy';
 
-const GROUNDS = { type: 'HR_DECISION', reference: 'QD-1/2026', issuer: 'HR', issuedOn: '2026-10-01' };
+const NOTE = 'Quyết định nghỉ việc số QD-1/2026';
 
 const record = (extra: Partial<RecordFacts> = {}): RecordFacts => ({
   today: '2026-10-24',
@@ -27,7 +27,7 @@ const record = (extra: Partial<RecordFacts> = {}): RecordFacts => ({
   lastWorkingDay: '2026-11-03',
   accessBlockMode: 'WITH_LAST_DAY',
   employee: { status: 'ACTIVE', workState: 'WORKING' },
-  grounds: GROUNDS,
+  groundsNote: NOTE,
   pendingTransfer: null,
   cancelPendingTransfer: false,
   namedAsSuccessor: false,
@@ -88,21 +88,12 @@ describe('whether a departure may be recorded', () => {
       'ALREADY_HANDING_OVER',
     ],
     ['no last working day, planned', { lastWorkingDay: undefined }, 'LAST_WORKING_DAY_REQUIRED'],
-    [
-      'no last working day, blocked now',
-      { lastWorkingDay: undefined, accessBlockMode: 'BLOCK_NOW' },
-      'LAST_WORKING_DAY_REQUIRED',
-    ],
     ['a planned day in the past', { lastWorkingDay: '2026-10-23' }, 'LAST_WORKING_DAY_INVALID'],
     ['a day before the person came', { hireDate: '2026-11-10' }, 'LAST_WORKING_DAY_INVALID'],
     ['a day before the placement began', { placementFrom: '2026-11-10' }, 'LAST_WORKING_DAY_INVALID'],
-    ['no basis', { grounds: undefined }, 'GROUNDS_REQUIRED'],
-    [
-      'a basis that is the code of a notice',
-      { grounds: { ...GROUNDS, reference: 'BM09-2026-000001' } },
-      'GROUNDS_IS_NOTICE',
-    ],
-    ['a basis lacking its issuer', { grounds: { ...GROUNDS, issuer: ' ' } }, 'GROUNDS_INCOMPLETE'],
+    ['no basis', { groundsNote: undefined }, 'GROUNDS_REQUIRED'],
+    ['a basis over 500 characters', { groundsNote: 'a'.repeat(501) }, 'GROUNDS_TOO_LONG'],
+    ['a basis that is the code of a notice', { groundsNote: 'BM09-2026-000001' }, 'GROUNDS_IS_NOTICE'],
     [
       'a transfer that takes effect first, without the confirmation to cancel it',
       { pendingTransfer: { effectiveOn: '2026-12-01' } },
@@ -134,13 +125,14 @@ describe('whether a departure may be recorded', () => {
 describe('moving, cancelling and leaving', () => {
   const change = (extra: object = {}) => ({
     state: 'HANDING_OVER' as const,
+    accessBlockMode: 'WITH_LAST_DAY' as const,
     today: '2026-10-24',
     hireDate: '2020-01-01',
     placementFrom: '2026-01-05',
     currentLastWorkingDay: '2026-11-03',
     newLastWorkingDay: '2026-11-20',
     reason: 'Dời ngày',
-    grounds: GROUNDS,
+    groundsNote: NOTE,
     successor: null,
     ...extra,
   });
@@ -151,12 +143,8 @@ describe('moving, cancelling and leaving', () => {
     ['is not a cancelled case', { state: 'CANCELLED' }, 'NOT_HANDING_OVER'],
     ['is not allowed after the last day', { today: '2026-11-04' }, 'LAST_DAY_ALREADY_PASSED'],
     ['needs a reason', { reason: '  ' }, 'REASON_REQUIRED'],
-    ['needs a basis', { grounds: undefined }, 'GROUNDS_REQUIRED'],
-    [
-      'needs a basis that is not a notice',
-      { grounds: { ...GROUNDS, reference: 'BM09-2026-000123' } },
-      'GROUNDS_IS_NOTICE',
-    ],
+    ['needs a basis', { groundsNote: undefined }, 'GROUNDS_REQUIRED'],
+    ['needs a basis that is not a notice', { groundsNote: 'BM09-2026-000123' }, 'GROUNDS_IS_NOTICE'],
     ['is not the same day', { newLastWorkingDay: '2026-11-03' }, 'NO_CHANGE'],
     ['is not in the past', { newLastWorkingDay: '2026-10-20' }, 'LAST_WORKING_DAY_INVALID'],
     [
@@ -169,14 +157,19 @@ describe('moving, cancelling and leaving', () => {
   });
 
   it('cancels a handover under way with a reason and a basis, and only that', () => {
-    expect(cancelRefusal({ state: 'HANDING_OVER', reason: 'Rút', grounds: GROUNDS })).toBeNull();
-    expect(code(cancelRefusal({ state: 'HANDING_OVER', reason: '', grounds: GROUNDS }))).toBe('REASON_REQUIRED');
+    expect(cancelRefusal({ state: 'HANDING_OVER', reason: 'Rút', groundsNote: NOTE })).toBeNull();
+    expect(code(cancelRefusal({ state: 'HANDING_OVER', reason: '', groundsNote: NOTE }))).toBe('REASON_REQUIRED');
     expect(code(cancelRefusal({ state: 'HANDING_OVER', reason: 'Rút' }))).toBe('GROUNDS_REQUIRED');
-    expect(code(cancelRefusal({ state: 'LEFT', reason: 'Rút', grounds: GROUNDS }))).toBe('CASE_LEFT');
+    expect(code(cancelRefusal({ state: 'LEFT', reason: 'Rút', groundsNote: NOTE }))).toBe('CASE_LEFT');
   });
 });
 
 describe('the revocations of the rights', () => {
+  it('gives the revocations of a departure the source its mode names (departureRevocationSource)', () => {
+    expect(departureRevocationSource('WITH_LAST_DAY')).toBe('DEPARTURE');
+    expect(departureRevocationSource('BLOCK_NOW')).toBe('ABRUPT_DEPARTURE');
+  });
+
   const right = (id: string, extra: Partial<RightFacts> = {}): RightFacts => ({
     assignmentId: id,
     hasTask: false,
@@ -251,43 +244,33 @@ describe('what keeps a case open and the four steps', () => {
     state: 'LEFT' as const,
     closed: false,
     lockRecorded: true,
+    mailboxLocked: true,
     openRights: 0,
-    accessRunsOn: 0,
-    registered: {},
   };
 
-  it('closes only when the account is locked, nothing is held, no access runs on and nothing registered waits', () => {
-    expect(closeRefusal(blockerFacts)).toBeNull();
-    expect(
-      blockersOf({
-        ...blockerFacts,
-        lockRecorded: false,
-        openRights: 2,
-        accessRunsOn: 1,
-        registered: { SERVICE_ACCOUNTS: 3, WORKSPACES: 0 },
-      }),
-    ).toEqual({
+  it('keeps a person who has left open only on the lock of the account, the lock of the mailbox and the rights with no completed task (QĐ-110e)', () => {
+    expect(blockersOf(blockerFacts)).toEqual({});
+    expect(blockersOf({ ...blockerFacts, lockRecorded: false, mailboxLocked: false, openRights: 2 })).toEqual({
       ACCOUNT_LOCK_NOT_RECORDED: 1,
+      MAILBOX_LOCK_NOT_RECORDED: 1,
       PERSONAL_RIGHTS_OPEN: 2,
-      ACCESS_RUNS_ON: 1,
-      SERVICE_ACCOUNTS: 3,
     });
-    expect(closeRefusal({ ...blockerFacts, openRights: 1 })).toEqual({
-      code: 'CASE_NOT_CLOSEABLE',
-      details: { blockers: ['PERSONAL_RIGHTS_OPEN'] },
-    });
-    expect(code(closeRefusal({ ...blockerFacts, state: 'HANDING_OVER' }))).toBe('CASE_NOT_LEFT');
-    expect(closeRefusal({ ...blockerFacts, closed: true })).toEqual({
-      code: 'CASE_NOT_CLOSEABLE',
-      details: { blockers: ['ALREADY_CLOSED'] },
-    });
+    expect(blockersOf({ ...blockerFacts, mailboxLocked: false })).toEqual({ MAILBOX_LOCK_NOT_RECORDED: 1 });
+    expect(blockersOf({ ...blockerFacts, openRights: 1 })).toEqual({ PERSONAL_RIGHTS_OPEN: 1 });
   });
 
-  it('puts the steps in the order they are done and marks the lock urgent only for a departure nobody planned', () => {
+  it('shows nothing for a handover under way, a case that was cancelled or a case that is closed', () => {
+    const everythingOpen = { ...blockerFacts, lockRecorded: false, mailboxLocked: false, openRights: 2 };
+
+    expect(blockersOf({ ...everythingOpen, state: 'HANDING_OVER' })).toEqual({});
+    expect(blockersOf({ ...everythingOpen, state: 'CANCELLED' })).toEqual({});
+    expect(blockersOf({ ...everythingOpen, closed: true })).toEqual({});
+  });
+
+  it('puts the steps in the order they are done, marks the lock urgent only for a departure nobody planned, and never waits on a handover (QĐ-110g)', () => {
     const steps = checklistOf({
       blockNow: true,
       lockRecorded: false,
-      pendingDuties: 2,
       heldRights: 3,
       withoutTask: 3,
       accessRunsOn: 0,
@@ -296,7 +279,7 @@ describe('what keeps a case open and the four steps', () => {
     });
 
     expect(steps).toEqual({
-      dataHandover: { state: 'PENDING', pendingDuties: 2 },
+      dataHandover: { state: 'DONE', pendingDuties: 0 },
       accountLock: { state: 'PENDING', urgent: true },
       revokeAccess: { state: 'PENDING', heldRights: 3, withoutTask: 3, accessRunsOn: 0 },
       seatsReleased: { state: 'PENDING', opened: 0, released: 0 },
@@ -305,7 +288,6 @@ describe('what keeps a case open and the four steps', () => {
       checklistOf({
         blockNow: false,
         lockRecorded: true,
-        pendingDuties: 0,
         heldRights: 1,
         withoutTask: 0,
         accessRunsOn: 1,
@@ -321,7 +303,6 @@ describe('what keeps a case open and the four steps', () => {
       checklistOf({
         blockNow: false,
         lockRecorded: true,
-        pendingDuties: 0,
         heldRights: 0,
         withoutTask: 0,
         accessRunsOn: 0,

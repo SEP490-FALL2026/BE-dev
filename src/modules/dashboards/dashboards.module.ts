@@ -1,7 +1,9 @@
 import { Module } from '@nestjs/common';
+import { CatalogModule } from '../catalog/catalog.module';
 import { DevicesModule } from '../devices/devices.module';
 import { IdentityAccessFacadeModule } from '../identity-access/identity-access-facade.module';
 import { LicensingModule } from '../licensing/licensing.module';
+import { OperatingParametersModule } from '../operating-parameters/operating-parameters.module';
 import { OrganizationModule } from '../organization/organization.module';
 import { OptimizationModule } from '../optimization/optimization.module';
 import { PersonnelModule } from '../personnel/personnel.module';
@@ -13,6 +15,9 @@ import { ItAdminDashboardController } from './it-admin/it-admin-dashboard.contro
 import { ItAdminDashboardService } from './it-admin/it-admin-dashboard.service';
 import { ManagerDashboardController } from './manager/manager-dashboard.controller';
 import { ManagerDashboardService } from './manager/manager-dashboard.service';
+import { DashboardProgressService } from './progress/dashboard-progress.service';
+import { RevocationSlaController } from './revocation-sla/revocation-sla.controller';
+import { RevocationSlaQueryService } from './revocation-sla/revocation-sla-query.service';
 import { SuperAdminDashboardController } from './super-admin/super-admin-dashboard.controller';
 import { SuperAdminDashboardService } from './super-admin/super-admin-dashboard.service';
 
@@ -23,10 +28,12 @@ import { SuperAdminDashboardService } from './super-admin/super-admin-dashboard.
  */
 @Module({
   imports: [
+    CatalogModule,
     DevicesModule,
     OrganizationModule,
     IdentityAccessFacadeModule,
     LicensingModule,
+    OperatingParametersModule,
     OptimizationModule,
     PersonnelModule,
     RequestsModule,
@@ -37,7 +44,15 @@ import { SuperAdminDashboardService } from './super-admin/super-admin-dashboard.
     ManagerDashboardController,
     ItAdminDashboardController,
     SuperAdminDashboardController,
+    RevocationSlaController,
   ],
-  providers: [EmployeeDashboardService, ManagerDashboardService, ItAdminDashboardService, SuperAdminDashboardService],
+  providers: [
+    DashboardProgressService,
+    EmployeeDashboardService,
+    ManagerDashboardService,
+    ItAdminDashboardService,
+    SuperAdminDashboardService,
+    RevocationSlaQueryService,
+  ],
 })
 export class DashboardsModule {}

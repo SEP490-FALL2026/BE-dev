@@ -43,7 +43,7 @@ export class LeaveNoticeRecorder implements OnModuleInit, NoticeEventRecorder {
         employeeId: notice.employeeId,
         startedOn: event.startedOn,
         approvedReturnOn: event.approvedReturnOn,
-        grounds: request.grounds,
+        groundsNote: request.groundsNote,
         noticeId: notice.id,
       });
 

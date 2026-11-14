@@ -55,7 +55,7 @@ describe('unplaced employee offboarding and first placement (integration, real P
       .recordCase({
         employeeId: emp.id,
         lastWorkingDay: h.day(10),
-        grounds: h.grounds,
+        groundsNote: h.groundsNote,
       })
       .expect(201);
 
@@ -67,11 +67,8 @@ describe('unplaced employee offboarding and first placement (integration, real P
     });
     expect(wire.department).toBeNull();
 
-    // Verify no handover duties created
-    const duties = h.dataOf<{ items: unknown[] }>(
-      await h.duties(`?pageSize=100&employeeId=${emp.id}`).expect(200),
-    ).items;
-    expect(duties).toEqual([]);
+    // No handover duty is made (QĐ-110g).
+    expect(await h.count('handover_duties')).toBe(0);
 
     // Visible to Super Admin in detail and list
     const saDetail = h.dataOf<CaseWire>(await h.readCase(wire.id, h.sa).expect(200));
@@ -110,7 +107,7 @@ describe('unplaced employee offboarding and first placement (integration, real P
       .recordCase({
         employeeId: emp.id,
         lastWorkingDay: h.day(5),
-        grounds: h.grounds,
+        groundsNote: h.groundsNote,
       })
       .expect(201);
 
@@ -174,7 +171,7 @@ describe('unplaced employee offboarding and first placement (integration, real P
       .recordCase({
         employeeId: emp.id,
         lastWorkingDay: h.day(12),
-        grounds: h.grounds,
+        groundsNote: h.groundsNote,
       })
       .expect(409);
 
@@ -187,6 +184,31 @@ describe('unplaced employee offboarding and first placement (integration, real P
     // Verify placement is still intact
     const { rows } = await h.ctx.sql.query('SELECT id FROM employee_placements WHERE employee_id = $1', [emp.id]);
     expect(rows).toHaveLength(1);
+  });
+
+  it('3b. a departure blocked now with a day other than today is 422 BLOCK_NOW_DAY_IS_TODAY, before the first placement that has not begun is looked at', async () => {
+    const emp = await createUnplacedEmployee();
+    await request(h.server())
+      .post(`/api/v1/employees/${emp.id}/first-placements`)
+      .set(h.as(h.sa))
+      .send({ departmentId: des.id, effectiveFrom: h.day(10) })
+      .expect(201);
+
+    const response = await h.recordCase({
+      employeeId: emp.id,
+      accessBlockMode: 'BLOCK_NOW',
+      lastWorkingDay: h.day(12),
+      groundsNote: h.groundsNote,
+    });
+
+    expect([response.status, h.codeOf(response), h.detailsOf(response)]).toEqual([
+      422,
+      'OFFBOARDING_CASE.LAST_WORKING_DAY_INVALID',
+      { reason: 'BLOCK_NOW_DAY_IS_TODAY', today: h.today() },
+    ]);
+    const { rows } = await h.ctx.sql.query('SELECT id FROM employee_placements WHERE employee_id = $1', [emp.id]);
+    expect(rows).toHaveLength(1);
+    expect(await h.caseCount(emp.id)).toBe(0);
   });
 
   it('4. reschedules last working day: refuses when >= cancelled validFrom, accepts when < cancelled validFrom', async () => {
@@ -208,7 +230,7 @@ describe('unplaced employee offboarding and first placement (integration, real P
         .recordCase({
           employeeId: emp.id,
           lastWorkingDay: h.day(5),
-          grounds: h.grounds,
+          groundsNote: h.groundsNote,
         })
         .expect(201),
     );
@@ -256,7 +278,7 @@ describe('unplaced employee offboarding and first placement (integration, real P
         .recordCase({
           employeeId: empA.id,
           lastWorkingDay: h.day(10),
-          grounds: h.grounds,
+          groundsNote: h.groundsNote,
         })
         .expect(201),
     );
@@ -294,7 +316,7 @@ describe('unplaced employee offboarding and first placement (integration, real P
         .recordCase({
           employeeId: empB.id,
           lastWorkingDay: h.day(10),
-          grounds: h.grounds,
+          groundsNote: h.groundsNote,
         })
         .expect(201),
     );
@@ -320,7 +342,7 @@ describe('unplaced employee offboarding and first placement (integration, real P
       .recordCase({
         employeeId: emp.id,
         lastWorkingDay: h.day(10),
-        grounds: h.grounds,
+        groundsNote: h.groundsNote,
       })
       .expect(201);
 
@@ -346,7 +368,7 @@ describe('unplaced employee offboarding and first placement (integration, real P
         employeeId: emp.id,
         toDepartmentId: des.id,
         effectiveOn: h.day(5),
-        grounds: h.grounds,
+        groundsNote: h.groundsNote,
       })
       .expect(409);
 
@@ -367,22 +389,22 @@ describe('unplaced employee offboarding and first placement (integration, real P
     const unplacedWithSeat = async () => {
       const employeeCode = code('NV-SEAT');
       const person = await h.worker(des, employeeCode);
-      const assignmentId = await h.seatOf(person, { subscriptionId: tool }, employeeCode);
+      await h.seatOf(person, { subscriptionId: tool }, employeeCode);
       await h.stripPlacements(person.employeeId);
       expect(await h.placementCount(person.employeeId)).toBe(0);
 
-      return { person, assignmentId };
+      return { person };
     };
     const rightsOf = async (id: string) =>
       h.dataOf<{ items: RightWire[] }>(await h.rightsOf(id, '?pageSize=100').expect(200)).items;
 
     it('8. opens no handover duty anywhere for the seat of a planned leaver: the IT Admin opens the revocation, the task starts at once, the case closes', async () => {
-      const { person, assignmentId } = await unplacedWithSeat();
+      const { person } = await unplacedWithSeat();
 
       const wire = await h.recordedCase(person);
       expect(wire.department ?? null).toBeNull();
       expect(wire.heldRights).toBe(1);
-      expect(await h.dutyRows(assignmentId)).toEqual([]);
+      expect(await h.count('handover_duties')).toBe(0);
 
       expect(await h.workState(person.employeeId)).toBe('ACTIVE/HANDING_OVER');
       await h.leaveOnLastDay(wire.id).expect(200);
@@ -391,42 +413,43 @@ describe('unplaced employee offboarding and first placement (integration, real P
       const opened = h.dataOf<CaseWire>(await h.revokeRights(wire.id, {}).expect(200));
       expect(opened.revocations).toEqual({ created: 1, reasonAdded: 0 });
 
-      // openFromTask ran for the task: still no duty (a head would be asked for this plan), no wait on the claim.
-      expect(await h.dutyRows(assignmentId)).toEqual([]);
+      // Still no duty, and no wait on the claim.
+      expect(await h.count('handover_duties')).toBe(0);
       const [right] = await rightsOf(wire.id);
       expect(right).toMatchObject({ dataLossOnRemoval: true, handover: null });
       const taskId = right.revocation?.taskId ?? '';
       await h.claim(taskId).expect(200);
       await h.revoked(taskId, { completion: 'ACCOUNT_REMOVED', evidence: 'đã xóa tài khoản' }).expect(200);
-      expect(await h.dutyRows(assignmentId)).toEqual([]);
-      const headsDuties = h.dataOf<{ items: unknown[] }>(
-        await h.duties(`?pageSize=100&employeeId=${person.employeeId}`, head.account).expect(200),
-      ).items;
-      expect(headsDuties).toEqual([]);
+      expect(await h.count('handover_duties')).toBe(0);
 
-      const closed = h.dataOf<CaseWire>(await h.closeCase(wire.id).expect(200));
+      // Every revocation is completed; the system closes the case when the lock of the mailbox is written (QĐ-110e), once the hourly
+      // pass of the block moment has run (audit A-1).
+      await h.blockPass();
+      const closed = h.dataOf<CaseWire>(await h.lockMailbox(wire.id, {}).expect(200));
       expect(closed.closed).toBe(true);
       expect(await h.workState(person.employeeId)).toBe('TERMINATED/LEFT');
     });
 
     it('8b. does the same for an abrupt departure: the person is LEFT at once and the revocation of the seat is not held', async () => {
-      const { person, assignmentId } = await unplacedWithSeat();
+      const { person } = await unplacedWithSeat();
 
       const wire = await h.recordedCase(person, { accessBlockMode: 'BLOCK_NOW', lastWorkingDay: h.today() });
 
-      expect(wire).toMatchObject({ state: 'LEFT', accessBlockMode: 'BLOCK_NOW', abrupt: true });
-      expect(await h.dutyRows(assignmentId)).toEqual([]);
+      expect(wire).toMatchObject({ state: 'LEFT', accessBlockMode: 'BLOCK_NOW' });
+      expect(wire).not.toHaveProperty('abrupt');
+      expect(await h.count('handover_duties')).toBe(0);
       await h.revokeRights(wire.id, { accountLock: LOCK }).expect(200);
       const [right] = await rightsOf(wire.id);
       expect(right.revocation?.source).toBe('ABRUPT_DEPARTURE');
-      expect(await h.dutyRows(assignmentId)).toEqual([]);
+      expect(await h.count('handover_duties')).toBe(0);
       const taskId = right.revocation?.taskId ?? '';
       await h.claim(taskId).expect(200);
       await h.revoked(taskId, { completion: 'ACCOUNT_REMOVED', evidence: 'đã xóa tài khoản' }).expect(200);
-      expect(h.dataOf<CaseWire>(await h.closeCase(wire.id).expect(200)).closed).toBe(true);
+      await h.blockPass();
+      expect(h.dataOf<CaseWire>(await h.lockMailbox(wire.id, {}).expect(200)).closed).toBe(true);
     });
 
-    it('9. refuses a last working day equal to validFrom (D-S28), keeps the placement, and from validFrom on records the normal flow with the head confirming', async () => {
+    it('9. refuses a last working day equal to validFrom (D-S28), keeps the placement, and from validFrom on records the normal flow', async () => {
       const employeeCode = code('NV-D28');
       const emp = await createUnplacedEmployee(employeeCode);
       const validFrom = h.day(10);
@@ -436,7 +459,7 @@ describe('unplaced employee offboarding and first placement (integration, real P
         .send({ departmentId: des.id, effectiveFrom: validFrom })
         .expect(201);
 
-      const same = await h.recordCase({ employeeId: emp.id, lastWorkingDay: validFrom, grounds: h.grounds });
+      const same = await h.recordCase({ employeeId: emp.id, lastWorkingDay: validFrom, groundsNote: h.groundsNote });
       expect([same.status, h.codeOf(same)]).toEqual([409, 'OFFBOARDING_CASE.PLACEMENT_OVERLAP']);
       expect(h.detailsOf(same)).toEqual({ reason: 'FIRST_PLACEMENT_PENDING', validFrom });
       expect(await h.placementCount(emp.id)).toBe(1);
@@ -447,9 +470,9 @@ describe('unplaced employee offboarding and first placement (integration, real P
       const person: Person = { employeeId: emp.id, account: await h.account(employeeCode, emp.id, 'EMPLOYEE') };
       const spy = pretendBusinessToday(h.ctx.app, validFrom);
       try {
-        const assignmentId = await h.seatOf(person, { subscriptionId: tool }, employeeCode);
+        await h.seatOf(person, { subscriptionId: tool }, employeeCode);
         const wire = h.dataOf<CaseWire>(
-          await h.recordCase({ employeeId: emp.id, lastWorkingDay: h.day(20), grounds: h.grounds }).expect(201),
+          await h.recordCase({ employeeId: emp.id, lastWorkingDay: h.day(20), groundsNote: h.groundsNote }).expect(201),
         );
 
         expect(wire.department).toMatchObject({ id: des.id });
@@ -460,9 +483,7 @@ describe('unplaced employee offboarding and first placement (integration, real P
         expect(row.rows[0]).toEqual({ department_id: des.id, cancelled_placement_id: null });
         expect(await h.auditEventsOf('EMPLOYEE.FIRST_PLACEMENT_CANCELLED', emp.id)).toEqual([]);
         expect(await h.placementCount(emp.id)).toBe(1);
-        const duties = await h.dutyRows(assignmentId);
-        expect(duties).toHaveLength(1);
-        expect(duties[0]).toMatchObject({ confirmer_role: 'DEPARTMENT_HEAD', department_id: des.id });
+        expect(await h.count('handover_duties')).toBe(0);
       } finally {
         spy.mockRestore();
       }
@@ -479,7 +500,7 @@ describe('unplaced employee offboarding and first placement (integration, real P
           .recordCase({
             employeeId: (await createUnplacedEmployee()).id,
             lastWorkingDay: h.day(10),
-            grounds: h.grounds,
+            groundsNote: h.groundsNote,
           })
           .expect(201),
       );

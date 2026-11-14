@@ -117,7 +117,8 @@ describe('the roles of a person who leaves and the duties of a workspace (integr
       const headed = await h.departmentWithUnit('P-RDH');
       const head = await h.worker(headed, code());
       await h.makeHead(headed, head);
-      const headCase = await h.recordedCase(head, { successor: { kind: 'NONE' } });
+      const heir = await h.worker(headed, code(), ['MANAGER']);
+      const headCase = await h.recordedCase(head, { successor: { kind: 'EMPLOYEE', employeeId: heir.employeeId } });
 
       expect(flagsOf(wire as FlaggedCase)).toEqual(['IT_ADMIN_IN_CHARGE']);
       expect(flagsOf(headCase as FlaggedCase)).toEqual(['DEPARTMENT_HEAD']);
@@ -127,7 +128,7 @@ describe('the roles of a person who leaves and the duties of a workspace (integr
         actor_kind: 'SYSTEM',
         after: { stage: 'RECORDED', priority: 'NORMAL', itAdminDepartmentCodes: ['P-RDR'] },
       });
-      expect((await flaggedEvents(headCase.id))[0].after.departmentHeadSuccessor).toBe('NONE');
+      expect((await flaggedEvents(headCase.id))[0].after.departmentHeadSuccessor).toBe('EMPLOYEE');
       expect(await stored(wire.id)).toEqual(['IT_ADMIN_IN_CHARGE']);
       expect(await stored(headCase.id)).toEqual(['DEPARTMENT_HEAD']);
       // The roles are read again when the case is read, and the person who left the role no longer holds it.
@@ -182,6 +183,38 @@ describe('the roles of a person who leaves and the duties of a workspace (integr
       } finally {
         await h.setRole('SPENDING_APPROVER', h.boss);
       }
+    });
+  });
+
+  describe('the two approvers that were retired (QĐ-93c, QĐ-110)', () => {
+    it('reads a snapshot recorded before without them, so moving the last day tells nobody again and rewrites the snapshot', async () => {
+      const department = await h.departmentWithUnit('P-RDX');
+      const person = await h.worker(department, code());
+      await h.setRole('SPENDING_APPROVER', person);
+      try {
+        const wire = await h.recordedCase(person);
+        const atRecord = await flaggedEvents(wire.id);
+        // A case recorded before the two names left the wire carries them in the column (the database enum keeps both).
+        await h.ctx.sql.query(
+          `UPDATE offboarding_cases SET role_flags = ARRAY['SPENDING_APPROVER', 'FALLBACK_APPROVER', 'SUBSTITUTE_APPROVER']::"OffboardingRoleFlag"[] WHERE id = $1`,
+          [wire.id],
+        );
+
+        await h.changeLastDay(wire.id, { lastWorkingDay: h.day(14), reason: 'Bàn giao muộn hơn' }).expect(200);
+
+        expect(await flaggedEvents(wire.id)).toHaveLength(atRecord.length);
+        expect(await stored(wire.id)).toEqual(['SPENDING_APPROVER']);
+        const read = h.dataOf<FlaggedCase>(await h.readCase(wire.id).expect(200));
+        expect(Object.keys(read.roleFlags)).not.toContain('FALLBACK_APPROVER');
+        expect(Object.keys(read.roleFlags)).not.toContain('SUBSTITUTE_APPROVER');
+        expect(read).not.toHaveProperty('abrupt');
+      } finally {
+        await h.setRole('SPENDING_APPROVER', h.boss);
+      }
+    });
+
+    it.each(['FALLBACK_APPROVER', 'SUBSTITUTE_APPROVER'])('refuses the list filtered by %s with 422', async (flag) => {
+      await h.listCases(`?roleFlag=${flag}`).expect(422);
     });
   });
 
@@ -316,19 +349,15 @@ describe('the roles of a person who leaves and the duties of a workspace (integr
       ]);
       expect(JSON.stringify(events)).not.toMatch(/password|secret|token|credential|figma-breakglass/i);
 
-      const refused = await h.closeCase(wire.id);
-      expect([refused.status, h.codeOf(refused)]).toEqual([409, 'OFFBOARDING_CASE.CASE_NOT_CLOSEABLE']);
-      expect(h.detailsOf(refused).blockers).toEqual(['WORKSPACE_OWNER_NOT_TRANSFERRED']);
+      // A workspace whose owner is not changed is a warning, never a blocker: the system closes the case all the same (QĐ-110e, QĐ-110j).
       const left = h.dataOf<FlaggedCase>(await h.readCase(wire.id).expect(200));
-      expect(left.blockers).toEqual({ WORKSPACE_OWNER_NOT_TRANSFERRED: 1 });
+      expect(left.blockers).toEqual({ MAILBOX_LOCK_NOT_RECORDED: 1 });
+      expect(Object.keys(left.warnings.workspaces)).toEqual([planId]);
 
-      await putProfile(planId, {
-        primaryOwnerEmployeeId: h.it1.employeeId,
-        members: [{ employeeId: h.it1.employeeId, role: 'OWNER' }],
-        ownerLimit: 1,
-      }).expect(200);
-      expect(h.dataOf<FlaggedCase>(await h.readCase(wire.id).expect(200)).blockers).toEqual({});
-      await h.closeCase(wire.id).expect(200);
+      await h.blockPass();
+      const closed = h.dataOf<FlaggedCase>(await h.lockMailbox(wire.id, {}).expect(200));
+      expect(closed).toMatchObject({ closed: true, blockers: {} });
+      expect(Object.keys(closed.warnings.workspaces)).toEqual([planId]);
     });
   });
 
@@ -348,7 +377,7 @@ describe('the roles of a person who leaves and the duties of a workspace (integr
       expect(dataStatements(bigFiltered.statements)).toHaveLength(dataStatements(small.statements).length);
       const rows = h.dataOf<{ items: FlaggedCase[] }>(big.result).items;
       expect(rows.length).toBeGreaterThanOrEqual(12);
-      expect(rows.every((row) => Object.keys(row.roleFlags).length === 8)).toBe(true);
+      expect(rows.every((row) => Object.keys(row.roleFlags).length === 6)).toBe(true);
       const filtered = h.dataOf<{ items: FlaggedCase[] }>(bigFiltered.result).items;
       expect(filtered.map((row) => row.employee.id)).toContain(approver.employeeId);
       // The filter reads the snapshot taken when the case was written: fewer cases, not the ones that held no role.
@@ -386,7 +415,8 @@ describe('the roles of a person who leaves and the duties of a workspace (integr
       for (const wire of [financeCase, bossCase]) {
         await h.leaveOnLastDay(wire.id).expect(200);
         await h.lockAccount(wire.id, { note: 'Đã khóa tài khoản công ty' }).expect(200);
-        const closed = h.dataOf<FlaggedCase>(await h.closeCase(wire.id).expect(200));
+        await h.blockPass();
+        const closed = h.dataOf<FlaggedCase>(await h.lockMailbox(wire.id, {}).expect(200));
         expect(closed.closed).toBe(true);
         expect((await flaggedEvents(wire.id)).map((event) => event.after.stage)).toEqual(['RECORDED']);
       }
@@ -471,7 +501,7 @@ describe('the roles of a person who leaves and the duties of a workspace (integr
       });
       const abrupt = await recordAsSuperAdmin(h.ctx.app, subjectCode, 'R-RD-003', {
         mode: 'abrupt-departure-record',
-        lastWorkingDay: h.day(-2),
+        lastWorkingDay: h.today(),
       });
 
       expect(await watched()).toMatchObject({

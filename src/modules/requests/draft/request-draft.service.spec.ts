@@ -84,10 +84,7 @@ describe('RequestDraftService.readOwn', () => {
   });
 });
 
-/**
- * A draft of the kind `SERVICE_ACCOUNT` is saved as the plain request it is until it is sent: the row of that type needs its detail
- * row when the transaction commits, and a draft has none, so the type is `GRANT` and the kind it will be is kept with its content.
- */
+/** A draft is saved as the plain request it will be, with the kind it will be kept with its content (`QĐ-110m`: a service account is no kind of draft). */
 describe('RequestDraftService.save', () => {
   const tx = { name: 'tx' };
   const drafts = { insert: jest.fn() };
@@ -109,14 +106,7 @@ describe('RequestDraftService.save', () => {
     drafts.insert.mockResolvedValue(
       row({
         policy: {
-          draft: {
-            kind: 'SERVICE_ACCOUNT',
-            planId: PLAN,
-            purpose: 'Build bot',
-            expectedIdentifier: 'ci-bot-1',
-            businessReason: 'Run the builds',
-            termMonths: 1,
-          },
+          draft: { kind: 'INDIVIDUAL', planId: PLAN, businessReason: 'Run the builds' },
         },
       }),
     );
@@ -134,21 +124,18 @@ describe('RequestDraftService.save', () => {
     service = module.get(RequestDraftService);
   });
 
-  it('writes the draft of a service account as a request of the type GRANT, with the branch of its plan, and answers its kind', async () => {
+  it('writes the draft of one person as a request of the type GRANT, with the branch of its plan, and answers its kind', async () => {
     const wire = await service.save(principal('e-owner'), {
-      kind: 'SERVICE_ACCOUNT',
+      kind: 'INDIVIDUAL',
       planId: PLAN,
-      purpose: 'Build bot',
-      expectedIdentifier: 'ci-bot-1',
       businessReason: 'Run the builds',
-      termMonths: 1,
     } as never);
 
     expect(drafts.insert).toHaveBeenCalledWith(
       tx,
       expect.objectContaining({ type: 'GRANT', branch: 'INTERNAL_FREE', planId: PLAN, departmentId: 'd-1' }),
     );
-    expect(wire).toMatchObject({ kind: 'SERVICE_ACCOUNT', departmentId: 'd-1', planId: PLAN, beneficiaryCount: 1 });
+    expect(wire).toMatchObject({ kind: 'INDIVIDUAL', departmentId: 'd-1', planId: PLAN, beneficiaryCount: 1 });
   });
 
   it('judges the sender alone for a draft of one person, and the sender with every line for a group draft (D-S21, OD-3)', async () => {

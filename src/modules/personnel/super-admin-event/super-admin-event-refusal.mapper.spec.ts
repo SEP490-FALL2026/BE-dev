@@ -29,6 +29,15 @@ describe('refusalOf — what the operations command says of a refusal', () => {
     expect(Object.keys(transfer ?? {}).sort()).toEqual(['name', 'problem', 'reason']);
   });
 
+  it('names a head who is moved without an employee to follow them with the word of a departure, PERSONNEL.SUCCESSOR_REQUIRED (QĐ-110h)', () => {
+    expect(refusalOf(new TransferRefusedError('SUCCESSOR_REQUIRED', { departmentId: 'd-1' }))).toMatchObject({
+      problem: 'PERSONNEL.SUCCESSOR_REQUIRED',
+    });
+    expect(refusalOf(new OffboardingRefusedError('SUCCESSOR_REQUIRED', { departmentId: 'd-1' }))).toMatchObject({
+      problem: 'PERSONNEL.SUCCESSOR_REQUIRED',
+    });
+  });
+
   it('keeps the reason of the answer of a notice recorder, which arrives as an ApiException', () => {
     const answer = new ApiException(HttpStatus.UNPROCESSABLE_ENTITY, {
       code: 'DEPARTMENT_TRANSFER.SUCCESSOR_NOT_A_MEMBER_ON_DATE',

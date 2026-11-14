@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { normalizeAccountIdentifier } from '../public/account-identifier.policy';
-import type { BusinessDate } from '../../../core/business-date';
+import { fromDateColumn, type BusinessDate } from '../../../core/business-date';
 import { endAfterGrant } from '../../../core/term-limit';
 import { DbTx, TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
@@ -16,11 +16,12 @@ import type {
   NewBaselineAssignment,
   SeatHolder,
   SeatUsage,
+  WaitingRegrant,
 } from '../public/licensing.types';
 import { licensingAuditEvent } from '../licensing-audit-event.mapper';
 import { toAssignmentFailure } from './assignment-conflicts.repo';
 import { AssignmentDepartmentRepo } from './assignment-department.repo';
-import { assignmentCreatedSnapshot } from './assignment.policy';
+import { assignmentCreatedSnapshot, replacedByGrant } from './assignment.policy';
 import { assertBaselineTarget, assertSeatTargetUsable, toSeatTargetRef } from './baseline-target.policy';
 import { AssignmentRepo } from './assignment.repo';
 
@@ -32,10 +33,24 @@ interface EndWithoutSeatInput {
   now: Date;
 }
 
+/** What the seat a request is granted is made of (`createFromRequest`). */
+interface GrantedSeat {
+  organizationId: string;
+  requestId: string;
+  /** The department of the request: the department of the person the seat is for. */
+  departmentId: string;
+  target: SeatTarget;
+  holder: AssignmentHolder;
+  effectiveFrom: BusinessDate;
+  expectedEndDate: BusinessDate | null;
+  /** The right of the person that this grant ended the same day (`endReplacedByGrant`, R-49); kept on the new right. */
+  replacesAssignmentId?: string | null;
+}
+
 /**
  * The assignments of seats (`US-02-05`, `US-07-01` AC-14). Assignments reach this service by the baseline import and by
  * a request; both are written under the lock of the subscription, with an audit event for each, and the database holds the
- * invariants whoever writes. A change of the person responsible for a service account is `AssignmentResponsibleService`. The
+ * invariants whoever writes. There is no service account any more (`QĐ-110m`). The
  * account identifier never enters an audit event.
  */
 @Injectable()
@@ -152,6 +167,8 @@ export class AssignmentService {
           expectedEndDate: row.expectedEndDate,
           predecessorId: null,
           baselineImportId: input.importId,
+          isMachineAccount: false,
+          machineAccountNote: null,
           createdByAppUserId: actor.appUserId,
         });
       } catch (error) {
@@ -179,26 +196,13 @@ export class AssignmentService {
    * Writes the seat a request is granted, in the caller transaction (which holds the lock of the seat target), with its
    * audit event: a personal seat, or a service account with its reason, owning department and Cost Center (`US-05-21`). The seats
    * of a subscription are one pool for every department (`QĐ-103d`): the seat is held by the department of the request
-   * (`departmentId`), the department of the person it is for. Throws AssignmentConflictError when the database refuses the seat:
+   * (`departmentId`), the department of the person it is for; `replacesAssignmentId` is the right this grant ended the same day (`endReplacedByGrant`, R-49).
+   * Throws AssignmentConflictError when the database refuses the seat:
    * an overlap, the seats all taken, the identifier in use, no expected end date for time-limited staff, or a rule of the baseline.
    */
-  async createFromRequest(
-    tx: DbTx,
-    actor: AuthenticatedPrincipal,
-    input: {
-      organizationId: string;
-      requestId: string;
-      /** The department of the request: the department of the person the seat is for. */
-      departmentId: string;
-      target: SeatTarget;
-      holder: AssignmentHolder;
-      effectiveFrom: BusinessDate;
-      expectedEndDate: BusinessDate | null;
-    },
-  ): Promise<AssignmentRecord> {
+  async createFromRequest(tx: DbTx, actor: AuthenticatedPrincipal, input: GrantedSeat): Promise<AssignmentRecord> {
     const { holder } = input;
-    // The pool of seats is shared by every department (`QĐ-103d`): a personal seat carries the department of the person it is for on the
-    // day of the grant, whoever owns the subscription; a service account carries the department that owns the account.
+    // The pool of seats is shared (`QĐ-103d`): a personal seat carries the department of the person it is for, a service account its owner's.
     const owningDepartmentId = holder.kind === 'SERVICE' ? holder.owningDepartmentId : input.departmentId;
     let record: AssignmentRecord;
     try {
@@ -219,6 +223,10 @@ export class AssignmentService {
         expectedEndDate: input.expectedEndDate,
         predecessorId: null,
         baselineImportId: null,
+        replacesAssignmentId: input.replacesAssignmentId ?? null,
+        // A new grant is a plain seat: the flag is put on it afterwards, by the IT Admin (`QĐ-110m`).
+        isMachineAccount: false,
+        machineAccountNote: null,
         createdByAppUserId: actor.appUserId,
       });
     } catch (error) {
@@ -243,6 +251,71 @@ export class AssignmentService {
     );
 
     return record;
+  }
+
+  /**
+   * Ends the right a grant replaces, the day it is given, before the new right is written (R-49, `QĐ-110q`, SPEC MF3-C.4): a person in the grace of a
+   * transfer asked again, on the same subscription, for software they hold, and the database would refuse two personal rights of one person at once
+   * (`INV-02`). The old right ends that day (`valid_until`), so the new one begins as it ends and the seat is counted once; nothing is done at the
+   * vendor and no task of revocation is made (it is the same account: the grant of the new right carries on from it), and the grace no longer takes it back.
+   * Done in the transaction of the grant, which holds the lock of the seat target. Returns the id of the right it ended, or null when the right is not
+   * one it ends (`replacedByGrant`: another person, another subscription, not open, a revocation under way).
+   */
+  async endReplacedByGrant(
+    tx: DbTx,
+    actor: AuthenticatedPrincipal,
+    input: {
+      organizationId: string;
+      requestId: string;
+      employeeId: string;
+      replacesAssignmentId: string;
+      target: SeatTarget;
+      today: BusinessDate;
+      /** A task of revocation is working the old right already: it ends the right itself. */
+      revocationUnderWay: boolean;
+    },
+  ): Promise<string | null> {
+    const old = await this.repo.lock(tx, input.replacesAssignmentId);
+    if (
+      !old ||
+      !replacedByGrant(old, {
+        employeeId: input.employeeId,
+        target: input.target,
+        today: input.today,
+        revocationUnderWay: input.revocationUnderWay,
+      })
+    )
+      return null;
+    await this.repo.end(tx, old.id, input.today);
+    await this.audit.record(
+      tx,
+      licensingAuditEvent(
+        actor,
+        input.organizationId,
+        'LICENSE_ASSIGNMENT.ENDED',
+        'LicenseAssignment',
+        old.id,
+        { validUntil: null },
+        { validUntil: input.today, regrantRequestId: input.requestId },
+      ),
+    );
+
+    return old.id;
+  }
+
+  /** Which of these rights a later right replaced (R-49): the ones a grant ended the day it gave the person the same software again. */
+  regrantedAmong(ids: readonly string[], tx?: DbTx): Promise<Set<string>> {
+    return this.repo.replacedAmong(ids, tx);
+  }
+
+  /** The grants of a right asked for again (R-49) of this person that wait, with the day each replaced right began: if one fails that right is open again. */
+  async waitingRegrantsOf(employeeId: string, tx?: DbTx): Promise<WaitingRegrant[]> {
+    const rows = await this.repo.waitingReplacementsOf(employeeId, tx);
+
+    return rows.map((row) => ({
+      replacedAssignmentId: row.replacedAssignmentId,
+      replacedEffectiveFrom: fromDateColumn(row.replacedValidFrom),
+    }));
   }
 
   /**
@@ -288,6 +361,34 @@ export class AssignmentService {
         current.id,
         { validUntil: null },
         { [failed ? 'failedAt' : 'cancelledAt']: input.now.toISOString(), requestId: input.requestId },
+      ),
+    );
+    await this.giveBackReplaced(tx, actor, current.id, input, failed ? 'GRANT_FAILED' : 'GRANT_CANCELLED');
+  }
+
+  /**
+   * A grant that ended a right of the person (R-49) did not come to be: the right is open again, so the person is not left with neither (the grace takes it
+   * back with the rest). Same transaction, under the lock of the seat target the grant held.
+   */
+  private async giveBackReplaced(
+    tx: DbTx,
+    actor: AuthenticatedPrincipal,
+    assignmentId: string,
+    input: EndWithoutSeatInput,
+    cause: 'GRANT_FAILED' | 'GRANT_CANCELLED',
+  ): Promise<void> {
+    const reopened = await this.repo.reopenReplacedBy(tx, assignmentId);
+    if (reopened === null) return;
+    await this.audit.record(
+      tx,
+      licensingAuditEvent(
+        actor,
+        input.organizationId,
+        'LICENSE_ASSIGNMENT.END_REVERSED',
+        'LicenseAssignment',
+        reopened,
+        { validUntil: input.now.toISOString().slice(0, 10) },
+        { validUntil: null, requestId: input.requestId, cause },
       ),
     );
   }

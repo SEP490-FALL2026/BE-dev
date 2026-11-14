@@ -7,7 +7,7 @@ import { OrganizationHistoryApi } from '../../organization/public/organization-h
 import { OrganizationApi } from '../../organization/public/organization.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { PersonnelNotifier, type PersonnelEventKind } from '../event-notice/personnel-notifier.service';
-import { groundsSnapshot, normalizedGrounds } from '../personnel-grounds.policy';
+import { groundsSnapshot, normalizedGroundsNote } from '../personnel-grounds.policy';
 import { personnelAuditEvent } from '../personnel-audit-event.mapper';
 import { actorColumns, type PersonnelActor } from '../public/personnel.types';
 import { TransferGuardService } from '../transfer/transfer-guard.service';
@@ -69,10 +69,10 @@ export class LeaveService {
         approvedReturnOn: input.approvedReturnOn,
         hireDate: employee.hireDate,
         employee: { status: employee.status, workState: employee.workState },
-        grounds: input.grounds,
+        groundsNote: input.groundsNote,
       }),
     );
-    const grounds = normalizedGrounds(input.grounds ?? {});
+    const grounds = normalizedGroundsNote(input.groundsNote ?? '');
     const by = actorColumns(actor);
     await this.history.setEmployeeWorkState(tx, input.employeeId, 'ON_LONG_LEAVE');
     const leave = await this.insertLeave(tx, {
@@ -134,10 +134,10 @@ export class LeaveService {
           startedOn: leave.startedOn,
           approvedReturnOn: leave.approvedReturnOn,
           newApprovedReturnOn: input.newApprovedReturnOn,
-          grounds: input.grounds,
+          groundsNote: input.groundsNote,
         }),
       );
-      const grounds = normalizedGrounds(input.grounds ?? {});
+      const grounds = normalizedGroundsNote(input.groundsNote ?? '');
       const by = actorColumns(actor);
       const changed = await this.leaves.changeReturnDate(tx, leave.id, input.newApprovedReturnOn, grounds);
       await this.leaves.insertChange(tx, {
@@ -167,7 +167,7 @@ export class LeaveService {
     });
   }
 
-  /** The person is back from `returnedOn`; on the approved day no document is needed, on any other day a new basis is. */
+  /** The person is back from `returnedOn`, with the basis in its box whatever the day (R-32); it is kept on the change `RETURNED`. */
   confirmReturn(actor: PersonnelActor, leaveId: string, input: ConfirmReturnInput, outer?: DbTx): Promise<LeaveRecord> {
     return this.inTransaction(actor, leaveId, outer, async (tx, { organizationId, leave, employeeCode, today }) => {
       refuse(
@@ -177,11 +177,11 @@ export class LeaveService {
           startedOn: leave.startedOn,
           approvedReturnOn: leave.approvedReturnOn,
           returnedOn: input.returnedOn,
-          grounds: input.grounds,
+          groundsNote: input.groundsNote,
         }),
       );
       const onSchedule = isOnSchedule(input.returnedOn, leave.approvedReturnOn);
-      const grounds = onSchedule ? undefined : normalizedGrounds(input.grounds ?? {});
+      const grounds = normalizedGroundsNote(input.groundsNote ?? '');
       const by = actorColumns(actor);
       const ended = await this.leaves.end(tx, leave.id, input.returnedOn, 'RETURNED');
       await this.history.setEmployeeWorkState(tx, leave.employeeId, 'WORKING');
@@ -207,7 +207,7 @@ export class LeaveService {
             workState: 'WORKING',
             returnedOn: input.returnedOn,
             onSchedule,
-            grounds: grounds ? groundsSnapshot(grounds) : null,
+            grounds: groundsSnapshot(grounds),
           },
         ),
       );

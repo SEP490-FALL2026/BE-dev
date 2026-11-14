@@ -46,8 +46,9 @@ phiên bản → khóa mọi đăng ký mở theo id.
 ## Extension point
 
 - Không mở điểm nào. Người đăng ký vào module khác: `personnel/offboarding/device-registration.listener.ts`
-  (`personnel.file-hook`, `onLeft`) gọi `DevicesApi.endRegistrationsOfHolder` với nguyên nhân `EMPLOYEE_LEFT`.
+  (`personnel.file-hook`) gọi `DevicesApi.endRegistrationsOfHolder`: `onLeft` với nguyên nhân `EMPLOYEE_LEFT`; `onCancelled` của hồ sơ nghỉ việc
+  hủy sau ngày cuối (chặn đã hiệu lực, `accessBlockInForce`) với nguyên nhân `DEPARTURE_BLOCKED` (mở khóa không làm đăng ký/credential sống lại).
 
 ## Chưa làm (mức B, sau demo)
 
-Yêu cầu dừng và SLA, lịch sử `/me`, `PATCH /devices`, kết thúc đăng ký theo ngày làm việc cuối, `DeviceRegistryPort` cho licensing.
+Yêu cầu dừng và SLA, lịch sử `/me`, `PATCH /devices`, kết thúc đăng ký theo ngày làm việc cuối, cổng đọc sổ thiết bị cho licensing K4 (contract `licensing/device-binding` đã gỡ ở MF2-A, `QĐ-110`: thiết kế lại từ sổ thiết bị thật khi làm K4 theo thiết bị).

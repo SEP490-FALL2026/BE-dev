@@ -5,7 +5,7 @@ import { Prisma } from '../../../generated/prisma/client';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { offboardingChangeDetailJson, type ChangeDetail } from '../personnel-change-detail.json';
-import type { Grounds } from '../personnel-grounds.policy';
+import { recordedGroundsOf, type RecordedGrounds } from '../personnel-grounds.policy';
 import { offboardingHeadHandoverJson } from '../personnel-head-handover.json';
 import type {
   AccessBlockMode,
@@ -32,12 +32,8 @@ export function toRecord(row: CaseRow): OffboardingRecord {
     lastWorkingDay: fromDateColumn(row.lastWorkingDay),
     departureEffectiveOn: fromDateColumn(row.departureEffectiveOn),
     handoverDueOn: date(row.handoverDueOn),
-    grounds: {
-      type: row.groundsType,
-      reference: row.groundsReference,
-      issuer: row.groundsIssuer,
-      issuedOn: fromDateColumn(row.groundsIssuedOn),
-    },
+    revocationDueOn: date(row.revocationDueOn),
+    grounds: recordedGroundsOf(row),
     headHandover: offboardingHeadHandoverJson.decode(row.headHandover),
     placementClosedId: row.placementClosedId,
     cancelledPlacementId: row.cancelledPlacementId,
@@ -53,6 +49,9 @@ export function toRecord(row: CaseRow): OffboardingRecord {
     accountLockByAppUserId: row.accountLockByAppUserId,
     accountLockAt: row.accountLockAt,
     accountLockNote: row.accountLockNote,
+    mailboxLockAt: row.mailboxLockAt,
+    mailboxLockByAppUserId: row.mailboxLockByAppUserId,
+    mailboxLockNote: row.mailboxLockNote,
     closedAt: row.closedAt,
     closedByAppUserId: row.closedByAppUserId,
     recordedByAppUserId: row.recordedByAppUserId,
@@ -70,7 +69,8 @@ export interface NewOffboarding {
   lastWorkingDay: BusinessDate;
   departureEffectiveOn: BusinessDate;
   handoverDueOn: BusinessDate | null;
-  grounds: Grounds;
+  revocationDueOn: BusinessDate;
+  grounds: RecordedGrounds;
   headHandover: HeadHandoverFacts | null;
   placementClosedId: string | null;
   cancelledPlacementId?: string | null;
@@ -109,10 +109,11 @@ export class OffboardingRepo {
         lastWorkingDay: toDateColumn(input.lastWorkingDay),
         departureEffectiveOn: toDateColumn(input.departureEffectiveOn),
         handoverDueOn: input.handoverDueOn ? toDateColumn(input.handoverDueOn) : null,
+        revocationDueOn: toDateColumn(input.revocationDueOn),
         groundsType: input.grounds.type,
         groundsReference: input.grounds.reference,
         groundsIssuer: input.grounds.issuer,
-        groundsIssuedOn: toDateColumn(input.grounds.issuedOn),
+        groundsIssuedOn: input.grounds.issuedOn ? toDateColumn(input.grounds.issuedOn) : null,
         headHandover: offboardingHeadHandoverJson.encode(input.headHandover),
         placementClosedId: input.placementClosedId ?? null,
         cancelledPlacementId: input.cancelledPlacementId ?? null,
@@ -169,6 +170,7 @@ export class OffboardingRepo {
       lastWorkingDay: BusinessDate;
       departureEffectiveOn: BusinessDate;
       handoverDueOn: BusinessDate | null;
+      revocationDueOn: BusinessDate;
       headHandover: HeadHandoverFacts | null;
       placementClosedId: string | null;
       cancelledPlacementId?: string | null;
@@ -182,6 +184,7 @@ export class OffboardingRepo {
         lastWorkingDay: toDateColumn(to.lastWorkingDay),
         departureEffectiveOn: toDateColumn(to.departureEffectiveOn),
         handoverDueOn: to.handoverDueOn ? toDateColumn(to.handoverDueOn) : null,
+        revocationDueOn: toDateColumn(to.revocationDueOn),
         headHandover: offboardingHeadHandoverJson.encode(to.headHandover),
         placementClosedId: to.placementClosedId,
       },
@@ -223,16 +226,6 @@ export class OffboardingRepo {
     const done = await tx.offboardingCase.updateMany({
       where: { id, state: { in: ['HANDING_OVER', 'LEFT'] }, accountLockAt: null },
       data: { accountLockAt: new Date(), accountLockByAppUserId: by.appUserId, accountLockNote: by.note },
-    });
-
-    return done.count === 1;
-  }
-
-  /** Closes the case once; false when it was closed meanwhile. */
-  async close(tx: DbTx, id: string, appUserId: string): Promise<boolean> {
-    const done = await tx.offboardingCase.updateMany({
-      where: { id, state: 'LEFT', closedAt: null },
-      data: { closedAt: new Date(), closedByAppUserId: appUserId },
     });
 
     return done.count === 1;

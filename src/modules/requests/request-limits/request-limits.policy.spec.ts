@@ -75,15 +75,61 @@ describe('judgeNewRequestLimits (BR-MF1-01)', () => {
     });
   });
 
-  describe('QĐ-108c / QĐ-103t: an exempt request (ROLE_ENDED, TRANSFER_OVERLAP)', () => {
-    it.each(['ROLE_ENDED', 'TRANSFER_OVERLAP'] as const)('%s skips GH-1 and GH-2 but not GH-3', (exemption) => {
+  describe('QĐ-108c: a request after a role ended (ROLE_ENDED)', () => {
+    it('skips GH-1 and GH-2 but not GH-3', () => {
       const open = ['r-1', 'r-2', 'r-3'].map((requestId) => ({ requestId, planId: 'plan-figma-pro' }));
 
       const verdict = judgeNewRequestLimits(
-        facts({ openNew: open, exemption, applicationId: 'app-miro', paidApplicationIds: apps(10) }),
+        facts({ openNew: open, exemption: 'ROLE_ENDED', applicationId: 'app-miro', paidApplicationIds: apps(10) }),
       );
 
       expect(verdict).toMatchObject({ refusal: null, openCount: 0, manyPaidSoftware: { count: 10, threshold: 10 } });
+    });
+  });
+
+  describe('QĐ-110q: a request in the grace of a transfer (TRANSFER_GRACE) is left out of the count, not of the duplicate', () => {
+    const grace = (over: Partial<LimitFacts> = {}) => facts({ exemption: 'TRANSFER_GRACE', ...over });
+
+    it('skips GH-2: a person at the most open requests may ask again for what they hold', () => {
+      const open = ['r-1', 'r-2', 'r-3'].map((requestId, index) => ({ requestId, planId: `plan-${index}` }));
+
+      const verdict = judgeNewRequestLimits(grace({ openNew: open }));
+
+      expect(verdict).toMatchObject({ refusal: null, openCount: 0 });
+    });
+
+    it('still refuses a second open request of the same plan, an exempt one included (QĐ-110q frees the count, not the duplicate)', () => {
+      const verdict = judgeNewRequestLimits(
+        grace({
+          openNew: [],
+          openIncludingExempt: [{ requestId: 'r-exempt', planId: 'plan-figma-pro' }],
+        }),
+      );
+
+      expect(verdict).toMatchObject({ refusal: 'HAS_OPEN_REQUEST', openRequestId: 'r-exempt' });
+    });
+
+    it('refuses the open request of the same plan the person sent before the transfer', () => {
+      const open = [{ requestId: 'r-before', planId: 'plan-figma-pro' }];
+
+      expect(judgeNewRequestLimits(grace({ openNew: open, openIncludingExempt: open }))).toMatchObject({
+        refusal: 'HAS_OPEN_REQUEST',
+        openRequestId: 'r-before',
+      });
+    });
+
+    it('lets through when the only open requests are of other plans, exempt ones included', () => {
+      const verdict = judgeNewRequestLimits(
+        grace({ openIncludingExempt: [{ requestId: 'r-1', planId: 'plan-figma-org' }] }),
+      );
+
+      expect(verdict.refusal).toBeNull();
+    });
+
+    it('keeps GH-3: many paid applications still ask a reason', () => {
+      const verdict = judgeNewRequestLimits(grace({ applicationId: 'app-miro', paidApplicationIds: apps(10) }));
+
+      expect(verdict).toMatchObject({ refusal: null, manyPaidSoftware: { count: 10, threshold: 10 } });
     });
   });
 

@@ -15,7 +15,7 @@ describe('recording the start of a long leave (integration, real PostgreSQL)', (
     employeeId,
     startedOn: h.day(-30),
     approvedReturnOn: h.day(60),
-    grounds: h.approval,
+    groundsNote: h.approval,
     ...extra,
   });
   const nothingWritten = async (person: Person) => ({
@@ -43,14 +43,18 @@ describe('recording the start of a long leave (integration, real PostgreSQL)', (
       approvedReturnOn: h.day(60),
       endedOn: null,
       overdueReturn: false,
-      grounds: h.approval,
+      groundsNote: h.approval,
       startedByAppUserId: h.sa.appUserId,
       startedByProcedure: false,
       employee: { id: person.employeeId },
     });
     expect(await h.workState(person.employeeId)).toBe('ON_LONG_LEAVE');
     const [event] = await h.auditEventsOf('LONG_LEAVE.STARTED', wire.id);
-    expect(event.after).toMatchObject({ workState: 'ON_LONG_LEAVE', grounds: h.approval, approvedReturnOn: h.day(60) });
+    expect(event.after).toMatchObject({
+      workState: 'ON_LONG_LEAVE',
+      grounds: { reference: h.approval },
+      approvedReturnOn: h.day(60),
+    });
     expect(await h.changeRows(wire.id)).toEqual([{ kind: 'STARTED' }]);
     const tables = await h.ctx.sql.query<{ table_name: string }>(
       `SELECT table_name FROM information_schema.tables WHERE table_name LIKE '%leave%verification%'`,
@@ -67,13 +71,13 @@ describe('recording the start of a long leave (integration, real PostgreSQL)', (
 
     const list = h.dataOf<{ items: LeaveWire[] }>(await h.listLeaves(`?employeeId=${person.employeeId}`));
     const detail = h.dataOf<LeaveWire>(await h.readLeave(wire.id));
-    const log = h.dataOf<{ items: { kind: string; newReturnOn: string; grounds: object }[] }>(
+    const log = h.dataOf<{ items: { kind: string; newReturnOn: string; groundsNote: string }[] }>(
       await h.leaveChanges(wire.id),
     );
 
     expect(list.items.map((item) => item.id)).toEqual([wire.id]);
     expect(detail.id).toBe(wire.id);
-    expect(log.items).toMatchObject([{ kind: 'STARTED', newReturnOn: h.day(60), grounds: h.approval }]);
+    expect(log.items).toMatchObject([{ kind: 'STARTED', newReturnOn: h.day(60), groundsNote: h.approval }]);
   });
 
   it('shows the work state in the members of the department: on leave for the one away, working for the other', async () => {
@@ -100,37 +104,32 @@ describe('recording the start of a long leave (integration, real PostgreSQL)', (
   describe('refuses what is not a basis, and writes nothing', () => {
     it.each([
       ['no basis', undefined, 'VALIDATION_ERROR'],
-      ['an empty basis', {}, 'VALIDATION_ERROR'],
+      ['an empty box', '', 'VALIDATION_ERROR'],
+      ['a blank box', '   ', 'VALIDATION_ERROR'],
+      ['a box of 501 characters', 'a'.repeat(501), 'VALIDATION_ERROR'],
       [
-        'a basis without the issuer',
-        { type: 'HR_DECISION', reference: 'Y', issuedOn: '2026-05-25' },
+        'the old four-part basis',
+        { type: 'HR_DECISION', reference: 'Y', issuer: 'HR', issuedOn: '2026-05-25' },
         'VALIDATION_ERROR',
       ],
-      [
-        'only the code of a notice',
-        { ...{ type: 'HR_DECISION', issuer: 'HR', issuedOn: '2026-05-25' }, reference: 'BM09-2026-000123' },
-        'LONG_LEAVE.GROUNDS_IS_NOTICE',
-      ],
-    ])('%s', async (_name, grounds, expected) => {
+      ['only the code of a notice', 'BM09-2026-000123', 'LONG_LEAVE.GROUNDS_IS_NOTICE'],
+    ])('%s', async (_name, groundsNote, expected) => {
       const person = await h.worker(des, code('E'));
       const before = await nothingWritten(person);
 
-      const response = await h.startLeave(body(person.employeeId, { grounds }));
+      const response = await h.startLeave(body(person.employeeId, { groundsNote }));
 
       expect([response.status, h.codeOf(response)]).toEqual([422, expected]);
       expect(await nothingWritten(person)).toEqual(before);
     });
 
-    it('names the part of the basis that is missing, as a malformed body', async () => {
+    it('takes a box of 500 characters, and keeps it trimmed', async () => {
       const person = await h.worker(des, code('E'));
 
-      const response = await h.startLeave(
-        body(person.employeeId, { grounds: { type: 'HR_DECISION', reference: 'Y', issuedOn: '2026-05-25' } }),
-      );
+      const response = await h.startLeave(body(person.employeeId, { groundsNote: `  ${'a'.repeat(500)}  ` }));
 
-      expect(JSON.stringify((response.body as { error: { details: unknown } }).error.details)).toContain(
-        'grounds.issuer',
-      );
+      expect(response.status).toBe(201);
+      expect(h.dataOf<{ groundsNote: string }>(response).groundsNote).toBe('a'.repeat(500));
     });
 
     it.each([['reason'], ['medical'], ['diagnosis']])(
@@ -230,7 +229,7 @@ describe('recording the start of a long leave (integration, real PostgreSQL)', (
       expect(Object.keys(wire)).not.toContain('selfExecuted');
       expect(await h.auditEventsOf('PERSONNEL.SELF_EXECUTED', wire.id)).toEqual([]);
 
-      await h.confirmReturn(wire.id, { returnedOn: h.today(), grounds: h.extension }).expect(200);
+      await h.confirmReturn(wire.id, { returnedOn: h.today(), groundsNote: h.extension }).expect(200);
       expect(await h.workState(h.it1.employeeId)).toBe('WORKING');
     });
 
@@ -261,7 +260,7 @@ describe('recording the start of a long leave (integration, real PostgreSQL)', (
       const hidden = await h.readLeave(other.id, h.it1);
       const listed = h.dataOf<{ items: LeaveWire[] }>(await h.listLeaves('', h.it1).expect(200));
 
-      expect(seen).toMatchObject({ id: mine.id, grounds: null });
+      expect(seen).toMatchObject({ id: mine.id, groundsNote: null });
       expect([hidden.status, h.codeOf(hidden)]).toEqual([404, 'LONG_LEAVE.NOT_FOUND']);
       expect(listed.items.map((item) => item.id)).toContain(mine.id);
       expect(listed.items.map((item) => item.id)).not.toContain(other.id);

@@ -88,9 +88,9 @@ export class CatalogApi {
     return this.plans.workspaceDutiesOf(employeeIds, tx);
   }
 
-  /** The plans with these ids by name, with their application, as far as they exist. */
-  getPlanSummaries(ids: readonly string[]): Promise<PlanSummary[]> {
-    return this.onboarding.planSummaries(ids);
+  /** The plans with these ids by name, with their application, as far as they exist; `tx` reads in the caller's transaction, which sees the plans it made. */
+  getPlanSummaries(ids: readonly string[], tx?: DbTx): Promise<PlanSummary[]> {
+    return this.onboarding.planSummaries(ids, tx);
   }
 
   /**
@@ -120,10 +120,16 @@ export class CatalogApi {
   /**
    * Buys one more seat on the subscription, in the transaction of the caller, which holds it locked through `lockSeatTarget`: `purchased_quantity`
    * rises by one (a K2 or K4 pool topped up with a grant, or the seat a K1 grant buys for its holder). It asks no Cost Center of the department
-   * that owns the subscription, if any. Throws PoolSeatNotAddableError for a subscription that is absent or a draft.
+   * that owns the subscription, if any. A rise of a K2 or K4 pool is told to the IT Admin who answers for it, with `requestId` (the request the seat is
+   * bought for) when the caller has one (`QĐ-110v`); a K1 purchase tells nobody (`S-4`). Throws PoolSeatNotAddableError for a subscription that is absent or a draft.
    */
-  addPoolSeat(tx: DbTx, actor: AuthenticatedPrincipal, subscriptionId: string): Promise<number> {
-    return this.subscriptions.addSeat(tx, actor, subscriptionId);
+  addPoolSeat(
+    tx: DbTx,
+    actor: AuthenticatedPrincipal,
+    subscriptionId: string,
+    requestId: string | null = null,
+  ): Promise<number> {
+    return this.subscriptions.addSeat(tx, actor, subscriptionId, requestId);
   }
 
   /** What one subscription is bought at (unit price and billing cycle); null when it has no price. */

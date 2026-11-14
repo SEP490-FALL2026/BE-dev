@@ -79,6 +79,7 @@ const releaseSchema = z.strictObject({
     'REVOKED',
     'LATE_GRANT',
     'GRANTED_FROM_POOL',
+    'TRANSFER_EFFECTIVE',
   ]),
   /**
    * Why Finance let the remainder go; for `REVOKED` and `LATE_GRANT` the task that caused it (`revocationTask:<id>`, `grantTask:<id>`); the

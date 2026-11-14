@@ -10,6 +10,7 @@ import type { RevocationSource } from '../public/licensing.types';
 const OPEN_SEAT_COLUMNS = {
   id: true,
   kind: true,
+  isMachineAccount: true,
   planId: true,
   subscriptionId: true,
   employeeId: true,
@@ -74,6 +75,7 @@ export class RuleSeatsRepo {
         assignmentId: row.id,
         chainRootId: roots.get(row.id) ?? row.id,
         kind: row.kind,
+        isMachineAccount: row.isMachineAccount,
         planId: row.planId,
         applicationId: row.plan.applicationId,
         subscriptionId: row.subscriptionId,

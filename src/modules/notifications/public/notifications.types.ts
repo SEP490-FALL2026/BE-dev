@@ -86,6 +86,7 @@ export const IN_APP_NOTIFICATION_CODES = [
   'PERSONNEL_NOTICE_OVERDUE',
   'ABRUPT_DEPARTURE_RECORDED',
   'ROLE_HOLDER_LEAVING',
+  // Read only (`QĐ-110p`): nothing writes it since the new head reviews nothing after a transfer; a notice already in an inbox still reads.
   'TRANSFER_REVIEW_DUE',
   'IT_ADMIN_SELF_EXECUTED',
   // The budget loops (`US-12-15` AC-24): ids, years and the reason the people concerned already read; no figure.
@@ -119,6 +120,8 @@ export const IN_APP_NOTIFICATION_CODES = [
   'BUDGET_BASELINE_VERSION_HEAD_ASSIGNED',
   // The alerts of the rights (`a03-license-inbox-alerts`, `FR-5.14`): a right about to end, a handover not confirmed, a service
   // account whose person leaves, a person who left and keeps a K1 access to the end of the paid period. Ids, codes and days only.
+  // The codes of the handover and of the service account are read only (`QĐ-110g`, `QĐ-110m`): nothing writes one any more, a row of
+  // an inbox that holds one still reads.
   'LICENSE_EXPIRY_REMINDER',
   // The window of the renewal of a right opened (BR-MF1-08a): told once to the holder and the head of their department.
   'RENEWAL_WINDOW_OPENED',
@@ -152,6 +155,30 @@ export const IN_APP_NOTIFICATION_CODES = [
   'USAGE_TRACKING_NOTICE',
   // Every vendor report of an application is older than a week, so no seat of it can be judged unused (`qd103-ghost-seat-g3-g4`, `Q-91`): told once to the IT Admin.
   'USAGE_SOURCE_STALE',
+  // MF-2 and MF-3 and what goes with them (`QĐ-110`, `QĐ-111`): a revocation past its day, a person blocked and the account not locked in
+  // time, the grace of a transfer (begun, ending, the rights being taken back), a request cancelled because its beneficiary is gone, the
+  // list of software of a department, the vendor admins of a plan below the minimum, a department nobody heads, seats added to a pool
+  // subscription, and the handover of an IT Admin's responsibilities that waits. Ids, days and counts only.
+  'REVOCATION_OVERDUE',
+  'DEPARTURE_ACCESS_BLOCKED',
+  'ACCOUNT_LOCK_OVERDUE',
+  'TRANSFER_GRACE_STARTED',
+  'TRANSFER_GRACE_ENDING',
+  'TRANSFER_RIGHTS_REVOKING',
+  'REQUEST_CANCELLED_BENEFICIARY_GONE',
+  // The grant of a request of that person is being carried out, so the system did not close it: the IT Admin checks the vendor and closes it.
+  'REQUEST_BENEFICIARY_GONE_IT_CHECK',
+  'DEPARTMENT_SOFTWARE_PROPOSED',
+  'DEPARTMENT_SOFTWARE_PROPOSAL_DECIDED',
+  'VENDOR_ADMINS_BELOW_MINIMUM',
+  'DEPARTMENT_WITHOUT_HEAD',
+  'SUBSCRIPTION_SEATS_INCREASED',
+  'IT_ADMIN_HANDOVER_PENDING',
+  // The IT Admin who took everything a leaving IT Admin answered for is told how many subscriptions and applications are theirs now (`QĐ-110j`, SPEC P5).
+  'IT_ADMIN_HANDOVER_RECEIVED',
+  // A handover cancelled after its last working day left revocation tasks in progress with no reason of the departure: the IT Admin closes
+  // them by what happened at the provider (`QĐ-110c`, MF2-C).
+  'DEPARTURE_REVOCATION_IT_CLOSE',
 ] as const;
 
 export type InAppNotificationCode = (typeof IN_APP_NOTIFICATION_CODES)[number];

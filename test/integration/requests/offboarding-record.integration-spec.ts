@@ -1,5 +1,5 @@
 import { clearSpendingApprover, setSpendingApprover } from '../../support/builders/account.builder';
-import { OffboardingHarness, type CaseWire, type RightWire } from '../../support/offboarding-harness';
+import { OffboardingHarness, type CaseWire } from '../../support/offboarding-harness';
 import type { Department, Person } from '../../support/request-harness';
 import type { TransferWire } from '../../support/transfer-harness';
 
@@ -57,86 +57,84 @@ describe('recording a departure (integration, real PostgreSQL)', () => {
     expect(wire).toMatchObject({
       state: 'HANDING_OVER',
       accessBlockMode: 'WITH_LAST_DAY',
-      abrupt: false,
       lastWorkingDay: h.day(10),
       departureEffectiveOn: h.day(11),
-      handoverDueOn: h.dueBefore(h.day(10)),
+      // No deadline of a handover is told any more (QĐ-110g): the key stays, always null, though the column is still written.
+      handoverDueOn: null,
       heldRights: 4,
       priorWorkState: 'WORKING',
       recordedByProcedure: false,
-      grounds: h.grounds,
+      groundsNote: h.groundsNote,
       employee: { id: person.employeeId },
       department: { id: des.id },
       headSuccessor: null,
       left: null,
       accountLockMissing: false,
     });
+    // The old column is still written (its constraint asks for it) and never told.
+    expect((await h.caseRow(wire.id)).handover_due_on).toBe(h.dueBefore(h.day(10)));
     expect(await h.workState(person.employeeId)).toBe('ACTIVE/HANDING_OVER');
     const placements = await h.placements(person.employeeId);
     expect(placements[placements.length - 1].valid_to).toBe(h.day(11));
-    const duties = await h.dutyRows();
-    const mine = duties.filter((duty) => duty.employee_id === person.employeeId);
-    expect(mine.map((duty) => duty.assignment_id).sort()).toEqual([...seats].sort());
-    expect(mine.every((duty) => duty.due_on === h.dueBefore(h.day(10)))).toBe(true);
+    // No confirmation of a handover is asked of anyone (QĐ-110g): recording the departure opens no duty.
+    expect(await h.count('handover_duties')).toBe(0);
     expect(await h.taskCount()).toBe(tasks);
     expect(await h.changeKinds(wire.id)).toEqual(['RECORDED']);
     const [event] = await h.auditEventsOf('OFFBOARDING_CASE.RECORDED', wire.id);
     expect(event.after).toMatchObject({
       lastWorkingDay: h.day(10),
-      grounds: h.grounds,
+      grounds: { reference: h.groundsNote },
       accessBlockMode: 'WITH_LAST_DAY',
     });
     expect((await h.auditEventsOf('PERSONNEL.EMPLOYEE_INFORMED', wire.id)).length).toBe(1);
 
     const rights = h.dataOf<{
-      items: { assignmentId: string; revocable: boolean; handover: { role: string } | null }[];
+      items: { assignmentId: string; revocable: boolean; handover: unknown }[];
     }>(await h.rightsOf(wire.id).expect(200)).items;
     expect(rights.map((right) => right.assignmentId).sort()).toEqual([...seats].sort());
-    expect(rights.every((right) => right.revocable && right.handover?.role === 'DEPARTMENT_HEAD')).toBe(true);
+    expect(rights.every((right) => right.revocable && right.handover === null)).toBe(true);
     const detail = h.dataOf<CaseWire>(await h.readCase(wire.id).expect(200));
-    expect(detail.checklist?.dataHandover).toEqual({ state: 'PENDING', pendingDuties: 4 });
+    expect(detail.checklist?.dataHandover).toEqual({ state: 'DONE', pendingDuties: 0 });
     expect(detail.checklist?.accountLock).toEqual({ state: 'PENDING', urgent: false });
   });
 
-  it('refuses a record without the last working day or without the mode, and one with `abrupt`, and writes nothing (AC-2, Q-04 B)', async () => {
+  it('refuses a record without the mode and one with `abrupt`, a planned handover without a last working day or in the past, and writes nothing (AC-2, QĐ-110b)', async () => {
     const { person } = await leaver();
     const before = await nothingWritten(person);
     const tasks = await h.taskCount();
 
-    const withoutDay = await h.recordCase({
-      employeeId: person.employeeId,
-      accessBlockMode: 'WITH_LAST_DAY',
-      grounds: h.grounds,
-    });
     const withoutMode = await h.recordCase({
       employeeId: person.employeeId,
       lastWorkingDay: h.day(10),
       accessBlockMode: undefined,
-      grounds: h.grounds,
+      groundsNote: h.groundsNote,
     });
     const retired = await h.recordCase(h.body(person, { abrupt: true }));
-    for (const response of [withoutDay, withoutMode, retired])
+    for (const response of [withoutMode, retired])
       expect([response.status, h.codeOf(response)]).toEqual([422, 'VALIDATION_ERROR']);
-    // A planned handover cannot start in the past; a departure blocked now can have a last working day that has gone by.
+    // A planned handover needs its day and cannot start in the past; a departure blocked now takes today when none is given.
+    const withoutDay = await h.recordCase({
+      employeeId: person.employeeId,
+      accessBlockMode: 'WITH_LAST_DAY',
+      groundsNote: h.groundsNote,
+    });
+    expect([withoutDay.status, h.codeOf(withoutDay)]).toEqual([422, 'OFFBOARDING_CASE.LAST_WORKING_DAY_REQUIRED']);
     const past = await h.recordCase(h.body(person, { lastWorkingDay: h.day(-1) }));
     expect([past.status, h.codeOf(past)]).toEqual([422, 'OFFBOARDING_CASE.LAST_WORKING_DAY_INVALID']);
 
     expect(await nothingWritten(person)).toEqual(before);
     expect(await h.taskCount()).toBe(tasks);
-    expect(await h.dutyRows()).toEqual(
-      expect.not.arrayContaining([expect.objectContaining({ employee_id: person.employeeId })]),
-    );
   });
 
-  it('refuses a departure without a whole basis or on the code of a notice and changes nothing (AC-23)', async () => {
+  it('refuses a departure without a basis in one box, with the old four-part one, or on the code of a notice and changes nothing (AC-23)', async () => {
     const { person } = await leaver();
     const before = await nothingWritten(person);
 
     const none = await h.recordCase({ employeeId: person.employeeId, lastWorkingDay: h.day(10) });
     const incomplete = await h.recordCase(
-      h.body(person, { grounds: { type: 'HR_DECISION', reference: 'QD-1/2026', issuer: '', issuedOn: '2026-10-01' } }),
+      h.body(person, { groundsNote: undefined, grounds: { type: 'HR_DECISION', reference: 'QD-1/2026' } }),
     );
-    const notice = await h.recordCase(h.body(person, { grounds: { ...h.grounds, reference: 'BM09-2026-000123' } }));
+    const notice = await h.recordCase(h.body(person, { groundsNote: 'BM09-2026-000123' }));
 
     expect([none, incomplete, notice].map((response) => [response.status, h.codeOf(response)])).toEqual([
       [422, 'VALIDATION_ERROR'],
@@ -144,9 +142,6 @@ describe('recording a departure (integration, real PostgreSQL)', () => {
       [422, 'OFFBOARDING_CASE.GROUNDS_IS_NOTICE'],
     ]);
     expect(await nothingWritten(person)).toEqual(before);
-    expect(await h.dutyRows()).toEqual(
-      expect.not.arrayContaining([expect.objectContaining({ employee_id: person.employeeId })]),
-    );
   });
 
   it('refuses a person who has left or is handing over already', async () => {
@@ -157,26 +152,6 @@ describe('recording a departure (integration, real PostgreSQL)', () => {
     expect([again.status, h.codeOf(again)]).toEqual([409, 'OFFBOARDING_CASE.ALREADY_HANDING_OVER']);
     const unknown = await h.recordCase(h.body({ ...person, employeeId: '3f0c7d54-9e1b-4f6a-8d2c-5b7a1e9c0d11' }));
     expect([unknown.status, h.codeOf(unknown)]).toEqual([404, 'OFFBOARDING_CASE.EMPLOYEE_NOT_FOUND']);
-  });
-
-  it('waits for a head when the department has none, and the head who arrives before the deadline takes the duty (AC-19)', async () => {
-    const ops = await h.departmentWithUnit(code('P'));
-    const employeeCode = code();
-    const person = await h.worker(ops, employeeCode);
-    await h.seatOf(person, { subscriptionId: subscriptions[0] }, employeeCode);
-    const wire = await h.recordedCase(person);
-
-    const waiting = h.dataOf<{ items: RightWire[] }>(await h.rightsOf(wire.id).expect(200)).items;
-    expect(
-      waiting.map((right) => [right.handover?.status, right.handover?.waitingReason, right.handover?.confirmer]),
-    ).toEqual([['OPEN', 'NO_HEAD', null]]);
-    const head = await h.worker(ops, code('H'));
-    await h.makeHead(ops, head);
-
-    const taken = h.dataOf<{ items: RightWire[] }>(await h.rightsOf(wire.id).expect(200)).items;
-    expect(taken.map((right) => [right.handover?.waitingReason, right.handover?.confirmer?.id])).toEqual([
-      [null, head.employeeId],
-    ]);
   });
 
   describe('the head of the department who goes (AC-8)', () => {
@@ -190,15 +165,32 @@ describe('recording a departure (integration, real PostgreSQL)', () => {
       return { department, head, next };
     };
 
-    it('is recorded without a successor: the department has no head from the day after, and the answer warns of it', async () => {
+    it('refuses a head who names nobody to follow them, or gives "nobody", and writes nothing (QĐ-110h)', async () => {
       const { department, head } = await headedDepartment();
+      const before = await nothingWritten(head);
 
-      const wire = await h.recordedCase(head);
+      for (const successor of [undefined, { kind: 'NONE' }]) {
+        const response = await h.recordCase(h.body(head, { successor }));
 
-      expect(wire.headSuccessor).toEqual({ kind: 'NONE', employee: null });
-      expect(wire.warnings?.departmentWithoutHeadFrom).toBe(h.day(11));
-      const periods = await h.headPeriods(department.id);
-      expect(periods).toEqual([expect.objectContaining({ employee_id: head.employeeId, valid_to: h.day(11) })]);
+        expect([response.status, h.codeOf(response), h.detailsOf(response)]).toEqual([
+          422,
+          'PERSONNEL.SUCCESSOR_REQUIRED',
+          { departmentId: department.id },
+        ]);
+      }
+      expect(await nothingWritten(head)).toEqual(before);
+      expect(await h.headPeriods(department.id)).toEqual([
+        expect.objectContaining({ employee_id: head.employeeId, valid_to: null }),
+      ]);
+    });
+
+    it('asks nothing of a person who does not head the department, whatever they give', async () => {
+      const { department, next } = await headedDepartment();
+
+      const wire = await h.recordedCase(next, { successor: { kind: 'NONE' } });
+
+      expect(wire.headSuccessor).toBeNull();
+      expect((await h.headPeriods(department.id))[0].valid_to).toBeNull();
     });
 
     it('hands the department to a member from the day after the last working day, and not before', async () => {
@@ -215,7 +207,7 @@ describe('recording a departure (integration, real PostgreSQL)', () => {
       ]);
     });
 
-    it('refuses a successor without MANAGER and the spending approver, writes nothing, and still records the departure with nobody (US-03-04 AC-8, US-03-06 AC-23, AC-24)', async () => {
+    it('refuses a successor without MANAGER and the spending approver, and writes nothing (US-03-04 AC-8, US-03-06 AC-23, AC-24)', async () => {
       const { department, head } = await headedDepartment();
       const withoutRole = await h.worker(department, code('N'));
       const approver = await h.worker(department, code('A'));
@@ -239,10 +231,6 @@ describe('recording a departure (integration, real PostgreSQL)', () => {
       ]);
       expect(await nothingWritten(head)).toEqual(before);
       await clearSpendingApprover(h.ctx, h.admin);
-
-      const recorded = await h.recordedCase(head, { successor: { kind: 'NONE' } });
-
-      expect(recorded.headSuccessor).toEqual({ kind: 'NONE', employee: null });
       expect(await h.headPeriods(department.id)).toEqual([expect.objectContaining({ employee_id: head.employeeId })]);
     });
 
@@ -265,10 +253,10 @@ describe('recording a departure (integration, real PostgreSQL)', () => {
   });
 
   describe('a departure nobody planned (AC-18)', () => {
-    it('is left at once: the sign-in is refused, the head is asked at once only about the tool that loses data', async () => {
+    it('is left at once: the sign-in is refused and no handover is asked about any tool, the one that loses data included (QĐ-110g)', async () => {
       const employeeCode = code();
       const person = await h.worker(des, employeeCode);
-      const lossy = await h.seatOf(person, { subscriptionId: chatgpt }, employeeCode);
+      await h.seatOf(person, { subscriptionId: chatgpt }, employeeCode);
       await h.seatOf(person, { subscriptionId: subscriptions[0] }, employeeCode);
       const tasks = await h.taskCount();
 
@@ -277,37 +265,44 @@ describe('recording a departure (integration, real PostgreSQL)', () => {
       expect(wire).toMatchObject({
         state: 'LEFT',
         accessBlockMode: 'BLOCK_NOW',
-        abrupt: true,
         handoverDueOn: null,
         accountLockMissing: true,
       });
+      expect(wire).not.toHaveProperty('abrupt');
       expect(wire.warnings).toMatchObject({ accountLockNotRecorded: true });
       expect(wire.checklist?.accountLock).toEqual({ state: 'PENDING', urgent: true });
       expect(await h.workState(person.employeeId)).toBe('TERMINATED/LEFT');
       expect(await h.employeeLeftOn(person.employeeId)).toBe(h.today());
-      const duties = (await h.dutyRows()).filter((duty) => duty.employee_id === person.employeeId);
-      expect(duties.map((duty) => [duty.assignment_id, duty.source, duty.confirmer_role])).toEqual([
-        [lossy, 'ABRUPT_DEPARTURE', 'DEPARTMENT_HEAD'],
-      ]);
+      expect(await h.count('handover_duties')).toBe(0);
       expect(await h.taskCount()).toBe(tasks);
       await h.readCase(wire.id, person.account).expect(401);
       expect((await h.auditEventsOf('OFFBOARDING_CASE.LEFT', wire.id)).length).toBe(1);
       expect((await h.auditEventsOf('OFFBOARDING_CASE.ACCOUNT_LOCK_REMINDER', wire.id)).length).toBe(1);
     });
 
-    it('does not wait for a successor of the head who goes: the department has no head from the day', async () => {
+    it('hands the department to the successor the day after, though the head works to the end of the day it is recorded (QĐ-110b, m-11)', async () => {
       const department = await h.departmentWithUnit(code('P'));
       const head = await h.worker(department, code('E'));
       await h.makeHead(department, head);
+      const next = await h.worker(department, code('H'), ['MANAGER']);
       await h.ctx.sql.query(`UPDATE department_head_periods SET valid_from = '2026-10-02' WHERE employee_id = $1`, [
         head.employeeId,
       ]);
 
-      const wire = await h.recordedCase(head, { accessBlockMode: 'BLOCK_NOW', lastWorkingDay: h.day(-1) });
+      const wire = await h.recordedCase(head, {
+        accessBlockMode: 'BLOCK_NOW',
+        lastWorkingDay: h.today(),
+        successor: { kind: 'EMPLOYEE', employeeId: next.employeeId },
+      });
 
       expect(wire.state).toBe('LEFT');
-      expect(wire.warnings?.departmentWithoutHeadFrom).toBe(h.today());
-      expect((await h.headPeriods(department.id))[0].valid_to).toBe(h.today());
+      expect(wire.lastWorkingDay).toBe(h.today());
+      expect(wire.departureEffectiveOn).toBe(h.day(1));
+      expect(wire.warnings?.departmentWithoutHeadFrom).toBeNull();
+      expect(await h.headPeriods(department.id)).toEqual([
+        expect.objectContaining({ employee_id: head.employeeId, valid_to: h.day(1) }),
+        expect.objectContaining({ employee_id: next.employeeId, valid_from: h.day(1), valid_to: null }),
+      ]);
     });
   });
 
@@ -316,7 +311,7 @@ describe('recording a departure (integration, real PostgreSQL)', () => {
       employeeId: person.employeeId,
       toDepartmentId: department.id,
       effectiveOn,
-      grounds: h.grounds,
+      groundsNote: h.groundsNote,
     });
 
     it('is cancelled in the same action when the last working day falls before it, on a confirmation, with the standard reason and the basis of the departure', async () => {
@@ -341,7 +336,7 @@ describe('recording a departure (integration, real PostgreSQL)', () => {
       expect(cancelled).toMatchObject({
         status: 'CANCELLED',
         cancellation: { reason: 'DEPARTURE_BEFORE_TRANSFER' },
-        grounds: h.grounds,
+        groundsNote: h.groundsNote,
       });
       const placements = await h.placements(person.employeeId);
       expect(placements.map((placement) => placement.department_id)).toEqual([des.id]);
@@ -369,12 +364,7 @@ describe('recording a departure (integration, real PostgreSQL)', () => {
           employeeId: person.employeeId,
           startedOn: h.day(-30),
           approvedReturnOn: h.day(60),
-          grounds: {
-            type: 'APPROVED_APPLICATION',
-            reference: 'DN-05/2026',
-            issuer: 'HR Department',
-            issuedOn: '2026-05-25',
-          },
+          groundsNote: 'Đơn xin nghỉ dài hạn số DN-05/2026',
         })
         .expect(201);
       expect(await h.workState(person.employeeId)).toBe('ACTIVE/ON_LONG_LEAVE');

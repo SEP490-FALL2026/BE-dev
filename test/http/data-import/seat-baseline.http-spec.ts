@@ -5,7 +5,6 @@ import { bodyOf } from '../../support/api-body';
 import { bearer, createHttpContractApp, principal } from '../../support/http-contract-app';
 
 const ID = '3f0c7d54-9e1b-4f6a-8d2c-5b7a1e9c0d11';
-const OTHER = '3f0c7d54-9e1b-4f6a-8d2c-5b7a1e9c0d22';
 
 type Call = (server: App) => request.Test;
 
@@ -33,13 +32,6 @@ const ROUTES: Array<[string, Call]> = [
   ['POST /seat-baseline/close', (s) => request(s).post('/api/v1/seat-baseline/close')],
   ['GET /license-assignments', (s) => request(s).get('/api/v1/license-assignments')],
   ['GET /subscriptions/{id}/seat-usage', (s) => request(s).get(`/api/v1/subscriptions/${ID}/seat-usage`)],
-  [
-    'POST /license-assignments/{id}/responsible-changes',
-    (s) =>
-      request(s)
-        .post(`/api/v1/license-assignments/${ID}/responsible-changes`)
-        .send({ employeeId: OTHER, effectiveFrom: '2026-10-15' }),
-  ],
 ];
 
 describe('seat baseline routes (e2e, no database)', () => {
@@ -185,24 +177,6 @@ describe('seat baseline routes (e2e, no database)', () => {
       ['seats of an id that is not a UUID', '/api/v1/subscriptions/not-a-uuid/seat-usage'],
     ])('turns away %s, 422', async (_name, path) => {
       const response = await request(app.getHttpServer()).get(path).set(asIt()).expect(422);
-
-      expect(bodyOf(response).error.code).toBe('VALIDATION_ERROR');
-    });
-
-    it.each([
-      ['no person', { effectiveFrom: '2026-10-15' }],
-      ['a person that is not a UUID', { employeeId: 'E5', effectiveFrom: '2026-10-15' }],
-      ['no day', { employeeId: OTHER }],
-      ['a day that is not a date', { employeeId: OTHER, effectiveFrom: '15/10/2026' }],
-      ['a day that does not exist', { employeeId: OTHER, effectiveFrom: '2026-02-30' }],
-      ['an end date that is not a date', { employeeId: OTHER, effectiveFrom: '2026-10-15', expectedEndDate: 'soon' }],
-      ['a field that is not known', { employeeId: OTHER, effectiveFrom: '2026-10-15', kind: 'PERSONAL' }],
-    ])('turns away a change of the responsible person with %s', async (_name, body) => {
-      const response = await request(app.getHttpServer())
-        .post(`/api/v1/license-assignments/${ID}/responsible-changes`)
-        .set(asIt())
-        .send(body)
-        .expect(422);
 
       expect(bodyOf(response).error.code).toBe('VALIDATION_ERROR');
     });

@@ -5,7 +5,12 @@ import { CatalogApi } from '../../catalog/public/catalog.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { AssignmentEndService } from '../assignment/assignment-end.service';
 import { SeatTargetNotFoundError } from '../public/licensing.errors';
-import type { OpenedRevocation, OpenRevocationInput } from '../public/licensing.types';
+import {
+  isSystemActor,
+  type OpenedRevocation,
+  type OpenRevocationInput,
+  type SystemActor,
+} from '../public/licensing.types';
 import { assertRevocable, assertRevocationSource, isOpenAssignment } from './revocation.policy';
 import { assertTiming } from './revocation-open.policy';
 import { ProvisioningTaskFrame } from './provisioning-task-frame.service';
@@ -41,7 +46,11 @@ export class RevocationService {
    * AssignmentNotFoundError, AssignmentNotOpenError, SeatTargetNotFoundError and ProvisioningAnotherItAdminNeededError (an IT
    * Admin who asks for their own seat while another IT Admin can).
    */
-  async open(tx: DbTx, actor: AuthenticatedPrincipal, input: OpenRevocationInput): Promise<OpenedRevocation> {
+  async open(
+    tx: DbTx,
+    actor: AuthenticatedPrincipal | SystemActor,
+    input: OpenRevocationInput,
+  ): Promise<OpenedRevocation> {
     const source = assertRevocationSource(input.source);
     const timing = assertTiming(input.timing);
     const now = input.now ?? new Date();
@@ -84,8 +93,12 @@ export class RevocationService {
   }
 
   /** The rule of the IT Admin who is the one revoked (`QĐ-77m`); a person who is not an IT Admin is never restricted by it. */
-  private async selfExecuted(tx: DbTx, actor: AuthenticatedPrincipal, holderEmployeeId: string): Promise<boolean> {
-    if (!actor.roles.includes('IT_ADMIN')) return false;
+  private async selfExecuted(
+    tx: DbTx,
+    actor: AuthenticatedPrincipal | SystemActor,
+    holderEmployeeId: string,
+  ): Promise<boolean> {
+    if (isSystemActor(actor) || !actor.roles.includes('IT_ADMIN')) return false;
 
     return (await this.frame.selfExecutionMode(actor, holderEmployeeId, tx)) === 'ALLOW_SELF_EXECUTED';
   }

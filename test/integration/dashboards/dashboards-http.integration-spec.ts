@@ -16,18 +16,21 @@ const SECTION_KEYS = {
     'needApprovals',
     'spendQueue',
     'spending',
-    'transferReviews',
   ],
   itAdmin: [
     'cancellationDeadlines',
+    'departures',
     'discrepancies',
     'ghostSeats',
     'grantTasks',
     'licenseKeys',
     'offboardingHandovers',
+    'plansBelowVendorAdminMinimum',
     'revocationTasks',
     'saasIssues',
+    'seatsReturned',
     'termsToReview',
+    'transfers',
     'unconfirmedDevices',
   ],
   superAdmin: [
@@ -37,9 +40,22 @@ const SECTION_KEYS = {
     'congestion',
     'departmentsWithoutHead',
     'departmentsWithoutItAdmin',
+    'departures',
     'personnelNotices',
+    'plansBelowVendorAdminMinimum',
+    'seatsReturned',
     'superAdminRole',
+    'transfers',
   ],
+};
+
+/** Every operation a section names, however deep the sections are grouped (the progress of the departures is a group of sections). */
+const operationsNamedBy = (node: unknown): string[] => {
+  if (typeof node !== 'object' || node === null) return [];
+  const { sourceOperationId } = node as { sourceOperationId?: unknown };
+  if (typeof sourceOperationId === 'string') return [sourceOperationId];
+
+  return Object.values(node).flatMap(operationsNamedBy);
 };
 
 const missing = (reason: string): SectionWire => ({
@@ -111,7 +127,7 @@ describe('role overviews (integration, real PostgreSQL)', () => {
     await h.recordedCase(await h.employeeIn(des.department, 'D-LV', []));
     await h.recordedCase(await h.employeeIn(eng.department, 'G-LV', []));
 
-    // A transfer into P-DES (opens a review for H1) and one into P-ENG (for H2).
+    // A transfer into P-DES and one into P-ENG: the overview of a head counts nothing of them (no review of the new head, QĐ-110p).
     const toDes = await h.employeeIn(eng.department, 'G-MV', []);
     await h.rightOf(toDes, 'G-MV', { subscriptionId: engTool });
     await h.moveToday(toDes, des.department);
@@ -226,13 +242,6 @@ describe('role overviews (integration, real PostgreSQL)', () => {
           'departmentToolsInUse',
         ),
       );
-      expect(overview.sections.transferReviews).toEqual(
-        countedAs(
-          await h.totalOf('/api/v1/transfer-reviews', des.head.account, { status: 'OPEN' }),
-          'transferReviewList',
-        ),
-      );
-      expect(overview.sections.transferReviews.count).toBe(1);
       expect(overview.sections.spending).toEqual(missing('FINANCE_FIGURES_NOT_DELIVERED'));
       expect(overview.sections.ghostSeats).toEqual(countedAs(0, 'ghostSeatQueueList'));
       expect(overview.sections.needApprovals).toEqual(
@@ -253,7 +262,6 @@ describe('role overviews (integration, real PostgreSQL)', () => {
       const ofEng = await overviewOf(OVERVIEW_PATHS.manager, eng.head.account);
 
       expect(ofEng.department?.code).toBe('P-ENG');
-      expect(ofEng.sections.transferReviews.count).toBe(1);
       expect(ofEng.sections.departmentSoftware.count).toBe(
         await h.totalOf(`/api/v1/departments/${eng.department.id}/tools-in-use`, eng.head.account),
       );
@@ -373,7 +381,7 @@ describe('role overviews (integration, real PostgreSQL)', () => {
       await overviewOf(OVERVIEW_PATHS.manager, des.head.account),
       await overviewOf(OVERVIEW_PATHS.itAdmin, it1),
       await overviewOf(OVERVIEW_PATHS.superAdmin, h.sa),
-    ].flatMap((overview) => Object.values(overview.sections).flatMap((section) => section.sourceOperationId ?? []));
+    ].flatMap((overview) => operationsNamedBy(overview.sections));
 
     expect(named.length).toBeGreaterThan(20);
     expect(named.filter((id) => !documented.has(id))).toEqual([]);

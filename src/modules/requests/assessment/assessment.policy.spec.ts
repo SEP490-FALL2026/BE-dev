@@ -90,7 +90,7 @@ describe('completing the assessment of paid or licensed software (US-05-06)', ()
   });
 
   describe('highly sensitive data (AC-7)', () => {
-    it('needs the opinion of the Business Owner, or the word that there is none with its reason', () => {
+    it('needs the opinion that was obtained, or the word that there is none with its reason', () => {
       expect(missingFields(complete({ dataSensitivity: 'HIGH' }))).toEqual(['opinion.status']);
       expect(missingFields(complete({ dataSensitivity: 'HIGH', opinionStatus: 'NOT_AVAILABLE' }))).toEqual([
         'opinion.note',

@@ -3,7 +3,6 @@ import type { BusinessDate } from '../../../core/business-date';
 import { Contributions } from '../../../core/extension/contributions';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { NoticeEventInput, NoticeEventKind, NoticeEventRef, NoticeRecord } from '../personnel-notice.types';
-import type { Grounds } from '../personnel-grounds.policy';
 import type { PersonnelActor } from './personnel.types';
 
 /** A file of the personnel context (a transfer now, the leaving of a person later) and the day its effect is due. */
@@ -13,11 +12,16 @@ export interface PersonnelFileEvent {
   employeeId: string;
   /** The day the file takes effect: the day of a transfer, the last day of a person who leaves. */
   dueOn: BusinessDate;
+  /**
+   * Only on the cancellation of a departure (`onCancelled`): true when the block on the access of the person had taken effect, so the
+   * last working day was past and what the block did (the machines of the person) is taken back with the cancellation (`QĐ-100z`).
+   */
+  accessBlockInForce?: boolean;
 }
 
 /**
  * What a flow that hangs on a personnel file does when the file is recorded, when its day moves and when it is cancelled
- * (`g6-service-account-handover` asks for a person to answer for the service accounts of the one who goes). Called in the
+ * (the role duties of the one who goes). Called in the
  * transaction of the write, after it, as a part of it: a hook that throws — a bug, a failing statement, a refusal it
  * raises — rolls the whole write back and its error is the error of the write, as a refusing entry of `Listeners` does. A hook that
  * is allowed to fail without the write failing catches the error inside itself. What a hook writes belongs to the transaction too, so
@@ -45,23 +49,15 @@ export class PersonnelFileHookContributions extends Contributions<PersonnelFileH
 }
 
 /**
- * What a flow that comes after the record of a departure tells it: how many things of its own still wait on a person who has left.
- * A blocker keeps the case from closing (the service accounts nobody answers for yet, the workspaces whose owner has not been
- * changed); a warning only shows beside the case and never stops anything (the roles the person holds that someone must take over).
- * The count is read when the case is shown or closed, in the caller's transaction when there is one.
+ * What a flow that comes after the record of a departure tells it: how many things of its own still wait on a person who has left. A warning
+ * only shows beside the case and never stops anything (the roles the person holds that someone must take over): the system closes a case
+ * whatever responsibility is not handed over (`QĐ-110e`, `QĐ-110j`), so nothing registers a blocker any more. The count is read when the
+ * case is shown, in the caller's transaction when there is one.
  */
 export interface OffboardingSource {
-  /** A finite code the wire names; it is the key of the count in `blockers` or `warnings.registered`. */
+  /** A finite code the wire names; it is the key of the count in `warnings.registered`. */
   readonly code: string;
   countFor(employeeId: string, tx?: DbTx): Promise<number>;
-}
-
-/** What keeps the record of a departure from closing, one source per code (the code is the name it is added under). */
-@Injectable()
-export class OffboardingBlockerContributions extends Contributions<OffboardingSource> {
-  constructor() {
-    super('personnel.offboarding-blocker');
-  }
 }
 
 /** What only shows beside the record of a departure, one source per code (the code is the name it is added under). */
@@ -72,11 +68,14 @@ export class OffboardingWarningContributions extends Contributions<OffboardingSo
   }
 }
 
-/** What a recorder is given to write the official event a notice announces. The basis is whole; the notice only names itself. */
+/**
+ * What a recorder is given to write the official event a notice announces. The basis is the sentence the four parts the Super Admin gave
+ * make (`QĐ-110a`: an event keeps its basis in one box); the notice only names itself.
+ */
 export interface NoticeEventRequest {
   actor: PersonnelActor;
   notice: NoticeRecord;
-  grounds: Grounds;
+  groundsNote: string;
   event: NoticeEventInput;
 }
 

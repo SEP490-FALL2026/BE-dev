@@ -1,7 +1,8 @@
 import request from 'supertest';
 import { subtractWorkingDays } from '../../src/core/working-days';
+import { BlockMomentSweeper } from '../../src/modules/personnel/departure-deadline/block-moment.job';
 import type { ApiAccount } from './api-accounts';
-import { HandoverHarness } from './handover-harness';
+import { SeatRevocationHarness } from './seat-revocation-harness';
 import type { Department, Person } from './request-harness';
 
 export interface CaseWire {
@@ -9,26 +10,33 @@ export interface CaseWire {
   employee: { id: string; employeeCode: string; fullName: string };
   state: 'HANDING_OVER' | 'LEFT' | 'CANCELLED';
   accessBlockMode: 'WITH_LAST_DAY' | 'BLOCK_NOW';
-  abrupt: boolean;
   lastWorkingDay: string;
-  handoverDueOn: string | null;
+  /** Always null on the wire since `QĐ-110g`. */
+  handoverDueOn: null;
   pastLastDay: boolean;
   accessBlocked: boolean;
   accessBlockedFrom: string | null;
   heldRights: number;
+  revocation: { dueOn: string | null; overdue: boolean; rightsWithoutCompletedTask: number };
   accountLockMissing: boolean;
   closed: boolean;
   department?: { id: string; code: string; name: string };
   priorWorkState?: 'WORKING' | 'ON_LONG_LEAVE';
   departureEffectiveOn?: string;
-  grounds?: { type: string; reference: string; issuer: string; issuedOn: string } | null;
+  groundsNote?: string | null;
   headSuccessor?: { kind: 'EMPLOYEE' | 'NONE'; employee: { id: string } | null } | null;
   recordedByAppUserId?: string | null;
   recordedByProcedure?: boolean;
   left?: { leftOn: string; leftAt: string; leftByAppUserId: string | null; leftByProcedure: boolean } | null;
   cancellation?: { cancelledAt: string; cancelledByProcedure: boolean; reason: string } | null;
   accountLock?: { recordedAt: string; recordedByAppUserId: string; note: string } | null;
-  closure?: { closedAt: string } | null;
+  mailboxLock?: {
+    recordedAt: string;
+    recordedByAppUserId: string | null;
+    recordedBySystem: boolean;
+    note: string | null;
+  } | null;
+  closure?: { closedAt: string; closedByAppUserId: string | null; closedBySystem: boolean } | null;
   checklist?: {
     dataHandover: { state: string; pendingDuties: number };
     accountLock: { state: string; urgent: boolean };
@@ -77,15 +85,18 @@ export interface CaseRow {
   placement_closed_id: string | null;
   left_on: string | null;
   account_lock_at: Date | null;
+  mailbox_lock_at: Date | null;
+  mailbox_lock_by_app_user_id: string | null;
   closed_at: Date | null;
+  closed_by_app_user_id: string | null;
   self_executed: boolean;
 }
 
 /**
- * The handover harness with what the tests of the record of a departure need: the calls of its eleven routes, the people it leaves
+ * The seat and revocation harness with what the tests of the record of a departure need: the calls of its eleven routes, the people it leaves
  * and what it writes in the database. No assertion lives here.
  */
-export class OffboardingHarness extends HandoverHarness {
+export class OffboardingHarness extends SeatRevocationHarness {
   /** The working day before `day`, with no day off in the calendar of a test installation. */
   dueBefore = (day: string): string => subtractWorkingDays(day, 1, new Set());
 
@@ -103,19 +114,27 @@ export class OffboardingHarness extends HandoverHarness {
     request(this.server()).get(`/api/v1/offboarding-cases/${id}/rights${query}`).set(this.as(account));
   caseChanges = (id: string, query = '', account: ApiAccount = this.sa) =>
     request(this.server()).get(`/api/v1/offboarding-cases/${id}/changes${query}`).set(this.as(account));
-  /** The basis is given with every move and every cancellation (`S-10`); a test that wants it missing passes `grounds: undefined`. */
+  /** The basis is given with every move and every cancellation (`S-10`); a test that wants it missing passes `groundsNote: undefined`. */
   changeLastDay = (id: string, body: object, account: ApiAccount = this.sa) =>
     request(this.server())
       .post(`/api/v1/offboarding-cases/${id}/last-day-changes`)
       .set(this.as(account))
-      .send({ grounds: this.grounds, ...body });
+      .send({ groundsNote: this.groundsNote, ...body });
   cancelCase = (id: string, body: object, account: ApiAccount = this.sa) =>
     request(this.server())
       .post(`/api/v1/offboarding-cases/${id}/cancellation`)
       .set(this.as(account))
-      .send({ grounds: this.grounds, ...body });
+      .send({ groundsNote: this.groundsNote, ...body });
   markLeft = (id: string, body: object = {}, account: ApiAccount = this.sa) =>
     request(this.server()).post(`/api/v1/offboarding-cases/${id}/departure`).set(this.as(account)).send(body);
+  /**
+   * One hourly pass of the block moment, as the timer runs it: what the block does (cancel the open requests, tell IT) happens there, and the
+   * system closes no case before it (audit A-1).
+   */
+  blockPass = async (): Promise<void> => {
+    const sweeper: BlockMomentSweeper = this.ctx.app.get(BlockMomentSweeper, { strict: false });
+    await (sweeper as unknown as { sweep: () => Promise<void> }).sweep();
+  };
   /**
    * The Super Admin marks the person left on their last working day (Q-04 B): a handover that has its last day ahead is first brought to
    * today, since the person cannot leave before it. Awaited, or chained with `.expect(status)` like a request.
@@ -146,10 +165,11 @@ export class OffboardingHarness extends HandoverHarness {
   };
   lockAccount = (id: string, body: object, account: ApiAccount = this.it1) =>
     request(this.server()).post(`/api/v1/offboarding-cases/${id}/account-lock`).set(this.as(account)).send(body);
+  /** Item (1b) of `BM-08`, the lock of the mailbox for good. */
+  lockMailbox = (id: string, body: object = {}, account: ApiAccount = this.it1) =>
+    request(this.server()).post(`/api/v1/offboarding-cases/${id}/mailbox-lock`).set(this.as(account)).send(body);
   revokeRights = (id: string, body: object, account: ApiAccount = this.it1) =>
     request(this.server()).post(`/api/v1/offboarding-cases/${id}/revocations`).set(this.as(account)).send(body);
-  closeCase = (id: string, account: ApiAccount = this.it1) =>
-    request(this.server()).post(`/api/v1/offboarding-cases/${id}/closure`).set(this.as(account));
   openRequestsOf = (id: string, query = '', account: ApiAccount = this.it1) =>
     request(this.server()).get(`/api/v1/offboarding-cases/${id}/open-requests${query}`).set(this.as(account));
   openGrantTasksOf = (id: string, query = '', account: ApiAccount = this.it1) =>
@@ -169,7 +189,7 @@ export class OffboardingHarness extends HandoverHarness {
     employeeId: person.employeeId,
     lastWorkingDay: this.day(10),
     accessBlockMode: 'WITH_LAST_DAY',
-    grounds: this.grounds,
+    groundsNote: this.groundsNote,
     ...extra,
   });
 
@@ -221,7 +241,8 @@ export class OffboardingHarness extends HandoverHarness {
               to_char(last_working_day, 'YYYY-MM-DD') AS last_working_day,
               to_char(departure_effective_on, 'YYYY-MM-DD') AS departure_effective_on,
               to_char(handover_due_on, 'YYYY-MM-DD') AS handover_due_on, placement_closed_id,
-              to_char(left_on, 'YYYY-MM-DD') AS left_on, account_lock_at, closed_at, self_executed
+              to_char(left_on, 'YYYY-MM-DD') AS left_on, account_lock_at, mailbox_lock_at, mailbox_lock_by_app_user_id,
+              closed_at, closed_by_app_user_id, self_executed
          FROM offboarding_cases WHERE id = $1`,
       [id],
     );

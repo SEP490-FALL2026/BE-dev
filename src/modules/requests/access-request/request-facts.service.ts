@@ -17,6 +17,7 @@ import type { PricingRecord } from './access-request.types';
 import { maxEndDateOf, pricingRecordFor, type RequestPriceInput } from './pricing.policy';
 import { RoutingFactsService, type GatheredRouting } from './routing-facts.service';
 import { routeNeedStep, requestRoutingOf, type RoutingDecision } from './routing.policy';
+import { TransferGraceHoldContributions, type TransferGraceHolding } from '../public/requests.extension-points';
 
 /** The parameter that says how long an approval step may wait; read when a request is sent and fixed in its policy. */
 const APPROVAL_SLA_PARAMETER = 'APPROVAL_SLA_WORKING_DAYS';
@@ -46,6 +47,11 @@ export interface Assessment {
   pricing: PricingRecord;
   routing: GatheredRouting & { decision: RoutingDecision };
   heldAccess: HeldAccess | null;
+  /**
+   * The seat held is a right from before a transfer whose grace still lasts (`QĐ-110q`, R-49): asking for it again is let through the check of the seat
+   * held and the count of the limits (GH-2; a duplicate of the plan stays refused), and the request replaces that right. Null when nothing is held, or the seat is not one of those.
+   */
+  graceHold: TransferGraceHolding | null;
   /** The last day a right asked for may end, and whether the end date asked for breaks it or is missing (`FR-2.8`, `US-05-23` AC-9). */
   maxEndDate: BusinessDate;
   endDateOutOfRange: boolean;
@@ -102,6 +108,7 @@ export class RequestFactsService {
     private readonly routing: RoutingFactsService,
     private readonly parameters: OperatingParametersApi,
     private readonly licensing: LicensingApi,
+    private readonly graceHolds: TransferGraceHoldContributions,
   ) {}
 
   /** Read before the transaction opens, so a slow parameter read never holds a lock. */
@@ -149,6 +156,8 @@ export class RequestFactsService {
       chainHasSpendStep: hasSpendStep(policy),
     });
 
+    const heldAccess = await this.heldAccess(input.employeeId, input.planId);
+
     return {
       today,
       unit,
@@ -160,7 +169,8 @@ export class RequestFactsService {
       ),
       pricing,
       routing: { ...gathered, decision: routeNeedStep(gathered.facts) },
-      heldAccess: await this.heldAccess(input.employeeId, input.planId),
+      heldAccess,
+      graceHold: heldAccess ? await this.graceHoldOf(tx, input.employeeId, heldAccess, today) : null,
       ...this.termCheck({
         today,
         expectedEndDate: input.expectedEndDate,
@@ -235,6 +245,28 @@ export class RequestFactsService {
       endDateOutOfRange: end !== null && (end < facts.today || end > maxEndDate),
       termRequired: end === null && facts.employmentType !== 'STAFF',
     };
+  }
+
+  /**
+   * Whether the seat held is a right from before a transfer whose grace still lasts (`QĐ-110q`, R-49): asked of the personnel context through the
+   * contributions this module opens (ADR-0019), the first that knows the right answering. With none added there is no grace, and the seat held refuses
+   * the request as it always did.
+   */
+  private async graceHoldOf(
+    tx: DbTx,
+    employeeId: string,
+    held: HeldAccess,
+    today: BusinessDate,
+  ): Promise<TransferGraceHolding | null> {
+    for (const contribution of this.graceHolds.all()) {
+      const found = await contribution.holdingOf(
+        { employeeId, assignmentId: held.assignmentId, effectiveFrom: held.effectiveFrom, today },
+        tx,
+      );
+      if (found !== null) return found;
+    }
+
+    return null;
   }
 
   /**

@@ -15,7 +15,7 @@ import {
 import { mayRequest } from '../access-request/access-request.policy';
 import { AccessRequestRepo } from '../access-request/access-request.repo';
 import type { AccessRequestRecord } from '../access-request/access-request.types';
-import { RequestFactsService, type RequestSettings } from '../access-request/request-facts.service';
+import { RequestFactsService, type Assessment, type RequestSettings } from '../access-request/request-facts.service';
 import { RequestLimitsService, type LimitSettings } from '../request-limits/request-limits.service';
 import { RequestSenderService } from './request-sender.service';
 import { RequestDraftRepo } from '../request-draft/request-draft.repo';
@@ -102,9 +102,7 @@ export class AccessRequestService {
       settings,
       lockDepartment: true,
     });
-    if (assessed.heldAccess && assessed.heldAccess.assignmentId !== options.toleratedSeatId) {
-      throw new AccessRequestAlreadyHoldsAccessError(assessed.heldAccess);
-    }
+    this.requireNotHeld(assessed, options.toleratedSeatId);
     if (assessed.endDateOutOfRange) throw new AccessRequestEndDateOutOfRangeError(assessed.maxEndDate);
     if (assessed.termRequired) throw new AccessRequestTermRequiredError();
     const manyPaidSoftware = await this.limits.requireForOne(tx, {
@@ -114,6 +112,7 @@ export class AccessRequestService {
       today: assessed.today,
       settings: options.limitSettings ?? (await this.limits.settings()),
       reason: body.manyPaidSoftwareReason,
+      exemptions: assessed.graceHold ? new Map([[actor.employeeId, 'TRANSFER_GRACE' as const]]) : undefined,
     });
     const sent: SubmittedRequest = {
       actor,
@@ -123,6 +122,7 @@ export class AccessRequestService {
       now,
       draftId: options.draftId,
       manyPaidSoftware,
+      graceHold: assessed.graceHold,
     };
     const created = await this.repo.insert(tx, newRequestOf(sent));
     await this.auditSubmitted(tx, actor, sent, created);
@@ -132,6 +132,21 @@ export class AccessRequestService {
     if (!record) throw new Error(`The request ${created.id} was not found after it was written.`);
 
     return record;
+  }
+
+  /**
+   * The seat the person already holds of the plan refuses the request, but for the one a renewal tolerates and a right held from before a transfer whose
+   * grace lasts: they may ask again for what they are about to lose, and the request replaces that right (`QĐ-110q`, R-49).
+   * Throws AccessRequestAlreadyHoldsAccessError.
+   */
+  private requireNotHeld(
+    assessed: Pick<Assessment, 'heldAccess' | 'graceHold'>,
+    toleratedSeatId: string | undefined,
+  ): void {
+    const held = assessed.heldAccess;
+    if (held && held.assignmentId !== toleratedSeatId && assessed.graceHold === null) {
+      throw new AccessRequestAlreadyHoldsAccessError(held);
+    }
   }
 
   /** A draft is locked before anything is read for the sending, and judged again under the lock: two sendings of one draft leave one. */

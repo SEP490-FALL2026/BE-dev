@@ -69,6 +69,8 @@ const PUBLIC_CONTRACT_EXPORTS: ReadonlySet<string> = new Set([
   'BudgetsModule: CommitmentRequestFactsHook',
   // G4 (ADR-0013): the catalog facade licensing reads the seat targets (subscription or internal plan) through.
   'CatalogModule: CatalogApi',
+  // X-IT.2: what an IT Admin answers for in the catalog (subscriptions and applications), counted and handed over by the hand-over of personnel.
+  'CatalogModule: CatalogResponsibilityApi',
   // The extension point licensing binds its reader of occupied seats to (public/catalog.extension-points.ts).
   'CatalogModule: SeatOccupancyHook',
   // The phase of the seat baseline licensing binds, so the rule against a second K2 or K4 subscription knows whether it is closed.
@@ -88,11 +90,10 @@ const PUBLIC_CONTRACT_EXPORTS: ReadonlySet<string> = new Set([
   'IdentityAccessFacadeModule: IdentityAccessApi',
   // D-S21 (qd93-remove-fallback-substitute-approvers): who can never ask for or be given access through a Request, one facade for every route that makes one.
   'IdentityAccessFacadeModule: RequestPartyEligibilityApi',
-  // The licensing facades, one per topic of its type files (R4): the revocation of seats and the grant of a request, the renewal, the handover
-  // duties of a departure, the open grant tasks of a person, the service account duties, and (G4, ADR-0013) the seat baseline the import reads and writes through.
+  // The licensing facades, one per topic of its type files (R4): the revocation of seats and the grant of a request, the renewal, the
+  // open grant tasks of a person, and (G4, ADR-0013) the seat baseline the import reads and writes through.
   'LicensingModule: LicensingApi',
   'LicensingModule: LicensingRenewalApi',
-  'LicensingModule: LicensingHandoverApi',
   'LicensingModule: LicensingGhostSeatApi',
   // qd103-vendor-usage-import: the seats and holders the usage import matches identities against, and the one door to the usage evidence the rules of wasted seats read.
   'LicensingModule: LicensingUsageApi',
@@ -101,7 +102,6 @@ const PUBLIC_CONTRACT_EXPORTS: ReadonlySet<string> = new Set([
   'UsageModule: UsageImportListeners',
   'LicensingModule: LicensingOpenGrantsApi',
   'OptimizationModule: OptimizationApi',
-  'LicensingModule: LicensingServiceAccountApi',
   'LicensingModule: LicensingSeatBaselineApi',
   // G8 (US-12-15): the counts of licensing the role overviews read.
   'LicensingModule: LicensingDashboardApi',
@@ -113,7 +113,6 @@ const PUBLIC_CONTRACT_EXPORTS: ReadonlySet<string> = new Set([
   'LicensingModule: RenewalHoldHook',
   'LicensingModule: RenewalFinancialContributions',
   'LicensingModule: RenewalUsageContributions',
-  'LicensingModule: ResponsibleDeadlineHook',
   'LicensingModule: SeatBaselineClosedListeners',
   // H5.5 (identity-access Wave B): the account contracts the API and the recovery command reach the account persistence
   // through; the persistence itself is declared once, here, because every graph needs it.
@@ -202,6 +201,8 @@ const PUBLIC_CONTRACT_EXPORTS: ReadonlySet<string> = new Set([
   'RequestsModule: RequestsAiSourceApi',
   // F43: the extension point the personnel context adds its listener of the outcome of a request to (public/requests.extension-points.ts).
   'RequestsModule: RequestOutcomeListeners',
+  // MF3-C.3 (QĐ-110q, R-49): the extension point the personnel context adds its answer to — a person in the grace of a transfer who holds the software asked for (public/requests.extension-points.ts).
+  'RequestsModule: TransferGraceHoldContributions',
   // The two entry services of `pnpm ops:recover` (Q6; E7): the holder's own account, and the role transfer.
   'IdentityAccessRecoveryCliModule: HolderRecoveryApi',
   'IdentityAccessRecoveryCliModule: RoleTransferRecoveryApi',

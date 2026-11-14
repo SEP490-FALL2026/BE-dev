@@ -165,7 +165,7 @@ export class SubscriptionService {
       // QĐ-111g: a declaration that names nobody takes the IT Admin responsible for the application, when they still work as one.
       responsibleItAdminEmployeeId: await this.poolRules.responsibleOfDeclaration(
         tx,
-        plan.applicationId,
+        plan.id,
         input.responsibleItAdminEmployeeId,
       ),
     };
@@ -174,6 +174,7 @@ export class SubscriptionService {
     const priced = await this.pricing.priceToday(tx, money);
     const complete = subscriptionStatusOf(plan, input.kind, { ...state, ...priced });
     this.poolRules.assert(plan, input.kind, state, complete === 'ACTIVE');
+    if (complete === 'ACTIVE') await this.poolRules.assertVendorAdmins(tx, plan);
     const created = await this.subscriptions.insert(tx, {
       organizationId,
       planId: plan.id,
@@ -243,7 +244,7 @@ export class SubscriptionService {
       const state = { ...stateOf(current), priceSnapshot };
       const missing = this.missingOf(plan, current.kind, state);
       if (missing.length > 0) throw new SubscriptionStillDraftError(missing);
-      await this.poolRules.assertActivation(tx, plan, current.kind, state);
+      await this.poolRules.assertActivation(tx, plan, current.kind, state, current.renewedFromId !== null);
       await this.poolRules.assertNoLiveDuplicate(tx, plan, id, organizationId);
 
       // A draft renewal period takes the flag that prices the plan from the period it continues, now that it is active (F-012).

@@ -1,5 +1,6 @@
 import request from 'supertest';
 import { SeatHarness } from '../../support/seat-baseline-harness';
+import { legacyServiceAccount } from '../../support/legacy-service-account';
 
 const h = new SeatHarness();
 const HEADER = 'employee_code,full_name,work_email,employment_type,hire_date,department_code,job_title';
@@ -68,11 +69,10 @@ describe('the people file and the people who hold seats (US-02-02 AC-4, integrat
 
   it('leaves out a person the file lists, however the row is judged, and counts all the seats a person holds', async () => {
     const subscriptionId = await h.subscription(10);
-    await h.person('E9');
-    await h.written({ subscriptionId }, [
-      { employee_code: 'E9', account_identifier: 'e9@acme.vn' },
-      { employee_code: 'E9', account_identifier: 'e9-bot', kind: 'service', reason: 'CI' },
-    ]);
+    const e9 = await h.person('E9');
+    await h.written({ subscriptionId }, [{ employee_code: 'E9', account_identifier: 'e9@acme.vn' }]);
+    // A service account of the earlier releases: nothing writes one any more, but the seats a person holds still count it.
+    await legacyServiceAccount(h.ctx.sql, { subscriptionId, employeeId: e9, identifier: 'e9-bot' });
 
     const without = await queueOf([newRow('E-NEW2')]);
     const withE9 = await queueOf([`E9,Person E9,e9@acme.vn,STAFF,2026-01-05,P-OPS,Administrator`]);

@@ -1,5 +1,4 @@
 import { Body, Controller, Get, HttpStatus, Param, Post, Query } from '@nestjs/common';
-import { PersonnelGroundsDateService } from '../personnel-grounds-date.service';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   ApiErrorResponses,
@@ -69,11 +68,15 @@ const CONCURRENT = 'the person or the case was changed meanwhile (CONCURRENT_CHA
 const NOT_UNDER_WAY = [E.CASE_LEFT, E.NOT_HANDING_OVER] as const;
 const CONCURRENT_EXAMPLES = [E.CONCURRENT_CHANGE] as const;
 const PERSON_REFUSALS = [E.EMPLOYEE_LEFT, E.ALREADY_HANDING_OVER, E.PENDING_EVENT_EXISTS] as const;
-const DAY_REFUSALS = [E.LAST_WORKING_DAY_INVALID, E.SUCCESSOR_NOT_A_MEMBER_ON_DATE] as const;
+const SUCCESSOR_REFUSALS = [
+  PERSONNEL_ACCESS_ERROR_EXAMPLES.SUCCESSOR_REQUIRED,
+  E.SUCCESSOR_NOT_A_MEMBER_ON_DATE,
+] as const;
+const DAY_REFUSALS = [E.LAST_WORKING_DAY_INVALID, ...SUCCESSOR_REFUSALS] as const;
 
 const GROUNDS_REFUSALS =
-  'the basis is the code of a notice and not a document (OFFBOARDING_CASE.GROUNDS_IS_NOTICE), it is issued after today (PERSONNEL.GROUNDS_ISSUED_ON_FUTURE); a basis that is missing or lacks a part is a VALIDATION_ERROR';
-const GROUNDS_EXAMPLES = [E.GROUNDS_IS_NOTICE, PERSONNEL_ACCESS_ERROR_EXAMPLES.GROUNDS_ISSUED_ON_FUTURE] as const;
+  'the basis (groundsNote) is only the code of a notice and not a document (OFFBOARDING_CASE.GROUNDS_IS_NOTICE); a basis that is missing, blank or over 500 characters is a VALIDATION_ERROR';
+const GROUNDS_EXAMPLES = [E.GROUNDS_IS_NOTICE] as const;
 
 /**
  * The departure of a person: a handover with the last working day and the basis it rests on, blocked from the last working day or from the day it is recorded (the Super Admin
@@ -90,7 +93,6 @@ export class OffboardingController {
     private readonly left: OffboardingLeftService,
     private readonly view: OffboardingViewService,
     private readonly detail: OffboardingDetailService,
-    private readonly groundsDate: PersonnelGroundsDateService,
   ) {}
 
   @Post()
@@ -100,7 +102,7 @@ export class OffboardingController {
     status: HttpStatus.CREATED,
     message: 'OFFBOARDING_CASE.RECORDED',
     description:
-      'The handover was recorded with the last working day and the basis, or, blocked now, the departure was recorded with the access of the person refused from the next request (a last working day that is today or past leaves the person at once). The placement of the person ends the day after the last working day, the head of the department they leave is handed over or left empty as chosen (a warning says from when), a long leave ends, a transfer that would take effect later is cancelled with the reason given, and the head of the department is asked to confirm the handover of every tool. No seat is taken away and no task is made. A person with no placement in force (department null) is recorded the same way with no placement to end and no head handover; a first placement not yet in force that starts after the last working day is cancelled with the record, and put back if the case is cancelled.',
+      'The handover was recorded with the last working day and the basis, or, blocked now, the departure was recorded with the access of the person refused from the next request: its last working day is the day it is recorded (left out, or today), the person leaves at once, and the successor of the head takes the department the day after. The placement of the person ends the day after the last working day, the head of the department they leave is handed over or left empty as chosen (a warning says from when), a long leave ends, a transfer that would take effect later is cancelled with the reason given. No seat is taken away and no task is made. A person with no placement in force (department null) is recorded the same way with no placement to end and no head handover; a first placement not yet in force that starts after the last working day is cancelled with the record, and put back if the case is cancelled.',
   })
   @ApiErrorResponses(
     ...WRITE_COMMON,
@@ -116,7 +118,7 @@ export class OffboardingController {
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
-      description: `The body is invalid (VALIDATION_ERROR), there is no last working day or it is not allowed (OFFBOARDING_CASE.LAST_WORKING_DAY_REQUIRED, LAST_WORKING_DAY_INVALID), ${GROUNDS_REFUSALS}, a transfer that waits would be cancelled by the departure and the confirmation is missing (TRANSFER_CANCELLATION_REQUIRED), or the person chosen to follow the head cannot take the department that day (SUCCESSOR_NOT_A_MEMBER_ON_DATE): nothing is saved.`,
+      description: `The body is invalid (VALIDATION_ERROR), there is no last working day for a planned handover or the day is not allowed (OFFBOARDING_CASE.LAST_WORKING_DAY_REQUIRED, LAST_WORKING_DAY_INVALID; for a departure blocked now details.reason BLOCK_NOW_DAY_IS_TODAY says the day must be today), ${GROUNDS_REFUSALS}, a transfer that waits would be cancelled by the departure and the confirmation is missing (TRANSFER_CANCELLATION_REQUIRED), the person heads the department they leave and names nobody to follow them or gives "nobody" (PERSONNEL.SUCCESSOR_REQUIRED, details.departmentId), or the person chosen to follow the head cannot take the department that day (OFFBOARDING_CASE.SUCCESSOR_NOT_A_MEMBER_ON_DATE): nothing is saved.`,
       examples: [
         VALIDATION_EXAMPLE,
         E.LAST_WORKING_DAY_REQUIRED,
@@ -127,7 +129,6 @@ export class OffboardingController {
     },
   )
   async record(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Body() body: RecordOffboardingBodyDto) {
-    await this.groundsDate.assertNotInFuture(body.grounds);
     try {
       return await this.detail.detailOf(await this.offboarding.record(userActor(actor), body));
     } catch (error) {
@@ -141,7 +142,7 @@ export class OffboardingController {
   @ApiSuccessResponse(OffboardingPageResponseDto, {
     message: 'OFFBOARDING_CASE.LISTED',
     description:
-      'A page of departures, by last working day, optionally of one person, one state, those handing over whose last working day has passed, or those whose company account is not recorded as locked, or those whose person held one of the roles that need someone to take over when the departure was recorded (the Super Admin, Finance, an approval role, the IT Admin in charge of a department, the head of a department, the owner or administrator of a workspace). Each row says who, where the case stands, the days, how many rights the person still holds and which of those roles they hold now.',
+      'A page of departures, by last working day, optionally of one person, one state, those handing over whose last working day has passed, or those whose company account is not recorded as locked, or those whose person held one of the roles that need someone to take over when the departure was recorded (the Super Admin, Finance, an approval role, the IT Admin in charge of a department, the head of a department, the owner or administrator of a workspace). Each row says who, where the case stands, the days, how many rights the person still holds and which of those roles they hold now. `revocation` is the deadline of the revocations, kept on the case: its day (`dueOn`, the Nth working day after the block moment, counting the day after the last working day as day 1, N being the parameter DEPARTURE_REVOCATION_WORKING_DAYS), how many personal seats have no task of revocation completed (those nobody opened a task for included) and whether the case is `overdue` (today is past the day with such a seat left). revocationOverdue=true lists only the late departures, false all the others. lastWorkingDayFrom and lastWorkingDayTo keep the departures whose last working day is in that range, both days included: the calendar of the next working days of the overview.',
   })
   @ApiErrorResponses(...COMMON, {
     status: HttpStatus.UNPROCESSABLE_ENTITY,
@@ -179,7 +180,7 @@ export class OffboardingController {
   @ApiSuccessResponse(OffboardingRightPageResponseDto, {
     message: 'OFFBOARDING_CASE.RIGHTS_LISTED',
     description:
-      'A page of the personal seats the person holds, oldest first: the tool and plan, the way it is taken away and what to do first, whether it loses data, the confirmation of the handover of the tool and the task that takes it away. Service accounts are not among them.',
+      'A page of the personal seats the person holds, oldest first: the tool and plan, the way it is taken away and what to do first, whether it loses data and the task that takes it away. Service accounts are not among them.',
   })
   @ApiErrorResponses(...COMMON, NOT_FOUND, PAGE_INVALID)
   async rights(
@@ -221,19 +222,25 @@ export class OffboardingController {
   @ApiSuccessResponse(OffboardingDetailResponseDto, {
     message: 'OFFBOARDING_CASE.LAST_DAY_CHANGED',
     description:
-      'The last working day moved: the placement of the person and the handover of the head move with it, the day the confirmation is due is counted again, and the reason and the basis are kept. Only a handover under way before its last working day can move.',
+      'The last working day moved: the placement of the person and the handover of the head move with it, and the reason and the basis are kept. Only a handover under way before its last working day can move.',
   })
   @ApiErrorResponses(
     ...WRITE_COMMON,
     NOT_FOUND,
     {
       status: HttpStatus.CONFLICT,
-      description: `The person has left (OFFBOARDING_CASE.CASE_LEFT), the handover is not under way (NOT_HANDING_OVER), the last working day has passed (LAST_DAY_ALREADY_PASSED), the case cancelled a first placement and the new day is on or after the day it would take effect (PLACEMENT_OVERLAP, details.reason FIRST_PLACEMENT_PENDING with validFrom), or ${CONCURRENT}.`,
-      examples: [...NOT_UNDER_WAY, E.LAST_DAY_ALREADY_PASSED, E.PLACEMENT_OVERLAP, ...CONCURRENT_EXAMPLES],
+      description: `The person has left (OFFBOARDING_CASE.CASE_LEFT), the handover is not under way (NOT_HANDING_OVER), the case was blocked now and its last working day, the day it was recorded, does not move (BLOCK_NOW_LAST_DAY_FIXED), the last working day has passed (LAST_DAY_ALREADY_PASSED), the case cancelled a first placement and the new day is on or after the day it would take effect (PLACEMENT_OVERLAP, details.reason FIRST_PLACEMENT_PENDING with validFrom), or ${CONCURRENT}.`,
+      examples: [
+        ...NOT_UNDER_WAY,
+        E.BLOCK_NOW_LAST_DAY_FIXED,
+        E.LAST_DAY_ALREADY_PASSED,
+        E.PLACEMENT_OVERLAP,
+        ...CONCURRENT_EXAMPLES,
+      ],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
-      description: `The body is invalid, such as one without a reason or a basis (VALIDATION_ERROR), ${GROUNDS_REFUSALS}, the day is the same or not allowed (NO_CHANGE, LAST_WORKING_DAY_INVALID), or the head of the department cannot be handed over on the new day (SUCCESSOR_NOT_A_MEMBER_ON_DATE): nothing is saved, and the old day and the old choice stay.`,
+      description: `The body is invalid, such as one without a reason or a basis (VALIDATION_ERROR), ${GROUNDS_REFUSALS}, the day is the same or not allowed (NO_CHANGE, LAST_WORKING_DAY_INVALID), the person heads the department and no employee follows them (PERSONNEL.SUCCESSOR_REQUIRED: a case recorded earlier with "nobody" must name one now), or the head of the department cannot be handed over on the new day (OFFBOARDING_CASE.SUCCESSOR_NOT_A_MEMBER_ON_DATE): nothing is saved, and the old day and the old choice stay.`,
       examples: [VALIDATION_EXAMPLE, ...GROUNDS_EXAMPLES, E.NO_CHANGE, ...DAY_REFUSALS],
     },
   )
@@ -242,7 +249,6 @@ export class OffboardingController {
     @Param() params: OffboardingIdParamDto,
     @Body() body: ChangeLastDayBodyDto,
   ) {
-    await this.groundsDate.assertNotInFuture(body.grounds);
     try {
       const record = await this.changes.changeLastDay(userActor(actor), params.id, body);
 
@@ -258,14 +264,14 @@ export class OffboardingController {
   @ApiSuccessResponse(OffboardingDetailResponseDto, {
     message: 'OFFBOARDING_CASE.CANCELLED',
     description:
-      'The handover was cancelled: the person keeps the department and, if they headed it, the head, the confirmations that waited are cancelled, and they are back to what they were doing (a long leave still ahead included). A first placement the case had cancelled is put back when its department is still active, and firstPlacementRestored says whether it was. No task is made or taken away.',
+      'The handover was cancelled: the person keeps the department and, if they headed it, the head, and they are back to what they were doing (a long leave still ahead included). A first placement the case had cancelled is put back when its department is still active, and firstPlacementRestored says whether it was. Before the last working day no task is made or taken away. After it (the block took effect) the block stays for the Super Admin to lift with an unlock and a reason, but what it did is taken back: the reason of the departure is withdrawn from every task of revocation (a task that waits is cancelled and the seat stays, a task another source asks for goes on, a task in progress is left to the IT Admin who works it to close by what happened at the provider and the IT Admin in charge is told), counted in revocationsWithdrawn, and every registration of a company machine of the person ends (cause DEPARTURE_BLOCKED), so the unlock revives no credential.',
   })
   @ApiErrorResponses(
     ...WRITE_COMMON,
     NOT_FOUND,
     {
       status: HttpStatus.CONFLICT,
-      description: `The person has left (OFFBOARDING_CASE.CASE_LEFT), the handover is not under way (NOT_HANDING_OVER), or ${CONCURRENT}.`,
+      description: `The person has left (OFFBOARDING_CASE.CASE_LEFT: a departure that happened is not cancelled), the handover is not under way (NOT_HANDING_OVER), or ${CONCURRENT}.`,
       examples: [...NOT_UNDER_WAY, ...CONCURRENT_EXAMPLES],
     },
     {
@@ -279,13 +285,17 @@ export class OffboardingController {
     @Param() params: OffboardingIdParamDto,
     @Body() body: CancelOffboardingBodyDto,
   ) {
-    await this.groundsDate.assertNotInFuture(body.grounds);
     try {
       const record = await this.changes.cancel(userActor(actor), params.id, body);
       const detail = await this.detail.detailOf(record);
-      return record.firstPlacementRestored !== undefined
-        ? { ...detail, firstPlacementRestored: record.firstPlacementRestored }
-        : detail;
+
+      return {
+        ...detail,
+        ...(record.firstPlacementRestored !== undefined
+          ? { firstPlacementRestored: record.firstPlacementRestored }
+          : {}),
+        revocationsWithdrawn: record.revocationsWithdrawn,
+      };
     } catch (error) {
       throw toOffboardingApiException(error);
     }

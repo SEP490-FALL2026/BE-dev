@@ -26,8 +26,7 @@ import { OffboardingDetailService } from './detail/offboarding-detail.service';
 const E = OFFBOARDING_ERROR_EXAMPLES;
 const FORBIDDEN = {
   status: HttpStatus.FORBIDDEN,
-  description:
-    'Only an IT Admin records the lock of the account, takes the rights away or closes a departure (AUTHORIZATION.FORBIDDEN).',
+  description: 'Only an IT Admin records the lock of the account or takes the rights away (AUTHORIZATION.FORBIDDEN).',
   examples: [FORBIDDEN_EXAMPLE],
 } as const;
 const COMMON = [UNAUTHENTICATED_RESPONSE, FORBIDDEN, GUARDED_SERVICE_UNAVAILABLE_RESPONSE] as const;
@@ -37,17 +36,12 @@ const NOT_FOUND = {
     'The offboarding case does not exist, or an IT Admin reads one of a department they are not in charge of (OFFBOARDING_CASE.NOT_FOUND).',
   examples: [E.NOT_FOUND],
 } as const;
-const ID_INVALID = {
-  status: HttpStatus.UNPROCESSABLE_ENTITY,
-  description: 'The id is not valid (VALIDATION_ERROR).',
-  examples: [VALIDATION_EXAMPLE],
-} as const;
 const CONCURRENT = 'the person or the case was changed meanwhile (CONCURRENT_CHANGE)';
 const LOCK_REFUSALS = [E.ACCOUNT_LOCK_NOT_RECORDED, E.ALREADY_RECORDED] as const;
 
 /**
- * The technical steps that follow the departure of a person, which are the IT Admin's (`QĐ-87a`): the lock of the company account, the
- * revocations of the rights and the closing of the case. The role is judged again by the service, so this guard is only the outer
+ * The technical steps that follow the departure of a person, which are the IT Admin's (`QĐ-87a`): the block of the company account (item 1a of `BM-08`) and the
+ * revocations of the rights; the lock of the mailbox for good (item 1b) is in `departure-closure/`, and the case closes by itself (`QĐ-110e`). The role is judged again by the service, so this guard is only the outer
  * layer. The events of the departure (the record, the last working day, the cancellation, the departure) are the Super Admin's and are
  * in `OffboardingController`. Nothing is revoked by itself.
  */
@@ -62,11 +56,14 @@ export class OffboardingStepsController {
 
   @Post(':id/account-lock')
   @RequireRoles('IT_ADMIN')
-  @ApiOperation({ operationId: 'offboardingCaseRecordAccountLock', summary: 'Record the lock of the company account' })
+  @ApiOperation({
+    operationId: 'offboardingCaseRecordAccountLock',
+    summary: 'Record the block of the company account (item 1a)',
+  })
   @ApiSuccessResponse(OffboardingDetailResponseDto, {
     message: 'OFFBOARDING_CASE.ACCOUNT_LOCK_RECORDED',
     description:
-      'Who locked the company account, the sessions and the device credentials of the person, outside the system, when, and what was done, written once. The revocations of the rights need it first or with them.',
+      'Item (1a) of BM-08, written once: who blocked the company account of the person outside the system (reset the password of the mailbox and sign out every session), when, and what was done. The mailbox is not locked here: locking it for good is the later item (1b). The system itself refuses the sign-in from the block moment; this records that the account at the company is blocked too. The revocations of the rights need it first or with them.',
   })
   @ApiErrorResponses(
     ...COMMON,
@@ -128,33 +125,6 @@ export class OffboardingStepsController {
       const detail = await this.detail.detailOf(opened.record, 'MINIMAL');
 
       return { ...detail, revocations: { created: opened.created, reasonAdded: opened.reasonAdded } };
-    } catch (error) {
-      throw toOffboardingApiException(error);
-    }
-  }
-
-  @Post(':id/closure')
-  @RequireRoles('IT_ADMIN')
-  @ApiOperation({ operationId: 'offboardingCaseClose', summary: 'Close a departure' })
-  @ApiSuccessResponse(OffboardingDetailResponseDto, {
-    message: 'OFFBOARDING_CASE.CLOSED',
-    description:
-      'The case is closed: the company account is recorded as locked and the person holds no personal right any more, and nothing registered by the flows that come after keeps it open.',
-  })
-  @ApiErrorResponses(
-    ...COMMON,
-    NOT_FOUND,
-    {
-      status: HttpStatus.CONFLICT,
-      description:
-        'The person has not left yet (OFFBOARDING_CASE.CASE_NOT_LEFT), or something keeps the case open (CASE_NOT_CLOSEABLE, with the codes in the details): the lock of the account is not recorded, a personal right is held (also one whose access runs on to the end of the paid period), or a later flow still waits.',
-      examples: [E.CASE_NOT_LEFT, E.CASE_NOT_CLOSEABLE],
-    },
-    ID_INVALID,
-  )
-  async close(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Param() params: OffboardingIdParamDto) {
-    try {
-      return await this.detail.detailOf(await this.revocations.close(actor, params.id), 'MINIMAL');
     } catch (error) {
       throw toOffboardingApiException(error);
     }

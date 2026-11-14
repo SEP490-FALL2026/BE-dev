@@ -4,6 +4,8 @@ import type { AuthenticatedPrincipal } from '../../../infrastructure/security/to
 import { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { PersonnelDashboardApi } from '../../personnel/public/personnel-dashboard.api';
+import type { DashboardProgress } from '../progress/dashboard-progress.policy';
+import { DashboardProgressService } from '../progress/dashboard-progress.service';
 import {
   assertHoldsRole,
   atSource,
@@ -14,7 +16,8 @@ import {
 
 export interface SuperAdminDashboard {
   asOf: BusinessDate;
-  sections: {
+  calendar: DashboardProgress['calendar'];
+  sections: Omit<DashboardProgress, 'calendar'> & {
     congestion: DashboardSection;
     backgroundJobs: DashboardSection;
     approverConfiguration: DashboardSection;
@@ -31,7 +34,9 @@ export interface SuperAdminDashboard {
  * total of spending. The departments without a head or without a usable IT Admin in charge (the same judgement as the warnings of the
  * departments) and the notices of heads waiting to be handled are counted; the congestion board, the configuration of the approvers,
  * the state of the Super Admin role and the people who can get an account are read by their own operations. Background tasks have no
- * record to read yet: the section says so and never shows zero.
+ * record to read yet: the section says so and never shows zero. The progress of the departures and the transfers of the whole company, the seats of the
+ * shared pools got back and the plans short of admins at the vendor (`departures`, `transfers`, `seatsReturned`, `plansBelowVendorAdminMinimum`) come from
+ * `DashboardProgressService` (SPEC P21).
  */
 @Injectable()
 export class SuperAdminDashboardService {
@@ -39,6 +44,7 @@ export class SuperAdminDashboardService {
     private readonly organizationReads: OrganizationReadApi,
     private readonly identity: IdentityAccessApi,
     private readonly personnel: PersonnelDashboardApi,
+    private readonly progress: DashboardProgressService,
   ) {}
 
   /** Throws DashboardRefusedError for a caller without the Super Admin role. */
@@ -58,10 +64,14 @@ export class SuperAdminDashboardService {
         !usable.has(department.itAdminEmployeeId),
     ).length;
     const notices = await this.personnel.noticesAwaitingHandling();
+    // The whole company: the progress of the departures and the transfers, the seats of the pools got back, the plans short of admins (SPEC P21).
+    const { calendar, ...progress } = await this.progress.read(today, {});
 
     return {
       asOf: today,
+      calendar,
       sections: {
+        ...progress,
         congestion: atSource('stepCongestionList'),
         backgroundJobs: notAvailable('NO_DATA_SOURCE'),
         approverConfiguration: atSource('appUserList'),

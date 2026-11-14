@@ -7,7 +7,7 @@ import type { ReturnSource } from './return-request.policy';
 
 export type ReturnRequestState = 'AWAITING_REVOCATION' | 'COMPLETED' | 'FAILED';
 
-/** A return as it is kept (`BM-03`): one seat, who sent it and why, what the plan asked of the handover, and how it ended. */
+/** A return as it is kept (`BM-03`): one seat, who sent it and why, what an older release asked of the handover (no longer asked, `QĐ-110g`), and how it ended. */
 export interface ReturnRequestRecord {
   id: string;
   organizationId: string;
@@ -34,7 +34,7 @@ export interface ReturnRequestRecord {
   createdAt: Date;
 }
 
-/** What a row of a list needs of a return: who, which seat, the state and the handover, none of the long texts. */
+/** What a row of a list needs of a return: who, which seat, the state and what was confirmed once, none of the long texts. */
 export type ReturnRequestSummaryRecord = Pick<
   ReturnRequestRecord,
   | 'id'
@@ -45,8 +45,6 @@ export type ReturnRequestSummaryRecord = Pick<
   | 'departmentId'
   | 'source'
   | 'requestedOn'
-  | 'handoverRequired'
-  | 'handoverDueOn'
   | 'handoverConfirmedAt'
   | 'handoverFlagged'
   | 'state'
@@ -92,8 +90,6 @@ const SUMMARY_SELECT = {
   departmentId: true,
   source: true,
   requestedOn: true,
-  handoverRequired: true,
-  handoverDueOn: true,
   handoverConfirmedAt: true,
   handoverFlagged: true,
   state: true,
@@ -107,7 +103,6 @@ const toSummary = (
 ): ReturnRequestSummaryRecord => ({
   ...row,
   requestedOn: fromDateColumn(row.requestedOn),
-  handoverDueOn: row.handoverDueOn ? fromDateColumn(row.handoverDueOn) : null,
 });
 
 const toRecord = (row: Prisma.ReturnRequestGetPayload<object>): ReturnRequestRecord => ({
@@ -208,18 +203,8 @@ export class ReturnRequestRepo {
     return found.length === 0 ? null : this.findById(found[0].id, tx);
   }
 
-  async confirmHandover(tx: DbTx, id: string, employeeId: string, at: Date): Promise<void> {
-    await tx.returnRequest.update({
-      where: { id },
-      data: { handoverConfirmedAt: at, handoverConfirmedByEmployeeId: employeeId },
-    });
-  }
-
-  async markCompleted(tx: DbTx, id: string, at: Date, flagged: boolean): Promise<void> {
-    await tx.returnRequest.update({
-      where: { id },
-      data: { state: 'COMPLETED', completedAt: at, handoverFlagged: flagged },
-    });
+  async markCompleted(tx: DbTx, id: string, at: Date): Promise<void> {
+    await tx.returnRequest.update({ where: { id }, data: { state: 'COMPLETED', completedAt: at } });
   }
 
   async markFailed(tx: DbTx, id: string, at: Date, reason: string): Promise<void> {

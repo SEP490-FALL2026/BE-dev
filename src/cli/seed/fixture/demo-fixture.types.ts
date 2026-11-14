@@ -39,6 +39,12 @@ export interface DemoPlan {
   dataLossOnRemoval: boolean;
   revocationNote?: string;
   sharingPolicy?: 'NOT_ALLOWED';
+  /** K4 only: the plan has an admin console at the vendor, so like a K2 plan it needs a workspace profile of two IT Admins (`QĐ-110k`, R-53). */
+  hasAdminConsole?: boolean;
+  /** The IT Admin who administers the plan at the vendor beside the one responsible for its subscription (default: the first other IT Admin). */
+  vendorAdmin?: string;
+  /** The workspace profile names no company account that owns the workspace: the subscription carries the flag `ownerAccountEmailMissing` (`QĐ-110u`). */
+  withoutOwnerAccountEmail?: true;
 }
 
 export interface DemoApplication {
@@ -76,8 +82,8 @@ export interface DemoSubscription {
 /** A seat the baseline file puts in the pool before the dataset starts, granted in the past. */
 export interface DemoSeat {
   subscription: string;
-  /** A person code, or a service account answered for by a person. */
-  holder: string | { serviceAccount: string; responsible: string; reason: string };
+  /** A person code: the baseline import takes personal seats only (`QĐ-110m`), a machine account is flagged after the grant. */
+  holder: string;
   /** Days before today the seat was granted; the default is 130, past the 90-day tier of the optimization rules. */
   grantedDaysAgo?: number;
   /** The seat ends this many days from today. */
@@ -133,6 +139,7 @@ export interface DemoNextYear {
 /** The states a scenario request is brought to, each by the actions of the people the routing names. */
 export type DemoRequestTarget =
   | 'PENDING'
+  | 'WAITING_CONTROLLED'
   | 'REJECTED'
   | 'WITHDRAWN'
   | 'AWAITING_SPEND_SUBMISSION'
@@ -201,8 +208,33 @@ export interface DemoGhostDecision {
   exemptDays?: number;
 }
 
+/**
+ * An event of a person the Super Admin records with its basis: a long leave from today; a departure that blocks access today, or one with a
+ * last working day this many working days from today (`WITH_LAST_DAY`); a transfer to another department that takes effect this many days
+ * from today (a person placed today can be moved from tomorrow at the earliest, `EFFECTIVE_DATE_NOT_AFTER_CURRENT_PERIOD`).
+ */
 export type DemoPersonnelEvent =
-  { kind: 'LONG_LEAVE'; employee: string; returnInDays: number } | { kind: 'OFFBOARDING'; employee: string };
+  | { kind: 'LONG_LEAVE'; employee: string; returnInDays: number }
+  | { kind: 'OFFBOARDING'; employee: string; lastDayInWorkingDays?: number }
+  | { kind: 'TRANSFER'; employee: string; toDepartment: string; effectiveInDays: number };
+
+/** The software list of a department (`QĐ-111c`): what its people are shown first when they ask for software, written by its IT Admin. */
+export interface DemoDepartmentSoftware {
+  department: string;
+  /** An application of the fixture, alone or with one of its plans, and a note for the people who read the list. */
+  items: { application: string; plan?: string; note?: string }[];
+}
+
+/** A proposal the head of a department makes to add a place of the catalog to its list, left waiting or rejected by its IT Admin with a reason. */
+export interface DemoSoftwareProposal {
+  key: string;
+  department: string;
+  application: string;
+  plan?: string;
+  reason: string;
+  outcome: 'PENDING' | 'REJECTED';
+  rejectionReason?: string;
+}
 
 export interface DemoFixture {
   id: string;
@@ -238,6 +270,8 @@ export interface DemoFixture {
   usageSources: DemoUsageSource[];
   ghostDecisions: DemoGhostDecision[];
   personnel: DemoPersonnelEvent[];
+  departmentSoftware: DemoDepartmentSoftware[];
+  softwareProposals: DemoSoftwareProposal[];
   /** A draft that is saved and never sent (its department has no Cost Center, so it cannot be sent). */
   draft: { requester: string; plan: string; end: DemoRequestEnd };
   /** A report of an error in the seat the request of this key granted. */

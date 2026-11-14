@@ -5,14 +5,17 @@ import { ObjectStorageModule } from '../../infrastructure/object-storage/object-
 import { AuditModule } from '../audit/audit.module';
 import { FinanceModule } from '../finance/finance.module';
 import { IdentityAccessFacadeModule } from '../identity-access/identity-access-facade.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 import { OperatingParametersModule } from '../operating-parameters/operating-parameters.module';
 import { OrganizationModule } from '../organization/organization.module';
 import { CatalogApi } from './public/catalog.api';
+import { CatalogResponsibilityApi } from './public/catalog-responsibility.api';
 import { SeatBaselinePhaseHook, SeatOccupancyHook } from './public/catalog.extension-points';
 import { ApplicationFactsService } from './catalog-entry/application-facts.service';
 import { ApplicationRetirementController } from './application-retirement/application-retirement.controller';
 import { ApplicationResponsibilityController } from './application-responsibility/application-responsibility.controller';
 import { ApplicationResponsibilityService } from './application-responsibility/application-responsibility.service';
+import { ResponsibilityHandoverService } from './application-responsibility/responsibility-handover.service';
 import { ApplicationRetirementRepo } from './application-retirement/application-retirement.repo';
 import { ApplicationRetirementService } from './application-retirement/application-retirement.service';
 import { ApplicationRepo } from './catalog-entry/application.repo';
@@ -37,6 +40,8 @@ import { FunctionalGroupsController } from './functional-group/functional-groups
 import { PlanFactsService } from './plan/plan-facts.service';
 import { PlanUsageRepo } from './plan/plan-usage.repo';
 import { PlanWorkspaceService } from './plan/plan-workspace.service';
+import { VendorAdminMinimumService } from './plan/vendor-admin-minimum.service';
+import { VendorAdminRolesService } from './plan/vendor-admin-roles.service';
 import { PlanRepo } from './plan/plan.repo';
 import { PlanService } from './plan/plan.service';
 import { PlansController } from './plan/plans.controller';
@@ -53,6 +58,7 @@ import { SubscriptionFactsService } from './subscription/subscription-facts.serv
 import { SubscriptionNoticeService } from './subscription/subscription-notice.service';
 import { SubscriptionPeriodService } from './subscription/subscription-period.service';
 import { SubscriptionPeriodApi } from './public/subscription-period.api';
+import { SubscriptionSeatIncreaseService } from './subscription/seat-increase/subscription-seat-increase.service';
 import { SubscriptionObligationService } from './subscription/obligation/subscription-obligation.service';
 import { SubscriptionGrantingRepo } from './subscription/subscription-granting.repo';
 import { SubscriptionChangeGuard } from './subscription/subscription-change-guard.service';
@@ -93,6 +99,7 @@ import { VendorRepo } from './vendor/vendor.repo';
     IdentityAccessFacadeModule,
     FinanceModule,
     OperatingParametersModule,
+    NotificationsModule,
     ObjectStorageModule,
   ],
   controllers: [
@@ -111,6 +118,7 @@ import { VendorRepo } from './vendor/vendor.repo';
   ],
   providers: [
     ApplicationResponsibilityService,
+    ResponsibilityHandoverService,
     PlanTermsService,
     PlanTermsRepo,
     VendorDictionaryService,
@@ -134,6 +142,8 @@ import { VendorRepo } from './vendor/vendor.repo';
     ApplicationFactsService,
     PlanService,
     PlanWorkspaceService,
+    VendorAdminRolesService,
+    VendorAdminMinimumService,
     PlanRepo,
     PlanUsageRepo,
     InternalSoftwareRegistrationService,
@@ -147,6 +157,7 @@ import { VendorRepo } from './vendor/vendor.repo';
     SubscriptionChangeService,
     SubscriptionService,
     SubscriptionPoolService,
+    SubscriptionSeatIncreaseService,
     SubscriptionPricingService,
     SubscriptionObligationService,
     SubscriptionDepartmentUseReader,
@@ -167,12 +178,14 @@ import { VendorRepo } from './vendor/vendor.repo';
     ApplicationRetirementRepo,
     ApplicationRetirementService,
     CatalogApi,
+    CatalogResponsibilityApi,
     SubscriptionPeriodApi,
     RequestableSoftwareRepo,
     RequestableSoftwareService,
   ],
   // The facade licensing reads the seat targets through (ADR-0013), and the hook licensing binds its reader of occupied seats to
-  // (`public/catalog.extension-points.ts`); the capability services and repos stay private.
-  exports: [CatalogApi, SubscriptionPeriodApi, SeatOccupancyHook, SeatBaselinePhaseHook],
+  // (`public/catalog.extension-points.ts`), and the facade the hand-over of an IT Admin who leaves moves their subscriptions and applications through
+  // (`public/catalog-responsibility.api.ts`); the capability services and repos stay private.
+  exports: [CatalogApi, CatalogResponsibilityApi, SubscriptionPeriodApi, SeatOccupancyHook, SeatBaselinePhaseHook],
 })
 export class CatalogModule {}

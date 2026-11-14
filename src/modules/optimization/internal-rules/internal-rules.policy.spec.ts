@@ -78,6 +78,7 @@ describe('G1 (gate 1)', () => {
 
 const seat = (patch: Partial<SeatFacts> = {}): SeatFacts => ({
   kind: 'PERSONAL',
+  isMachineAccount: false,
   provisioningType: 'K2',
   pricingModel: 'PER_SEAT',
   holderLeft: true,
@@ -102,8 +103,9 @@ describe('G2 (gates 1 and 8)', () => {
     });
   });
 
-  it('does nothing for a holder who has not left, a service account or a seat that is not PER_SEAT', () => {
+  it('does nothing for a holder who has not left, a machine account, a service account or a seat that is not PER_SEAT', () => {
     expect(decideG2(seat({ holderLeft: false }), null).step).toEqual({ kind: 'NONE' });
+    expect(decideG2(seat({ isMachineAccount: true }), null)).toEqual({ skip: null, step: { kind: 'NONE' } });
     expect(decideG2(seat({ kind: 'SERVICE' }), null)).toEqual({ skip: null, step: { kind: 'NONE' } });
     expect(decideG2(seat({ pricingModel: 'FLAT_RATE' }), null).skip?.gate).toBe('PER_SEAT');
     expect(decideG2(seat({ provisioningType: 'K5', pricingModel: null }), null).skip?.gate).toBe('INTERNAL_SOFTWARE');

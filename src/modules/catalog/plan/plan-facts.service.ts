@@ -1,14 +1,24 @@
 import { Injectable } from '@nestjs/common';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
+import { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
+import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { ApplicationPlans } from '../catalog-entry/application-plans.types';
 import type { BusinessDate } from '../../../core/business-date';
 import type { PlanRevocationInfo, PlanSummary, PlanUsageRate, WorkspaceDuty } from '../public/catalog.types';
 import { kpi3Percent } from './plan.policy';
 import { PlanRepo } from './plan.repo';
 import { PlanUsageRepo } from './plan-usage.repo';
-import type { PlanLookup } from './plan.types';
+import { notYetBlocked } from './vendor-admin-roles.policy';
+import type { PlanLookup, WorkspaceMemberRecord } from './plan.types';
 
 export type LockedPlan = PlanLookup;
+
+/** Who administers a plan at the vendor as its profile records them (`QĐ-110k`, `QĐ-110u`): the people with their roles, the email of the company account and the note. */
+export interface VendorAdminsRecord {
+  members: WorkspaceMemberRecord[];
+  ownerAccountEmail: string | null;
+  adminNote: string | null;
+}
 
 /** What the subscriptions and the terms of a plan need to know about it, and what the application needs to know of its plans. */
 @Injectable()
@@ -16,6 +26,8 @@ export class PlanFactsService implements ApplicationPlans {
   constructor(
     private readonly plans: PlanRepo,
     private readonly usage: PlanUsageRepo,
+    private readonly identity: IdentityAccessApi,
+    private readonly organizationReads: OrganizationReadApi,
   ) {}
 
   /** Replaces what is known of the usage of the plans of the organization with what one pass of the usage rules found (`KPI-3`). */
@@ -49,6 +61,36 @@ export class PlanFactsService implements ApplicationPlans {
     return this.plans.lockExclusiveLookup(tx, id);
   }
 
+  /**
+   * Which of these people work now as IT Admins at the vendor (`QĐ-110k`): an account that can act whose person a departure does not already refuse
+   * (the flag of a plan falls "from the block", before the person has left). One read of the accounts and one of the blocks, whatever the number.
+   */
+  async workingAdminsAmong(employeeIds: readonly string[], tx?: DbTx): Promise<Set<string>> {
+    if (employeeIds.length === 0) return new Set();
+    const usable = await this.identity.findUsableItAdminEmployeeIds(employeeIds, tx);
+    if (usable.size === 0) return usable;
+    const blocks = await this.identity.findDepartureBlocks([...usable], tx);
+    const today = await this.organizationReads.businessToday(new Date(), tx);
+
+    return notYetBlocked(
+      usable,
+      new Map([...blocks].map(([employeeId, block]) => [employeeId, block.blockedFrom])),
+      today,
+    );
+  }
+
+  /** Who administers each of these plans at the vendor, in one read, by plan; a plan whose profile was never recorded is absent. */
+  async vendorAdminsOf(planIds: readonly string[], tx?: DbTx): Promise<Map<string, VendorAdminsRecord>> {
+    const profiles = await this.plans.findProfilesOf(planIds, tx);
+
+    return new Map(
+      [...profiles].map(([planId, profile]) => [
+        planId,
+        { members: profile.members, ownerAccountEmail: profile.ownerAccountEmail, adminNote: profile.adminNote },
+      ]),
+    );
+  }
+
   /** The plans with these ids as `LockedPlan`s without a lock, in one read. */
   lookups(ids: readonly string[], tx?: DbTx): Promise<LockedPlan[]> {
     return this.plans.findLookups(ids, tx);
@@ -60,8 +102,8 @@ export class PlanFactsService implements ApplicationPlans {
   }
 
   /** The plans with these ids by name, with their application: for the views that list seats. */
-  summaries(ids: readonly string[]): Promise<PlanSummary[]> {
-    return this.plans.findSummaries(ids);
+  summaries(ids: readonly string[], tx?: DbTx): Promise<PlanSummary[]> {
+    return this.plans.findSummaries(ids, tx);
   }
 
   /** The plans of the other applications of the same functional group (`US-05-04` AC-3): bounded, empty with no group. */

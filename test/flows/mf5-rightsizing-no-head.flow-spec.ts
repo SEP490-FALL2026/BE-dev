@@ -23,13 +23,15 @@ describe('MF-5 phòng sở hữu không có trưởng phòng: hồ sơ chờ và
   });
 
   it('trưởng phòng nghỉ việc, IT Admin vẫn đề xuất được; hồ sơ chờ NO_HEAD, không ai xác nhận, Super Admin được báo một lần #9 @B5', async () => {
-    await call().post('NV-SA', '/offboarding-cases', {
-      employeeId: await world.facts.employeeId('NV-ENGH'),
-      lastWorkingDay: call().today(),
-      accessBlockMode: 'BLOCK_NOW',
-      grounds: { type: 'HR_DECISION', reference: 'QĐ-NV-2026-09', issuer: 'Phòng Nhân sự', issuedOn: call().today() },
-      successor: { kind: 'NONE' },
+    // A head who leaves now needs a successor (QĐ-110h): the department is left without a head by the Super Admin instead.
+    const { department_id: departmentId } = await world.facts.one<{ department_id: string }>(
+      `SELECT department_id FROM department_head_periods WHERE employee_id = $1 AND valid_to IS NULL`,
+      [await world.facts.employeeId('NV-ENGH')],
+    );
+    const vacated = await call().post('NV-SA', `/departments/${departmentId}/head-vacancies`, {
+      effectiveFrom: call().today(),
     });
+    expect(vacated.status).toBe(200);
     world.clock.jumpDays(1);
     await world.actors.signIn('NV-ITA1');
     await world.actors.signIn('NV-SA');

@@ -26,6 +26,7 @@ export const declarePlanBodySchema = z.strictObject({
   revocationNote: note.nullable().optional(),
   dataLossOnRemoval: z.boolean().optional(),
   sharingPolicy: sharingPolicy.optional(),
+  hasAdminConsole: z.boolean().optional(),
 });
 
 /** The application cannot change: it is not a field here, so naming it is a validation error. */
@@ -37,6 +38,7 @@ export const updatePlanBodySchema = z.strictObject({
   revocationNote: note.nullable().optional(),
   dataLossOnRemoval: z.boolean().optional(),
   sharingPolicy: sharingPolicy.nullable().optional(),
+  hasAdminConsole: z.boolean().optional(),
 });
 
 export const workspaceProfileBodySchema = z.strictObject({
@@ -44,7 +46,7 @@ export const workspaceProfileBodySchema = z.strictObject({
   members: z
     .array(z.strictObject({ employeeId: z.uuid(), role: workspaceRole }))
     .min(1)
-    .max(100),
+    .max(20),
   ownerLimit: z.number().int().min(1).max(1000).nullable().optional(),
   adminLimit: z.number().int().min(1).max(1000).nullable().optional(),
   ownerTransferProcedure: note.nullable().optional(),
@@ -57,6 +59,9 @@ export const workspaceProfileBodySchema = z.strictObject({
     })
     .nullable()
     .optional(),
+  /** The email of the company account that stands as owner at the vendor (`QĐ-110u`): never a password. Missing means the subscription is flagged, not refused. */
+  ownerAccountEmail: z.string().trim().min(1).max(320).pipe(z.email()).nullable().optional(),
+  adminNote: z.string().max(2000).nullable().optional(),
 });
 
 export const listPlansQuerySchema = z.strictObject({
@@ -82,6 +87,8 @@ const workspaceProfileSchema = z.strictObject({
       lastReviewedOn: z.string(),
     })
     .nullable(),
+  ownerAccountEmail: z.string().nullable(),
+  adminNote: z.string().nullable(),
   updatedAt: z.iso.datetime(),
 });
 /** A row of the list; the plan as a detail or a write answers it is this and the revocation note. */
@@ -95,6 +102,8 @@ const planSummarySchema = z.strictObject({
   controlLevel: controlLevel.nullable(),
   dataLossOnRemoval: z.boolean(),
   sharingPolicy: sharingPolicy.nullable(),
+  /** A `K4` plan the company administers through a console of the vendor needs two IT Admins there (`R-53`); false for every other kind. */
+  hasAdminConsole: z.boolean(),
   seatTracking: z.enum(['APPLICABLE', 'NOT_APPLICABLE']),
   createdAt: z.iso.datetime(),
   updatedAt: z.iso.datetime(),

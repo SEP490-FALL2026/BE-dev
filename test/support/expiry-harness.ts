@@ -16,14 +16,8 @@ export interface ExpiredRightWire {
   status: 'WAITING_RENEWAL_DECISION' | 'READY_TO_REVOKE' | 'REVOCATION_OPEN';
   pendingRenewal: { requestId: string; state: string } | null;
   revocation: { taskId: string; status: string } | null;
-  handover: {
-    dutyId: string;
-    status: string;
-    role: string;
-    dueOn: string;
-    overdue: boolean;
-    flaggedUnconfirmed: boolean;
-  } | null;
+  /** Always null since `QĐ-110g`. */
+  handover: null;
 }
 
 export interface ReminderWire {
@@ -44,15 +38,6 @@ export interface ReminderRow {
   expected_end_date: string;
 }
 
-export interface DutyRow {
-  id: string;
-  source: string;
-  confirmer_role: string;
-  due_on: string;
-  confirmed_value: string | null;
-  proceeded_unconfirmed_at: Date | null;
-}
-
 /**
  * The return harness with what the tests of the rights that end on a day need: the three routes, the hourly pass run by hand, the
  * rows the database keeps, and a stand-in for the renewals that wait (the module of requests registers the real reader, which
@@ -65,8 +50,6 @@ export class ExpiryHarness extends ReturnHarness {
     request(this.server()).post(`/api/v1/assignment-expiry-queue/${assignmentId}/revocation`).set(this.as(account));
   reminders = (query = '', account: ApiAccount = this.it1) =>
     request(this.server()).get(`/api/v1/assignment-expiry-reminders${query}`).set(this.as(account));
-  confirmDuty = (id: string, body: object, account: ApiAccount = this.it1) =>
-    request(this.server()).post(`/api/v1/handover-duties/${id}/confirmations`).set(this.as(account)).send(body);
 
   /** The hourly pass, run by hand as if it were `now`; returns how many reminders were new. */
   noticeDue = (now?: Date): Promise<number> => this.ctx.app.get(ExpiryReminderService).noticeDue(now);
@@ -94,18 +77,6 @@ export class ExpiryHarness extends ReturnHarness {
     const { rows } = await this.ctx.sql.query<ReminderRow>(
       `SELECT audience::text, recipient_employee_id, department_id, to_char(expected_end_date, 'YYYY-MM-DD') AS expected_end_date
          FROM assignment_expiry_reminders WHERE assignment_id = $1 ORDER BY audience::text, expected_end_date`,
-      [assignmentId],
-    );
-
-    return rows;
-  }
-
-  /** The handover duties of a seat, oldest first. */
-  async dutyRows(assignmentId: string): Promise<DutyRow[]> {
-    const { rows } = await this.ctx.sql.query<DutyRow>(
-      `SELECT id, source::text, confirmer_role::text, to_char(due_on, 'YYYY-MM-DD') AS due_on,
-              confirmed_value::text, proceeded_unconfirmed_at
-         FROM handover_duties WHERE assignment_id = $1 ORDER BY created_at, id`,
       [assignmentId],
     );
 

@@ -27,10 +27,38 @@ export type LineStage = 'NEED' | 'SPEND';
 export type LineCancelCause = 'BENEFICIARY_LEFT' | 'BENEFICIARY_TRANSFERRED';
 
 /**
- * What a row can carry as the cause of a closing, as it is read: the two causes of the IT Admin and the one the conversion command
- * writes when the spending approver is a party of the request (`QĐ-93k(1)`); nobody closed that one (OD-6).
+ * Why the system closed a request, or a line, because the person it is for is gone (`QĐ-110d`, `QĐ-110o`): they left, or were moved to
+ * another department. Nobody closed it.
  */
-export type ReadableCancelCause = LineCancelCause | 'SPENDING_APPROVER_PARTY';
+export type SystemCancelCause = 'SYSTEM_BENEFICIARY_LEFT' | 'SYSTEM_BENEFICIARY_TRANSFERRED';
+
+/**
+ * Why the system closed a request for a service account that was still open when that kind left the scope (`QĐ-110m`): written once, by the
+ * migration that removed it, on a request and never on a line. Nobody closed it.
+ */
+export type ScopeRemovedCancelCause = 'SYSTEM_SCOPE_REMOVED';
+
+/**
+ * What a row can carry as the cause of a closing, as it is read: the two causes of the IT Admin, the two of the system, the one of a kind
+ * that left the scope, and the one the conversion command writes when the spending approver is a party of the request (`QĐ-93k(1)`);
+ * nobody closed those (OD-6).
+ */
+export type ReadableCancelCause =
+  LineCancelCause | SystemCancelCause | ScopeRemovedCancelCause | 'SPENDING_APPROVER_PARTY';
+
+/** Whether the cause is one of the system: nobody closed what carries it. */
+export const isSystemCancelCause = (cause: ReadableCancelCause): cause is SystemCancelCause =>
+  cause === 'SYSTEM_BENEFICIARY_LEFT' || cause === 'SYSTEM_BENEFICIARY_TRANSFERRED';
+
+/** The causes as the wire lists them (a request and a line share them). */
+export const READABLE_CANCEL_CAUSES = [
+  'BENEFICIARY_LEFT',
+  'BENEFICIARY_TRANSFERRED',
+  'SYSTEM_BENEFICIARY_LEFT',
+  'SYSTEM_BENEFICIARY_TRANSFERRED',
+  'SYSTEM_SCOPE_REMOVED',
+  'SPENDING_APPROVER_PARTY',
+] as const satisfies readonly ReadableCancelCause[];
 
 /** The states in which a line has ended: nothing happens to it again. */
 export const ENDED_LINE_STATES: readonly LineState[] = [

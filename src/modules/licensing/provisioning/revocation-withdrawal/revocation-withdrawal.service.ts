@@ -105,6 +105,7 @@ export class RevocationWithdrawalService {
           remainingReasons: remaining,
           outcome,
         },
+        input.operator,
       ),
     );
     if (outcome !== 'CANCELLED') return;
@@ -118,6 +119,7 @@ export class RevocationWithdrawalService {
         task.id,
         { status: task.status },
         { status: 'CANCELLED', taskKind: 'REVOKE', closeReason: NO_LONGER_APPLIES, assignmentStillOpen: true },
+        input.operator,
       ),
     );
   }

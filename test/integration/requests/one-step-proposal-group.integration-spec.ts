@@ -49,37 +49,35 @@ describe('BR-MF1-02: one-step proposals and group requests', () => {
       'ACCESS_REQUEST.NO_NEED_APPROVER',
     );
   });
-  it('BR-MF1-02: a member group without a head has confirmed lines and one spend decision', async () => {
+  it('QĐ-110i: a paid member group without a head waits at the need step with unconfirmed lines, and goes to the head who is named', async () => {
     const u = await h.departmentWithHead('P-GRPONE');
     await h.budgetFor(u, { total: 1_000_000_000 });
     const plan = await h.planOf(await h.subscription(100));
     const people = [u.member, await h.colleague(u)];
+    const newHead = await h.colleague(u);
     await h.ctx.sql.query(`DELETE FROM department_head_periods WHERE department_id=$1`, [u.department.id]);
     const response = await h.submitGroup(h.groupBody(plan, people), u.member.account).expect(201);
     const sent = h.dataOf<{ request: AccessRequestWire }>(response).request;
-    expect(sent.routing).toEqual({ mode: 'ONE_STEP', oneStepReason: 'NO_DEPARTMENT_HEAD' });
-    expect(sent.state).toBe('AWAITING_SPEND_DECISION');
+    expect(sent.routing).toEqual({ mode: 'VIA_HEAD', oneStepReason: null });
+    expect(sent.state).toBe('WAITING_CONTROLLED');
+    expect(sent.needStep).toMatchObject({ state: 'WAITING', assignee: null, waitingReason: 'NO_DEPARTMENT_HEAD' });
     const lines = h.dataOf<{ items: Array<{ state: string; needStep: { state: string } }> }>(
       await h.linesOf(sent.id, u.member.account).expect(200),
     ).items;
     expect(lines).toHaveLength(2);
-    for (const line of lines)
-      expect(line).toMatchObject({ state: 'NEED_CONFIRMED', needStep: { state: 'NOT_REQUIRED' } });
-    await h
-      .decideSpendLines(
-        sent.id,
-        { lines: people.map((person) => ({ employeeId: person.employeeId, decision: 'APPROVE' })) },
-        h.boss.account,
-      )
-      .expect(200);
-    expect(
-      (
-        await h.ctx.sql.query(
-          `SELECT 1 FROM approval_records WHERE request_id=$1 AND decider_role='SPENDING_APPROVER'`,
-          [sent.id],
-        )
-      ).rows,
-    ).toHaveLength(1);
+    for (const line of lines) expect(line).toMatchObject({ state: 'AWAITING_NEED', needStep: { state: 'WAITING' } });
+    // No one-step route and no spend decision exist for it yet: the spending approver has nothing to decide.
+    expect((await h.ctx.sql.query(`SELECT 1 FROM approval_records WHERE request_id=$1`, [sent.id])).rows).toHaveLength(
+      0,
+    );
+
+    await h.makeHead(u.department, newHead);
+
+    expect((await h.needSteps(sent.id))[0]).toMatchObject({
+      state: 'PENDING',
+      assignee_employee_id: newHead.employeeId,
+    });
+    expect(await h.state(sent.id)).toBe('PENDING');
   });
   it('BR-MF1-02: head group stays VIA_HEAD and in the batch queue, with the current group bound', async () => {
     const u = await h.departmentWithHead('P-GRPHEAD');

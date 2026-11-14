@@ -1,7 +1,7 @@
 # licensing
 
 Mục đích: quyền dùng phần mềm của người — assignment ghế, đóng seat baseline, hàng đợi provisioning (grant và thu
-hồi), bàn giao trước khi thu hồi, quyền hết hạn, kho license key, báo lỗi SaaS, danh sách quyền của chính Employee và
+hồi), quyền hết hạn, kho license key, báo lỗi SaaS, danh sách quyền của chính Employee và
 gia hạn subscription (đề xuất, quyết định, kết quả, mốc cảnh báo, sự cố tự gia hạn). Story chính: US-02-05, US-03-05,
 US-03-06, US-03-08, US-03-09, US-04-12, US-05-14, US-07-01, US-07-02, US-07-04, US-07-05, US-07-09 → US-07-11,
 US-11-01 → US-11-05 (một phần, xem `docs/workspace/items/a06-*`); phần đọc "Phần mềm của tôi" của US-12-15 AC-2 và
@@ -20,6 +20,7 @@ dashboards; gốc `src/app/app.module.ts`.
     - `withdrawRevocationReason` — nguồn gỡ lý do của chính mình: còn lý do khác ⟹ `CONTINUES`; hết lý do ⟹ tác vụ
       `CANCELLED` (`NO_LONGER_APPLIES`, ghế không đổi), riêng tác vụ `IN_PROGRESS` chỉ hủy khi
       `cancelInProgressClaimedBy` đúng người nhận, ngược lại `IT_ADMIN_TO_CLOSE`; gọi lại ⟹ `NOT_FOUND`/`ALREADY_ENDED`.
+      Tham số tùy chọn `operator` (thủ tục có kiểm soát): audit ghi `OPERATOR` thay vì tài khoản đứng thế.
     - `lockGrantOfRequest`, `completedGrantOfRequest`, `cancelGrantOfRequest` — task grant của một request;
       `recordProvisioningFailure` — ghi lần thử connector lỗi (US-07-04).
     - `listPersonalSeatsOf`, `countPersonalSeatsOf`, `getSeatsHeldInPlans`, `listTerminatingAccess`,
@@ -33,22 +34,22 @@ dashboards; gốc `src/app/app.module.ts`.
     `chainRootId` và `usableOn` theo `QĐ-77n` — mắt xích đầu của chuỗi gia hạn; 3 câu lệnh dù bao nhiêu ghế),
     `findHoldersByAccountIdentifiers` (người giữ hoặc từng giữ ghế dưới một định danh tài khoản), `listCurrentHolders` (người đang giữ
     ghế một ứng dụng, người nhận thông báo theo dõi). Chỉ đọc; `usage` là bên gọi.
-  - `LicensingHandoverApi` ([public/licensing-handover.api.ts](public/licensing-handover.api.ts)) — bàn giao:
-    `openHandoverDuties`, `reconcileHandoverDuties`, `cancelHandoverDuties`, `getHandoverDutiesOf`.
   - `LicensingRenewalApi` ([public/licensing-renewal.api.ts](public/licensing-renewal.api.ts)) — trả ghế và gia hạn
     (US-05-14): `getAssignmentFacts`, `renewAssignment`, `hasPendingRenewal`.
   - `LicensingOpenGrantsApi` ([public/licensing-open-grants.api.ts](public/licensing-open-grants.api.ts)) —
     `listOpenGrantTasksOfBeneficiary`, `listHeldSeatsOfRequests` (seat của Request còn giữ ngày `on`, đi theo chuỗi `predecessor_id` — `HANDOVER`,
     gia hạn quyền, `RENEWAL_CARRY` — tới bản ghi đang chạy, từ grant của Request hoặc bản ghi Request nêu; trả phòng sở hữu hiện tại và các bản
     ghi sau gốc; là thứ khoản 01/01 đếm, `BR-MF1-09e`).
-  - `LicensingServiceAccountApi` ([public/licensing-service-account.api.ts](public/licensing-service-account.api.ts)) —
-    `listServiceAccountDuties`, `remindServiceAccountDuties` (nhắc IT Admin phụ trách phòng sở hữu vào hộp thông báo, gọi từ
-    hook hồ sơ của personnel).
   - `LicensingDashboardApi` ([public/licensing-dashboard.api.ts](public/licensing-dashboard.api.ts)) — số đếm cho trang tổng
     quan theo vai (dashboards): `employeeFacts`, `departmentFacts`, `itAdminFacts`; type ở `licensing-dashboard.types.ts`.
   - `LicensingSeatBaselineApi` ([public/licensing-seat-baseline.api.ts](public/licensing-seat-baseline.api.ts)) — seat
     baseline (data-import, onboarding): `seatTargetRef`, `resolveBaselineTarget`, `lockBaselineTarget`, `baselineFacts`,
     `createBaselineAssignments`, `getBaselineProgress`, `openSeatHolders`.
+  - `LicensingDepartmentToolsApi` ([public/licensing-department-tools.api.ts](public/licensing-department-tools.api.ts)) — danh sách phần mềm của phòng
+    (DS.4, `QĐ-111c`; một facade riêng vì `LicensingApi` đã 8 phụ thuộc): `addDepartmentSoftwareFromCatalogLink(tx, actor, { departmentId, applicationId, planId, note? })` →
+    `{ entryId, added }` cho tick "thêm vào danh sách phòng" của `POST /access-requests/{id}/catalog-link` (SPEC FE IN-1; `requests` gọi trong transaction của nó, ở
+    gói IN-1). Idempotent: chỗ đã có ⟹ `added: false`, không Audit, không làm hỏng transaction của người gọi; ngoài danh mục ⟹ `DepartmentSoftwareNotInCatalogError`,
+    phòng không có ⟹ `ToolsDepartmentNotFoundError` (cả hai ở `licensing.errors.ts`). Không xét lại phạm vi IT Admin: người gọi đã xét trên Request; type ở `licensing-department-tools.types.ts`.
 - `public/licensing.types.ts` — input/output của facade; `public/licensing-*.types.ts` — type theo nhóm việc.
 - `public/licensing.errors.ts` — lỗi nghiệp vụ (`SeatBaselineClosedError`, `RevocationRefusedError`, `Provisioning*`…).
 - `public/licensing.extension-points.ts` — bảy point dưới đây, contract và union sự kiện `RevocationEvent`.
@@ -57,8 +58,8 @@ dashboards; gốc `src/app/app.module.ts`.
 
 ## Bảng sở hữu
 
-- `license_assignments`, `seat_baseline_states`, `provisioning_tasks`, `provisioning_task_reasons`, `handover_duties`,
-  `service_account_duty_notices`, `assignment_expiry_reminders`, `assignment_renewal_windows`, `license_keys`, `license_key_reveal_windows`,
+- `license_assignments`, `seat_baseline_states`, `provisioning_tasks`, `provisioning_task_reasons`, `handover_duties` (không còn ghi từ `QĐ-110g`; bảng giữ tới đợt dọn),
+  `service_account_duty_notices` (không còn ghi từ `QĐ-110m`; bảng giữ tới đợt dọn), `assignment_expiry_reminders`, `assignment_renewal_windows`, `license_keys`, `license_key_reveal_windows`,
   `saas_issues`, `saas_issue_entries`, `saas_issue_counters`, `subscription_renewals`,
   `subscription_renewal_released_seats`, `subscription_deadline_events` (`prisma/models/licensing.prisma`).
 
@@ -66,15 +67,13 @@ dashboards; gốc `src/app/app.module.ts`.
 
 - Mở `GrantRequestGateHook` (`licensing.grant-request-gate`, Hook) — requests
   `access-request/grant/access-request-grant.listener.ts`.
-- Mở `RevocationListeners` (`licensing.revocation`, Listeners) — licensing `handover/handover-revocation.listener.ts`,
-  requests `return-request/return-revocation.listener.ts`. Moment: `OPENED`, `BEFORE_WORK`, `AFTER_WORK`, `CLOSED_FAILED`,
-  `REASON_WITHDRAWN { task, withdrawn, remaining, cancelled }` (bàn giao tính lại duty từ `remaining`; return bỏ qua).
+- Mở `RevocationListeners` (`licensing.revocation`, Listeners) — requests `return-request/return-revocation.listener.ts`
+  (và các listener khác của requests/optimization bind). Moment: `OPENED`, `BEFORE_WORK`, `AFTER_WORK`, `CLOSED_FAILED`,
+  `REASON_WITHDRAWN { task, withdrawn, remaining, cancelled }` (return bỏ qua). Không còn listener bàn giao (`QĐ-110g`).
 - Mở `RenewalHoldHook` (`licensing.renewal-hold`, Hook) — requests `renewal-request/renewal-hold.listener.ts`.
-- Mở `ResponsibleDeadlineHook` (`licensing.responsible-deadline`, Hook) — personnel
-  `service-account/personnel-file-deadlines.listener.ts`.
 - Bind `SeatBaselinePhaseHook` (catalog, `catalog.seat-baseline-phase`) — `seat-baseline/seat-baseline-phase.listener.ts`.
-- Mở `SeatBaselineClosedListeners` (`licensing.seat-baseline-closed`, Listeners) — personnel
-  `transfer-review/post-setup-review.listener.ts`.
+- Mở `SeatBaselineClosedListeners` (`licensing.seat-baseline-closed`, Listeners) — chưa có bên đăng ký (bên duy nhất, rà soát sau thiết lập của
+  personnel, đã gỡ ở MF3-A; từ `QĐ-103d` danh sách người giữ ghế phòng khác luôn rỗng).
 - Mở `RenewalFinancialContributions` (`licensing.renewal-financial-snapshot`, Contributions) — chưa có bên thêm: module
   sở hữu ngân sách/chi phí (requests/budgets) thêm reader; chưa có thì snapshot đóng băng ghi `NOT_CONNECTED`, không 0.
 - Mở `RenewalUsageContributions` (`licensing.renewal-usage-evidence`, Contributions) — chưa có bên thêm: chủ evidence
@@ -88,7 +87,7 @@ dashboards; gốc `src/app/app.module.ts`.
 ## Hướng phụ thuộc giữa capability (R6)
 
 Không vòng (`pnpm arch:capabilities --module licensing`, gate `capability-graph`). Từ thấp lên cao: `assignment`,
-`license-key`, `saas-issue`, `device-binding` → `provisioning`, `seat-baseline` → `department-tools`, `handover` → `expiry` →
+`license-key`, `saas-issue` → `provisioning`, `seat-baseline` → `department-tools`, `expiry` →
 `my-software`, `subscription-renewal` (đọc ghế, mở thu hồi qua `RevocationService`, không capability nào import nó) →
 `dashboard-facts`. Cạnh
 ngược là vòng:
@@ -96,22 +95,41 @@ dịch vụ nào đọc cả ghế lẫn thu hồi thì đứng trên cả hai (
 
 ## Capability → file chính
 
-- `assignment/` — assignment ghế, đổi người phụ trách service account, ghế của subscription;
-  `assignments.controller.ts`, `subscription-seats.controller.ts`; `AssignmentService`, `AssignmentResponsibleService`.
-  Con: `service-account-duty/` (US-03-08), `renewal/` (US-05-14).
+- `assignment/` — assignment ghế (đọc danh sách) và ghế của subscription; `assignments.controller.ts`,
+  `subscription-seats.controller.ts`; `AssignmentService`. Con: `renewal/` (US-05-14). Không còn tài khoản dịch vụ (`QĐ-110m`): các dòng
+  `kind = 'SERVICE'` cũ chỉ còn là lịch sử (hoặc đợi chuyển, xem `…_licensing_service_accounts_converted`).
+- `machine-account/` — cờ _dùng cho tài khoản máy_ trên seat cá nhân của IT Admin (`QĐ-110m`, R-9): `POST /license-assignments/{id}/machine-account`;
+  `machine-account.controller.ts`, `MachineAccountService`, `machine-account.policy.ts` (thuần: loại seat, đang mở, người giữ là IT Admin dùng
+  được). Seat có cờ không tính vào INV-02; bật cờ cần lý do; tắt cờ khi trùng seat cá nhân cùng thuê bao ⟹ 409 `MACHINE_ACCOUNT_OVERLAP`.
 - `department-tools/` — công cụ phòng ban đang dùng (US-03-06); `department-tools.controller.ts`; `DepartmentToolsService`.
   Đọc ghế của `assignment/` và việc thu hồi của `provisioning/` nên đứng trên cả hai.
+  **Danh sách phần mềm của phòng** (DS, `QĐ-110s`, `QĐ-110t`, `QĐ-111c`, SPEC P16–P18; chỉ hướng dẫn, không tự cấp): bảng `department_software_entries`
+  (một dòng cho mỗi (phòng, ứng dụng, gói); unique `NULLS NOT DISTINCT` nên "ứng dụng không gói" chỉ một lần) và `department_software_proposals` (lịch sử đề xuất,
+  partial unique một đề xuất `PENDING` cho mỗi chỗ). `department-software.controller.ts`: `GET /departments/{id}/software-list`
+  (thành viên phòng, trưởng phòng, mọi IT Admin, Super Admin), `POST …/software-list/changes { add ≤ 50, remove ≤ 50 }` (chỉ IT Admin phụ trách phòng theo phạm vi
+  `US-01-11`), `GET /me/department-software-list` (phòng của chính người gọi). `DepartmentSoftwareChangesService` gỡ rồi thêm trong một transaction,
+  khóa phòng `FOR SHARE`, `insertEntries` là `ON CONFLICT DO NOTHING` nên trùng ⟹ 409 `DEPARTMENT_SOFTWARE.ALREADY_LISTED` và không ghi gì; ngoài danh mục
+  (ứng dụng không có/đã ngừng, gói không thuộc ứng dụng) ⟹ 422 `NOT_IN_CATALOG`; mục không thuộc phòng ⟹ 404 `ENTRY_NOT_FOUND`. Quyền và luật ở
+  `department-software.policy.ts` (thuần, có spec); `DepartmentSoftwareAccessService` gom dữ kiện; `DepartmentSoftwareViewService` đặt tên
+  (một lần đọc catalog cho cả trang); mọi SQL ở `department-software.repo.ts`. Thứ tự: mới thêm trước rồi `id`. Tên file tiền tố `department-software-` để
+  tách khỏi `tools-in-use`.
+  **Đề xuất** (DS.3, P18): `department-software-proposals.controller.ts` — `POST /department-software-proposals` (`@RequireRoles('MANAGER')`, phòng = phòng người đó
+  đang làm trưởng, thân không nêu phòng; chỉ chỗ trong danh mục ⟹ 422 `NOT_IN_CATALOG`; đã có trong danh sách ⟹ 409 `ALREADY_LISTED`; đã có đề xuất mở ⟹ 409
+  `PROPOSAL_ALREADY_OPEN` do partial unique), `GET` (IT Admin theo phạm vi phòng, trưởng phòng theo phòng mình; ngoài phạm vi ⟹ trang rỗng),
+  `POST …/{id}/acceptance` (thêm vào danh sách ngay, một lần; đã có do IT thêm tay ⟹ lấy dòng đó) và `…/rejection { reason }` (`@RequireRoles('IT_ADMIN')`; đề xuất của phòng
+  mình không phụ trách ⟹ 404; đã quyết ⟹ 409 `PROPOSAL_NOT_PENDING`; hai người quyết cùng lúc ⟹ `UPDATE … WHERE state = 'PENDING'` chỉ một thắng).
+  `DepartmentSoftwareProposalService` (một transaction mỗi bước: Audit + thông báo), `DepartmentSoftwareNotice` (`DEPARTMENT_SOFTWARE_PROPOSED` tới IT phụ trách, hoặc mọi IT Admin dùng
+  được khi chưa có; `DEPARTMENT_SOFTWARE_PROPOSAL_DECIDED` tới trưởng phòng đã đề xuất, kèm lý do khi từ chối).
 - `seat-baseline/` — xem/đóng baseline ghế (US-02-05 AC-6); `seat-baseline.controller.ts`; `SeatBaselineService`.
 - `provisioning/` — task grant và thu hồi; `revocation.service.ts` (mở thu hồi) với `RevocationTaskFactory`,
   `RevocationRecorder`, `revocation-open.policy.ts`; `provisioning.policy.ts`. Con: `tasks/`
   (`provisioning-tasks.controller.ts`; grant: `ProvisioningGrantService` → `ProvisioningGrantPlanner` (xét trước khóa) +
-  `ProvisioningGrantWriter` (ghi trong transaction), `provisioning-grant.policy.ts`; `ProvisioningService` giữ danh sách,
+  `ProvisioningGrantWriter` (ghi trong transaction; Request xin lại trong ân hạn điều chuyển có `replacesAssignmentId` ⟹ `AssignmentService.endReplacedByGrant` kết thúc quyền cũ cùng thuê bao
+  `valid_until` = ngày cấp trước khi chèn quyền mới, R-49; cấp hỏng/hủy ⟹ `giveBackReplaced` mở lại; `LicensingApi.listRegrantedAssignments`), `provisioning-grant.policy.ts`; `ProvisioningService` giữ danh sách,
   claim, hoàn tất, báo lỗi; `ProvisioningDecisionService`), `revocation-completion/`
-  (`revocation-tasks.controller.ts`), `grant-cancellation/`, `open-grants/`, `department-use/`.
-- `handover/` — xác nhận bàn giao dữ liệu trước khi thu hồi (US-03-09, US-07-09); `handover-duties.controller.ts`;
-  `HandoverService`, `HandoverConfirmationService`; `handover-duty.job.ts` nhắc quá hạn mỗi giờ. Người nghỉ việc không phòng
-  (`departmentId` null, `D-S18`): `requirementOf` bỏ nguồn `DEPARTURE`/`ABRUPT_DEPARTURE`, nên không có nghĩa vụ trưởng phòng ở
-  `open` lẫn `openFromTask` và tác vụ thu hồi không bị giữ; nguồn khác (IT, trả về) giữ nguyên.
+  (`revocation-tasks.controller.ts`), `grant-cancellation/`, `open-grants/`, `department-use/`, `k1-checklist/` (checklist thu hồi `K1`,
+  `QĐ-111az`: biến thể `DEPARTURE` 6 mục / `STILL_EMPLOYED` 2 mục suy từ các lý do còn đứng, kiểm đủ tick + bằng chứng + `doneAt` không giảm theo
+  `order`; cột `provisioning_tasks.k1_checklist`, codec `provisioning-k1-checklist.json.ts`; `RevocationAftermath.keepChecklist` gọi lúc hoàn tất).
 - `expiry/` — quyền đã hết hạn, nhắc trước 7 ngày (US-03-05); `expiry.controller.ts`; `expiry-reminder.job.ts`.
   Cửa sổ Request tiếp tục (BR-MF1-08a): `expiry-renewal-window.job.ts` mỗi giờ ghi `assignment_renewal_windows` (số ngày lúc mở, bất biến)
   và báo người giữ + trưởng phòng một lần (`RENEWAL_WINDOW_OPENED`). Tác vụ `EXTEND` (`provisioning/tasks/provisioning-extension.service.ts`,
@@ -121,9 +139,6 @@ dịch vụ nào đọc cả ghế lẫn thu hồi thì đứng trên cả hai (
 - `my-software/` — "Phần mềm của tôi" (US-12-15 AC-2, US-16-01 AC-1): `my-software.controller.ts`
   (`GET /me/software-rights`, mọi tài khoản đã đăng nhập (`QĐ-95d`), chỉ quyền cá nhân của chính người gọi), `MySoftwareService`, `MySoftwareRepo`;
   trạng thái theo ngày nghiệp vụ ở `my-software.policy.ts`. Không đọc khóa K4, giá, Cost Center hay định danh tài khoản.
-- `device-binding/` — contract sổ thiết bị G7 cho K4 (`DeviceRegistryPort`) và luật thuần gán/gỡ/giới hạn khóa theo thiết
-  bị; **chưa dùng ở đâu, chưa bind**: sổ thiết bị của Owner chưa có, chỉ có contract test với mock
-  (`device-binding.policy.spec.ts`, stand-in `test/support/device-registry-contract-double.ts`). Không import capability nào.
 - `dashboard-facts/` — số đếm mà trang tổng quan theo vai đọc (US-12-15 AC-2, AC-3, AC-4), mỗi số bằng tổng của danh sách
   hiện có cùng phạm vi: quyền và quyền sắp hết của Employee (dùng luật của `my-software.policy.ts`), báo lỗi SaaS, ghế phòng ban
   (qua `AssignmentDepartmentRepo`), task cấp/thu hồi và báo lỗi IT Admin phụ trách, key trong kho. `DashboardFactsService`,
@@ -141,9 +156,8 @@ dịch vụ nào đọc cả ghế lẫn thu hồi thì đứng trên cả hai (
   của một quyết định ghi ở `decision/renewal-decision-trail.service.ts`.
 - Gốc module (dùng chung nhiều capability): `licensing-audit-event.mapper.ts`, `licensing.http-errors.ts`;
   `licensing-alerts.policy.ts` + `licensing-alerts.service.ts` (`LicensingAlerts`) — cảnh báo license `FR-5.14` vào hộp thông báo
-  (dòng 3 T−7 ở `expiry/`, dòng 12 bàn giao ở `handover/handover-alert.service.ts`, dòng 13 tài khoản dịch vụ ở
-  `assignment/service-account-duty/`, dòng 38 `K1` của người nghỉ ở `provisioning/revocation-completion/`; hạng mục
-  `a03-license-inbox-alerts`).
+  (dòng 3 T−7 ở `expiry/`, dòng 12 bàn giao đã bỏ theo `QĐ-110g`, dòng 13 tài khoản dịch vụ đã bỏ theo `QĐ-110m`, dòng 38 `K1` của
+  người nghỉ ở `provisioning/revocation-completion/`; hạng mục `a03-license-inbox-alerts`).
 
 ## Kho dùng chung (`shared-pool/`, L0)
 
@@ -179,19 +193,30 @@ dịch vụ nào đọc cả ghế lẫn thu hồi thì đứng trên cả hai (
 
 - Assignment không bao giờ bị xóa; chỉ đổi khi kết thúc, failed hoặc cancelled, ngày dự kiến kết thúc đã đặt thì không
   sửa — đổi là gia hạn, bản ghi mới (trigger `license_assignment_reject_change`). Một người không giữ hai ghế cá nhân
-  chồng thời gian trên cùng subscription/plan (`license_assignments_personal_no_overlap`, INV-02).
+  chồng thời gian trên cùng subscription/plan (`license_assignments_personal_no_overlap`, INV-02), trừ seat có cờ _tài khoản máy_
+  (`is_machine_account`, R-9: `WHERE kind = 'PERSONAL' AND NOT is_machine_account`; cờ ⇔ `machine_account_note`).
+  Cùng người, cùng định danh trên cùng subscription vi phạm cả hai ràng buộc loại trừ (`…personal_no_overlap`, `…identifier_no_overlap`); DB báo ràng buộc **tạo trước**, nên `personal_no_overlap` phải cũ hơn `identifier_no_overlap` (mã `OVERLAP`, không phải `IDENTIFIER_IN_USE`): drop/add một ràng buộc thì drop/add lại ràng buộc kia sau nó (migration `20261113000600`; test `license-assignment-constraints` ghim thứ tự).
 - Thu hồi chỉ mở qua `openRevocation`, trong transaction của nguồn; ghế được trả khi task hoàn tất; gọi lại cùng nguồn
   và reference không đổi gì.
 - Mốc thu hồi (`BR-MF5-04`): mỗi lý do giữ `due_on`/`not_before` của nơi gọi; tác vụ giữ mốc suy ra từ các lý do còn hiệu
   lực — **lý do không mốc thắng ân hạn** (một lý do không `not_before` ⟹ tác vụ không mốc, R-J08), ngược lại `MIN`.
   `claim` và `revocation-completion` trước `not_before` ⟹ 409 `PROVISIONING_TASK.NOT_BEFORE` (`details.notBefore`).
+- Hoàn tất thu hồi `K1` (`QĐ-111az`, P25): body phải có `k1Checklist { items[{ code, done, doneAt }], evidence? }` của đúng biến thể thẻ nêu
+  (`GET /provisioning-tasks/{id}` → `k1Checklist { variant, items[{ code, label, order, doneAt }] }`; server quyết biến thể: có lý do `DEPARTURE`/`ABRUPT_DEPARTURE`
+  ⟹ `DEPARTURE`). Thiếu mục/tick/thời điểm/bằng chứng ⟹ 422 `REVOCATION.K1_CHECKLIST_INCOMPLETE`; `doneAt` giảm theo `order` (vd khóa hộp thư trước đăng xuất
+  mọi phiên) ⟹ 422 `K1_CHECKLIST_OUT_OF_ORDER`; mục ngoài biến thể, trùng, hoặc `k1Checklist` cho loại ghế khác ⟹ `COMPLETION_NOT_ALLOWED`. Hệ thống không điều
+  khiển Google/M365. Checklist ghi cùng transaction hoàn tất (trước khi tác vụ `COMPLETED`); sự kiện `AFTER_WORK` mang `completed.k1Checklist { variant, doneCodes }`
+  để listener của `personnel` đọc `MAILBOX_LOCKED`. **Khóa hộp thư (mục 6) chỉ thuộc tác vụ thu hồi `K1` sống cuối cùng của người đó** (R-1, S17, P28):
+  khi người đó còn tác vụ thu hồi `K1` khác chưa `COMPLETED`/`CANCELLED`/`CLOSED_FAILED` (kể cả `FAILED`), thẻ chỉ có 5 mục và gửi mục 6 ⟹ `COMPLETION_NOT_ALLOWED`;
+  tác vụ cuối có 6 mục và `doneCodes` chứa `MAILBOX_LOCKED` chỉ khi đã tick. Hai tác vụ của một người hoàn tất cùng lúc được xét lần lượt bằng khóa advisory
+  theo người (`k1-checklist:<employeeId>`, lấy sau khóa task và khóa ghế): đúng một tác vụ là cuối.
 - **Lý do đã gỡ không được đọc ở đâu** (chỉ `listAllOf` cho lịch sử trên thẻ tác vụ): `find`, `listOf`, `countOf`,
-  `listRevocationsOpenedFor`, `listPersonalSeatsOf` (đang thu hồi), bàn giao đều lọc `withdrawn_at IS NULL`; index
+  `listRevocationsOpenedFor`, `listPersonalSeatsOf` (đang thu hồi) đều lọc `withdrawn_at IS NULL`; index
   duy nhất lý do là partial `WHERE withdrawn_at IS NULL` nên mở lại cùng `(source, reference)` trên cùng tác vụ được.
 - Thứ tự khóa: task grant trước request (`lockGrantOfRequest`); đích ghế subscription `FOR UPDATE`, plan nội bộ
   `FOR SHARE`; `createBaselineAssignments` giữ baseline state `FOR SHARE` nên việc đóng baseline phải chờ. Đóng
   baseline là vĩnh viễn (không route mở lại); sau đó assignment chỉ đến từ request.
-- `RevocationListeners` chạy theo thứ tự thêm (handover của licensing trước return của requests), dừng ở listener đầu
+- `RevocationListeners` chạy theo thứ tự thêm (seat-release, return, ghost seat của các module khác), dừng ở listener đầu
   tiên ném lỗi; thứ tự được ghim trong `provisioning-revocation-read-contracts.integration-spec.ts`.
 - Gia hạn: một case mỗi kỳ subscription; đề xuất, quyết định, kết quả mỗi phần ghi một lần rồi đóng băng (trigger
   `subscription_renewals_guard`); kỳ mới nối chuỗi tối đa một (`subscriptions_renewed_from_id_key`); ghế chỉ chuyển khi số

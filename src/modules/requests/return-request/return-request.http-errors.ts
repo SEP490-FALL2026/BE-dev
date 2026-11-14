@@ -8,16 +8,12 @@ import { ReturnRequestRefusedError, type ReturnRefusal } from './return-request.
 const STATUS: Record<ReturnRefusal, HttpStatus> = {
   NOT_HOLDER: HttpStatus.FORBIDDEN,
   OUTSIDE_DEPARTMENT: HttpStatus.FORBIDDEN,
-  NOT_REQUESTER: HttpStatus.FORBIDDEN,
   ASSIGNMENT_NOT_FOUND: HttpStatus.NOT_FOUND,
   NOT_FOUND: HttpStatus.NOT_FOUND,
   NO_DEPARTMENT: HttpStatus.CONFLICT,
   ASSIGNMENT_NOT_RETURNABLE: HttpStatus.CONFLICT,
   ALREADY_REQUESTED: HttpStatus.CONFLICT,
   RENEWAL_PENDING: HttpStatus.CONFLICT,
-  HANDOVER_NOT_REQUIRED: HttpStatus.CONFLICT,
-  HANDOVER_ALREADY_CONFIRMED: HttpStatus.CONFLICT,
-  NOT_AWAITING: HttpStatus.CONFLICT,
   ORIGIN_MISMATCH: HttpStatus.UNPROCESSABLE_ENTITY,
 };
 
@@ -42,7 +38,6 @@ const example = (error: Error) => errorExampleOf(toReturnApiException(error));
 export const RETURN_ERROR_EXAMPLES = {
   NOT_HOLDER: example(new ReturnRequestRefusedError('NOT_HOLDER')),
   OUTSIDE_DEPARTMENT: example(new ReturnRequestRefusedError('OUTSIDE_DEPARTMENT')),
-  NOT_REQUESTER: example(new ReturnRequestRefusedError('NOT_REQUESTER')),
   ASSIGNMENT_NOT_FOUND: example(new ReturnRequestRefusedError('ASSIGNMENT_NOT_FOUND')),
   NOT_FOUND: example(new ReturnRequestRefusedError('NOT_FOUND')),
   NO_DEPARTMENT: example(new ReturnRequestRefusedError('NO_DEPARTMENT')),
@@ -56,8 +51,5 @@ export const RETURN_ERROR_EXAMPLES = {
   ASSIGNMENT_NOT_RETURNABLE: example(new ReturnRequestRefusedError('ASSIGNMENT_NOT_RETURNABLE', 'NOT_OPEN')),
   ALREADY_REQUESTED: example(new ReturnRequestRefusedError('ALREADY_REQUESTED')),
   RENEWAL_PENDING: example(new ReturnRequestRefusedError('RENEWAL_PENDING')),
-  HANDOVER_NOT_REQUIRED: example(new ReturnRequestRefusedError('HANDOVER_NOT_REQUIRED')),
-  HANDOVER_ALREADY_CONFIRMED: example(new ReturnRequestRefusedError('HANDOVER_ALREADY_CONFIRMED')),
-  NOT_AWAITING: example(new ReturnRequestRefusedError('NOT_AWAITING')),
   ORIGIN_MISMATCH: example(new ReturnRequestRefusedError('ORIGIN_MISMATCH')),
 } as const;

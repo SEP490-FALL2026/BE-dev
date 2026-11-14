@@ -96,7 +96,7 @@ connection trước khi dọn thủ công; không xóa theo wildcard.
 
 Không assertion, không hook. `flow-template.ts`: mẫu đã seed của lượt (`prepareSeededTemplate` ở global setup, `cloneSeededTemplate` cho từng file),
 mật khẩu dataset và danh sách `SWEEPER_OVERRIDES`. `flow-world.ts`: `FlowWorld.open()` clone mẫu, bật đồng hồ, dựng app, đăng ký các
-pass (`projection`, `sla`, `expiry`, `renewal`, `transferReview`) vào `FlowClock`. `flow-actors.ts`: đăng nhập thật theo mã
+pass (`projection`, `sla`, `expiry`, `renewal`) vào `FlowClock`. `flow-actors.ts`: đăng nhập thật theo mã
 (`signIn`, `ensure`, `as`, `refresh`/`keep`). `flow-clock.ts`: `Date` giả (D0 = ngày thật, 12:00 giờ tổ chức), `jumpTo`/`jumpDays`/
 `jumpWorkingDays` chỉ tiến, luật CR-1 về đồng hồ PostgreSQL. `flow-facts.ts`: chỉ `SELECT` (đếm bảng, một dòng, thông báo, Audit).
 `flow-calls.ts`: gọi API theo vai (`get`/`post`/`put`) và các bước lặp lại của luồng Request.
@@ -145,23 +145,11 @@ fixture SQL không chứng minh workflow tạo tài khoản. Dùng `bodyOf(respo
   `step-sla.integration-spec.ts`, the queue of the head in `step-sla-queue.integration-spec.ts`, Finance and the Super Admin lookup in
   `step-sla-finance-question.integration-spec.ts`, the backlog alert, the board and the incidents in `step-congestion.integration-spec.ts`,
   what the database refuses in `step-sla-constraints.integration-spec.ts`.
-- `support/handover-harness.ts`: the transfer harness with what the handover confirmation needs: `seatOf` (a seat of a person the harness
-  made, a person who joined long ago), `describePlan` (data loss and the notice of a plan), `open` (what a source module does to open
-  a revocation), `openDuties`, `reconcileDuties` and `cancelDuties` (what the record of a departure does), `noticeOverdue` (the hourly
-  reminder by hand), the three routes (`duties`, `duty`, `confirmDuty`), `makeHeadFrom` (a head named for a day to come, which is
-  who follows a head who leaves) and `dutyRows`, `auditActions`, `liveTaskOf`, `assignmentRow` for what the database keeps. Deadlines
-  are given as days from the real today (`h.day(n)`), never by moving the clock: a duty whose deadline has passed is one opened with a
-  past `dueOn`. The flows are in `handover-duty-departure.integration-spec.ts`, who confirms when the head is missing or leaves in
-  `handover-duty-successor.integration-spec.ts`, every source of a revocation in `handover-duty-sources.integration-spec.ts`, the
-  lists with the statement count in `handover-duty-read.integration-spec.ts`; what the database refuses is in
-  `handover-duty-constraints.integration-spec.ts`.
-- `support/transfer-review-harness.ts`: the handover harness with what the review after a transfer needs: `movedWith` (a person of a
-  department who holds tools and is moved to another from today; returns the seats in the order of the tools and the review the move
-  opened), `moveToday`, the four routes (`reviews`, `review`, `reviewItems`, `decide`), `noticeLateReviews` (the hourly reminder by
-  hand), `backdate` (moves the deadline of a review into the past with the guard trigger off for that one update) and `reviewRows`,
-  `itemRows`, `taskRow`, `reasonRows` for what the database keeps. The opening is in `transfer-review-open.integration-spec.ts`, the
-  decisions and the late review in `transfer-review-decide.integration-spec.ts`, the reads with the statement count in
-  `transfer-review-read.integration-spec.ts`; what the database refuses is in `transfer-review-constraints.integration-spec.ts`.
+- `support/seat-revocation-harness.ts`: the transfer harness with what the tests of a revocation of seats need: `seatOf` (a seat of a person
+  the harness made, a person who joined long ago), `describePlan` (data loss and the notice of a plan), `open` (what a source module does
+  to open a revocation), `revoked` (the completion of a task), `makeHeadFrom` (a head named for a day to come) and `auditActions`,
+  `liveTaskOf`, `assignmentRow` for what the database keeps. No handover is confirmed any more (`QĐ-110g`), so the harness has no duty:
+  a test that wants to say none was made counts the rows of `handover_duties` (the table stays until the later clean-up).
 - `support/leave-harness.ts`: the transfer harness with what a long leave needs: `worker` (a person who joined long ago, so a leave may
   begin on any recent day), the six routes (`startLeave`, `changeReturnDate`, `confirmReturn`, `readLeave`, `listLeaves`, `leaveChanges`),
   `started` (a leave expected to begin), `noticeOverdueAt(day)` (the hourly reminder by hand, as of a day), `departure()` and `personnel()`
@@ -169,12 +157,12 @@ fixture SQL không chứng minh workflow tạo tài khoản. Dùng `bodyOf(respo
   `changeRows` for what the database keeps. The start is in `long-leave-start.integration-spec.ts`, the return, the new day and the late
   return in `long-leave-return.integration-spec.ts`, what the database refuses, the list with the statement count, the leaving functions
   and `getLeaveIntervals` in `long-leave-integrity.integration-spec.ts`.
-- `support/offboarding-harness.ts`: the handover harness with what the record of a departure needs: `worker` (a person who joined long ago),
-  the eleven routes (`recordCase`, `readCase`, `listCases`, `rightsOf`, `caseChanges`, `changeLastDay`, `cancelCase`, `markLeft`, `lockAccount`,
-  `revokeRights`, `closeCase`), `body` and `recordedCase` (a departure expected to be recorded), `dueBefore(day)` (a working day before a day,
+- `support/offboarding-harness.ts`: the seat and revocation harness with what the record of a departure needs: `worker` (a person who joined long ago),
+  the routes (`recordCase`, `readCase`, `listCases`, `rightsOf`, `caseChanges`, `changeLastDay`, `cancelCase`, `markLeft`, `lockAccount`,
+  `revokeRights`, `lockMailbox`), `body` and `recordedCase` (a departure expected to be recorded), `dueBefore(day)` (a working day before a day,
   no day off), and `caseRow`, `caseCount`, `changeKinds`, `workState`, `employeeLeftOn`, `taskCount` for what the database keeps. The record
   is in `offboarding-record.integration-spec.ts`, moving and cancelling in `offboarding-change.integration-spec.ts`, the departure, the
-  revocations and the closing in `offboarding-departure.integration-spec.ts`, an IT Admin who leaves in `offboarding-self.integration-spec.ts`,
+  revocations and the closing in `offboarding-departure.integration-spec.ts` (the lock of the mailbox and the closing by the system in `departure-closure.integration-spec.ts`), an IT Admin who leaves in `offboarding-self.integration-spec.ts`,
   what the database refuses and the reads with the statement count in `offboarding-integrity.integration-spec.ts`, and the routes without a
   database in `test/http/personnel/offboarding-cases.http-spec.ts`.
 - `support/offboarding-harness.ts` also has the routes of the requests of a person who left: `openRequestsOf`, `openGrantTasksOf` and
@@ -190,19 +178,10 @@ fixture SQL không chứng minh workflow tạo tài khoản. Dùng `bodyOf(respo
   role) on the offboarding harness; the Super Admin of the harness leaves in the last case of the file, after which no account can be made or
   given a role in that database, so keep a case that needs the Super Admin before it. `test/http/personnel/role-duties.http-spec.ts` is the two routes without
   a database.
-- `support/service-account-handover-harness.ts`: the offboarding harness with what the handover of service accounts needs: `botOf` (a
-  service account written through the baseline import), the routes (`changeResponsibleOf`, `proposeMove`, `confirmMove`, `cancelMove`,
-  `listMoves`, `listServiceDuties`, `closeTransfer`), `chainOf` (the chain of an assignment as the database keeps it), `seatsTaken(day)`,
-  `unitOf`, `moveRow`, `noticeCount`, `sweepOverdue(now)` (the hourly reminder by hand) and `pretendToday(day)` (the organization says
-  it is another day). The duties, the change of the person responsible, the departure and the reminder are in
-  `service-account-duty.integration-spec.ts`, the move and its confirmation in `service-account-move.integration-spec.ts`, what the
-  database refuses in `service-account-integrity.integration-spec.ts`, and the routes without a database in
-  `test/http/licensing/service-account-handover.http-spec.ts`.
 - `support/expiry-harness.ts`: the return harness with what the rights that end on a day need: the three routes (`queue`,
-  `startRevocation`, `reminders`), `noticeDue(now)` (the hourly reminder by hand), `queueRows`, `reminderRows`, `dutyRows` (the handover
-  of a seat), `giveEndDate` (the database refuses to change an end date that was set) and `waitingRenewals(map)` (a stand-in for the
+  `startRevocation`, `reminders`), `noticeDue(now)` (the hourly reminder by hand), `queueRows`, `reminderRows`, `giveEndDate` (the database refuses to change an end date that was set) and `waitingRenewals(map)` (a stand-in for the
   renewals that wait, which returns the real reader when called back). The reminders and what the database refuses are in
-  `assignment-expiry-reminders.integration-spec.ts`, the queue, the start of the revocation, the handover and the failure in
+  `assignment-expiry-reminders.integration-spec.ts`, the queue, the start of the revocation and the failure in
   `assignment-expiry-queue.integration-spec.ts`, and the routes without a database in `test/http/licensing/assignment-expiry.http-spec.ts`.
 - `support/renewal-harness.ts`: the expiry harness with what the renewal of a subscription needs: the seven calls (`renewals`, `read`,
   `ranking`, `propose`, `decideRenewal`, `outcome`, `deadlineEvents`), `sweepOn(day)` (the hourly pass by hand as if it were that

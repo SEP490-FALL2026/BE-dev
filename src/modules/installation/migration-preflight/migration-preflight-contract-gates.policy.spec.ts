@@ -20,19 +20,25 @@ const noDirection: ContractGateFacts['costCenterDirection'] = {
 const gates = (overrides: Partial<ContractGateFacts['subscriptionOwner']> = {}): ContractGateFacts => ({
   subscriptionOwner: { schema: 'READY', subscriptionIds: [], ...overrides },
   costCenterDirection: noDirection,
-  retiredKinds: { pendingNoticeIds: [], pendingTransferIds: [], pendingMoveIds: [] },
+  retiredKinds: { pendingNoticeIds: [], pendingTransferIds: [], pendingMoveIds: [], serviceAccountIds: [] },
   legacyReturns: noReturns,
 });
 const direction = (overrides: Partial<ContractGateFacts['costCenterDirection']> = {}): ContractGateFacts => ({
   subscriptionOwner: { schema: 'NO_TABLE', subscriptionIds: [] },
   costCenterDirection: { ...noDirection, schema: 'READY', ...overrides },
-  retiredKinds: { pendingNoticeIds: [], pendingTransferIds: [], pendingMoveIds: [] },
+  retiredKinds: { pendingNoticeIds: [], pendingTransferIds: [], pendingMoveIds: [], serviceAccountIds: [] },
   legacyReturns: noReturns,
 });
 const retired = (overrides: Partial<ContractGateFacts['retiredKinds']> = {}): ContractGateFacts => ({
   subscriptionOwner: { schema: 'NO_TABLE', subscriptionIds: [] },
   costCenterDirection: noDirection,
-  retiredKinds: { pendingNoticeIds: [], pendingTransferIds: [], pendingMoveIds: [], ...overrides },
+  retiredKinds: {
+    pendingNoticeIds: [],
+    pendingTransferIds: [],
+    pendingMoveIds: [],
+    serviceAccountIds: [],
+    ...overrides,
+  },
   legacyReturns: noReturns,
 });
 const converged: PreflightReport = {
@@ -218,7 +224,7 @@ describe('withContractGates', () => {
       judgeContractGates({
         subscriptionOwner: { schema: 'READY', subscriptionIds: [] },
         costCenterDirection: { ...noDirection, schema: 'READY' },
-        retiredKinds: { pendingNoticeIds: [], pendingTransferIds: [], pendingMoveIds: [] },
+        retiredKinds: { pendingNoticeIds: [], pendingTransferIds: [], pendingMoveIds: [], serviceAccountIds: [] },
         legacyReturns: noReturns,
       }),
     );

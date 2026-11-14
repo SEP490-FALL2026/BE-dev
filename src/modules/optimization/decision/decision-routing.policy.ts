@@ -52,7 +52,7 @@ export function headWatchOf(input: { state: GhostSeatState; hasHead: boolean; re
   return { kind: 'KEEP' };
 }
 
-/** What a paused recommendation does once the transfer that paused it is looked at (`QĐ-90c`, `US-10-06` AC-15, AC-19). */
+/** What a paused recommendation does once the transfer that paused it is looked at (`QĐ-90c`, `US-10-06` AC-15; AC-19 is gone with `QĐ-110p`). */
 export type ResumeStep = { kind: 'STAY' } | { kind: 'SEAT_REVOKED' } | { kind: 'TO_OPEN' } | { kind: 'TO_QUEUE' };
 
 export function resumeStepOf(input: {
@@ -66,7 +66,7 @@ export function resumeStepOf(input: {
   return isRoutedTier(input.tier) ? { kind: 'TO_QUEUE' } : { kind: 'TO_OPEN' };
 }
 
-/** A transfer is over for the rule once it is cancelled or the IT Admin closed it. */
+/** A transfer is over for the rule once it is cancelled or the system closed it (every right of the old department is taken back, `QĐ-110r`). */
 export const isTransferOver = (transfer: { status: string; closedAt: Date | null }): boolean =>
   transfer.status === 'CANCELLED' || transfer.closedAt !== null;
 

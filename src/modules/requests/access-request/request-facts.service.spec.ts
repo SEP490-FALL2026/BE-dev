@@ -7,6 +7,7 @@ import { FinanceSetupIncompleteError } from '../../organization/public/organizat
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { AccessRequestPlanNotFoundError } from './access-request.errors';
 import { RequestFactsService, type AssessmentInput } from './request-facts.service';
+import { TransferGraceHoldContributions } from '../public/requests.extension-points';
 import { RoutingFactsService } from './routing-facts.service';
 
 const TODAY = '2026-10-28';
@@ -29,6 +30,7 @@ describe('RequestFactsService.assess', () => {
   const catalog = { findPlanSeatTargets: jest.fn(), getPlanPrice: jest.fn() };
   const routing = { gather: jest.fn() };
   const licensing = { getSeatsHeldInPlans: jest.fn() };
+  const graceHolds = { holdingOf: jest.fn() };
 
   let service: RequestFactsService;
 
@@ -73,6 +75,7 @@ describe('RequestFactsService.assess', () => {
       departmentHeadEmployeeId: 'h-1',
     });
     licensing.getSeatsHeldInPlans.mockResolvedValue({ items: [], total: 0 });
+    graceHolds.holdingOf.mockResolvedValue(null);
 
     const module = await Test.createTestingModule({
       providers: [
@@ -82,9 +85,44 @@ describe('RequestFactsService.assess', () => {
         { provide: RoutingFactsService, useValue: routing },
         { provide: OperatingParametersApi, useValue: { getValue: jest.fn() } },
         { provide: LicensingApi, useValue: licensing },
+        { provide: TransferGraceHoldContributions, useValue: { all: () => [graceHolds] } },
       ],
     }).compile();
     service = module.get(RequestFactsService);
+  });
+
+  describe('QĐ-110q, R-49: the seat held is a right from before a transfer in its grace', () => {
+    const SEAT = { id: 'a-1', effectiveFrom: '2026-09-01', validUntil: null };
+
+    it('asks the contributions of the grace about the seat held, the person and the day, and says so', async () => {
+      given(COST_CENTER, 'SAAS');
+      licensing.getSeatsHeldInPlans.mockResolvedValue({ items: [SEAT], total: 1 });
+      graceHolds.holdingOf.mockResolvedValue({ transferId: 't-1', assignmentId: 'a-1' });
+
+      const assessed = await service.assess(tx, input());
+
+      expect(assessed.heldAccess).toEqual({ assignmentId: 'a-1', effectiveFrom: '2026-09-01', validUntil: null });
+      expect(assessed.graceHold).toEqual({ transferId: 't-1', assignmentId: 'a-1' });
+      expect(graceHolds.holdingOf).toHaveBeenCalledWith(
+        { employeeId: 'e-1', assignmentId: 'a-1', effectiveFrom: '2026-09-01', today: assessed.today },
+        tx,
+      );
+    });
+
+    it('has no grace for a seat that is not one of those, and asks nobody when nothing is held', async () => {
+      given(COST_CENTER, 'SAAS');
+      licensing.getSeatsHeldInPlans.mockResolvedValue({ items: [SEAT], total: 1 });
+      graceHolds.holdingOf.mockResolvedValue(null);
+      expect((await service.assess(tx, input())).graceHold).toBeNull();
+
+      licensing.getSeatsHeldInPlans.mockResolvedValue({ items: [], total: 0 });
+      graceHolds.holdingOf.mockClear();
+      const nothing = await service.assess(tx, input());
+
+      expect(nothing.heldAccess).toBeNull();
+      expect(nothing.graceHold).toBeNull();
+      expect(graceHolds.holdingOf).not.toHaveBeenCalled();
+    });
   });
 
   it('judges a free internal request of a department with no Cost Center in use, charged to none, and locks the department', async () => {

@@ -1,4 +1,4 @@
-import { isEnded, type LineRecord, type LineState } from '../access-request/group-request.types';
+import { isEnded, isSystemCancelCause, type LineRecord, type LineState } from '../access-request/group-request.types';
 
 /**
  * What a request for a group is, as a summary of its lines (`US-05-17`, `US-05-03` AC-14), as a pure decision: the request is the
@@ -67,7 +67,8 @@ export type RequestEnding =
   | {
       kind: 'CANCELLATION';
       cancelledAt: Date;
-      cancelledByEmployeeId: string;
+      /** Null when the last line was closed by the system: nobody closed it, so the sender did not either (`QĐ-110d`). */
+      cancelledByEmployeeId: string | null;
       cause: NonNullable<LineRecord['cancelCause']> | 'BENEFICIARY_LEFT';
       note: string | null;
     }
@@ -92,14 +93,18 @@ function lastEnd(lines: readonly EndedLine[]): Date | null {
   );
 }
 
-/** A request cancelled by the IT Admin: the last line they closed says who closed the request and why, so it is cancelled by the same hand. */
+/**
+ * A request cancelled by the IT Admin: the last line they closed says who closed the request and why, so it is cancelled by the same hand.
+ * When the system closed that line (`QĐ-110d`) nobody closed the request, and the sender is not put in their place.
+ */
 function cancellationOf(lines: readonly EndedLine[], requesterEmployeeId: string, now: Date): RequestEnding {
   const last = lastEnded(lines, 'CANCELLED');
+  const bySystem = last?.cancelCause != null && isSystemCancelCause(last.cancelCause);
 
   return {
     kind: 'CANCELLATION',
     cancelledAt: last?.endedAt ?? now,
-    cancelledByEmployeeId: last?.endedByEmployeeId ?? requesterEmployeeId,
+    cancelledByEmployeeId: bySystem ? null : (last?.endedByEmployeeId ?? requesterEmployeeId),
     cause: last?.cancelCause ?? 'BENEFICIARY_LEFT',
     note: last?.endReason ?? null,
   };

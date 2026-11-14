@@ -216,6 +216,10 @@ export class DepartmentRecordService {
     return this.departments.memberIdsOn(departmentId, onDate, tx);
   }
 
+  memberIdsOfMany(departmentIds: readonly string[], onDate: BusinessDate, tx?: DbTx): Promise<string[]> {
+    return this.departments.memberIdsOfMany(departmentIds, onDate, tx);
+  }
+
   headedDepartment(employeeId: string, onDate: BusinessDate): Promise<{ departmentId: string } | null> {
     return this.heads.headedDepartment(employeeId, onDate);
   }

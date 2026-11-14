@@ -2,6 +2,14 @@ import { createZodDto } from '../../../infrastructure/http/dto/zod-dto';
 import { z } from 'zod';
 import { successEnvelopeSchema } from '../../../infrastructure/http/dto/success-envelope.dto';
 import { businessDate } from '../../../infrastructure/http/dto/business-date.dto';
+import { READABLE_CANCEL_CAUSES } from './group-request.types';
+import { LIMIT_EXEMPTIONS } from './access-request.types';
+
+/**
+ * Why a request was left out of the limits (`QĐ-110q`: `TRANSFER_GRACE`, the person asked again in the grace of a transfer for software they hold: left out of
+ * the count of GH-2, not of the duplicate of GH-1 (an open request of the same plan still refuses it); `QĐ-108c`: `ROLE_ENDED`: left out of GH-1 and GH-2).
+ */
+export const limitExemptionSchema = z.enum(LIMIT_EXEMPTIONS);
 
 /** The longest note of a reason or a label a request keeps; the DTO bounds the request with them. */
 export const REASON_MAX_LENGTH = 1000;
@@ -179,6 +187,8 @@ export const requestSchema = z.strictObject({
       }),
     })
     .nullable(),
+  /** Why the request was left out of the count of the limits when it was sent (`TRANSFER_GRACE` is not left out of the duplicate of GH-1); null for every other request (P10, `QĐ-110q`). */
+  limitExemption: limitExemptionSchema.nullable(),
   /** GH-3 (`BR-MF1-01g`): the person uses many paid applications, how many and why they ask for more; null when not flagged. */
   flags: z.strictObject({
     manyPaidSoftware: z.strictObject({ count: z.number().int().nonnegative(), reason: z.string() }).nullable(),
@@ -247,13 +257,15 @@ export const requestSchema = z.strictObject({
   /**
    * Who closed the request because the person it was for left, when, why and the note they gave; null for any other request.
    * `cancelledBy` is null, and `cause` is `SPENDING_APPROVER_PARTY`, when the conversion command closed it because the spending
-   * approver is one of its parties (`QĐ-93k(1)`): no employee closed it.
+   * approver is one of its parties (`QĐ-93k(1)`), or `SYSTEM_BENEFICIARY_LEFT` / `SYSTEM_BENEFICIARY_TRANSFERRED` when the system closed
+   * it because the person it was for left or was moved to another department (`QĐ-110d`, `QĐ-110o`), or `SYSTEM_SCOPE_REMOVED` when it was a
+   * request for a service account, a kind that left the scope (`QĐ-110m`): no employee closed it.
    */
   cancellation: z
     .strictObject({
       cancelledBy: employeeRef.nullable(),
       cancelledAt: z.iso.datetime(),
-      cause: z.enum(['BENEFICIARY_LEFT', 'BENEFICIARY_TRANSFERRED', 'SPENDING_APPROVER_PARTY']),
+      cause: z.enum(READABLE_CANCEL_CAUSES),
       note: z.string().nullable(),
     })
     .nullable(),

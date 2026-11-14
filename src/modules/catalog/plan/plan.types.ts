@@ -18,6 +18,8 @@ export interface PlanRecord {
   revocationNote: string | null;
   dataLossOnRemoval: boolean;
   sharingPolicy: SharingPolicy | null;
+  /** A `K4` plan the company administers through a console of the vendor (`R-53`); false for every other kind. */
+  hasAdminConsole: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -43,6 +45,9 @@ export interface WorkspaceProfileRecord {
     holderEmployeeId: string;
     lastReviewedOn: string;
   } | null;
+  /** The email of the company account that stands as owner of the plan at the vendor; no password (`QĐ-110u`). */
+  ownerAccountEmail: string | null;
+  adminNote: string | null;
   updatedAt: Date;
 }
 
@@ -65,6 +70,8 @@ export interface WorkspaceProfileView {
     holder: PersonView;
     lastReviewedOn: string;
   } | null;
+  ownerAccountEmail: string | null;
+  adminNote: string | null;
   updatedAt: Date;
 }
 
@@ -85,6 +92,7 @@ export interface NewPlan {
   revocationNote: string | null;
   dataLossOnRemoval: boolean;
   sharingPolicy: SharingPolicy | null;
+  hasAdminConsole: boolean;
 }
 
 export interface PlanChanges {
@@ -95,6 +103,7 @@ export interface PlanChanges {
   revocationNote?: string | null;
   dataLossOnRemoval?: boolean;
   sharingPolicy?: SharingPolicy | null;
+  hasAdminConsole?: boolean;
 }
 
 /** The plan and the facts about it the capabilities that hang off it read: a subscription, the terms. */
@@ -104,6 +113,7 @@ export interface PlanLookup {
   provisioningType: ProvisioningType;
   pricingModel: PricingModel | null;
   sharingPolicy: SharingPolicy | null;
+  hasAdminConsole: boolean;
   applicationId: string;
   applicationName: string;
   applicationKind: ApplicationKind;

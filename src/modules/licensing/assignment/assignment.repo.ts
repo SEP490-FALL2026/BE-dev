@@ -29,6 +29,8 @@ const RECORD_SELECT = {
   validUntil: true,
   expectedEndDate: true,
   predecessorId: true,
+  isMachineAccount: true,
+  machineAccountNote: true,
   failedAt: true,
   cancelledAt: true,
   createdAt: true,
@@ -58,6 +60,8 @@ export const toRecord = (row: Row): AssignmentRecord => ({
   validUntil: row.validUntil ? fromDateColumn(row.validUntil) : null,
   expectedEndDate: row.expectedEndDate ? fromDateColumn(row.expectedEndDate) : null,
   predecessorId: row.predecessorId,
+  isMachineAccount: row.isMachineAccount,
+  machineAccountNote: row.machineAccountNote,
   failedAt: row.failedAt,
   cancelledAt: row.cancelledAt,
   createdAt: row.createdAt,
@@ -80,12 +84,17 @@ export interface NewAssignment {
   expectedEndDate: BusinessDate | null;
   predecessorId: string | null;
   baselineImportId: string | null;
+  /** The older right of the same person that the grant of this one ended the day it was given (R-49); absent for every other right. */
+  replacesAssignmentId?: string | null;
+  /** A record that follows a flagged seat keeps its flag and its reason (`R-9`); every other record is written plain. */
+  isMachineAccount: boolean;
+  machineAccountNote: string | null;
   createdByAppUserId: string;
 }
 
 /**
- * The one writer of `license_assignments`. Rows are never deleted and only `valid_until` and `expected_end_date` ever
- * change (the database refuses the rest), so there is no update of anything else here.
+ * The one writer of `license_assignments`. Rows are never deleted and only `valid_until`, `expected_end_date` and the flag of a machine
+ * account with its note ever change (the database refuses the rest), so there is no update of anything else here.
  */
 @Injectable()
 export class AssignmentRepo {
@@ -110,6 +119,9 @@ export class AssignmentRepo {
         expectedEndDate: input.expectedEndDate ? toDateColumn(input.expectedEndDate) : null,
         predecessorId: input.predecessorId,
         baselineImportId: input.baselineImportId,
+        replacesAssignmentId: input.replacesAssignmentId ?? null,
+        isMachineAccount: input.isMachineAccount,
+        machineAccountNote: input.machineAccountNote,
         createdByAppUserId: input.createdByAppUserId,
       },
     });
@@ -158,6 +170,24 @@ export class AssignmentRepo {
     });
   }
 
+  /**
+   * Turns the flag of a machine account on (with its note) or off (the note goes with it): the one edit of a seat that is not about its end
+   * (`QĐ-110m`). The database judges INV-02 again for the seat, so an update that leaves two personal seats of one person overlapping
+   * is refused with 23P01 and nothing changes.
+   */
+  async setMachineAccount(
+    tx: DbTx,
+    id: string,
+    input: { on: boolean; note: string | null },
+  ): Promise<AssignmentRecord> {
+    const row = await tx.licenseAssignment.update({
+      where: { id },
+      data: { isMachineAccount: input.on, machineAccountNote: input.on ? input.note : null },
+    });
+
+    return toRecord(row);
+  }
+
   /** Ends the assignment the day `until` (that day no longer counts). */
   async end(tx: DbTx, id: string, until: BusinessDate): Promise<void> {
     await tx.licenseAssignment.update({ where: { id }, data: { validUntil: toDateColumn(until) } });
@@ -188,13 +218,21 @@ export class AssignmentRepo {
       where: target.subscriptionId
         ? { subscriptionId: target.subscriptionId }
         : { planId: target.planId, subscriptionId: null },
-      select: { employeeId: true, kind: true, normalizedAccountIdentifier: true, validFrom: true, validUntil: true },
+      select: {
+        employeeId: true,
+        kind: true,
+        isMachineAccount: true,
+        normalizedAccountIdentifier: true,
+        validFrom: true,
+        validUntil: true,
+      },
       orderBy: [{ validFrom: 'asc' }, { id: 'asc' }],
     });
 
     return rows.map((row) => ({
       employeeId: row.employeeId,
       kind: row.kind,
+      isMachineAccount: row.isMachineAccount,
       normalizedAccountIdentifier: row.normalizedAccountIdentifier,
       effectiveFrom: fromDateColumn(row.validFrom),
       validUntil: row.validUntil ? fromDateColumn(row.validUntil) : null,
@@ -217,6 +255,54 @@ export class AssignmentRepo {
   /** The assignments of the subscription that have not ended and have not failed as of `day` (a future start included). */
   async countHolding(subscriptionId: string, day: BusinessDate, tx?: DbTx): Promise<number> {
     return (tx ?? this.prisma).licenseAssignment.count({ where: { subscriptionId, ...HOLDING(day) } });
+  }
+
+  /**
+   * Gives back the right a grant ended (R-49) when that grant did not come to be: the right the assignment replaced, if it still ends on the day the
+   * assignment began, is open again. Returns its id, or null when there was none or it ended some other way since. The new assignment has failed or
+   * been cancelled before this runs, so its period is empty and the two never overlap.
+   */
+  async reopenReplacedBy(tx: DbTx, newAssignmentId: string): Promise<string | null> {
+    const rows = await tx.$queryRaw<{ id: string }[]>`
+      UPDATE license_assignments AS old SET valid_until = NULL
+        FROM license_assignments AS replacement
+       WHERE replacement.id = ${newAssignmentId}::uuid AND old.id = replacement.replaces_assignment_id
+         AND old.valid_until = replacement.valid_from AND old.failed_at IS NULL AND old.cancelled_at IS NULL
+      RETURNING old.id`;
+
+    return rows[0]?.id ?? null;
+  }
+
+  /** Which of these rights a later right replaced (R-49): the ones the grant of a request ended the day it gave the new one. One statement. */
+  async replacedAmong(ids: readonly string[], tx?: DbTx): Promise<Set<string>> {
+    if (ids.length === 0) return new Set();
+    const rows = await (tx ?? this.prisma).licenseAssignment.findMany({
+      // A grant that failed or was cancelled gave the old right back (`reopenReplacedBy`): it replaced nothing.
+      where: { replacesAssignmentId: { in: [...ids] }, failedAt: null, cancelledAt: null },
+      select: { replacesAssignmentId: true },
+    });
+
+    return new Set(rows.flatMap((row) => (row.replacesAssignmentId === null ? [] : [row.replacesAssignmentId])));
+  }
+
+  /**
+   * The grants of a right asked for again (R-49) of this person that wait: the new assignment replaces an older right, and its task is neither done
+   * (`granted_on`) nor closed as failed nor cancelled. With the day the replaced right began. One statement.
+   */
+  async waitingReplacementsOf(
+    employeeId: string,
+    tx?: DbTx,
+  ): Promise<{ replacedAssignmentId: string; replacedValidFrom: Date }[]> {
+    const rows = await (tx ?? this.prisma).licenseAssignment.findMany({
+      where: { employeeId, replacesAssignmentId: { not: null }, grantedOn: null, failedAt: null, cancelledAt: null },
+      select: { replacesAssignmentId: true, replaces: { select: { validFrom: true } } },
+    });
+
+    return rows.flatMap((row) =>
+      row.replacesAssignmentId === null || row.replaces === null
+        ? []
+        : [{ replacedAssignmentId: row.replacesAssignmentId, replacedValidFrom: row.replaces.validFrom }],
+    );
   }
 
   /** How many seats each of these purchases has held as of `day` (`HOLDING`: a future start and a service account included), one statement. */

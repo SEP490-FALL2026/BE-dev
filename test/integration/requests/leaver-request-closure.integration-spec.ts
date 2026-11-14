@@ -1,3 +1,5 @@
+import { Client } from 'pg';
+import { waitForLockWaiters } from '../../support/lock-wait';
 import { RequestCommitmentReleaseGuard } from '../../../src/modules/requests/spend/commitment-release.listener';
 import { OffboardingHarness, type CaseWire } from '../../support/offboarding-harness';
 import { PgRelay } from '../../support/pg-relay';
@@ -499,6 +501,89 @@ describe('the requests and grants of a person who left (integration, real Postgr
       expect(h.codeOf(refusedGrant)).toBe('PROVISIONING.BENEFICIARY_DEPARTED');
       expect(h.codeOf(refusedClaim)).toBe('PROVISIONING.BENEFICIARY_DEPARTED');
       expect((await taskOf(queued)).status).toBe('QUEUED');
+    });
+  });
+
+  describe('a grant is not started from the day a departure blocks the person (QĐ-110d)', () => {
+    it('refuses to grant and to claim a queued task once the block is in force, before the person is marked left, and leaves the task being worked as it is', async () => {
+      const u = await example();
+      const working = await approvedFor(u, u.leaver, 5 * M);
+      const workingTask = await granted(working);
+      await h.claim(workingTask).expect(200);
+      const queued = await approvedFor(u, u.leaver, 5 * M, 1);
+      const queuedTask = await granted(queued, 1);
+      const fresh = await approvedFor(u, u.leaver, 5 * M, 2);
+      const departure = await h.recordedCase(u.leaver);
+      // Before the day of the block the grant goes on as it did: the person is still at work.
+      expect(departure.state).toBe('HANDING_OVER');
+      expect(departure.accessBlocked).toBe(false);
+      await h.ctx.sql.query(`UPDATE employee_access_blocks SET blocked_from = $2::date WHERE employee_id = $1`, [
+        u.leaver.employeeId,
+        h.today(),
+      ]);
+
+      const refusedGrant = await h.grant({ requestId: fresh, subscriptionId: plans[2].subscriptionId }).expect(409);
+      const refusedClaim = await h.claim(queuedTask).expect(409);
+
+      expect(h.codeOf(refusedGrant)).toBe('PROVISIONING.BENEFICIARY_DEPARTED');
+      expect(h.detailsOf(refusedGrant)).toMatchObject({ requestId: fresh, cause: 'ACCESS_BLOCKED' });
+      expect(h.codeOf(refusedClaim)).toBe('PROVISIONING.BENEFICIARY_DEPARTED');
+      expect(h.detailsOf(refusedClaim)).toMatchObject({ cause: 'ACCESS_BLOCKED' });
+      expect((await taskOf(queued)).status).toBe('QUEUED');
+      expect(await taskOf(fresh)).toBeUndefined();
+      // The task already being worked is not touched: it is the IT Admin's to check with the vendor and close (QĐ-110d).
+      expect((await taskOf(working)).status).toBe('IN_PROGRESS');
+    });
+
+    it('holds the beneficiary FOR SHARE before it reads the block, as the grant does: a departure that blocks them meanwhile is seen', async () => {
+      const u = await example();
+      const queued = await approvedFor(u, u.leaver, 5 * M);
+      const task = await granted(queued);
+      await h.recordedCase(u.leaver);
+      const holder = new Client({ connectionString: h.ctx.database.url });
+      await holder.connect();
+      try {
+        await holder.query('BEGIN');
+        await holder.query('SELECT id FROM employees WHERE id = $1 FOR UPDATE', [u.leaver.employeeId]);
+        await holder.query(`UPDATE employee_access_blocks SET blocked_from = $2::date WHERE employee_id = $1`, [
+          u.leaver.employeeId,
+          h.today(),
+        ]);
+
+        const claiming = h.claim(task).then((response) => response);
+        await waitForLockWaiters(h.ctx.sql, 1);
+        await holder.query('COMMIT');
+        const refused = await claiming;
+
+        expect([refused.status, h.codeOf(refused), h.detailsOf(refused)]).toEqual([
+          409,
+          'PROVISIONING.BENEFICIARY_DEPARTED',
+          { requestId: queued, cause: 'ACCESS_BLOCKED', nextStep: 'CANCEL_REQUEST' },
+        ]);
+        expect((await taskOf(queued)).status).toBe('QUEUED');
+      } finally {
+        await holder.query('ROLLBACK').catch(() => undefined);
+        await holder.end();
+      }
+    });
+
+    it('lets another IT Admin take over a task already being worked once the block is in force: the check with the vendor can change hands', async () => {
+      const u = await example();
+      const working = await approvedFor(u, u.leaver, 5 * M);
+      const workingTask = await granted(working);
+      await h.claim(workingTask).expect(200);
+      await h.recordedCase(u.leaver);
+      await h.ctx.sql.query(`UPDATE employee_access_blocks SET blocked_from = $2::date WHERE employee_id = $1`, [
+        u.leaver.employeeId,
+        h.today(),
+      ]);
+
+      const other = await h.worker(u.department, `LR-I${n}`, ['IT_ADMIN']);
+
+      const taken = await h.claim(workingTask, other.account).expect(200);
+
+      expect(h.dataOf<{ task: TaskWire }>(taken).task).toMatchObject({ id: workingTask, status: 'IN_PROGRESS' });
+      expect((await taskOf(working)).status).toBe('IN_PROGRESS');
     });
   });
 

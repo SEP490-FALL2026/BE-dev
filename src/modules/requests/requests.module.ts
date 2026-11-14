@@ -12,6 +12,7 @@ import { LicensingModule } from '../licensing/licensing.module';
 import { FinanceModule } from '../finance/finance.module';
 import { IdentityAccessFacadeModule } from '../identity-access/identity-access-facade.module';
 import { OperatingParametersModule } from '../operating-parameters/operating-parameters.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 import { OrganizationModule } from '../organization/organization.module';
 import { AccessRequestGrantGate } from './grant/access-request-grant.listener';
 import { SeatReleaseRepo } from './grant/seat-release.repo';
@@ -28,7 +29,7 @@ import { RequestCommitmentFacts } from './spend/commitment-request-facts.listene
 import { RequestDraftService } from './draft/request-draft.service';
 import { RequestDraftSubmitService } from './draft/request-draft-submit.service';
 import { RequestDraftsController } from './draft/request-drafts.controller';
-import { RequestOutcomeListeners } from './public/requests.extension-points';
+import { RequestOutcomeListeners, TransferGraceHoldContributions } from './public/requests.extension-points';
 import { RequestOutcomeService } from './outcome/request-outcome.service';
 import { AssessmentRepo } from './assessment/assessment.repo';
 import { AssessmentCompletionService } from './assessment/assessment-completion.service';
@@ -64,6 +65,9 @@ import { WithdrawalWriter } from './withdraw/withdrawal-writer.service';
 import { WithdrawalService } from './withdraw/withdrawal.service';
 import { CancellationController } from './cancellation/cancellation.controller';
 import { DepartureCancellationService } from './cancellation/departure-cancellation.service';
+import { BeneficiaryGoneCancellation } from './cancellation/beneficiary-gone-cancellation.service';
+import { BeneficiaryGoneClosing } from './cancellation/beneficiary-gone-closing.service';
+import { BeneficiaryGoneItNotice } from './cancellation/beneficiary-gone-it-notice.service';
 import { OpenRequestRepo } from './access-request/open-request/open-request.repo';
 import { OpenRequestService } from './access-request/open-request/open-request.service';
 import { CostCenterOpenRequestsReader } from './access-request/open-request/cost-center-open-requests.listener';
@@ -153,7 +157,6 @@ import { RenewalRequestService } from './renewal-request/renewal-request.service
 import { RenewalRequestsController } from './renewal-request/renewal-requests.controller';
 import { ReturnRequestQueryService } from './return-request/return-request-query.service';
 import { ReturnRequestRepo } from './return-request/return-request.repo';
-import { ReturnHandoverService } from './return-request/return-handover.service';
 import { ReturnSeatGate } from './return-request/return-seat-gate.service';
 import { ReturnRequestService } from './return-request/return-request.service';
 import { ReturnRequestsController } from './return-request/return-requests.controller';
@@ -161,10 +164,6 @@ import { ReturnRevocationHook } from './return-request/return-revocation.listene
 import { RequestTimingRepo } from './timing/request-timing.repo';
 import { RequestTimingService } from './timing/request-timing.service';
 import { RequestTimingsController } from './timing/request-timings.controller';
-import { ServiceAccountBoundaryService } from './service-account-request/service-account-boundary.service';
-import { ServiceAccountRequestRepo } from './service-account-request/service-account-request.repo';
-import { ServiceAccountRequestService } from './service-account-request/service-account-request.service';
-import { ServiceAccountRequestsController } from './service-account-request/service-account-requests.controller';
 import { MyRequestsController } from './request-history/request-history-mine.controller';
 import { AccessRequestEventsController } from './request-history/access-request-events.controller';
 import { RequestAuditFlagsController } from './request-history/request-audit-flags.controller';
@@ -194,6 +193,8 @@ import { MyRequestsService } from './my-requests/my-requests.service';
     RequestsRoutingFacadeModule,
     DatabaseModule,
     AuditModule,
+    // The inbox notice to the IT Admin for a request the system left to them (`BeneficiaryGoneItNotice`).
+    NotificationsModule,
     OrganizationModule,
     IdentityAccessFacadeModule,
     CatalogModule,
@@ -218,7 +219,6 @@ import { MyRequestsService } from './my-requests/my-requests.service';
     NeedDecisionQueueController,
     GrantQueueController,
     AssessmentQueueController,
-    ServiceAccountRequestsController,
     ReturnRequestsController,
     RenewalRequestsController,
     ControlledWaitController,
@@ -242,6 +242,8 @@ import { MyRequestsService } from './my-requests/my-requests.service';
     AccessRequestService,
     RequestLimitsRepo,
     RequestLimitsService,
+    // The grace of a transfer, the extension point this module opens for personnel (`QĐ-110q`, R-49).
+    TransferGraceHoldContributions,
     RequestResubmissionService,
     RequestSenderService,
     RequestDraftService,
@@ -269,6 +271,10 @@ import { MyRequestsService } from './my-requests/my-requests.service';
     WithdrawalWriter,
     WithdrawalService,
     DepartureCancellationService,
+    // The system closes the open requests of a person who is gone (`QĐ-110d`, `QĐ-110o`); `RequestsApi` opens it to `personnel`.
+    BeneficiaryGoneClosing,
+    BeneficiaryGoneItNotice,
+    BeneficiaryGoneCancellation,
     OpenRequestRepo,
     OpenRequestService,
     // What the organization asks before it retires a department or a Cost Center: the requests that are not over.
@@ -318,12 +324,8 @@ import { MyRequestsService } from './my-requests/my-requests.service';
     GrantQueueService,
     AssessmentQueueRepo,
     AssessmentQueueService,
-    ServiceAccountRequestRepo,
-    ServiceAccountRequestService,
-    ServiceAccountBoundaryService,
     ReturnRequestRepo,
     ReturnSeatGate,
-    ReturnHandoverService,
     ReturnRequestService,
     ReturnRequestQueryService,
     ReturnRevocationHook,
@@ -380,6 +382,12 @@ import { MyRequestsService } from './my-requests/my-requests.service';
     YearStartCommitmentsService,
     YearStartCommitmentsSweeper,
   ],
-  exports: [RequestsApi, RequestOutcomeListeners, RequestsDashboardApi, RequestsAiSourceApi],
+  exports: [
+    RequestsApi,
+    RequestOutcomeListeners,
+    TransferGraceHoldContributions,
+    RequestsDashboardApi,
+    RequestsAiSourceApi,
+  ],
 })
 export class RequestsModule {}

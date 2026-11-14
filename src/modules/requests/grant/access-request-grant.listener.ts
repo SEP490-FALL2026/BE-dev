@@ -1,9 +1,15 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
+import type { BusinessDate } from '../../../core/business-date';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { AuditApi } from '../../audit/public/audit.api';
 import { BudgetsApi } from '../../budgets/public/budgets.api';
 import { GrantRequestGateHook, type GrantRequestGate } from '../../licensing/public/licensing.extension-points';
-import type { GrantOutcome, GrantOutcomeFacts, GrantRequestAnswer } from '../../licensing/public/licensing.types';
+import type {
+  GrantOutcome,
+  GrantOutcomeFacts,
+  GrantRequestAnswer,
+  ProvisioningKind,
+} from '../../licensing/public/licensing.types';
 import { GroupGrantService } from '../group-request/group-grant.service';
 import { AccessRequestRepo } from '../access-request/access-request.repo';
 import type { AccessRequestRecord } from '../access-request/access-request.types';
@@ -91,6 +97,13 @@ export class AccessRequestGrantGate implements GrantRequestGate, OnModuleInit {
     });
 
     return answer;
+  }
+
+  reportRightReplaced(
+    tx: DbTx,
+    input: { assignmentId: string; provisioningType: ProvisioningKind; endedOn: BusinessDate; now: Date },
+  ): Promise<void> {
+    return this.seats.afterRightReplaced(tx, input);
   }
 
   async reportOutcome(

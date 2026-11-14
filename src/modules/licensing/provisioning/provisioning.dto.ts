@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { successEnvelopeSchema } from '../../../infrastructure/http/dto/success-envelope.dto';
 import { createZodDto } from '../../../infrastructure/http/dto/zod-dto';
-import { REVOCATION_SOURCES } from '../public/licensing.types';
+import { K1_CHECKLIST_CODES, K1_CHECKLIST_VARIANTS, REVOCATION_SOURCES } from '../public/licensing.types';
 import { EVIDENCE_MAX_LENGTH, FAILURE_REASON_MAX_LENGTH } from './provisioning.policy';
 import { REVOCATION_NOTE_MAX_LENGTH } from './revocation.policy';
 import { WITHDRAWAL_REASON_MAX_LENGTH } from '../license-key/license-key.policy';
@@ -45,6 +45,28 @@ const COMPLETIONS = [
   'KEY_DEACTIVATED',
 ] as const;
 
+/** The most steps a K1 checklist holds (a departure has six). */
+const K1_CHECKLIST_MAX_ITEMS = 10;
+
+/**
+ * The checklist the IT Admin ticks to complete the revocation of a K1 seat (`QĐ-111az`, P25): which steps the task has depends on its variant,
+ * which the server decides and the card tells (`k1Checklist.variant`). A step is judged by the policy and answers with its own code: one that is
+ * missing, not ticked or timed badly (`REVOCATION.K1_CHECKLIST_INCOMPLETE`), ticked out of its order (`K1_CHECKLIST_OUT_OF_ORDER`), or one the
+ * variant does not have (`COMPLETION_NOT_ALLOWED`). Only the shape is checked here.
+ */
+const k1ChecklistBodySchema = z.strictObject({
+  items: z
+    .array(
+      z.strictObject({
+        code: z.enum(K1_CHECKLIST_CODES),
+        done: z.boolean(),
+        doneAt: z.iso.datetime({ offset: true }).optional(),
+      }),
+    )
+    .max(K1_CHECKLIST_MAX_ITEMS),
+  evidence: z.string().max(EVIDENCE_MAX_LENGTH).optional(),
+});
+
 /**
  * How a revocation was completed. Which way fits which kind of provisioning, which of the fields it needs (a K1 completion
  * needs the day the paid period ends and what is known of the access) and whether the evidence is enough are judged by the
@@ -61,6 +83,8 @@ export const revocationCompletionBodySchema = z.strictObject({
   /** K4 only, required for K4 (422 `REVOCATION.KEY_DISPOSITION_REQUIRED`): the key goes back to the store, or is withdrawn from it at once (`WITHDRAW`, with a reason). */
   keyDisposition: z.enum(['RETURN_TO_STORE', 'WITHDRAW']).optional(),
   withdrawalReason: z.string().max(WITHDRAWAL_REASON_MAX_LENGTH).optional(),
+  /** K1 only, and then required (422 `REVOCATION.K1_CHECKLIST_INCOMPLETE`): the steps done, each with the instant it was done (P25). */
+  k1Checklist: k1ChecklistBodySchema.optional(),
 });
 export const accessCutBodySchema = z.strictObject({
   accessCutOn: businessDate,
@@ -87,6 +111,11 @@ export const listTasksQuerySchema = z.strictObject({
   scope: z.enum(['ALL', 'MINE', 'GENERAL']).default('ALL'),
   /** `true`: only the tasks that may be taken today (a revocation in its grace is left out); `false`: only those in their grace. */
   claimableNow: z
+    .enum(['true', 'false'])
+    .transform((value) => value === 'true')
+    .optional(),
+  /** `true`: only the tasks past their due day that are not over; `false`: all the others (`QĐ-110c`). */
+  overdue: z
     .enum(['true', 'false'])
     .transform((value) => value === 'true')
     .optional(),
@@ -121,6 +150,20 @@ const revocationSummarySchema = z.strictObject({
   terminating: z.boolean(),
   terminatingUntil: responseBusinessDate.nullable(),
 });
+/** The checklist on the card of a K1 revocation: the steps of its variant in order, each with the instant it was ticked (null while it is not). */
+const k1ChecklistCardSchema = z.strictObject({
+  variant: z.enum(K1_CHECKLIST_VARIANTS),
+  items: z
+    .array(
+      z.strictObject({
+        code: z.enum(K1_CHECKLIST_CODES),
+        label: z.string(),
+        order: z.number().int().positive(),
+        doneAt: z.iso.datetime().nullable(),
+      }),
+    )
+    .max(K1_CHECKLIST_MAX_ITEMS),
+});
 const revocationDetailSchema = revocationSummarySchema.extend({
   completionNote: z.string().nullable(),
   accessCutOn: responseBusinessDate.nullable(),
@@ -154,6 +197,13 @@ const taskSummarySchema = z.strictObject({
       applicationId: z.uuid(),
       applicationName: z.string(),
       provisioningType: z.enum(['K1', 'K2', 'K3', 'K4', 'K5']),
+      /** On the card of a revocation: what the plan says now to do before the seat is taken away, read only; null on a grant and when the plan has none. */
+      preRevocationNote: z
+        .string()
+        .nullable()
+        .describe(
+          'The note the plan carries now about what to do before the seat is taken away, read when the card is read, not a copy kept when the task was opened. Read only: nobody confirms it. Null on a grant and when the plan has no note.',
+        ),
     })
     .nullable(),
   subscriptionId: z.uuid().nullable(),
@@ -209,6 +259,11 @@ const taskSchema = taskSummarySchema.extend({
   closedBy: z.uuid().nullable(),
   closeReason: z.string().nullable(),
   revocation: revocationDetailSchema.nullable(),
+  k1Checklist: k1ChecklistCardSchema
+    .nullable()
+    .describe(
+      'Present on a K1 revocation that can still be completed (the steps to tick) and on one completed with a checklist (what was ticked and when). The variant is decided by the server from why the seat is revoked: DEPARTURE (a person who leaves: reset the mailbox password, Forgot password on the software, sign out every session, turn off the renewal, record the evidence and, only on the last K1 revocation of the person, lock the mailbox: while another K1 revocation of the same person is not over this task has the five steps before the lock) or STILL_EMPLOYED (turn off the renewal, record the evidence). The system does not control Google or Microsoft 365: the IT Admin does the steps there and ticks them here, in order. Null on any other task, on a K1 revocation completed before the checklist, and on one cancelled or closed as failed.',
+    ),
 });
 const pagination = z.strictObject({
   page: z.number().int().positive(),

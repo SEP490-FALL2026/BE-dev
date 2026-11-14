@@ -88,12 +88,17 @@ describe('the queue of the need steps when the person who holds a step changes (
 
     // The screen the head opened before the change is stale: the step is not theirs, and the decision is not made.
     expect(await idsOf(u.head.account)).toEqual([]);
-    // QĐ-104f (MF1-D, L2-02): a paid request waiting for a head who left with no successor becomes one step (HEAD_LEFT); its need step
-    // is closed, so the former head, who held it, is told it is no longer pending.
-    const refused = await decide(r1.id, { decision: 'APPROVE' }, u.head.account).expect(409);
-    expect(h.codeOf(refused)).toBe('ACCESS_REQUEST.STEP_NOT_PENDING');
+    // QĐ-110i (MF1-X): a paid request that was with a head who left with no successor does not become one step; its need step waits for a
+    // head and holds nobody, so the former head no longer reads it: the decision is refused as for a request that is not theirs (it was a
+    // 409 on the closed step the earlier one-step rule left them as holder).
+    const refused = await decide(r1.id, { decision: 'APPROVE' }, u.head.account).expect(404);
+    expect(h.codeOf(refused)).toBe('ACCESS_REQUEST.NOT_FOUND');
     expect(await records(r1.id)).toEqual([]);
-    expect(await h.stepOf(r1.id, 'NEED')).toMatchObject({ state: 'CLOSED' });
+    expect(await h.stepOf(r1.id, 'NEED')).toMatchObject({
+      state: 'WAITING',
+      assignee_employee_id: null,
+      waiting_reason: 'NO_DEPARTMENT_HEAD',
+    });
     // Nobody takes the need step of an internal request in place of a head (QĐ-93c, Q-33): it waits, and is in nobody's queue, the
     // spending approver's included.
     expect(await h.stepOf(other.id, 'NEED')).toMatchObject({

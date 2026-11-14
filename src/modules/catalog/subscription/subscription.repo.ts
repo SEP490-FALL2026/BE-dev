@@ -24,6 +24,8 @@ const WITH_PLAN = {
     select: {
       name: true,
       pricingModel: true,
+      provisioningType: true,
+      hasAdminConsole: true,
       application: {
         select: { id: true, name: true, kind: true, vendor: { select: { id: true, name: true } } },
       },
@@ -35,30 +37,34 @@ type Row = Prisma.SubscriptionGetPayload<{ include: typeof WITH_PLAN }>;
 const date = (value: Date | null) => (value ? fromDateColumn(value) : null);
 const column = (value: string | null) => (value ? toDateColumn(value) : null);
 
-function toRecord(row: Row): SubscriptionRecord {
-  const unitPrice: UnitPriceRecord | null =
-    row.unitPriceMinor !== null && row.unitPriceCurrency !== null && row.priceRecordedOn !== null
-      ? {
-          amountMinor: row.unitPriceMinor,
-          currency: row.unitPriceCurrency,
-          recordedOn: fromDateColumn(row.priceRecordedOn),
-        }
-      : null;
-  const priceSnapshot: PriceSnapshotRecord | null =
-    row.priceRate !== null &&
+function unitPriceOf(row: Row): UnitPriceRecord | null {
+  return row.unitPriceMinor !== null && row.unitPriceCurrency !== null && row.priceRecordedOn !== null
+    ? {
+        amountMinor: row.unitPriceMinor,
+        currency: row.unitPriceCurrency,
+        recordedOn: fromDateColumn(row.priceRecordedOn),
+      }
+    : null;
+}
+
+function priceSnapshotOf(row: Row): PriceSnapshotRecord | null {
+  return row.priceRate !== null &&
     row.priceRateDate !== null &&
     row.priceRateSource !== null &&
     row.priceReportingMinor !== null &&
     row.priceReportingCurrency !== null
-      ? {
-          rate: parseRate(row.priceRate.toFixed(10)),
-          rateDate: fromDateColumn(row.priceRateDate),
-          rateSource: row.priceRateSource,
-          reportingMinor: row.priceReportingMinor,
-          reportingCurrency: row.priceReportingCurrency,
-          exchangeRateId: row.priceExchangeRateId,
-        }
-      : null;
+    ? {
+        rate: parseRate(row.priceRate.toFixed(10)),
+        rateDate: fromDateColumn(row.priceRateDate),
+        rateSource: row.priceRateSource,
+        reportingMinor: row.priceReportingMinor,
+        reportingCurrency: row.priceReportingCurrency,
+        exchangeRateId: row.priceExchangeRateId,
+      }
+    : null;
+}
+
+function toRecord(row: Row): SubscriptionRecord {
   const { application } = row.plan;
   if (!application.vendor) throw new Error('A subscription belongs to an application with a vendor');
 
@@ -67,6 +73,8 @@ function toRecord(row: Row): SubscriptionRecord {
     planId: row.planId,
     planName: row.plan.name,
     planPricingModel: row.plan.pricingModel,
+    planProvisioningType: row.plan.provisioningType,
+    planHasAdminConsole: row.plan.hasAdminConsole,
     ownerDepartmentId: row.ownerDepartmentId, // Gói 9: nullable kho chung
     applicationId: application.id,
     applicationName: application.name,
@@ -75,8 +83,8 @@ function toRecord(row: Row): SubscriptionRecord {
     kind: row.kind,
     status: row.status,
     purchasedQuantity: row.purchasedQuantity,
-    unitPrice,
-    priceSnapshot,
+    unitPrice: unitPriceOf(row),
+    priceSnapshot: priceSnapshotOf(row),
     billingCycle: row.billingCycle,
     commitmentTermMonths:
       row.commitmentTermMonths === 1 || row.commitmentTermMonths === 12 ? row.commitmentTermMonths : null,
@@ -197,6 +205,33 @@ export class SubscriptionRepo {
     if (locked.length === 0) return null;
 
     return this.find(id, tx);
+  }
+
+  /**
+   * Hands every subscription that names `fromEmployeeId` responsible to `toEmployeeId` (`QĐ-111g`), in one statement: the rows are locked in
+   * id order first, so two handing overs of the same IT Admin queue up and the second finds none. Returns the ids it moved, in id order.
+   */
+  async reassignResponsible(tx: DbTx, fromEmployeeId: string, toEmployeeId: string): Promise<string[]> {
+    const rows = await tx.$queryRaw<{ id: string }[]>`
+      WITH held AS (
+        SELECT id FROM subscriptions WHERE responsible_it_admin_employee_id = ${fromEmployeeId}::uuid ORDER BY id FOR UPDATE)
+      UPDATE subscriptions s
+         SET responsible_it_admin_employee_id = ${toEmployeeId}::uuid, updated_at = now()
+        FROM held WHERE s.id = held.id
+      RETURNING s.id`;
+
+    return rows.map((row) => row.id).sort();
+  }
+
+  /** How many subscriptions name each of these IT Admins responsible (`QĐ-111g`); one who answers for none is absent. */
+  async countResponsibleOf(employeeIds: readonly string[], tx?: DbTx): Promise<Map<string, number>> {
+    if (employeeIds.length === 0) return new Map();
+    const rows = await (tx ?? this.prisma).$queryRaw<{ employee_id: string; total: number }[]>`
+      SELECT responsible_it_admin_employee_id AS employee_id, count(*)::int AS total
+        FROM subscriptions WHERE responsible_it_admin_employee_id = ANY(${[...employeeIds]}::uuid[])
+       GROUP BY responsible_it_admin_employee_id`;
+
+    return new Map(rows.map((row) => [row.employee_id, row.total]));
   }
 
   /** The subscriptions and perpetual purchases of these plans: only what a rule about their term needs. */

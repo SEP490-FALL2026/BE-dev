@@ -228,6 +228,7 @@ describe('the money held for a seat goes back by the day (RV-07, M-06, M-10; int
         endedOn: `${h.year}-05-01`,
         paidThroughOn: null,
         sources: ['MANAGER_NOT_NEEDED'],
+        k1Checklist: null,
       },
     };
 
@@ -263,6 +264,7 @@ describe('the money held for a seat goes back by the day (RV-07, M-06, M-10; int
         endedOn: `${h.year}-05-01`,
         paidThroughOn: null,
         sources: ['MANAGER_NOT_NEEDED'],
+        k1Checklist: null,
       },
     };
 

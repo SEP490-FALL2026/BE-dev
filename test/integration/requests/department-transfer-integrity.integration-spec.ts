@@ -18,7 +18,7 @@ describe('the history of a person and the list of transfers (integration, real P
     employeeId,
     toDepartmentId: fin.id,
     effectiveOn: h.day(30),
-    grounds: h.grounds,
+    groundsNote: h.groundsNote,
     ...extra,
   });
   /** What the database answers with when it refuses `sql`: the SQLSTATE, or null when it took it. */
@@ -139,7 +139,7 @@ describe('the history of a person and the list of transfers (integration, real P
       const person = await h.veteran(des, code('E'));
       const done = await h.recorded(body(person.employeeId, { effectiveOn: h.today() }));
       const other = await h.recorded(body((await h.veteran(des, code('E'))).employeeId));
-      await h.cancelTransfer(other.id, { reason: 'Not needed', grounds: h.grounds }).expect(200);
+      await h.cancelTransfer(other.id, { reason: 'Not needed', groundsNote: h.groundsNote }).expect(200);
 
       expect(await sqlState(`DELETE FROM department_transfers WHERE id = $1`, [done.id])).toBe('23001');
       expect(
@@ -213,7 +213,7 @@ describe('the history of a person and the list of transfers (integration, real P
       );
       expect(items.map((item) => item.id)).toEqual(ordered.map((item) => item.id));
       expect(items.length).toBeGreaterThanOrEqual(12);
-      expect(items[0]).not.toHaveProperty('grounds');
+      expect(items[0]).not.toHaveProperty('groundsNote');
       expect(first).toHaveLength(3);
     });
 

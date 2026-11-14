@@ -2,10 +2,10 @@ import { Injectable } from '@nestjs/common';
 import type { BusinessDate } from '../../../core/business-date';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { LicensingApi } from '../../licensing/public/licensing.api';
-import { LicensingHandoverApi } from '../../licensing/public/licensing-handover.api';
 import { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import type { EmployeeRecord } from '../../organization/public/organization.types';
+import { RevocationOverdueService } from '../departure-deadline/revocation-overdue.service';
 import { PersonnelAccessRefusedError } from '../public/personnel.errors';
 import { readAccessOf, type ReadAccess } from '../personnel-self-action.policy';
 import { RoleDutiesService } from '../role-duties/role-duties.service';
@@ -20,7 +20,7 @@ import { OffboardingRefusedError } from './offboarding.errors';
 import { toChange, toRight, toSummary } from './offboarding.mapper';
 import { OffboardingListRepo } from './offboarding-list.repo';
 import { OffboardingRepo } from './offboarding.repo';
-import type { OffboardingListFilter } from './offboarding.types';
+import type { OffboardingListFilter, OffboardingRecord } from './offboarding.types';
 
 export interface Paged<T> {
   items: T[];
@@ -53,10 +53,10 @@ export class OffboardingViewService {
     private readonly lists: OffboardingListRepo,
     private readonly organizationReads: OrganizationReadApi,
     private readonly licensing: LicensingApi,
-    private readonly licensingHandovers: LicensingHandoverApi,
     private readonly roleDuties: RoleDutiesService,
     private readonly identity: IdentityAccessApi,
     private readonly detail: OffboardingDetailService,
+    private readonly overdue: RevocationOverdueService,
   ) {}
 
   async list(
@@ -65,12 +65,16 @@ export class OffboardingViewService {
   ): Promise<Paged<OffboardingSummaryWire>> {
     const { departmentIds } = await this.scopeOf(actor);
     const today = await this.organizationReads.businessToday();
-    const { items, total } = await this.lists.list({ ...filter, ...(departmentIds ? { departmentIds } : {}), today });
-    const employees = await this.employeesOf(items.map((item) => item.employeeId));
-    const held = await this.licensing.countPersonalSeatsOf(
-      items.filter((item) => item.state !== 'CANCELLED').map((item) => item.employeeId),
+    const { items, total } = await this.lists.list({
+      ...filter,
+      ...(departmentIds ? { departmentIds } : {}),
+      ...(await this.revocationOverdueNarrowing(filter.revocationOverdue, today, departmentIds)),
       today,
-    );
+    });
+    const employees = await this.employeesOf(items.map((item) => item.employeeId));
+    const liveEmployeeIds = items.filter((item) => item.state !== 'CANCELLED').map((item) => item.employeeId);
+    const held = await this.licensing.countPersonalSeatsOf(liveEmployeeIds, today);
+    const withoutCompletedTask = await this.licensing.countPersonalSeatsWithoutCompletedTaskOf(liveEmployeeIds, today);
 
     const roles = await this.roleDuties.flagMapsOf(items.filter((item) => item.state !== 'CANCELLED'));
     const blocks = await this.identity.findDepartureBlocks(items.map((item) => item.employeeId));
@@ -81,12 +85,29 @@ export class OffboardingViewService {
           today,
           block: blocks.get(item.employeeId) ?? null,
           heldRights: held.get(item.employeeId) ?? 0,
+          rightsWithoutCompletedTask: withoutCompletedTask.get(item.employeeId) ?? 0,
           roleFlags: roles.get(item.employeeId),
         }),
       ),
       total,
       filter,
     );
+  }
+
+  /**
+   * The filter `revocationOverdue` (`QĐ-110c`): the seats are `licensing`'s, so the departures past the deadline of their revocations that
+   * still have a right without a completed task are worked out first (the same reading the telling uses), and the page is then cut from
+   * them (`true`) or from all the others (`false`), so the pages and the total stay exact.
+   */
+  private async revocationOverdueNarrowing(
+    wanted: boolean | undefined,
+    today: BusinessDate,
+    departmentIds: readonly string[] | undefined,
+  ): Promise<Pick<OffboardingListFilter, 'onlyIds' | 'exceptIds'>> {
+    if (wanted === undefined) return {};
+    const ids = (await this.overdue.overdueCases(today, departmentIds)).map((late) => late.id);
+
+    return wanted ? { onlyIds: ids } : { exceptIds: ids };
   }
 
   async get(actor: AuthenticatedPrincipal, id: string): Promise<OffboardingDetailWire> {
@@ -98,7 +119,15 @@ export class OffboardingViewService {
     return this.detail.detailOf(record, access);
   }
 
-  /** One page of the rights the person still holds, oldest first, each with the confirmation of its handover and its task. */
+  /**
+   * The case as the IT Admin sees it after a step they took (the answer of the commands of the steps that follow the departure): the minimal
+   * projection, for a case the caller has just read under its locks, so no scope is judged again.
+   */
+  stepResult(record: OffboardingRecord): Promise<OffboardingDetailWire> {
+    return this.detail.detailOf(record, 'MINIMAL');
+  }
+
+  /** One page of the rights the person still holds, oldest first, each with its task. */
   async rights(
     actor: AuthenticatedPrincipal,
     id: string,
@@ -112,26 +141,13 @@ export class OffboardingViewService {
     const seats =
       record.state === 'CANCELLED' ? [] : await this.licensing.listPersonalSeatsOf(record.employeeId, today);
     const slice = seats.slice((page.page - 1) * page.pageSize, page.page * page.pageSize);
-    const [duties, terminating] = await Promise.all([
-      this.licensingHandovers.getHandoverDutiesOf(slice.map((seat) => seat.assignmentId)),
-      slice.length > 0 ? this.licensing.listTerminatingAccess([record.employeeId]) : Promise.resolve([]),
-    ]);
-    const employees = await this.employeesOf(
-      duties.flatMap((duty) => (duty.confirmerEmployeeId ? [duty.confirmerEmployeeId] : [])),
-    );
-    const dutyOf = new Map(duties.map((duty) => [duty.assignmentId, duty]));
+    const terminating = slice.length > 0 ? await this.licensing.listTerminatingAccess([record.employeeId]) : [];
     const runsOn = new Map<string, BusinessDate>(
       terminating.map((access) => [access.assignmentId, access.accessUntil]),
     );
 
     return paged(
-      slice.map((seat) =>
-        toRight(seat, {
-          duty: dutyOf.get(seat.assignmentId),
-          accessRunsOnUntil: runsOn.get(seat.assignmentId),
-          employees,
-        }),
-      ),
+      slice.map((seat) => toRight(seat, { accessRunsOnUntil: runsOn.get(seat.assignmentId) })),
       seats.length,
       page,
     );

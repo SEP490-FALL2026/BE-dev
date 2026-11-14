@@ -12,7 +12,7 @@ import {
 import { PersonnelNotifier } from '../event-notice/personnel-notifier.service';
 import { PersonnelFileHooks } from '../event-notice/personnel-file-hooks.service';
 import { personnelAuditEvent } from '../personnel-audit-event.mapper';
-import { groundsSnapshot, normalizedGrounds } from '../personnel-grounds.policy';
+import { groundsSnapshot, normalizedGroundsNote } from '../personnel-grounds.policy';
 import { actorColumns, type PersonnelActor } from '../public/personnel.types';
 import { TransferRefusedError } from './transfer.errors';
 import { headSuccessorLabel, retiredDestinationRefusal } from './transfer.policy';
@@ -44,7 +44,7 @@ export class TransferRecorder {
     facts: { seen: TransferSeen; held: TransferHeld; organizationId: string; today: BusinessDate },
   ): Promise<TransferRecord> {
     const { seen, held, organizationId, today } = facts;
-    const grounds = normalizedGrounds(input.grounds ?? {});
+    const grounds = normalizedGroundsNote(input.groundsNote ?? '');
     const handover = await this.handOverHead(tx, {
       organizationId,
       departmentId: seen.before.departmentId,

@@ -12,6 +12,7 @@ import { RequestDraftRepo } from './request-draft/request-draft.repo';
 import { ControlledWaitAlertService } from './reassignment/controlled-wait-alert.service';
 import { ControlledWaitQueryService } from './reassignment/controlled-wait-query.service';
 import { ControlledWaitRepo } from './reassignment/controlled-wait.repo';
+import { DepartmentWithoutHeadNotice } from './reassignment/department-without-head-notice.service';
 import { RequestsApprovalRoleListener } from './reassignment/approval-role.listener';
 import { RequestsOrganizationChangeListener } from './reassignment/organization-change.listener';
 import { RequestsSpendingApproverGrantCheck } from './reassignment/spending-approver-grant.listener';
@@ -68,6 +69,7 @@ import { StepSlaService } from './sla/step-sla.service';
     ControlledWaitAlertService,
     ControlledWaitQueryService,
     StepReassignmentService,
+    DepartmentWithoutHeadNotice,
     RequestsOrganizationChangeListener,
     RequestsApprovalRoleListener,
     SpendingApproverWorkRepo,

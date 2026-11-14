@@ -235,7 +235,7 @@ describe('the queue of provisioning tasks over HTTP (integration, real PostgreSQ
     const refused = await h.claim(made.id).expect(409);
 
     expect(h.codeOf(refused)).toBe('PROVISIONING.BENEFICIARY_DEPARTED');
-    expect(h.detailsOf(refused)).toEqual({ requestId: made.requestId, nextStep: 'CANCEL_REQUEST' });
+    expect(h.detailsOf(refused)).toEqual({ requestId: made.requestId, cause: 'LEFT', nextStep: 'CANCEL_REQUEST' });
     expect(await task(made.id)).toMatchObject({ status: 'QUEUED', claimedBy: null });
   });
 

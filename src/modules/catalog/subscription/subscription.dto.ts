@@ -16,6 +16,8 @@ const billingCycle = z.enum(['MONTHLY', 'QUARTERLY', 'ANNUAL', 'OTHER']);
 const commitmentTermMonths = z.union([z.literal(1), z.literal(12)]);
 const vendorMinimumSeats = z.number().int().min(1).max(1_000_000_000);
 const quantity = z.number().int().min(0).max(1_000_000_000);
+/** The vendor admins a subscription lists: the members of the workspace profile of its plan, at most this many (X-IT.5, QĐ-110k). */
+export const VENDOR_ADMINS_MAX = 20;
 const noticeDays = z.number().int().min(0).max(3650);
 const money = z.strictObject({ amount: z.string().max(40), currency: z.string().regex(/^[A-Z]{3}$/) });
 
@@ -127,6 +129,26 @@ const subscriptionSchema = z.strictObject({
   warnings: z.array(z.enum(['NO_ALERT_ANCHOR', 'RESPONSIBLE_MISSING', 'BILLING_CYCLE_LEGACY', 'SHOULD_MERGE'])),
   /** The other live subscriptions of the same K2 or K4 plan when `warnings` has SHOULD_MERGE: the ones to fold into one. */
   mergeCandidateIds: z.array(z.uuid()),
+  /** Who administers the plan at the vendor: empty for a plan that needs no admins (K1, K5, K4 with no admin console). At most 20. */
+  vendorAdmins: z
+    .array(
+      z.strictObject({
+        employeeId: z.uuid(),
+        employeeCode: z.string(),
+        fullName: z.string(),
+        role: z.enum(['OWNER', 'ADMIN']),
+        /** The person is an IT Admin who works now. */
+        working: z.boolean(),
+      }),
+    )
+    .max(VENDOR_ADMINS_MAX),
+  /** The email of the company account that owns the plan at the vendor (no password); null when none is recorded. */
+  ownerAccountEmail: z.string().nullable(),
+  adminNote: z.string().nullable(),
+  /** The plan needs admins at the vendor and fewer than two of the ones recorded work now: a flag, never a refusal (a subscription older than the rule has it). */
+  vendorAdminsBelowMinimum: z.boolean(),
+  /** The plan needs admins at the vendor and no email of the company account is recorded: a flag, never a refusal. */
+  ownerAccountEmailMissing: z.boolean(),
   taxProfile: z.strictObject({ status: z.enum(['DECLARED', 'MISSING']), group: z.enum(['T1', 'T2', 'T3']).nullable() }),
   taxEstimate: taxEstimate.nullable(),
   createdAt: z.iso.datetime(),

@@ -88,6 +88,7 @@ export const ROUTE_ERROR_CODES_CATALOG: Readonly<Record<string, Partial<Record<R
     planCreate: {
       '409': ['PLAN.NAME_TAKEN'],
       '422': [
+        'PLAN.ADMIN_CONSOLE_NOT_APPLICABLE',
         'PLAN.APPLICATION_NOT_FOUND',
         'PLAN.APPLICATION_RETIRED',
         'PLAN.CONTROL_LEVEL_REQUIRED',
@@ -125,6 +126,7 @@ export const ROUTE_ERROR_CODES_CATALOG: Readonly<Record<string, Partial<Record<R
         'PLAN.WORKSPACE_PROFILE_BLOCKS_TYPE_CHANGE',
       ],
       '422': [
+        'PLAN.ADMIN_CONSOLE_NOT_APPLICABLE',
         'PLAN.CONTROL_LEVEL_REQUIRED',
         'PLAN.DATA_LOSS_NOTE_REQUIRED',
         'PLAN.NAME_INVALID',
@@ -140,6 +142,7 @@ export const ROUTE_ERROR_CODES_CATALOG: Readonly<Record<string, Partial<Record<R
       '404': ['PLAN.NOT_FOUND'],
       '422': [
         'PLAN.PRIMARY_OWNER_NOT_LISTED',
+        'PLAN.VENDOR_ADMINS_INVALID',
         'PLAN.WORKSPACE_LIMIT_EXCEEDED',
         'PLAN.WORKSPACE_MEMBER_DUPLICATE',
         'PLAN.WORKSPACE_PERSON_INVALID',
@@ -171,6 +174,7 @@ export const ROUTE_ERROR_CODES_CATALOG: Readonly<Record<string, Partial<Record<R
         'SUBSCRIPTION.RESPONSIBLE_NOT_IT_ADMIN',
         'SUBSCRIPTION.RESPONSIBLE_REQUIRED',
         'SUBSCRIPTION.STILL_DRAFT',
+        'SUBSCRIPTION.VENDOR_ADMINS_REQUIRED',
       ],
     },
     subscriptionCreate: {
@@ -193,6 +197,7 @@ export const ROUTE_ERROR_CODES_CATALOG: Readonly<Record<string, Partial<Record<R
         'SUBSCRIPTION.PLAN_NOT_FOUND',
         'SUBSCRIPTION.RESPONSIBLE_NOT_IT_ADMIN',
         'SUBSCRIPTION.RESPONSIBLE_REQUIRED',
+        'SUBSCRIPTION.VENDOR_ADMINS_REQUIRED',
       ],
     },
     subscriptionGet: {
@@ -218,6 +223,7 @@ export const ROUTE_ERROR_CODES_CATALOG: Readonly<Record<string, Partial<Record<R
         'SUBSCRIPTION.RESPONSIBLE_REQUIRED',
         'SUBSCRIPTION.STILL_DRAFT',
         'SUBSCRIPTION.UPDATE_EMPTY',
+        'SUBSCRIPTION.VENDOR_ADMINS_REQUIRED',
       ],
     },
     vendorGroupCreate: {

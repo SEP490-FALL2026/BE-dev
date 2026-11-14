@@ -1,5 +1,5 @@
 import type { BusinessDate } from '../../../core/business-date';
-import type { Grounds, GroundsInput } from '../personnel-grounds.policy';
+import type { RecordedGrounds } from '../personnel-grounds.policy';
 
 export type LeaveStatus = 'ACTIVE' | 'ENDED';
 export type LeaveEndKind = 'RETURNED' | 'DEPARTURE_STARTED';
@@ -15,7 +15,7 @@ export interface LeaveRecord {
   endedOn: BusinessDate | null;
   endKind: LeaveEndKind | null;
   resumesLeaveId: string | null;
-  grounds: Grounds;
+  grounds: RecordedGrounds;
   /** Who started it: an account, or the ticket of the controlled procedure: exactly one of the two is set. */
   startedByAppUserId: string | null;
   startedByTicketId: string | null;
@@ -40,7 +40,7 @@ export interface LeaveChangeRecord {
   newReturnOn: BusinessDate | null;
   returnedOn: BusinessDate | null;
   onSchedule: boolean | null;
-  grounds: Grounds | null;
+  grounds: RecordedGrounds | null;
   /** The account, or the ticket of the controlled procedure. */
   recordedByAppUserId: string | null;
   recordedByTicketId: string | null;
@@ -62,17 +62,20 @@ export interface StartLeaveInput {
   employeeId: string;
   startedOn: BusinessDate;
   approvedReturnOn: BusinessDate;
-  grounds?: GroundsInput;
+  /** The basis in one box (`QĐ-110a`); the policy refuses it when it is missing, blank, too long or the code of a notice. */
+  groundsNote?: string | undefined;
   /** The notice of a head this leave is recorded from (`US-03-11`); a leave recorded straight from a document has none. */
   noticeId?: string;
 }
 
 export interface ChangeReturnDateInput {
   newApprovedReturnOn: BusinessDate;
-  grounds?: GroundsInput;
+  /** The basis in one box (`QĐ-110a`); the policy refuses it when it is missing, blank, too long or the code of a notice. */
+  groundsNote?: string | undefined;
 }
 
 export interface ConfirmReturnInput {
   returnedOn: BusinessDate;
-  grounds?: GroundsInput;
+  /** The basis in one box (`QĐ-110a`); the policy refuses it when it is missing, blank, too long or the code of a notice. */
+  groundsNote?: string | undefined;
 }

@@ -40,7 +40,7 @@ const READERS = {
   examples: [FORBIDDEN_EXAMPLE],
 } as const;
 const INVALID_DESCRIPTION =
-  'The request is invalid (VALIDATION_ERROR) or a rule refuses it: PLAN.APPLICATION_NOT_FOUND, APPLICATION_RETIRED, NAME_INVALID, NOTE_INVALID, PROVISIONING_TYPE_NOT_SUPPORTED, PROVISIONING_TYPE_MISMATCH, PRICING_MODEL_REQUIRED, PRICING_MODEL_NOT_APPLICABLE, CONTROL_LEVEL_REQUIRED, DATA_LOSS_NOTE_REQUIRED or UPDATE_EMPTY.';
+  'The request is invalid (VALIDATION_ERROR) or a rule refuses it: PLAN.APPLICATION_NOT_FOUND, APPLICATION_RETIRED, NAME_INVALID, NOTE_INVALID, PROVISIONING_TYPE_NOT_SUPPORTED, PROVISIONING_TYPE_MISMATCH, PRICING_MODEL_REQUIRED, PRICING_MODEL_NOT_APPLICABLE, CONTROL_LEVEL_REQUIRED, DATA_LOSS_NOTE_REQUIRED, ADMIN_CONSOLE_NOT_APPLICABLE (the flag hasAdminConsole belongs to a K4 plan alone) or UPDATE_EMPTY.';
 /** The rule refusals of the shape of a plan, met by a declaration and by a change alike. */
 const SHAPE_EXAMPLES = [
   EXAMPLES.NAME_INVALID,
@@ -51,6 +51,7 @@ const SHAPE_EXAMPLES = [
   EXAMPLES.PRICING_MODEL_NOT_APPLICABLE,
   EXAMPLES.CONTROL_LEVEL_REQUIRED,
   EXAMPLES.DATA_LOSS_NOTE_REQUIRED,
+  EXAMPLES.ADMIN_CONSOLE_NOT_APPLICABLE,
 ] as const;
 const DECLARE_INVALID = {
   status: HttpStatus.UNPROCESSABLE_ENTITY,
@@ -96,6 +97,7 @@ function toPlanSummaryWire(plan: PlanSummaryRecord) {
     controlLevel: plan.controlLevel,
     dataLossOnRemoval: plan.dataLossOnRemoval,
     sharingPolicy: plan.sharingPolicy,
+    hasAdminConsole: plan.hasAdminConsole,
     seatTracking: seatTrackingOf(plan.pricingModel),
     createdAt: plan.createdAt.toISOString(),
     updatedAt: plan.updatedAt.toISOString(),
@@ -207,16 +209,16 @@ export class PlansController {
 
   @Put(':id/workspace-profile')
   @RequireRoles('IT_ADMIN')
-  @ApiOperation({ operationId: 'planWorkspaceProfileSet', summary: 'Record the workspace profile of a K2 plan' })
+  @ApiOperation({ operationId: 'planWorkspaceProfileSet', summary: 'Record who administers a plan at the vendor' })
   @ApiSuccessResponse(WorkspaceProfileResponseDto, {
     message: 'PLAN.WORKSPACE_PROFILE_SET',
     description:
-      'The workspace profile replaces the previous one as a whole; it names the owners, the admins and the emergency account, and takes no password.',
+      'The workspace profile replaces the previous one as a whole; it names the owners, the admins and the emergency account, the email of the company account that owns the plan at the vendor (optional) and a free note, and takes no password. Only a plan that needs admins at the vendor has one: a K2 plan, or a K4 plan with an admin console. The owners and admins are at least two different IT Admins who work now.',
   })
   @ApiErrorResponses(...AUTH_ERRORS, IT_ONLY, NOT_FOUND, {
     status: HttpStatus.UNPROCESSABLE_ENTITY,
     description:
-      'The request is invalid (VALIDATION_ERROR) or a rule refuses it: PLAN.WORKSPACE_PROFILE_NOT_APPLICABLE, WORKSPACE_PERSON_INVALID, PRIMARY_OWNER_NOT_LISTED, WORKSPACE_MEMBER_DUPLICATE, WORKSPACE_LIMIT_EXCEEDED or WORKSPACE_TEXT_INVALID.',
+      'The request is invalid (VALIDATION_ERROR) or a rule refuses it: PLAN.WORKSPACE_PROFILE_NOT_APPLICABLE, WORKSPACE_PERSON_INVALID, PRIMARY_OWNER_NOT_LISTED, WORKSPACE_MEMBER_DUPLICATE, WORKSPACE_LIMIT_EXCEEDED, WORKSPACE_TEXT_INVALID or VENDOR_ADMINS_INVALID (fewer than two different IT Admins).',
     examples: [
       VALIDATION_EXAMPLE,
       EXAMPLES.WORKSPACE_PROFILE_NOT_APPLICABLE,
@@ -225,6 +227,7 @@ export class PlansController {
       EXAMPLES.WORKSPACE_MEMBER_DUPLICATE,
       EXAMPLES.WORKSPACE_LIMIT_EXCEEDED,
       EXAMPLES.WORKSPACE_TEXT_INVALID,
+      EXAMPLES.VENDOR_ADMINS_INVALID,
     ],
   })
   async setWorkspaceProfile(

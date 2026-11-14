@@ -3,7 +3,6 @@ import { ApiException } from '../../../infrastructure/http/errors/api.exception'
 import { FinanceSetupIncompleteError } from '../../organization/public/organization.errors';
 import { toGroupRequestApiException } from '../group-request/group-request.http-errors';
 import { toRenewalApiException } from '../renewal-request/renewal-request.http-errors';
-import { toServiceAccountApiException } from '../service-account-request/service-account-request.http-errors';
 import { toAccessRequestApiException } from '../access-request/access-request.http-errors';
 import { toAssessmentApiException } from './assessment.http-errors';
 
@@ -20,7 +19,6 @@ describe('FINANCE.SETUP_INCOMPLETE on the request routes', () => {
     ['the assessment mapper (proposals)', toAssessmentApiException],
     ['the group request mapper', toGroupRequestApiException],
     ['the renewal request mapper', toRenewalApiException],
-    ['the service account request mapper', toServiceAccountApiException],
   ])('is answered 409 by %s, with no department id in the answer', (_name, map) => {
     const answer = map(error);
 

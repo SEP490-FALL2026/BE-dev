@@ -5,6 +5,8 @@ import type {
   DepartmentLicensingFacts,
   EmployeeLicensingFacts,
   ItAdminLicensingFacts,
+  RevocationTaskFacts,
+  SeatsReturnedFacts,
 } from './licensing-dashboard.types';
 
 /**
@@ -28,5 +30,24 @@ export class LicensingDashboardApi {
   /** The open tasks and reports the IT Admin is in charge of, and the keys in the vault not assigned yet. */
   itAdminFacts(employeeId: string): Promise<ItAdminLicensingFacts> {
     return this.facts.itAdmin(employeeId);
+  }
+
+  /**
+   * The seats of the shared pools (`K2`) taken back for a departure or a transfer and handed out again from the first of the month of `today` to `today`
+   * (SPEC P21). With `responsibleEmployeeId`, the tasks that IT Admin is in charge of by default; without it, the whole company.
+   */
+  seatsReturned(today: BusinessDate, responsibleEmployeeId?: string): Promise<SeatsReturnedFacts> {
+    return this.facts.seatsReturned(today, responsibleEmployeeId);
+  }
+
+  /**
+   * The tasks of revocation that these departures (`OFFBOARDING_CASE`) or transfers (`DEPARTMENT_TRANSFER`) asked for, still to do, failed or completed (SPEC
+   * P22): one row for each task and reference, with the day it was completed and the IT Admin in charge. A task cancelled or closed as failed is left out.
+   */
+  revocationTasksOf(
+    referenceKind: 'OFFBOARDING_CASE' | 'DEPARTMENT_TRANSFER',
+    referenceIds: readonly string[],
+  ): Promise<RevocationTaskFacts[]> {
+    return this.facts.revocationTasksOf(referenceKind, referenceIds);
   }
 }

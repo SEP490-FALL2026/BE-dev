@@ -32,9 +32,6 @@ const REQUESTS_CONTROLLER_IMPORTED: Record<string, string> = {
     'handles the drafts of a person who leaves (`request-draft-departure.service`): both are the use case of draft itself',
   'group-request-submission':
     'sending a group draft runs the use case of this capability (`group-request.service`) from `draft/request-draft-submit.service.ts`',
-  'service-account-request':
-    'sending a service-account draft runs its use case (`service-account-request.service`, dto and http-errors) from ' +
-    '`draft/request-draft-submit.service.ts`',
   'line-closure':
     'closing the request of a person who left runs the closing of the group lines (`group-line-closure.service`, `.policy`) from ' +
     '`cancellation/departure-cancellation.service.ts`',

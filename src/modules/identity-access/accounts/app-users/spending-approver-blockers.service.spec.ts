@@ -22,7 +22,7 @@ describe('SpendingApproverBlockersService', () => {
 
   it('puts the answers of every check in one order, by kind and then id, whichever module answered first', async () => {
     const checks = new SpendingApproverGrantChecks();
-    checks.add('b', { blockersOf: () => Promise.resolve([blocker('SERVICE_ACCOUNT', 'z'), blocker('REQUEST', 'b')]) });
+    checks.add('b', { blockersOf: () => Promise.resolve([blocker('RETURN_REQUEST', 'z'), blocker('REQUEST', 'b')]) });
     checks.add('a', { blockersOf: () => Promise.resolve([blocker('REQUEST', 'a'), blocker('BUDGET_PROPOSAL', 'p')]) });
 
     const found = await new SpendingApproverBlockersService(checks).of(tx, 'employee');
@@ -31,7 +31,7 @@ describe('SpendingApproverBlockersService', () => {
       'BUDGET_PROPOSAL:p',
       'REQUEST:a',
       'REQUEST:b',
-      'SERVICE_ACCOUNT:z',
+      'RETURN_REQUEST:z',
     ]);
     expect(found.truncated).toBe(false);
   });

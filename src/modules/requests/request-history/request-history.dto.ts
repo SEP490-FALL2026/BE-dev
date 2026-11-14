@@ -118,7 +118,7 @@ export const requestAuditFlagItemSchema = z.strictObject({
   department: departmentRef,
   application: z.strictObject({ id: z.uuid(), name: z.string() }),
   plan: z.strictObject({ id: z.uuid(), name: z.string() }),
-  /** Why the request went the one-step route: the requester heads the department, or it has no head. */
+  /** Why the request went the one-step route: the requester heads the department, or it is free internal software and the department has no head. */
   routingReason: requestSchema.shape.routing.shape.oneStepReason,
   /** Who completed the grant and when; null until it is completed. The IT Admin is null when their account is gone. */
   grant: z.strictObject({ itAdmin: employeeRef.nullable(), completedAt: z.iso.datetime() }).nullable(),

@@ -27,6 +27,7 @@ const detailOf = (view: TaskView) => ({
   handOffEvidence: view.handOffEvidence,
   closedBy: view.closedBy,
   closeReason: view.closeReason,
+  k1Checklist: view.k1Checklist,
   revocation: view.revocation && {
     ...view.revocation,
     firstReason: view.revocation.firstReason && {

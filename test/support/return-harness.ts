@@ -2,7 +2,7 @@ import request from 'supertest';
 import type { ApiAccount } from './api-accounts';
 import { assignmentIdOf, importSeats } from './builders/seat.builder';
 import type { AccessRequestWire, Person } from './request-harness';
-import { ServiceAccountHarness } from './service-account-harness';
+import { SpendHarness } from './spend-harness';
 
 /** A return as the wire carries it, in a list and in its detail. */
 export interface ReturnWire {
@@ -54,15 +54,13 @@ export interface SeatRow {
  * (so that giving one back is seen on the seats free today), the calls of the routes of returns and renewals and of the queue
  * that takes a seat away. No assertion lives here.
  */
-export class ReturnHarness extends ServiceAccountHarness {
+export class ReturnHarness extends SpendHarness {
   returnSeat = (body: object, account: ApiAccount) =>
     request(this.server()).post('/api/v1/return-requests').set(this.as(account)).send(body);
   returnList = (account: ApiAccount, query: Record<string, string | number> = {}) =>
     request(this.server()).get('/api/v1/return-requests').query(query).set(this.as(account));
   returnGet = (id: string, account: ApiAccount) =>
     request(this.server()).get(`/api/v1/return-requests/${id}`).set(this.as(account));
-  confirmHandover = (id: string, account: ApiAccount) =>
-    request(this.server()).post(`/api/v1/return-requests/${id}/handover-confirmation`).set(this.as(account));
   renew = (body: object, account: ApiAccount) =>
     request(this.server()).post('/api/v1/access-requests/renewals').set(this.as(account)).send(body);
   revoked = (id: string, body: object, account: ApiAccount = this.it1) =>

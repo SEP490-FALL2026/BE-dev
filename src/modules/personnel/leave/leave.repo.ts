@@ -4,7 +4,7 @@ import { type BusinessDate, fromDateColumn, toDateColumn } from '../../../core/b
 import { Prisma } from '../../../generated/prisma/client';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
-import type { Grounds } from '../personnel-grounds.policy';
+import { recordedGroundsOf, type RecordedGrounds } from '../personnel-grounds.policy';
 import type { LeaveInterval } from '../public/personnel.types';
 import type {
   LeaveChangeKind,
@@ -40,12 +40,7 @@ function toRecord(row: LeaveRow): LeaveRecord {
     endedOn: dateOrNull(row.endedOn),
     endKind: row.endKind,
     resumesLeaveId: row.resumesLeaveId,
-    grounds: {
-      type: row.groundsType,
-      reference: row.groundsReference,
-      issuer: row.groundsIssuer,
-      issuedOn: fromDateColumn(row.groundsIssuedOn),
-    },
+    grounds: recordedGroundsOf(row),
     startedByAppUserId: row.startedByAppUserId,
     startedByTicketId: row.startedByTicketId,
     startedAt: row.startedAt,
@@ -53,11 +48,11 @@ function toRecord(row: LeaveRow): LeaveRecord {
   };
 }
 
-const groundsColumns = (grounds: Grounds) => ({
+const groundsColumns = (grounds: RecordedGrounds) => ({
   groundsType: grounds.type,
   groundsReference: grounds.reference,
   groundsIssuer: grounds.issuer,
-  groundsIssuedOn: toDateColumn(grounds.issuedOn),
+  groundsIssuedOn: grounds.issuedOn ? toDateColumn(grounds.issuedOn) : null,
 });
 
 function toChange(row: ChangeRow): LeaveChangeRecord {
@@ -68,15 +63,7 @@ function toChange(row: ChangeRow): LeaveChangeRecord {
     newReturnOn: dateOrNull(row.newReturnOn),
     returnedOn: dateOrNull(row.returnedOn),
     onSchedule: row.onSchedule,
-    grounds:
-      row.groundsType && row.groundsReference && row.groundsIssuer && row.groundsIssuedOn
-        ? {
-            type: row.groundsType,
-            reference: row.groundsReference,
-            issuer: row.groundsIssuer,
-            issuedOn: fromDateColumn(row.groundsIssuedOn),
-          }
-        : null,
+    grounds: row.groundsReference ? recordedGroundsOf({ ...row, groundsReference: row.groundsReference }) : null,
     recordedByAppUserId: row.recordedByAppUserId,
     recordedByTicketId: row.recordedByTicketId,
     recordedAt: row.recordedAt,
@@ -147,7 +134,12 @@ export class LeaveRepo {
     return row && toRecord(row);
   }
 
-  async changeReturnDate(tx: DbTx, id: string, approvedReturnOn: BusinessDate, grounds: Grounds): Promise<LeaveRecord> {
+  async changeReturnDate(
+    tx: DbTx,
+    id: string,
+    approvedReturnOn: BusinessDate,
+    grounds: RecordedGrounds,
+  ): Promise<LeaveRecord> {
     const row = await tx.employeeLeave.update({
       where: { id },
       data: { approvedReturnOn: toDateColumn(approvedReturnOn), ...groundsColumns(grounds) },
@@ -174,7 +166,7 @@ export class LeaveRepo {
       newReturnOn?: BusinessDate;
       returnedOn?: BusinessDate;
       onSchedule?: boolean;
-      grounds?: Grounds;
+      grounds?: RecordedGrounds;
       recordedByAppUserId: string | null;
       recordedByTicketId: string | null;
     },

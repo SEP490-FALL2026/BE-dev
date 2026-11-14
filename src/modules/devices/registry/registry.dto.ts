@@ -60,7 +60,7 @@ export const deviceDetailSchema = deviceSummarySchema.extend({
       holder: holderSchema,
       validUntil: responseBusinessDate,
       endedAt: instant,
-      endCause: z.enum(['HOLDER_CHANGED', 'DEVICE_RETIRED', 'DEPARTURE', 'EMPLOYEE_LEFT']),
+      endCause: z.enum(['HOLDER_CHANGED', 'DEVICE_RETIRED', 'DEPARTURE', 'EMPLOYEE_LEFT', 'DEPARTURE_BLOCKED']),
     })
     .nullable(),
   retirementReason: z.string().nullable(),
