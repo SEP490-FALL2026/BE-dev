@@ -118,6 +118,9 @@ export const IN_APP_NOTIFICATION_CODES = [
   'BUDGET_DECISION_DEADLINE_REMINDER',
   'BUDGET_COST_CENTER_SETUP_DUE',
   'BUDGET_BASELINE_VERSION_HEAD_ASSIGNED',
+  // The budget of the year after is not approved yet for a Cost Center (`QĐ-111am`, B-4): told to Finance and the spending approver on 01/12 and then every Monday
+  // until a version is approved. The Cost Center and the year only.
+  'BUDGET_NEXT_YEAR_MISSING',
   // The alerts of the rights (`a03-license-inbox-alerts`, `FR-5.14`): a right about to end, a handover not confirmed, a service
   // account whose person leaves, a person who left and keeps a K1 access to the end of the paid period. Ids, codes and days only.
   // The codes of the handover and of the service account are read only (`QĐ-110g`, `QĐ-110m`): nothing writes one any more, a row of

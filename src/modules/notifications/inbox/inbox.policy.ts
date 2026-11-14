@@ -108,6 +108,8 @@ export const PARAM_KEYS_BY_CODE: Readonly<Record<InAppNotificationCode, readonly
   BUDGET_DECISION_DEADLINE_REMINDER: ['cycleId', 'year', 'versionCount', 'decisionDeadline'],
   BUDGET_COST_CENTER_SETUP_DUE: ['cycleId', 'year', 'departmentId'],
   BUDGET_BASELINE_VERSION_HEAD_ASSIGNED: ['versionId', 'costCenterId', 'year'],
+  // The budget of the year after is not approved yet for a Cost Center: the Cost Center and the year, never a figure.
+  BUDGET_NEXT_YEAR_MISSING: ['costCenterId', 'year'],
   // The alerts of the rights (`a03-license-inbox-alerts`): the right, the person, the day and the role asked; never a key, an
   // account identifier, a price or the text of a note.
   LICENSE_EXPIRY_REMINDER: ['assignmentId', 'holderEmployeeId', 'planId', 'expectedEndDate', 'audience'],

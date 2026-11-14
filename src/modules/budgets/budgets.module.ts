@@ -68,6 +68,8 @@ import { VersionService } from './version/version.service';
 import { VersionViewService } from './budget/version-view.service';
 import { BudgetYearEndService } from './year-end/year-end.service';
 import { BudgetYearEndSweeper } from './year-end/year-end.job';
+import { NextYearReminderService } from './year-end/next-year-reminder.service';
+import { NextYearReminderSweeper } from './year-end/next-year-reminder.job';
 import { BudgetAttachmentUploadsController } from './attachment/budget-attachment-uploads.controller';
 import { BudgetAttachmentReadsController } from './attachment/budget-attachment-reads.controller';
 import { BudgetAttachmentRepo } from './attachment/budget-attachment.repo';
@@ -85,7 +87,7 @@ import { BudgetAttachmentExpirySweeper } from './attachment/budget-attachment-ex
  * the versions of the budget Finance builds from them. It reads the organization (Cost Centers, heads, the day), the
  * finance context (currencies, money), the catalog (that a plan a line names exists), the operating parameters and the notices
  * of the inbox through their facades, and writes nothing of theirs. The controllers live in the module because no other graph needs
- * them yet. The closure of the fiscal year (`BudgetYearEndSweeper`) runs in the API process like the other sweepers. It
+ * them yet. The closure of the fiscal year (`BudgetYearEndSweeper`) and the reminder of the year after (`NextYearReminderSweeper`) run in the API process like the other sweepers. It
  * exports one facade (`BudgetsApi`), what the check of a request reads, and the extension points the requests context binds
  * (`public/budgets.extension-points.ts`: who hears when a budget changes, who says a remainder may go); it never imports them back.
  */
@@ -143,6 +145,8 @@ import { BudgetAttachmentExpirySweeper } from './attachment/budget-attachment-ex
     LineImportService,
     BudgetYearEndService,
     BudgetYearEndSweeper,
+    NextYearReminderService,
+    NextYearReminderSweeper,
     BudgetAttachmentRepo,
     BudgetAttachmentDeclarationService,
     BudgetAttachmentCompletionService,
