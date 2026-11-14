@@ -5,9 +5,19 @@ import type { SystemActor } from '../../../src/modules/licensing/public/licensin
 import { graceOf } from '../../../src/modules/personnel/transfer-grace/transfer-grace.policy';
 import { TransferGraceService } from '../../../src/modules/personnel/transfer-grace/transfer-grace.service';
 import { OffboardingHarness } from '../../support/offboarding-harness';
+import { pretendBusinessToday } from '../../support/pretend-today';
 import type { Unit } from '../../support/spend-harness';
 
 const h = new OffboardingHarness();
+/**
+ * The day this suite lives on, the same whatever day it runs: the 15th of June of the year after the one that is running (so never before
+ * the day the people of the installation are made on), said to the harness and, once it is started, to the application. Its numbers count
+ * the months from the month of that day to December.
+ */
+h.year += 1;
+h.next += 1;
+const DAY = `${h.year}-06-15`;
+h.today = () => DAY;
 const M = 1_000_000;
 const MONTHLY = BigInt(M);
 const NONE: ReadonlySet<string> = new Set();
@@ -33,6 +43,7 @@ describe('the day a transfer takes effect (integration, real PostgreSQL)', () =>
 
   beforeAll(async () => {
     await h.start();
+    pretendBusinessToday(h.ctx.app, DAY);
     await h.withApprover();
     for (let i = 0; i < 3; i += 1) {
       const subscriptionId = await h.subscription(40, 'K2');
@@ -59,7 +70,11 @@ describe('the day a transfer takes effect (integration, real PostgreSQL)', () =>
       requestId,
       minor === null ? null : minor.toString(),
     ]);
-  /** A request for the member approved for the whole year at 1 000 000 a month, with no end. */
+  /**
+   * A request for the member approved for the whole year at 1 000 000 a month, with no end: a right for the long term on purpose (the harness
+   * gives a request one month of use, whose seat would end a month after the grant and cover fewer months of the year than these cases
+   * count), so the seat has no end date and the commitment runs to December on any day.
+   */
   const approved = async (u: Unit, which: number): Promise<string> => {
     const id = await h.waitingForApprover(u, plans[which].plan, { amount: 12 * M });
     await h.ctx.sql.query(

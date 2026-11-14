@@ -4,9 +4,19 @@ import { TransactionRunner } from '../../../src/infrastructure/database/transact
 import { LicensingApi } from '../../../src/modules/licensing/public/licensing.api';
 import type { ProvisioningKind, SystemActor } from '../../../src/modules/licensing/public/licensing.types';
 import { RequestsApi } from '../../../src/modules/requests/public/requests.api';
+import { pretendBusinessToday } from '../../support/pretend-today';
 import { SpendHarness, type Unit } from '../../support/spend-harness';
 
 const h = new SpendHarness();
+/**
+ * The day this suite lives on, the same whatever day it runs: the 15th of June of the year after the one that is running (so never before
+ * the day the people of the installation are made on), said to the harness and, once it is started, to the application. On the real last
+ * day of a year a revocation ends on 01/01 and gives nothing back of that year's commitment.
+ */
+h.year += 1;
+h.next += 1;
+const DAY = `${h.year}-06-15`;
+h.today = () => DAY;
 const M = 1_000_000;
 const MONTHLY = BigInt(M);
 
@@ -37,6 +47,7 @@ describe('the money held for the old rights of a transfer goes back once, the da
 
   beforeAll(async () => {
     await h.start();
+    pretendBusinessToday(h.ctx.app, DAY);
     await h.withApprover();
     subscriptionId = await h.subscription(20, 'K2');
     plan = await h.planOf(subscriptionId);
@@ -53,7 +64,11 @@ describe('the money held for the old rights of a transfer goes back once, the da
 
     return u;
   };
-  /** A request for one person approved for the whole year at 1 000 000 a month, with no end. */
+  /**
+   * A request for one person approved for the whole year at 1 000 000 a month, with no end: a right for the long term on purpose (the
+   * harness gives a request one month of use, whose seat would end a month after the grant and cover fewer months of the year than these
+   * cases count), so the seat has no end date and the commitment runs to December on any day.
+   */
   const approved = async (u: Unit) => {
     const id = await h.waitingForApprover(u, plan, { amount: 12 * M });
     await h.ctx.sql.query(
