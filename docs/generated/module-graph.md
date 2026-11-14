@@ -125,10 +125,10 @@ flowchart BT
   requests -->|29| catalog
   requests -->|7| finance
   requests -->|31| identity_access
-  requests -->|51| licensing
+  requests -->|50| licensing
   requests -->|10| notifications
   requests -->|11| operating_parameters
-  requests -->|83| organization
+  requests -->|84| organization
   usage -->|7| audit
   usage -->|7| catalog
   usage -->|15| devices

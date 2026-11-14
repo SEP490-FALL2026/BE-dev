@@ -40644,7 +40644,7 @@
             }
           },
           "409": {
-            "description": "The request was sent already (ACCESS_REQUEST.NOT_DRAFT), the department has no Cost Center in use yet (FINANCE.SETUP_INCOMPLETE), the application of the plan is retired (ACCESS_REQUEST.APPLICATION_RETIRED), the sender belongs to no department (ACCESS_REQUEST.NO_DEPARTMENT) or already holds a seat of the plan (ACCESS_REQUEST.ALREADY_HOLDS_ACCESS). A request for new access is refused when the person already has one of the plan open (ACCESS_REQUEST.OPEN_REQUEST_EXISTS, details.requestId) or already has as many open as they may (ACCESS_REQUEST.OPEN_LIMIT_REACHED, details.limit and details.openRequestIds; GH-1/GH-2, BR-MF1-01). The refusals particular to a group are those of its own operation.",
+            "description": "The request was sent already (ACCESS_REQUEST.NOT_DRAFT), the department has no Cost Center in use yet (FINANCE.SETUP_INCOMPLETE), the application of the plan is retired (ACCESS_REQUEST.APPLICATION_RETIRED), the sender belongs to no department (ACCESS_REQUEST.NO_DEPARTMENT) or already holds a seat of the plan (ACCESS_REQUEST.ALREADY_HOLDS_ACCESS). A request for new access is refused when the person already has one of the plan open (ACCESS_REQUEST.OPEN_REQUEST_EXISTS, details.requestId; GH-1, BR-MF1-01). The refusals particular to a group are those of its own operation.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -40722,18 +40722,6 @@
                         "requestId": "req_example"
                       }
                     }
-                  },
-                  "ACCESS_REQUEST.OPEN_LIMIT_REACHED": {
-                    "summary": "The person already has as many requests for new access open as they may.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "ACCESS_REQUEST.OPEN_LIMIT_REACHED",
-                        "message": "The person already has as many requests for new access open as they may.",
-                        "details": { "limit": 3, "openRequestIds": ["<request-id>"] },
-                        "requestId": "req_example"
-                      }
-                    }
                   }
                 }
               }
@@ -40782,7 +40770,7 @@
             }
           },
           "422": {
-            "description": "The id is invalid (VALIDATION_ERROR), the sender is the spending approver (REQUEST_PARTY.INELIGIBLE), or the draft was saved with an end date that no longer fits, before today or more than a year from today: ACCESS_REQUEST.END_DATE_OUT_OF_RANGE (GROUP_REQUEST.TERM_BEYOND_LIMIT for a group), with details { maxEndDate }, or without the end date a contractor, freelancer or intern needs: ACCESS_REQUEST.TERM_REQUIRED. A group draft with fewer than two different people is refused as GROUP_REQUEST.TOO_FEW_LINES. A person who already uses as many paid applications as the threshold must give manyPaidSoftwareReason (ACCESS_REQUEST.MANY_PAID_SOFTWARE_REASON_REQUIRED, details.count and details.threshold; GH-3). Nothing changes: the draft stays, to be saved again with a shorter term.",
+            "description": "The id is invalid (VALIDATION_ERROR), the sender is the spending approver (REQUEST_PARTY.INELIGIBLE), or the draft was saved with an end date that no longer fits, before today or more than a year from today: ACCESS_REQUEST.END_DATE_OUT_OF_RANGE (GROUP_REQUEST.TERM_BEYOND_LIMIT for a group), with details { maxEndDate }, or without the end date a contractor, freelancer or intern needs: ACCESS_REQUEST.TERM_REQUIRED. A group draft with fewer than two different people is refused as GROUP_REQUEST.TOO_FEW_LINES. A person who was already named in as many requests for new access this calendar week (Monday to Sunday, organization time zone; a request withdrawn or refused still counts) as the weekly limit allows is refused until the next Monday (ACCESS_REQUEST.OPEN_LIMIT_REACHED, details.limit and details.resetsOn; GH-2, BR-MF1-01f). Nothing changes: the draft stays, to be saved again with a shorter term.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -40838,14 +40826,14 @@
                       }
                     }
                   },
-                  "ACCESS_REQUEST.MANY_PAID_SOFTWARE_REASON_REQUIRED": {
-                    "summary": "The person uses many paid applications already: a reason is required to ask for another one.",
+                  "ACCESS_REQUEST.OPEN_LIMIT_REACHED": {
+                    "summary": "The person was already named in as many requests for new access this week as they may.",
                     "value": {
                       "success": false,
                       "error": {
-                        "code": "ACCESS_REQUEST.MANY_PAID_SOFTWARE_REASON_REQUIRED",
-                        "message": "The person uses many paid applications already: a reason is required to ask for another one.",
-                        "details": { "count": 10, "threshold": 10 },
+                        "code": "ACCESS_REQUEST.OPEN_LIMIT_REACHED",
+                        "message": "The person was already named in as many requests for new access this week as they may.",
+                        "details": { "limit": 10, "resetsOn": "2026-11-16" },
                         "requestId": "req_example"
                       }
                     }
@@ -41251,7 +41239,7 @@
             }
           },
           "409": {
-            "description": "The application of the plan is retired (ACCESS_REQUEST.APPLICATION_RETIRED), the sender belongs to no department (ACCESS_REQUEST.NO_DEPARTMENT), the department has no Cost Center in use yet (FINANCE.SETUP_INCOMPLETE) or the sender already holds a seat of the plan (ACCESS_REQUEST.ALREADY_HOLDS_ACCESS, with the seat in details). A request for new access is refused when the person already has one of the plan open (ACCESS_REQUEST.OPEN_REQUEST_EXISTS, details.requestId) or already has as many open as they may (ACCESS_REQUEST.OPEN_LIMIT_REACHED, details.limit and details.openRequestIds; GH-1/GH-2, BR-MF1-01).",
+            "description": "The application of the plan is retired (ACCESS_REQUEST.APPLICATION_RETIRED), the sender belongs to no department (ACCESS_REQUEST.NO_DEPARTMENT), the department has no Cost Center in use yet (FINANCE.SETUP_INCOMPLETE) or the sender already holds a seat of the plan (ACCESS_REQUEST.ALREADY_HOLDS_ACCESS, with the seat in details). A request for new access is refused when the person already has one of the plan open (ACCESS_REQUEST.OPEN_REQUEST_EXISTS, details.requestId; GH-1, BR-MF1-01e).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -41318,18 +41306,6 @@
                         "requestId": "req_example"
                       }
                     }
-                  },
-                  "ACCESS_REQUEST.OPEN_LIMIT_REACHED": {
-                    "summary": "The person already has as many requests for new access open as they may.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "ACCESS_REQUEST.OPEN_LIMIT_REACHED",
-                        "message": "The person already has as many requests for new access open as they may.",
-                        "details": { "limit": 3, "openRequestIds": ["<request-id>"] },
-                        "requestId": "req_example"
-                      }
-                    }
                   }
                 }
               }
@@ -41378,7 +41354,7 @@
             }
           },
           "422": {
-            "description": "The form is incomplete or invalid (VALIDATION_ERROR): the reason and the term are required. The sender is the spending approver (REQUEST_PARTY.INELIGIBLE, with the sender in details.employeeIds). A person who already uses as many paid applications as the threshold must give manyPaidSoftwareReason (ACCESS_REQUEST.MANY_PAID_SOFTWARE_REASON_REQUIRED, details.count and details.threshold; GH-3). Nothing is written.",
+            "description": "The form is incomplete or invalid (VALIDATION_ERROR): the reason and the term are required. The sender is the spending approver (REQUEST_PARTY.INELIGIBLE, with the sender in details.employeeIds). A person who was already named in as many requests for new access this calendar week (Monday to Sunday, organization time zone; a request withdrawn or refused still counts) as the weekly limit allows is refused until the next Monday (ACCESS_REQUEST.OPEN_LIMIT_REACHED, details.limit and details.resetsOn; GH-2, BR-MF1-01f). Nothing is written.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -41411,14 +41387,14 @@
                       }
                     }
                   },
-                  "ACCESS_REQUEST.MANY_PAID_SOFTWARE_REASON_REQUIRED": {
-                    "summary": "The person uses many paid applications already: a reason is required to ask for another one.",
+                  "ACCESS_REQUEST.OPEN_LIMIT_REACHED": {
+                    "summary": "The person was already named in as many requests for new access this week as they may.",
                     "value": {
                       "success": false,
                       "error": {
-                        "code": "ACCESS_REQUEST.MANY_PAID_SOFTWARE_REASON_REQUIRED",
-                        "message": "The person uses many paid applications already: a reason is required to ask for another one.",
-                        "details": { "count": 10, "threshold": 10 },
+                        "code": "ACCESS_REQUEST.OPEN_LIMIT_REACHED",
+                        "message": "The person was already named in as many requests for new access this week as they may.",
+                        "details": { "limit": 10, "resetsOn": "2026-11-16" },
                         "requestId": "req_example"
                       }
                     }
@@ -43547,7 +43523,7 @@
             }
           },
           "409": {
-            "description": "The sender belongs to no department (ACCESS_REQUEST.NO_DEPARTMENT) or the department has no Cost Center in use yet (FINANCE.SETUP_INCOMPLETE). A proposal counts as a request for new access: the sender already has as many open as they may (ACCESS_REQUEST.OPEN_LIMIT_REACHED, GH-2, BR-MF1-01f).",
+            "description": "The sender belongs to no department (ACCESS_REQUEST.NO_DEPARTMENT) or the department has no Cost Center in use yet (FINANCE.SETUP_INCOMPLETE).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -43570,18 +43546,6 @@
                       "error": {
                         "code": "FINANCE.SETUP_INCOMPLETE",
                         "message": "The department has no Cost Center in use yet: Finance has to create one for it first.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "ACCESS_REQUEST.OPEN_LIMIT_REACHED": {
-                    "summary": "The person already has as many requests for new access open as they may.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "ACCESS_REQUEST.OPEN_LIMIT_REACHED",
-                        "message": "The person already has as many requests for new access open as they may.",
-                        "details": { "limit": 3, "openRequestIds": ["<request-id>"] },
                         "requestId": "req_example"
                       }
                     }
@@ -43633,7 +43597,7 @@
             }
           },
           "422": {
-            "description": "The form is incomplete or invalid (VALIDATION_ERROR): the name, the homepage, the purpose, the company data that will go through the software and the term are required. The sender is the spending approver (REQUEST_PARTY.INELIGIBLE). A person who already uses as many paid applications as the threshold must give manyPaidSoftwareReason (ACCESS_REQUEST.MANY_PAID_SOFTWARE_REASON_REQUIRED, details.count and details.threshold; GH-3). Nothing is written.",
+            "description": "The form is incomplete or invalid (VALIDATION_ERROR): the name, the homepage, the purpose, the company data that will go through the software and the term are required. The sender is the spending approver (REQUEST_PARTY.INELIGIBLE). A proposal counts as a request for new access: a person who was already named in as many requests for new access this calendar week (Monday to Sunday, organization time zone; a request withdrawn or refused still counts) as the weekly limit allows is refused until the next Monday (ACCESS_REQUEST.OPEN_LIMIT_REACHED, details.limit and details.resetsOn; GH-2, BR-MF1-01f). Nothing is written.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -43666,14 +43630,14 @@
                       }
                     }
                   },
-                  "ACCESS_REQUEST.MANY_PAID_SOFTWARE_REASON_REQUIRED": {
-                    "summary": "The person uses many paid applications already: a reason is required to ask for another one.",
+                  "ACCESS_REQUEST.OPEN_LIMIT_REACHED": {
+                    "summary": "The person was already named in as many requests for new access this week as they may.",
                     "value": {
                       "success": false,
                       "error": {
-                        "code": "ACCESS_REQUEST.MANY_PAID_SOFTWARE_REASON_REQUIRED",
-                        "message": "The person uses many paid applications already: a reason is required to ask for another one.",
-                        "details": { "count": 10, "threshold": 10 },
+                        "code": "ACCESS_REQUEST.OPEN_LIMIT_REACHED",
+                        "message": "The person was already named in as many requests for new access this week as they may.",
+                        "details": { "limit": 10, "resetsOn": "2026-11-16" },
                         "requestId": "req_example"
                       }
                     }
@@ -49735,7 +49699,7 @@
             }
           },
           "409": {
-            "description": "The seat cannot be renewed (RENEWAL_REQUEST.ASSIGNMENT_NOT_RENEWABLE, with the reason in details: it is a service account, another record follows it, it has ended, it has no end date, its grant is not done, or it is being revoked), it already has a renewal waiting (RENEWAL_REQUEST.ALREADY_REQUESTED), its window is not open yet (RENEWAL_REQUEST.WINDOW_NOT_OPEN, with details.opensOn and details.windowDays: a renewal is sent from RENEWAL_WINDOW_DAYS days before the approved end, BR-MF1-08a), the application is retired (ACCESS_REQUEST.APPLICATION_RETIRED) or, after the end, the person holds another seat of the tool (ACCESS_REQUEST.ALREADY_HOLDS_ACCESS). After the end the ask is a request for new access, so GH-1/GH-2 judge it too (ACCESS_REQUEST.OPEN_REQUEST_EXISTS, ACCESS_REQUEST.OPEN_LIMIT_REACHED). Nothing is written.",
+            "description": "The seat cannot be renewed (RENEWAL_REQUEST.ASSIGNMENT_NOT_RENEWABLE, with the reason in details: it is a service account, another record follows it, it has ended, it has no end date, its grant is not done, or it is being revoked), it already has a renewal waiting (RENEWAL_REQUEST.ALREADY_REQUESTED), its window is not open yet (RENEWAL_REQUEST.WINDOW_NOT_OPEN, with details.opensOn and details.windowDays: a renewal is sent from RENEWAL_WINDOW_DAYS days before the approved end, BR-MF1-08a), the application is retired (ACCESS_REQUEST.APPLICATION_RETIRED) or, after the end, the person holds another seat of the tool (ACCESS_REQUEST.ALREADY_HOLDS_ACCESS). After the end the ask is a request for new access, so GH-1 judges it too (ACCESS_REQUEST.OPEN_REQUEST_EXISTS). Nothing is written.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -49837,18 +49801,6 @@
                         "requestId": "req_example"
                       }
                     }
-                  },
-                  "ACCESS_REQUEST.OPEN_LIMIT_REACHED": {
-                    "summary": "The person already has as many requests for new access open as they may.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "ACCESS_REQUEST.OPEN_LIMIT_REACHED",
-                        "message": "The person already has as many requests for new access open as they may.",
-                        "details": { "limit": 3, "openRequestIds": ["<request-id>"] },
-                        "requestId": "req_example"
-                      }
-                    }
                   }
                 }
               }
@@ -49897,7 +49849,7 @@
             }
           },
           "422": {
-            "description": "The form is incomplete or invalid (VALIDATION_ERROR): the seat, the new end date (newEndDate; or, deprecated, the months more extensionMonths 1 to 12, exactly one of the two) and the reason are required, and nothing else is taken. The new end must be after the end the right has and at most twelve months after it (RENEWAL_REQUEST.END_DATE_OUT_OF_RANGE, with details.previousEndDate and details.maxEndDate). The sender or the holder of the seat is the spending approver (REQUEST_PARTY.INELIGIBLE). After the end, a holder who uses as many paid applications as the threshold must give manyPaidSoftwareReason (ACCESS_REQUEST.MANY_PAID_SOFTWARE_REASON_REQUIRED). Nothing is written.",
+            "description": "The form is incomplete or invalid (VALIDATION_ERROR): the seat, the new end date (newEndDate; or, deprecated, the months more extensionMonths 1 to 12, exactly one of the two) and the reason are required, and nothing else is taken. The new end must be after the end the right has and at most twelve months after it (RENEWAL_REQUEST.END_DATE_OUT_OF_RANGE, with details.previousEndDate and details.maxEndDate). The sender or the holder of the seat is the spending approver (REQUEST_PARTY.INELIGIBLE). After the end the ask is a request for new access, so GH-2 judges it too: a person who was already named in as many requests for new access this calendar week (Monday to Sunday, organization time zone; a request withdrawn or refused still counts) as the weekly limit allows is refused until the next Monday (ACCESS_REQUEST.OPEN_LIMIT_REACHED, details.limit and details.resetsOn; GH-2, BR-MF1-01f). Nothing is written.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -49930,14 +49882,14 @@
                       }
                     }
                   },
-                  "ACCESS_REQUEST.MANY_PAID_SOFTWARE_REASON_REQUIRED": {
-                    "summary": "The person uses many paid applications already: a reason is required to ask for another one.",
+                  "ACCESS_REQUEST.OPEN_LIMIT_REACHED": {
+                    "summary": "The person was already named in as many requests for new access this week as they may.",
                     "value": {
                       "success": false,
                       "error": {
-                        "code": "ACCESS_REQUEST.MANY_PAID_SOFTWARE_REASON_REQUIRED",
-                        "message": "The person uses many paid applications already: a reason is required to ask for another one.",
-                        "details": { "count": 10, "threshold": 10 },
+                        "code": "ACCESS_REQUEST.OPEN_LIMIT_REACHED",
+                        "message": "The person was already named in as many requests for new access this week as they may.",
+                        "details": { "limit": 10, "resetsOn": "2026-11-16" },
                         "requestId": "req_example"
                       }
                     }
@@ -98387,7 +98339,6 @@
                 "format": "date",
                 "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."
               },
-              "manyPaidSoftwareReason": { "type": "string", "minLength": 1, "maxLength": 1000 },
               "kind": { "type": "string", "enum": ["INDIVIDUAL"] }
             },
             "required": ["planId", "businessReason", "kind"],
@@ -98403,10 +98354,7 @@
                 "type": "array",
                 "items": {
                   "type": "object",
-                  "properties": {
-                    "employeeId": { "type": "string", "format": "uuid" },
-                    "manyPaidSoftwareReason": { "type": "string", "minLength": 1, "maxLength": 1000 }
-                  },
+                  "properties": { "employeeId": { "type": "string", "format": "uuid" } },
                   "required": ["employeeId"],
                   "additionalProperties": false
                 }
@@ -98691,23 +98639,6 @@
                     "enum": ["TRANSFER_GRACE", "ROLE_ENDED", null],
                     "nullable": true
                   },
-                  "flags": {
-                    "type": "object",
-                    "properties": {
-                      "manyPaidSoftware": {
-                        "type": "object",
-                        "properties": {
-                          "count": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
-                          "reason": { "type": "string" }
-                        },
-                        "required": ["count", "reason"],
-                        "additionalProperties": false,
-                        "nullable": true
-                      }
-                    },
-                    "required": ["manyPaidSoftware"],
-                    "additionalProperties": false
-                  },
                   "renewal": {
                     "type": "object",
                     "properties": {
@@ -99004,7 +98935,6 @@
                   "expectedEndDate",
                   "serviceAccount",
                   "limitExemption",
-                  "flags",
                   "renewal",
                   "spend",
                   "budgetYear",
@@ -99036,8 +98966,7 @@
             "type": "string",
             "format": "date",
             "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."
-          },
-          "manyPaidSoftwareReason": { "type": "string", "minLength": 1, "maxLength": 1000 }
+          }
         },
         "required": ["planId", "businessReason"],
         "additionalProperties": false
@@ -99219,23 +99148,6 @@
                     "enum": ["TRANSFER_GRACE", "ROLE_ENDED", null],
                     "nullable": true
                   },
-                  "flags": {
-                    "type": "object",
-                    "properties": {
-                      "manyPaidSoftware": {
-                        "type": "object",
-                        "properties": {
-                          "count": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
-                          "reason": { "type": "string" }
-                        },
-                        "required": ["count", "reason"],
-                        "additionalProperties": false,
-                        "nullable": true
-                      }
-                    },
-                    "required": ["manyPaidSoftware"],
-                    "additionalProperties": false
-                  },
                   "renewal": {
                     "type": "object",
                     "properties": {
@@ -99532,7 +99444,6 @@
                   "expectedEndDate",
                   "serviceAccount",
                   "limitExemption",
-                  "flags",
                   "renewal",
                   "spend",
                   "budgetYear",
@@ -99654,14 +99565,7 @@
                         "maximum": 9007199254740991,
                         "minimum": 0
                       },
-                      "paidSoftwareCount": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
-                      "paidSoftwareThreshold": {
-                        "type": "integer",
-                        "exclusiveMinimum": true,
-                        "maximum": 9007199254740991,
-                        "minimum": 0
-                      },
-                      "reasonRequired": { "type": "boolean" },
+                      "resetsOn": { "type": "string" },
                       "refusal": {
                         "type": "string",
                         "enum": ["HAS_OPEN_REQUEST", "OPEN_LIMIT_REACHED", null],
@@ -99669,15 +99573,7 @@
                       },
                       "openRequestId": { "type": "string", "format": "uuid", "nullable": true }
                     },
-                    "required": [
-                      "openNewCount",
-                      "openNewMax",
-                      "paidSoftwareCount",
-                      "paidSoftwareThreshold",
-                      "reasonRequired",
-                      "refusal",
-                      "openRequestId"
-                    ],
+                    "required": ["openNewCount", "openNewMax", "resetsOn", "refusal", "openRequestId"],
                     "additionalProperties": false
                   },
                   "limitExemption": {
@@ -100088,23 +99984,6 @@
                         "enum": ["TRANSFER_GRACE", "ROLE_ENDED", null],
                         "nullable": true
                       },
-                      "flags": {
-                        "type": "object",
-                        "properties": {
-                          "manyPaidSoftware": {
-                            "type": "object",
-                            "properties": {
-                              "count": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
-                              "reason": { "type": "string" }
-                            },
-                            "required": ["count", "reason"],
-                            "additionalProperties": false,
-                            "nullable": true
-                          }
-                        },
-                        "required": ["manyPaidSoftware"],
-                        "additionalProperties": false
-                      },
                       "renewal": {
                         "type": "object",
                         "properties": {
@@ -100407,7 +100286,6 @@
                       "expectedEndDate",
                       "serviceAccount",
                       "limitExemption",
-                      "flags",
                       "renewal",
                       "spend",
                       "budgetYear",
@@ -100556,8 +100434,7 @@
             "type": "string",
             "format": "date",
             "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."
-          },
-          "manyPaidSoftwareReason": { "type": "string", "minLength": 1, "maxLength": 1000 }
+          }
         },
         "required": ["softwareName", "homepageUrl", "purpose", "dataDescription", "expectedUsers"],
         "additionalProperties": false
@@ -103287,8 +103164,7 @@
             "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."
           },
           "extensionMonths": { "type": "integer", "minimum": 1, "maximum": 12 },
-          "businessReason": { "type": "string", "minLength": 1, "maxLength": 1000 },
-          "manyPaidSoftwareReason": { "type": "string", "minLength": 1, "maxLength": 1000 }
+          "businessReason": { "type": "string", "minLength": 1, "maxLength": 1000 }
         },
         "required": ["assignmentId", "businessReason"],
         "additionalProperties": false
@@ -103470,23 +103346,6 @@
                     "type": "string",
                     "enum": ["TRANSFER_GRACE", "ROLE_ENDED", null],
                     "nullable": true
-                  },
-                  "flags": {
-                    "type": "object",
-                    "properties": {
-                      "manyPaidSoftware": {
-                        "type": "object",
-                        "properties": {
-                          "count": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
-                          "reason": { "type": "string" }
-                        },
-                        "required": ["count", "reason"],
-                        "additionalProperties": false,
-                        "nullable": true
-                      }
-                    },
-                    "required": ["manyPaidSoftware"],
-                    "additionalProperties": false
                   },
                   "renewal": {
                     "type": "object",
@@ -103784,7 +103643,6 @@
                   "expectedEndDate",
                   "serviceAccount",
                   "limitExemption",
-                  "flags",
                   "renewal",
                   "spend",
                   "budgetYear",
@@ -104256,10 +104114,7 @@
             "type": "array",
             "items": {
               "type": "object",
-              "properties": {
-                "employeeId": { "type": "string", "format": "uuid" },
-                "manyPaidSoftwareReason": { "type": "string", "minLength": 1, "maxLength": 1000 }
-              },
+              "properties": { "employeeId": { "type": "string", "format": "uuid" } },
               "required": ["employeeId"],
               "additionalProperties": false
             }
@@ -104334,24 +104189,13 @@
                         "HAS_OPEN_REQUEST",
                         "TERM_REQUIRED",
                         "OPEN_LIMIT_REACHED",
-                        "MANY_PAID_SOFTWARE_REASON_REQUIRED",
                         "DUPLICATE_LINE",
                         null
                       ],
                       "nullable": true
-                    },
-                    "manyPaidSoftware": {
-                      "type": "object",
-                      "properties": {
-                        "count": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
-                        "threshold": { "type": "integer", "minimum": -9007199254740991, "maximum": 9007199254740991 }
-                      },
-                      "required": ["count", "threshold"],
-                      "additionalProperties": false,
-                      "nullable": true
                     }
                   },
-                  "required": ["employeeId", "ok", "reason", "manyPaidSoftware"],
+                  "required": ["employeeId", "ok", "reason"],
                   "additionalProperties": false
                 }
               },
@@ -104618,23 +104462,6 @@
                     "type": "string",
                     "enum": ["TRANSFER_GRACE", "ROLE_ENDED", null],
                     "nullable": true
-                  },
-                  "flags": {
-                    "type": "object",
-                    "properties": {
-                      "manyPaidSoftware": {
-                        "type": "object",
-                        "properties": {
-                          "count": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
-                          "reason": { "type": "string" }
-                        },
-                        "required": ["count", "reason"],
-                        "additionalProperties": false,
-                        "nullable": true
-                      }
-                    },
-                    "required": ["manyPaidSoftware"],
-                    "additionalProperties": false
                   },
                   "renewal": {
                     "type": "object",
@@ -104932,7 +104759,6 @@
                   "expectedEndDate",
                   "serviceAccount",
                   "limitExemption",
-                  "flags",
                   "renewal",
                   "spend",
                   "budgetYear",
@@ -105661,23 +105487,6 @@
                       "additionalProperties": false
                     },
                     "reserveUsed": { "type": "boolean" },
-                    "flags": {
-                      "type": "object",
-                      "properties": {
-                        "manyPaidSoftware": {
-                          "type": "object",
-                          "properties": {
-                            "count": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
-                            "reason": { "type": "string" }
-                          },
-                          "required": ["count", "reason"],
-                          "additionalProperties": false,
-                          "nullable": true
-                        }
-                      },
-                      "required": ["manyPaidSoftware"],
-                      "additionalProperties": false
-                    },
                     "awaitingMe": { "type": "boolean" }
                   },
                   "required": [
@@ -105701,7 +105510,6 @@
                     "requester",
                     "department",
                     "reserveUsed",
-                    "flags",
                     "awaitingMe"
                   ],
                   "additionalProperties": false
@@ -105901,24 +105709,7 @@
                       "required": ["id", "code", "name"],
                       "additionalProperties": false
                     },
-                    "reserveUsed": { "type": "boolean" },
-                    "flags": {
-                      "type": "object",
-                      "properties": {
-                        "manyPaidSoftware": {
-                          "type": "object",
-                          "properties": {
-                            "count": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
-                            "reason": { "type": "string" }
-                          },
-                          "required": ["count", "reason"],
-                          "additionalProperties": false,
-                          "nullable": true
-                        }
-                      },
-                      "required": ["manyPaidSoftware"],
-                      "additionalProperties": false
-                    }
+                    "reserveUsed": { "type": "boolean" }
                   },
                   "required": [
                     "id",
@@ -105940,8 +105731,7 @@
                     "withdrawal",
                     "requester",
                     "department",
-                    "reserveUsed",
-                    "flags"
+                    "reserveUsed"
                   ],
                   "additionalProperties": false
                 }
