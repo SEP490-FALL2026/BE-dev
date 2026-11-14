@@ -24,6 +24,14 @@ export class DepartmentSoftwareProposalNotFoundError extends Error {
   }
 }
 
+/** The IT Admin who accepts or rejects is the person who made the proposal (`SoD-4`): another IT Admin in charge decides it. */
+export class DepartmentSoftwareOwnProposalError extends Error {
+  constructor() {
+    super('A proposal is not decided by the person who made it.');
+    this.name = 'DepartmentSoftwareOwnProposalError';
+  }
+}
+
 /** The department already has an open proposal for the place (the partial unique index said so). */
 export class DepartmentSoftwareProposalOpenError extends Error {
   constructor() {

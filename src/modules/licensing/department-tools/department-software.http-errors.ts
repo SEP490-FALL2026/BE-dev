@@ -6,6 +6,7 @@ import { DepartmentSoftwareNoteInvalidError, DepartmentSoftwareNotInCatalogError
 import {
   DepartmentSoftwareAlreadyListedError,
   DepartmentSoftwareEntryNotFoundError,
+  DepartmentSoftwareOwnProposalError,
   DepartmentSoftwareProposalDecidedError,
   DepartmentSoftwareProposalNotFoundError,
   DepartmentSoftwareProposalOpenError,
@@ -15,7 +16,7 @@ import {
  * Maps the refusals of the routes of the list of software of a department and of its proposals to their codes (`DEPARTMENT_SOFTWARE.*`);
  * the rest (the department that does not exist, the one that is out of scope) goes to the licensing mapper. What the catalog does not offer
  * is a 422 and names every place; a place already listed, an open proposal and a decided one are 409, a place or a proposal that is not there
- * is a 404.
+ * is a 404. Deciding the proposal one made is a 403 (`SoD-4`): the caller is an IT Admin of the department, and still not the one who decides.
  */
 export function toDepartmentSoftwareApiException(error: unknown): unknown {
   if (error instanceof DepartmentSoftwareNotInCatalogError) {
@@ -52,6 +53,12 @@ export function toDepartmentSoftwareApiException(error: unknown): unknown {
       message: error.message,
     });
   }
+  if (error instanceof DepartmentSoftwareOwnProposalError) {
+    return new ApiException(HttpStatus.FORBIDDEN, {
+      code: 'DEPARTMENT_SOFTWARE.OWN_PROPOSAL',
+      message: error.message,
+    });
+  }
   if (error instanceof DepartmentSoftwareProposalOpenError) {
     return new ApiException(HttpStatus.CONFLICT, {
       code: 'DEPARTMENT_SOFTWARE.PROPOSAL_ALREADY_OPEN',
@@ -78,6 +85,7 @@ export const DEPARTMENT_SOFTWARE_ERROR_EXAMPLES = {
   ALREADY_LISTED: example(new DepartmentSoftwareAlreadyListedError([PLACE])),
   ENTRY_NOT_FOUND: example(new DepartmentSoftwareEntryNotFoundError(['entry-id'])),
   PROPOSAL_NOT_FOUND: example(new DepartmentSoftwareProposalNotFoundError()),
+  OWN_PROPOSAL: example(new DepartmentSoftwareOwnProposalError()),
   PROPOSAL_ALREADY_OPEN: example(new DepartmentSoftwareProposalOpenError()),
   PROPOSAL_NOT_PENDING: example(new DepartmentSoftwareProposalDecidedError()),
 } as const;

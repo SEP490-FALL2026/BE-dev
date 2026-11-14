@@ -76,6 +76,20 @@ export function decisionRefusal(state: 'PENDING' | 'ACCEPTED' | 'REJECTED'): Dec
   return state === 'PENDING' ? null : 'NOT_PENDING';
 }
 
+export type DecidedByRefusal = 'OWN_PROPOSAL';
+
+/**
+ * Nobody decides the proposal they made (`SoD-4`): the one who proposes and the one who accepts or rejects are two people. A person holds one
+ * role, so the two meet only when the head who proposed was changed to IT Admin afterwards; whatever role they hold now, the proposal is not
+ * theirs to decide, and another IT Admin in charge of the department does.
+ */
+export function decidedByRefusal(
+  decider: { employeeId: string },
+  proposal: { proposedByEmployeeId: string },
+): DecidedByRefusal | null {
+  return decider.employeeId === proposal.proposedByEmployeeId ? 'OWN_PROPOSAL' : null;
+}
+
 /** The longest note a place of the list keeps (the CHECK of `department_software_entries`, and the schema of the routes). */
 export const SOFTWARE_NOTE_MAX = 500;
 

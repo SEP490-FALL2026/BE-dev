@@ -12,11 +12,13 @@ import { DepartmentSoftwareViewService } from './department-software-view.servic
 import type { SoftwareProposalWire } from './department-software.dto';
 import {
   DepartmentSoftwareAlreadyListedError,
+  DepartmentSoftwareOwnProposalError,
   DepartmentSoftwareProposalDecidedError,
   DepartmentSoftwareProposalNotFoundError,
   DepartmentSoftwareProposalOpenError,
 } from './department-software.errors';
 import {
+  decidedByRefusal,
   decisionRefusal,
   mayChangeList,
   proposerDepartment,
@@ -31,7 +33,7 @@ const place = (item: DepartmentSoftwareItem) => ({ applicationId: item.applicati
  * The proposals of the head of a department to add software to its list (`QĐ-110t`, `QĐ-111c`, SPEC P18). Only the head proposes, for the
  * department they lead, and only a place the catalog offers; one open proposal for each place is decided by the unique index, so a second is
  * a conflict and nothing is checked before the insert. The IT Admin in charge accepts (the place goes in the list, at once and once) or rejects
- * with a reason; a proposal is decided once, by whoever's update finds it still open. A proposal an IT Admin is not in charge of is not found. Each
+ * with a reason, and never one they proposed themselves (`SoD-4`); a proposal is decided once, by whoever's update finds it still open. A proposal an IT Admin is not in charge of is not found. Each
  * step is one transaction with its Audit Trail event and its notice: the IT Admin is told of a proposal, the head of its decision.
  */
 @Injectable()
@@ -101,7 +103,7 @@ export class DepartmentSoftwareProposalService {
   /**
    * Accepts the proposal: the place goes in the list (nothing to write when an IT Admin put it there meanwhile) and the head is told. A place
    * the catalog no longer offers is refused: the IT Admin rejects it. Throws DepartmentSoftwareProposalNotFoundError,
-   * DepartmentSoftwareNotInCatalogError and DepartmentSoftwareProposalDecidedError.
+   * DepartmentSoftwareOwnProposalError, DepartmentSoftwareNotInCatalogError and DepartmentSoftwareProposalDecidedError.
    */
   async accept(
     actor: AuthenticatedPrincipal,
@@ -126,7 +128,7 @@ export class DepartmentSoftwareProposalService {
     return { proposal: (await this.view.proposals([done.decided]))[0], entryId: done.entryId };
   }
 
-  /** Rejects the proposal with the reason the head reads (`QĐ-110t`). Throws DepartmentSoftwareProposalNotFoundError and DepartmentSoftwareProposalDecidedError. */
+  /** Rejects the proposal with the reason the head reads (`QĐ-110t`). Throws DepartmentSoftwareProposalNotFoundError, DepartmentSoftwareOwnProposalError and DepartmentSoftwareProposalDecidedError. */
   async reject(actor: AuthenticatedPrincipal, proposalId: string, reason: string): Promise<SoftwareProposalWire> {
     const proposal = await this.inCharge(actor, proposalId);
     const organization = await this.requireOrganization();
@@ -143,12 +145,17 @@ export class DepartmentSoftwareProposalService {
     return (await this.view.proposals([decided]))[0];
   }
 
-  /** The proposal, for an IT Admin in charge of its department: one of another department is not found, as one that is not there. */
+  /**
+   * The proposal, for an IT Admin in charge of its department: one of another department is not found, as one that is not there. The person
+   * who made it does not decide it (`SoD-4`): that is asked of the one who can see it, after the scope, and before anything is written.
+   */
   private async inCharge(actor: AuthenticatedPrincipal, proposalId: string): Promise<SoftwareProposal> {
     const proposal = await this.repo.findProposal(proposalId);
     if (!proposal) throw new DepartmentSoftwareProposalNotFoundError();
     const inItAdminScope = (await this.access.itAdminScope(actor)).has(proposal.departmentId);
     if (!mayChangeList({ roles: actor.roles, inItAdminScope })) throw new DepartmentSoftwareProposalNotFoundError();
+    if (decidedByRefusal({ employeeId: actor.employeeId }, proposal) !== null)
+      throw new DepartmentSoftwareOwnProposalError();
 
     return proposal;
   }
