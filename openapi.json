@@ -101386,6 +101386,37 @@
                     "maximum": 9007199254740991,
                     "minimum": 0
                   },
+                  "nextYearBudget": {
+                    "type": "object",
+                    "properties": {
+                      "year": { "type": "integer", "minimum": -9007199254740991, "maximum": 9007199254740991 },
+                      "approved": {
+                        "type": "object",
+                        "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                        "required": ["amount", "currency"],
+                        "additionalProperties": false,
+                        "nullable": true
+                      },
+                      "remaining": {
+                        "type": "object",
+                        "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                        "required": ["amount", "currency"],
+                        "additionalProperties": false,
+                        "nullable": true
+                      },
+                      "remainingAfter": {
+                        "type": "object",
+                        "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                        "required": ["amount", "currency"],
+                        "additionalProperties": false,
+                        "nullable": true
+                      },
+                      "warning": { "type": "boolean" }
+                    },
+                    "required": ["year", "approved", "remaining", "remainingAfter", "warning"],
+                    "additionalProperties": false,
+                    "nullable": true
+                  },
                   "ranAt": { "type": "string", "format": "date-time" }
                 },
                 "required": [
@@ -101400,6 +101431,7 @@
                   "primaryCode",
                   "bindingTotal",
                   "yearCount",
+                  "nextYearBudget",
                   "ranAt"
                 ],
                 "additionalProperties": false
