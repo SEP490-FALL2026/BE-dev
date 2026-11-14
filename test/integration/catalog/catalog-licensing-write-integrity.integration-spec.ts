@@ -23,6 +23,23 @@ async function sqlState(client: Client, text: string, values: unknown[] = []): P
   }
 }
 
+/** The SQLSTATE and the constraint a rejected statement names: which rule of the database said no, not only that one did. */
+async function refusalOf(
+  client: Client,
+  text: string,
+  values: unknown[] = [],
+): Promise<{ code: string; constraint: string | null } | null> {
+  try {
+    await client.query(text, values);
+
+    return null;
+  } catch (error) {
+    const { code, constraint } = error as { code?: string; constraint?: string };
+
+    return { code: code ?? 'unknown', constraint: constraint ?? null };
+  }
+}
+
 describe('write integrity of catalog, finance and licensing (integration, DB-03, DB-07 to DB-11, DB-14)', () => {
   let holder: Client;
   const sql = () => h.ctx.sql;
@@ -457,7 +474,37 @@ describe('write integrity of catalog, finance and licensing (integration, DB-03,
       expect(h.codeOf(response)).toBe('PLAN.IN_USE_BLOCKS_CHANGE');
       expect(h.detailsOf(response)).toEqual({ reason: 'TERM_SUBSCRIPTIONS' });
       expect(await kindOf(plan)).toEqual(before);
-      expect(await sqlState(sql(), `UPDATE plans SET provisioning_type = 'K4' WHERE id = $1`, [plan])).toBe('23514');
+      expect(await refusalOf(sql(), `UPDATE plans SET provisioning_type = 'K4' WHERE id = $1`, [plan])).toEqual({
+        code: '23514',
+        constraint: 'plans_change_keeps_terms',
+      });
+    }, 60_000);
+
+    it('refuses the same for a plan of seats (K2) with the profile of its workspace admins, and leaves the profile as it was', async () => {
+      const subscription = await h.subscription(10, 'K2');
+      const plan = await planOfSubscription(subscription);
+      const before = await kindOf(plan);
+      const profileOf = async () =>
+        (
+          await sql().query<{ profiles: string; admins: string }>(
+            `SELECT (SELECT count(*) FROM plan_workspace_profiles WHERE plan_id = $1)::text AS profiles,
+                    (SELECT count(*) FROM plan_workspace_admins WHERE plan_id = $1)::text AS admins`,
+            [plan],
+          )
+        ).rows[0];
+      expect(await profileOf()).toEqual({ profiles: '1', admins: '2' });
+
+      const response = await patchPlan(plan, { provisioningType: 'K4' });
+
+      expect(response.status).toBe(409);
+      expect(h.codeOf(response)).toBe('PLAN.IN_USE_BLOCKS_CHANGE');
+      expect(h.detailsOf(response)).toEqual({ reason: 'TERM_SUBSCRIPTIONS' });
+      expect(await kindOf(plan)).toEqual(before);
+      expect(await profileOf()).toEqual({ profiles: '1', admins: '2' });
+      expect(await refusalOf(sql(), `UPDATE plans SET provisioning_type = 'K4' WHERE id = $1`, [plan])).toEqual({
+        code: '23514',
+        constraint: 'plans_change_keeps_terms',
+      });
     }, 60_000);
 
     it('lets a plan with no subscription enter K4, and a plan that is K4 already stays K4 (the trigger looks at the change of kind only)', async () => {
