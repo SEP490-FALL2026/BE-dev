@@ -3,7 +3,7 @@ import { toDateColumn, type BusinessDate } from '../../../core/business-date';
 import { Prisma } from '../../../generated/prisma/client';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
-import type { RuleSubscription } from '../public/catalog.types';
+import type { RuleSubscription, StockPlanFilter, StockPlanPage } from '../public/catalog.types';
 
 /**
  * A period a seat can still be taken from on `today` as far as its successor goes (`BR-MF1-09a`): no later period continues it, or the one
@@ -30,6 +30,66 @@ export class SubscriptionGrantingRepo {
     });
 
     return new Set(rows.flatMap((row) => (row.renewedFromId === null ? [] : [row.renewedFromId])));
+  }
+
+  /**
+   * One page of the plans that give out seats (K2), keys (K4) or personal accounts (K1), each with the subscriptions a seat can be taken
+   * from on `today`: the shared pool of the plan as a grant reads it (active, not taken over by a later period, not ended). A plan with no
+   * such subscription is not listed, and with an IT Admin named only the subscriptions that person answers for count, so the plans of
+   * the others do not appear. By application, plan then id, and the total for the same filter, from one snapshot.
+   */
+  async pageStockPlans(filter: StockPlanFilter): Promise<StockPlanPage> {
+    const grantable: Prisma.SubscriptionWhereInput = {
+      status: 'ACTIVE',
+      ...(filter.responsibleItAdminEmployeeId
+        ? { responsibleItAdminEmployeeId: filter.responsibleItAdminEmployeeId }
+        : {}),
+      AND: [
+        notTakenOverOn(filter.today),
+        { OR: [{ endDate: null }, { endDate: { gte: toDateColumn(filter.today) } }] },
+      ],
+    };
+    const where: Prisma.PlanWhereInput = {
+      provisioningType: { in: ['K1', 'K2', 'K4'] },
+      ...(filter.planId ? { id: filter.planId } : {}),
+      subscriptions: { some: grantable },
+    };
+
+    return this.prisma.$transaction(
+      async (tx) => {
+        const rows = await tx.plan.findMany({
+          where,
+          select: {
+            id: true,
+            name: true,
+            provisioningType: true,
+            application: { select: { id: true, name: true, logoUrl: true } },
+            subscriptions: { where: grantable, select: { id: true, purchasedQuantity: true }, orderBy: { id: 'asc' } },
+          },
+          orderBy: [{ application: { normalizedName: 'asc' } }, { normalizedName: 'asc' }, { id: 'asc' }],
+          skip: filter.skip,
+          take: filter.take,
+        });
+
+        return {
+          items: rows.map((row) => ({
+            planId: row.id,
+            planName: row.name,
+            // The filter keeps K1, K2 and K4 plans only.
+            provisioningType: row.provisioningType as 'K1' | 'K2' | 'K4',
+            applicationId: row.application.id,
+            applicationName: row.application.name,
+            applicationLogoUrl: row.application.logoUrl,
+            subscriptions: row.subscriptions.map((subscription) => ({
+              subscriptionId: subscription.id,
+              purchasedQuantity: subscription.purchasedQuantity,
+            })),
+          })),
+          total: await tx.plan.count({ where }),
+        };
+      },
+      { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead },
+    );
   }
 
   /**

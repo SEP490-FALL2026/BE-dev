@@ -332,6 +332,7 @@ export const SUCCESS_MESSAGES: Readonly<Record<string, string>> = {
   stepCongestionIncidentRecord: 'STEP_CONGESTION.INCIDENT_RECORDED',
   stepCongestionList: 'STEP_CONGESTION.LISTED',
   stepCongestionStepList: 'STEP_CONGESTION.STEPS_LISTED',
+  stockSummaryList: 'STOCK_SUMMARY.LISTED',
   subscriptionComplete: 'SUBSCRIPTION.COMPLETED',
   subscriptionDeadlineEventList: 'SUBSCRIPTION_DEADLINE_EVENT.LISTED',
   subscriptionCreate: 'SUBSCRIPTION.CREATED',

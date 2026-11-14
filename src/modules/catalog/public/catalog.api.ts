@@ -14,6 +14,8 @@ import type {
   PlanUsageRate,
   PoolSubscription,
   RuleSubscription,
+  StockPlanFilter,
+  StockPlanPage,
   SubscriptionPrice,
   WorkspaceDuty,
   SeatTarget,
@@ -163,6 +165,16 @@ export class CatalogApi {
     tx?: DbTx,
   ): Promise<Map<string, PoolSubscription[]>> {
     return this.subscriptions.grantableOfPlans(planIds, today, tx);
+  }
+
+  /**
+   * One page of the plans that give out seats (K2), keys (K4) or personal accounts (K1), by application then plan, each with the subscriptions a seat
+   * can be taken from today (the shared pool of the plan, `getGrantableSubscriptions`) and the total for the same filter, from one snapshot: what
+   * the stock summary of the IT Admin counts over (`QĐ-111n`). A plan with no such subscription is absent; with `responsibleItAdminEmployeeId`
+   * only that IT Admin's subscriptions count.
+   */
+  getStockPlans(filter: StockPlanFilter): Promise<StockPlanPage> {
+    return this.subscriptions.stockPlansPage(filter);
   }
 
   /**

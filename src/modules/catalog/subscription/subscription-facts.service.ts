@@ -7,7 +7,13 @@ import { SubscriptionPoolService } from './pool/subscription-pool.service';
 import { SubscriptionGrantingRepo } from './subscription-granting.repo';
 import { SubscriptionPriceService } from './price/subscription-price.service';
 import { SubscriptionRepo } from './subscription.repo';
-import type { BaselineSubscription, RuleSubscription, SubscriptionPrice } from '../public/catalog.types';
+import type {
+  BaselineSubscription,
+  RuleSubscription,
+  StockPlanFilter,
+  StockPlanPage,
+  SubscriptionPrice,
+} from '../public/catalog.types';
 import type { SubscriptionKind } from './subscription.types';
 
 /** What the rules of another capability need to know of the subscriptions of some plans: their kind and their end. */
@@ -64,6 +70,11 @@ export class SubscriptionFactsService {
   /** The subscriptions a seat can be taken from today for many plans, in one read, by plan, each in the order a grant takes them. */
   grantableOfPlans(planIds: readonly string[], today: BusinessDate, tx?: DbTx) {
     return this.subscriptions.findGrantableOfPlans(planIds, today, tx);
+  }
+
+  /** One page of the plans that give out seats, keys or personal accounts, each with the subscriptions a seat can be taken from today (see `CatalogApi.getStockPlans`). */
+  stockPlansPage(filter: StockPlanFilter): Promise<StockPlanPage> {
+    return this.granting.pageStockPlans(filter);
   }
 
   /**

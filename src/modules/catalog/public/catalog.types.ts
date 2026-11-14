@@ -1,3 +1,5 @@
+import type { BusinessDate } from '../../../core/business-date';
+
 /** What a seat is held against: a subscription of a paid plan, or an internal plan that has no subscription. */
 export type SeatTargetRef = { subscriptionId: string } | { planId: string };
 
@@ -46,6 +48,37 @@ export interface PoolSubscription {
   purchasedQuantity: number | null;
   /** The subscription that prices the plan (`Q-04`): the one a grant that names no subscription takes first. */
   isPrimaryForPlan: boolean;
+}
+
+/**
+ * A plan that gives out seats (K2), keys (K4) or personal accounts (K1), with the subscriptions they sit on today: the shared pool of the plan,
+ * as a grant reads it (`PoolSubscription`). What the stock summary of the IT Admin counts the plan over (`QĐ-111n`).
+ */
+export interface StockPlan {
+  planId: string;
+  planName: string;
+  provisioningType: 'K1' | 'K2' | 'K4';
+  applicationId: string;
+  applicationName: string;
+  /** The https link the IT Admin pasted for the logo of the application, never checked, or null. */
+  applicationLogoUrl: string | null;
+  subscriptions: { subscriptionId: string; purchasedQuantity: number | null }[];
+}
+
+/** A page of plans by application then plan, and how many there are in all for the same filter. */
+export interface StockPlanPage {
+  items: StockPlan[];
+  total: number;
+}
+
+/** Which plans a stock summary lists: those with a subscription a seat can be taken from on `today`, of this IT Admin only when named (`QĐ-111n`). */
+export interface StockPlanFilter {
+  today: BusinessDate;
+  /** Only the subscriptions this IT Admin answers for, and the plans that have one. */
+  responsibleItAdminEmployeeId?: string;
+  planId?: string;
+  skip: number;
+  take: number;
 }
 
 /** What one subscription is bought at: the price a seat granted from it would have cost (`QĐ-106e`). */

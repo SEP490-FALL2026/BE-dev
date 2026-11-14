@@ -121,6 +121,11 @@ dịch vụ nào đọc cả ghế lẫn thu hồi thì đứng trên cả hai (
   `DepartmentSoftwareProposalService` (một transaction mỗi bước: Audit + thông báo), `DepartmentSoftwareNotice` (`DEPARTMENT_SOFTWARE_PROPOSED` tới IT phụ trách, hoặc mọi IT Admin dùng
   được khi chưa có; `DEPARTMENT_SOFTWARE_PROPOSAL_DECIDED` tới trưởng phòng đã đề xuất, kèm lý do khi từ chối).
 - `seat-baseline/` — xem/đóng baseline ghế (US-02-05 AC-6); `seat-baseline.controller.ts`; `SeatBaselineService`.
+- `stock-summary/` — `GET /stock-summary` (IT Admin, `QĐ-111n`): kho đếm theo kiểu cấp, một dòng cho mỗi gói chứ không cho mỗi bản ghi thuê bao. `stock.kind`
+  `SEATS` (K2: `purchased`, `assigned`, `free`, `revoking`; `purchased` và `free` là null khi một thuê bao chưa có số lượng), `KEYS` (K4: `inStore`, `assigned`, `withdrawn`
+  đếm khóa), `HOLDERS` (K1: số quyền đang giữ). Đếm trên thuê bao cấp được hôm nay (`CatalogApi.getStockPlans`), cùng nghĩa với kho của hàng cấp: ghế qua
+  `SharedPoolCapacityRepo.occupancyOfMany`, khóa qua `LicenseKeyRepo.countsOfSubscriptions`, quyền qua `AssignmentRepo.countHoldingOfSubscriptions` (mỗi loại một câu lệnh
+  cho cả trang). `mine=true` giữ gói có thuê bao mình phụ trách và chỉ đếm các thuê bao đó; không lọc theo phòng (kho không của phòng, `FR-1.12`). `stock-summary.policy.ts` thuần.
 - `provisioning/` — task grant và thu hồi; `revocation.service.ts` (mở thu hồi) với `RevocationTaskFactory`,
   `RevocationRecorder`, `revocation-open.policy.ts`; `provisioning.policy.ts`. Con: `tasks/`
   (`provisioning-tasks.controller.ts`; grant: `ProvisioningGrantService` → `ProvisioningGrantPlanner` (xét trước khóa) +

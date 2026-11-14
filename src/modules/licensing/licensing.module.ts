@@ -128,6 +128,8 @@ import { SharedPoolCapacityRepo } from './shared-pool/shared-pool-capacity.repo'
 import { SharedPoolService } from './shared-pool/shared-pool.service';
 import { SeatBaselineRepo } from './seat-baseline/seat-baseline.repo';
 import { SeatBaselineService } from './seat-baseline/seat-baseline.service';
+import { StockSummaryController } from './stock-summary/stock-summary.controller';
+import { StockSummaryQueryService } from './stock-summary/stock-summary-query.service';
 import { RenewalAlertsService } from './subscription-renewal/alerts/renewal-alerts.service';
 import { RenewalDeadlineService } from './subscription-renewal/deadline/renewal-deadline.service';
 import { RenewalDecisionTrail } from './subscription-renewal/decision/renewal-decision-trail.service';
@@ -177,6 +179,7 @@ import { SubscriptionRenewalsController } from './subscription-renewal/subscript
     SaasIssuesController,
     MySoftwareController,
     SubscriptionRenewalsController,
+    StockSummaryController,
   ],
   providers: [
     LicensingAlerts,
@@ -210,6 +213,7 @@ import { SubscriptionRenewalsController } from './subscription-renewal/subscript
     SharedPoolCapacityRepo,
     SharedPoolAvoidedCostRepo,
     SharedPoolService,
+    StockSummaryQueryService,
     ProvisioningTaskRepo,
     ProvisioningTaskFrame,
     ProvisioningHolderService,

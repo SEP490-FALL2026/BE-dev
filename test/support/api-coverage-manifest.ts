@@ -105,6 +105,7 @@ export const API_COVERAGE_MANIFEST: readonly string[] = [
   'POST /api/v1/access-requests/{id}/spend-approval',
   'POST /api/v1/spend-batches/{id}/decisions',
   'GET /api/v1/grant-queue',
+  'GET /api/v1/stock-summary',
   'GET /api/v1/budget-cycles',
   'POST /api/v1/budget-cycles',
   'GET /api/v1/budget-cycles/{year}',

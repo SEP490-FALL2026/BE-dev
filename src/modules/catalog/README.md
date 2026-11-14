@@ -30,6 +30,9 @@ unitPrice, reportingUnitPrice, billingCycle }`, thuê bao `PERPETUAL` có giá �
   - `getGrantableSubscriptions(planId, today, tx?)` / `getGrantableSubscriptionsOfPlans` (nhiều plan, một lần đọc) — thuê bao `ACTIVE` còn hiệu lực hôm
     nay, chưa bị kỳ kế tiếp `ACTIVE` đã bắt đầu thay (kỳ đang chạy và kỳ kế tiếp ghi trước ngày bắt đầu cùng là kho; bản `DRAFT` không cấp được), thứ tự:
     thuê bao chính trước, rồi giá tháng quy đổi cao nhất (`orderBySourcePreference`); `getSubscriptionPrice` (kèm giá quy đổi; `PERPETUAL` ⟹ `ONE_TIME`).
+  - `getStockPlans({ today, responsibleItAdminEmployeeId?, planId?, skip, take })` — một trang gói K1/K2/K4 theo ứng dụng rồi gói, mỗi gói kèm các thuê bao
+    cấp được hôm nay (cùng nghĩa `getGrantableSubscriptions`; gói không có thuê bao nào bị bỏ, có `responsibleItAdminEmployeeId` thì chỉ thuê bao của IT Admin đó
+    được tính) và tổng cho cùng bộ lọc, một snapshot: nền của `GET /stock-summary` của `licensing` (`QĐ-111n`). SQL ở `SubscriptionGrantingRepo.pageStockPlans`.
   - `addPoolSeat(tx, actor, subscriptionId)` — +1 `purchased_quantity` của thuê bao `ACTIVE` đang bị bên gọi khóa (`lockSeatTarget`), gói năm tăng giữa
     kỳ được, không hỏi Cost Center của phòng sở hữu; dùng khi `provisioningTaskGrant` có `purchase` mà kho hết và khi cấp `K1` (mỗi lần cấp tự +1).
   - `getSubscriptionIdsOwnedBy`, `getApplicationsOwnedBy`, `getWorkspaceDutiesOf` — thứ một phòng ban/người đang giữ.
