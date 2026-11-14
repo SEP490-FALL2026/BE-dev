@@ -4,7 +4,6 @@ import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { BudgetsReadApi } from '../../budgets/public/budgets-read.api';
 import { AuditApi } from '../../audit/public/audit.api';
-import { FinanceApi } from '../../finance/public/finance.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { accessRequestAuditEvent } from '../access-request/access-request-audit-event.mapper';
 import { AccessRequestNotPriceableError } from '../access-request/access-request.errors';
@@ -13,7 +12,7 @@ import type { AccessRequestRecord, PricingRecord } from '../access-request/acces
 import { RepricingService } from '../repricing/repricing.service';
 import { AssessmentReadRepo } from '../access-request/assessment-read.repo';
 import { scaleAmount } from './line-allocation.policy';
-import { checkBudget, type CheckResult, type YearBudget } from './budget-check.policy';
+import { checkBudget, costInDong, type CheckResult, type YearBudget } from './budget-check.policy';
 import { BudgetCheckRepo, type CheckRecord, type CheckTrigger } from './budget-check.repo';
 
 /** The same amount for the same year and months: nothing to write. */
@@ -24,8 +23,8 @@ const isSameAmount = (before: PricingRecord, after: PricingRecord): boolean =>
   before.amountMonths === after.amountMonths &&
   before.kind === after.kind;
 
-/** Why a request cannot be checked at all: it is not a case for the check, but for whoever gives it its price or its rate. */
-export type NotCheckable = 'PRICE_MISSING' | 'RATE_MISSING';
+/** Why a request cannot be checked at all: it is not a case for the check, but for whoever gives it its price in dong. */
+export type NotCheckable = 'PRICE_MISSING';
 
 /** The part of a request that is checked: its payments are made for `priced` people and the check is of `scoped` of them. */
 export interface CheckScope {
@@ -58,8 +57,8 @@ interface CostCenterRead {
 
 /**
  * Makes one check of the budget of a request (`US-06-12`) and keeps it. It works the amount of the request out again for the day of the
- * check (`QĐ-109e`: the months left of that year, at the price of that day), reads the year it falls in, turns the amount into the
- * estimate that falls on the company in the reporting currency at the rate of the day, reads the approved budget of that year in the
+ * check (`QĐ-109e`: the months left of that year, at the price of that day), reads the year it falls in, takes the amount as the
+ * estimate that falls on the company (it is in dong, nothing is converted: `QĐ-111an`), reads the approved budget of that year in the
  * current Cost Center of the department, and gives the whole to the pure judgement. It decides nothing about who looks next: the routing
  * does, from what is kept here. It runs in the transaction of the caller, so the check and the move it leads to are one.
  */
@@ -68,7 +67,6 @@ export class BudgetCheckService {
   constructor(
     private readonly checks: BudgetCheckRepo,
     private readonly budgets: BudgetsReadApi,
-    private readonly finance: FinanceApi,
     private readonly organizationReads: OrganizationReadApi,
     private readonly assessments: AssessmentReadRepo,
     private readonly repricing: RepricingService,
@@ -239,11 +237,11 @@ export class BudgetCheckService {
     scope?: CheckScope,
   ): Promise<Computed> {
     const { pricing } = request;
-    const converted = await this.costOf(tx, request, today, scope);
-    if (converted.status === 'NOT_CHECKABLE' || pricing.budgetYear === null) {
-      return converted.status === 'NOT_CHECKABLE' ? converted : { status: 'NOT_CHECKABLE', reason: 'PRICE_MISSING' };
+    const cost = this.costOf(request, scope);
+    if (cost.status === 'NOT_CHECKABLE' || pricing.budgetYear === null) {
+      return cost.status === 'NOT_CHECKABLE' ? cost : { status: 'NOT_CHECKABLE', reason: 'PRICE_MISSING' };
     }
-    const costMinor = converted.costMinor;
+    const costMinor = cost.costMinor;
 
     // The year is the one the amount was worked out for, which is the year of the day of the check (`QĐ-109e`).
     const year = pricing.budgetYear;
@@ -260,37 +258,30 @@ export class BudgetCheckService {
     return {
       status: 'COMPUTED',
       result,
-      currency: converted.currency,
+      currency: cost.currency,
       bindingTotalMinor: costMinor,
       costCenterId: costCenter.id,
     };
   }
 
   /**
-   * What the request costs the company, in the reporting currency at the rate of the day: the price before tax (`FR-3.2`), so no estimate of
-   * tax is added. A request for a group is checked on the people approved: the amount is the part of it for fewer people.
+   * What the request costs the company, in dong as the price stands: the price before tax (`FR-3.2`), so no estimate of tax is added. A
+   * request for a group is checked on the people approved: the amount is the part of it for fewer people. A price left in another currency
+   * is no price to check (`costInDong`).
    */
-  private async costOf(
-    tx: DbTx,
+  private costOf(
     request: AccessRequestRecord,
-    today: BusinessDate,
     scope?: CheckScope,
-  ): Promise<
-    { status: 'COST'; costMinor: bigint; currency: string } | { status: 'NOT_CHECKABLE'; reason: NotCheckable }
-  > {
+  ): { status: 'COST'; costMinor: bigint; currency: string } | { status: 'NOT_CHECKABLE'; reason: NotCheckable } {
     const { amount } = request.pricing;
     if (request.pricing.status !== 'PRICED' || amount === null)
       return { status: 'NOT_CHECKABLE', reason: 'PRICE_MISSING' };
     const checked = scope ? scaleAmount(amount.amountMinor, scope.priced, scope.scoped) : amount.amountMinor;
     if (checked === null) return { status: 'NOT_CHECKABLE', reason: 'PRICE_MISSING' };
 
-    const converted = await this.finance.snapshotMoney(tx, { amountMinor: checked, currency: amount.currency }, today);
-    if (converted.status === 'MISSING_RATE') return { status: 'NOT_CHECKABLE', reason: 'RATE_MISSING' };
+    const cost = costInDong({ amountMinor: checked, currency: amount.currency });
+    if (cost === null) return { status: 'NOT_CHECKABLE', reason: 'PRICE_MISSING' };
 
-    return {
-      status: 'COST',
-      costMinor: converted.snapshot.reportingAmountMinor,
-      currency: converted.snapshot.reportingCurrency,
-    };
+    return { status: 'COST', costMinor: cost.amountMinor, currency: cost.currency };
   }
 }

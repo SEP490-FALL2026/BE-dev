@@ -6,7 +6,7 @@ const h = new GroupHarness();
 const M = 1_000_000;
 let serial = 0;
 
-describe('BR-MF1-02 one-step reserve, supplementary files and missing rates', () => {
+describe('BR-MF1-02 one-step reserve, supplementary files and a price left outside dong', () => {
   let plan: string;
   beforeAll(async () => {
     await h.start();
@@ -103,7 +103,7 @@ describe('BR-MF1-02 one-step reserve, supplementary files and missing rates', ()
     expect(await h.lineStates(sent.id)).toEqual(['NEED_CONFIRMED', 'NEED_CONFIRMED', 'DROPPED']);
   });
 
-  it('BR-MF1-02 Q-31 persists RATE_MISSING without a new check or stale overBy, then recovers after a rate is recorded', async () => {
+  it('BR-MF1-02 Q-31, QĐ-111an persists PRICE_MISSING without a new check or stale overBy for an amount left in another currency, then recovers once it is in dong', async () => {
     const u = await unit();
     const sent = await h.sent(u.head, plan, { termMonths: 1 });
     await h.setPayments(sent.id, { amount: 100_000, currency: 'USD' });
@@ -111,15 +111,11 @@ describe('BR-MF1-02 one-step reserve, supplementary files and missing rates', ()
     await resubmit(sent.id, u.head.account).expect(200);
     expect(await fetch(sent.id, u.head.account)).toMatchObject({
       state: 'AWAITING_REQUESTER_REVISION',
-      spend: { stage: 'RETURNED_TO_REQUESTER', blockedReasons: ['RATE_MISSING'], overBy: null },
+      spend: { stage: 'RETURNED_TO_REQUESTER', blockedReasons: ['PRICE_MISSING'], overBy: null },
     });
     const after = await h.ctx.sql.query(`SELECT id FROM request_budget_checks WHERE request_id=$1`, [sent.id]);
     expect(after.rows).toEqual(before.rows);
-    await request(h.server())
-      .post('/api/v1/exchange-rates')
-      .set(h.as(h.finance))
-      .send({ currency: 'USD', rateDate: h.today(), rate: '25000' })
-      .expect(201);
+    await h.setPayments(sent.id, { amount: 25 * M });
     await h.budgetFor(u, { total: 100 * M });
     await resubmit(sent.id, u.head.account).expect(200);
     expect((await fetch(sent.id, u.head.account)).state).toBe('AWAITING_SPEND_DECISION');
