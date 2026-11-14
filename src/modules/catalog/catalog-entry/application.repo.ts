@@ -287,17 +287,31 @@ export class ApplicationRepo {
     );
   }
 
-  /** The applications with these ids, for a decision on what a collector may report; those that do not exist are absent. */
+  /**
+   * The applications with these ids, for a decision on what a collector may report; those that do not exist are absent. An application is a
+   * communication service when it stands in the group Liên lạc (`QĐ-111e`): the group says it, no flag of the row is read.
+   */
   async collectorApplications(
     ids: readonly string[],
     tx?: DbTx,
   ): Promise<
     { id: string; name: string; kind: ApplicationKind; isCommunicationService: boolean; retiredAt: Date | null }[]
   > {
-    return (tx ?? this.prisma).application.findMany({
+    const rows = await (tx ?? this.prisma).application.findMany({
       where: { id: { in: [...ids] } },
-      select: { id: true, name: true, kind: true, isCommunicationService: true, retiredAt: true },
+      select: {
+        id: true,
+        name: true,
+        kind: true,
+        retiredAt: true,
+        functionalGroup: { select: { systemKey: true } },
+      },
       orderBy: { id: 'asc' },
     });
+
+    return rows.map(({ functionalGroup, ...row }) => ({
+      ...row,
+      isCommunicationService: functionalGroup?.systemKey === 'COMMUNICATION',
+    }));
   }
 }

@@ -5,8 +5,6 @@ import { pretendBusinessToday } from './pretend-today';
 import { declareApplication, declarePlan, declareSubscription } from './builders/catalog.builder';
 import { SeatHarness } from './seat-baseline-harness';
 
-const NO = { personToPersonMessaging: false, callsOrMeetings: false, mailbox: false };
-
 export interface SourceWire {
   id: string;
   application: { id: string; name: string };
@@ -73,7 +71,14 @@ export const EVENT_SOURCE = {
 export class UsageHarness extends SeatHarness {
   private machines = 0;
 
-  /** An application of the catalog with a plan and a subscription of 100 seats; `communication` makes it a messaging service. */
+  /** The fixed group Liên lạc of the organization (`QĐ-111bf`). */
+  async communicationGroupId(): Promise<string> {
+    return (
+      await this.ctx.sql.query<{ id: string }>(`SELECT id FROM functional_groups WHERE system_key = 'COMMUNICATION'`)
+    ).rows[0].id;
+  }
+
+  /** An application of the catalog with a plan and a subscription of 100 seats; `communication` makes it a messaging service (it stands in Liên lạc). */
   async usageApp(options: { communication?: boolean; kind?: 'SAAS' | 'INTERNAL' } = {}) {
     const kind = options.kind ?? 'SAAS';
     const applicationId = await declareApplication(this.ctx, this.it1.accessToken, {
@@ -81,7 +86,8 @@ export class UsageHarness extends SeatHarness {
       kind,
       ...(kind === 'INTERNAL' ? {} : { vendorName: this.unique('Vendor') }),
       dataSensitivity: 'LOW',
-      communication: options.communication ? { ...NO, personToPersonMessaging: true } : NO,
+      // QĐ-111e: a messaging service is one that stands in the group Liên lạc.
+      ...(options.communication ? { functionalGroupId: await this.communicationGroupId() } : {}),
     });
     if (kind === 'INTERNAL') return { applicationId, planId: null, subscriptionId: null };
     const planId = await declarePlan(this.ctx, this.it1.accessToken, {

@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import request from 'supertest';
 import { ApiAccount, adminToken, createActivatedAccount } from '../../support/api-accounts';
 import { HttpTestApp, SeededInstallation, createHttpTestApp, seedInstallation } from '../../support/http-test-app';
+import { CatalogApi } from '../../../src/modules/catalog/public/catalog.api';
 import { intakeBodyOf } from '../../support/application-body';
 
 interface ApplicationWire {
@@ -511,6 +512,38 @@ describe('the application catalog over HTTP (integration, real PostgreSQL)', () 
       expect(codeOf(await patch(another.id, { dictionaryServiceLineId: lineId }).expect(422))).toBe(
         'APPLICATION.DICTIONARY_LINE_MISMATCH',
       );
+    });
+  });
+
+  describe('what the usage rules read (CT-1.8)', () => {
+    it('QĐ-111e: the facade says an application is a communication service when it stands in Liên lạc, whatever the old flag says, and follows a change of group', async () => {
+      const communication = (
+        await ctx.sql.query<{ id: string }>(`SELECT id FROM functional_groups WHERE system_key = 'COMMUNICATION'`)
+      ).rows[0].id;
+      const chat = await app({ functionalGroupId: communication });
+      const other = await app();
+      const legacyFlagged = await app();
+      // A row written before the groups: the old flag is up and the group is not Liên lạc. The group decides.
+      await ctx.sql.query(
+        `UPDATE applications SET comm_mailbox = true, is_communication_service = true WHERE id = $1`,
+        [legacyFlagged.id],
+      );
+      const catalog = ctx.app.get(CatalogApi, { strict: false });
+      const read = async (ids: string[]) =>
+        Object.fromEntries(
+          (await catalog.getCollectorApplications(ids)).map((row) => [row.id, row.isCommunicationService]),
+        );
+
+      expect(await read([chat.id, other.id, legacyFlagged.id])).toEqual({
+        [chat.id]: true,
+        [other.id]: false,
+        [legacyFlagged.id]: false,
+      });
+
+      await patch(chat.id, { functionalGroupId: (await functionalGroup()).id }).expect(200);
+      await patch(other.id, { functionalGroupId: communication }).expect(200);
+
+      expect(await read([chat.id, other.id])).toEqual({ [chat.id]: false, [other.id]: true });
     });
   });
 

@@ -216,14 +216,14 @@ describe('the preview of a vendor usage report over HTTP (integration, real Post
   });
 
   describe('US-08-02 AC-3: a messaging service is not collected', () => {
-    it('refuses an upload into a source whose application was flagged as a communication service after the source was made', async () => {
+    it('refuses an upload into a source whose application was moved to the group Liên lạc after the source was made', async () => {
       const { applicationId } = await h.usageApp();
       const source = await h.source(applicationId);
       const before = await h.count('usage_imports');
-      await h.ctx.sql.query(
-        `UPDATE applications SET is_communication_service = true, comm_calls_or_meetings = true WHERE id = $1`,
-        [applicationId],
-      );
+      await h.ctx.sql.query(`UPDATE applications SET functional_group_id = $2 WHERE id = $1`, [
+        applicationId,
+        await h.communicationGroupId(),
+      ]);
 
       const response = await h
         .uploadReport(source.id, aggregate([['a@acme.vn', '2026-08-01']]), {

@@ -74,7 +74,7 @@ export class CatalogApi {
 
   /**
    * The applications with these ids as a collector's allowlist needs to judge them: name, kind, whether the application is a
-   * communication service (never reported, `QĐ-62o`) and whether it is retired. An id that does not exist is absent.
+   * communication service (it stands in the group Liên lạc, `QĐ-111e`; never reported, `QĐ-62o`) and whether it is retired. An id that does not exist is absent.
    */
   getCollectorApplications(ids: readonly string[], tx?: DbTx) {
     return this.applicationLookup.collectorApplications(ids, tx);
