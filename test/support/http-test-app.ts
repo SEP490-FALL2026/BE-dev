@@ -3,6 +3,7 @@ import { Test } from '@nestjs/testing';
 import { Client } from 'pg';
 import { App } from 'supertest/types';
 import { configureApplication } from '../../src/app/configure-application';
+import { FunctionalGroupRepo } from '../../src/modules/catalog/functional-group/functional-group.repo';
 import { TransactionRunner } from '../../src/infrastructure/database/transaction-runner';
 import { IdentityAccessApi } from '../../src/modules/identity-access/public/identity-access.api';
 import { OrganizationApi } from '../../src/modules/organization/public/organization.api';
@@ -131,6 +132,8 @@ export async function seedInstallation(app: INestApplication): Promise<SeededIns
       timeZone: 'Asia/Ho_Chi_Minh',
       reportingCurrency: 'VND',
     });
+    // The installation command starts every organization with the seven standard functional groups (`QĐ-111bf`).
+    await app.get(FunctionalGroupRepo, { strict: false }).insertStandard(tx, org.id);
     // The department first, then the Cost Center created for it (`QĐ-87d(1)`), as the installation command does.
     const department = await organization.createDepartment(tx, {
       organizationId: org.id,

@@ -13,6 +13,7 @@ import {
   FunctionalGroupNotFoundError,
   FunctionalGroupUpdateEmptyError,
 } from './functional-group.errors';
+import { assertGroupChangeAllowed } from './functional-group.policy';
 import { FunctionalGroupRepo } from './functional-group.repo';
 import type { FunctionalGroupRecord, FunctionalGroupStatus } from './functional-group.types';
 
@@ -97,6 +98,10 @@ export class FunctionalGroupService {
       return await this.runner.run(async (tx) => {
         const current = await this.groups.lock(tx, id);
         if (!current) throw new FunctionalGroupNotFoundError();
+        assertGroupChangeAllowed(current, {
+          ...(name !== undefined ? { name } : {}),
+          ...(input.status !== undefined ? { status: input.status } : {}),
+        });
         const changes = {
           ...(name !== undefined && name !== current.name ? { name } : {}),
           ...(input.status !== undefined && input.status !== current.status ? { status: input.status } : {}),
