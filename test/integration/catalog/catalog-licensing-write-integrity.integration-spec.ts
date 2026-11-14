@@ -437,6 +437,40 @@ describe('write integrity of catalog, finance and licensing (integration, DB-03,
     }, 60_000);
   });
 
+  describe('DB-07 (C-R1): a plan bought once keeps no subscription over a term', () => {
+    const kindOf = async (planId: string) =>
+      (
+        await sql().query<{ provisioning_type: string; pricing_model: string | null }>(
+          `SELECT provisioning_type, pricing_model FROM plans WHERE id = $1`,
+          [planId],
+        )
+      ).rows[0];
+
+    it('refuses to enter K4 while a term subscription hangs on the plan: 409 PLAN.IN_USE_BLOCKS_CHANGE reason TERM_SUBSCRIPTIONS, the plan stays as it was, and the database refuses too', async () => {
+      const subscription = await h.subscription(10, 'K1');
+      const plan = await planOfSubscription(subscription);
+      const before = await kindOf(plan);
+
+      const response = await patchPlan(plan, { provisioningType: 'K4' });
+
+      expect(response.status).toBe(409);
+      expect(h.codeOf(response)).toBe('PLAN.IN_USE_BLOCKS_CHANGE');
+      expect(h.detailsOf(response)).toEqual({ reason: 'TERM_SUBSCRIPTIONS' });
+      expect(await kindOf(plan)).toEqual(before);
+      expect(await sqlState(sql(), `UPDATE plans SET provisioning_type = 'K4' WHERE id = $1`, [plan])).toBe('23514');
+    }, 60_000);
+
+    it('lets a plan with no subscription enter K4, and a plan that is K4 already stays K4 (the trigger looks at the change of kind only)', async () => {
+      const empty = await h.plan('K1');
+      expect((await patchPlan(empty, { provisioningType: 'K4' })).status).toBe(200);
+      expect((await kindOf(empty)).provisioning_type).toBe('K4');
+
+      const bought = await h.subscription(5, 'K4');
+      const plan = await planOfSubscription(bought);
+      expect((await patchPlan(plan, { name: h.unique('Renamed bought once') })).status).toBe(200);
+    }, 60_000);
+  });
+
   describe('DB-14: the head of a version history moves up by one, to a version that exists', () => {
     it('refuses to send the head of a tax profile back or ahead, and a version that is not the next', async () => {
       const vendor = (
