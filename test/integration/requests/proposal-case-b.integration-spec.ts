@@ -449,5 +449,92 @@ describe('requests: case B against the catalog (integration, real PostgreSQL)', 
         (await h.ctx.sql.query(`SELECT plan_id FROM access_requests WHERE id = $1`, [proposed.id])).rows[0],
       ).toEqual({ plan_id: plus });
     });
+
+    describe('the months of the request, judged by the plan it is linked to (QĐ-111i)', () => {
+      let seats: string; // a plan of seats (K2)
+      let bought: string; // a plan bought once (K4)
+
+      beforeAll(async () => {
+        seats = await h.plan('K2');
+        bought = await h.plan('K4');
+      });
+
+      /** A short proposal for `months` months whose assessment the IT Admin concluded as `kind`, completed, and put where the decision of the spending approver leaves it. */
+      const decidedAs = async (kind: 'K2' | 'K4', months?: number): Promise<AccessRequestWire> => {
+        const proposed = await shortAwaiting(months === undefined ? {} : { termMonths: months });
+        const concluded = planFields({ provisioningType: kind, ...(kind === 'K4' ? { adminConsole: false } : {}) });
+        await h.saveAssessment(proposed.id, concluded, itInCharge.account).expect(200);
+        await h.completeAssessment(proposed.id, itInCharge.account).expect(200);
+        await h.ctx.sql.query(`UPDATE access_requests SET state = 'AWAITING_EXECUTION' WHERE id = $1`, [proposed.id]);
+
+        return proposed;
+      };
+      const termOf = async (id: string) =>
+        (
+          await h.ctx.sql.query<{ term_months: number | null; plan_id: string | null }>(
+            `SELECT term_months, plan_id FROM access_requests WHERE id = $1`,
+            [id],
+          )
+        ).rows[0];
+      const linkedEventOf = async (id: string) =>
+        (await h.auditEvents('ACCESS_REQUEST', id)).find((event) => event.action === 'ACCESS_REQUEST.CATALOG_LINKED');
+
+      it('refuses a plan bought by the month (K1) for more than 9 months when the assessment concluded seats (K2): 422 ASSESSMENT.TERM_NOT_FIT_KIND, nothing written', async () => {
+        const proposed = await decidedAs('K2', 12);
+
+        const refused = await link(proposed.id, { planId: plus }).expect(422);
+
+        expect(h.codeOf(refused)).toBe('ASSESSMENT.TERM_NOT_FIT_KIND');
+        expect(h.detailsOf(refused)).toEqual({
+          provisioningType: 'K1',
+          termMonths: 12,
+          maxMonths: 9,
+          reason: 'TERM_MONTHS_OUT_OF_RANGE',
+        });
+        expect(await termOf(proposed.id)).toEqual({ term_months: 12, plan_id: null });
+        expect(await linkedEventOf(proposed.id)).toBeUndefined();
+      });
+
+      it('refuses a plan bought by the month (K1) when the assessment concluded a plan bought once (K4), which asks no months', async () => {
+        const proposed = await decidedAs('K4', 6);
+
+        const refused = await link(proposed.id, { planId: plus }).expect(422);
+
+        expect(h.codeOf(refused)).toBe('ASSESSMENT.TERM_NOT_FIT_KIND');
+        expect(h.detailsOf(refused)).toMatchObject({
+          provisioningType: 'K1',
+          termMonths: null,
+          reason: 'TERM_REQUIRED',
+        });
+        expect(await termOf(proposed.id)).toEqual({ term_months: null, plan_id: null });
+      });
+
+      it('takes a plan of another kind when the months still fit it, and keeps them (6 months, K2 then K1)', async () => {
+        const proposed = await decidedAs('K2', 6);
+
+        await link(proposed.id, { planId: plus }).expect(200);
+
+        expect(await termOf(proposed.id)).toEqual({ term_months: 6, plan_id: plus });
+        expect((await linkedEventOf(proposed.id))?.after).toMatchObject({ termMonths: 6, termMonthsCleared: null });
+      });
+
+      it('clears the months when the plan is one bought once (K4), as the completion does, and the audit trail says so', async () => {
+        const proposed = await decidedAs('K2', 6);
+
+        await link(proposed.id, { planId: bought }).expect(200);
+
+        expect(await termOf(proposed.id)).toEqual({ term_months: null, plan_id: bought });
+        expect((await linkedEventOf(proposed.id))?.after).toMatchObject({ termMonths: null, termMonthsCleared: 6 });
+      });
+
+      it('leaves the months as they are when the plan is of the kind the assessment concluded', async () => {
+        const proposed = await decidedAs('K2', 12);
+
+        await link(proposed.id, { planId: seats }).expect(200);
+
+        expect(await termOf(proposed.id)).toEqual({ term_months: 12, plan_id: seats });
+        expect((await linkedEventOf(proposed.id))?.after).toMatchObject({ termMonths: 12, termMonthsCleared: null });
+      });
+    });
   });
 });

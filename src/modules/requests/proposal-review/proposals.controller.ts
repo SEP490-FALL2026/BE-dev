@@ -338,8 +338,8 @@ export class ProposalsController {
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
-        'The body is invalid (VALIDATION_ERROR), or the catalog no longer offers what the list of the department would hold (DEPARTMENT_SOFTWARE.NOT_IN_CATALOG). Nothing is written.',
-      examples: [VALIDATION_EXAMPLE, EXAMPLES.DEPARTMENT_SOFTWARE_NOT_IN_CATALOG],
+        'The body is invalid (VALIDATION_ERROR), or the plan is of another kind than the assessment concluded and the months of use the person gave do not fit it (ASSESSMENT.TERM_NOT_FIT_KIND, with details.provisioningType, termMonths, maxMonths and the reason: link a plan of a kind that takes them, or reject the request for the person to propose again), or the catalog no longer offers what the list of the department would hold (DEPARTMENT_SOFTWARE.NOT_IN_CATALOG). Nothing is written. A plan bought once takes no months: linking it clears any the person gave.',
+      examples: [VALIDATION_EXAMPLE, EXAMPLES.TERM_NOT_FIT_KIND, EXAMPLES.DEPARTMENT_SOFTWARE_NOT_IN_CATALOG],
     },
   )
   async linkCatalogPlan(

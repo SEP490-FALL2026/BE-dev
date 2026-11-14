@@ -161,7 +161,9 @@ cùng cần; phần ghi nằm ở `assessment/assessment.repo.ts`.
   - `repricing/` — tính lại số tiền của Request theo ngày (QĐ-109e): `RepricingService` (giá thuê bao chính hoặc báo giá của IT Admin, tính theo `asOf`; Request giữ số tháng thì mỗi người một ngày kết thúc riêng qua `RequestTermEndsService`), `quote-pricing.policy.ts` (số tiền từ báo giá); `spend`, `spend-submission`, `group-request`, `assessment` gọi, không import capability nào ngoài lõi `access-request`.
   - `assessment/` — thẩm định phần mềm ngoài catalog, đăng ký nội bộ, nối plan (US-05-06, US-05-18, US-05-20);
     `AssessmentQueryService` (đọc), `AssessmentService` (lưu), `AssessmentCompletionService`, `AssessmentRejectionService`, qua cổng chung
-    `AssessmentGate` (khóa đề xuất, người thẩm định, bước của IT Admin); `ProposalService`,
+    `AssessmentGate` (khóa đề xuất, người thẩm định, bước của IT Admin); `AssessmentTermFitService` là chỗ duy nhất xét lại số tháng của đề xuất
+    theo kiểu cấp (QĐ-111i; K4 xóa tháng, K1 ngoài 1–9 ⟹ 422 `ASSESSMENT.TERM_NOT_FIT_KIND`): hoàn tất đánh giá dùng kiểu IT kết luận, `catalog-link`
+    dùng kiểu của gói được gắn khi khác kiểu đã kết luận; `ProposalService`,
     `need-spend.service.ts`, `internal-registration.service.ts` (đăng ký nội bộ; `internalRegistrationBasis`, `registeredShapeOf`,
     `actsForAssignee` ở `assessment.policy.ts`); `proposal-review/` — `proposals.controller.ts`.
   - `grant-queue/` — hàng đợi cấp của IT Admin (US-03-02; gửi thay một người đã gỡ, QĐ-96); `cancellation/` — IT Admin đóng request của người đã nghỉ (US-03-04) và hệ thống đóng request của người đã nghỉ/chuyển (`beneficiary-gone-*`, X0.7).

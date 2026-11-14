@@ -17,6 +17,7 @@ import { AccessRequestRepo } from '../access-request/access-request.repo';
 import type { AccessRequestRecord } from '../access-request/access-request.types';
 import { CatalogLinkRefusedError } from './assessment.errors';
 import { canLinkCatalogPlan } from './assessment.policy';
+import { AssessmentTermFitService } from './assessment-term-fit.service';
 
 /** What the link did: the request with its plan, and the place in the list of the department when the IT Admin asked for one. */
 export interface CatalogLinked {
@@ -32,6 +33,8 @@ export interface CatalogLinked {
  * that entry and it goes on as case A (R-25), without the person sending it again. With the tick `addToDepartmentList` the application and the
  * plan also go into the list of software of the department of the request (`QĐ-111c`), in the same transaction, which only an IT Admin in charge of
  * that department may ask. The audit names the IT Admin who answers for the application of the plan (`QĐ-111g`); the link does not wait for one.
+ * The plan can be of another kind than the one the assessment concluded, so the months of the request are judged again by the kind of the plan
+ * (`AssessmentTermFitService`, the rule of the completion): a plan bought once clears them, a plan that does not take them refuses the link.
  */
 @Injectable()
 export class CatalogLinkService {
@@ -43,12 +46,14 @@ export class CatalogLinkService {
     private readonly departmentTools: LicensingDepartmentToolsApi,
     private readonly organizationReads: OrganizationReadApi,
     private readonly identity: IdentityAccessApi,
+    private readonly termFit: AssessmentTermFitService,
   ) {}
 
   /**
    * Throws AccessRequestNotFoundError, CatalogLinkRefusedError (the request cannot be linked now, or the department is not one the IT Admin is in
    * charge of), AccessRequestPlanNotFoundError and AccessRequestApplicationRetiredError, and, for the tick, the refusals of the list of the department
-   * (DepartmentSoftwareNotInCatalogError, DepartmentSoftwareNoteInvalidError, ToolsDepartmentNotFoundError). Nothing is written when any is thrown.
+   * (DepartmentSoftwareNotInCatalogError, DepartmentSoftwareNoteInvalidError, ToolsDepartmentNotFoundError) and AssessmentTermNotFitError (the months of the
+   * request do not fit the kind of the plan). Nothing is written when any is thrown.
    */
   async link(
     actor: AuthenticatedPrincipal,
@@ -64,6 +69,7 @@ export class CatalogLinkService {
       if (!target) throw new AccessRequestPlanNotFoundError();
       if (target.applicationStatus === 'RETIRED') throw new AccessRequestApplicationRetiredError();
       const responsibleItAdminEmployeeId = await this.catalog.getPlanResponsibleItAdminId(input.planId, tx);
+      const fitted = await this.termFit.fitToLinkedPlan(tx, request, target.provisioningType, new Date());
 
       await this.requests.setPlan(tx, requestId, input.planId);
       const departmentList =
@@ -85,6 +91,9 @@ export class CatalogLinkService {
             addToDepartmentList: input.addToDepartmentList === true,
             departmentSoftwareEntryId: departmentList?.entryId ?? null,
             departmentSoftwareEntryAdded: departmentList?.added ?? null,
+            // The time of use the request keeps, and the months a plan bought once cleared from it (`QĐ-111i`).
+            termMonths: fitted.request.termMonths,
+            termMonthsCleared: fitted.termMonthsCleared,
           },
         ),
       );

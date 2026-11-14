@@ -1,9 +1,7 @@
 import { Injectable } from '@nestjs/common';
-import { checkTermMonths, termRuleOf } from '../../../core/term-limit';
 import { TransactionRunner, type DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../../audit/public/audit.api';
-import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { accessRequestAuditEvent } from '../access-request/access-request-audit-event.mapper';
 import { AccessRequestRepo } from '../access-request/access-request.repo';
 import type { AccessRequestRecord, PricingRecord } from '../access-request/access-request.types';
@@ -12,13 +10,13 @@ import { SpendRoutingService } from '../spend/spend-routing.service';
 import {
   AssessmentIncompleteError,
   AssessmentInternalByRegistrationError,
-  AssessmentTermNotFitError,
   AssessmentUncontrollableError,
 } from './assessment.errors';
 import { assessmentScopeOf, judgeCompletion, type AssessmentScope } from './assessment.policy';
 import { AssessmentRepo } from './assessment.repo';
 import { AssessmentGate } from './assessment-gate.service';
 import { AssessmentPricingService } from './assessment-pricing.service';
+import { AssessmentTermFitService, type FittedTerm } from './assessment-term-fit.service';
 
 /**
  * Completing the assessment of a proposal (`US-05-06`, `US-01-12` AC-2): once it says all the minimum asks, the control level and a
@@ -35,7 +33,7 @@ export class AssessmentCompletionService {
     private readonly audit: AuditApi,
     private readonly entry: SpendRoutingService,
     private readonly pricing: AssessmentPricingService,
-    private readonly organizationReads: OrganizationReadApi,
+    private readonly termFit: AssessmentTermFitService,
   ) {}
 
   /**
@@ -76,39 +74,19 @@ export class AssessmentCompletionService {
   }
 
   /**
-   * The time of use of the proposal judged again by the kind of grant the IT Admin concluded (`QĐ-111i`): the proposal took the rule of `K2` because
-   * the kind of plan was not known. A plan bought once (`K4`) asks no months, so those the person gave are cleared (the audit says how many); any
-   * other time of use that does not fit (`K1` takes 1 to 9 months and never none, a person with a term takes no right with no end, a contract that
-   * ended) is refused and nothing is written. Returns the request as it is priced from now on.
-   * Throws AssessmentTermNotFitError.
+   * The time of use of the proposal judged again by the kind of grant the IT Admin concluded (`QĐ-111i`, `AssessmentTermFitService`).
+   * Returns the request as it is priced from now on. Throws AssessmentTermNotFitError.
    */
   private async fitTerm(
     tx: DbTx,
     request: AccessRequestRecord,
     concluded: AssessmentRecord,
     now: Date,
-  ): Promise<{ request: AccessRequestRecord; termMonthsCleared: number | null }> {
+  ): Promise<FittedTerm> {
     const kind = concluded.provisioningType;
     if (kind === null) throw new Error(`The assessment of ${request.id} was completed with no kind of provisioning.`);
-    const [beneficiaryId] = request.beneficiaryEmployeeIds;
-    const person = beneficiaryId === undefined ? null : await this.organizationReads.getEmployee(beneficiaryId, tx);
-    const contractEndDate = person?.contractEndDate ?? null;
-    const months = kind === 'K4' ? null : request.termMonths;
-    const refusal = checkTermMonths({
-      kind,
-      termMonths: months,
-      fixedTermPerson: (person?.employmentType ?? 'STAFF') !== 'STAFF',
-      contractEndKnown: contractEndDate !== null,
-      contractEndDate,
-      termStart: await this.organizationReads.businessToday(now, tx),
-    });
-    if (refusal !== null) {
-      throw new AssessmentTermNotFitError(refusal, kind, request.termMonths, termRuleOf(kind).maxMonths);
-    }
-    if (request.termMonths === months) return { request, termMonthsCleared: null };
-    await this.requests.setTermMonths(tx, request.id, months);
 
-    return { request: { ...request, termMonths: months }, termMonthsCleared: request.termMonths };
+    return this.termFit.fit(tx, request, kind, now);
   }
 
   /** The quote that prices the request, when the assessment may be completed here; the errors say what stops it. */
@@ -139,7 +117,7 @@ function completedAuditDetail(
   assessment: AssessmentRecord,
   pricing: PricingRecord,
   actingForAssignee: boolean,
-  fitted: { request: AccessRequestRecord; termMonthsCleared: number | null },
+  fitted: FittedTerm,
 ) {
   return {
     requestId,

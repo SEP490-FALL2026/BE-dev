@@ -45,6 +45,7 @@ import { AssessmentRejectionService } from './assessment/assessment-rejection.se
 import { AssessmentService } from './assessment/assessment.service';
 import { AssessmentViewService } from './assessment/assessment-view.service';
 import { AssessmentStepRepo } from './assessment/assessment-step.repo';
+import { AssessmentTermFitService } from './assessment/assessment-term-fit.service';
 import { CatalogLinkService } from './assessment/catalog-link.service';
 import { QuoteService } from './assessment/quote.service';
 import { InternalRegistrationService } from './assessment/internal-registration.service';
@@ -270,6 +271,7 @@ import { MyRequestsService } from './my-requests/my-requests.service';
     AssessmentQueryService,
     AssessmentPatchService,
     AssessmentPricingService,
+    AssessmentTermFitService,
     AssessmentCompletionService,
     AssessmentRejectionService,
     AssessmentService,
