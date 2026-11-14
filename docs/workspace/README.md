@@ -20,6 +20,8 @@ Nếu nguồn mâu thuẫn hoặc cần đổi nghiệp vụ, người phụ tr�
 - items/: một thư mục mỗi lát, tên ổn định như us-xx-yy-short-name hoặc issue-123-short-name; không cần bộ đếm riêng.
 - local/: nháp cá nhân; không chứa đầu vào bàn giao duy nhất.
 - research/: hướng dẫn nghiên cứu; kết quả theo hạng mục đặt cạnh spec.
+- [Đề xuất lịch sử AI dùng MongoDB](proposals/ai-history-mongodb/spec.md): draft ngày 13/11/2026, chưa là work item
+  `ready`; sau duyệt thiết kế mới phân rã và đăng ký theo mẫu bên dưới.
 - [prompts/](prompts/README.md): cách giao một phần G, một G hoặc nhiều G; bộ prompt theo giai đoạn cho dev tự làm hoặc dùng AI.
 - [Roadmap](../roadmap.md): thứ tự dự kiến, phụ thuộc và tiến độ hạng mục.
 
