@@ -102375,6 +102375,37 @@
                       "enum": ["WITHIN_BASE", "USES_RESERVE", "BLOCKED", null],
                       "nullable": true
                     },
+                    "nextYearBudget": {
+                      "type": "object",
+                      "properties": {
+                        "year": { "type": "integer", "minimum": -9007199254740991, "maximum": 9007199254740991 },
+                        "approved": {
+                          "type": "object",
+                          "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                          "required": ["amount", "currency"],
+                          "additionalProperties": false,
+                          "nullable": true
+                        },
+                        "remaining": {
+                          "type": "object",
+                          "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                          "required": ["amount", "currency"],
+                          "additionalProperties": false,
+                          "nullable": true
+                        },
+                        "remainingAfter": {
+                          "type": "object",
+                          "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                          "required": ["amount", "currency"],
+                          "additionalProperties": false,
+                          "nullable": true
+                        },
+                        "warning": { "type": "boolean" }
+                      },
+                      "required": ["year", "approved", "remaining", "remainingAfter", "warning"],
+                      "additionalProperties": false,
+                      "nullable": true
+                    },
                     "batchId": { "type": "string", "format": "uuid", "nullable": true }
                   },
                   "required": [
@@ -102394,6 +102425,7 @@
                     "amount",
                     "primaryCode",
                     "outcome",
+                    "nextYearBudget",
                     "batchId"
                   ],
                   "additionalProperties": false
@@ -102874,6 +102906,37 @@
                     "additionalProperties": false,
                     "nullable": true
                   },
+                  "nextYearBudget": {
+                    "type": "object",
+                    "properties": {
+                      "year": { "type": "integer", "minimum": -9007199254740991, "maximum": 9007199254740991 },
+                      "approved": {
+                        "type": "object",
+                        "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                        "required": ["amount", "currency"],
+                        "additionalProperties": false,
+                        "nullable": true
+                      },
+                      "remaining": {
+                        "type": "object",
+                        "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                        "required": ["amount", "currency"],
+                        "additionalProperties": false,
+                        "nullable": true
+                      },
+                      "remainingAfter": {
+                        "type": "object",
+                        "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                        "required": ["amount", "currency"],
+                        "additionalProperties": false,
+                        "nullable": true
+                      },
+                      "warning": { "type": "boolean" }
+                    },
+                    "required": ["year", "approved", "remaining", "remainingAfter", "warning"],
+                    "additionalProperties": false,
+                    "nullable": true
+                  },
                   "annualVendorAmount": {
                     "type": "object",
                     "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
@@ -102893,6 +102956,7 @@
                   "assessment",
                   "decision",
                   "budgetSnapshot",
+                  "nextYearBudget",
                   "annualVendorAmount"
                 ],
                 "additionalProperties": false

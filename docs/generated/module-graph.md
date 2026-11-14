@@ -49,9 +49,9 @@ flowchart BT
   budgets -->|3| finance
   budgets -->|5| identity_access
   budgets -->|2| licensing
-  budgets -->|5| notifications
+  budgets -->|6| notifications
   budgets -->|4| operating_parameters
-  budgets -->|18| organization
+  budgets -->|19| organization
   catalog -->|21| audit
   catalog -->|10| finance
   catalog -->|8| identity_access
@@ -121,14 +121,14 @@ flowchart BT
   personnel -->|97| organization
   personnel -->|8| requests
   requests -->|58| audit
-  requests -->|23| budgets
+  requests -->|25| budgets
   requests -->|30| catalog
   requests -->|7| finance
   requests -->|31| identity_access
   requests -->|51| licensing
   requests -->|10| notifications
   requests -->|11| operating_parameters
-  requests -->|86| organization
+  requests -->|87| organization
   usage -->|7| audit
   usage -->|7| catalog
   usage -->|15| devices
