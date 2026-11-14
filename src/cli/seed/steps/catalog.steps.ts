@@ -64,11 +64,10 @@ async function oneApplication(
   return { status: 'done', label };
 }
 
-/** The plan of the one command: the body of a plan without its application and without the pricing model, which the system works out. */
+/** The plan of the one command: the body of a plan without its application, which the command is making. */
 function firstPlanBody(plan: DemoPlan): Record<string, unknown> {
   const body = planBody('', plan);
   delete body.applicationId;
-  delete body.pricingModel;
 
   return body;
 }
@@ -79,7 +78,6 @@ function planBody(applicationId: string, plan: DemoPlan): Record<string, unknown
     name: plan.name,
     provisioningType: plan.provisioningType,
     dataLossOnRemoval: plan.dataLossOnRemoval,
-    ...(plan.pricingModel ? { pricingModel: plan.pricingModel } : {}),
     ...(plan.controlLevel ? { controlLevel: plan.controlLevel } : {}),
     ...(plan.revocationNote ? { revocationNote: plan.revocationNote } : {}),
     ...(plan.sharingPolicy ? { sharingPolicy: plan.sharingPolicy } : {}),
@@ -90,7 +88,8 @@ type PlanRow = { id: string; name: string } & Partial<Record<keyof DemoPlan, unk
 
 /** The fields of the fixture's plan that the existing one does not have (only those the fixture sets). */
 function planDifferences(plan: DemoPlan, row: PlanRow): string[] {
-  const keys = ['provisioningType', 'pricingModel', 'controlLevel', 'dataLossOnRemoval', 'sharingPolicy'] as const;
+  // The pricing model is not compared: the system works it out from the kind of provisioning (B-5), whatever the fixture still says.
+  const keys = ['provisioningType', 'controlLevel', 'dataLossOnRemoval', 'sharingPolicy'] as const;
 
   return keys.filter((key) => plan[key] !== undefined && row[key] !== plan[key]);
 }

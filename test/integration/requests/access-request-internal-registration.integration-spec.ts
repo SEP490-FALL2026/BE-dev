@@ -77,9 +77,12 @@ describe('requests over HTTP: registering internal software (integration, real P
         vendor_id: string | null;
         type: string;
         model: string | null;
+        group_key: string | null;
       }>(
-        `SELECT a.kind, a.responsible_it_admin_employee_id AS owner, a.vendor_id, p.provisioning_type AS type, p.pricing_model AS model
-           FROM plans p JOIN applications a ON a.id = p.application_id WHERE p.id = $1`,
+        `SELECT a.kind, a.responsible_it_admin_employee_id AS owner, a.vendor_id, p.provisioning_type AS type, p.pricing_model AS model,
+                g.system_key AS group_key
+           FROM plans p JOIN applications a ON a.id = p.application_id
+           LEFT JOIN functional_groups g ON g.id = a.functional_group_id WHERE p.id = $1`,
         [done.plan?.planId],
       );
       expect(registered.rows[0]).toEqual({
@@ -88,6 +91,8 @@ describe('requests over HTTP: registering internal software (integration, real P
         vendor_id: null,
         type: 'K5',
         model: null,
+        // QĐ-111d, CT-1.5: every road that makes an application puts it in a group; this one names none, so it stands in Khác.
+        group_key: 'OTHER',
       });
     });
 
