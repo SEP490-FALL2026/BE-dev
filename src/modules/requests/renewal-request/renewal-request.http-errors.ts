@@ -77,7 +77,7 @@ export const RENEWAL_ERROR_EXAMPLES = {
   ),
   NO_DEPARTMENT: example(new AccessRequestNoDepartmentError()),
   OPEN_REQUEST_EXISTS: example(new AccessRequestOpenRequestExistsError('<request-id>')),
-  OPEN_LIMIT_REACHED: example(new AccessRequestOpenLimitReachedError(3, ['<request-id>'])),
+  OPEN_LIMIT_REACHED: example(new AccessRequestOpenLimitReachedError(10, '2026-11-16')),
   MANY_PAID_SOFTWARE_REASON_REQUIRED: example(new AccessRequestManyPaidSoftwareReasonRequiredError(10, 10)),
   REQUEST_PARTY_INELIGIBLE: example(
     new RequestPartyIneligibleError({

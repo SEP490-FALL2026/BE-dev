@@ -111,15 +111,15 @@ export const PARAMETER_DEFINITIONS: readonly ParameterDefinition[] = [
   },
   {
     key: 'REQUEST_OPEN_NEW_LIMIT',
-    label: 'Số Request cấp mới đang mở tối đa của một người',
+    label: 'Số Request cấp mới tối đa mỗi tuần của một người',
     group: 'WORKFLOW',
     shape: { kind: 'int', min: 1, max: 20 },
-    default: 3,
+    default: 10,
     unit: 'requests',
     unitLabel: 'Request',
     description:
-      'GH-2: a person who already is the beneficiary of this many requests for new access still open cannot be named in another one.',
-    source: 'BR-MF1-01f, QĐ-103c, QĐ-104b',
+      'GH-2: a person already named in this many requests for new access sent in the calendar week (Monday to Sunday, organization time zone; withdrawn and refused ones count) cannot be named in another one until the next Monday.',
+    source: 'BR-MF1-01f, QĐ-111h',
   },
   {
     key: 'PAID_SOFTWARE_FLAG_THRESHOLD',

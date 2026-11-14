@@ -137,6 +137,7 @@ export class GroupSubmissionFactsService {
       employeeIds: ids,
       planId: input.planId,
       applicationId: target.applicationId,
+      now: input.now,
       today,
       settings: input.limitSettings,
     });

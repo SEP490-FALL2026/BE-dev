@@ -106,6 +106,12 @@ describe('operating parameter definitions (US-01-04)', () => {
     }
   });
 
+  it('QĐ-111h: the limit of requests for new access is one of the calendar week, ten to begin with', () => {
+    expect(defaultValues().REQUEST_OPEN_NEW_LIMIT).toBe(10);
+    expect(definitionOf('REQUEST_OPEN_NEW_LIMIT')?.description).toMatch(/calendar week/);
+    expect(validateParameterValue('REQUEST_OPEN_NEW_LIMIT', 15, defaultValues())).toEqual({ ok: true });
+  });
+
   it('knows its own keys and nothing else', () => {
     expect(definitionOf('APPROVAL_SLA_WORKING_DAYS')?.unit).toBe('working days');
     expect(definitionOf('TIME_ZONE')).toBeUndefined();
@@ -207,7 +213,7 @@ describe('operating parameter labels and groups (QĐ93-PARAM-LABEL)', () => {
       ['APPROVAL_SLA_WORKING_DAYS', 'Hạn xử lý một bước phê duyệt', 'WORKFLOW', 'working days', 'ngày làm việc'],
       ['BACKLOG_ALERT_THRESHOLD', 'Ngưỡng tồn đọng bước phê duyệt', 'WORKFLOW', 'steps', 'bước'],
       ['SPEND_SUBMISSION_WAIT_WORKING_DAYS', 'Hạn chờ trình duyệt chi', 'WORKFLOW', 'working days', 'ngày làm việc'],
-      ['REQUEST_OPEN_NEW_LIMIT', 'Số Request cấp mới đang mở tối đa của một người', 'WORKFLOW', 'requests', 'Request'],
+      ['REQUEST_OPEN_NEW_LIMIT', 'Số Request cấp mới tối đa mỗi tuần của một người', 'WORKFLOW', 'requests', 'Request'],
       [
         'PAID_SOFTWARE_FLAG_THRESHOLD',
         'Ngưỡng số phần mềm trả phí cần lý do khi xin thêm',

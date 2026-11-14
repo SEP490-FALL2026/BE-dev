@@ -1,3 +1,4 @@
+import type { BusinessDate } from '../../../core/business-date';
 import type { WithdrawalRefusal } from './withdrawal.policy';
 import type { CancellationRefusal, HeldAccess } from './access-request.types';
 
@@ -65,13 +66,13 @@ export class AccessRequestOpenRequestExistsError extends Error {
   }
 }
 
-/** GH-2 (`BR-MF1-01f`): the person already has as many requests for new access open as they may. */
+/** GH-2 (`BR-MF1-01f`, `QĐ-111h`): the person was already named in as many requests for new access this calendar week as they may; the count starts again on `resetsOn`. */
 export class AccessRequestOpenLimitReachedError extends Error {
   constructor(
     readonly limit: number,
-    readonly openRequestIds: readonly string[],
+    readonly resetsOn: BusinessDate,
   ) {
-    super('The person already has as many requests for new access open as they may.');
+    super('The person was already named in as many requests for new access this week as they may.');
     this.name = 'AccessRequestOpenLimitReachedError';
   }
 }

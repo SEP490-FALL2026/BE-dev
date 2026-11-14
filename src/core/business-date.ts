@@ -60,3 +60,14 @@ export function monthBoundsOf(date: BusinessDate): { start: BusinessDate; nextSt
 
   return { start: `${date.slice(0, 8)}01`, nextStart };
 }
+
+/**
+ * The calendar week `date` is in, Monday to Sunday: `[start, nextStart)`, `start` the Monday on or before `date` and `nextStart` the Monday after it.
+ * Whole days of the calendar, no time zone involved: the caller gives the date as it reads in the zone of the organization.
+ */
+export function weekBoundsOf(date: BusinessDate): { start: BusinessDate; nextStart: BusinessDate } {
+  const sinceMonday = (new Date(`${date}T00:00:00.000Z`).getUTCDay() + 6) % 7;
+  const start = addDays(date, -sinceMonday);
+
+  return { start, nextStart: addDays(start, 7) };
+}

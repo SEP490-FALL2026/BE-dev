@@ -86,8 +86,9 @@ export class RequestPreviewService {
       existingAccess: assessed.heldAccess,
       blockedBy,
       limits: {
-        openNewCount: limits.openCount,
-        openNewMax: limitSettings.openLimit,
+        openNewCount: limits.sentThisWeek,
+        openNewMax: limitSettings.weeklyLimit,
+        resetsOn: limits.resetsOn,
         paidSoftwareCount: limits.paidSoftwareCount,
         paidSoftwareThreshold: limitSettings.paidThreshold,
         reasonRequired: limits.manyPaidSoftware !== null,
@@ -123,6 +124,7 @@ export class RequestPreviewService {
     const limitSettings = await this.limits.settings();
 
     return this.runner.run(async (tx) => {
+      const now = new Date();
       const blockedBy = await this.requestParties.blockOf(
         { requesterEmployeeId: actor.employeeId, beneficiaryEmployeeIds: [actor.employeeId] },
         tx,
@@ -132,7 +134,7 @@ export class RequestPreviewService {
         employeeId: actor.employeeId,
         planId: body.planId,
         expectedEndDate: body.expectedEndDate ?? null,
-        now: new Date(),
+        now,
         settings,
         lockDepartment: false,
       });
@@ -140,6 +142,7 @@ export class RequestPreviewService {
         employeeId: actor.employeeId,
         planId: body.planId,
         applicationId: assessed.target.applicationId,
+        now,
         today: assessed.today,
         settings: limitSettings,
         exemptions: assessed.graceHold ? new Map([[actor.employeeId, 'TRANSFER_GRACE' as const]]) : undefined,

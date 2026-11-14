@@ -57,8 +57,11 @@ const SUBMITTED_MESSAGE: Readonly<Record<DraftKind, string>> = {
   GROUP: 'GROUP_REQUEST.SUBMITTED',
 };
 
-/** GH-1 and GH-2 of the person a draft is sent for (`BR-MF1-01`). */
-const GH_CONFLICT_EXAMPLES = [EXAMPLES.OPEN_REQUEST_EXISTS, EXAMPLES.OPEN_LIMIT_REACHED];
+/** GH-1 of the person a draft is sent for (`BR-MF1-01`): another request of the plan open. */
+const GH_CONFLICT_EXAMPLES = [EXAMPLES.OPEN_REQUEST_EXISTS];
+
+/** GH-2 and GH-3 of the person a draft is sent for (`BR-MF1-01`): refused as a rule of the form, not as a conflict. */
+const GH_RULE_EXAMPLES = [EXAMPLES.OPEN_LIMIT_REACHED, EXAMPLES.MANY_PAID_SOFTWARE_REASON_REQUIRED];
 
 /**
  * The drafts of paid requests: what a person saves when their department has no Cost Center yet and a paid request
@@ -156,7 +159,7 @@ export class RequestDraftsController {
     {
       status: HttpStatus.CONFLICT,
       description:
-        'The request was sent already (ACCESS_REQUEST.NOT_DRAFT), the department has no Cost Center in use yet (FINANCE.SETUP_INCOMPLETE), the application of the plan is retired (ACCESS_REQUEST.APPLICATION_RETIRED), the sender belongs to no department (ACCESS_REQUEST.NO_DEPARTMENT) or already holds a seat of the plan (ACCESS_REQUEST.ALREADY_HOLDS_ACCESS). A request for new access is refused when the person already has one of the plan open (ACCESS_REQUEST.OPEN_REQUEST_EXISTS, details.requestId) or already has as many open as they may (ACCESS_REQUEST.OPEN_LIMIT_REACHED, details.limit and details.openRequestIds; GH-1/GH-2, BR-MF1-01). The refusals particular to a group are those of its own operation.',
+        'The request was sent already (ACCESS_REQUEST.NOT_DRAFT), the department has no Cost Center in use yet (FINANCE.SETUP_INCOMPLETE), the application of the plan is retired (ACCESS_REQUEST.APPLICATION_RETIRED), the sender belongs to no department (ACCESS_REQUEST.NO_DEPARTMENT) or already holds a seat of the plan (ACCESS_REQUEST.ALREADY_HOLDS_ACCESS). A request for new access is refused when the person already has one of the plan open (ACCESS_REQUEST.OPEN_REQUEST_EXISTS, details.requestId; GH-1, BR-MF1-01). The refusals particular to a group are those of its own operation.',
       examples: [
         EXAMPLES.NOT_DRAFT,
         EXAMPLES.FINANCE_SETUP_INCOMPLETE,
@@ -169,13 +172,13 @@ export class RequestDraftsController {
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
-        'The id is invalid (VALIDATION_ERROR), the sender is the spending approver (REQUEST_PARTY.INELIGIBLE), or the draft was saved with an end date that no longer fits, before today or more than a year from today: ACCESS_REQUEST.END_DATE_OUT_OF_RANGE (GROUP_REQUEST.TERM_BEYOND_LIMIT for a group), with details { maxEndDate }, or without the end date a contractor, freelancer or intern needs: ACCESS_REQUEST.TERM_REQUIRED. A group draft with fewer than two different people is refused as GROUP_REQUEST.TOO_FEW_LINES. A person who already uses as many paid applications as the threshold must give manyPaidSoftwareReason (ACCESS_REQUEST.MANY_PAID_SOFTWARE_REASON_REQUIRED, details.count and details.threshold; GH-3). Nothing changes: the draft stays, to be saved again with a shorter term.',
+        'The id is invalid (VALIDATION_ERROR), the sender is the spending approver (REQUEST_PARTY.INELIGIBLE), or the draft was saved with an end date that no longer fits, before today or more than a year from today: ACCESS_REQUEST.END_DATE_OUT_OF_RANGE (GROUP_REQUEST.TERM_BEYOND_LIMIT for a group), with details { maxEndDate }, or without the end date a contractor, freelancer or intern needs: ACCESS_REQUEST.TERM_REQUIRED. A group draft with fewer than two different people is refused as GROUP_REQUEST.TOO_FEW_LINES. A person who was already named in as many requests for new access this calendar week (Monday to Sunday, organization time zone; a request withdrawn or refused still counts) as the weekly limit allows is refused until the next Monday (ACCESS_REQUEST.OPEN_LIMIT_REACHED, details.limit and details.resetsOn; GH-2, BR-MF1-01f). A person who already uses as many paid applications as the threshold must give manyPaidSoftwareReason (ACCESS_REQUEST.MANY_PAID_SOFTWARE_REASON_REQUIRED, details.count and details.threshold; GH-3). Nothing changes: the draft stays, to be saved again with a shorter term.',
       examples: [
         VALIDATION_EXAMPLE,
         EXAMPLES.REQUEST_PARTY_INELIGIBLE,
         EXAMPLES.END_DATE_OUT_OF_RANGE,
         EXAMPLES.TERM_REQUIRED,
-        EXAMPLES.MANY_PAID_SOFTWARE_REASON_REQUIRED,
+        ...GH_RULE_EXAMPLES,
         GROUP_REQUEST_ERROR_EXAMPLES.TERM_BEYOND_LIMIT,
         GROUP_REQUEST_ERROR_EXAMPLES.TOO_FEW_LINES,
       ],

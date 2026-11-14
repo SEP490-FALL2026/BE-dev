@@ -109,6 +109,7 @@ export class AccessRequestService {
       employeeId: actor.employeeId,
       planId: body.planId,
       applicationId: assessed.target.applicationId,
+      now,
       today: assessed.today,
       settings: options.limitSettings ?? (await this.limits.settings()),
       reason: body.manyPaidSoftwareReason,

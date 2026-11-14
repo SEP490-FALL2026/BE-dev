@@ -107,10 +107,10 @@ export function toAccessRequestApiException(error: unknown): unknown {
     });
   }
   if (error instanceof AccessRequestOpenLimitReachedError) {
-    return new ApiException(HttpStatus.CONFLICT, {
+    return new ApiException(HttpStatus.UNPROCESSABLE_ENTITY, {
       code: 'ACCESS_REQUEST.OPEN_LIMIT_REACHED',
       message: error.message,
-      details: { limit: error.limit, openRequestIds: [...error.openRequestIds] },
+      details: { limit: error.limit, resetsOn: error.resetsOn },
     });
   }
   if (error instanceof AccessRequestManyPaidSoftwareReasonRequiredError) {
@@ -206,7 +206,7 @@ export const ACCESS_REQUEST_ERROR_EXAMPLES = {
     }),
   ),
   OPEN_REQUEST_EXISTS: example(new AccessRequestOpenRequestExistsError('<request-id>')),
-  OPEN_LIMIT_REACHED: example(new AccessRequestOpenLimitReachedError(3, ['<request-id>'])),
+  OPEN_LIMIT_REACHED: example(new AccessRequestOpenLimitReachedError(10, '2026-11-16')),
   MANY_PAID_SOFTWARE_REASON_REQUIRED: example(new AccessRequestManyPaidSoftwareReasonRequiredError(10, 10)),
   NOT_ASSIGNEE: example(new AccessRequestNotAssigneeError()),
   EMPLOYEE_REQUIRED: example(new AccessRequestEmployeeRequiredError()),

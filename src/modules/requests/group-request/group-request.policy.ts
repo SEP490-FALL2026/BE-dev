@@ -90,7 +90,7 @@ export interface LineFacts {
   holdsAccess: boolean;
   /** A request for the plan is open for the person: another of their own, or a line of another group. */
   hasOpenRequest: boolean;
-  /** GH-2 (`BR-MF1-01f`): the person already has as many requests for new access open as they may. */
+  /** GH-2 (`BR-MF1-01f`, `QĐ-111h`): the person was already named in as many requests for new access this calendar week as they may. */
   openLimitReached?: boolean;
   /** GH-3 (`BR-MF1-01g`): the person uses many paid applications and the sender gave no reason for their line. */
   manyPaidSoftwareReasonMissing?: boolean;

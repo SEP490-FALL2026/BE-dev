@@ -69,6 +69,7 @@ export class ProposalService {
         employeeId: actor.employeeId,
         planId: null,
         applicationId: null,
+        now,
         today: assessed.today,
         settings: limitSettings,
         reason: body.manyPaidSoftwareReason,
