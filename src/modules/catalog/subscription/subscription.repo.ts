@@ -14,6 +14,7 @@ import type {
   PriceSnapshotRecord,
   SubscriptionKind,
   SubscriptionListFilter,
+  SubscriptionListScope,
   SubscriptionRecord,
   SubscriptionState,
   UnitPriceRecord,
@@ -28,12 +29,14 @@ const WITH_PLAN = {
       provisioningType: true,
       hasAdminConsole: true,
       application: {
-        select: { id: true, name: true, kind: true, vendor: { select: { id: true, name: true } } },
+        select: { id: true, name: true, logoUrl: true, kind: true, vendor: { select: { id: true, name: true } } },
       },
     },
   },
 } as const;
 type Row = Prisma.SubscriptionGetPayload<{ include: typeof WITH_PLAN }>;
+/** A subscription that runs a period (`QĐ-111o`): not a purchase made once, not a draft, not a period a later one continues. */
+const RUNS_A_PERIOD: Prisma.SubscriptionWhereInput = { kind: 'TERM', status: 'ACTIVE', renewedBy: null };
 
 const date = (value: Date | null) => (value ? fromDateColumn(value) : null);
 const column = (value: string | null) => (value ? toDateColumn(value) : null);
@@ -85,6 +88,7 @@ function toRecord(row: Row): SubscriptionRecord {
     ownerDepartmentId: row.ownerDepartmentId, // Gói 9: nullable kho chung
     applicationId: application.id,
     applicationName: application.name,
+    applicationLogoUrl: application.logoUrl,
     applicationKind: application.kind,
     vendor: { id: application.vendor.id, name: application.vendor.name },
     kind: row.kind,
@@ -546,9 +550,24 @@ export class SubscriptionRepo {
     return new Map(rows.map((row) => [row.id, `${row.plan.application.name} / ${row.plan.name}`]));
   }
 
-  /** One page by application, plan then creation, and the total for the same filter, from one snapshot. */
-  async list(filter: SubscriptionListFilter): Promise<{ items: SubscriptionRecord[]; total: number }> {
-    const conditions: Prisma.SubscriptionWhereInput[] = [
+  /**
+   * Every operating subscription the filters let through whose point of adjustment is read, to find the ones near or past it (`QĐ-111o`): not
+   * a purchase made once, a draft or a period a later one continues. Not paged: they are few, and the point is a rule of the policy.
+   */
+  async findExpiryCandidates(scope: SubscriptionListScope): Promise<SubscriptionRecord[]> {
+    const where: Prisma.SubscriptionWhereInput = { AND: [...this.conditionsOf(scope), RUNS_A_PERIOD] };
+
+    return (await this.prisma.subscription.findMany({ where, include: WITH_PLAN, orderBy: { id: 'asc' } })).map(
+      toRecord,
+    );
+  }
+
+  private conditionsOf(filter: SubscriptionListScope & { ids?: readonly string[] }): Prisma.SubscriptionWhereInput[] {
+    return [
+      ...(filter.ids ? [{ id: { in: [...filter.ids] } }] : []),
+      ...(filter.responsibleItAdminEmployeeId
+        ? [{ responsibleItAdminEmployeeId: filter.responsibleItAdminEmployeeId }]
+        : []),
       ...(filter.applicationId ? [{ plan: { applicationId: filter.applicationId } }] : []),
       ...(filter.planId ? [{ planId: filter.planId }] : []),
       ...(filter.status ? [{ status: filter.status }] : []),
@@ -571,7 +590,11 @@ export class SubscriptionRepo {
           ]
         : []),
     ];
-    const where: Prisma.SubscriptionWhereInput = { AND: conditions };
+  }
+
+  /** One page by application, plan then creation, and the total for the same filter, from one snapshot. */
+  async list(filter: SubscriptionListFilter): Promise<{ items: SubscriptionRecord[]; total: number }> {
+    const where: Prisma.SubscriptionWhereInput = { AND: this.conditionsOf(filter) };
 
     return this.prisma.$transaction(
       async (tx) => {

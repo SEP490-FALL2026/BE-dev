@@ -49,6 +49,8 @@ export interface SubscriptionRecord {
   ownerDepartmentId: string | null;
   applicationId: string;
   applicationName: string;
+  /** The https link to the logo the IT Admin pasted for the application, never checked; null when none is set. */
+  applicationLogoUrl: string | null;
   applicationKind: ApplicationKind;
   vendor: { id: string; name: string };
   kind: SubscriptionKind;
@@ -118,9 +120,16 @@ export interface SubscriptionListFilter {
   kind?: SubscriptionKind;
   /** Only the subscriptions that have no anchor for an alert: found by the same rule that derives the warning. */
   withoutAlertAnchor?: boolean;
+  /** Only the subscriptions this IT Admin answers for (`QĐ-103v`(4)). */
+  responsibleItAdminEmployeeId?: string;
+  /** Only these subscriptions: what the filter by expiry found (none when empty). */
+  ids?: readonly string[];
   skip: number;
   take: number;
 }
+
+/** The filters of a list, before any page: what the subscriptions that are near or past their point of adjustment are found among. */
+export type SubscriptionListScope = Omit<SubscriptionListFilter, 'skip' | 'take' | 'ids'>;
 
 export interface TaxEstimateSummary {
   basis: 'PROFILE' | 'DEFAULT_NO_PROFILE';
@@ -149,6 +158,7 @@ export interface SubscriptionView {
   ownerDepartmentId: string | null; // Gói 9: nullable kho dùng chung
   applicationId: string;
   applicationName: string;
+  logoUrl: string | null;
   vendor: { id: string; name: string };
   kind: SubscriptionKind;
   status: SubscriptionStatus;
@@ -167,8 +177,17 @@ export interface SubscriptionView {
   autoRenew: boolean;
   allowsMidTermReduction: boolean;
   responsibleItAdminEmployeeId: string | null;
+  /** Who answers for the subscription, by name; null when none is named. */
+  responsibleItAdmin: { employeeId: string; employeeCode: string; fullName: string } | null;
   vendorMinimumSeats: number | null;
   isPrimaryForPlan: boolean;
+  /** Near (SOON) or past (EXPIRED) the point of adjustment today (`QĐ-111o`); null before it, for a purchase made once and with no date to count from. */
+  expiry: ExpiryState | null;
+  /** Days to the deadline the point counts to, negative once it is past; null with no point. */
+  daysLeft: number | null;
+  deadlineKind: DeadlineKind | null;
+  /** The seats of a shared pool of a K2 plan; null for any other kind of plan. */
+  seats: { purchased: number | null; assigned: number; free: number | null; inRevocation: number } | null;
   noticeDeadline: { value: BusinessDate | null; source: NoticeSource };
   alerts: { baseDate: BusinessDate | null; dates: BusinessDate[] };
   warnings: SubscriptionWarning[];
@@ -185,3 +204,9 @@ export interface SubscriptionView {
   createdAt: Date;
   updatedAt: Date;
 }
+
+/** What the point of adjustment of a subscription counts to: the payment day of a plan by the month, or, by the year, the deadline to cancel, the renewal day or the end day (`QĐ-111o`). */
+export type DeadlineKind = 'PAYMENT_DATE' | 'NOTICE_DEADLINE' | 'RENEWAL_DATE' | 'END_DATE';
+
+/** Near (SOON) or past (EXPIRED) the point of adjustment today. */
+export type ExpiryState = 'SOON' | 'EXPIRED';

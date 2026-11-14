@@ -30,6 +30,7 @@ import type {
   SubscriptionRecord,
   SubscriptionKind,
   SubscriptionListFilter,
+  SubscriptionListScope,
   SubscriptionState,
   SubscriptionStatus,
   SubscriptionView,
@@ -100,27 +101,50 @@ export class SubscriptionService {
     private readonly runner: TransactionRunner,
   ) {}
 
-  async list(query: {
-    applicationId?: string;
-    planId?: string;
-    status?: SubscriptionStatus;
-    kind?: SubscriptionKind;
-    warning?: 'NO_ALERT_ANCHOR';
-    page: number;
-    pageSize: number;
-  }): Promise<Page<SubscriptionView>> {
-    const filter: SubscriptionListFilter = {
+  /**
+   * One page. `mine` keeps the subscriptions the caller answers for; `expiry` keeps the ones that are near or past their point of adjustment
+   * (`QĐ-111o`): they are found among the subscriptions that run a period by the rule of the policy and then paged, so the total is the
+   * total of the filter.
+   */
+  async list(
+    query: {
+      applicationId?: string;
+      planId?: string;
+      status?: SubscriptionStatus;
+      kind?: SubscriptionKind;
+      warning?: 'NO_ALERT_ANCHOR';
+      mine?: boolean;
+      expiry?: 'SOON' | 'EXPIRED';
+      page: number;
+      pageSize: number;
+    },
+    callerEmployeeId: string,
+  ): Promise<Page<SubscriptionView>> {
+    const scope: SubscriptionListScope = {
       ...(query.applicationId ? { applicationId: query.applicationId } : {}),
       ...(query.planId ? { planId: query.planId } : {}),
       ...(query.status ? { status: query.status } : {}),
       ...(query.kind ? { kind: query.kind } : {}),
       ...(query.warning ? { withoutAlertAnchor: true } : {}),
+      ...(query.mine ? { responsibleItAdminEmployeeId: callerEmployeeId } : {}),
+    };
+    const filter: SubscriptionListFilter = {
+      ...scope,
+      ...(query.expiry ? { ids: await this.idsWithExpiry(scope, query.expiry) } : {}),
       skip: (query.page - 1) * query.pageSize,
       take: query.pageSize,
     };
     const { items, total } = await this.subscriptions.list(filter);
 
     return pageOf(await this.views.viewAll(items), total, query.page, query.pageSize);
+  }
+
+  /** The ids of the subscriptions among `scope` that stand at `state` against their point of adjustment today. */
+  private async idsWithExpiry(scope: SubscriptionListScope, state: 'SOON' | 'EXPIRED'): Promise<string[]> {
+    const candidates = await this.subscriptions.findExpiryCandidates(scope);
+    const readings = await this.views.expiryReadings(candidates);
+
+    return candidates.filter((record) => readings.get(record.id)?.state === state).map((record) => record.id);
   }
 
   /** The guidance of an empty list: set only when there is not one subscription at all, not when a filter matched none. */

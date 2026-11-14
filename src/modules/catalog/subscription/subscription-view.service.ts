@@ -3,22 +3,54 @@ import { formatAmount } from '../../../core/money/money';
 import { FinanceApi } from '../../finance/public/finance.api';
 import type { TaxEstimateResult } from '../../finance/public/finance.types';
 import { OperatingParametersApi } from '../../operating-parameters/public/operating-parameters.api';
+import type { BusinessDate } from '../../../core/business-date';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
+import { SeatOccupancyHook } from '../public/catalog.extension-points';
 import { PlanFactsService } from '../plan/plan-facts.service';
 import { needsVendorAdmins } from '../plan/plan-vendor-admins.policy';
+import { adjustmentPointOf, expiryReading } from './obligation/subscription-obligation.policy';
 import { alertDates, deriveNotice, missingData, noticeInputOf, noticeWarnings } from './subscription.policy';
 import { isPricedInDong } from './price/subscription-price.policy';
 import { liveIdsByPlan, liveSiblingsOf, poolWarnings, vendorAdminFlags } from './pool/subscription-pool.policy';
 import { SubscriptionRepo } from './subscription.repo';
-import type { SubscriptionRecord, SubscriptionView, TaxEstimateSummary, VendorAdminView } from './subscription.types';
+import type {
+  DeadlineKind,
+  ExpiryState,
+  SubscriptionRecord,
+  SubscriptionView,
+  TaxEstimateSummary,
+  VendorAdminView,
+} from './subscription.types';
 
 type LiveOfPlans = { byPlan: Map<string, string[]>; has: (id: string) => boolean };
+type SeatCounts = ReadonlyMap<string, { occupied: number; inRevocation: number }>;
+
+/** Where a subscription stands against its point of adjustment today (`QĐ-111o`). */
+export interface ExpiryReadingView {
+  state: ExpiryState | null;
+  daysLeft: number | null;
+  deadlineKind: DeadlineKind | null;
+}
 
 /** The most live subscriptions of one plan an answer names: duplicates exist only while the seat baseline is open, a few at most. */
 const MERGE_CANDIDATES_MAX = 20;
 
 const mergeCandidatesOf = (live: LiveOfPlans, record: SubscriptionRecord): string[] =>
   live.has(record.id) ? liveSiblingsOf(live.byPlan, record.planId, record.id).slice(0, MERGE_CANDIDATES_MAX) : [];
+
+/** The seats of a shared pool: only a K2 plan has them (a key, a personal right and an internal tool are counted by what they are, `IA-2`). */
+const seatsOfPool = (record: SubscriptionRecord, counts: SeatCounts): SubscriptionView['seats'] => {
+  if (record.planProvisioningType !== 'K2') return null;
+  const taken = counts.get(record.id);
+  const assigned = taken?.occupied ?? 0;
+
+  return {
+    purchased: record.purchasedQuantity,
+    assigned,
+    free: record.purchasedQuantity === null ? null : Math.max(0, record.purchasedQuantity - assigned),
+    inRevocation: taken?.inRevocation ?? 0,
+  };
+};
 
 const mergeWarnings = (mergeCandidateIds: readonly string[]): 'SHOULD_MERGE'[] =>
   mergeCandidateIds.length > 0 ? ['SHOULD_MERGE'] : [];
@@ -36,7 +68,61 @@ export class SubscriptionViewService {
     private readonly subscriptions: SubscriptionRepo,
     private readonly organizationReads: OrganizationReadApi,
     private readonly planFacts: PlanFactsService,
+    private readonly occupancy: SeatOccupancyHook,
   ) {}
+
+  /**
+   * Where each of these subscriptions stands against its point of adjustment today: near it, past it while seats are still held, or
+   * neither. One read of the seats for any number of subscriptions; what the filter by expiry of a list is found with, and what a row says.
+   */
+  async expiryReadings(records: readonly SubscriptionRecord[]): Promise<Map<string, ExpiryReadingView>> {
+    const today = await this.organizationReads.businessToday();
+
+    return this.readingsOf(records, today, await this.seatsOf(records, today));
+  }
+
+  private readingsOf(
+    records: readonly SubscriptionRecord[],
+    today: BusinessDate,
+    seats: SeatCounts,
+  ): Map<string, ExpiryReadingView> {
+    return new Map(
+      records.map((record) => {
+        const point = adjustmentPointOf(record);
+        const { state, daysLeft } = expiryReading(point, today, (seats.get(record.id)?.occupied ?? 0) > 0);
+
+        return [record.id, { state, daysLeft, deadlineKind: point?.kind ?? null }];
+      }),
+    );
+  }
+
+  /** The seats each of these subscriptions holds from today on, and how many of them are being taken back: one read for all of them. */
+  private seatsOf(records: readonly SubscriptionRecord[], today: BusinessDate): Promise<SeatCounts> {
+    return records.length === 0
+      ? Promise.resolve(new Map())
+      : this.occupancy.get().seatsOfSubscriptions(
+          records.map((record) => record.id),
+          today,
+        );
+  }
+
+  /** The people who answer for these subscriptions, by name, in one read. */
+  private async answerersOf(records: readonly SubscriptionRecord[]) {
+    const ids = [
+      ...new Set(
+        records.flatMap((record) => (record.responsibleItAdminEmployeeId ? [record.responsibleItAdminEmployeeId] : [])),
+      ),
+    ];
+    const people = new Map(
+      (ids.length === 0 ? [] : await this.organizationReads.getEmployees(ids)).map((person) => [person.id, person]),
+    );
+
+    return (record: SubscriptionRecord): SubscriptionView['responsibleItAdmin'] => {
+      const person = record.responsibleItAdminEmployeeId ? people.get(record.responsibleItAdminEmployeeId) : undefined;
+
+      return person ? { employeeId: person.id, employeeCode: person.employeeCode, fullName: person.fullName } : null;
+    };
+  }
 
   /** The records as they are answered, with the derived notice, alerts, warnings, tax profile and estimate. */
   async viewAll(records: SubscriptionRecord[]): Promise<SubscriptionView[]> {
@@ -74,6 +160,18 @@ export class SubscriptionViewService {
 
     const live = await this.liveOfPooledPlans(records);
     const vendorAdmins = await this.vendorAdminsOf(records);
+    const today = await this.organizationReads.businessToday();
+    const seatCounts = await this.seatsOf(records, today);
+    const readings = this.readingsOf(records, today, seatCounts);
+    const answerer = await this.answerersOf(records);
+    const adjustment = (record: SubscriptionRecord) => ({
+      logoUrl: record.applicationLogoUrl,
+      responsibleItAdmin: answerer(record),
+      expiry: readings.get(record.id)?.state ?? null,
+      daysLeft: readings.get(record.id)?.daysLeft ?? null,
+      deadlineKind: readings.get(record.id)?.deadlineKind ?? null,
+      seats: seatsOfPool(record, seatCounts),
+    });
     const views: SubscriptionView[] = [];
     for (const record of records) {
       // The rule against a second live subscription of a K2 or K4 plan: answered at every phase of the baseline, so the IT Admin sees what to fold (`QĐ-104k`(3)).
@@ -140,6 +238,7 @@ export class SubscriptionViewService {
         responsibleItAdminEmployeeId: record.responsibleItAdminEmployeeId,
         vendorMinimumSeats: record.vendorMinimumSeats,
         isPrimaryForPlan: record.isPrimaryForPlan,
+        ...adjustment(record),
         noticeDeadline: { value: notice.deadline, source: notice.source },
         alerts: { baseDate: notice.baseDate, dates: alertDates(notice.baseDate, daysBefore) },
         warnings: [...noticeWarnings(notice.source), ...poolWarnings(record), ...mergeWarnings(mergeCandidateIds)],

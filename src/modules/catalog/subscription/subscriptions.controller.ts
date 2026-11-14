@@ -143,7 +143,7 @@ export class SubscriptionsController {
   @ApiSuccessResponse(SubscriptionPageResponseDto, {
     message: 'SUBSCRIPTION.LISTED',
     description:
-      'A page of subscriptions by application, plan and creation, optionally filtered; warning=NO_ALERT_ANCHOR lists those with no date to alert from. Who administers the plan at the vendor (vendorAdmins), the email of the company account that owns it there (ownerAccountEmail) and the note (adminNote) are for the IT Admin: Finance reads them empty, with the two flags.',
+      'A page of subscriptions by application, plan and creation, optionally filtered; warning=NO_ALERT_ANCHOR lists those with no date to alert from, mine=true those the caller answers for, expiry=SOON or EXPIRED those near or past the point of adjustment (a plan by the month 7 days before its payment day, a plan by the year 30 days before the deadline to cancel; a purchase made once never). Each row says the days left to the deadline, the seats of a shared pool (K2), who answers for it and the logo of the application. Who administers the plan at the vendor (vendorAdmins), the email of the company account that owns it there (ownerAccountEmail) and the note (adminNote) are for the IT Admin: Finance reads them empty, with the two flags.',
   })
   @ApiErrorResponses(...AUTH_ERRORS, READERS, {
     status: HttpStatus.UNPROCESSABLE_ENTITY,
@@ -152,7 +152,7 @@ export class SubscriptionsController {
   })
   async list(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Query() query: ListSubscriptionsQueryDto) {
     try {
-      const page = await this.subscriptions.list(query);
+      const page = await this.subscriptions.list(query, actor.employeeId);
       const emptyState = page.items.length === 0 ? await this.subscriptions.emptyState() : null;
 
       return { items: page.items.map((item) => toWireFor(actor, item)), pagination: page.pagination, emptyState };

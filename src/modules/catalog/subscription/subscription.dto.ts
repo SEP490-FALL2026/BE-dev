@@ -76,12 +76,22 @@ export const updateSubscriptionBodySchema = z.strictObject({
   isPrimaryForPlan: z.boolean().optional(),
 });
 
+const queryFlag = z.enum(['true', 'false']).transform((value) => value === 'true');
+
 export const listSubscriptionsQuerySchema = z.strictObject({
   applicationId: z.uuid().optional(),
   planId: z.uuid().optional(),
   status: status.optional(),
   kind: kind.optional(),
   warning: z.enum(['NO_ALERT_ANCHOR']).optional(),
+  mine: queryFlag.optional().meta({
+    description:
+      'true lists only the subscriptions the caller answers for as their IT Admin; false or absent lists them all.',
+  }),
+  expiry: z.enum(['SOON', 'EXPIRED']).optional().meta({
+    description:
+      'SOON lists the subscriptions from the point of adjustment to the day of its deadline, EXPIRED those past the deadline while seats are still held. A purchase made once is never listed.',
+  }),
   page: z.coerce.number().int().positive().default(1),
   pageSize: z.coerce.number().int().positive().max(100).default(20),
 });
@@ -104,6 +114,10 @@ const subscriptionSchema = z.strictObject({
   ownerDepartmentId: z.uuid().nullable(),
   applicationId: z.uuid(),
   applicationName: z.string(),
+  logoUrl: z.string().nullable().meta({
+    description:
+      'The https link to the logo image of the application that the IT Admin pasted, or null. The server never checks it: it may be broken, so show the first letter of the name when the image does not load.',
+  }),
   vendor: z.strictObject({ id: z.uuid(), name: z.string() }),
   kind,
   status,
@@ -121,8 +135,36 @@ const subscriptionSchema = z.strictObject({
   autoRenew: z.boolean(),
   allowsMidTermReduction: z.boolean(),
   responsibleItAdminEmployeeId: z.uuid().nullable(),
+  responsibleItAdmin: z
+    .strictObject({ employeeId: z.uuid(), employeeCode: z.string(), fullName: z.string() })
+    .nullable()
+    .meta({ description: 'The IT Admin who answers for the subscription, by name; null when none is named.' }),
   vendorMinimumSeats: z.number().int().nullable(),
   isPrimaryForPlan: z.boolean(),
+  expiry: z.enum(['SOON', 'EXPIRED']).nullable().meta({
+    description:
+      'SOON from the point of adjustment to the day of its deadline, EXPIRED past it while seats are still held; null before the point, for a purchase made once and when no date is known to count from.',
+  }),
+  daysLeft: z.number().int().nullable().meta({
+    description:
+      'The days from today to the deadline the point counts to; negative once it is past; null when there is no point.',
+  }),
+  deadlineKind: z.enum(['PAYMENT_DATE', 'NOTICE_DEADLINE', 'RENEWAL_DATE', 'END_DATE']).nullable().meta({
+    description:
+      'What daysLeft counts to: the payment day of a plan by the month; by the year, the deadline to cancel, else the renewal day, else the end day.',
+  }),
+  seats: z
+    .strictObject({
+      purchased: z.number().int().nullable(),
+      assigned: z.number().int().nonnegative(),
+      free: z.number().int().nonnegative().nullable(),
+      inRevocation: z.number().int().nonnegative(),
+    })
+    .nullable()
+    .meta({
+      description:
+        'The seats of the shared pool of a K2 plan: bought, taken by an assignment from today on, free to grant, and held by a right being taken back. Null for any other kind of plan.',
+    }),
   noticeDeadline: z.strictObject({
     value: z.string().nullable(),
     source: z.enum(['DECLARED', 'INFERRED_UNCONFIRMED', 'BY_END_DATE', 'MISSING', 'NOT_APPLICABLE']),

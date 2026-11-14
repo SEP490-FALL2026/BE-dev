@@ -3,6 +3,7 @@ import type { BusinessDate } from '../../../core/business-date';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { SeatOccupancyHook, type SeatOccupancyReader } from '../../catalog/public/catalog.extension-points';
 import type { OpenSeatHolding, OpenSeatHoldings } from '../../catalog/public/catalog.types';
+import { SharedPoolCapacityRepo } from '../shared-pool/shared-pool-capacity.repo';
 import { AssignmentRepo } from './assignment.repo';
 
 /**
@@ -18,6 +19,7 @@ export class AssignmentSeatOccupancy implements SeatOccupancyReader, OnModuleIni
 
   constructor(
     private readonly repo: AssignmentRepo,
+    private readonly capacity: SharedPoolCapacityRepo,
     private readonly hook: SeatOccupancyHook,
   ) {}
 
@@ -39,6 +41,16 @@ export class AssignmentSeatOccupancy implements SeatOccupancyReader, OnModuleIni
     tx?: DbTx,
   ): Promise<ReadonlySet<string>> {
     return this.repo.subscriptionIdsHolding(subscriptionIds, day, tx);
+  }
+
+  seatsOfSubscriptions(
+    subscriptionIds: readonly string[],
+    day: BusinessDate,
+    tx?: DbTx,
+  ): Promise<ReadonlyMap<string, { occupied: number; inRevocation: number }>> {
+    return tx
+      ? this.capacity.occupancyOf(tx, subscriptionIds, day)
+      : this.capacity.occupancyOfMany(subscriptionIds, day);
   }
 
   async openAssignmentsOfPlans(
