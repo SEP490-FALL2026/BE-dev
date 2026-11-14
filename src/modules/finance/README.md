@@ -5,7 +5,7 @@ là VND (`QĐ-111an`): không có tỷ giá, không quy đổi; bảng `exchange
 đây (ADR-0007, bản sửa đổi). Story chính: US-12-09 (hồ sơ thuế NCC).
 
 Tầng: T3 ([tiers.cjs](../../../scripts/arch/tiers.cjs)). Phụ thuộc: audit, organization. Được dùng bởi: budgets,
-catalog, installation, operating-parameters, requests ([module-graph](../../../docs/generated/module-graph.md)).
+catalog, installation, requests ([module-graph](../../../docs/generated/module-graph.md)).
 
 ## Public API (`public/`)
 

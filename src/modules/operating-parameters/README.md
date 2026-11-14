@@ -3,8 +3,7 @@
 Mục đích: tham số vận hành do Super Admin đặt (ngưỡng, hạn, lịch) có lịch sử, ngày không làm việc và tiền tệ báo cáo của
 tổ chức. Story chính: US-01-04.
 
-Tầng: T3 ([tiers.cjs](../../../scripts/arch/tiers.cjs)). Phụ thuộc: audit, finance (chỉ `OperatingParametersHttpModule`,
-để biết tiền tệ hợp lệ), organization. Được dùng bởi: budgets, catalog, licensing, personnel, requests
+Tầng: T3 ([tiers.cjs](../../../scripts/arch/tiers.cjs)). Phụ thuộc: audit, organization. Được dùng bởi: budgets, catalog, licensing, personnel, requests
 ([module-graph](../../../docs/generated/module-graph.md)).
 
 ## Public API (`public/`)
