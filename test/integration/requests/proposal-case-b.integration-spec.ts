@@ -1,4 +1,5 @@
 import request from 'supertest';
+import { addDays } from '../../../src/core/business-date';
 import { declareApplication, declarePlan } from '../../support/builders/catalog.builder';
 import { AccessRequestWire, Department, Person, RequestHarness } from '../../support/request-harness';
 
@@ -101,6 +102,22 @@ describe('requests: case B against the catalog (integration, real PostgreSQL)', 
         [departmentId],
       )
     ).rows;
+
+  it('a proposal of a person with a term whose contract ended before today is refused 422 ACCESS_REQUEST.TERM_CONTRACT_ENDED with the day the contract ended, and nothing is written', async () => {
+    const intern = await person();
+    await h.ctx.sql.query(`UPDATE employees SET hire_date = '2020-01-01' WHERE id = $1`, [intern.employeeId]);
+    await h.ctx.sql.query(`UPDATE employees SET employment_type = 'INTERN', contract_end_date = $2 WHERE id = $1`, [
+      intern.employeeId,
+      addDays(h.today(), -1),
+    ]);
+    const rows = await h.requestRows();
+
+    const refused = await h.propose(h.proposeBody({ termMonths: 3 }), intern.account).expect(422);
+
+    expect(h.codeOf(refused)).toBe('ACCESS_REQUEST.TERM_CONTRACT_ENDED');
+    expect(h.detailsOf(refused)).toEqual({ contractEndDate: addDays(h.today(), -1) });
+    expect(await h.requestRows()).toBe(rows);
+  });
 
   describe('software the catalog has already (QĐ-111b)', () => {
     it.each([
