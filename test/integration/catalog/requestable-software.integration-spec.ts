@@ -415,8 +415,9 @@ describe('the software a person may request (integration, real PostgreSQL)', () 
       const plans = await plansFor(designer, `applicationId=${picked?.id ?? ''}`);
       const plan = await planRow(designer, plans.items[0].id);
 
-      const preview = await h.previewed(designer, plan.id);
-      const sent = await h.sent(designer, plan.id);
+      // A plan bought by the month (K1) asks for its time of use; internal software (K5) takes one too (`QĐ-111i`).
+      const preview = await h.previewed(designer, plan.id, { termMonths: 3 });
+      const sent = await h.sent(designer, plan.id, { termMonths: 3 });
 
       expect(plan.id).toBe(planId);
       expect(preview).toMatchObject({ branch, canSubmit: true, pricing: { status: pricing } });

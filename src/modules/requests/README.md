@@ -119,7 +119,8 @@ cùng cần; phần ghi nằm ở `assessment/assessment.repo.ts`.
 - **Lõi và dùng chung (không controller)**
   - `access-request/` — `access-request.repo.ts` (writer duy nhất của `access_requests`, `access_request_beneficiaries`,
     `access_request_steps`), `assessment-read.repo.ts`, `routing.policy.ts` + `routing-facts.service.ts` (định tuyến bước nhu cầu),
-    `pricing.policy.ts` (`requestAmountOf`: giá tháng của thuê bao chính × số tháng còn lại của năm của `asOf`, tháng đầu/cuối tính đủ; `K4` = giá mua;
+    `pricing.policy.ts` (`requestAmountOf`: giá tháng của thuê bao chính × số tháng **bắt đầu** trong năm của `asOf` (tháng k bắt đầu ở ngày bắt đầu + k − 1 tháng, R-39);
+    số tháng bắt đầu năm sau là `nextYearAmount` (Dùng lâu dài = 12 tháng, R-46); thời gian dùng đi bằng số tháng `termMonths` (`core/term-limit.ts`: `K1` 1–9, `K2`/`K5` 1–12 hoặc không, `K4` không hỏi), người có thời hạn bị **cắt** ở ngày hết hợp đồng (`employees.contract_ends_on`), không bị từ chối; `K4` = giá mua;
     Request tiếp tục có kỳ mới năm sau ⟹ 0 + `nextYearAmount`, QĐ-109b; mốc `asOf` theo QĐ-109e: gửi = tạm tính, mỗi lần `BudgetCheckService.run`
     tính lại và ghi `ACCESS_REQUEST.REPRICED`), `request-facts.service.ts` (đọc mọi sự kiện mà một request được xét bởi: phòng ban, kế hoạch, giá, người
     giữ ghế, định tuyến; trước đây `request-assessment.service`), `need-decision.policy.ts`, `withdrawal.policy.ts`. Con:
@@ -152,7 +153,7 @@ cùng cần; phần ghi nằm ở `assessment/assessment.repo.ts`.
     lại, `WithdrawalWriter` ghi, `withdrawal.policy.ts` ở L0); ba controller khai báo
     ngay sau hub trong `requests.module.ts` để thứ tự path của API không đổi.
   - `draft/` — bản nháp: lưu, liệt kê, gửi, xóa; `request-drafts.controller.ts`; `RequestDraftService`.
-  - `repricing/` — tính lại số tiền của Request theo ngày (QĐ-109e): `RepricingService` (giá thuê bao chính hoặc báo giá của IT Admin, tính theo `asOf`), `quote-pricing.policy.ts` (số tiền từ báo giá); `spend`, `spend-submission`, `group-request`, `assessment` gọi, không import capability nào ngoài lõi `access-request`.
+  - `repricing/` — tính lại số tiền của Request theo ngày (QĐ-109e): `RepricingService` (giá thuê bao chính hoặc báo giá của IT Admin, tính theo `asOf`; Request giữ số tháng thì mỗi người một ngày kết thúc riêng qua `RequestTermEndsService`), `quote-pricing.policy.ts` (số tiền từ báo giá); `spend`, `spend-submission`, `group-request`, `assessment` gọi, không import capability nào ngoài lõi `access-request`.
   - `assessment/` — thẩm định phần mềm ngoài catalog, đăng ký nội bộ, nối plan (US-05-06, US-05-18, US-05-20);
     `AssessmentQueryService` (đọc), `AssessmentService` (lưu), `AssessmentCompletionService`, `AssessmentRejectionService`, qua cổng chung
     `AssessmentGate` (khóa đề xuất, người thẩm định, bước của IT Admin); `ProposalService`,

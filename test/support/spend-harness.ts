@@ -116,7 +116,16 @@ export class SpendHarness extends BudgetHarness {
    * payments the spec gives it. Everything but the payments is what the real routes made.
    */
   async paidRequest(unit: Unit, planId: string, spec: PaidSpec = {}): Promise<string> {
-    const sent = await this.sent(unit.member, planId, { termMonths: 1 });
+    // A plan bought once (K4) asks for no time of use; every other kind takes one month here (`QĐ-111i`).
+    const kind = await this.ctx.sql.query<{ provisioning_type: string }>(
+      `SELECT provisioning_type::text FROM plans WHERE id = $1`,
+      [planId],
+    );
+    const sent = await this.sent(
+      unit.member,
+      planId,
+      kind.rows[0]?.provisioning_type === 'K4' ? {} : { termMonths: 1 },
+    );
     await this.decide(sent.id, { decision: 'APPROVE' }, unit.head.account).expect(200);
     await this.setPayments(sent.id, spec);
 

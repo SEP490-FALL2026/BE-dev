@@ -46,6 +46,7 @@ const view = {
     monthlyPrice: null,
     nextYearAmount: null,
   },
+  cost: null,
   policy: { version: 2, hasSpendStep: true, slaWorkingDays: 2 },
   submittedAt: date,
   needStep: {

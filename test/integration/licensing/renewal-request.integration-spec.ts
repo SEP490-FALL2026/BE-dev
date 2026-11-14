@@ -1,7 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { LicensingApi } from '../../../src/modules/licensing/public/licensing.api';
 import { LicensingRenewalApi } from '../../../src/modules/licensing/public/licensing-renewal.api';
-import { effectiveEndOf, renewalEndOf } from '../../../src/core/term-limit';
+import { renewalEndOf } from '../../../src/core/term-limit';
 import { monthsBetween } from '../../../src/modules/requests/renewal-request/renewal-request.policy';
 import { ReturnHarness, type RenewalWire } from '../../support/return-harness';
 import type { Unit } from '../../support/spend-harness';
@@ -346,8 +346,9 @@ describe('the renewal of a right that ends on a day over PostgreSQL (US-05-14)',
       expect(request).toMatchObject({
         type: 'GRANT',
         state: 'PENDING',
-        termMonths: null,
-        expectedEndDate: effectiveEndOf({ start: h.today(), months: 2 }),
+        // The late renewal is a request for new access with the months of use asked (`QĐ-111i`): it keeps the months, not a day.
+        termMonths: 2,
+        expectedEndDate: null,
         renewal: null,
         plan: { planId: internalPlan },
       });
