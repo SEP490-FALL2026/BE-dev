@@ -7,6 +7,7 @@ export const snapshot = (application: ApplicationRecord) => ({
   dictionaryServiceLineId: application.dictionaryServiceLineId,
   domains: application.domains,
   dataSensitivity: application.dataSensitivity,
+  logoUrl: application.logoUrl,
   responsibleItAdminEmployeeId: application.responsibleItAdminEmployeeId,
   functionalGroupId: application.functionalGroup?.id ?? null,
   status: application.status,
@@ -21,11 +22,12 @@ export const sameList = (a: readonly string[], b: readonly string[]): boolean =>
  * the dictionary line) are judged by the caller, in that order, for the ones that changed.
  */
 export function applicationChangesOf(
-  current: Pick<ApplicationRecord, 'name' | 'domains' | 'dataSensitivity' | 'dictionaryServiceLineId'> & {
+  current: Pick<ApplicationRecord, 'name' | 'domains' | 'dataSensitivity' | 'dictionaryServiceLineId' | 'logoUrl'> & {
     functionalGroup: { id: string } | null;
   },
   input: {
     dataSensitivity?: DataSensitivity | null;
+    logoUrl?: string | null;
     functionalGroupId?: string;
     dictionaryServiceLineId?: string | null;
   },
@@ -37,10 +39,10 @@ export function applicationChangesOf(
   };
 }
 
-/** The name, the domains and the sensitivity of the data (null says it is not rated). */
+/** The name, the domains, the sensitivity of the data (null says it is not rated) and the logo (null removes it). */
 function scalarChangesOf(
-  current: Pick<ApplicationRecord, 'name' | 'domains' | 'dataSensitivity'>,
-  input: { dataSensitivity?: DataSensitivity | null },
+  current: Pick<ApplicationRecord, 'name' | 'domains' | 'dataSensitivity' | 'logoUrl'>,
+  input: { dataSensitivity?: DataSensitivity | null; logoUrl?: string | null },
   cleaned: { name?: string; domains?: string[] },
 ): ApplicationChanges {
   const changes: ApplicationChanges = {};
@@ -49,6 +51,7 @@ function scalarChangesOf(
   if (input.dataSensitivity !== undefined && input.dataSensitivity !== current.dataSensitivity) {
     changes.dataSensitivity = input.dataSensitivity;
   }
+  if (input.logoUrl !== undefined && input.logoUrl !== current.logoUrl) changes.logoUrl = input.logoUrl;
 
   return changes;
 }

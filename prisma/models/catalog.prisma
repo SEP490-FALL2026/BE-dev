@@ -144,6 +144,8 @@ model Application {
   responsibleItAdminEmployeeId String?        @map("responsible_it_admin_employee_id") @db.Uuid
   // QĐ-111f: may be left empty.
   dataSensitivity             DataSensitivity? @map("data_sensitivity")
+  // CT-1.L1: an https link to the logo image, pasted by the IT Admin (nothing is uploaded, the server never fetches it); at most 500 characters (a CHECK).
+  logoUrl                     String?         @map("logo_url")
   // QĐ-111e: no longer asked or written; the group COMMUNICATION says an application is a communication service. Kept (default false) for the rows written before.
   commPersonToPersonMessaging Boolean         @default(false) @map("comm_person_to_person_messaging")
   commCallsOrMeetings         Boolean         @default(false) @map("comm_calls_or_meetings")

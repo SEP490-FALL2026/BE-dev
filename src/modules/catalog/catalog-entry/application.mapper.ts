@@ -9,6 +9,7 @@ export function toSummaryWire(application: ApplicationSummaryView) {
     kind: application.kind,
     vendor: application.vendor ? { id: application.vendor.id, name: application.vendor.name } : null,
     dataSensitivity: application.dataSensitivity,
+    logoUrl: application.logoUrl,
     isCommunicationService: application.isCommunicationService,
     responsibleItAdmin: application.responsibleItAdmin,
     needsResponsible: application.needsResponsible,

@@ -34,6 +34,7 @@ const record = (overrides: Partial<ApplicationRecord> = {}): ApplicationRecord =
   dictionaryServiceLineId: null,
   domains: [],
   dataSensitivity: 'LOW',
+  logoUrl: null,
   responsibleItAdminEmployeeId: 'owner-1',
   isCommunicationService: false,
   functionalGroup: { id: 'group-1', name: 'Design' },

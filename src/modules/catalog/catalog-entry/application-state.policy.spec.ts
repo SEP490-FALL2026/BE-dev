@@ -6,6 +6,7 @@ const current = {
   dataSensitivity: 'MEDIUM' as const,
   functionalGroup: { id: 'grp-1' } as { id: string } | null,
   dictionaryServiceLineId: 'line-1' as string | null,
+  logoUrl: 'https://cdn.example.com/slack.png' as string | null,
 };
 
 describe('what an update of an application changes (US-04-01, US-04-02)', () => {
@@ -51,6 +52,16 @@ describe('what an update of an application changes (US-04-01, US-04-02)', () => 
     expect(
       applicationChangesOf({ ...current, dictionaryServiceLineId: null }, { dictionaryServiceLineId: null }, {}),
     ).toEqual({});
+  });
+
+  it('replaces the logo, removes it with null and leaves it when the update says nothing or the same (CT-1.L1)', () => {
+    const next = 'https://cdn.example.com/slack-new.png';
+
+    expect(applicationChangesOf(current, {}, {})).toEqual({});
+    expect(applicationChangesOf(current, { logoUrl: current.logoUrl }, {})).toEqual({});
+    expect(applicationChangesOf(current, { logoUrl: next }, {})).toEqual({ logoUrl: next });
+    expect(applicationChangesOf(current, { logoUrl: null }, {})).toEqual({ logoUrl: null });
+    expect(applicationChangesOf({ ...current, logoUrl: null }, { logoUrl: null }, {})).toEqual({});
   });
 
   it('rates the data, or clears the rating with null (QĐ-111f), and notes it only when it differs', () => {

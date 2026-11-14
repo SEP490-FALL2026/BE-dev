@@ -11,6 +11,8 @@ export interface ApplicationRecord {
   domains: string[];
   /** `QĐ-111f`: may be left empty. */
   dataSensitivity: DataSensitivity | null;
+  /** The https link to the logo image the IT Admin pasted; null when there is none. */
+  logoUrl: string | null;
   /** QĐ-111g: the IT Admin who answers for the application; null when the creator was not a usable IT Admin and nobody took it over. */
   responsibleItAdminEmployeeId: string | null;
   /** `QĐ-111e`: an application is a communication service when it stands in the group Liên lạc; nobody answers three questions any more. */
@@ -28,6 +30,8 @@ export interface ApplicationSummaryRecord {
   kind: ApplicationKind;
   vendor: { id: string; name: string } | null;
   dataSensitivity: DataSensitivity | null;
+  /** The https link to the logo image the IT Admin pasted; null when there is none. */
+  logoUrl: string | null;
   responsibleItAdminEmployeeId: string | null;
   isCommunicationService: boolean;
   functionalGroup: { id: string; name: string };
@@ -71,6 +75,8 @@ export interface NewApplication {
   functionalGroupId: string;
   responsibleItAdminEmployeeId: string | null;
   dataSensitivity: DataSensitivity | null;
+  /** The https link to the logo image the IT Admin pasted; null when there is none. */
+  logoUrl: string | null;
   domains: string[];
 }
 
@@ -79,5 +85,6 @@ export interface ApplicationChanges {
   dictionaryServiceLineId?: string | null;
   functionalGroupId?: string;
   dataSensitivity?: DataSensitivity | null;
+  logoUrl?: string | null;
   domains?: string[];
 }

@@ -20,6 +20,7 @@ export interface CreateApplicationInput {
   domains?: string[];
   functionalGroupId?: string;
   dataSensitivity?: DataSensitivity | null;
+  logoUrl?: string;
   plan: Omit<DeclarePlanInput, 'applicationId' | 'pricingModel'>;
 }
 
@@ -89,6 +90,7 @@ export class ApplicationIntakeService {
           domains,
           ...(input.functionalGroupId !== undefined ? { functionalGroupId: input.functionalGroupId } : {}),
           dataSensitivity: input.dataSensitivity ?? null,
+          ...(input.logoUrl !== undefined ? { logoUrl: input.logoUrl } : {}),
         },
         tx,
       );

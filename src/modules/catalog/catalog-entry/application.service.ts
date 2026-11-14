@@ -35,6 +35,8 @@ export interface DeclareApplicationInput {
   dataSensitivity?: DataSensitivity | null;
   /** Left out, the application stands in `Khác` (`QĐ-111d`). */
   functionalGroupId?: string;
+  /** The https link to the logo image; already judged by the request schema. */
+  logoUrl?: string | null;
 }
 
 export interface UpdateApplicationInput {
@@ -42,6 +44,8 @@ export interface UpdateApplicationInput {
   domains?: string[];
   dataSensitivity?: DataSensitivity | null;
   functionalGroupId?: string;
+  /** A link replaces the logo, null removes it, nothing leaves it as it is. */
+  logoUrl?: string | null;
   dictionaryServiceLineId?: string | null;
 }
 
@@ -163,6 +167,7 @@ export class ApplicationService {
       // QĐ-111g: the IT Admin who declares the application answers for it; there is no field to choose another.
       responsibleItAdminEmployeeId: actor.employeeId,
       dataSensitivity: input.dataSensitivity ?? null,
+      logoUrl: input.logoUrl ?? null,
       domains,
     });
     await this.auditCreated(tx, actor, created, { ensured, source, name, domains, organizationId });

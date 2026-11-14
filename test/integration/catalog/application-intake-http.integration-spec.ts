@@ -304,4 +304,94 @@ describe('POST /applications: the application and its first plan in one command 
     expect(second.pricingModel).toBe('PER_SEAT');
     expect(bought.pricingModel).toBeNull();
   });
+  describe('the logo: a link to an image, https only (CT-1.L1)', () => {
+    const LOGO = 'https://cdn.example.com/logo.png';
+    const patch = (id: string, body: object) =>
+      request(server()).patch(`/api/v1/applications/${id}`).set(as(it1)).send(body);
+    const detail = async (id: string) =>
+      dataOf<{ logoUrl: string | null }>(
+        await request(server()).get(`/api/v1/applications/${id}`).set(as(it1)).expect(200),
+      );
+    const make = async (extra: object = {}) =>
+      dataOf<CreatedWire & { logoUrl: string | null }>(
+        await create({ name: unique('Logo app'), vendorName: unique('Logo vendor'), plan: k2(), ...extra }).expect(201),
+      );
+
+    it('keeps the link given with the application (blanks cut off), answers it in the detail and the list, and null when there is none', async () => {
+      const withLogo = await make({ logoUrl: `  ${LOGO} ` });
+      const without = await make();
+
+      expect(withLogo.logoUrl).toBe(LOGO);
+      expect(without.logoUrl).toBeNull();
+      expect((await detail(withLogo.id)).logoUrl).toBe(LOGO);
+      const list = dataOf<{ items: { id: string; logoUrl: string | null }[] }>(
+        await request(server()).get('/api/v1/applications').query({ pageSize: 100 }).set(as(it1)).expect(200),
+      );
+      expect(list.items.find((item) => item.id === withLogo.id)?.logoUrl).toBe(LOGO);
+      expect(list.items.find((item) => item.id === without.id)?.logoUrl).toBeNull();
+    });
+
+    it('refuses a link that is not https, a script or one of 501 characters: 422 VALIDATION_ERROR, nothing stored', async () => {
+      const before = await n('applications');
+
+      for (const logoUrl of [
+        'http://cdn.example.com/logo.png',
+        'javascript:alert(1)',
+        `https://cdn.example.com/${'a'.repeat(480)}`,
+      ]) {
+        const response = await create({
+          name: unique('Bad logo'),
+          vendorName: unique('V'),
+          plan: k2(),
+          logoUrl,
+        }).expect(422);
+        expect(errorOf(response).code).toBe('VALIDATION_ERROR');
+      }
+      expect(await n('applications')).toBe(before);
+    });
+
+    it('replaces the link, leaves it when the update does not send it, removes it with null, and audits each change', async () => {
+      const created = await make({ logoUrl: LOGO });
+      const next = 'https://cdn.example.com/logo-2.png';
+
+      await patch(created.id, { logoUrl: next }).expect(200);
+      expect((await detail(created.id)).logoUrl).toBe(next);
+      await patch(created.id, { dataSensitivity: 'LOW' }).expect(200);
+      expect((await detail(created.id)).logoUrl).toBe(next);
+      const cleared = dataOf<{ logoUrl: string | null }>(await patch(created.id, { logoUrl: null }).expect(200));
+      expect(cleared.logoUrl).toBeNull();
+      const events = await ctx.sql.query<{ before: { logoUrl?: string | null }; after: { logoUrl?: string | null } }>(
+        `SELECT before, after FROM audit_events WHERE resource_id = $1 AND action = 'APPLICATION.UPDATED' ORDER BY occurred_at, id`,
+        [created.id],
+      );
+      expect(events.rows.map((row) => [row.before.logoUrl, row.after.logoUrl])).toEqual([
+        [LOGO, next],
+        [next, next],
+        [next, null],
+      ]);
+    });
+
+    it('refuses an update with a link that is not https or is empty: 422 VALIDATION_ERROR, the logo stays', async () => {
+      const created = await make({ logoUrl: LOGO });
+
+      for (const logoUrl of ['http://cdn.example.com/logo.png', '', '   ']) {
+        expect(errorOf(await patch(created.id, { logoUrl }).expect(422)).code).toBe('VALIDATION_ERROR');
+      }
+      expect((await detail(created.id)).logoUrl).toBe(LOGO);
+    });
+
+    it('is held by the database too: a row cannot keep a link that is not https, has a space or is over 500 characters', async () => {
+      const created = await make();
+      const write = async (logoUrl: string) =>
+        ctx.sql.query(`UPDATE applications SET logo_url = $2 WHERE id = $1`, [created.id, logoUrl]).then(
+          () => null,
+          (error: { code?: string }) => error.code ?? 'error',
+        );
+
+      expect(await write('http://cdn.example.com/logo.png')).toBe('23514');
+      expect(await write('https://cdn.example.com/a b.png')).toBe('23514');
+      expect(await write(`https://cdn.example.com/${'a'.repeat(480)}`)).toBe('23514');
+      expect(await write(LOGO)).toBeNull();
+    });
+  });
 });

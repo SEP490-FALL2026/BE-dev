@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { successEnvelopeSchema } from '../../../infrastructure/http/dto/success-envelope.dto';
 import { createZodDto } from '../../../infrastructure/http/dto/zod-dto';
-import { applicationSchema, sensitivity, text, textList } from '../catalog-entry/application.dto';
+import { applicationSchema, logoUrlSchema, sensitivity, text, textList } from '../catalog-entry/application.dto';
 import { declarePlanBodySchema, planSchema } from '../plan/plan.dto';
 
 /**
@@ -30,6 +30,7 @@ export const createApplicationBodySchema = z.strictObject({
     .optional()
     .meta({ description: 'The group the application is classed under; left out, it stands in Khác.' }),
   dataSensitivity: sensitivity.nullable().optional(),
+  logoUrl: logoUrlSchema.optional().meta({ description: 'A link to the logo image, https only; nothing is uploaded.' }),
   plan: firstPlanSchema,
 });
 

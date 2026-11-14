@@ -13,6 +13,7 @@ const SUMMARY_KEYS = [
   'id',
   'isCommunicationService',
   'kind',
+  'logoUrl',
   'name',
   'needsResponsible',
   'responsibleItAdmin',

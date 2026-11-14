@@ -13,12 +13,39 @@ export const textList = z.array(z.string().max(1000)).max(100);
 export const sensitivity = z.enum(['LOW', 'MEDIUM', 'HIGH']);
 const kind = z.enum(['SAAS', 'LICENSED', 'INTERNAL']);
 
+/** The longest link a logo may be: the column and its CHECK say the same. */
+export const MAX_LOGO_URL_LENGTH = 500;
+const isHttpsLink = (value: string): boolean => {
+  try {
+    const url = new URL(value);
+
+    return url.protocol === 'https:' && url.hostname !== '';
+  } catch {
+    return false;
+  }
+};
+
+/**
+ * The logo of an application is a link to an image, pasted by the IT Admin: nothing is uploaded and the server never fetches it. Only `https://`
+ * is taken (a link that is not encrypted, a script or a data link is refused as a validation error), at most 500 characters once the blanks at
+ * both ends are cut off; the link is kept as written. It points at somebody else's server: it can be broken, and a screen that shows it shows the
+ * first letter of the name when the image does not load.
+ */
+export const logoUrlSchema = z
+  .string()
+  .trim()
+  .max(MAX_LOGO_URL_LENGTH)
+  .refine(isHttpsLink, { message: 'The logo is a link that starts with https://' });
+
 /** The kind and the vendor cannot change: they are not fields here, so naming one is a validation error. */
 export const updateApplicationBodySchema = z.strictObject({
   name: text.optional(),
   domains: textList.optional(),
   dataSensitivity: sensitivity.nullable().optional(),
   functionalGroupId: z.uuid().optional(),
+  logoUrl: logoUrlSchema.nullable().optional().meta({
+    description: 'A link to the logo image, https only; left out it stays, null removes it.',
+  }),
   dictionaryServiceLineId: z.uuid().nullable().optional(),
 });
 
@@ -39,6 +66,10 @@ const applicationSummarySchema = z.strictObject({
   kind,
   vendor: z.strictObject({ id: z.uuid(), name: z.string() }).nullable(),
   dataSensitivity: sensitivity.nullable(),
+  logoUrl: z.string().nullable().meta({
+    description:
+      'The https link to the logo image that the IT Admin pasted, or null. The server never checks it: it may be broken, so show the first letter of the name when the image does not load.',
+  }),
   isCommunicationService: z.boolean().meta({
     description:
       'True when the application stands in the group Liên lạc (email, chat, meetings): the usage rules never collect it.',
