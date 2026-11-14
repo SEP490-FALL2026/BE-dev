@@ -127,9 +127,7 @@ const batchSchema = z.strictObject({
 const submitResultSchema = z.strictObject({
   requestId: z.uuid(),
   outcome: z.enum(['SENT_TO_APPROVER', 'AWAITING_RESERVE_CONFIRMATION', 'STOPPED']),
-  stopReason: z
-    .enum(['PRICE_EXPIRED', 'NO_APPROVED_BUDGET', 'OVER_RESERVE', 'PRICE_MISSING', 'RATE_MISSING'])
-    .nullable(),
+  stopReason: z.enum(['PRICE_EXPIRED', 'NO_APPROVED_BUDGET', 'OVER_RESERVE', 'PRICE_MISSING']).nullable(),
   /** `APPLIED`: the confirmation was kept and the spend step opened; `IGNORED`: it was given for a request that does not use the reserve; `NOT_GIVEN`. */
   reserveConfirmation: z.enum(['APPLIED', 'IGNORED', 'NOT_GIVEN']),
 });
@@ -157,7 +155,6 @@ const batchItemSchema = z.strictObject({
       'NO_APPROVED_BUDGET',
       'OVER_RESERVE',
       'PRICE_MISSING',
-      'RATE_MISSING',
       'STALE_COST_EVIDENCE',
       'CLOSED_OR_EXPIRED_BUDGET_PERIOD',
     ])

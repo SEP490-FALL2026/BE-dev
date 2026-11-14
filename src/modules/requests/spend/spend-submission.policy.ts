@@ -8,11 +8,10 @@
 /**
  * Why a request stays in the queue of its head when they send it: it says what is missing or why it is blocked, never a figure of the
  * budget. The first reason of the check is kept here (the head reads them all on the request); the two codes of the data of a batch made
- * before the three outcomes are read, never given.
+ * before the three outcomes are read, never given. `RATE_MISSING` of a batch made before `QĐ-111an` is read as `PRICE_MISSING`.
  */
 export type StopReason =
   | 'PRICE_MISSING'
-  | 'RATE_MISSING'
   | 'PRICE_EXPIRED'
   | 'NO_APPROVED_BUDGET'
   | 'OVER_RESERVE'

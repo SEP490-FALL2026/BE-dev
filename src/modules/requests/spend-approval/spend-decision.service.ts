@@ -108,7 +108,7 @@ export class SpendDecisionService {
     tx: DbTx,
     actor: AuthenticatedPrincipal,
     of: { request: AccessRequestRecord; step: SpendStepRecord; now: Date },
-    reason: 'PRICE_MISSING' | 'RATE_MISSING',
+    reason: 'PRICE_MISSING',
   ): Promise<SpendDecisionResult> {
     if (of.request.routing?.mode !== 'ONE_STEP') throw new SpendDecisionRefusedError('NOT_CHECKABLE');
     await this.effects.sendBack(tx, actor, of.request, of.step, { now: of.now, reasons: [reason], check: null });

@@ -6,7 +6,7 @@ describe('BR-MF1-02: a revision uses current missing-data reasons', () => {
   };
   const service = new SpendStatusService(checks as never, {} as never, {} as never);
   const base = { id: 'request', state: 'AWAITING_REQUESTER_REVISION', policy: { chain: ['SPEND_APPROVAL'] } };
-  it.each(['PRICE_MISSING', 'RATE_MISSING'])('does not show stale overBy with %s', async (reason) => {
+  it.each(['PRICE_MISSING'])('does not show stale overBy with %s', async (reason) => {
     checks.latest.mockClear();
     const result = await service.of({ ...base, oneStepBlockedReason: reason } as unknown as AccessRequestRecord);
     expect(result).toEqual({
