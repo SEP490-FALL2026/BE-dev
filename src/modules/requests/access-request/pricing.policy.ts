@@ -2,13 +2,15 @@ import type { BillingCycleCode, MissingPriceReason, PricingRecord } from './acce
 import { addDays, type BusinessDate } from '../../../core/business-date';
 import { addMonths, fiscalYearOf } from '../../../core/fiscal-year';
 import { MAX_AMOUNT_MINOR, type Money } from '../../../core/money/money';
+import { monthsBeginningIn } from '../../../core/term-limit';
 
 /**
- * What a request for paid software costs, as a pure calculation (`FR-3.2`, `BR-MF1-06`, `QĐ-109e`): the unit price of the
- * plan, for the months that are left of the calendar year the request is checked in (the month it starts is counted whole), for
- * every person it is for. There is no schedule of payments: one amount for one year. The price comes from the main subscription of
- * the plan in the catalog, never from a person's hand. When there is no price nothing is guessed: the request is _missing
- * its price_ and cannot be sent on to be decided as spend (`QĐ-84e`).
+ * What a request for paid software costs, as a pure calculation (`FR-3.2`, `BR-MF1-06`, `QĐ-109e`, `QĐ-111j`): the price of a month of
+ * the plan times the months of the term that begin in the calendar year the request is checked in (a month counts whole as soon as it
+ * begins, R-39), for every person it is for; the months that begin in the year after are the part of next year, kept at the approval
+ * (`QĐ-111k`). There is no schedule of payments: one amount for one year. The price comes from the main subscription of the plan in the
+ * catalog, never from a person's hand. When there is no price nothing is guessed: the request is _missing its price_ and cannot be sent
+ * on to be decided as spend (`QĐ-84e`).
  */
 
 const CYCLE_MONTHS: Readonly<Record<Exclude<BillingCycleCode, 'OTHER'>, number>> = {
@@ -34,7 +36,7 @@ export interface PricingInput {
    * start in a year after the check date counts as no month in this year.
    */
   from?: BusinessDate;
-  /** The day the right ends; null when it has no end, so the amount runs to the end of the year. */
+  /** The last day of the right; null when it has no end (_Dùng lâu dài_): the part of next year is then twelve months (R-46). */
   endDate: BusinessDate | null;
 }
 
@@ -48,27 +50,13 @@ export type Pricing =
       /** The months of the year the amount covers; null for a one-time price. 0 for a start in a year after the check date. */
       months: number | null;
       budgetYear: number;
-      /** The cost of the part that falls in the year after the check date, for a request that starts then (`QĐ-109b`); null otherwise. */
+      /** The cost of the months that begin in the year after the check date (`QĐ-111k`, `QĐ-109b`); null when none does. */
       nextYearAmount: Money | null;
     }
   | { status: 'MISSING'; reason: MissingPriceReason; budgetYear: number };
 
-/** The calendar months from the month of `start` to the month of `end`, both counted whole; a day before the start still counts as one month. */
-export function monthsBetween(start: BusinessDate, end: BusinessDate): number {
-  const monthIndex = (day: BusinessDate): number => Number(day.slice(0, 4)) * 12 + Number(day.slice(5, 7));
-
-  return Math.max(1, monthIndex(end) - monthIndex(start) + 1);
-}
-
 /** Whole minor units, rounded up once (`R-B01`): the part of a price that is a fraction of a cent is paid in full. */
 const ceilDiv = (numerator: bigint, denominator: bigint): bigint => (numerator + denominator - 1n) / denominator;
-
-/** The last day an amount of a request counts: the end of its right, never past the end of the year. */
-function lastDayCounted(year: number, endDate: BusinessDate | null): BusinessDate {
-  const yearEnd: BusinessDate = `${year}-12-31`;
-
-  return endDate !== null && endDate < yearEnd ? endDate : yearEnd;
-}
 
 /**
  * What one seat of a commitment costs a month, rounded up (`R-B01`): the cost of the year held over its months and its seats, kept on the
@@ -163,36 +151,65 @@ export function requestAmountOf(input: PricingInput): Pricing {
   if (input.billingCycle === null) return { status: 'MISSING', reason: 'NO_PRICED_SUBSCRIPTION', budgetYear: year };
   if (input.billingCycle === 'OTHER') return { status: 'MISSING', reason: 'CYCLE_UNKNOWN', budgetYear: year };
 
-  const cycleMonths = BigInt(CYCLE_MONTHS[input.billingCycle]);
-  const costOf = (months: number): bigint => ceilDiv(unitPrice.amountMinor * BigInt(months) * people, cycleMonths);
+  return recurringAmountOf({ ...input, unitPrice }, input.billingCycle, priced);
+}
+
+/** The months that begin in the year of the check date and in the year after, priced by the month of the plan (`QĐ-111j`, `QĐ-111k`, R-46). */
+function recurringAmountOf(
+  input: PricingInput & { unitPrice: Money },
+  billingCycle: Exclude<BillingCycleCode, 'OTHER'>,
+  priced: (facts: {
+    amountMinor: bigint;
+    cycle: BillingCycleCode;
+    months: number | null;
+    nextYearAmountMinor: bigint | null;
+  }) => Pricing,
+): Pricing {
+  const year = fiscalYearOf(input.checkDate);
+  const cycleMonths = BigInt(CYCLE_MONTHS[billingCycle]);
+  const costOf = (months: number): bigint =>
+    ceilDiv(input.unitPrice.amountMinor * BigInt(months) * BigInt(input.beneficiaries), cycleMonths);
   const start = input.from !== undefined && input.from > input.checkDate ? input.from : input.checkDate;
   const startYear = fiscalYearOf(start);
+  // A right with no end holds twelve months of the year after, whatever day it begins (R-46); one with an end, the months that begin then.
+  const monthsOf = (inYear: number): number =>
+    input.endDate === null && inYear > startYear ? 12 : monthsBeginningIn({ start, end: input.endDate, year: inYear });
 
   // A right that begins in a year after the check date costs nothing in this one; its first year is shown, never held (`QĐ-109b`).
   if (startYear > year) {
-    const nextMonths = monthsBetween(start, lastDayCounted(startYear, input.endDate));
-
     return priced({
       amountMinor: 0n,
-      cycle: input.billingCycle,
+      cycle: billingCycle,
       months: 0,
-      nextYearAmountMinor: costOf(nextMonths),
+      nextYearAmountMinor: costOf(Math.max(1, monthsBeginningIn({ start, end: input.endDate, year: startYear }))),
     });
   }
 
-  const months = monthsBetween(start, lastDayCounted(year, input.endDate));
+  const months = Math.max(1, monthsOf(year));
+  const nextMonths = monthsOf(year + 1);
 
   return priced({
     amountMinor: costOf(months),
-    cycle: input.billingCycle,
+    cycle: billingCycle,
     months,
-    nextYearAmountMinor: null,
+    nextYearAmountMinor: nextMonths > 0 ? costOf(nextMonths) : null,
   });
 }
 
 export interface RequestPriceInput extends Pick<PricingInput, 'beneficiaries' | 'checkDate' | 'endDate' | 'from'> {
   planId: string;
   free: boolean;
+  /**
+   * The last day of the right of each person it is for, when they do not all end on the same day: a person with a term is cut at the end of
+   * the contract, the others are not (R-38). Seats that end on the same day cost the same, so each end is counted once. When given,
+   * `beneficiaries` and `endDate` are not read.
+   */
+  endsByPerson?: readonly (BusinessDate | null)[];
+  /**
+   * The ends were worked out from the months of use asked, as of `checkDate` (`QĐ-111i`): none of them is a day the request carries, and the
+   * seat takes its end from the day it is granted.
+   */
+  endIsDerived?: boolean;
 }
 
 export interface RequestPlanPrice {
@@ -215,26 +232,64 @@ const NOT_APPLICABLE_PRICING: PricingRecord = {
   nextYearAmount: null,
 };
 
+/** What a request for people whose rights end on different days costs: each end is priced once for the people that share it, and the parts are added. */
+function requestAmountsOf(input: RequestPriceInput, price: RequestPlanPrice): Pricing {
+  const ends = input.endsByPerson ?? Array.from({ length: input.beneficiaries }, () => input.endDate);
+  if (ends.length === 0) return requestAmountOf({ ...price, ...input, beneficiaries: 0 });
+  const byEnd = new Map<BusinessDate | null, number>();
+  for (const end of ends) byEnd.set(end, (byEnd.get(end) ?? 0) + 1);
+  const parts = [...byEnd].map(([endDate, beneficiaries]) =>
+    requestAmountOf({
+      kind: price.kind,
+      unitPrice: price.unitPrice,
+      billingCycle: price.billingCycle,
+      beneficiaries,
+      checkDate: input.checkDate,
+      from: input.from,
+      endDate,
+    }),
+  );
+  const [first] = parts;
+  if (parts.length === 1) return first;
+  const missing = parts.find((part) => part.status === 'MISSING');
+  if (missing) return missing;
+  const priced = parts.filter((part): part is Extract<Pricing, { status: 'PRICED' }> => part.status === 'PRICED');
+  const sum = (pick: (part: (typeof priced)[number]) => bigint | null): bigint | null =>
+    priced.reduce<bigint | null>((total, part) => {
+      const value = pick(part);
+
+      return value === null ? total : (total ?? 0n) + value;
+    }, null);
+  const amountMinor = sum((part) => part.amount.amountMinor) ?? 0n;
+  const nextYearMinor = sum((part) => part.nextYearAmount?.amountMinor ?? null);
+  const base = priced[0];
+  if (amountMinor > MAX_AMOUNT_MINOR)
+    return { status: 'MISSING', reason: 'AMOUNT_TOO_LARGE', budgetYear: base.budgetYear };
+
+  return {
+    ...base,
+    amount: { amountMinor, currency: base.amount.currency },
+    // The seat of a commitment is held over the months of the longest term: the people of a group share one commitment.
+    months: base.months === null ? null : Math.max(...priced.map((part) => part.months ?? 0)),
+    nextYearAmount: nextYearMinor === null ? null : { amountMinor: nextYearMinor, currency: base.amount.currency },
+  };
+}
+
 /** The same stored pricing record for intake and worker repricing, from the same plan-price facts. */
 export function pricingRecordFor(input: RequestPriceInput, price: RequestPlanPrice | null): PricingRecord {
-  if (input.free) return { ...NOT_APPLICABLE_PRICING, expectedEndDate: input.endDate };
+  const recordedEnd = input.endIsDerived === true || input.endsByPerson !== undefined ? null : input.endDate;
+  if (input.free) return { ...NOT_APPLICABLE_PRICING, expectedEndDate: recordedEnd };
   const kind = price?.kind ?? 'RECURRING';
-  const priced = requestAmountOf({
-    kind,
-    unitPrice: price?.unitPrice ?? null,
-    billingCycle: price?.billingCycle ?? null,
-    beneficiaries: input.beneficiaries,
-    checkDate: input.checkDate,
-    from: input.from,
-    endDate: input.endDate,
-  });
+  const priced: Pricing = price
+    ? requestAmountsOf(input, { ...price, kind })
+    : { status: 'MISSING', reason: 'NO_PRICED_SUBSCRIPTION', budgetYear: fiscalYearOf(input.checkDate) };
   if (priced.status === 'MISSING') {
     return {
       status: 'MISSING',
       missingReason: priced.reason,
       kind: price?.kind ?? null,
       budgetYear: priced.budgetYear,
-      expectedEndDate: input.endDate,
+      expectedEndDate: recordedEnd,
       amountMonths: null,
       amount: null,
       unitPrice: null,
@@ -248,7 +303,7 @@ export function pricingRecordFor(input: RequestPriceInput, price: RequestPlanPri
     missingReason: null,
     kind,
     budgetYear: priced.budgetYear,
-    expectedEndDate: input.endDate,
+    expectedEndDate: recordedEnd,
     amountMonths: priced.months,
     amount: priced.amount,
     unitPrice: priced.unitPrice,

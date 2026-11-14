@@ -1,6 +1,7 @@
 import request from 'supertest';
 import { addDays } from '../../../src/core/business-date';
-import { maxEndDateOf, monthsBetween } from '../../../src/modules/requests/access-request/pricing.policy';
+import { monthsBeginningIn } from '../../../src/core/term-limit';
+import { maxEndDateOf } from '../../../src/modules/requests/access-request/pricing.policy';
 import { AccessRequestWire, Department, Person, RequestHarness } from '../../support/request-harness';
 
 const h = new RequestHarness();
@@ -44,9 +45,8 @@ describe('requests over HTTP: the preview before sending (integration, real Post
     it('shows the amount, the chain with who holds each step, and the time of every step', async () => {
       const today = h.today();
       const end = h.endDated({ termMonths: 6 }).expectedEndDate as string;
-      const yearEnd = `${today.slice(0, 4)}-12-31`;
       // BR-MF1-06: the months left of the year, the month it starts counted whole, to the end date at the latest.
-      const months = monthsBetween(today, end < yearEnd ? end : yearEnd);
+      const months = monthsBeginningIn({ start: today, end, year: Number(today.slice(0, 4)) });
       const preview = await h.previewed(designer, paidPlan, { termMonths: 6 });
 
       expect(preview).toMatchObject({

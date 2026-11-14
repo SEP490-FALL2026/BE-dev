@@ -194,13 +194,13 @@ describe('RequestFactsService.assess', () => {
       expect(pricing.amount).toEqual({ amountMinor: 6000n, currency: 'USD' });
     });
 
-    it('BR-MF1-06c: an end date inside the year stops the amount in its month', async () => {
+    it('BR-MF1-06c, R-39: an end date inside the year stops the amount at the last month that began (10/11 begins, 10/12 does not by 15/11)', async () => {
       given(COST_CENTER, 'SAAS');
       catalog.getPlanPrice.mockResolvedValue(monthly);
 
       const { pricing } = await service.assess(tx, input({ expectedEndDate: '2026-11-15' }));
 
-      expect(pricing).toMatchObject({ amountMonths: 2, expectedEndDate: '2026-11-15' });
+      expect(pricing).toMatchObject({ amountMonths: 1, expectedEndDate: '2026-11-15' });
     });
 
     it('BR-MF1-07: a one-time price (a key) is the price of the purchase, with no months', async () => {

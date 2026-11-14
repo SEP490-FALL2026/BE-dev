@@ -1,11 +1,5 @@
-import {
-  maxEndDateOf,
-  monthsBetween,
-  pricingRecordFor,
-  requestAmountOf,
-  seatMonthlyOf,
-  type PricingInput,
-} from './pricing.policy';
+import { termRunOf } from '../../../core/term-limit';
+import { maxEndDateOf, pricingRecordFor, requestAmountOf, seatMonthlyOf, type PricingInput } from './pricing.policy';
 
 const SEAT = { amountMinor: 2000n, currency: 'USD' }; // 20.00 per seat per month
 
@@ -29,7 +23,8 @@ describe('BR-MF1-06 shared intake and worker pricing record', () => {
       amountMonths: 2,
       budgetYear: 2026,
       expectedEndDate: null,
-      nextYearAmount: null,
+      // A right with no end holds twelve months of the next year (R-46).
+      nextYearAmount: { amountMinor: 48000n },
     });
   });
 
@@ -73,7 +68,7 @@ describe('BR-MF1-06: the amount of a request is the price of the months left of 
       months: 2,
       amount: { amountMinor: 4000n, currency: 'USD' },
       budgetYear: 2026,
-      nextYearAmount: null,
+      nextYearAmount: { amountMinor: 24000n, currency: 'USD' },
     });
   });
 
@@ -235,16 +230,114 @@ describe('what is not priced (US-05-02 AC-4, QĐ-84e)', () => {
   });
 });
 
-describe('the months and the last day a right may end', () => {
-  it('counts both months whole', () => {
-    expect(monthsBetween('2026-07-31', '2026-07-31')).toBe(1);
-    expect(monthsBetween('2026-07-31', '2026-10-01')).toBe(4);
-    expect(monthsBetween('2026-11-10', '2026-12-31')).toBe(2);
-  });
-
+describe('the last day a right may end', () => {
   it('is the day before the same day twelve months later (US-05-23 AC-9)', () => {
     expect(maxEndDateOf('2026-11-10')).toBe('2027-11-09');
     expect(maxEndDateOf('2028-02-29')).toBe('2029-02-27');
+  });
+});
+
+describe('T-RQ2: the commitment is the price of a month times the months that begin, split by the year each begins in (QĐ-111j, R-39, R-46)', () => {
+  const dong = (amountMinor: bigint) => ({ amountMinor, currency: 'VND' });
+  const k1 = { kind: 'RECURRING' as const, unitPrice: dong(600_000n), billingCycle: 'MONTHLY' as const };
+
+  it('K1 600.000 for 9 months, approved 15/11/2026: 2026 is 1.200.000 and the part of next year is 4.200.000', () => {
+    const run = termRunOf({ start: '2026-11-15', months: 9, contractEndsOn: null });
+
+    expect(requestAmountOf({ ...k1, beneficiaries: 1, checkDate: '2026-11-15', endDate: run.end })).toMatchObject({
+      status: 'PRICED',
+      months: 2,
+      amount: { amountMinor: 1_200_000n },
+      budgetYear: 2026,
+      nextYearAmount: { amountMinor: 4_200_000n },
+    });
+  });
+
+  it('K2 Dùng lâu dài 375.000, approved 20/11/2026: 2026 is 750.000 and the part of next year is 12 months, 4.500.000', () => {
+    expect(
+      requestAmountOf({
+        kind: 'RECURRING',
+        unitPrice: dong(375_000n),
+        billingCycle: 'MONTHLY',
+        beneficiaries: 1,
+        checkDate: '2026-11-20',
+        endDate: null,
+      }),
+    ).toMatchObject({
+      months: 2,
+      amount: { amountMinor: 750_000n },
+      nextYearAmount: { amountMinor: 4_500_000n },
+    });
+  });
+
+  it('a term that ends inside the year has no part of next year', () => {
+    const run = termRunOf({ start: '2026-03-10', months: 6, contractEndsOn: null });
+
+    expect(requestAmountOf({ ...k1, beneficiaries: 1, checkDate: '2026-03-10', endDate: run.end })).toMatchObject({
+      months: 6,
+      amount: { amountMinor: 3_600_000n },
+      nextYearAmount: null,
+    });
+  });
+
+  it('the price of a month of an annual price is a twelfth, rounded up once, and the twelve months of next year keep it', () => {
+    expect(
+      requestAmountOf({
+        kind: 'RECURRING',
+        unitPrice: dong(1_000n),
+        billingCycle: 'ANNUAL',
+        beneficiaries: 1,
+        checkDate: '2026-12-01',
+        endDate: null,
+      }),
+    ).toMatchObject({ months: 1, amount: { amountMinor: 84n }, nextYearAmount: { amountMinor: 1_000n } });
+  });
+});
+
+describe('T-R38: a person with a term is cut at the end of the contract and each month that begins counts (R-38, R-39)', () => {
+  const k1 = { planId: 'plan', free: false, checkDate: '2026-11-10' };
+  const price = {
+    kind: 'RECURRING' as const,
+    unitPrice: { amountMinor: 600_000n, currency: 'VND' },
+    billingCycle: 'MONTHLY' as const,
+  };
+  const endOf = (contractEndsOn: string | null) => termRunOf({ start: '2026-11-10', months: 9, contractEndsOn }).end;
+
+  it('an intern whose contract ends 31/01/2027, K1 for 9 months sent 10/11/2026: 3 months begin, 1.800.000 in all (2026: 1.200.000, next year 600.000)', () => {
+    expect(pricingRecordFor({ ...k1, beneficiaries: 1, endDate: endOf('2027-01-31') }, price)).toMatchObject({
+      status: 'PRICED',
+      amountMonths: 2,
+      amount: { amountMinor: 1_200_000n },
+      nextYearAmount: { amountMinor: 600_000n },
+    });
+  });
+
+  it('a group prices each person for their own end: only the line of the intern is cut', () => {
+    const record = pricingRecordFor(
+      { ...k1, beneficiaries: 3, endDate: null, endsByPerson: [endOf(null), endOf('2027-01-31'), endOf(null)] },
+      price,
+    );
+
+    // staff: 2 months in 2026 (1.200.000) and 7 in 2027 (4.200.000) each; the intern: 1.200.000 and 600.000.
+    expect(record).toMatchObject({
+      status: 'PRICED',
+      amountMonths: 2,
+      amount: { amountMinor: 3_600_000n },
+      nextYearAmount: { amountMinor: 9_000_000n },
+    });
+  });
+
+  it('a group of people who all end on the same day is the same as the amount of one person times them', () => {
+    const one = pricingRecordFor({ ...k1, beneficiaries: 1, endDate: endOf(null) }, price);
+    const three = pricingRecordFor(
+      { ...k1, beneficiaries: 3, endDate: null, endsByPerson: [endOf(null), endOf(null), endOf(null)] },
+      price,
+    );
+
+    expect(three).toMatchObject({
+      amount: { amountMinor: (one.amount?.amountMinor ?? 0n) * 3n },
+      nextYearAmount: { amountMinor: (one.nextYearAmount?.amountMinor ?? 0n) * 3n },
+    });
   });
 });
 

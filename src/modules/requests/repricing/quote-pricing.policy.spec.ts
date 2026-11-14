@@ -36,8 +36,9 @@ describe('the amount of a request from a quote (US-05-06 AC-14, BR-MF1-06)', () 
     expect(result.budgetYear).toBe(2026);
   });
 
-  it('BR-MF1-06c: stops in the month of the end date the request asked for', () => {
-    expect(priced({ endDate: day('2026-11-05') }).amount).toEqual(dong(16));
+  it('BR-MF1-06c, R-39: counts the months that have begun by the end date the request asked for (23/10 and 23/11 begin by 25/11, not by 05/11)', () => {
+    expect(priced({ endDate: day('2026-11-25') }).amount).toEqual(dong(16));
+    expect(priced({ endDate: day('2026-11-05') }).amount).toEqual(dong(8));
   });
 
   it('is multiplied by the people it is for', () => {
