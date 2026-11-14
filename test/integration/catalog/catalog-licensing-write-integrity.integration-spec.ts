@@ -4,6 +4,7 @@ import request from 'supertest';
 import { TransactionRunner } from '../../../src/infrastructure/database/transaction-runner';
 import { VendorRecordService } from '../../../src/modules/catalog/vendor/vendor-record.service';
 import { bodyOf } from '../../support/api-body';
+import { declareApplication, declarePlan, declareSubscription } from '../../support/builders/catalog.builder';
 import { SeatHarness } from '../../support/seat-baseline-harness';
 import { waitForLockWaiters } from '../../support/lock-wait';
 import { intakeBodyOf } from '../../support/application-body';
@@ -367,6 +368,50 @@ describe('write integrity of catalog, finance and licensing (integration, DB-03,
       expect(h.codeOf(response)).toBe('PLAN.IN_USE_BLOCKS_CHANGE');
       expect(h.detailsOf(response)).toEqual({ reason: 'LICENSE_KEYS' });
       expect(await sqlState(sql(), `UPDATE plans SET provisioning_type = 'K1' WHERE id = $1`, [plan])).toBe('23514');
+    }, 60_000);
+
+    it('CT-1: refuses to leave K4 while a perpetual purchase of an application that is not licensed hangs on it, and lets a licensed one go', async () => {
+      const perpetual = (planId: string) =>
+        declareSubscription(h.ctx, h.it1.accessToken, {
+          ownerDepartmentId: h.seed.departmentId,
+          planId,
+          kind: 'PERPETUAL',
+          startDate: '2026-03-15',
+          purchasedQuantity: 5,
+        });
+      // A K4 plan of an application that is not LICENSED, which is what the one command of the catalog makes (B-5).
+      const saas = await declareApplication(h.ctx, h.it1.accessToken, {
+        name: h.unique('Bought once app'),
+        kind: 'SAAS',
+        vendorName: h.unique('Vendor'),
+        dataSensitivity: 'LOW',
+      });
+      const bought = await declarePlan(h.ctx, h.it1.accessToken, {
+        applicationId: saas,
+        name: h.unique('Bought once'),
+        provisioningType: 'K4',
+        controlLevel: 'FULL',
+      });
+      await perpetual(bought);
+
+      const response = await patchPlan(bought, { provisioningType: 'K2' });
+
+      expect(response.status).toBe(409);
+      expect(h.codeOf(response)).toBe('PLAN.IN_USE_BLOCKS_CHANGE');
+      expect(h.detailsOf(response)).toEqual({ reason: 'PERPETUAL_SUBSCRIPTIONS' });
+      expect(
+        (await sql().query<{ type: string }>(`SELECT provisioning_type AS type FROM plans WHERE id = $1`, [bought]))
+          .rows[0].type,
+      ).toBe('K4');
+      expect(await sqlState(sql(), `UPDATE plans SET provisioning_type = 'K2' WHERE id = $1`, [bought])).toBe('23514');
+      // A licensed application was always allowed the purchase on any plan: its plan may leave K4.
+      const licensed = await h.plan('K4');
+      await sql().query(
+        `UPDATE applications SET kind = 'LICENSED' WHERE id = (SELECT application_id FROM plans WHERE id = $1)`,
+        [licensed],
+      );
+      await perpetual(licensed);
+      expect((await patchPlan(licensed, { provisioningType: 'K1' })).status).toBe(200);
     }, 60_000);
   });
 

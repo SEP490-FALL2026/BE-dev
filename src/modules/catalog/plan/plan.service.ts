@@ -271,6 +271,7 @@ export class PlanService {
 const CHANGE_BLOCKS: readonly PlanChangeBlock[] = [
   'ACTIVE_SUBSCRIPTION_WITHOUT_QUANTITY',
   'LICENSE_KEYS',
+  'PERPETUAL_SUBSCRIPTIONS',
   'SUBSCRIPTIONS',
 ];
 

@@ -166,7 +166,8 @@ export class PlanTermsBlockTypeChangeError extends Error {
 }
 
 /** What the database found on the plan that the change would leave invalid (`plans_keep_children_valid`). */
-export type PlanChangeBlock = 'ACTIVE_SUBSCRIPTION_WITHOUT_QUANTITY' | 'LICENSE_KEYS' | 'SUBSCRIPTIONS';
+export type PlanChangeBlock =
+  'ACTIVE_SUBSCRIPTION_WITHOUT_QUANTITY' | 'LICENSE_KEYS' | 'PERPETUAL_SUBSCRIPTIONS' | 'SUBSCRIPTIONS';
 
 export class PlanInUseBlocksChangeError extends Error {
   constructor(readonly reason: PlanChangeBlock) {
