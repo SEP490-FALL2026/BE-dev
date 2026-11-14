@@ -396,15 +396,19 @@ export class AssignmentService {
   /**
    * The task of the grant is completed on `grantedOn`: that is the day the right begins, and the end it asked for is cut to a year from
    * it at the latest (`BR-MF1-06a`, `QĐ-106b`). A seat with no end asked for keeps none. `valid_from` is not touched (the database keeps it).
-   * Returns the end the seat has from then on, null when it has none.
+   * Returns the day the seat began and the end it has from then on, null when it has none.
    */
-  async recordGranted(tx: DbTx, assignmentId: string, grantedOn: BusinessDate): Promise<BusinessDate | null> {
+  async recordGranted(
+    tx: DbTx,
+    assignmentId: string,
+    grantedOn: BusinessDate,
+  ): Promise<{ effectiveFrom: BusinessDate; expectedEndDate: BusinessDate | null }> {
     const current = await this.repo.find(assignmentId, tx);
     if (!current) throw new AssignmentNotFoundError();
     const expectedEndDate = endAfterGrant({ expectedEndDate: current.expectedEndDate, grantedOn });
     await this.repo.markGranted(tx, assignmentId, { grantedOn, expectedEndDate });
 
-    return expectedEndDate;
+    return { effectiveFrom: current.effectiveFrom, expectedEndDate };
   }
 
   /** The seats bought, taken and free on today in the organization calendar. Throws SeatTargetNotFoundError. */

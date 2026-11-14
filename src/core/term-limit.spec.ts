@@ -3,6 +3,7 @@ import {
   checkTermMonths,
   effectiveEndOf,
   endAfterGrant,
+  lastMonthBeginsOn,
   monthsBeginningIn,
   renewalEndOf,
   renewalStartOf,
@@ -278,6 +279,39 @@ describe('the run of a term: the months that begin, the end, and the cut at the 
       end: '2026-04-29',
       startedMonths: 3,
     });
+  });
+});
+
+describe('the last month of a term begins on a day of its own (R-39, QĐ-103f: a month that has begun counts whole)', () => {
+  it('a term of 3 months from 15/03 ends 14/06 and its last month began on 15/05, not in June', () => {
+    expect(lastMonthBeginsOn({ start: '2026-03-15', end: termEndOf('2026-03-15', 3) })).toBe('2026-05-15');
+    expect(lastMonthBeginsOn({ start: '2026-03-15', end: '2026-06-14' })).toBe('2026-05-15');
+  });
+
+  it('an end on the last day of a month, and a term of one month, begin their last month inside it', () => {
+    expect(lastMonthBeginsOn({ start: '2026-03-15', end: '2026-06-30' })).toBe('2026-06-15');
+    expect(lastMonthBeginsOn({ start: '2026-03-01', end: termEndOf('2026-03-01', 3) })).toBe('2026-05-01');
+    expect(lastMonthBeginsOn({ start: '2026-11-05', end: termEndOf('2026-11-05', 1) })).toBe('2026-11-05');
+  });
+
+  it('a term cut short by a contract: the last month is the last that began by the cut, whatever day of the month it falls on', () => {
+    expect(lastMonthBeginsOn({ start: '2026-03-15', end: '2026-05-16' })).toBe('2026-05-15');
+    expect(lastMonthBeginsOn({ start: '2026-03-15', end: '2026-05-14' })).toBe('2026-04-15');
+    expect(lastMonthBeginsOn({ start: '2026-03-15', end: '2026-03-15' })).toBe('2026-03-15');
+  });
+
+  it('a month that begins on the 31st begins on the last day of a shorter month', () => {
+    expect(lastMonthBeginsOn({ start: '2026-01-31', end: termEndOf('2026-01-31', 3) })).toBe('2026-03-31');
+    expect(lastMonthBeginsOn({ start: '2026-01-31', end: '2026-02-28' })).toBe('2026-02-28');
+  });
+
+  it('counts the months monthsBeginningIn counts: the last of them is the last month that begins', () => {
+    const start = '2026-11-15';
+    const end = termEndOf(start, 9);
+    const last = lastMonthBeginsOn({ start, end });
+
+    expect(last).toBe('2027-07-15');
+    expect(monthsBeginningIn({ start, end, year: 2027 })).toBe(7);
   });
 });
 

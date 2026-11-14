@@ -1,5 +1,6 @@
 import { addDays, type BusinessDate } from '../../../core/business-date';
 import { fiscalYearOf } from '../../../core/fiscal-year';
+import { lastMonthBeginsOn } from '../../../core/term-limit';
 import type { SeatCommitment } from '../../budgets/public/budgets.types';
 import type { ProvisioningKind, RevocationCompletedFacts } from '../../licensing/public/licensing.types';
 import { releaseOnLateGrant, releaseOnRevocation } from '../../licensing/public/seat-month-cost.policy';
@@ -20,6 +21,11 @@ const BY_THE_MONTH: readonly ProvisioningKind[] = ['K1', 'K2'];
 export interface SeatCoverage {
   /** The last day the request pays for the right (its end, or the new end of a request to go on using); null when it has no end. */
   endDate: BusinessDate | null;
+  /**
+   * The day the last month of its months of use begins on (R-39: a month that has begun counts whole, so a term from 15/03 to 14/06 is March, April
+   * and May); null when its months are counted by the calendar, as the months of an end a person chose by hand are.
+   */
+  lastMonthBeginsOn: BusinessDate | null;
   /** The year its amount was worked out for, and how many months of that year the amount covers (null for a one-time price). */
   budgetYear: number | null;
   amountMonths: number | null;
@@ -40,17 +46,42 @@ export function coverageEndOf(input: {
   return input.termMonths !== null && input.termMonths > 0 ? input.grantedEnd : null;
 }
 
+/**
+ * The day the last month of a request begins on (`SeatCoverage.lastMonthBeginsOn`): for a request with months of use whose end is the one of a term
+ * run, the last day a month of the seat began on, from its start to that end (a term from 15/03 ends 14/06 and its last month began on 15/05, a term
+ * cut by a contract on 16/05 had one begin on 15/05). None when its months are counted by the calendar: an end a person chose by hand (a request of
+ * an older release), no months of use, no end, or no start known.
+ */
+export function lastMonthBeginsOf(input: {
+  startDate: BusinessDate | null;
+  endDate: BusinessDate | null;
+  termMonths: number | null;
+  byHand: boolean;
+}): BusinessDate | null {
+  const { startDate, endDate } = input;
+  if (input.byHand || input.termMonths === null || input.termMonths <= 0) return null;
+  if (startDate === null || endDate === null || endDate < startDate) return null;
+
+  return lastMonthBeginsOn({ start: startDate, end: endDate });
+}
+
 const monthOf = (day: BusinessDate): number => Number(day.slice(5, 7));
+
+/** The day that says the last month a request covers: the one its last month begins on, else the last day it pays for. */
+const lastDayOf = (coverage: SeatCoverage): BusinessDate | null => coverage.lastMonthBeginsOn ?? coverage.endDate;
 
 const smaller = (a: bigint, b: bigint): bigint => (a < b ? a : b);
 
-/** The last month of `year` the request covers: the month of its end in that year, none when it ended before the year, else December. */
-export function lastMonthOf(year: number, endDate: BusinessDate | null): number {
-  if (endDate === null) return 12;
-  const endYear = fiscalYearOf(endDate);
-  if (endYear < year) return 0;
+/**
+ * The last month of `year` the request covers, from the day that says it (`lastDayOf`): the month of that day in that year, none when it is before
+ * the year, else December; December too when there is no such day.
+ */
+export function lastMonthOf(year: number, lastDay: BusinessDate | null): number {
+  if (lastDay === null) return 12;
+  const lastYear = fiscalYearOf(lastDay);
+  if (lastYear < year) return 0;
 
-  return endYear === year ? monthOf(endDate) : 12;
+  return lastYear === year ? monthOf(lastDay) : 12;
 }
 
 /**
@@ -61,7 +92,7 @@ export function firstMonthOf(commitment: Pick<SeatCommitment, 'year' | 'origin'>
   if (commitment.origin === 'YEAR_START') return 1;
   if (coverage.budgetYear !== commitment.year || coverage.amountMonths === null || coverage.amountMonths <= 0) return 1;
 
-  return Math.max(1, lastMonthOf(commitment.year, coverage.endDate) - coverage.amountMonths + 1);
+  return Math.max(1, lastMonthOf(commitment.year, lastDayOf(coverage)) - coverage.amountMonths + 1);
 }
 
 /**
@@ -92,8 +123,10 @@ function releasable(
 
 /**
  * What one seat of the commitment gives back when the right ends on `endsOn` (`RV-07`): the months from the month of `endsOn` to the last
- * month the request covers, less what the days of that month before `endsOn` cost. A right that ended in an earlier year gives nothing back;
- * a commitment of a year after the end, or one whose months begin after the end, gives back every month it covers.
+ * month the request covers, less what the days of that month before `endsOn` cost. The months a request with months of use covers are those
+ * that began (`lastMonthBeginsOn`, R-39): 15/03 to 14/06 is March, April and May, and a right that ends on the last day paid or after it gives back
+ * nothing. A right that ended in an earlier year gives nothing back; a commitment of a year after the end, or one whose months begin after the end,
+ * gives back every month it covers.
  */
 export function revocationShare(input: {
   commitment: SeatCommitment;
@@ -108,7 +141,7 @@ export function revocationShare(input: {
   const endYear = fiscalYearOf(endsOn);
   if (commitment.year < endYear) return 0n;
   const first = firstMonthOf(commitment, coverage);
-  const last = lastMonthOf(commitment.year, coverage.endDate);
+  const last = lastMonthOf(commitment.year, lastDayOf(coverage));
   if (last < first) return 0n;
   const amount =
     commitment.year > endYear || monthOf(endsOn) < first

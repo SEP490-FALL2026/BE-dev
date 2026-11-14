@@ -164,6 +164,19 @@ export function termRunOf(facts: {
 }
 
 /**
+ * The day the last month of a term begins on: the last of the days `start` plus a whole number of months that is not after `end` (R-39: a month that
+ * has begun counts whole, so the months are those the term has begun, one for each such day). A term of `n` months ends the day before the same day
+ * `n` months later, so its last month began on `start` plus `n - 1` months; a term cut short by a contract ends on any day, and the last month is the
+ * last that had begun by then. `end` is never before `start`.
+ */
+export function lastMonthBeginsOn(facts: { start: BusinessDate; end: BusinessDate }): BusinessDate {
+  let last = facts.start;
+  for (let month = 1; addMonths(facts.start, month) <= facts.end; month += 1) last = addMonths(facts.start, month);
+
+  return last;
+}
+
+/**
  * The months of a term that begin in `year`: a month begins every month from `start` until `end` (for ever with no end) and belongs to the
  * year of the day it begins (`QĐ-111j`). What each year costs is the price of a month times this.
  */

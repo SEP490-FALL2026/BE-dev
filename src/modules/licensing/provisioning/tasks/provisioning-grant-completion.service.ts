@@ -57,7 +57,7 @@ export class ProvisioningGrantCompletion {
       });
     }
     const completedOn = await this.organizationReads.businessToday(now, tx);
-    const expectedEndDate = await this.assignments.recordGranted(tx, task.assignmentId, completedOn);
+    const granted = await this.assignments.recordGranted(tx, task.assignmentId, completedOn);
     if (task.requestId === null) return;
 
     const pooled = provisioningType === 'K2' || provisioningType === 'K4';
@@ -68,7 +68,8 @@ export class ProvisioningGrantCompletion {
       provisioningType,
       grantedOn: completedOn,
       assignmentId: task.assignmentId,
-      expectedEndDate,
+      effectiveFrom: granted.effectiveFrom,
+      expectedEndDate: granted.expectedEndDate,
     });
     if (!fromPool) return;
     await this.sharedPool.recordAvoided(tx, {

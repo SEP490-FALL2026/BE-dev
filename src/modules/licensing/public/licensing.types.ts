@@ -428,9 +428,11 @@ export interface RevocationCompletedFacts {
    */
   chainAssignmentIds: string[];
   /**
-   * The day the seat that grant made ends (its `expected_end_date`): a request with months of use records no end date, so this is the last
-   * day it pays for the right; null when the seat has no end (B-C1).
+   * The day the seat that grant made began (its `valid_from`) and the day it ends (its `expected_end_date`): a request with months of use records
+   * no end date, so the end is the last day it pays for the right and the two give the days its months begin on (R-39); null when no request
+   * granted it, and the end null when the seat has none.
    */
+  grantedStartDate: BusinessDate | null;
   grantedEndDate: BusinessDate | null;
   provisioningType: ProvisioningKind;
   /** The day the right ends: it holds the seat on every day before it (`valid_until`). */
@@ -453,7 +455,8 @@ export interface GrantOutcomeFacts {
   provisioningType: ProvisioningKind;
   grantedOn: BusinessDate;
   assignmentId: string;
-  /** The day the seat ends, as it stands once granted; null when the seat has no end (B-C1). */
+  /** The day the seat began and the day it ends, as they stand once granted; the end is null when the seat has none (see `RevocationCompletedFacts.grantedStartDate`). */
+  effectiveFrom: BusinessDate;
   expectedEndDate: BusinessDate | null;
 }
 
@@ -465,7 +468,8 @@ export interface RightChain {
   assignmentId: string;
   grantRequestId: string | null;
   chainAssignmentIds: string[];
-  /** The end of the seat the request's grant made, as in {@link RevocationCompletedFacts.grantedEndDate}. */
+  /** The start and the end of the seat the request's grant made, as in {@link RevocationCompletedFacts.grantedStartDate}. */
+  grantedStartDate: BusinessDate | null;
   grantedEndDate: BusinessDate | null;
 }
 

@@ -7,6 +7,7 @@ describe('BR-MF1-09: the commitment of a K4 request granted from the pool goes b
     provisioningType: 'K4',
     grantedOn: '2026-11-10',
     assignmentId: 'a-1',
+    effectiveFrom: '2026-11-10',
     expectedEndDate: null,
     ...extra,
   });

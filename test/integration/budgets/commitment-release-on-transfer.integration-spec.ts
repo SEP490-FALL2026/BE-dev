@@ -57,7 +57,7 @@ describe('the money held for the old rights of a transfer goes back once, the da
   const approved = async (u: Unit) => {
     const id = await h.waitingForApprover(u, plan, { amount: 12 * M });
     await h.ctx.sql.query(
-      `UPDATE access_requests SET amount_months = 12, price_kind = 'RECURRING', expected_end_date = NULL, budget_year = $2 WHERE id = $1`,
+      `UPDATE access_requests SET amount_months = 12, price_kind = 'RECURRING', term_months = NULL, expected_end_date = NULL, budget_year = $2 WHERE id = $1`,
       [id, h.year],
     );
     await h.decideSpend(id, { decision: 'APPROVE' }, h.boss.account).expect(200);

@@ -55,7 +55,11 @@ export class SeatReleaseService {
     const coverages = await this.repo.coverageOf(tx, {
       requestIds: completed.grantRequestId === null ? [] : [completed.grantRequestId],
       assignmentIds: completed.chainAssignmentIds,
-      grant: { requestId: completed.grantRequestId, endDate: completed.grantedEndDate },
+      grant: {
+        requestId: completed.grantRequestId,
+        startDate: completed.grantedStartDate,
+        endDate: completed.grantedEndDate,
+      },
     });
     await this.give(tx, coverages, now, {
       reason: 'REVOKED',
@@ -88,7 +92,7 @@ export class SeatReleaseService {
       const coverages = await this.repo.coverageOf(tx, {
         requestIds: chain.grantRequestId === null ? [] : [chain.grantRequestId],
         assignmentIds: chain.chainAssignmentIds,
-        grant: { requestId: chain.grantRequestId, endDate: chain.grantedEndDate },
+        grant: { requestId: chain.grantRequestId, startDate: chain.grantedStartDate, endDate: chain.grantedEndDate },
       });
       const released = await this.give(tx, coverages, now, {
         reason: 'TRANSFER_EFFECTIVE',
@@ -120,7 +124,7 @@ export class SeatReleaseService {
     const coverages = await this.repo.coverageOf(tx, {
       requestIds: chain.grantRequestId === null ? [] : [chain.grantRequestId],
       assignmentIds: chain.chainAssignmentIds,
-      grant: { requestId: chain.grantRequestId, endDate: chain.grantedEndDate },
+      grant: { requestId: chain.grantRequestId, startDate: chain.grantedStartDate, endDate: chain.grantedEndDate },
     });
     await this.give(tx, coverages, input.now, {
       reason: 'TRANSFER_EFFECTIVE',
@@ -139,7 +143,7 @@ export class SeatReleaseService {
     const coverages = await this.repo.coverageOf(tx, {
       requestIds: [requestId],
       assignmentIds: [],
-      grant: { requestId, endDate: facts.expectedEndDate },
+      grant: { requestId, startDate: facts.effectiveFrom, endDate: facts.expectedEndDate },
     });
     await this.give(tx, coverages, now, {
       reason: 'LATE_GRANT',

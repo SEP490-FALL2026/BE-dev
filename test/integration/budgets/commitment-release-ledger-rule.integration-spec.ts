@@ -181,6 +181,7 @@ describe('a commitment goes back once for the transfer of its right, by its own 
       completed: {
         grantRequestId: requestId,
         chainAssignmentIds: [assignmentId],
+        grantedStartDate: null,
         grantedEndDate: null,
         provisioningType: 'K2',
         endedOn: ended,

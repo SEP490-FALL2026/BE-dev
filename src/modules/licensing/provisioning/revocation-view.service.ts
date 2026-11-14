@@ -152,6 +152,7 @@ export class RevocationViewService {
       found.push({
         assignmentId,
         grantRequestId: grant?.requestId ?? null,
+        grantedStartDate: grant?.startDate ?? null,
         grantedEndDate: grant?.endDate ?? null,
         chainAssignmentIds: await this.chains.chainOf(tx, assignmentId),
       });

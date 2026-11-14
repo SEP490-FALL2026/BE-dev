@@ -39,6 +39,7 @@ export class RevocationCompletedFactsReader {
 
     return {
       grantRequestId: grant?.requestId ?? null,
+      grantedStartDate: grant?.startDate ?? null,
       grantedEndDate: grant?.endDate ?? null,
       chainAssignmentIds: await this.chains.chainOf(tx, task.assignmentId),
       provisioningType: done.provisioningType,
