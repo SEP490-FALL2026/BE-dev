@@ -59,7 +59,11 @@ controller) và `requests-work-facade.module.ts` (phần worker chạy, API dùn
 - Đăng ký vào licensing: `licensing.grant-request-gate` ← `grant/access-request-grant.listener.ts`;
   `licensing.revocation` ← `return-request/return-revocation.listener.ts` và `grant/seat-revocation.listener.ts` (G9-02: hoàn tất
   thu hồi `K1`/`K2` ⟹ giải phóng theo ngày khoản của Request cấp và Request tiếp tục của chuỗi, `grant/seat-release.*`; cấp `K2` muộn
-  ⟹ giải phóng phần trước ngày cấp trong `grant/access-request-grant.listener.ts`); `licensing.renewal-hold` ←
+  ⟹ giải phóng phần trước ngày cấp trong `grant/access-request-grant.listener.ts`). Request có _Thời gian dùng_ (`term_months`) không ghi ngày kết thúc:
+  ngày cuối nó trả tiền là `expected_end_date` của seat do lệnh cấp của chính nó làm ra (`RevocationCompletedFacts.grantedEndDate`, `RightChain.grantedEndDate`,
+  `GrantOutcomeFacts.expectedEndDate`), các tháng của nó là các tháng đã bắt đầu từ ngày bắt đầu seat (`grantedStartDate`, `effectiveFrom`) và tháng cuối là tháng của
+  ngày tháng cuối bắt đầu (`SeatCoverage.lastMonthBeginsOn`, R-39: 15/03–14/06 là tháng 3, 4, 5); Request tiếp tục lấy `new_expected_end_date` và bắt đầu từ ngày sau hạn cũ;
+  Request cũ có ngày kết thúc tự chọn và quyền _Dùng lâu dài_ đếm theo tháng lịch / tới tháng 12 như trước (`grant/seat-release.repo.ts`, `seat-release.policy.ts`); `licensing.renewal-hold` ←
   `renewal-request/renewal-hold.listener.ts`.
 - Đăng ký vào organization: `organization.department-use-readers`, `organization.cost-center-use-readers` ←
   `access-request/open-request/*-open-requests.listener.ts`; `organization.change-listeners` ←

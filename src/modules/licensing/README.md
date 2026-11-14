@@ -188,8 +188,11 @@ dịch vụ nào đọc cả ghế lẫn thu hồi thì đứng trên cả hai (
   nên không vòng). `requests` giải phóng toàn bộ cam kết của Request K4 cấp từ kho (`GRANTED_FROM_POOL`); thu hồi K4 không đổi cam kết (giá một lần).
   Chưa làm: gắn thiết bị công ty đã đăng ký (`deviceId`, `DeviceRegistryHook`).
 - `grantQueueList` (module `requests`) đọc `stock { kind, free, inRevocation }` qua `LicensingPoolStockApi.getStockOfPlans` (số lần đọc cố định, không N+1).
-- Thu hồi hoàn tất phát `RevocationTaskFacts.completed` (`grantRequestId` qua chuỗi `predecessor_id` — `assignment-chain.repo.ts`, `provisioningType`, `endedOn`,
-  `paidThroughOn`, `sources`) để module cam kết giải phóng theo ngày (`public/seat-month-cost.policy.ts`: RV-07, M-10). Phần ghi vào cam kết thuộc `budgets`/`requests`, chưa nối.
+- Thu hồi hoàn tất phát `RevocationTaskFacts.completed` (`grantRequestId` qua chuỗi `predecessor_id` — `assignment-chain.repo.ts`, `grantedStartDate` và `grantedEndDate` là ngày bắt đầu
+  (`valid_from`) và ngày kết thúc (`expected_end_date`) của seat do lệnh cấp của Request làm ra, `provisioningType`, `endedOn`, `paidThroughOn`, `sources`) để module cam kết giải phóng theo ngày
+  (`public/seat-month-cost.policy.ts`: RV-07, M-10). `LicensingApi.listRightChainsOf` (`RightChain`) trả cùng hai ngày cho điều chuyển, và kết quả cấp (`GrantOutcomeFacts`) mang
+  `effectiveFrom` và `expectedEndDate` của seat đã cấp (sau khi cắt một năm): Request có _Thời gian dùng_ không ghi ngày kết thúc, nên ngày cuối nó trả tiền là ngày kết thúc của seat do lệnh cấp làm
+  ra, và các tháng của nó bắt đầu vào các ngày tính từ ngày bắt đầu seat (R-39). Phần ghi vào cam kết thuộc `requests` (`grant/seat-release.*`).
 - Thứ tự khóa của grant: request → thuê bao `FOR UPDATE` → plan `FOR SHARE` → người; đếm `free` không khóa thuê bao khác của plan.
 
 ## Bất biến quan trọng
