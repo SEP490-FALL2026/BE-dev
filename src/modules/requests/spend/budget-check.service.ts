@@ -31,6 +31,11 @@ export type NotCheckable = 'PRICE_MISSING';
 export interface CheckScope {
   priced: number;
   scoped: number;
+  /**
+   * The people of the check, when they are known: the request is then priced again for them alone, each for their own end (R-38), and what
+   * they cost is what the check reads. Without them the amount of the group is scaled evenly, which is only right when all of them cost the same.
+   */
+  employeeIds?: readonly string[];
 }
 
 export type CheckOutcome =
@@ -201,6 +206,34 @@ export class BudgetCheckService {
     return [pricing.budgetYear];
   }
 
+  /**
+   * The amount the check reads: the whole amount, or for a part of a group the amount of those people, priced again each for their own end
+   * (a person cut at the end of a contract costs fewer months, so a part is not an even share of the whole).
+   */
+  private async checkedAmount(
+    tx: DbTx,
+    request: AccessRequestRecord,
+    today: BusinessDate,
+    scope?: CheckScope,
+  ): Promise<bigint | null> {
+    const amount = request.pricing.amount as NonNullable<PricingRecord['amount']>;
+    if (!scope) return amount.amountMinor;
+    if (scope.employeeIds === undefined) return scaleAmount(amount.amountMinor, scope.priced, scope.scoped);
+    const people = new Set(scope.employeeIds);
+    const part = await this.repricing.reprice(
+      tx,
+      {
+        ...request,
+        lines: request.lines.map((line) =>
+          people.has(line.employeeId) ? line : { ...line, state: 'DROPPED' as const },
+        ),
+      },
+      today,
+    );
+
+    return part.status === 'PRICED' ? (part.amount?.amountMinor ?? null) : null;
+  }
+
   /** The Cost Center in use of the department now, and whether a decision finds it is not the one the request was last checked against. */
   private async costCenterOf(tx: DbTx, request: AccessRequestRecord, trigger: CheckTrigger): Promise<CostCenterRead> {
     const current = (await this.organizationReads.getUnitCostCenterIds([request.departmentId], tx)).get(
@@ -238,7 +271,7 @@ export class BudgetCheckService {
     scope?: CheckScope,
   ): Promise<Computed> {
     const { pricing } = request;
-    const cost = this.costOf(request, scope);
+    const cost = await this.costOf(tx, request, today, scope);
     if (cost.status === 'NOT_CHECKABLE' || pricing.budgetYear === null) {
       return cost.status === 'NOT_CHECKABLE' ? cost : { status: 'NOT_CHECKABLE', reason: 'PRICE_MISSING' };
     }
@@ -270,14 +303,18 @@ export class BudgetCheckService {
    * request for a group is checked on the people approved: the amount is the part of it for fewer people. A price left in another currency
    * is no price to check (`costInDong`).
    */
-  private costOf(
+  private async costOf(
+    tx: DbTx,
     request: AccessRequestRecord,
+    today: BusinessDate,
     scope?: CheckScope,
-  ): { status: 'COST'; costMinor: bigint; currency: string } | { status: 'NOT_CHECKABLE'; reason: NotCheckable } {
+  ): Promise<
+    { status: 'COST'; costMinor: bigint; currency: string } | { status: 'NOT_CHECKABLE'; reason: NotCheckable }
+  > {
     const { amount } = request.pricing;
     if (request.pricing.status !== 'PRICED' || amount === null)
       return { status: 'NOT_CHECKABLE', reason: 'PRICE_MISSING' };
-    const checked = scope ? scaleAmount(amount.amountMinor, scope.priced, scope.scoped) : amount.amountMinor;
+    const checked = await this.checkedAmount(tx, request, today, scope);
     if (checked === null) return { status: 'NOT_CHECKABLE', reason: 'PRICE_MISSING' };
 
     const cost = costInDong({ amountMinor: checked, currency: amount.currency });

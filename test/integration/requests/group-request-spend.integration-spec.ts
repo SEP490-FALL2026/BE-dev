@@ -1,3 +1,4 @@
+import { pretendBusinessToday } from '../../support/pretend-today';
 import { GroupHarness, type Colleague } from '../../support/group-harness';
 import type { Unit } from '../../support/spend-harness';
 
@@ -121,6 +122,121 @@ describe('the spend of the people of a request for a group, decided one by one o
         [id],
       );
       expect(stored.rows[0].next_year_amount_minor).toBe(String(2 * 12 * M));
+    });
+
+    describe('RQ-2: each person is held for their own months, a person cut at the end of a contract included (R-38, QĐ-111j)', () => {
+      /**
+       * The day is fixed: the business day is 10 November of the year. Two staff and an intern ask for 6 months of a plan of 1.000.000 a month:
+       * the staff months begin 10/11, 10/12 and then four of the year after (6.000.000 in all: 2.000.000 and 4.000.000), the intern's contract ends
+       * 05/12, so only the month of 10/11 begins (1.000.000, nothing of the year after).
+       */
+      const cutGroup = async () => {
+        const u = await unit();
+        await h.budgetFor(u, { total: 100_000 * M });
+        await h.budgetFor(u, { total: 100_000 * M, year: h.next });
+        const [e1, e2, e3] = await h.colleagues(u, 3);
+        await h.ctx.sql.query(`UPDATE employees SET employment_type = 'INTERN', contract_end_date = $2 WHERE id = $1`, [
+          e3.employeeId,
+          `${h.year}-12-05`,
+        ]);
+        // The people are made on the real day: they are backdated to the first of the year so that the fixed day, which may come before the
+        // real one, finds them in their department. The day is fixed for the sending and the decision.
+        const first = `${h.year}-01-01`;
+        await h.ctx.sql.query(
+          `UPDATE employees SET hire_date = $2 WHERE id IN (SELECT employee_id FROM employee_placements WHERE department_id = $1)`,
+          [u.department.id, first],
+        );
+        await h.ctx.sql.query(`UPDATE employee_placements SET valid_from = $2 WHERE department_id = $1`, [
+          u.department.id,
+          first,
+        ]);
+        await h.ctx.sql.query(`UPDATE department_head_periods SET valid_from = $2 WHERE department_id = $1`, [
+          u.department.id,
+          first,
+        ]);
+        pretendBusinessToday(h.ctx.app, `${h.year}-11-10`);
+        const sent = h.dataOf<{ request: { id: string; pricing: { amount: { amount: string } } } }>(
+          await h.submitGroup(h.groupBody(paid, [e1, e2, e3], { termMonths: 6 }), u.head.account).expect(201),
+        ).request;
+        await h.sendOn([sent.id], u.head.account).expect(201);
+
+        return { id: sent.id, e1, e2, e3, priced: sent.pricing.amount.amount };
+      };
+      const rowsOf = async (id: string) =>
+        (
+          await h.ctx.sql.query<{ employee_id: string; budget_year: number; amount_minor: string; held: boolean }>(
+            `SELECT employee_id, budget_year, amount_minor::text, held FROM access_request_line_amounts WHERE request_id = $1`,
+            [id],
+          )
+        ).rows;
+      const kept = async (id: string) =>
+        (
+          await h.ctx.sql.query<{ amount_minor: string; next_year_amount_minor: string | null }>(
+            `SELECT amount_minor::text, next_year_amount_minor::text FROM access_requests WHERE id = $1`,
+            [id],
+          )
+        ).rows[0];
+      afterEach(() => jest.restoreAllMocks());
+
+      it('prices the whole group for each person own end: 2.000.000 + 2.000.000 + 1.000.000', async () => {
+        const { priced } = await cutGroup();
+
+        expect(priced).toBe('5000000');
+      });
+
+      it('approving the two staff and refusing the intern holds exactly what the two cost: 4.000.000, not a third of the group taken away', async () => {
+        const { id, e1, e2, e3 } = await cutGroup();
+
+        await h
+          .decideSpendLines(
+            id,
+            { lines: [approve(e1.employeeId), approve(e2.employeeId), refuse(e3.employeeId)] },
+            h.boss.account,
+          )
+          .expect(200);
+
+        expect((await h.commitments(id)).map((commitment) => [commitment.year, commitment.amount_minor])).toEqual([
+          [h.year, '4000000'],
+        ]);
+        const rows = await rowsOf(id);
+        expect(
+          rows
+            .filter((row) => row.employee_id === e1.employeeId || row.employee_id === e2.employeeId)
+            .map((row) => [row.budget_year, row.amount_minor, row.held])
+            .sort(),
+        ).toEqual(
+          [
+            [h.year, '2000000', true],
+            [h.year, '2000000', true],
+            [h.year + 1, '4000000', false],
+            [h.year + 1, '4000000', false],
+          ].sort(),
+        );
+        expect(rows.some((row) => row.employee_id === e3.employeeId)).toBe(false);
+        expect(await kept(id)).toEqual({ amount_minor: '4000000', next_year_amount_minor: '8000000' });
+      });
+
+      it('approving all three holds 5.000.000: 2.000.000 for each of the staff and 1.000.000 for the intern, who keeps nothing of the year after', async () => {
+        const { id, e1, e2, e3 } = await cutGroup();
+
+        await h
+          .decideSpendLines(id, { lines: [e1, e2, e3].map((person) => approve(person.employeeId)) }, h.boss.account)
+          .expect(200);
+
+        expect((await h.commitments(id)).map((commitment) => [commitment.year, commitment.amount_minor])).toEqual([
+          [h.year, '5000000'],
+        ]);
+        const held = (await rowsOf(id)).filter((row) => row.held);
+        expect(Object.fromEntries(held.map((row) => [row.employee_id, row.amount_minor]))).toEqual({
+          [e1.employeeId]: '2000000',
+          [e2.employeeId]: '2000000',
+          [e3.employeeId]: '1000000',
+        });
+        expect((await rowsOf(id)).filter((row) => !row.held).map((row) => row.employee_id)).not.toContain(
+          e3.employeeId,
+        );
+        expect(await kept(id)).toEqual({ amount_minor: '5000000', next_year_amount_minor: '8000000' });
+      });
     });
 
     it('holds nothing when every person is refused, and ends the request as refused', async () => {

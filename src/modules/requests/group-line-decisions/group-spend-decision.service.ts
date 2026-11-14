@@ -80,6 +80,9 @@ export class GroupSpendDecisionService {
       const outcome = await this.checks.run(tx, request, 'SPEND_DECISION', actor, now, {
         priced: pricedPeople(request.lines.map((line) => line.state)),
         scoped: approved > 0 ? approved : confirmed.length,
+        employeeIds: (approved > 0 ? verdicts.filter((verdict) => verdict.decision === 'APPROVE') : verdicts).map(
+          (verdict) => verdict.employeeId,
+        ),
       });
       const checkId = outcome.status === 'CHECKED' ? outcome.check.id : null;
       if (approved === 0) {
