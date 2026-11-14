@@ -76,7 +76,15 @@ const requestablePlanSummarySchema = z.strictObject({
   id: z.uuid(),
   name: z.string(),
   provisioningType: z.enum(['K1', 'K2', 'K3', 'K4', 'K5']),
-  application: z.strictObject({ id: z.uuid(), name: z.string(), kind, logoUrl: z.string().nullable() }),
+  application: z.strictObject({
+    id: z.uuid(),
+    name: z.string(),
+    kind,
+    logoUrl: z.string().nullable().meta({
+      description:
+        'The https link to the logo image that the IT Admin pasted, or null. The server never checks it: it may be broken, so show the first letter of the name when the image does not load.',
+    }),
+  }),
   price: z
     .strictObject({
       status: z.enum(['PRICED', 'MISSING', 'NOT_APPLICABLE']),

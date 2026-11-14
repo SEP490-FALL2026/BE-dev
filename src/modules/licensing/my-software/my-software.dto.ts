@@ -16,7 +16,14 @@ const querySchema = z.strictObject({
 /** One right of the caller on a list: the software and plan, how it is granted, where it stands and until when. */
 export const mySoftwareRightSummarySchema = z.strictObject({
   assignmentId: z.uuid(),
-  application: z.strictObject({ id: z.uuid(), name: z.string(), logoUrl: z.string().nullable() }),
+  application: z.strictObject({
+    id: z.uuid(),
+    name: z.string(),
+    logoUrl: z.string().nullable().meta({
+      description:
+        'The https link to the logo image that the IT Admin pasted, or null. The server never checks it: it may be broken, so show the first letter of the name when the image does not load.',
+    }),
+  }),
   plan: z.strictObject({ id: z.uuid(), name: z.string() }),
   provisioningType: z.enum(['K1', 'K2', 'K3', 'K4', 'K5']),
   status: z.enum(MY_SOFTWARE_STATUSES),
