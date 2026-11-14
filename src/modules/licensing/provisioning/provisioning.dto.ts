@@ -233,6 +233,8 @@ const taskSummarySchema = z.strictObject({
       purchasedAt: z.iso.datetime(),
     })
     .nullable(),
+  /** On a grant: the last day of the contract of the holder when the seat ends on it, because the time of use asked for was cut there; null otherwise. */
+  termCutAt: responseBusinessDate.nullable(),
   elapsedSeconds: z.number().int().nonnegative(),
 });
 const taskSchema = taskSummarySchema.extend({

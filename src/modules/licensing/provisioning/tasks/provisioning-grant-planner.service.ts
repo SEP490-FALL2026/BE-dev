@@ -69,6 +69,10 @@ export class ProvisioningGrantPlanner {
     // The most tries are fixed here: a parameter changed later reaches only the tasks made after it (US-01-04 AC-13).
     const maxAttempts = maxAttemptsFor(Number(await this.parameters.getValue('PROVISIONING_RETRY_COUNT')));
 
-    return { answer, plan, serviceIdentifier, organization, today, inCharge, maxAttempts };
+    // The end of the contract of the person the seat is for: a time of use that runs past it is cut there when the seat is written (R-38).
+    const holder = answer.seat === 'PERSONAL' ? await this.organizationReads.getEmployee(answer.employeeId) : null;
+    const holderContractEnd = holder?.contractEndsOn ?? null;
+
+    return { answer, plan, serviceIdentifier, organization, today, inCharge, maxAttempts, holderContractEnd };
   }
 }

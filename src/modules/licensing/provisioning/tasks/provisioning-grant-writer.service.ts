@@ -19,7 +19,7 @@ import { ProvisioningTaskRepo } from '../provisioning-task.repo';
 import type { ProvisioningTaskRecord } from '../provisioning-task.types';
 import type { GrantInput, ProvisioningGrantPlanner } from './provisioning-grant-planner.service';
 import { claimMatchesAnswer, grantPurchaseOf, grantTaskAudit } from './provisioning-grant.policy';
-import { effectiveEndOf } from '../../../../core/term-limit';
+import { termRunOf } from '../../../../core/term-limit';
 import type { GrantRequestAnswer } from '../../public/licensing.types';
 import { ProvisioningHolderService } from './provisioning-holder.service';
 import { SharedPoolService } from '../../shared-pool/shared-pool.service';
@@ -52,6 +52,7 @@ export class ProvisioningGrantWriter {
     planned: Planned,
   ): Promise<ProvisioningTaskRecord> {
     const { answer, plan, serviceIdentifier, organization, today, inCharge, maxAttempts } = planned;
+    const { holderContractEnd } = planned;
     // The request is locked and moved to "being carried out" here, in the transaction of the grant: a second grant of
     // the same request finds it no longer grantable, and a request that changed since the read above is refused.
     const claimed = await this.gate.get().claimForGrant(tx, input.requestId, input.beneficiaryEmployeeId);
@@ -78,7 +79,7 @@ export class ProvisioningGrantWriter {
       target,
       holder,
       effectiveFrom: today,
-      expectedEndDate: this.endOfSeat(claimed, today),
+      expectedEndDate: this.endOfSeat(claimed, today, holderContractEnd),
       replacesAssignmentId: replaced,
     });
 
@@ -286,14 +287,20 @@ export class ProvisioningGrantWriter {
   }
 
   /**
-   * The day the seat ends: the day the request carries (the IT Admin names none, `Q-03` c1), else the end of its term for a request that
-   * costs money, never cut at the end of the calendar year (`QĐ-98`, `QĐ-104a`); free internal software and a service account have none.
+   * The day the seat ends: the day an older request carries (the IT Admin names none, `Q-03` c1), else the end of the months of use the
+   * request asked for, counted from today, the day it is granted, and never cut at the end of the calendar year (`QĐ-98`, `QĐ-111i`). A person
+   * with a term is cut at the end of their contract, whenever that comes first (R-38, `INV-07`). A right with no months and a service account
+   * have no end.
    */
-  private endOfSeat(claimed: Extract<GrantRequestAnswer, { status: 'GRANTABLE' }>, today: string): string | null {
+  private endOfSeat(
+    claimed: Extract<GrantRequestAnswer, { status: 'GRANTABLE' }>,
+    today: string,
+    holderContractEnd: string | null,
+  ): string | null {
     if (claimed.expectedEndDate !== null) return claimed.expectedEndDate;
     if (!claimed.termBound) return null;
 
-    return effectiveEndOf({ start: today, months: claimed.termMonths });
+    return termRunOf({ start: today, months: claimed.termMonths, contractEndsOn: holderContractEnd }).end;
   }
 
   /** K5: the plan itself (no seat); K1 and K2: the subscription, which must be of the plan and have a quantity. */

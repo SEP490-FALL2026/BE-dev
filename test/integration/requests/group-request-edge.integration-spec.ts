@@ -1,4 +1,5 @@
-import { effectiveEndOf } from '../../../src/core/term-limit';
+import { addDays } from '../../../src/core/business-date';
+import { monthsBeginningIn, termRunOf } from '../../../src/core/term-limit';
 import { GroupHarness } from '../../support/group-harness';
 import type { Unit } from '../../support/spend-harness';
 
@@ -128,29 +129,53 @@ describe('the edges of a request for a group over PostgreSQL (US-05-17 AC-5, AC-
     ).toEqual(expect.arrayContaining(['NEED', 'SPEND_DECISION', 'GRANT']));
   });
 
-  it('FR-2.8, R-D01: needs the end date of the group for a person who is not staff, gives it to every line, and the seat ends with it (AC-8)', async () => {
+  it('T-R38, FR-2.8, INV-07: a person with a term gives the months and is cut at the end of their own contract, on their own line only (AC-8)', async () => {
     const u = await unit();
     const subscription = await h.subscription(10);
     const plan = await h.planOf(subscription);
     const [e1, e2] = await h.colleagues(u, 2);
-    await h.ctx.sql.query(`UPDATE employees SET employment_type = 'INTERN' WHERE id = $1`, [e2.employeeId]);
+    const contractEnd = addDays(h.today(), 40);
+    await h.ctx.sql.query(`UPDATE employees SET employment_type = 'INTERN', contract_ends_on = $2 WHERE id = $1`, [
+      e2.employeeId,
+      contractEnd,
+    ]);
     const withDay = {
       ...h.groupBody(plan, [e1, e2]),
       lines: [{ employeeId: e1.employeeId }, { employeeId: e2.employeeId, expectedEndDate: '2099-12-31' }],
     };
-
-    // Rewritten from "no end day of the sender": the group names one end date for all of its people now (`QĐ-104a`, `FR-2.8`).
-    const end = effectiveEndOf({ start: h.today(), months: 3 });
+    const full = termRunOf({ start: h.today(), months: 3, contractEndsOn: null });
+    const cut = termRunOf({ start: h.today(), months: 3, contractEndsOn: contractEnd });
+    const year = Number(h.today().slice(0, 4));
+    const months = (run: typeof full, inYear: number) =>
+      monthsBeginningIn({ start: h.today(), end: run.end, year: inYear });
 
     const refused = await h.submitGroup(withDay, u.head.account).expect(422);
     const refusedNone = await h.submitGroup(h.groupBody(plan, [e1, e2]), u.head.account).expect(422);
-    const sent = h.dataOf<{ request: { id: string } }>(
-      await h.submitGroup(h.groupBody(plan, [e1, e2], { expectedEndDate: end }), u.head.account).expect(201),
-    ).request;
+    const refusedNull = await h
+      .submitGroup(h.groupBody(plan, [e1, e2], { termMonths: null }), u.head.account)
+      .expect(422);
+    const sent = h.dataOf<{
+      request: { id: string; pricing: { amount: { amount: string }; nextYearAmount: { amount: string } | null } };
+    }>(await h.submitGroup(h.groupBody(plan, [e1, e2], { termMonths: 3 }), u.head.account).expect(201)).request;
 
+    expect(cut.cutAt).toBe(contractEnd);
     expect(h.codeOf(refused)).toBe('VALIDATION_ERROR');
-    expect(h.codeOf(refusedNone)).toBe('GROUP_REQUEST.LINES_REFUSED');
-    expect((await h.lineRows(sent.id)).map((line) => line.expected_end_date)).toEqual([end, end]);
+    for (const [response, reason] of [
+      [refusedNone, 'TERM_REQUIRED'],
+      [refusedNull, 'TERM_LONG_TERM_NOT_ALLOWED'],
+    ] as const) {
+      expect(response.body).toMatchObject({
+        error: {
+          code: 'GROUP_REQUEST.LINES_REFUSED',
+          details: { lines: [{ employeeId: e2.employeeId, reason }] },
+        },
+      });
+    }
+    // Each person is priced for their own end: the staff member for 3 months, the intern for the months that begin by the contract.
+    expect(sent.pricing.amount.amount).toBe(String(M * (months(full, year) + months(cut, year))));
+    const nextYear = M * (months(full, year + 1) + months(cut, year + 1));
+    expect(sent.pricing.nextYearAmount?.amount ?? '0').toBe(String(nextYear));
+    expect((await h.lineRows(sent.id)).map((line) => line.expected_end_date)).toEqual([null, null]);
 
     await h.sendOn([sent.id], u.head.account).expect(201);
     await h
@@ -164,14 +189,14 @@ describe('the edges of a request for a group over PostgreSQL (US-05-17 AC-5, AC-
         )
         .expect(201);
     }
-    // The seat ends with the end date the group named.
+    // The seat of the staff member ends with the months; the seat of the intern ends at their contract (INV-07).
     const seats = await h.ctx.sql.query<{ employee_id: string; expected_end_date: string | null }>(
       `SELECT employee_id, expected_end_date::text FROM license_assignments WHERE employee_id = ANY($1::uuid[])`,
       [[e1.employeeId, e2.employeeId]],
     );
     expect(Object.fromEntries(seats.rows.map((row) => [row.employee_id, row.expected_end_date]))).toEqual({
-      [e1.employeeId]: end,
-      [e2.employeeId]: end,
+      [e1.employeeId]: full.end,
+      [e2.employeeId]: contractEnd,
     });
   });
 
