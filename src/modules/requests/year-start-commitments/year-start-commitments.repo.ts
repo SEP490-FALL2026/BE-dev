@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Prisma } from '../../../generated/prisma/client';
 import { fromDateColumn, type BusinessDate } from '../../../core/business-date';
+import { DONG } from '../../../core/money/money';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { YEAR_START_REQUEST_STATES } from './year-start-commitments.policy';
 
@@ -18,6 +19,16 @@ export interface YearStartCandidate {
   /** The year the approval worked the amount out for, and what it kept of the year after (`QĐ-111k`): null when it kept nothing. */
   budgetYear: number | null;
   nextYearAmountMinor: bigint | null;
+  /** The currency the approval worked its amounts out in: a request approved before the prices were all in dong may still have another (`QĐ-111an`). */
+  amountCurrency: string | null;
+}
+
+/** A number the approval of a person of a group kept of a year in a currency other than dong. */
+export interface ForeignKeptLine {
+  requestId: string;
+  employeeId: string;
+  currency: string;
+  amountMinor: bigint;
 }
 
 interface CandidateRow {
@@ -30,6 +41,7 @@ interface CandidateRow {
   term_months: number | null;
   budget_year: number | null;
   next_year_amount_minor: bigint | null;
+  amount_currency: string | null;
 }
 
 /**
@@ -158,7 +170,7 @@ export class YearStartCommitmentsRepo {
     const after = afterId === null ? Prisma.empty : Prisma.sql`AND r."id" > ${afterId}::uuid`;
     const rows = await tx.$queryRaw<CandidateRow[]>`
       SELECT r."id", r."type"::text AS "type", r."state"::text AS "state", r."plan_id", r."department_id", r."expected_end_date",
-             r."term_months", r."budget_year", r."next_year_amount_minor"
+             r."term_months", r."budget_year", r."next_year_amount_minor", r."amount_currency"
         FROM "access_requests" r
        WHERE r."organization_id" = ${organizationId}::uuid
          AND r."type" IN ('GRANT', 'SERVICE_ACCOUNT', 'GROUP_GRANT', 'RENEWAL')
@@ -179,6 +191,7 @@ export class YearStartCommitmentsRepo {
       termMonths: row.term_months,
       budgetYear: row.budget_year,
       nextYearAmountMinor: row.next_year_amount_minor,
+      amountCurrency: row.amount_currency,
     }));
   }
 
@@ -222,7 +235,8 @@ export class YearStartCommitmentsRepo {
 
   /**
    * What the approval kept of the year `year` for each person of these requests for a group (`QĐ-111k`, M-13): the rows of
-   * `access_request_line_amounts` that no commitment holds, by request and person. A person who has none kept nothing.
+   * `access_request_line_amounts` that no commitment holds, by request and person, in dong only (`QĐ-111an`: a number kept in another currency is
+   * never read as dong, see `foreignKeptNextYearOfLines`). A person who has none kept nothing.
    */
   async keptNextYearOfLines(
     tx: DbTx,
@@ -232,7 +246,7 @@ export class YearStartCommitmentsRepo {
     const kept = new Map<string, Map<string, bigint>>();
     if (requestIds.length === 0) return kept;
     const rows = await tx.accessRequestLineAmount.findMany({
-      where: { requestId: { in: [...requestIds] }, budgetYear: year, held: false },
+      where: { requestId: { in: [...requestIds] }, budgetYear: year, held: false, currency: DONG },
       select: { requestId: true, employeeId: true, amountMinor: true },
       orderBy: [{ requestId: 'asc' }, { employeeId: 'asc' }],
     });
@@ -243,6 +257,20 @@ export class YearStartCommitmentsRepo {
     }
 
     return kept;
+  }
+
+  /**
+   * The numbers the approval kept of the year `year` for the people of these requests for a group in a currency other than dong (a request approved
+   * before the prices were all in dong): the pass does not read them, and says which it left (`BUDGET_COMMITMENT.YEAR_START_SAVED_AMOUNT_IGNORED`).
+   */
+  async foreignKeptNextYearOfLines(tx: DbTx, requestIds: readonly string[], year: number): Promise<ForeignKeptLine[]> {
+    if (requestIds.length === 0) return [];
+
+    return tx.accessRequestLineAmount.findMany({
+      where: { requestId: { in: [...requestIds] }, budgetYear: year, held: false, currency: { not: DONG } },
+      select: { requestId: true, employeeId: true, amountMinor: true, currency: true },
+      orderBy: [{ requestId: 'asc' }, { employeeId: 'asc' }],
+    });
   }
 
   /** The record that follows the renewed one, for each of these renewals that was applied: the seat the renewal stands for. */

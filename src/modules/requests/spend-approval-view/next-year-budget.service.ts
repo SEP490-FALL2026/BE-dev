@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { fiscalYearOf } from '../../../core/fiscal-year';
+import { DONG } from '../../../core/money/money';
 import { BudgetsReadApi } from '../../budgets/public/budgets-read.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { SpendWireViewService } from '../spend/spend-wire-view.service';
@@ -40,9 +41,14 @@ export class NextYearBudgetService {
     now: Date = new Date(),
   ): Promise<Map<string, NextYearBudgetWire | null>> {
     const year = fiscalYearOf(await this.organizationReads.businessToday(now)) + 1;
+    // Only a part kept in dong is read against the budget: a request approved before the prices were all in dong may have kept it in another
+    // currency, which is neither added nor converted (`QĐ-111an`), so it has no figure of its own.
     const keeping = subjects.filter(
       (subject) =>
-        subject.costCenterId !== null && subject.budgetYear === year - 1 && (subject.nextYearAmountMinor ?? 0n) > 0n,
+        subject.costCenterId !== null &&
+        subject.budgetYear === year - 1 &&
+        subject.currency === DONG &&
+        (subject.nextYearAmountMinor ?? 0n) > 0n,
     );
     const costCenterIds = keeping.flatMap((subject) => (subject.costCenterId === null ? [] : [subject.costCenterId]));
     const [approved, kept] = await Promise.all([
@@ -65,7 +71,7 @@ export class NextYearBudgetService {
         thisMinor: subject.nextYearAmountMinor ?? 0n,
       });
       if (figures === null) continue;
-      const currency = budget?.currency ?? subject.currency ?? 'VND';
+      const currency = budget?.currency ?? DONG;
       const money = formatters.get(currency) ?? (await this.wireView.formatter(currency));
       formatters.set(currency, money);
       const optional = (minor: bigint | null) => (minor === null ? null : money(minor));

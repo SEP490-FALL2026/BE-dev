@@ -143,6 +143,25 @@ describe('the budget of the year after on the spend step of a request (QĐ-111al
     expect(await nextYearBudgetOf(probe)).toMatchObject({ remaining: vnd(5_800_000), remainingAfter: vnd(1_600_000) });
   });
 
+  it('B1A-01: a request approved in dollars by an older release is not added to the sums of the Cost Center, and its own number is not read as dong', async () => {
+    const u = await unit({ total: 8 * M, reserve: 2 * M });
+    const first = await waiting(u, 9);
+    await h.decideSpend(first, { decision: 'APPROVE' }, h.boss.account).expect(200);
+    const legacy = await waiting(u, 9);
+    await h.decideSpend(legacy, { decision: 'APPROVE' }, h.boss.account).expect(200);
+    // An older release approved it in dollars: the part of the year after it kept is 7 months at 20.00, that is 14.000 cents.
+    await h.ctx.sql.query(
+      `UPDATE access_requests SET amount_currency = 'USD', next_year_amount_minor = 14000 WHERE id = $1`,
+      [legacy],
+    );
+    const probe = await waiting(u, 9);
+
+    // Only the request in dong is taken from the budget: 10.000.000 − 4.200.000. Taking 14.000 as dong would leave 5.786.000.
+    expect(await nextYearBudgetOf(probe)).toMatchObject({ remaining: vnd(5_800_000), remainingAfter: vnd(1_600_000) });
+    // The request in dollars has no figure of the budget of its own: it keeps nothing in dong.
+    expect(await nextYearBudgetOf(legacy)).toBeNull();
+  });
+
   it('R-46: a right with no end keeps twelve months of the year after, so it counts for the warning of the others', async () => {
     const u = await unit({ total: 8 * M, reserve: 2 * M });
     pretendBusinessToday(h.ctx.app, `${h.year}-11-20`);

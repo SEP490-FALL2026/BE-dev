@@ -20,6 +20,7 @@ const candidate = (patch: Partial<YearStartCandidate> & { id: string }): YearSta
   termMonths: null,
   budgetYear: 2026,
   nextYearAmountMinor: null,
+  amountCurrency: 'VND',
   ...patch,
 });
 const heldSeat = (patch: Partial<GrantedSeatOfRequest> & { requestId: string }): GrantedSeatOfRequest => ({
@@ -52,6 +53,7 @@ function setup(input: {
     lockBatch: jest.fn().mockResolvedValue(input.candidates),
     unclaimedSeats: jest.fn().mockResolvedValue(input.unclaimed ?? new Map()),
     keptNextYearOfLines: jest.fn().mockResolvedValue(input.kept ?? new Map()),
+    foreignKeptNextYearOfLines: jest.fn().mockResolvedValue([]),
     renewalSuccessors: jest.fn().mockResolvedValue(input.renewals ?? []),
     renewalsThatBegan: jest.fn().mockResolvedValue(input.renewalsThatBegan ?? new Map()),
   };

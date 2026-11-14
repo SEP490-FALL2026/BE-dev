@@ -203,6 +203,29 @@ describe('the commitment of 01/01 is what the approval kept (T-RQ2 for 01/01, T-
     expect((await rows(id)).map((row) => row.amount_minor)).toEqual(['8400000']);
   });
 
+  it('B1A-01: a request approved in dollars by an older release is not counted by the number it kept (14.000 cents are not 14.000 dong): the months at the price of 01/01, and the audit trail says so', async () => {
+    const u = await unit();
+    const { subscription, plan } = await planAt('K1', 600_000);
+    const id = await approvedOn(u, plan, 9, `${h.year}-11-15`);
+    // An older release approved it in dollars: 7 months at 20.00 a month is 14.000 cents of the year after.
+    await h.ctx.sql.query(
+      `UPDATE access_requests SET amount_currency = 'USD', next_year_amount_minor = 14000 WHERE id = $1`,
+      [id],
+    );
+    await setPrice(subscription, 650_000);
+
+    await passOn();
+
+    expect((await rows(id)).map((row) => row.amount_minor)).toEqual([String(9 * 650_000)]);
+    const events = await h.ctx.sql.query<{ after: { currency: string; savedMinor: string; year: number } }>(
+      `SELECT after FROM audit_events WHERE action = 'BUDGET_COMMITMENT.YEAR_START_SAVED_AMOUNT_IGNORED' AND resource_id = $1`,
+      [id],
+    );
+    expect(events.rows.map((row) => row.after)).toEqual([
+      expect.objectContaining({ currency: 'USD', savedMinor: '14000', year: h.next }),
+    ]);
+  });
+
   it('QĐ-111ak: a request of an older release, which kept nothing, is counted by the months to the end of its seat at the price of 01/01', async () => {
     const u = await unit();
     const { subscription, plan } = await planAt('K1', 600_000);

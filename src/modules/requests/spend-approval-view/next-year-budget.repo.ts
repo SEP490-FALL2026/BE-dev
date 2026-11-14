@@ -1,4 +1,5 @@
 import { Injectable } from '@nestjs/common';
+import { DONG } from '../../../core/money/money';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { YEAR_START_REQUEST_STATES } from '../year-start-commitments/year-start-commitments.policy';
 
@@ -29,6 +30,8 @@ export class NextYearBudgetRepo {
         budgetYear: year - 1,
         state: { in: [...YEAR_START_REQUEST_STATES] },
         nextYearAmountMinor: { not: null },
+        // A part kept in another currency (an approval of before the prices were all in dong) is not added to dong, nor converted.
+        amountCurrency: DONG,
         id: { notIn: [...exceptRequestIds] },
       },
       _sum: { nextYearAmountMinor: true },

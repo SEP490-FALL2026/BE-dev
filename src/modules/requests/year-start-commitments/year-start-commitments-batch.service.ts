@@ -1,5 +1,6 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import type { BusinessDate } from '../../../core/business-date';
+import { DONG } from '../../../core/money/money';
 import { termEndOf } from '../../../core/term-limit';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { AuditApi } from '../../audit/public/audit.api';
@@ -38,8 +39,15 @@ export interface YearStartBatchResult {
 }
 
 type HoldItem = YearStartHoldInput['items'][number];
-/** What the approval of a request kept of the year that begins for a person (null for a request for one person): null when it kept nothing. */
+/** What the approval of a request kept of the year that begins for a person (null for a request for one person): null when it kept nothing in dong. */
 type KeptOf = (requestId: string, employeeId: string | null) => bigint | null;
+/** A number the approval kept of the year that begins in a currency other than dong: it is never read as dong, the seat is counted by its months. */
+interface IgnoredSaved {
+  requestId: string;
+  employeeId: string | null;
+  currency: string;
+  savedMinor: bigint;
+}
 type LeftOut = { requestId: string; reason: YearStartSkipReason };
 
 /**
@@ -57,7 +65,9 @@ type LeftOut = { requestId: string; reason: YearStartSkipReason };
  * the check of an approval.
  *
  * The amount is what each seat that still stands after 31/12 kept at its approval (a request for months of use), or twelve months of the
- * price of 01/01 (a right with no end): `yearStartAmountOf` (`QĐ-111ak`).
+ * price of 01/01 (a right with no end): `yearStartAmountOf` (`QĐ-111ak`). Only a number kept in dong is read: a request approved before the
+ * prices were all in dong may have kept it in another currency, and that number is never taken for dong nor converted; the seat is counted by
+ * its months at the price of 01/01 and the audit event `BUDGET_COMMITMENT.YEAR_START_SAVED_AMOUNT_IGNORED` says which number was left.
  *
  * A request is left out, with an audit event and no commitment, when its plan has no price (or a price left in another currency than dong),
  * its amount is too large, or the department that bears it has no Cost Center in use; one that has nothing to commit (every seat is over, or
@@ -66,6 +76,8 @@ type LeftOut = { requestId: string; reason: YearStartSkipReason };
  */
 @Injectable()
 export class YearStartCommitmentsBatchService {
+  private readonly logger = new Logger(YearStartCommitmentsBatchService.name);
+
   constructor(
     private readonly repo: YearStartCommitmentsRepo,
     private readonly budgets: BudgetsApi,
@@ -81,7 +93,7 @@ export class YearStartCommitmentsBatchService {
     const candidates = await this.withoutCommitment(tx, await this.ofPaidKinds(tx, locked), pass.year);
     if (candidates.length === 0) return { lastId, created: 0, skipped: 0 };
 
-    const { items, leftOut } = await this.judgeAll(tx, pass, candidates);
+    const { items, leftOut, ignored } = await this.judgeAll(tx, pass, candidates);
     const held = await this.budgets.holdYearStart(tx, {
       organizationId: pass.organizationId,
       year: pass.year,
@@ -95,6 +107,7 @@ export class YearStartCommitmentsBatchService {
       );
     }
     for (const left of leftOut) await this.recordSkipped(tx, pass, left);
+    for (const number of ignored) await this.recordIgnored(tx, pass, number);
 
     return { lastId, created: held.created.length, skipped: leftOut.length };
   }
@@ -104,9 +117,9 @@ export class YearStartCommitmentsBatchService {
     tx: DbTx,
     pass: YearStartPassContext,
     candidates: readonly YearStartCandidate[],
-  ): Promise<{ items: HoldItem[]; leftOut: LeftOut[] }> {
+  ): Promise<{ items: HoldItem[]; leftOut: LeftOut[]; ignored: IgnoredSaved[] }> {
     const yearStart: BusinessDate = `${pass.year}-01-01`;
-    const seats = await this.seatsOf(tx, candidates, pass.year);
+    const { seats, ignored } = await this.seatsOf(tx, candidates, pass.year);
     const bearing = new Map(
       candidates.map((candidate) => [
         candidate.id,
@@ -142,7 +155,7 @@ export class YearStartCommitmentsBatchService {
       });
     }
 
-    return { items, leftOut };
+    return { items, leftOut, ignored };
   }
 
   /** Only the grants of a plan that costs money every month a seat is held: `K1` and `K2` (a key, or free software, holds nothing on 01/01). */
@@ -181,8 +194,8 @@ export class YearStartCommitmentsBatchService {
     tx: DbTx,
     candidates: readonly YearStartCandidate[],
     year: number,
-  ): Promise<Map<string, YearStartSeat[]>> {
-    const keptOf = await this.keptNumbersOf(tx, candidates, year);
+  ): Promise<{ seats: Map<string, YearStartSeat[]>; ignored: IgnoredSaved[] }> {
+    const { keptOf, ignored } = await this.keptNumbersOf(tx, candidates, year);
     const seats = new Map<string, YearStartSeat[]>();
     for (const [requestId, seat] of [
       ...(await this.unclaimedSeatsOf(tx, candidates, year, keptOf)),
@@ -191,25 +204,51 @@ export class YearStartCommitmentsBatchService {
       seats.set(requestId, [...(seats.get(requestId) ?? []), seat]);
     }
 
-    return seats;
+    return { seats, ignored };
   }
 
-  /** What the approval of a request kept of the year for a person, as a reader of the rows of the year (`QĐ-111k`, M-13). */
-  private async keptNumbersOf(tx: DbTx, candidates: readonly YearStartCandidate[], year: number): Promise<KeptOf> {
+  /**
+   * What the approval of a request kept of the year for a person, as a reader of the rows of the year (`QĐ-111k`, M-13): only a number written in
+   * dong (`QĐ-111an`). A number kept in another currency (a request approved before the prices were all in dong, which the migration left as it
+   * was) is not read and not converted, and is returned in `ignored` to be said in the audit trail.
+   */
+  private async keptNumbersOf(
+    tx: DbTx,
+    candidates: readonly YearStartCandidate[],
+    year: number,
+  ): Promise<{ keptOf: KeptOf; ignored: IgnoredSaved[] }> {
     const byId = new Map(candidates.map((candidate) => [candidate.id, candidate]));
-    const keptLines = await this.repo.keptNextYearOfLines(
-      tx,
-      candidates.filter((candidate) => candidate.type === 'GROUP_GRANT').map((candidate) => candidate.id),
-      year,
-    );
+    const groupIds = candidates
+      .filter((candidate) => candidate.type === 'GROUP_GRANT')
+      .map((candidate) => candidate.id);
+    const keptLines = await this.repo.keptNextYearOfLines(tx, groupIds, year);
+    const ignored: IgnoredSaved[] = (await this.repo.foreignKeptNextYearOfLines(tx, groupIds, year)).map((line) => ({
+      requestId: line.requestId,
+      employeeId: line.employeeId,
+      currency: line.currency,
+      savedMinor: line.amountMinor,
+    }));
+    for (const candidate of candidates) {
+      const kept = candidate.type !== 'GROUP_GRANT' && candidate.budgetYear === year - 1;
+      if (kept && candidate.nextYearAmountMinor !== null && candidate.amountCurrency !== DONG) {
+        ignored.push({
+          requestId: candidate.id,
+          employeeId: null,
+          currency: candidate.amountCurrency ?? 'UNKNOWN',
+          savedMinor: candidate.nextYearAmountMinor,
+        });
+      }
+    }
 
-    return (requestId, employeeId) => {
+    const keptOf: KeptOf = (requestId, employeeId) => {
       const request = byId.get(requestId);
       if (request === undefined) return null;
       if (request.type === 'GROUP_GRANT') return keptLines.get(requestId)?.get(employeeId ?? '') ?? null;
 
-      return request.budgetYear === year - 1 ? request.nextYearAmountMinor : null;
+      return request.budgetYear === year - 1 && request.amountCurrency === DONG ? request.nextYearAmountMinor : null;
     };
+
+    return { keptOf, ignored };
   }
 
   /**
@@ -295,6 +334,29 @@ export class YearStartCommitmentsBatchService {
     }
 
     return prices;
+  }
+
+  /** A number the approval kept in another currency than dong was left unread: the audit trail and the log say which, so it is not lost silently. */
+  private async recordIgnored(tx: DbTx, pass: YearStartPassContext, number: IgnoredSaved) {
+    this.logger.warn(
+      `The part of ${pass.year} that request ${number.requestId} kept is in ${number.currency}, not dong: the seat is counted by its months at the price of 01/01`,
+    );
+    await this.audit.record(tx, {
+      organizationId: pass.organizationId,
+      actorKind: 'SYSTEM',
+      action: 'BUDGET_COMMITMENT.YEAR_START_SAVED_AMOUNT_IGNORED',
+      resourceType: 'ACCESS_REQUEST',
+      resourceId: number.requestId,
+      before: null,
+      after: {
+        requestId: number.requestId,
+        employeeId: number.employeeId,
+        year: pass.year,
+        currency: number.currency,
+        savedMinor: number.savedMinor.toString(),
+      },
+      correlationId: `year-start-commitments:${pass.organizationId}:${pass.year}`,
+    });
   }
 
   private async recordSkipped(tx: DbTx, pass: YearStartPassContext, left: LeftOut) {
