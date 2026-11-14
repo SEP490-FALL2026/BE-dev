@@ -45659,7 +45659,7 @@
             }
           },
           "422": {
-            "description": "The body is invalid (VALIDATION_ERROR), or the catalog no longer offers what the list of the department would hold (DEPARTMENT_SOFTWARE.NOT_IN_CATALOG). Nothing is written.",
+            "description": "The body is invalid (VALIDATION_ERROR), or the plan is of another kind than the assessment concluded and the months of use the person gave do not fit it (ASSESSMENT.TERM_NOT_FIT_KIND, with details.provisioningType, termMonths, maxMonths and the reason: link a plan of a kind that takes them, or reject the request for the person to propose again), or the catalog no longer offers what the list of the department would hold (DEPARTMENT_SOFTWARE.NOT_IN_CATALOG). Nothing is written. A plan bought once takes no months: linking it clears any the person gave.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -45672,6 +45672,23 @@
                         "code": "VALIDATION_ERROR",
                         "message": "Request validation failed.",
                         "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "ASSESSMENT.TERM_NOT_FIT_KIND": {
+                    "summary": "The time of use the proposal gave does not fit a plan of kind K1: TERM_MONTHS_OUT_OF_RANGE.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "ASSESSMENT.TERM_NOT_FIT_KIND",
+                        "message": "The time of use the proposal gave does not fit a plan of kind K1: TERM_MONTHS_OUT_OF_RANGE.",
+                        "details": {
+                          "provisioningType": "K1",
+                          "termMonths": 12,
+                          "maxMonths": 9,
+                          "reason": "TERM_MONTHS_OUT_OF_RANGE"
+                        },
                         "requestId": "req_example"
                       }
                     }
