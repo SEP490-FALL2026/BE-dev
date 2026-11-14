@@ -88,10 +88,28 @@ Lượt 2 (HEAD `67a1abeb`, chat 81 chạy test song song trên cùng Postgres):
 Ghi chú: chạy `npx jest --config test/config/jest.gates.cjs <file>` riêng lẻ cho `extension-wiring` báo 2 đỏ kể cả ở HEAD sạch; chạy qua
 `pnpm test:gates` thì xanh — cách gọi khác môi trường, không phải lỗi code.
 
-## 5. Seed
+## 5. Seed (gói Z của MF-2/MF-3) — commit `b4e638cf`
 
-_(điền khi xong)_
+Theo [AUDIT-C.md](AUDIT-C.md) Phần 2, Z1–Z8, Z10–Z12 (Z9 chờ Owner chốt C-3). Mọi dữ liệu ghi qua route/service; 40 người / 29 tài khoản.
 
-## 6. Lệnh và commit
+| Ca demo | Người | FE làm gì |
+| --- | --- | --- |
+| K4 có trang quản trị + hồ sơ 2 IT Admin; Canva thiếu email chủ | JetBrains All (ITA1+ITA3), Canva | xem `GET /subscriptions` (cờ), `GET /plans/{id}/workspace-profile` |
+| IT Admin nghỉ việc có bàn giao (P5) | NV-ITA4 (Mailchimp, chủ workspace) | `POST /offboarding-cases/{id}/it-admin-handover` → NV-ITA3; preview P23 |
+| Điều chuyển qua P6 | NV-DEV4 ENG → ITO, hiệu lực ngày mai | từ ngày hiệu lực + job tổ chức: ân hạn P7/P8, xin lại Jira P10 |
+| Danh sách phần mềm phòng + đề xuất | ENG, DES, MKT; NV-DESH (Canva, `PENDING`), NV-ENGH (Mailchimp, `REJECTED`) | `GET /me/department-software-list`, P16/P18 |
+| K5 ở phòng không trưởng phòng | R28 NV-LGL1 `hr-portal-access` | `GET /access-request-audit-flags` |
+| Nghỉ việc chặn ngay theo luồng mới | NV-OFF1 (Figma, Jira, GitHub, Grammarly K1), dừng trước (1a) | ITA1: (1a) → mở thu hồi → hoàn tất (K1 checklist 6 bước) → (1b) tự ghi → đóng sau lượt quét |
 
-_(điền khi xong)_
+Bỏ: ca m-17 (không dựng được qua route). Kiểm: `typecheck`, `format:check`, `rules:check` 0 lỗi; `jest src/cli/seed` 154/154;
+`test:gates` 331/331; `seed:local -- --continue` trên DB sạch `slm_smoke` (cổng 35432) 54 bước exit 0, chạy lại 54 "đã có" exit 2;
+`test:flows` 60 xanh, 9 skip có sẵn; `test:integration:serial` 96 xanh.
+
+## 6. Commit (nhánh `feat/mf2-mf3`, chưa push)
+
+`5767a120` D-2 · `96a47cc0` D-5 · `b3655d42` D-62/D-64 · `a112030b` A-1, B-4 · `4f3af64e` C-1 · `c9305ecc` B-2 (migration
+`20261113002700`) · `e9eba8a1` gate/serial/flow · `dc879586` biên bản + prompt 3 · `67a1abeb` module graph · `a3dd4e67` GhostRow (cherry-pick
+từ `feat/fe-feedback`) · `a54590fa` kết quả test · `b4e638cf` seed Z. Nhánh `feat/fe-feedback` tách từ `dc879586`: khi gộp, lấy
+`feat/mf2-mf3` vào `feat/fe-feedback` (commit `a3dd4e67` trùng nội dung với `2ec03e4f` nên không xung đột).
+
+Sáng Owner: `git -C D:\FPT\FALL2026\Code\BE-dev-software-license-management push origin feat/mf2-mf3`, chờ CI xanh rồi merge; đọc §3.2.
