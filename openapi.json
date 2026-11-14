@@ -31262,7 +31262,7 @@
             }
           },
           "409": {
-            "description": "PROVISIONING.REQUEST_NOT_APPROVED, REQUEST_ENDED, REQUEST_NOT_IN_CATALOG (the software is not registered in the catalog yet), REQUEST_BOUNDARY_NOT_CHECKED (a service account whose boundary the IT Admin has not accepted), RESPONSIBLE_NOT_IN_DEPARTMENT (the person who answers for a service account left its department or the company: name another), TYPE_NOT_SUPPORTED (K3), BENEFICIARY_DEPARTED (the person has left, or a departure has blocked their access from today though they are not marked left yet: details.cause LEFT or ACCESS_BLOCKED, details.nextStep CANCEL_REQUEST), BENEFICIARY_NOT_STARTED (details.startsOn: the person joins later), PURCHASE_NOT_ALLOWED (a `purchase` was sent while the pool of the plan still has a free seat: details.freeSeats and details.subscriptionIds), SEAT_TARGET.APPLICATION_RETIRED, or LICENSE_ASSIGNMENT.SEAT_CAPACITY (the subscription has no free seat and no `purchase` was sent: details.freeSeatsInPool is how many seats the other subscriptions of the plan hold free). A refused purchase is kept in the audit trail with the free seats (PROVISIONING_TASK.PURCHASE_REFUSED).",
+            "description": "PROVISIONING.REQUEST_NOT_APPROVED, REQUEST_ENDED, REQUEST_NOT_IN_CATALOG (the software is not registered in the catalog yet), REQUEST_BOUNDARY_NOT_CHECKED (a service account whose boundary the IT Admin has not accepted), RESPONSIBLE_NOT_IN_DEPARTMENT (the person who answers for a service account left its department or the company: name another), TYPE_NOT_SUPPORTED (K3), BENEFICIARY_DEPARTED (the person has left, or a departure has blocked their access from today though they are not marked left yet: details.cause LEFT or ACCESS_BLOCKED, details.nextStep CANCEL_REQUEST), BENEFICIARY_NOT_STARTED (details.startsOn: the person joins later), CONTRACT_ENDED (details.contractEndDate: the contract of a contractor, freelancer or intern ended before today, so no seat is granted), PURCHASE_NOT_ALLOWED (a `purchase` was sent while the pool of the plan still has a free seat: details.freeSeats and details.subscriptionIds), SEAT_TARGET.APPLICATION_RETIRED, or LICENSE_ASSIGNMENT.SEAT_CAPACITY (the subscription has no free seat and no `purchase` was sent: details.freeSeatsInPool is how many seats the other subscriptions of the plan hold free). A refused purchase is kept in the audit trail with the free seats (PROVISIONING_TASK.PURCHASE_REFUSED).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -31354,6 +31354,18 @@
                         "code": "PROVISIONING.BENEFICIARY_NOT_STARTED",
                         "message": "The beneficiary has not started yet.",
                         "details": { "requestId": "<request-id>", "startsOn": "2026-01-01" },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "PROVISIONING.CONTRACT_ENDED": {
+                    "summary": "The contract of the beneficiary ended: no seat is granted beyond it.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "PROVISIONING.CONTRACT_ENDED",
+                        "message": "The contract of the beneficiary ended: no seat is granted beyond it.",
+                        "details": { "requestId": "<request-id>", "contractEndDate": "2026-01-01" },
                         "requestId": "req_example"
                       }
                     }
@@ -40859,7 +40871,7 @@
             }
           },
           "422": {
-            "description": "The id is invalid (VALIDATION_ERROR), the sender is the spending approver (REQUEST_PARTY.INELIGIBLE), or the time of use the draft was saved with is refused: ACCESS_REQUEST.TERM_REQUIRED (a plan bought by the month, or a contractor, freelancer or intern, with no months), TERM_MONTHS_OUT_OF_RANGE (1 to 9 for a plan bought by the month, 1 to 12 for the others), TERM_NOT_ASKED (a plan bought once takes none) or TERM_LONG_TERM_NOT_ALLOWED (no end for a contractor, freelancer or intern; for a group, that person is named on their own line). A group draft with fewer than two different people is refused as GROUP_REQUEST.TOO_FEW_LINES. A person who was already named in as many requests for new access this calendar week (Monday to Sunday, organization time zone; a request withdrawn or refused still counts) as the weekly limit allows is refused until the next Monday (ACCESS_REQUEST.OPEN_LIMIT_REACHED, details.limit and details.resetsOn; GH-2, BR-MF1-01f). Nothing changes: the draft stays, to be saved again with another time of use.",
+            "description": "The id is invalid (VALIDATION_ERROR), the sender is the spending approver (REQUEST_PARTY.INELIGIBLE), or the time of use the draft was saved with is refused: ACCESS_REQUEST.TERM_REQUIRED (a plan bought by the month, or a contractor, freelancer or intern, with no months), TERM_MONTHS_OUT_OF_RANGE (1 to 9 for a plan bought by the month, 1 to 12 for the others), TERM_NOT_ASKED (a plan bought once takes none) TERM_LONG_TERM_NOT_ALLOWED (no end for a contractor, freelancer or intern; for a group, that person is named on their own line) or TERM_CONTRACT_ENDED (the contract of a contractor, freelancer or intern ended before today, details.contractEndDate; for a group, on their own line). A group draft with fewer than two different people is refused as GROUP_REQUEST.TOO_FEW_LINES. A person who was already named in as many requests for new access this calendar week (Monday to Sunday, organization time zone; a request withdrawn or refused still counts) as the weekly limit allows is refused until the next Monday (ACCESS_REQUEST.OPEN_LIMIT_REACHED, details.limit and details.resetsOn; GH-2, BR-MF1-01f). Nothing changes: the draft stays, to be saved again with another time of use.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -40932,6 +40944,18 @@
                       "error": {
                         "code": "ACCESS_REQUEST.TERM_LONG_TERM_NOT_ALLOWED",
                         "message": "A contractor, a freelancer or an intern gets access for a term: give the months, not a right with no end.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "ACCESS_REQUEST.TERM_CONTRACT_ENDED": {
+                    "summary": "The contract of the person ended before the time of use begins: no access is given beyond it.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "ACCESS_REQUEST.TERM_CONTRACT_ENDED",
+                        "message": "The contract of the person ended before the time of use begins: no access is given beyond it.",
+                        "details": { "contractEndDate": "2026-10-31" },
                         "requestId": "req_example"
                       }
                     }
@@ -44490,7 +44514,7 @@
             }
           },
           "422": {
-            "description": "The assessment lacks fields, with the names in details.missing (ASSESSMENT.INCOMPLETE), or the quote cannot price the request (ASSESSMENT.QUOTE_NOT_IN_FORCE, AMOUNT_TOO_LARGE, or QUOTE_PRICE_NOT_VND when the stored quote is not in dong: record it again in dong). Nothing is written and the request stays with the IT Admin.",
+            "description": "The assessment lacks fields, with the names in details.missing (ASSESSMENT.INCOMPLETE), the quote cannot price the request (ASSESSMENT.QUOTE_NOT_IN_FORCE, AMOUNT_TOO_LARGE, or QUOTE_PRICE_NOT_VND when the stored quote is not in dong: record it again in dong), or the time of use the person gave does not fit the kind of plan concluded (ASSESSMENT.TERM_NOT_FIT_KIND, with details.provisioningType, termMonths, maxMonths and the reason: a plan bought by the month takes 1 to 9 months; reject the request for the person to propose again with months that fit). Nothing is written and the request stays with the IT Admin. A plan bought once takes no months: completing it clears any the person gave.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -44548,6 +44572,23 @@
                       "error": {
                         "code": "ASSESSMENT.QUOTE_PRICE_NOT_VND",
                         "message": "The quote cannot price the request: QUOTE_PRICE_NOT_VND.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "ASSESSMENT.TERM_NOT_FIT_KIND": {
+                    "summary": "The time of use the proposal gave does not fit a plan of kind K1: TERM_MONTHS_OUT_OF_RANGE.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "ASSESSMENT.TERM_NOT_FIT_KIND",
+                        "message": "The time of use the proposal gave does not fit a plan of kind K1: TERM_MONTHS_OUT_OF_RANGE.",
+                        "details": {
+                          "provisioningType": "K1",
+                          "termMonths": 12,
+                          "maxMonths": 9,
+                          "reason": "TERM_MONTHS_OUT_OF_RANGE"
+                        },
                         "requestId": "req_example"
                       }
                     }
@@ -50379,7 +50420,7 @@
             }
           },
           "422": {
-            "description": "The form is incomplete or invalid (VALIDATION_ERROR): the seat, the reason and exactly one of the months of use to go on (extensionMonths) and a right with no end (longTerm: true) are required, and nothing else is taken (an end date is not given: the system works it out). The window of the renewal is not open yet (RENEWAL_REQUEST.WINDOW_NOT_OPEN, with details.opensOn and details.windowDays: a renewal is sent from RENEWAL_WINDOW_DAYS days before the approved end, BR-MF1-08a). The months follow the kind of the plan: 1 to 9 for a plan bought by the month (ACCESS_REQUEST.TERM_MONTHS_OUT_OF_RANGE), 1 to 12 for the others; a right with no end is for a plan of seats or internal software only (ACCESS_REQUEST.TERM_REQUIRED for a plan bought by the month) and never for a contractor, a freelancer or an intern (ACCESS_REQUEST.TERM_LONG_TERM_NOT_ALLOWED), whose new period is cut at the end of their contract instead; a plan bought once is not renewed (ACCESS_REQUEST.TERM_NOT_ASKED). The sender or the holder of the seat is the spending approver (REQUEST_PARTY.INELIGIBLE). After the end the ask is a request for new access, so GH-2 judges it too: a person who was already named in as many requests for new access this calendar week (Monday to Sunday, organization time zone; a request withdrawn or refused still counts) as the weekly limit allows is refused until the next Monday (ACCESS_REQUEST.OPEN_LIMIT_REACHED, details.limit and details.resetsOn; GH-2, BR-MF1-01f). A renewal sent in time is not counted by GH-2. Nothing is written.",
+            "description": "The form is incomplete or invalid (VALIDATION_ERROR): the seat, the reason and exactly one of the months of use to go on (extensionMonths) and a right with no end (longTerm: true) are required, and nothing else is taken (an end date is not given: the system works it out). The window of the renewal is not open yet (RENEWAL_REQUEST.WINDOW_NOT_OPEN, with details.opensOn and details.windowDays: a renewal is sent from RENEWAL_WINDOW_DAYS days before the approved end, BR-MF1-08a). The months follow the kind of the plan: 1 to 9 for a plan bought by the month (ACCESS_REQUEST.TERM_MONTHS_OUT_OF_RANGE), 1 to 12 for the others; a right with no end is for a plan of seats or internal software only (ACCESS_REQUEST.TERM_REQUIRED for a plan bought by the month) and never for a contractor, a freelancer or an intern (ACCESS_REQUEST.TERM_LONG_TERM_NOT_ALLOWED), whose new period is cut at the end of their contract instead; a plan bought once is not renewed (ACCESS_REQUEST.TERM_NOT_ASKED); a contractor, a freelancer or an intern whose contract ends before the new period begins gets no renewal (ACCESS_REQUEST.TERM_CONTRACT_ENDED, details.contractEndDate). The sender or the holder of the seat is the spending approver (REQUEST_PARTY.INELIGIBLE). After the end the ask is a request for new access, so GH-2 judges it too: a person who was already named in as many requests for new access this calendar week (Monday to Sunday, organization time zone; a request withdrawn or refused still counts) as the weekly limit allows is refused until the next Monday (ACCESS_REQUEST.OPEN_LIMIT_REACHED, details.limit and details.resetsOn; GH-2, BR-MF1-01f). A renewal sent in time is not counted by GH-2. Nothing is written.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -50448,6 +50489,18 @@
                       "error": {
                         "code": "ACCESS_REQUEST.TERM_LONG_TERM_NOT_ALLOWED",
                         "message": "A contractor, a freelancer or an intern gets access for a term: give the months, not a right with no end.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "ACCESS_REQUEST.TERM_CONTRACT_ENDED": {
+                    "summary": "The contract of the person ended before the time of use begins: no access is given beyond it.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "ACCESS_REQUEST.TERM_CONTRACT_ENDED",
+                        "message": "The contract of the person ended before the time of use begins: no access is given beyond it.",
+                        "details": { "contractEndDate": "2026-10-31" },
                         "requestId": "req_example"
                       }
                     }
@@ -100473,6 +100526,7 @@
                       "TERM_MONTHS_OUT_OF_RANGE",
                       "TERM_NOT_ASKED",
                       "TERM_LONG_TERM_NOT_ALLOWED",
+                      "TERM_CONTRACT_ENDED",
                       null
                     ],
                     "nullable": true
@@ -106285,6 +106339,7 @@
                         "HAS_OPEN_REQUEST",
                         "TERM_REQUIRED",
                         "TERM_LONG_TERM_NOT_ALLOWED",
+                        "TERM_CONTRACT_ENDED",
                         "OPEN_LIMIT_REACHED",
                         "DUPLICATE_LINE",
                         null
