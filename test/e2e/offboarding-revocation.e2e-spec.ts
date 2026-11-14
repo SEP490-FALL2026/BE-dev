@@ -53,6 +53,8 @@ describe('the departure of a person and the revocation of their seats (e2e, D-3)
     expect(left).toMatchObject({ state: 'LEFT', left: { leftOn: h.today() }, heldRights: 2 });
     expect(await h.workState(leaver.employeeId)).toBe('TERMINATED/LEFT');
     await request(h.server()).get('/api/v1/me').set(h.as(leaver.account)).expect(401);
+    // The hourly pass of the block moment does what the block asks (cancel the open requests, tell IT); the system closes no case before it (audit A-1).
+    await h.blockPass();
   });
 
   it('the IT Admin records the lock of the account and opens the revocation of every right', async () => {
