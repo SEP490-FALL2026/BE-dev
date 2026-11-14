@@ -120,4 +120,17 @@ describe('BR-MF1-02 one-step reserve, supplementary files and a price left outsi
     await resubmit(sent.id, u.head.account).expect(200);
     expect((await fetch(sent.id, u.head.account)).state).toBe('AWAITING_SPEND_DECISION');
   });
+
+  it('QĐ-111an, R-4 reads a request an older release sent back for want of a rate as the missing price, and the wire never carries RATE_MISSING', async () => {
+    const u = await unit();
+    const sent = await h.sent(u.head, plan, { termMonths: 1 });
+    await h.ctx.sql.query(`UPDATE access_requests SET one_step_blocked_reason = 'RATE_MISSING' WHERE id = $1`, [
+      sent.id,
+    ]);
+
+    expect(await fetch(sent.id, u.head.account)).toMatchObject({
+      state: 'AWAITING_REQUESTER_REVISION',
+      spend: { stage: 'RETURNED_TO_REQUESTER', blockedReasons: ['PRICE_MISSING'], overBy: null },
+    });
+  });
 });

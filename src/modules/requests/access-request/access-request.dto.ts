@@ -222,9 +222,7 @@ export const requestSchema = z.strictObject({
         'REFUSED',
       ]),
       /** Why the request is blocked, every reason that applies; empty unless the stage is `BLOCKED`. */
-      blockedReasons: z
-        .array(z.enum(['PRICE_EXPIRED', 'NO_APPROVED_BUDGET', 'OVER_RESERVE', 'PRICE_MISSING', 'RATE_MISSING']))
-        .max(3),
+      blockedReasons: z.array(z.enum(['PRICE_EXPIRED', 'NO_APPROVED_BUDGET', 'OVER_RESERVE', 'PRICE_MISSING'])).max(3),
       /** How far over the base (it waits for the reserve to be confirmed) or over the reserve (blocked for that); null otherwise. */
       overBy: moneySchema.nullable(),
       /** What the spending approver wrote when they refused the request. */

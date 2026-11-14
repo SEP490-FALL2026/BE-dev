@@ -201,7 +201,7 @@ export interface AccessRequestRecord {
   limitExemption?: LimitExemption | null;
   /** The old right of the person this request replaces (R-49); internal, never on the wire. */
   replacesAssignmentId?: string | null;
-  oneStepBlockedReason?: 'PRICE_MISSING' | 'RATE_MISSING' | null;
+  oneStepBlockedReason?: 'PRICE_MISSING' | null;
   id: string;
   organizationId: string;
   type: AccessRequestKind;

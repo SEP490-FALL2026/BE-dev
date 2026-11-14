@@ -111,7 +111,7 @@ export class AccessRequestRepo {
     return { id: created.id, needStepId: created.steps[0].id };
   }
 
-  async setOneStepBlockedReason(tx: DbTx, id: string, reason: 'PRICE_MISSING' | 'RATE_MISSING' | null): Promise<void> {
+  async setOneStepBlockedReason(tx: DbTx, id: string, reason: 'PRICE_MISSING' | null): Promise<void> {
     await tx.accessRequest.update({ where: { id }, data: { oneStepBlockedReason: reason } });
   }
 

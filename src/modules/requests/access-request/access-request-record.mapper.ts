@@ -3,7 +3,7 @@ import { fromDateColumn } from '../../../core/business-date';
 import { toPricing } from './access-request-pricing.mapper';
 import type { NeedStepState, AccessRequestRecord, ReadableNeedWaitingReason } from './access-request.types';
 import { requestPolicyJson } from './access-request.json';
-import { currentStateOf } from './access-request.policy';
+import { currentMissingReasonOf, currentStateOf } from './access-request.policy';
 import { LIMIT_EXEMPTIONS, type LimitExemption } from './access-request.types';
 
 /** What a request is read as: the columns, the people it is for, its need steps with their decisions, and the lines of a group. */
@@ -178,7 +178,11 @@ export function toRecord(row: RequestRow): AccessRequestRecord {
   const { decision: firstDecision, ...step } = first;
 
   return {
-    oneStepBlockedReason: row.oneStepBlockedReason as 'PRICE_MISSING' | 'RATE_MISSING' | null,
+    // An older release also wrote RATE_MISSING; it is read as the missing price it comes to (`currentMissingReasonOf`).
+    oneStepBlockedReason:
+      row.oneStepBlockedReason === null
+        ? null
+        : currentMissingReasonOf(row.oneStepBlockedReason as 'PRICE_MISSING' | 'RATE_MISSING'),
     manyPaidSoftware: manyPaidSoftwareOf(row),
     limitExemption: limitExemptionOf(row.limitExemption),
     replacesAssignmentId: row.replacesAssignmentId,

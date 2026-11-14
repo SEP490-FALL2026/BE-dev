@@ -38,7 +38,7 @@ export interface NeedStepView extends Omit<
 /** Where the request stands on its way to the spending approver, as the wire writes it (`BR-MF1-06g`). */
 export interface SpendView {
   stage: SpendStage;
-  blockedReasons: (BlockReason | 'PRICE_MISSING' | 'RATE_MISSING')[];
+  blockedReasons: (BlockReason | 'PRICE_MISSING')[];
   /** How far over the base (waiting for the reserve to be confirmed) or over the reserve (blocked for that); null otherwise. */
   overBy: MoneyView | null;
   refusalReason: string | null;

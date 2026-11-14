@@ -98,7 +98,7 @@ export class SpendEffectsService {
   ): Promise<void> {
     await this.steps.end(tx, step, 'CLOSED', null, by.now);
     if (request.routing?.mode === 'ONE_STEP') {
-      const missing = by.reasons.find((reason) => reason === 'PRICE_MISSING' || reason === 'RATE_MISSING');
+      const missing = by.reasons.find((reason) => reason === 'PRICE_MISSING');
       await this.requests.setOneStepBlockedReason(tx, request.id, missing ?? null);
     }
     await this.requests.setState(
