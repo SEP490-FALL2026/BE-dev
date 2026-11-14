@@ -44,7 +44,7 @@ Super Admin đăng nhập bằng `--super-admin-email` (mặc định `system.ad
 | NV-DEV3  | Vũ Thị Giang    | giang.vu@saoviet.example    | EMPLOYEE          | ENG        | -     | Nhân viên: R17 đã cấp; R03 chờ nhu cầu; R20 chờ IT mua khóa DataGrip                                                               |
 | NV-DEV4  | Lương Hoàng Phi | phi.luong@saoviet.example   | EMPLOYEE          | ENG        | -     | Nhân viên: R22 chờ IT cấp từ kho GitHub; **điều chuyển sang ITO từ ngày mai** (giữ Jira, 1Password, Mailchimp trong ân hạn)        |
 | NV-OFF1  | Hà Văn Nam      | nam.ha@saoviet.example      | EMPLOYEE          | ENG        | -     | Nghỉ việc chặn ngay hôm nay; còn Figma, Jira, GitHub và Grammarly (K1): IT làm 1a, thu hồi, checklist K1, 1b (G2)                  |
-| NV-CTR1  | Vũ Quốc Phong   | phong.vu@saoviet.example    | EMPLOYEE          | ENG        | -     | Nhà thầu: R16, quyền Jira còn 20 ngày, vào cửa sổ Request tiếp tục                                                                 |
+| NV-CTR1  | Vũ Quốc Phong   | phong.vu@saoviet.example    | EMPLOYEE          | ENG        | -     | Nhà thầu, hợp đồng hết sau 20 ngày: R16 xin 3 tháng, quyền Jira bị cắt đúng hôm đó, vào cửa sổ Request tiếp tục                   |
 | NV-INT1  | Đặng Quốc Huy   | no account                  | -                 | ENG        | -     | Thực tập sinh: ứng viên tạo tài khoản                                                                                              |
 | NV-DESH  | Bùi Ngọc Khánh  | khanh.bui@saoviet.example   | MANAGER           | DES        | DES   | Trưởng phòng Thiết kế: nhận khuyến nghị G3/G4, tự quyết ghế của mình, xác nhận dự phòng R21; đề xuất Canva chờ IT (P1)             |
 | NV-DES1  | Đỗ Thị Lan      | lan.do@saoviet.example      | EMPLOYEE          | DES        | -     | Nhân viên: R04 bị từ chối, R06 nội bộ chờ IT, R25 đề xuất Whimsical; Figma không hoạt động 79 ngày (G4)                            |
@@ -60,7 +60,7 @@ Super Admin đăng nhập bằng `--super-admin-email` (mặc định `system.ad
 | NV-DES11 | Hồ Văn Quý      | no account                  | -                 | DES        | -     | Figma không hoạt động 74 ngày; seed cho trưởng phòng Thu hồi (ân hạn 7 ngày)                                                       |
 | NV-DES12 | Cao Thị Sương   | no account                  | -                 | DES        | -     | Figma không hoạt động 65 ngày, quyền còn hơn 1 tháng; seed cho Miễn trừ 90 ngày                                                    |
 | NV-FINH  | Phan Thị Ngọc   | ngoc.phan@saoviet.example   | MANAGER           | FIN        | FIN   | Trưởng phòng Tài chính                                                                                                             |
-| NV-FIN1  | Trịnh Văn Phúc  | phuc.trinh@saoviet.example  | FINANCE           | FIN        | -     | Finance (đúng một người): kỳ ngân sách, Trần, phiên bản, Cost Center, tỷ giá, thuế                                                 |
+| NV-FIN1  | Trịnh Văn Phúc  | phuc.trinh@saoviet.example  | FINANCE           | FIN        | -     | Finance (đúng một người): kỳ ngân sách, Trần, phiên bản, Cost Center, thuế                                                         |
 | NV-ITOH  | Trần Minh Thanh | thanh.tran@saoviet.example  | MANAGER           | ITO        | ITO   | Trưởng phòng CNTT: duyệt nhu cầu R24 của IT Admin; đề xuất ngân sách 2027 chờ Finance                                              |
 | NV-ITA1  | Lý Minh Quân    | quan.ly@saoviet.example     | IT_ADMIN          | ITO        | -     | IT Admin (ENG, ITO, SAL, LGL): Jira, GitHub, Slack, Postman, 1Password, JetBrains; hàng chờ cấp; chạy luật; danh sách phần mềm ENG |
 | NV-ITA2  | Mai Thị Rạng    | rang.mai@saoviet.example    | IT_ADMIN          | ITO        | -     | IT Admin (BOD, DES, FIN, MKT): Figma, Canva; thẩm định phần mềm mới; nguồn usage Figma/Canva; danh sách DES, MKT; xét đề xuất P1   |
@@ -93,7 +93,7 @@ Super Admin đăng nhập bằng `--super-admin-email` (mặc định `system.ad
 | Canva · Teams          | K2   | 250.000 / tháng                     | 6   | 2        | 4     | R10 dùng dự phòng; nguồn usage **quá cũ**; cờ **thiếu email chủ**            |
 | ChatGPT · Plus         | K1   | 500.000 / tháng                     | -   | -        | -     | R18: K1 luôn mua thêm một ghế khi cấp                                        |
 | Grammarly · Pro        | K1   | 300.000 / tháng                     | 1   | 1        | 0     | Ghế nền duy nhất là của NV-OFF1: thu hồi có checklist K1 (D-62)              |
-| Cursor · Pro           | K1   | **20 USD** / tháng (tỷ giá 25.400)  | -   | -        | -     | **Gói giá ngoại tệ** (Finance ghi tỷ giá của ngày); R12                      |
+| Cursor · Pro           | K1   | 508.000 / tháng (báo giá gốc 20 USD) | -   | -        | -     | Giá ghi bằng đồng, **giá gốc 20 USD** giữ kèm (`originalPrice`); R12         |
 | JetBrains · All        | K4   | 6.000.000 / khóa (mua một lần)      | 3   | 1 khóa   | 2     | **Có trang quản trị** (hồ sơ 2 IT Admin); R19: IT gán khóa Trống             |
 | JetBrains · DataGrip   | K4   | 3.000.000 / khóa                    | 0   | -        | **0** | **Kho khóa hết**: R20 IT phải mua và nhập khóa; không trang quản trị         |
 | Cổng Nhân sự Nội bộ    | K5   | không phí                           | -   | -        | -     | R06: phần mềm nội bộ, không kiểm tra ngân sách; R28 phòng không trưởng phòng |
@@ -114,7 +114,7 @@ Sổ số "Mua / Đang giữ / Trống" là lúc seed xong (R01…R22 đã cấp
 | LGL           | số liệu nền    | -             | Phòng không trưởng phòng: phiên bản `BASELINE_NO_HEAD`                             |
 | OPS           | -              | -             | Không Cost Center: không có ngân sách                                              |
 
-Các Request R10, R21, R11 dài tới **cuối tháng** nên giá trị luôn là đúng một tháng, không phụ thuộc ngày chạy seed; các phòng MKT, DES, SAL không có Request nào khác giữ hoặc chờ ngân sách.
+Các Request R10, R21, R11 xin đúng **một tháng** (`termMonths: 1`) nên giá trị luôn là một tháng giá, không phụ thuộc ngày chạy seed; các phòng MKT, DES, SAL không có Request nào khác giữ hoặc chờ ngân sách.
 
 **Năm `Y+1`.** Finance mở kỳ (Trần năm 500.000.000, dự phòng kho 50.000.000, Trần từng phòng: ENG 100M, MKT 60M, SAL 60M, ITO 50M, DES 40M, FIN 30M, BOD 30M, LGL 10M, OPS 0, ADMIN 0) rồi phát hành. Còn lại để demo MF-4 đi tiếp:
 
@@ -129,12 +129,14 @@ Các Request R10, R21, R11 dài tới **cuối tháng** nên giá trị luôn l�
 
 Gửi theo thứ tự bảng (Request đã cấp trước, để ghế trong kho và số Request đang mở của từng người đúng). Mỗi Request mang thẻ `[SV-Rnn]` ở đầu lý do; mỗi người có tối đa 3 Request đang mở (GH-2).
 
+_Thời gian dùng_ (`QĐ-111i`): Request gửi `termMonths`, không gửi ngày kết thúc. Gói K1 xin 3 tháng, R10, R21, R11 một tháng, R17 hai tháng, R16 ba tháng (bị cắt tại ngày hết hợp đồng của nhà thầu); gói K2, K5 của nhân viên chính thức không hạn, gói K4 không hỏi tháng.
+
 | Mã  | Người gửi                  | Phần mềm          | Trạng thái sau seed                            | Ghi chú                                                                                           |
 | --- | -------------------------- | ----------------- | ---------------------------------------------- | ------------------------------------------------------------------------------------------------- |
 | R01 | NV-DEV1                    | Postman (K2)      | `COMPLETED`, cấp từ kho                        | Duyệt nhu cầu → trình lô → duyệt chi → IT cấp                                                     |
 | R14 | NV-ENGH → NV-DEV2, NV-DEV3 | Slack (K2)        | `COMPLETED`                                    | **Request nhóm** của trưởng phòng                                                                 |
-| R16 | NV-CTR1                    | Jira (K2)         | `COMPLETED`, quyền **20 ngày**                 | Nhà thầu; đã vào cửa sổ **Request tiếp tục** (30 ngày)                                            |
-| R17 | NV-DEV3                    | Postman (K2)      | `COMPLETED`, quyền 60 ngày                     | Cửa sổ Request tiếp tục chưa mở                                                                   |
+| R16 | NV-CTR1                    | Jira (K2)         | `COMPLETED`, quyền **20 ngày**                 | Nhà thầu xin 3 tháng, cắt tại ngày hết hợp đồng; đã vào cửa sổ **Request tiếp tục** (30 ngày)      |
+| R17 | NV-DEV3                    | Postman (K2)      | `COMPLETED`, quyền 60 ngày                     | Xin 2 tháng; cửa sổ Request tiếp tục chưa mở                                                      |
 | R18 | NV-DEV1                    | ChatGPT Plus (K1) | `COMPLETED`                                    | K1 luôn mua thêm một ghế                                                                          |
 | R19 | NV-DEV2                    | JetBrains (K4)    | `COMPLETED`                                    | Gán khóa từ kho khóa                                                                              |
 | R05 | NV-DEV1                    | Cursor Pro (K1)   | `WITHDRAWN`                                    | Người yêu cầu rút                                                                                 |

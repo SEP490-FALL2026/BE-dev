@@ -212,6 +212,8 @@ export function subscriptionTerms(ctx: DemoRunContext, subscription: DemoSubscri
   const base = {
     purchasedQuantity: purchasedQuantityOf(ctx, subscription),
     unitPrice: subscription.unitPrice,
+    // The quote of the vendor when it is not in dong, kept beside the price (FX-1); the price itself is always in dong.
+    ...(subscription.originalPrice ? { originalPrice: subscription.originalPrice } : {}),
     responsibleItAdminEmployeeId: ctx.ids.employees.get(subscription.responsible),
   };
   // A key is bought once, on a day in the past (the purchase date is the start date); it has no term and no end.
@@ -298,7 +300,7 @@ export const CATALOG_STEPS: readonly DemoStep[] = [
   {
     key: 'catalog.subscriptions',
     title: 'Một thuê bao cho mỗi gói: kho dùng chung (IT Admin)',
-    needs: ['catalog.plans', 'catalog.workspace-profiles', 'finance.exchange-rates'],
+    needs: ['catalog.plans', 'catalog.workspace-profiles'],
     run: subscriptions,
   },
 ];

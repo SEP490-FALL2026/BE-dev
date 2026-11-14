@@ -68,13 +68,31 @@ describe('shared dataset v4: the catalog and the shared pool', () => {
     expect(F.keys.some((k) => k.subscription === 'datagrip')).toBe(false);
   });
 
-  it('has one annual subscription with a commitment, and one priced in a foreign currency with a rate for it', () => {
+  it('has one annual subscription with a commitment, and prices every subscription in dong (the dollar price of Cursor stays beside it as the original price)', () => {
     const annual = F.subscriptions.filter((s) => s.billingCycle === 'ANNUAL');
     expect(annual).toHaveLength(1);
     expect(annual[0]).toMatchObject({ termMonths: 12, renewalInDays: 50 });
-    const foreign = F.subscriptions.filter((s) => s.unitPrice.currency !== F.currency);
-    expect(foreign).toHaveLength(1);
-    expect(F.exchangeRates.map((r) => r.currency)).toContain(foreign[0].unitPrice.currency);
+    // QĐ-111an: a price is written in dong only; no rate is recorded any more (the route is gone), so the fixture holds none.
+    expect(F.subscriptions.filter((s) => s.unitPrice.currency !== F.currency)).toEqual([]);
+    expect(F).not.toHaveProperty('exchangeRates');
+    // 20 USD at the 25.400 the dataset once recorded for the day: the same price, in dong.
+    expect(F.subscriptions.filter((s) => s.originalPrice !== undefined).map((s) => s.key)).toEqual(['cursor']);
+    expect(subscriptionOf('cursor-pro')).toMatchObject({
+      unitPrice: { amount: '508000', currency: 'VND' },
+      originalPrice: { amount: '20', currency: 'USD' },
+    });
+  });
+
+  it('declares no application of the old kind and no pricing model: the system works both out from the plan (CT-1, B-5)', () => {
+    expect(F.applications.map((app) => app.kind)).not.toContain('LICENSED');
+    for (const declared of F.applications.flatMap((app) => app.plans))
+      expect(declared).not.toHaveProperty('pricingModel');
+  });
+
+  it('buys a plan of one purchase (K4) once and every other plan over a term: only a perpetual subscription is written for K4 (B-5)', () => {
+    for (const declared of F.subscriptions) {
+      expect(declared.kind === 'PERPETUAL').toBe(plan(declared.plan).provisioningType === 'K4');
+    }
   });
 
   it('holds only seats of declared people and subscriptions, one seat of a person per subscription', () => {
@@ -124,10 +142,10 @@ describe('shared dataset v4: the budgets', () => {
   });
 
   it('makes the three outcomes of the budget check come out whatever the day', () => {
-    // A request that ends on the last day of the month costs one month of the price, whichever day it is sent on.
+    // A request for one month costs one month of the price, whichever day it is sent on.
     const cost = (key: string) => {
       const request = F.requests.find((r) => r.key === key)!;
-      expect(request.end).toBe('EOM');
+      expect(request.termMonths).toBe(1);
 
       return BigInt(subscriptionOf(request.plan!).unitPrice.amount);
     };
@@ -236,11 +254,31 @@ describe('shared dataset v4: the requests of MF-1', () => {
   });
 
   it('gives a time-limited right to the contractor inside the 30-day window and another outside it', () => {
-    const ends = F.requests.filter((r) => typeof r.end === 'object').map((r) => (r.end as { inDays: number }).inDays);
-    expect(Math.min(...ends)).toBeLessThanOrEqual(30);
-    expect(Math.max(...ends)).toBeGreaterThan(30);
-    expect(person('NV-CTR1').employmentType).toBe('CONTRACTOR');
-    expect(F.requests.find((r) => r.requester === 'NV-CTR1')?.end).toEqual({ inDays: 20 });
+    // RQ-2 (QĐ-111i): a request names months, not a date. The contractor's right is cut at the end of the contract the Super Admin
+    // recorded for the person, so it is the contract that puts the end 20 days away; the other right runs its two months.
+    const contractor = person('NV-CTR1');
+    expect(contractor.employmentType).toBe('CONTRACTOR');
+    expect(contractor.contractEndInDays).toBe(20);
+    expect(contractor.contractEndInDays).toBeLessThanOrEqual(30);
+    expect(F.requests.find((r) => r.requester === 'NV-CTR1')?.termMonths).toBeGreaterThanOrEqual(1);
+    expect(F.requests.find((r) => r.key === 'R17')?.termMonths).toBe(2);
+  });
+
+  it('asks for the time of use the kind of plan wants (QĐ-111i): K1 1 to 9 months, K2/K5 1 to 12 or none, K4 none, and months for a person with a term', () => {
+    const typeOf = (key: string) => (key ? plan(key).provisioningType : null);
+    const withTerm = new Set(F.people.filter((p) => p.employmentType !== 'STAFF').map((p) => p.code));
+    for (const request of [...F.requests, { ...F.draft, key: 'draft' }]) {
+      const type = typeOf(request.plan ?? '');
+      if (type === 'K1') expect(request.termMonths).toBeGreaterThanOrEqual(1);
+      if (type === 'K1') expect(request.termMonths).toBeLessThanOrEqual(9);
+      if (type === 'K4') expect(request.termMonths).toBeNull();
+      if (typeof request.termMonths === 'number') {
+        expect(request.termMonths).toBeGreaterThanOrEqual(1);
+        expect(request.termMonths).toBeLessThanOrEqual(12);
+      }
+      // A person with a term never gets a right with no end: 422 TERM_LONG_TERM_NOT_ALLOWED.
+      if (withTerm.has(request.requester) && type !== 'K4') expect(request.termMonths).not.toBeNull();
+    }
   });
 
   it('saves a draft in a department with no Cost Center, which can only stay a draft', () => {

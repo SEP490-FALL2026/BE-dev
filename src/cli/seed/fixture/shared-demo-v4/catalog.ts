@@ -4,7 +4,6 @@ const k2 = (key: string, name: string, extra: Partial<DemoPlan> = {}): DemoPlan 
   key,
   name,
   provisioningType: 'K2',
-  pricingModel: 'PER_SEAT',
   controlLevel: 'FULL',
   dataLossOnRemoval: false,
   sharingPolicy: 'NOT_ALLOWED',
@@ -15,7 +14,6 @@ const k4 = (key: string, name: string, extra: Partial<DemoPlan> = {}): DemoPlan 
   key,
   name,
   provisioningType: 'K4',
-  pricingModel: 'PER_SEAT',
   controlLevel: 'FULL',
   dataLossOnRemoval: false,
   sharingPolicy: 'NOT_ALLOWED',
@@ -71,7 +69,6 @@ const APPLICATIONS: DemoApplication[] = [
         key: 'chatgpt-plus',
         name: 'ChatGPT Plus',
         provisioningType: 'K1',
-        pricingModel: 'PER_SEAT',
         controlLevel: 'PARTIAL',
         dataLossOnRemoval: false,
         sharingPolicy: 'NOT_ALLOWED',
@@ -89,7 +86,6 @@ const APPLICATIONS: DemoApplication[] = [
         key: 'cursor-pro',
         name: 'Cursor Pro',
         provisioningType: 'K1',
-        pricingModel: 'PER_SEAT',
         controlLevel: 'PARTIAL',
         dataLossOnRemoval: false,
         sharingPolicy: 'NOT_ALLOWED',
@@ -107,7 +103,6 @@ const APPLICATIONS: DemoApplication[] = [
         key: 'grammarly-pro',
         name: 'Grammarly Pro',
         provisioningType: 'K1',
-        pricingModel: 'PER_SEAT',
         controlLevel: 'PARTIAL',
         dataLossOnRemoval: false,
         sharingPolicy: 'NOT_ALLOWED',
@@ -116,16 +111,10 @@ const APPLICATIONS: DemoApplication[] = [
     'SAAS',
     'MEDIUM',
   ),
-  app(
-    'jetbrains',
-    'JetBrains',
-    'JetBrains',
-    [
-      k4('jetbrains-all', 'JetBrains All Products', { hasAdminConsole: true, vendorAdmin: 'NV-ITA3' }),
-      k4('jetbrains-datagrip', 'JetBrains DataGrip'),
-    ],
-    'LICENSED',
-  ),
+  app('jetbrains', 'JetBrains', 'JetBrains', [
+    k4('jetbrains-all', 'JetBrains All Products', { hasAdminConsole: true, vendorAdmin: 'NV-ITA3' }),
+    k4('jetbrains-datagrip', 'JetBrains DataGrip'),
+  ]),
   {
     key: 'hr-portal',
     name: 'Cổng Nhân sự Nội bộ',
@@ -143,12 +132,11 @@ const monthly = (
   amount: string,
   responsible: string,
   freeAfterBaseline: number,
-  currency = 'VND',
 ): DemoSubscription => ({
   key,
   plan,
   kind: 'TERM',
-  unitPrice: { amount, currency },
+  unitPrice: { amount, currency: 'VND' },
   billingCycle: 'MONTHLY',
   termMonths: 1,
   noticePeriodDays: 30,
@@ -180,8 +168,14 @@ const SUBSCRIPTIONS: DemoSubscription[] = [
   monthly('canva', 'canva-teams', '250000', 'NV-ITA2', 4),
   // K1: bought one by one when a seat is granted, so ChatGPT and Cursor start with none (the MF-5 reduction flows count their seats).
   { ...monthly('chatgpt', 'chatgpt-plus', '500000', 'NV-ITA1', 0), quantity: 0, ownerDepartment: 'ENG' },
-  // The one plan priced in a foreign currency: Finance records the rate of the day.
-  { ...monthly('cursor', 'cursor-pro', '20', 'NV-ITA1', 0, 'USD'), quantity: 0, ownerDepartment: 'ENG' },
+  // The vendor quotes 20 USD; a price is written in dong (`QĐ-111an`), so it is 508.000 (at the 25.400 the dataset used to record) and the
+  // dollar quote stays beside it as the original price (FX-1, D-45).
+  {
+    ...monthly('cursor', 'cursor-pro', '508000', 'NV-ITA1', 0),
+    quantity: 0,
+    ownerDepartment: 'ENG',
+    originalPrice: { amount: '20', currency: 'USD' },
+  },
   // The K1 plan of the person who leaves today: its one seat is his, so his revocation shows the K1 checklist (D-62).
   { ...monthly('grammarly', 'grammarly-pro', '300000', 'NV-ITA1', 0), quantity: 1, ownerDepartment: 'ENG' },
   // K4: a key is bought once; the keys sit in the key store. JetBrains has three, DataGrip none.
@@ -244,9 +238,8 @@ const SEATS: DemoSeat[] = [
   ...seat('grammarly', ['NV-OFF1']),
 ];
 
-export const CATALOG: Pick<DemoFixture, 'applications' | 'subscriptions' | 'seats' | 'exchangeRates'> = {
+export const CATALOG: Pick<DemoFixture, 'applications' | 'subscriptions' | 'seats'> = {
   applications: APPLICATIONS,
   subscriptions: SUBSCRIPTIONS,
   seats: SEATS,
-  exchangeRates: [{ currency: 'USD', rate: '25400' }],
 };

@@ -1,7 +1,6 @@
-import { dayOffset, endOfMonth } from '../demo-dates';
 import { as, listAll, tag } from '../demo-step-kit';
 import type { DemoRunContext, DemoStep, StepOutcome } from '../demo-run.types';
-import type { DemoRequestEnd, DemoRequestScenario } from '../fixture/demo-fixture.types';
+import type { DemoRequestScenario } from '../fixture/demo-fixture.types';
 import { nextScenarioAction, reachedTarget, ScenarioAction } from './scenario-path';
 
 export interface RequestWire {
@@ -25,19 +24,13 @@ function departmentOf(ctx: DemoRunContext, code: string) {
   return department;
 }
 
-/** The end date a scenario names, relative to today (`undefined`: the request names none). */
-export function endDateOf(ctx: DemoRunContext, end: DemoRequestEnd): string | undefined {
-  if (end === 'NONE') return undefined;
-  if (end === 'EOM') return endOfMonth(ctx.today);
-
-  return dayOffset(ctx.today, end.inDays);
-}
-
-const withEnd = (ctx: DemoRunContext, end: DemoRequestEnd) => {
-  const expectedEndDate = endDateOf(ctx, end);
-
-  return expectedEndDate === undefined ? {} : { expectedEndDate };
-};
+/**
+ * The time of use of a request as the body carries it (`QĐ-111i`, RQ-2): the months it asks for, never a date (`expectedEndDate` is a 422).
+ * No months: the field is left out, which is a right with no end for a plan of seats or internal software of a staff member, and nothing for a
+ * plan bought once.
+ */
+export const termBody = (termMonths: number | null): { termMonths?: number } =>
+  termMonths === null ? {} : { termMonths };
 
 /**
  * The request of a scenario, found from what the API itself recorded: every request its requester sent is an Audit Trail
@@ -77,20 +70,20 @@ async function submit(ctx: DemoRunContext, scenario: DemoRequestScenario): Promi
     created = await ctx.api.call(requester, 'POST', '/access-requests/proposals', {
       ...scenario.proposal,
       purpose: text,
-      ...withEnd(ctx, scenario.end),
+      ...termBody(scenario.termMonths),
     });
   } else if (scenario.beneficiaries) {
     created = await ctx.api.call(requester, 'POST', '/group-requests', {
       planId,
       lines: scenario.beneficiaries.map((code) => ({ employeeId: ctx.ids.employees.get(code) })),
       businessReason: text,
-      ...withEnd(ctx, scenario.end),
+      ...termBody(scenario.termMonths),
     });
   } else {
     created = await ctx.api.call(requester, 'POST', '/access-requests', {
       planId,
       businessReason: text,
-      ...withEnd(ctx, scenario.end),
+      ...termBody(scenario.termMonths),
     });
   }
   ctx.ids.requests.set(scenario.key, created.request.id);

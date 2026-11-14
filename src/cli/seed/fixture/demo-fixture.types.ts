@@ -28,13 +28,17 @@ export interface DemoPerson {
   employmentType: 'STAFF' | 'CONTRACTOR' | 'FREELANCER' | 'INTERN';
   /** The one direct role of the person's sign-in account; null: no account (the Super Admin can create one to test). */
   account: DemoRole | null;
+  /**
+   * A person with a term (not `STAFF`): the contract ends this many days from today. The Super Admin writes it on the employee (D-21) and a
+   * request, which names months, is cut there (`QĐ-111i`, R-38); a staff member has none (the API refuses one).
+   */
+  contractEndInDays?: number;
 }
 
 export interface DemoPlan {
   key: string;
   name: string;
   provisioningType: 'K1' | 'K2' | 'K4' | 'K5';
-  pricingModel?: 'PER_SEAT';
   controlLevel?: 'FULL' | 'PARTIAL';
   dataLossOnRemoval: boolean;
   revocationNote?: string;
@@ -50,7 +54,8 @@ export interface DemoPlan {
 export interface DemoApplication {
   key: string;
   name: string;
-  kind: 'SAAS' | 'LICENSED' | 'INTERNAL';
+  /** What the application becomes: the system works it out from the plan (K5 internal, the others `SAAS`), the fixture only says what it expects. */
+  kind: 'SAAS' | 'INTERNAL';
   vendorName?: string;
   dataSensitivity: 'LOW' | 'MEDIUM' | 'HIGH';
   plans: DemoPlan[];
@@ -61,8 +66,10 @@ export interface DemoSubscription {
   key: string;
   plan: string;
   kind: 'TERM' | 'PERPETUAL';
-  /** The price of one seat for one billing period, major units of `currency`. */
-  unitPrice: { amount: string; currency: string };
+  /** The price of one seat for one billing period, in dong (`QĐ-111an`: a price is written in the currency of the company only). */
+  unitPrice: { amount: string; currency: 'VND' };
+  /** The price the vendor quotes, when it is not in dong: kept beside `unitPrice` (FX-1), never used to work anything out. */
+  originalPrice?: { amount: string; currency: string };
   billingCycle: 'MONTHLY' | 'ANNUAL';
   /** The commitment of the period: 1 month for a monthly plan, 12 for an annual one. */
   termMonths: 1 | 12;
@@ -150,9 +157,6 @@ export type DemoRequestTarget =
   | 'BLOCKED'
   | 'COMPLETED';
 
-/** How the request ends: no end date, the last day of the month of today, or a number of days from today. */
-export type DemoRequestEnd = 'NONE' | 'EOM' | { inDays: number };
-
 export interface DemoRequestScenario {
   key: string;
   requester: string;
@@ -161,7 +165,11 @@ export interface DemoRequestScenario {
   /** A plan of the catalog, or a proposal of software that is not in it. */
   plan?: string;
   proposal?: { softwareName: string; homepageUrl: string; dataDescription: string; expectedUsers: number };
-  end: DemoRequestEnd;
+  /**
+   * The time of use the request asks for, in whole months (`QĐ-111i`, RQ-2): `K1` 1 to 9, `K2`/`K5` 1 to 12 (a person with a term must give
+   * months), null for a right with no end (`K2`/`K5` of a staff member) and for `K4`, which asks for none. The end date follows from it.
+   */
+  termMonths: number | null;
   target: DemoRequestTarget;
   /** The head confirms the use of the reserve with the batch, so the request goes on to the spending approver. */
   confirmReserve?: boolean;
@@ -250,8 +258,6 @@ export interface DemoFixture {
   applications: DemoApplication[];
   subscriptions: DemoSubscription[];
   seats: DemoSeat[];
-  /** The exchange rate of a foreign currency to the reporting one, recorded by Finance for today. */
-  exchangeRates: { currency: string; rate: string }[];
   /** A Finance-declared tax profile for the vendor of one application. */
   taxProfile: {
     application: string;
@@ -273,7 +279,7 @@ export interface DemoFixture {
   departmentSoftware: DemoDepartmentSoftware[];
   softwareProposals: DemoSoftwareProposal[];
   /** A draft that is saved and never sent (its department has no Cost Center, so it cannot be sent). */
-  draft: { requester: string; plan: string; end: DemoRequestEnd };
+  draft: { requester: string; plan: string; termMonths: number | null };
   /** A report of an error in the seat the request of this key granted. */
   saasIssue: { request: string; description: string };
   /** A notice (BM-09) a head sends; it changes nothing until the Super Admin handles it. */

@@ -28,7 +28,6 @@ export function demoSteps(fixture: DemoFixture): DemoStep[] {
   return [
     ...ORGANIZATION_STEPS,
     pick('finance.cost-centers'),
-    pick('finance.exchange-rates'),
     ...CATALOG_STEPS,
     pick('finance.tax-profile'),
     ...BASELINE_STEPS,

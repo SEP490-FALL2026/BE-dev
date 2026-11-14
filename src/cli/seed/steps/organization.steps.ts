@@ -58,6 +58,21 @@ async function oneDepartment(
   return { status: 'done', label };
 }
 
+/** The body of `POST /employees` for a person of the fixture: a person with a term carries the day the contract ends (RQ-2, D-21). */
+export function employeeBodyOf(ctx: DemoRunContext, person: DemoPerson): Record<string, unknown> {
+  return {
+    employeeCode: person.code,
+    fullName: person.fullName,
+    workEmail: emailOf(ctx, person.code),
+    employmentType: person.employmentType,
+    hireDate: dayOffset(ctx.today, -HIRE_DAYS_AGO),
+    departmentCode: person.department,
+    ...(person.contractEndInDays === undefined
+      ? {}
+      : { contractEndDate: dayOffset(ctx.today, person.contractEndInDays) }),
+  };
+}
+
 async function employees(ctx: DemoRunContext): Promise<StepOutcome> {
   const found = await ctx.accounts.findEmployees(ctx.fixture.people.map((person) => person.code));
   const members = new Map<string, Map<string, { fullName: string }>>();
@@ -73,14 +88,12 @@ async function employees(ctx: DemoRunContext): Promise<StepOutcome> {
       results.push({ status: 'planned', label: person.code });
       continue;
     }
-    const created = await ctx.api.call<{ id: string }>(ctx.superAdminEmail, 'POST', '/employees', {
-      employeeCode: person.code,
-      fullName: person.fullName,
-      workEmail: emailOf(ctx, person.code),
-      employmentType: person.employmentType,
-      hireDate: dayOffset(ctx.today, -HIRE_DAYS_AGO),
-      departmentCode: person.department,
-    });
+    const created = await ctx.api.call<{ id: string }>(
+      ctx.superAdminEmail,
+      'POST',
+      '/employees',
+      employeeBodyOf(ctx, person),
+    );
     ctx.ids.employees.set(person.code, created.id);
     results.push({ status: 'done', label: person.code });
   }

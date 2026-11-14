@@ -103,7 +103,8 @@ const PEOPLE: DemoPerson[] = [
   person('NV-DEV3', 'Vũ Thị Giang', 'giang.vu', 'ENG', 'EMPLOYEE'),
   person('NV-DEV4', 'Lương Hoàng Phi', 'phi.luong', 'ENG', 'EMPLOYEE'),
   person('NV-OFF1', 'Hà Văn Nam', 'nam.ha', 'ENG', 'EMPLOYEE'),
-  person('NV-CTR1', 'Vũ Quốc Phong', 'phong.vu', 'ENG', 'EMPLOYEE', 'CONTRACTOR'),
+  // The contract ends in 20 days: his request names months and his right is cut there, inside the 30-day window of the request to go on.
+  { ...person('NV-CTR1', 'Vũ Quốc Phong', 'phong.vu', 'ENG', 'EMPLOYEE', 'CONTRACTOR'), contractEndInDays: 20 },
   person('NV-INT1', 'Đặng Quốc Huy', 'huy.dang', 'ENG', null, 'INTERN'),
   // Design: the department of the usage scenarios (MF-5); most of its people only hold seats.
   person('NV-DESH', 'Bùi Ngọc Khánh', 'khanh.bui', 'DES', 'MANAGER'),

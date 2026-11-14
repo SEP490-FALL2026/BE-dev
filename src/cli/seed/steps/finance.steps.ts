@@ -43,32 +43,6 @@ async function costCenters(ctx: DemoRunContext): Promise<StepOutcome> {
   return summarize(results);
 }
 
-/** The rate of each foreign currency of the fixture for today, recorded by Finance (a subscription in it is Draft without one). */
-async function exchangeRates(ctx: DemoRunContext): Promise<StepOutcome> {
-  const finance = await as(ctx, financePerson(ctx));
-  const results: Result[] = [];
-  for (const spec of ctx.fixture.exchangeRates) {
-    const label = `${spec.currency} → ${ctx.fixture.currency}`;
-    const known = await listAll<{ id: string }>(
-      ctx,
-      finance,
-      `/exchange-rates?currency=${spec.currency}&from=${ctx.today}&to=${ctx.today}`,
-    );
-    if (known.length > 0) results.push({ status: 'present', label });
-    else if (ctx.mode === 'plan') results.push({ status: 'planned', label });
-    else {
-      await ctx.api.call(finance, 'POST', '/exchange-rates', {
-        currency: spec.currency,
-        rateDate: ctx.today,
-        rate: spec.rate,
-      });
-      results.push({ status: 'done', label });
-    }
-  }
-
-  return summarize(results);
-}
-
 async function taxProfile(ctx: DemoRunContext): Promise<StepOutcome> {
   const finance = await as(ctx, financePerson(ctx));
   const vendorId = ctx.ids.vendors.get(ctx.fixture.taxProfile.application);
@@ -167,12 +141,6 @@ async function cycles(ctx: DemoRunContext): Promise<StepOutcome> {
 
 export const FINANCE_STEPS: readonly DemoStep[] = [
   { key: 'finance.cost-centers', title: 'Cost Center của phòng (Finance)', needs: ['org.accounts'], run: costCenters },
-  {
-    key: 'finance.exchange-rates',
-    title: 'Tỷ giá ngoại tệ của ngày (Finance)',
-    needs: ['org.accounts'],
-    run: exchangeRates,
-  },
   {
     key: 'finance.tax-profile',
     title: 'Hồ sơ thuế nhà cung cấp (Finance)',
