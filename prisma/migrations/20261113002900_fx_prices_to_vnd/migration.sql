@@ -150,10 +150,10 @@ INSERT INTO "audit_events" (
 SELECT gen_random_uuid(), c."organization_id", 'SYSTEM', NULL, '{}', 'ACCESS_REQUEST.REPRICED', 'ACCESS_REQUEST', c."id"::text,
        jsonb_build_object('requestId', c."id", 'source', 'REQUEST', 'trigger', 'FX_CONVERSION',
                           'beforeAmountMinor', c."old_amount"::text, 'beforeCurrency', c."old_currency",
-                          'beforeUnitPriceMinor', c."old_unit"::text),
+                          'beforeUnitPriceMinor', c."old_unit"::text, 'beforeNextYearAmountMinor', c."old_next"::text),
        jsonb_build_object('requestId', c."id", 'source', 'REQUEST', 'trigger', 'FX_CONVERSION',
                           'afterAmountMinor', c."new_amount"::text, 'afterCurrency', 'VND',
-                          'afterUnitPriceMinor', c."new_unit"::text,
+                          'afterUnitPriceMinor', c."new_unit"::text, 'afterNextYearAmountMinor', c."new_next"::text,
                           'convertedAt', c."rate"::text || ' of ' || to_char(c."rate_date", 'YYYY-MM-DD'),
                           'rule', 'the amount is in dong (QĐ-111an); converted once at the newest rate on or before the day of the migration'),
        '20261113002900_fx_prices_to_vnd'
@@ -228,10 +228,13 @@ ALTER TABLE "request_supplements" ENABLE TRIGGER "request_supplements_no_update_
 DO $$
 DECLARE
     left_subscriptions TEXT;
+    left_assessments TEXT;
     left_requests TEXT;
 BEGIN
     SELECT string_agg(s."id"::text, ', ' ORDER BY s."id") INTO left_subscriptions
       FROM "subscriptions" s WHERE s."unit_price_minor" IS NOT NULL AND s."unit_price_currency" <> 'VND';
+    SELECT string_agg(a."request_id"::text, ', ' ORDER BY a."request_id") INTO left_assessments
+      FROM "access_request_assessments" a WHERE a."quote_unit_price_minor" IS NOT NULL AND a."quote_currency" <> 'VND';
     SELECT string_agg(r."id"::text, ', ' ORDER BY r."id") INTO left_requests
       FROM "access_requests" r
      WHERE r."amount_currency" IS NOT NULL AND r."amount_currency" <> 'VND'
@@ -240,6 +243,9 @@ BEGIN
 
     IF left_subscriptions IS NOT NULL THEN
         RAISE NOTICE 'QĐ-111an: subscriptions priced in another currency with no exchange rate, left as they are: %', left_subscriptions;
+    END IF;
+    IF left_assessments IS NOT NULL THEN
+        RAISE NOTICE 'QĐ-111an: assessments (by request) whose quote is in another currency with no exchange rate, left as they are; the request cannot be priced from them until the quote is recorded again in dong: %', left_assessments;
     END IF;
     IF left_requests IS NOT NULL THEN
         RAISE NOTICE 'QĐ-111an: requests not yet decided as spend, in another currency with no exchange rate, left as they are: %', left_requests;

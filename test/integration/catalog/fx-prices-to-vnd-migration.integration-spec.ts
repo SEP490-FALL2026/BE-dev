@@ -297,6 +297,10 @@ describe('the migration that turns prices into dong (integration, real PostgreSQ
     const events = (await auditOf(request)).filter((event) => event.action === 'ACCESS_REQUEST.REPRICED');
     expect(events.length).toBeGreaterThanOrEqual(1);
     expect(events.every((event) => event.actor_kind === 'SYSTEM' && event.actor_app_user_id === null)).toBe(true);
+    // The audit event of the request names what the amount of the year after was before and after, not only the amount of the year.
+    const ofRequest = events.find((event) => (event.after as { source?: string } | null)?.source === 'REQUEST');
+    expect(ofRequest?.before).toMatchObject({ beforeNextYearAmountMinor: '20000' });
+    expect(ofRequest?.after).toMatchObject({ afterNextYearAmountMinor: '5080000' });
   });
 
   it('leaves a request whose spend was decided in its currency: the commitment it holds is not touched', async () => {
@@ -313,8 +317,8 @@ describe('the migration that turns prices into dong (integration, real PostgreSQ
     ).toEqual({ currency: 'USD' });
   });
 
-  it('converts the quote of an assessment, keeping the quote it was', async () => {
-    await rate('USD', '2026-09-01', '25400');
+  /** A request for software that is not in the catalog, with the assessment of the IT Admin holding a quote in a currency. */
+  const assessmentWithQuote = async (currency: string, minor: number): Promise<string> => {
     const requestId = randomUUID();
     await h.ctx.sql.query(
       `INSERT INTO access_requests (id, organization_id, type, branch, state, requester_employee_id, department_id, cost_center_id,
@@ -325,9 +329,115 @@ describe('the migration that turns prices into dong (integration, real PostgreSQ
     );
     await h.ctx.sql.query(
       `INSERT INTO access_request_assessments (request_id, status, quote_unit_price_minor, quote_currency, quote_billing_cycle, quote_valid_from)
-       VALUES ($1, 'DRAFT', 800, 'USD', 'MONTHLY', '2026-01-01')`,
-      [requestId],
+       VALUES ($1, 'DRAFT', $2, $3, 'MONTHLY', '2026-01-01')`,
+      [requestId, minor, currency],
     );
+
+    return requestId;
+  };
+
+  /** A step and an approved spend decision of a request, with no commitment: as a decision whose commitment was not written leaves it. */
+  const approveSpend = async (requestId: string): Promise<void> => {
+    const stepId = randomUUID();
+    await h.ctx.sql.query(
+      `INSERT INTO access_request_steps (id, request_id, kind, sequence, state, assignee_employee_id, routing_row, sla_working_days, assigned_at)
+       VALUES ($1, $2, 'SPEND_APPROVAL', 1, 'PENDING', $3, 1, 2, now())`,
+      [stepId, requestId, person.employeeId],
+    );
+    // An approval keeps the check it was made on (`spend_decisions_shape_check`).
+    const check = await h.ctx.sql.query<{ id: string }>(
+      `INSERT INTO request_budget_checks (id, organization_id, request_id, number, trigger, route, stale_cost_evidence, plan_line_overdue,
+                                          period_closed, off_plan, currency, binding_total_minor, outcome)
+       VALUES (gen_random_uuid(), $1, $2, 1, 'SUBMISSION'::"BudgetCheckTrigger", 'SPEND_APPROVAL'::"BudgetCheckRoute", false, false, false, false,
+               'VND', 1, 'WITHIN_BASE') RETURNING id`,
+      [organizationId(), requestId],
+    );
+    await h.ctx.sql.query(
+      `INSERT INTO spend_decisions (step_id, request_id, check_id, decision, decided_by_employee_id, decided_at)
+       VALUES ($1, $2, $3, 'APPROVED', $4, now())`,
+      [stepId, requestId, check.rows[0].id, person.employeeId],
+    );
+  };
+
+  it('uses no rate dated after the day it runs: the newest one on or before today converts, a rate of the future never does', async () => {
+    await rate('EUR', '2026-09-01', '28000');
+    await rate('EUR', '2099-01-01', '99999');
+    const id = await subscription({ minor: 1000n, currency: 'EUR', status: 'DRAFT' });
+
+    await migrate();
+
+    expect(await subscriptionRow(id)).toMatchObject({
+      unit_price_minor: '280000',
+      unit_price_currency: 'VND',
+      original_unit_price_minor: '1000',
+      original_currency: 'EUR',
+    });
+  });
+
+  it('leaves a request with an approved spend decision in its currency even when no commitment was written for it', async () => {
+    await rate('USD', '2026-09-01', '25400');
+    const request = await pricedRequest('USD', { amount: 50000n, unit: 1000n });
+    await approveSpend(request);
+    const file = await supplement(request, 'USD', 50000n, 40000n);
+
+    await migrate();
+
+    expect(await requestRow(request)).toMatchObject({ amount_minor: '50000', amount_currency: 'USD' });
+    expect(await supplementRow(file)).toMatchObject({ after_amount_minor: '40000', currency: 'USD' });
+  });
+
+  it('names a request in a currency with no rate in a notice, and leaves it as it is', async () => {
+    const request = await pricedRequest('SGD', { amount: 5000n, unit: 500n });
+
+    const raised = await migrate();
+
+    expect(await requestRow(request)).toMatchObject({ amount_minor: '5000', amount_currency: 'SGD' });
+    expect(raised.some((message) => message.includes(request))).toBe(true);
+    expect(await auditOf(request)).toHaveLength(0);
+  });
+
+  it('names an assessment whose quote is in a currency with no rate in a notice, and leaves the quote as it is', async () => {
+    const requestId = await assessmentWithQuote('THB', 7000);
+
+    const raised = await migrate();
+
+    expect(
+      (
+        await h.ctx.sql.query(
+          `SELECT quote_unit_price_minor::text, quote_currency, quote_original_currency FROM access_request_assessments WHERE request_id = $1`,
+          [requestId],
+        )
+      ).rows[0],
+    ).toEqual({ quote_unit_price_minor: '7000', quote_currency: 'THB', quote_original_currency: null });
+    expect(raised.some((message) => message.includes(requestId))).toBe(true);
+  });
+
+  it('puts the append-only guard of the supplementary files back: the trigger is enabled after the migration and a file cannot be changed', async () => {
+    await rate('USD', '2026-09-01', '25400');
+    const request = await pricedRequest('USD', { amount: 50000n, unit: 1000n });
+    const file = await supplement(request, 'USD', 50000n, 40000n);
+
+    await migrate();
+
+    expect(
+      (
+        await h.ctx.sql.query(
+          `SELECT tgenabled FROM pg_trigger WHERE tgrelid = 'request_supplements'::regclass AND tgname = 'request_supplements_no_update_delete'`,
+        )
+      ).rows,
+    ).toEqual([{ tgenabled: 'O' }]);
+    let state: string | null = null;
+    try {
+      await h.ctx.sql.query(`UPDATE request_supplements SET reason = 'changed' WHERE id = $1`, [file]);
+    } catch (error) {
+      state = (error as { code?: string }).code ?? 'unknown';
+    }
+    expect(state).toBe('23001');
+  });
+
+  it('converts the quote of an assessment, keeping the quote it was', async () => {
+    await rate('USD', '2026-09-01', '25400');
+    const requestId = await assessmentWithQuote('USD', 800);
 
     await migrate();
 
