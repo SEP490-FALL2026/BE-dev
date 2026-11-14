@@ -37,7 +37,7 @@ dashboards; gốc `src/app/app.module.ts`.
   - `LicensingRenewalApi` ([public/licensing-renewal.api.ts](public/licensing-renewal.api.ts)) — trả ghế và gia hạn
     (US-05-14): `getAssignmentFacts`, `renewAssignment`, `hasPendingRenewal`.
   - `LicensingOpenGrantsApi` ([public/licensing-open-grants.api.ts](public/licensing-open-grants.api.ts)) —
-    `listOpenGrantTasksOfBeneficiary`, `listHeldSeatsOfRequests` (seat của Request còn giữ ngày `on`, đi theo chuỗi `predecessor_id` — `HANDOVER`,
+    `listOpenGrantTasksOfBeneficiary`, `listGrantExecutionsOfRequests` (tác vụ cấp chưa hủy của từng người trong Request, mới nhất trước: hàng cấp của IT Admin), `listHeldSeatsOfRequests` (seat của Request còn giữ ngày `on`, đi theo chuỗi `predecessor_id` — `HANDOVER`,
     gia hạn quyền, `RENEWAL_CARRY` — tới bản ghi đang chạy, từ grant của Request hoặc bản ghi Request nêu; trả phòng sở hữu hiện tại và các bản
     ghi sau gốc; là thứ khoản 01/01 đếm, `BR-MF1-09e`).
   - `LicensingDashboardApi` ([public/licensing-dashboard.api.ts](public/licensing-dashboard.api.ts)) — số đếm cho trang tổng
@@ -126,7 +126,7 @@ dịch vụ nào đọc cả ghế lẫn thu hồi thì đứng trên cả hai (
   (`provisioning-tasks.controller.ts`; grant: `ProvisioningGrantService` → `ProvisioningGrantPlanner` (xét trước khóa) +
   `ProvisioningGrantWriter` (ghi trong transaction; Request xin lại trong ân hạn điều chuyển có `replacesAssignmentId` ⟹ `AssignmentService.endReplacedByGrant` kết thúc quyền cũ cùng thuê bao
   `valid_until` = ngày cấp trước khi chèn quyền mới, R-49; cấp hỏng/hủy ⟹ `giveBackReplaced` mở lại; `LicensingApi.listRegrantedAssignments`), `provisioning-grant.policy.ts`; `ProvisioningService` giữ danh sách,
-  claim, hoàn tất, báo lỗi; `ProvisioningDecisionService`), `revocation-completion/`
+  claim, hoàn tất, báo lỗi; `ProvisioningDecisionService`; người bấm "Cấp" tự nhận tác vụ ngay trong giao dịch cấp (`IN_PROGRESS`, sự kiện `CLAIMED` sau `CREATED`, QĐ-111m); bấm lại hoặc IT khác bấm cho cùng Request và người trả về tác vụ đã có (`takenBy`, không cấp lần hai); `public/licensing-grant-execution.policy.ts` nói nút nào bật ở mỗi trạng thái tác vụ), `revocation-completion/`
   (`revocation-tasks.controller.ts`), `grant-cancellation/`, `open-grants/`, `department-use/`, `k1-checklist/` (checklist thu hồi `K1`,
   `QĐ-111az`: biến thể `DEPARTURE` 6 mục / `STILL_EMPLOYED` 2 mục suy từ các lý do còn đứng, kiểm đủ tick + bằng chứng + `doneAt` không giảm theo
   `order`; cột `provisioning_tasks.k1_checklist`, codec `provisioning-k1-checklist.json.ts`; `RevocationAftermath.keepChecklist` gọi lúc hoàn tất).

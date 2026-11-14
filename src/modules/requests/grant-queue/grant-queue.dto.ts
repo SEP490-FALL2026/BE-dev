@@ -2,6 +2,9 @@ import { z } from 'zod';
 import { successEnvelopeSchema } from '../../../infrastructure/http/dto/success-envelope.dto';
 import { createZodDto } from '../../../infrastructure/http/dto/zod-dto';
 
+/** The most acts a grant task offers at once: the seven there are (take, complete, report, retry, hand off, close, cancel). */
+export const GRANT_EXECUTION_ACTIONS_MAX = 7;
+
 /** Where the grant of one person stands: not begun, begun and not over, or over (completed, or closed as failed). */
 const queueState = z.enum(['WAITING', 'EXECUTING', 'DONE']);
 
@@ -52,7 +55,7 @@ const grantQueueItemSchema = z.strictObject({
       failureReason: z.string().nullable(),
       availableActions: z
         .array(z.enum(['CLAIM', 'COMPLETE', 'REPORT_FAILURE', 'RETRY', 'HAND_OFF', 'CLOSE_FAILED', 'CANCEL']))
-        .max(7)
+        .max(GRANT_EXECUTION_ACTIONS_MAX)
         .meta({
           description:
             'What the IT Admin may do next on the task, each one a route of the provisioning task: take it, complete it with evidence, report it as not done, try it again, hand it to a person, close it as failed, or cancel it when the requester withdrew.',

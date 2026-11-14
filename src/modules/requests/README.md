@@ -166,7 +166,7 @@ cùng cần; phần ghi nằm ở `assessment/assessment.repo.ts`.
     dùng kiểu của gói được gắn khi khác kiểu đã kết luận; `ProposalService`,
     `need-spend.service.ts`, `internal-registration.service.ts` (đăng ký nội bộ; `internalRegistrationBasis`, `registeredShapeOf`,
     `actsForAssignee` ở `assessment.policy.ts`); `proposal-review/` — `proposals.controller.ts`.
-  - `grant-queue/` — hàng đợi cấp của IT Admin (US-03-02; gửi thay một người đã gỡ, QĐ-96); `cancellation/` — IT Admin đóng request của người đã nghỉ (US-03-04) và hệ thống đóng request của người đã nghỉ/chuyển (`beneficiary-gone-*`, X0.7).
+  - `grant-queue/` — hàng cấp theo người của IT Admin (US-03-02, QĐ-111m): chỉ phòng trong phạm vi `getItAdminScope`, lọc `planId`/`state` (`WAITING`/`EXECUTING`/`DONE`, suy từ trạng thái Request hoặc dòng của người, không đọc bảng licensing), mỗi người có phòng và `execution` (tác vụ cấp qua `LicensingOpenGrantsApi.listGrantExecutionsOfRequests`, hành động theo `grantExecutionActions`); `cancellation/` — IT Admin đóng request của người đã nghỉ (US-03-04) và hệ thống đóng request của người đã nghỉ/chuyển (`beneficiary-gone-*`, X0.7).
   - Lịch sử Request theo vai, chỉ đọc (L3 `request-history/`, qd103-request-history-by-role): `GET /me/access-requests` (người gửi; `involvement`
     SENT/FOR_ME/ALL, người thụ hưởng Request nhóm chỉ thấy `myLine` của mình), `GET /departments/{id}/access-requests` (trưởng phòng hôm nay của
     phòng), `GET /access-requests` (IT Admin toàn tổ chức; Người duyệt chi Request đã mở bước chi; Finance Request đã duyệt chi),
