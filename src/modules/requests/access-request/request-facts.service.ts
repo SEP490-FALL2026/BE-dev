@@ -246,10 +246,7 @@ export class RequestFactsService {
     kind: TermKind;
     termMonths: number | null | undefined;
     employee: { employmentType: string; contractEndDate?: BusinessDate | null } | null;
-    /**
-     * The time of use is the one of a request to go on using: a plan bought once has no end to move, so it is never renewed, and the end of the
-     * contract that lets a new request for it end there (`INV-07`) does not make a right with no end for a person with a term.
-     */
+    /** The time of use is the one of a request to go on using a right: a plan bought once has no end to move, so it is never renewed (`QĐ-111l`). */
     renewing?: boolean;
   }): Pick<Assessment, 'termRefusal' | 'term'> {
     const fixedTermPerson = (facts.employee?.employmentType ?? 'STAFF') !== 'STAFF';
@@ -257,7 +254,8 @@ export class RequestFactsService {
       kind: facts.kind,
       termMonths: facts.termMonths,
       fixedTermPerson,
-      contractEndKnown: facts.renewing !== true && (facts.employee?.contractEndDate ?? null) !== null,
+      contractEndKnown: (facts.employee?.contractEndDate ?? null) !== null,
+      renewing: facts.renewing === true,
     });
     const months = termRefusal === null && typeof facts.termMonths === 'number' ? facts.termMonths : null;
 

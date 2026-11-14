@@ -342,7 +342,17 @@ describe('RequestFactsService.assess', () => {
       organization.getEmployee.mockResolvedValue({ employmentType: 'INTERN', contractEndDate: '2027-01-31' });
 
       expect((await service.assess(tx, renewing({ termMonths: 3 }))).termRefusal).toBe('TERM_NOT_ASKED');
-      expect((await service.assess(tx, renewing({ termMonths: null }))).termRefusal).toBe('TERM_LONG_TERM_NOT_ALLOWED');
+      expect((await service.assess(tx, renewing({ termMonths: null }))).termRefusal).toBe('TERM_NOT_ASKED');
+    });
+
+    it('a plan bought once is not renewed by a staff member either: a right with no end (longTerm) for K4 is refused as asking no time of use', async () => {
+      plan('K4');
+      organization.getEmployee.mockResolvedValue({ employmentType: 'STAFF' });
+
+      expect((await service.assess(tx, renewing({ termMonths: null }))).termRefusal).toBe('TERM_NOT_ASKED');
+      expect((await service.assess(tx, renewing({ termMonths: 3 }))).termRefusal).toBe('TERM_NOT_ASKED');
+      // A new request for the same plan is not a renewal: a staff member sends it with no months.
+      expect((await service.assess(tx, input({ termMonths: null }))).termRefusal).toBeNull();
     });
   });
 });

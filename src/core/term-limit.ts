@@ -67,11 +67,16 @@ export function checkTermMonths(facts: {
    * there (`INV-07`): without it the right would have no end, which is refused as any right with no end for them.
    */
   contractEndKnown?: boolean;
+  /**
+   * The time of use is the one of a request to go on using a right (`QĐ-111l`): a plan bought once has no end to move, so it is never renewed,
+   * whoever asks and whatever they answer, and is refused as a plan that asks no time of use.
+   */
+  renewing?: boolean;
 }): TermRefusal | null {
   const rule = termRuleOf(facts.kind);
   const { termMonths } = facts;
   if (!rule.asked) {
-    if (typeof termMonths === 'number') return 'TERM_NOT_ASKED';
+    if (facts.renewing === true || typeof termMonths === 'number') return 'TERM_NOT_ASKED';
 
     return facts.fixedTermPerson && facts.contractEndKnown !== true ? 'TERM_LONG_TERM_NOT_ALLOWED' : null;
   }

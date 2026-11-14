@@ -121,6 +121,19 @@ describe('the time of use a kind of grant asks for (QĐ-111i, FR-2.8)', () => {
     expect(asked('K4', 3, true, true)).toBe('TERM_NOT_ASKED');
     expect(asked('K4', null, false, false)).toBeNull();
   });
+
+  it('QĐ-111l: a plan bought once is never renewed: a request to go on using asks no time of use of K4, for anyone, with or without months', () => {
+    const renewed = (termMonths: number | null, fixedTermPerson: boolean, contractEndKnown: boolean) =>
+      checkTermMonths({ kind: 'K4', termMonths, fixedTermPerson, contractEndKnown, renewing: true });
+
+    expect(renewed(null, false, false)).toBe('TERM_NOT_ASKED');
+    expect(renewed(3, false, false)).toBe('TERM_NOT_ASKED');
+    expect(renewed(null, true, true)).toBe('TERM_NOT_ASKED');
+    expect(renewed(3, true, true)).toBe('TERM_NOT_ASKED');
+    // The other kinds are judged as for any request.
+    expect(checkTermMonths({ kind: 'K2', termMonths: null, fixedTermPerson: false, renewing: true })).toBeNull();
+    expect(checkTermMonths({ kind: 'K1', termMonths: 9, fixedTermPerson: false, renewing: true })).toBeNull();
+  });
 });
 
 describe('the run of a term: the months that begin, the end, and the cut at the end of a contract (R-38, R-39)', () => {
