@@ -231,3 +231,7 @@ _Bổ sung D-17 (review 8):_ `K1` + người có thời hạn: `termMonths: null
 - **File/commit:** `e7ebdeaa` — `requests/renewal-request/*` (dto, policy `renewalTermMonthsOf`, service, writer, errors, http-errors, controller), `requests/access-request/request-facts.service.ts`, `access-request.dto.ts`/`.types.ts`/`access-request-record.mapper.ts`, `request-view/access-request-query.service.ts`, `renewal-apply/renewal-request.repo.ts`, `licensing/public/licensing-renewal.types.ts`, `prisma/models/requests.prisma`, `prisma/migrations/20261113003300_rq3_renewal_long_term`.
 - **Đổi lại:** (1) đổi một nhánh của `checkTermMonths`/`termOf`; (3) cột để nguyên (không drop), thêm lại NOT NULL bằng migration mới nếu bỏ `longTerm`.
 - **FE cần biết:** body Request tiếp tục `extensionMonths` | `longTerm: true`; `renewal.newExpectedEndDate` có thể `null`; xem trước/chi tiết `cost` như RQ-2.
+
+_Bổ sung D-28 (review RQ-3):_ `K4` không có đường gia hạn cho **mọi** người, kể cả nhân sự chính thức: Request tiếp tục `K4` có tháng hoặc `longTerm` đều ⟹ `ACCESS_REQUEST.TERM_NOT_ASKED` (thay cho `TERM_LONG_TERM_NOT_ALLOWED` ở ca nhân sự có thời hạn không tháng nêu ở D-28(1)); luật nằm ở `checkTermMonths` (cờ `renewing`) — `756f712c`.
+
+_Bổ sung D-26 (review RQ-3):_ quyền mà cổng thu hồi từ chối (`RevocationRefusedError`: loại `K3`, chưa xây) không còn bị ghi `logger.error` mỗi giờ; lượt quét bỏ qua và quyền vẫn nằm ở hàng đợi IT — `5096f7ad`.
