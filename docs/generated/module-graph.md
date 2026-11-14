@@ -83,6 +83,7 @@ flowchart BT
   identity_access -->|10| notifications
   identity_access -->|36| organization
   installation -->|6| audit
+  installation -->|2| catalog
   installation -->|2| finance
   installation -->|11| identity_access
   installation -->|8| organization
@@ -137,4 +138,4 @@ flowchart BT
   usage -->|10| organization
 ```
 
-95 module edges.
+96 module edges.

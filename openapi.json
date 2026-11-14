@@ -19004,11 +19004,11 @@
         "parameters": [],
         "requestBody": {
           "required": true,
-          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/DeclareApplicationBodyDto" } } }
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CreateApplicationBodyDto" } } }
         },
         "responses": {
           "201": {
-            "description": "The application is in the catalog; proposedToDictionary says it was outside the dictionary and proposed to it.",
+            "description": "The application and its first plan are in the catalog. The application is INTERNAL when the plan is granted by hand (K5) and SAAS otherwise; it stands in the group named, or in Khác. The pricing model of the plan follows its kind of provisioning. proposedToDictionary says the vendor was outside the dictionary and proposed to it.",
             "content": {
               "application/json": {
                 "schema": {
@@ -19095,11 +19095,31 @@
             }
           },
           "409": {
-            "description": "The vendor already has an application of this name (APPLICATION.NAME_TAKEN), the dictionary line belongs to another application (APPLICATION.DICTIONARY_LINE_TAKEN), or a simultaneous request changed the dictionary group of the vendor or of the line first (APPLICATION.DICTIONARY_GROUP_CHANGED): refresh the application and the line, then send the request again.",
+            "description": "The catalog already has this software, by name or by a domain it shares (APPLICATION.DUPLICATE: details.existing is the entry, details.matchedBy says NAME or DOMAIN), the vendor already has an application of this name (APPLICATION.NAME_TAKEN), the dictionary line belongs to another application (APPLICATION.DICTIONARY_LINE_TAKEN), or a simultaneous request changed the dictionary group first (APPLICATION.DICTIONARY_GROUP_CHANGED).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
                 "examples": {
+                  "APPLICATION.DUPLICATE": {
+                    "summary": "The catalog already has this software.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "APPLICATION.DUPLICATE",
+                        "message": "The catalog already has this software.",
+                        "details": {
+                          "existing": {
+                            "id": "<application-id>",
+                            "name": "Figma",
+                            "vendorName": "Figma Inc",
+                            "functionalGroup": null
+                          },
+                          "matchedBy": "NAME"
+                        },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
                   "APPLICATION.NAME_TAKEN": {
                     "summary": "The vendor already has an application with this name.",
                     "value": {
@@ -19180,7 +19200,7 @@
             }
           },
           "422": {
-            "description": "The request is invalid (VALIDATION_ERROR) or a rule refuses it: NAME_INVALID, VENDOR_NAME_INVALID, DOMAIN_INVALID, TOO_MANY_DOMAINS, NOTE_INVALID, VENDOR_REQUIRED, VENDOR_SOURCE_AMBIGUOUS, INTERNAL_HAS_NO_VENDOR, FUNCTIONAL_GROUP_INVALID, DICTIONARY_LINE_NOT_FOUND, DICTIONARY_LINE_MISMATCH or UPDATE_EMPTY.",
+            "description": "The request is invalid (VALIDATION_ERROR) or a rule of the application or of its plan refuses it: APPLICATION.NAME_INVALID, VENDOR_NAME_INVALID, DOMAIN_INVALID, TOO_MANY_DOMAINS, VENDOR_REQUIRED, VENDOR_SOURCE_AMBIGUOUS, INTERNAL_HAS_NO_VENDOR, FUNCTIONAL_GROUP_INVALID, DICTIONARY_LINE_NOT_FOUND, DICTIONARY_LINE_MISMATCH, or a PLAN.* rule (kind not supported, control level required, data-loss note required, name invalid). Nothing is kept when any of them refuses.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -19208,6 +19228,17 @@
                       }
                     }
                   },
+                  "APPLICATION.VENDOR_NAME_INVALID": {
+                    "summary": "A vendor name must be 1 to 200 characters.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "APPLICATION.VENDOR_NAME_INVALID",
+                        "message": "A vendor name must be 1 to 200 characters.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
                   "APPLICATION.DOMAIN_INVALID": {
                     "summary": "A domain must be a host such as figma.com.",
                     "value": {
@@ -19231,13 +19262,24 @@
                       }
                     }
                   },
-                  "APPLICATION.NOTE_INVALID": {
-                    "summary": "The communication note is at most 1000 characters.",
+                  "APPLICATION.VENDOR_REQUIRED": {
+                    "summary": "A SaaS or licensed application names its vendor or a dictionary service line.",
                     "value": {
                       "success": false,
                       "error": {
-                        "code": "APPLICATION.NOTE_INVALID",
-                        "message": "The communication note is at most 1000 characters.",
+                        "code": "APPLICATION.VENDOR_REQUIRED",
+                        "message": "A SaaS or licensed application names its vendor or a dictionary service line.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "APPLICATION.VENDOR_SOURCE_AMBIGUOUS": {
+                    "summary": "Name the vendor or a dictionary service line, not both.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "APPLICATION.VENDOR_SOURCE_AMBIGUOUS",
+                        "message": "Name the vendor or a dictionary service line, not both.",
                         "requestId": "req_example"
                       }
                     }
@@ -19286,35 +19328,24 @@
                       }
                     }
                   },
-                  "APPLICATION.VENDOR_NAME_INVALID": {
-                    "summary": "A vendor name must be 1 to 200 characters.",
+                  "PLAN.PROVISIONING_TYPE_NOT_SUPPORTED": {
+                    "summary": "The kind K3 (SSO/SCIM) is specified only and cannot be declared yet.",
                     "value": {
                       "success": false,
                       "error": {
-                        "code": "APPLICATION.VENDOR_NAME_INVALID",
-                        "message": "A vendor name must be 1 to 200 characters.",
+                        "code": "PLAN.PROVISIONING_TYPE_NOT_SUPPORTED",
+                        "message": "The kind K3 (SSO/SCIM) is specified only and cannot be declared yet.",
                         "requestId": "req_example"
                       }
                     }
                   },
-                  "APPLICATION.VENDOR_REQUIRED": {
-                    "summary": "A SaaS or licensed application names its vendor or a dictionary service line.",
+                  "PLAN.CONTROL_LEVEL_REQUIRED": {
+                    "summary": "A plan of kind K1, K2 or K4 names its default control level.",
                     "value": {
                       "success": false,
                       "error": {
-                        "code": "APPLICATION.VENDOR_REQUIRED",
-                        "message": "A SaaS or licensed application names its vendor or a dictionary service line.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "APPLICATION.VENDOR_SOURCE_AMBIGUOUS": {
-                    "summary": "Name the vendor or a dictionary service line, not both.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "APPLICATION.VENDOR_SOURCE_AMBIGUOUS",
-                        "message": "Name the vendor or a dictionary service line, not both.",
+                        "code": "PLAN.CONTROL_LEVEL_REQUIRED",
+                        "message": "A plan of kind K1, K2 or K4 names its default control level.",
                         "requestId": "req_example"
                       }
                     }
@@ -19378,7 +19409,7 @@
           }
         },
         "security": [{ "bearer": [] }],
-        "summary": "Declare an application",
+        "summary": "Declare an application with its first plan",
         "tags": ["applications"]
       }
     },
@@ -19760,7 +19791,7 @@
             }
           },
           "422": {
-            "description": "The request is invalid (VALIDATION_ERROR) or a rule refuses it: NAME_INVALID, VENDOR_NAME_INVALID, DOMAIN_INVALID, TOO_MANY_DOMAINS, NOTE_INVALID, VENDOR_REQUIRED, VENDOR_SOURCE_AMBIGUOUS, INTERNAL_HAS_NO_VENDOR, FUNCTIONAL_GROUP_INVALID, DICTIONARY_LINE_NOT_FOUND, DICTIONARY_LINE_MISMATCH or UPDATE_EMPTY.",
+            "description": "The request is invalid (VALIDATION_ERROR) or a rule refuses it: NAME_INVALID, DOMAIN_INVALID, TOO_MANY_DOMAINS, FUNCTIONAL_GROUP_INVALID, DICTIONARY_LINE_NOT_FOUND, DICTIONARY_LINE_MISMATCH or UPDATE_EMPTY.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -19807,28 +19838,6 @@
                       "error": {
                         "code": "APPLICATION.TOO_MANY_DOMAINS",
                         "message": "An application has at most 20 domains.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "APPLICATION.NOTE_INVALID": {
-                    "summary": "The communication note is at most 1000 characters.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "APPLICATION.NOTE_INVALID",
-                        "message": "The communication note is at most 1000 characters.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "APPLICATION.INTERNAL_HAS_NO_VENDOR": {
-                    "summary": "An internal application has no vendor and no dictionary line.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "APPLICATION.INTERNAL_HAS_NO_VENDOR",
-                        "message": "An internal application has no vendor and no dictionary line.",
                         "requestId": "req_example"
                       }
                     }
@@ -20382,7 +20391,7 @@
         },
         "responses": {
           "200": {
-            "description": "The group as it is after the change; a change of nothing is answered the same and not audited.",
+            "description": "The group as it is after the change; a change of nothing is answered the same and not audited. The fixed groups (systemKey set) are not renamed or switched off.",
             "content": {
               "application/json": {
                 "schema": {
@@ -20490,7 +20499,7 @@
             }
           },
           "409": {
-            "description": "A group with this name exists, ignoring case, accents and spacing (FUNCTIONAL_GROUP.NAME_TAKEN).",
+            "description": "A group with this name exists, ignoring case, accents and spacing (FUNCTIONAL_GROUP.NAME_TAKEN).\n\nThe group is one of the two the system relies on, Liên lạc and Khác, and is not renamed or switched off (FUNCTIONAL_GROUP.FIXED).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -20502,6 +20511,17 @@
                       "error": {
                         "code": "FUNCTIONAL_GROUP.NAME_TAKEN",
                         "message": "A functional group with this name already exists.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "FUNCTIONAL_GROUP.FIXED": {
+                    "summary": "The groups Liên lạc and Khác are fixed: they are not renamed or switched off.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "FUNCTIONAL_GROUP.FIXED",
+                        "message": "The groups Liên lạc and Khác are fixed: they are not renamed or switched off.",
                         "requestId": "req_example"
                       }
                     }
@@ -20672,6 +20692,27 @@
             "schema": { "type": "string", "enum": ["K1", "K2", "K3", "K4", "K5"] }
           },
           {
+            "name": "functionalGroupId",
+            "required": false,
+            "in": "query",
+            "description": "Only the plans of the applications in this functional group.",
+            "schema": { "format": "uuid", "type": "string" }
+          },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "description": "Only the plans of the applications in this catalog status.",
+            "schema": { "type": "string", "enum": ["APPROVED", "RETIRED"] }
+          },
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "description": "Text in the name of the plan or of its application, ignoring case and accents.",
+            "schema": { "maxLength": 100, "type": "string" }
+          },
+          {
             "name": "page",
             "required": false,
             "in": "query",
@@ -20692,7 +20733,7 @@
         ],
         "responses": {
           "200": {
-            "description": "A page of plans by application then plan name, optionally for one application or one kind.",
+            "description": "A page of plans by application then plan name, optionally for one application, one kind of provisioning, the functional group or the catalog status of the application, or a search over the plan and application names.",
             "content": {
               "application/json": {
                 "schema": {
@@ -20945,6 +20986,7 @@
                       "error": {
                         "code": "PLAN.NAME_TAKEN",
                         "message": "The application already has a plan with this name.",
+                        "details": { "existing": { "id": "<plan-id>", "name": "Team", "provisioningType": "K2" } },
                         "requestId": "req_example"
                       }
                     }
@@ -21502,6 +21544,7 @@
                       "error": {
                         "code": "PLAN.NAME_TAKEN",
                         "message": "The application already has a plan with this name.",
+                        "details": { "existing": { "id": "<plan-id>", "name": "Team", "provisioningType": "K2" } },
                         "requestId": "req_example"
                       }
                     }
@@ -92152,8 +92195,16 @@
                       "additionalProperties": false,
                       "nullable": true
                     },
-                    "dataSensitivity": { "type": "string", "enum": ["LOW", "MEDIUM", "HIGH"] },
-                    "isCommunicationService": { "type": "boolean" },
+                    "dataSensitivity": { "type": "string", "enum": ["LOW", "MEDIUM", "HIGH", null], "nullable": true },
+                    "logoUrl": {
+                      "description": "The https link to the logo image that the IT Admin pasted, or null. The server never checks it: it may be broken, so show the first letter of the name when the image does not load.",
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "isCommunicationService": {
+                      "type": "boolean",
+                      "description": "True when the application stands in the group Liên lạc (email, chat, meetings): the usage rules never collect it."
+                    },
                     "responsibleItAdmin": {
                       "type": "object",
                       "properties": {
@@ -92175,8 +92226,7 @@
                       "type": "object",
                       "properties": { "id": { "type": "string", "format": "uuid" }, "name": { "type": "string" } },
                       "required": ["id", "name"],
-                      "additionalProperties": false,
-                      "nullable": true
+                      "additionalProperties": false
                     },
                     "status": { "type": "string", "enum": ["APPROVED", "RETIRED"] },
                     "updatedAt": { "type": "string", "format": "date-time" }
@@ -92187,6 +92237,7 @@
                     "kind",
                     "vendor",
                     "dataSensitivity",
+                    "logoUrl",
                     "isCommunicationService",
                     "responsibleItAdmin",
                     "needsResponsible",
@@ -92241,120 +92292,6 @@
         "required": ["success", "message", "data"],
         "additionalProperties": false
       },
-      "DeclareApplicationBodyDto": {
-        "type": "object",
-        "properties": {
-          "name": { "type": "string", "maxLength": 1000 },
-          "kind": { "type": "string", "enum": ["SAAS", "LICENSED", "INTERNAL"] },
-          "vendorName": { "type": "string", "maxLength": 1000 },
-          "dictionaryServiceLineId": { "type": "string", "format": "uuid" },
-          "domains": { "maxItems": 100, "type": "array", "items": { "type": "string", "maxLength": 1000 } },
-          "dataSensitivity": { "type": "string", "enum": ["LOW", "MEDIUM", "HIGH"] },
-          "communication": {
-            "type": "object",
-            "properties": {
-              "personToPersonMessaging": { "type": "boolean" },
-              "callsOrMeetings": { "type": "boolean" },
-              "mailbox": { "type": "boolean" },
-              "note": { "type": "string", "maxLength": 5000 }
-            },
-            "required": ["personToPersonMessaging", "callsOrMeetings", "mailbox"],
-            "additionalProperties": false
-          },
-          "functionalGroupId": { "type": "string", "format": "uuid" }
-        },
-        "required": ["name", "kind", "dataSensitivity", "communication"],
-        "additionalProperties": false
-      },
-      "CreatedApplicationResponseDto": {
-        "type": "object",
-        "properties": {
-          "success": { "type": "boolean", "enum": [true] },
-          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
-          "data": {
-            "type": "object",
-            "properties": {
-              "id": { "type": "string", "format": "uuid" },
-              "name": { "type": "string" },
-              "kind": { "type": "string", "enum": ["SAAS", "LICENSED", "INTERNAL"] },
-              "vendor": {
-                "type": "object",
-                "properties": { "id": { "type": "string", "format": "uuid" }, "name": { "type": "string" } },
-                "required": ["id", "name"],
-                "additionalProperties": false,
-                "nullable": true
-              },
-              "dataSensitivity": { "type": "string", "enum": ["LOW", "MEDIUM", "HIGH"] },
-              "isCommunicationService": { "type": "boolean" },
-              "responsibleItAdmin": {
-                "type": "object",
-                "properties": {
-                  "employeeId": { "type": "string", "format": "uuid" },
-                  "employeeCode": { "type": "string" },
-                  "fullName": { "type": "string" }
-                },
-                "required": ["employeeId", "employeeCode", "fullName"],
-                "additionalProperties": false,
-                "description": "The IT Admin who answers for the application (the one who declared it, or who took it over); null when nobody does.",
-                "nullable": true
-              },
-              "needsResponsible": {
-                "type": "boolean",
-                "description": "True when nobody is responsible, or the one named is no longer a working IT Admin: any IT Admin may take it over with the responsibility transfer."
-              },
-              "usageCollectionDefault": { "type": "string", "nullable": true, "enum": ["NOT_COLLECTED", null] },
-              "functionalGroup": {
-                "type": "object",
-                "properties": { "id": { "type": "string", "format": "uuid" }, "name": { "type": "string" } },
-                "required": ["id", "name"],
-                "additionalProperties": false,
-                "nullable": true
-              },
-              "status": { "type": "string", "enum": ["APPROVED", "RETIRED"] },
-              "updatedAt": { "type": "string", "format": "date-time" },
-              "dictionaryServiceLineId": { "type": "string", "format": "uuid", "nullable": true },
-              "domains": { "type": "array", "items": { "type": "string" } },
-              "communication": {
-                "type": "object",
-                "properties": {
-                  "personToPersonMessaging": { "type": "boolean" },
-                  "callsOrMeetings": { "type": "boolean" },
-                  "mailbox": { "type": "boolean" },
-                  "isCommunicationService": { "type": "boolean" },
-                  "note": { "type": "string", "nullable": true }
-                },
-                "required": ["personToPersonMessaging", "callsOrMeetings", "mailbox", "isCommunicationService", "note"],
-                "additionalProperties": false
-              },
-              "createdAt": { "type": "string", "format": "date-time" },
-              "proposedToDictionary": { "type": "boolean" }
-            },
-            "required": [
-              "id",
-              "name",
-              "kind",
-              "vendor",
-              "dataSensitivity",
-              "isCommunicationService",
-              "responsibleItAdmin",
-              "needsResponsible",
-              "usageCollectionDefault",
-              "functionalGroup",
-              "status",
-              "updatedAt",
-              "dictionaryServiceLineId",
-              "domains",
-              "communication",
-              "createdAt",
-              "proposedToDictionary"
-            ],
-            "additionalProperties": false,
-            "nullable": true
-          }
-        },
-        "required": ["success", "message", "data"],
-        "additionalProperties": false
-      },
       "ApplicationDetailResponseDto": {
         "type": "object",
         "properties": {
@@ -92373,8 +92310,16 @@
                 "additionalProperties": false,
                 "nullable": true
               },
-              "dataSensitivity": { "type": "string", "enum": ["LOW", "MEDIUM", "HIGH"] },
-              "isCommunicationService": { "type": "boolean" },
+              "dataSensitivity": { "type": "string", "enum": ["LOW", "MEDIUM", "HIGH", null], "nullable": true },
+              "logoUrl": {
+                "description": "The https link to the logo image that the IT Admin pasted, or null. The server never checks it: it may be broken, so show the first letter of the name when the image does not load.",
+                "type": "string",
+                "nullable": true
+              },
+              "isCommunicationService": {
+                "type": "boolean",
+                "description": "True when the application stands in the group Liên lạc (email, chat, meetings): the usage rules never collect it."
+              },
               "responsibleItAdmin": {
                 "type": "object",
                 "properties": {
@@ -92396,25 +92341,12 @@
                 "type": "object",
                 "properties": { "id": { "type": "string", "format": "uuid" }, "name": { "type": "string" } },
                 "required": ["id", "name"],
-                "additionalProperties": false,
-                "nullable": true
+                "additionalProperties": false
               },
               "status": { "type": "string", "enum": ["APPROVED", "RETIRED"] },
               "updatedAt": { "type": "string", "format": "date-time" },
               "dictionaryServiceLineId": { "type": "string", "format": "uuid", "nullable": true },
               "domains": { "type": "array", "items": { "type": "string" } },
-              "communication": {
-                "type": "object",
-                "properties": {
-                  "personToPersonMessaging": { "type": "boolean" },
-                  "callsOrMeetings": { "type": "boolean" },
-                  "mailbox": { "type": "boolean" },
-                  "isCommunicationService": { "type": "boolean" },
-                  "note": { "type": "string", "nullable": true }
-                },
-                "required": ["personToPersonMessaging", "callsOrMeetings", "mailbox", "isCommunicationService", "note"],
-                "additionalProperties": false
-              },
               "createdAt": { "type": "string", "format": "date-time" },
               "similarApplications": {
                 "maxItems": 20,
@@ -92452,6 +92384,7 @@
               "kind",
               "vendor",
               "dataSensitivity",
+              "logoUrl",
               "isCommunicationService",
               "responsibleItAdmin",
               "needsResponsible",
@@ -92461,7 +92394,6 @@
               "updatedAt",
               "dictionaryServiceLineId",
               "domains",
-              "communication",
               "createdAt",
               "similarApplications",
               "similarTotal",
@@ -92479,18 +92411,14 @@
         "properties": {
           "name": { "type": "string", "maxLength": 1000 },
           "domains": { "maxItems": 100, "type": "array", "items": { "type": "string", "maxLength": 1000 } },
-          "dataSensitivity": { "type": "string", "enum": ["LOW", "MEDIUM", "HIGH"] },
-          "communication": {
-            "type": "object",
-            "properties": {
-              "personToPersonMessaging": { "type": "boolean" },
-              "callsOrMeetings": { "type": "boolean" },
-              "mailbox": { "type": "boolean" },
-              "note": { "type": "string", "maxLength": 5000, "nullable": true }
-            },
-            "additionalProperties": false
+          "dataSensitivity": { "type": "string", "enum": ["LOW", "MEDIUM", "HIGH", null], "nullable": true },
+          "functionalGroupId": { "type": "string", "format": "uuid" },
+          "logoUrl": {
+            "type": "string",
+            "maxLength": 500,
+            "description": "A link to the logo image, https only; left out it stays, null removes it.",
+            "nullable": true
           },
-          "functionalGroupId": { "type": "string", "format": "uuid", "nullable": true },
           "dictionaryServiceLineId": { "type": "string", "format": "uuid", "nullable": true }
         },
         "additionalProperties": false
@@ -92513,8 +92441,16 @@
                 "additionalProperties": false,
                 "nullable": true
               },
-              "dataSensitivity": { "type": "string", "enum": ["LOW", "MEDIUM", "HIGH"] },
-              "isCommunicationService": { "type": "boolean" },
+              "dataSensitivity": { "type": "string", "enum": ["LOW", "MEDIUM", "HIGH", null], "nullable": true },
+              "logoUrl": {
+                "description": "The https link to the logo image that the IT Admin pasted, or null. The server never checks it: it may be broken, so show the first letter of the name when the image does not load.",
+                "type": "string",
+                "nullable": true
+              },
+              "isCommunicationService": {
+                "type": "boolean",
+                "description": "True when the application stands in the group Liên lạc (email, chat, meetings): the usage rules never collect it."
+              },
               "responsibleItAdmin": {
                 "type": "object",
                 "properties": {
@@ -92536,25 +92472,12 @@
                 "type": "object",
                 "properties": { "id": { "type": "string", "format": "uuid" }, "name": { "type": "string" } },
                 "required": ["id", "name"],
-                "additionalProperties": false,
-                "nullable": true
+                "additionalProperties": false
               },
               "status": { "type": "string", "enum": ["APPROVED", "RETIRED"] },
               "updatedAt": { "type": "string", "format": "date-time" },
               "dictionaryServiceLineId": { "type": "string", "format": "uuid", "nullable": true },
               "domains": { "type": "array", "items": { "type": "string" } },
-              "communication": {
-                "type": "object",
-                "properties": {
-                  "personToPersonMessaging": { "type": "boolean" },
-                  "callsOrMeetings": { "type": "boolean" },
-                  "mailbox": { "type": "boolean" },
-                  "isCommunicationService": { "type": "boolean" },
-                  "note": { "type": "string", "nullable": true }
-                },
-                "required": ["personToPersonMessaging", "callsOrMeetings", "mailbox", "isCommunicationService", "note"],
-                "additionalProperties": false
-              },
               "createdAt": { "type": "string", "format": "date-time" }
             },
             "required": [
@@ -92563,6 +92486,7 @@
               "kind",
               "vendor",
               "dataSensitivity",
+              "logoUrl",
               "isCommunicationService",
               "responsibleItAdmin",
               "needsResponsible",
@@ -92572,8 +92496,183 @@
               "updatedAt",
               "dictionaryServiceLineId",
               "domains",
-              "communication",
               "createdAt"
+            ],
+            "additionalProperties": false,
+            "nullable": true
+          }
+        },
+        "required": ["success", "message", "data"],
+        "additionalProperties": false
+      },
+      "CreateApplicationBodyDto": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string", "maxLength": 1000 },
+          "vendorName": { "type": "string", "maxLength": 1000 },
+          "dictionaryServiceLineId": { "type": "string", "format": "uuid" },
+          "homepageUrl": {
+            "description": "The web page of the software: its host is kept among the domains, and a catalog entry that has it already is a duplicate.",
+            "type": "string",
+            "maxLength": 1000
+          },
+          "domains": { "maxItems": 100, "type": "array", "items": { "type": "string", "maxLength": 1000 } },
+          "functionalGroupId": {
+            "description": "The group the application is classed under; left out, it stands in Khác.",
+            "type": "string",
+            "format": "uuid"
+          },
+          "dataSensitivity": { "type": "string", "enum": ["LOW", "MEDIUM", "HIGH", null], "nullable": true },
+          "logoUrl": {
+            "description": "A link to the logo image, https only; nothing is uploaded.",
+            "type": "string",
+            "maxLength": 500
+          },
+          "plan": {
+            "type": "object",
+            "properties": {
+              "name": { "type": "string", "maxLength": 1000 },
+              "provisioningType": { "type": "string", "enum": ["K1", "K2", "K3", "K4", "K5"] },
+              "controlLevel": { "type": "string", "enum": ["FULL", "PARTIAL", "UNCONTROLLABLE"] },
+              "revocationNote": { "type": "string", "maxLength": 5000, "nullable": true },
+              "dataLossOnRemoval": { "type": "boolean" },
+              "sharingPolicy": { "type": "string", "enum": ["ALLOWED", "NOT_ALLOWED"] },
+              "hasAdminConsole": { "type": "boolean" }
+            },
+            "required": ["name", "provisioningType"],
+            "additionalProperties": false
+          }
+        },
+        "required": ["name", "plan"],
+        "additionalProperties": false
+      },
+      "CreatedApplicationResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "enum": [true] },
+          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string", "format": "uuid" },
+              "name": { "type": "string" },
+              "kind": { "type": "string", "enum": ["SAAS", "LICENSED", "INTERNAL"] },
+              "vendor": {
+                "type": "object",
+                "properties": { "id": { "type": "string", "format": "uuid" }, "name": { "type": "string" } },
+                "required": ["id", "name"],
+                "additionalProperties": false,
+                "nullable": true
+              },
+              "dataSensitivity": { "type": "string", "enum": ["LOW", "MEDIUM", "HIGH", null], "nullable": true },
+              "logoUrl": {
+                "description": "The https link to the logo image that the IT Admin pasted, or null. The server never checks it: it may be broken, so show the first letter of the name when the image does not load.",
+                "type": "string",
+                "nullable": true
+              },
+              "isCommunicationService": {
+                "type": "boolean",
+                "description": "True when the application stands in the group Liên lạc (email, chat, meetings): the usage rules never collect it."
+              },
+              "responsibleItAdmin": {
+                "type": "object",
+                "properties": {
+                  "employeeId": { "type": "string", "format": "uuid" },
+                  "employeeCode": { "type": "string" },
+                  "fullName": { "type": "string" }
+                },
+                "required": ["employeeId", "employeeCode", "fullName"],
+                "additionalProperties": false,
+                "description": "The IT Admin who answers for the application (the one who declared it, or who took it over); null when nobody does.",
+                "nullable": true
+              },
+              "needsResponsible": {
+                "type": "boolean",
+                "description": "True when nobody is responsible, or the one named is no longer a working IT Admin: any IT Admin may take it over with the responsibility transfer."
+              },
+              "usageCollectionDefault": { "type": "string", "nullable": true, "enum": ["NOT_COLLECTED", null] },
+              "functionalGroup": {
+                "type": "object",
+                "properties": { "id": { "type": "string", "format": "uuid" }, "name": { "type": "string" } },
+                "required": ["id", "name"],
+                "additionalProperties": false
+              },
+              "status": { "type": "string", "enum": ["APPROVED", "RETIRED"] },
+              "updatedAt": { "type": "string", "format": "date-time" },
+              "dictionaryServiceLineId": { "type": "string", "format": "uuid", "nullable": true },
+              "domains": { "type": "array", "items": { "type": "string" } },
+              "createdAt": { "type": "string", "format": "date-time" },
+              "proposedToDictionary": { "type": "boolean" },
+              "plan": {
+                "type": "object",
+                "properties": {
+                  "id": { "type": "string", "format": "uuid" },
+                  "applicationId": { "type": "string", "format": "uuid" },
+                  "applicationName": { "type": "string" },
+                  "applicationLogoUrl": {
+                    "description": "The https link to the logo image of the application, or null. It may be broken: show the first letter of the application name when the image does not load.",
+                    "type": "string",
+                    "nullable": true
+                  },
+                  "name": { "type": "string" },
+                  "provisioningType": { "type": "string", "enum": ["K1", "K2", "K3", "K4", "K5"] },
+                  "pricingModel": {
+                    "type": "string",
+                    "enum": ["PER_SEAT", "FLAT_RATE", "CONCURRENT", "CONSUMPTION", "PER_HOST", null],
+                    "nullable": true
+                  },
+                  "controlLevel": {
+                    "type": "string",
+                    "enum": ["FULL", "PARTIAL", "UNCONTROLLABLE", null],
+                    "nullable": true
+                  },
+                  "dataLossOnRemoval": { "type": "boolean" },
+                  "sharingPolicy": { "type": "string", "enum": ["ALLOWED", "NOT_ALLOWED", null], "nullable": true },
+                  "hasAdminConsole": { "type": "boolean" },
+                  "seatTracking": { "type": "string", "enum": ["APPLICABLE", "NOT_APPLICABLE"] },
+                  "createdAt": { "type": "string", "format": "date-time" },
+                  "updatedAt": { "type": "string", "format": "date-time" },
+                  "revocationNote": { "type": "string", "nullable": true }
+                },
+                "required": [
+                  "id",
+                  "applicationId",
+                  "applicationName",
+                  "applicationLogoUrl",
+                  "name",
+                  "provisioningType",
+                  "pricingModel",
+                  "controlLevel",
+                  "dataLossOnRemoval",
+                  "sharingPolicy",
+                  "hasAdminConsole",
+                  "seatTracking",
+                  "createdAt",
+                  "updatedAt",
+                  "revocationNote"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": [
+              "id",
+              "name",
+              "kind",
+              "vendor",
+              "dataSensitivity",
+              "logoUrl",
+              "isCommunicationService",
+              "responsibleItAdmin",
+              "needsResponsible",
+              "usageCollectionDefault",
+              "functionalGroup",
+              "status",
+              "updatedAt",
+              "dictionaryServiceLineId",
+              "domains",
+              "createdAt",
+              "proposedToDictionary",
+              "plan"
             ],
             "additionalProperties": false,
             "nullable": true
@@ -92598,10 +92697,16 @@
                     "id": { "type": "string", "format": "uuid" },
                     "name": { "type": "string" },
                     "status": { "type": "string", "enum": ["ACTIVE", "INACTIVE"] },
+                    "systemKey": {
+                      "type": "string",
+                      "enum": ["COMMUNICATION", "OTHER", null],
+                      "description": "COMMUNICATION (Liên lạc) or OTHER (Khác) for the two fixed groups, which are never renamed or switched off; null for every other group.",
+                      "nullable": true
+                    },
                     "createdAt": { "type": "string", "format": "date-time" },
                     "updatedAt": { "type": "string", "format": "date-time" }
                   },
-                  "required": ["id", "name", "status", "createdAt", "updatedAt"],
+                  "required": ["id", "name", "status", "systemKey", "createdAt", "updatedAt"],
                   "additionalProperties": false
                 }
               },
@@ -92647,10 +92752,16 @@
               "id": { "type": "string", "format": "uuid" },
               "name": { "type": "string" },
               "status": { "type": "string", "enum": ["ACTIVE", "INACTIVE"] },
+              "systemKey": {
+                "type": "string",
+                "enum": ["COMMUNICATION", "OTHER", null],
+                "description": "COMMUNICATION (Liên lạc) or OTHER (Khác) for the two fixed groups, which are never renamed or switched off; null for every other group.",
+                "nullable": true
+              },
               "createdAt": { "type": "string", "format": "date-time" },
               "updatedAt": { "type": "string", "format": "date-time" }
             },
-            "required": ["id", "name", "status", "createdAt", "updatedAt"],
+            "required": ["id", "name", "status", "systemKey", "createdAt", "updatedAt"],
             "additionalProperties": false,
             "nullable": true
           }
@@ -92682,6 +92793,11 @@
                     "id": { "type": "string", "format": "uuid" },
                     "applicationId": { "type": "string", "format": "uuid" },
                     "applicationName": { "type": "string" },
+                    "applicationLogoUrl": {
+                      "description": "The https link to the logo image of the application, or null. It may be broken: show the first letter of the application name when the image does not load.",
+                      "type": "string",
+                      "nullable": true
+                    },
                     "name": { "type": "string" },
                     "provisioningType": { "type": "string", "enum": ["K1", "K2", "K3", "K4", "K5"] },
                     "pricingModel": {
@@ -92705,6 +92821,7 @@
                     "id",
                     "applicationId",
                     "applicationName",
+                    "applicationLogoUrl",
                     "name",
                     "provisioningType",
                     "pricingModel",
@@ -92774,6 +92891,11 @@
               "id": { "type": "string", "format": "uuid" },
               "applicationId": { "type": "string", "format": "uuid" },
               "applicationName": { "type": "string" },
+              "applicationLogoUrl": {
+                "description": "The https link to the logo image of the application, or null. It may be broken: show the first letter of the application name when the image does not load.",
+                "type": "string",
+                "nullable": true
+              },
               "name": { "type": "string" },
               "provisioningType": { "type": "string", "enum": ["K1", "K2", "K3", "K4", "K5"] },
               "pricingModel": {
@@ -92798,6 +92920,7 @@
               "id",
               "applicationId",
               "applicationName",
+              "applicationLogoUrl",
               "name",
               "provisioningType",
               "pricingModel",
@@ -92828,6 +92951,11 @@
               "id": { "type": "string", "format": "uuid" },
               "applicationId": { "type": "string", "format": "uuid" },
               "applicationName": { "type": "string" },
+              "applicationLogoUrl": {
+                "description": "The https link to the logo image of the application, or null. It may be broken: show the first letter of the application name when the image does not load.",
+                "type": "string",
+                "nullable": true
+              },
               "name": { "type": "string" },
               "provisioningType": { "type": "string", "enum": ["K1", "K2", "K3", "K4", "K5"] },
               "pricingModel": {
@@ -92931,6 +93059,7 @@
               "id",
               "applicationId",
               "applicationName",
+              "applicationLogoUrl",
               "name",
               "provisioningType",
               "pricingModel",
@@ -94632,6 +94761,11 @@
                     "id": { "type": "string", "format": "uuid" },
                     "name": { "type": "string" },
                     "kind": { "type": "string", "enum": ["SAAS", "LICENSED", "INTERNAL"] },
+                    "logoUrl": {
+                      "description": "The https link to the logo image, or null. It may be broken: show the first letter of the name when the image does not load.",
+                      "type": "string",
+                      "nullable": true
+                    },
                     "vendorName": { "type": "string", "nullable": true },
                     "functionalGroup": {
                       "type": "object",
@@ -94665,6 +94799,7 @@
                     "id",
                     "name",
                     "kind",
+                    "logoUrl",
                     "vendorName",
                     "functionalGroup",
                     "planCount",
@@ -94711,6 +94846,11 @@
               "id": { "type": "string", "format": "uuid" },
               "name": { "type": "string" },
               "kind": { "type": "string", "enum": ["SAAS", "LICENSED", "INTERNAL"] },
+              "logoUrl": {
+                "description": "The https link to the logo image, or null. It may be broken: show the first letter of the name when the image does not load.",
+                "type": "string",
+                "nullable": true
+              },
               "vendorName": { "type": "string", "nullable": true },
               "functionalGroup": {
                 "type": "object",
@@ -94734,12 +94874,13 @@
                 "description": "Why it cannot be sent: the department of the caller has no Cost Center in use yet.",
                 "nullable": true
               },
-              "dataSensitivity": { "type": "string", "enum": ["LOW", "MEDIUM", "HIGH"] }
+              "dataSensitivity": { "type": "string", "enum": ["LOW", "MEDIUM", "HIGH", null], "nullable": true }
             },
             "required": [
               "id",
               "name",
               "kind",
+              "logoUrl",
               "vendorName",
               "functionalGroup",
               "planCount",
@@ -94776,9 +94917,14 @@
                       "properties": {
                         "id": { "type": "string", "format": "uuid" },
                         "name": { "type": "string" },
-                        "kind": { "type": "string", "enum": ["SAAS", "LICENSED", "INTERNAL"] }
+                        "kind": { "type": "string", "enum": ["SAAS", "LICENSED", "INTERNAL"] },
+                        "logoUrl": {
+                          "description": "The https link to the logo image that the IT Admin pasted, or null. The server never checks it: it may be broken, so show the first letter of the name when the image does not load.",
+                          "type": "string",
+                          "nullable": true
+                        }
                       },
-                      "required": ["id", "name", "kind"],
+                      "required": ["id", "name", "kind", "logoUrl"],
                       "additionalProperties": false
                     },
                     "price": {
@@ -94864,9 +95010,14 @@
                 "properties": {
                   "id": { "type": "string", "format": "uuid" },
                   "name": { "type": "string" },
-                  "kind": { "type": "string", "enum": ["SAAS", "LICENSED", "INTERNAL"] }
+                  "kind": { "type": "string", "enum": ["SAAS", "LICENSED", "INTERNAL"] },
+                  "logoUrl": {
+                    "description": "The https link to the logo image that the IT Admin pasted, or null. The server never checks it: it may be broken, so show the first letter of the name when the image does not load.",
+                    "type": "string",
+                    "nullable": true
+                  }
                 },
-                "required": ["id", "name", "kind"],
+                "required": ["id", "name", "kind", "logoUrl"],
                 "additionalProperties": false
               },
               "price": {
@@ -95261,12 +95412,26 @@
                     "entryId": { "type": "string", "format": "uuid" },
                     "applicationId": { "type": "string", "format": "uuid" },
                     "applicationName": { "type": "string" },
+                    "applicationLogoUrl": {
+                      "description": "The https link to the logo image that the IT Admin pasted, or null. The server never checks it: it may be broken, so show the first letter of the name when the image does not load.",
+                      "type": "string",
+                      "nullable": true
+                    },
                     "planId": { "type": "string", "format": "uuid", "nullable": true },
                     "planName": { "type": "string", "nullable": true },
                     "note": { "type": "string", "nullable": true },
                     "addedAt": { "type": "string" }
                   },
-                  "required": ["entryId", "applicationId", "applicationName", "planId", "planName", "note", "addedAt"],
+                  "required": [
+                    "entryId",
+                    "applicationId",
+                    "applicationName",
+                    "applicationLogoUrl",
+                    "planId",
+                    "planName",
+                    "note",
+                    "addedAt"
+                  ],
                   "additionalProperties": false
                 }
               },
@@ -95333,12 +95498,26 @@
                     "entryId": { "type": "string", "format": "uuid" },
                     "applicationId": { "type": "string", "format": "uuid" },
                     "applicationName": { "type": "string" },
+                    "applicationLogoUrl": {
+                      "description": "The https link to the logo image that the IT Admin pasted, or null. The server never checks it: it may be broken, so show the first letter of the name when the image does not load.",
+                      "type": "string",
+                      "nullable": true
+                    },
                     "planId": { "type": "string", "format": "uuid", "nullable": true },
                     "planName": { "type": "string", "nullable": true },
                     "note": { "type": "string", "nullable": true },
                     "addedAt": { "type": "string" }
                   },
-                  "required": ["entryId", "applicationId", "applicationName", "planId", "planName", "note", "addedAt"],
+                  "required": [
+                    "entryId",
+                    "applicationId",
+                    "applicationName",
+                    "applicationLogoUrl",
+                    "planId",
+                    "planName",
+                    "note",
+                    "addedAt"
+                  ],
                   "additionalProperties": false
                 }
               },
@@ -95369,12 +95548,26 @@
                     "entryId": { "type": "string", "format": "uuid" },
                     "applicationId": { "type": "string", "format": "uuid" },
                     "applicationName": { "type": "string" },
+                    "applicationLogoUrl": {
+                      "description": "The https link to the logo image that the IT Admin pasted, or null. The server never checks it: it may be broken, so show the first letter of the name when the image does not load.",
+                      "type": "string",
+                      "nullable": true
+                    },
                     "planId": { "type": "string", "format": "uuid", "nullable": true },
                     "planName": { "type": "string", "nullable": true },
                     "note": { "type": "string", "nullable": true },
                     "addedAt": { "type": "string" }
                   },
-                  "required": ["entryId", "applicationId", "applicationName", "planId", "planName", "note", "addedAt"],
+                  "required": [
+                    "entryId",
+                    "applicationId",
+                    "applicationName",
+                    "applicationLogoUrl",
+                    "planId",
+                    "planName",
+                    "note",
+                    "addedAt"
+                  ],
                   "additionalProperties": false
                 }
               },
@@ -95437,6 +95630,11 @@
                   },
                   "applicationId": { "type": "string", "format": "uuid" },
                   "applicationName": { "type": "string" },
+                  "applicationLogoUrl": {
+                    "description": "The https link to the logo image that the IT Admin pasted, or null. The server never checks it: it may be broken, so show the first letter of the name when the image does not load.",
+                    "type": "string",
+                    "nullable": true
+                  },
                   "planId": { "type": "string", "format": "uuid", "nullable": true },
                   "planName": { "type": "string", "nullable": true },
                   "reason": { "type": "string" },
@@ -95460,6 +95658,7 @@
                   "department",
                   "applicationId",
                   "applicationName",
+                  "applicationLogoUrl",
                   "planId",
                   "planName",
                   "reason",
@@ -95506,6 +95705,11 @@
                     },
                     "applicationId": { "type": "string", "format": "uuid" },
                     "applicationName": { "type": "string" },
+                    "applicationLogoUrl": {
+                      "description": "The https link to the logo image that the IT Admin pasted, or null. The server never checks it: it may be broken, so show the first letter of the name when the image does not load.",
+                      "type": "string",
+                      "nullable": true
+                    },
                     "planId": { "type": "string", "format": "uuid", "nullable": true },
                     "planName": { "type": "string", "nullable": true },
                     "reason": { "type": "string" },
@@ -95529,6 +95733,7 @@
                     "department",
                     "applicationId",
                     "applicationName",
+                    "applicationLogoUrl",
                     "planId",
                     "planName",
                     "reason",
@@ -95590,6 +95795,11 @@
                   },
                   "applicationId": { "type": "string", "format": "uuid" },
                   "applicationName": { "type": "string" },
+                  "applicationLogoUrl": {
+                    "description": "The https link to the logo image that the IT Admin pasted, or null. The server never checks it: it may be broken, so show the first letter of the name when the image does not load.",
+                    "type": "string",
+                    "nullable": true
+                  },
                   "planId": { "type": "string", "format": "uuid", "nullable": true },
                   "planName": { "type": "string", "nullable": true },
                   "reason": { "type": "string" },
@@ -95613,6 +95823,7 @@
                   "department",
                   "applicationId",
                   "applicationName",
+                  "applicationLogoUrl",
                   "planId",
                   "planName",
                   "reason",
@@ -97730,8 +97941,16 @@
                     "assignmentId": { "type": "string", "format": "uuid" },
                     "application": {
                       "type": "object",
-                      "properties": { "id": { "type": "string", "format": "uuid" }, "name": { "type": "string" } },
-                      "required": ["id", "name"],
+                      "properties": {
+                        "id": { "type": "string", "format": "uuid" },
+                        "name": { "type": "string" },
+                        "logoUrl": {
+                          "description": "The https link to the logo image that the IT Admin pasted, or null. The server never checks it: it may be broken, so show the first letter of the name when the image does not load.",
+                          "type": "string",
+                          "nullable": true
+                        }
+                      },
+                      "required": ["id", "name", "logoUrl"],
                       "additionalProperties": false
                     },
                     "plan": {
