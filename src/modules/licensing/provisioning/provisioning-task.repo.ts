@@ -130,6 +130,26 @@ export class ProvisioningTaskRepo {
     return toRecord(row);
   }
 
+  /**
+   * The grant task a request already has for a person that was neither cancelled nor closed as failed (a task that is over without a seat
+   * is no answer to a second press), the newest first; `employeeId` names the person of a request for a group, whose line each task answers
+   * for. Null when there is none.
+   */
+  async findGrantOf(requestId: string, employeeId?: string, tx?: DbTx): Promise<ProvisioningTaskRecord | null> {
+    const row = await (tx ?? this.prisma).provisioningTask.findFirst({
+      where: {
+        kind: 'GRANT',
+        requestId,
+        status: { notIn: ['CANCELLED', 'CLOSED_FAILED'] },
+        ...(employeeId === undefined ? {} : { assignment: { employeeId } }),
+      },
+      include: WITH_ASSIGNMENT,
+      orderBy: [{ createdAt: 'desc' }, { id: 'desc' }],
+    });
+
+    return row ? toRecord(row) : null;
+  }
+
   async find(id: string, tx?: DbTx): Promise<ProvisioningTaskRecord | null> {
     const row = await (tx ?? this.prisma).provisioningTask.findUnique({ where: { id }, include: WITH_ASSIGNMENT });
 

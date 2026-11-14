@@ -157,13 +157,15 @@ describe('the grant of the people of a request for a group, one person at a time
       expect(await h.state(id)).toBe('EXECUTING');
     });
 
-    it('grants one person once: a second grant of the same line finds it carried out', async () => {
+    it('grants one person once: a second grant of the same line gives back the task that exists, and the other person is still to be granted', async () => {
       const { people, id } = await approved(2);
-      await granted(id, people[0].employeeId);
+      const first = await granted(id, people[0].employeeId);
 
-      const again = await grant(id, people[0].employeeId).expect(409);
+      const again = h.dataOf<{ task: TaskWire }>(await grant(id, people[0].employeeId).expect(201)).task;
 
-      expect(h.codeOf(again)).toBe('PROVISIONING.REQUEST_ENDED');
+      expect(again.id).toBe(first.id);
+      expect(await assignments(id)).toHaveLength(1);
+      expect(await h.lineStates(id)).toEqual(['EXECUTING', 'APPROVED']);
     });
   });
 

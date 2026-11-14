@@ -37,6 +37,8 @@ describe('cancelling the grant of a request for a beneficiary who was transferre
       }),
     );
   const granted = async () => h.granted(await h.person(`E-TR${(counter += 1)}`), planId, { subscriptionId });
+  /** A task nobody has worked: the grant takes the work for whoever presses it, so it is one put back in the queue after a failure. */
+  const queued = async () => h.unclaimed((await granted()).id);
   const VENDOR_CHECKED = 'The vendor confirmed the invitation was taken back';
   const taskRow = async (id: string) =>
     (
@@ -59,7 +61,7 @@ describe('cancelling the grant of a request for a beneficiary who was transferre
 
   it('needs the confirmation of the check with the vendor even for a task nobody has worked, and then cancels it with its assignment so the seat is free again', async () => {
     const before = await h.freeSeats(subscriptionId);
-    const task = await granted();
+    const task = await queued();
     expect(await h.freeSeats(subscriptionId)).toBe((before ?? 0) - 1);
 
     expect(await cancel(task.requestId, 'BENEFICIARY_TRANSFERRED')).toEqual({ status: 'EVIDENCE_REQUIRED' });
@@ -83,8 +85,8 @@ describe('cancelling the grant of a request for a beneficiary who was transferre
   });
 
   it('keeps the withdrawal of the requester and the departure of the beneficiary as before: a task nobody has worked needs no evidence', async () => {
-    const withdrawn = await granted();
-    const left = await granted();
+    const withdrawn = await queued();
+    const left = await queued();
 
     expect(await cancel(withdrawn.requestId, 'REQUESTER_WITHDREW')).toMatchObject({ status: 'CANCELLED' });
     expect(await cancel(left.requestId, 'BENEFICIARY_LEFT')).toMatchObject({ status: 'CANCELLED' });

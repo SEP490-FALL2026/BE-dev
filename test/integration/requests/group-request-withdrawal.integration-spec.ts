@@ -142,7 +142,8 @@ describe('withdrawing one person of a request for a group, or what is left of it
 
     it('cancels the task and the assignment of a person nobody has worked, as cancelled and never as failed', async () => {
       const { u, people, id } = await approved(3);
-      await granted(id, people[2].employeeId);
+      // Nobody has worked it: the grant takes the work for whoever presses it, so this is a task put back in the queue after a failure.
+      await h.unclaimed((await granted(id, people[2].employeeId)).id);
 
       await h.withdrawLine(id, people[2].employeeId, {}, u.head.account).expect(200);
 
@@ -218,7 +219,7 @@ describe('withdrawing one person of a request for a group, or what is left of it
       const [e1, e2, e3] = people;
       const done = await granted(id, e1.employeeId);
       await completed(done.id);
-      await granted(id, e2.employeeId);
+      await h.unclaimed((await granted(id, e2.employeeId)).id);
       const others = [...(await shareOf(id, e2.employeeId)), ...(await shareOf(id, e3.employeeId))];
 
       await h.withdrawRequest(id, { reason: 'The rest are not needed' }, u.head.account).expect(200);

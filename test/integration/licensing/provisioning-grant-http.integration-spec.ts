@@ -59,14 +59,15 @@ describe('the grant of a seat over HTTP (integration, real PostgreSQL)', () => {
     expect(task).toMatchObject({
       kind: 'GRANT',
       channel: 'MANUAL',
-      status: 'QUEUED',
+      // The IT Admin who presses "Grant" takes the work: the task is theirs from the start, whoever is in charge by default.
+      status: 'IN_PROGRESS',
       subscriptionId,
       accountIdentifier: 'e-5@acme.vn',
       defaultResponsibleEmployeeId: a1Employee,
       inGeneralQueue: false,
       beneficiary: { employeeId: e5, employeeCode: 'E-5' },
       plan: { provisioningType: 'K2' },
-      claimedBy: null,
+      claimedBy: h.it1.appUserId,
       completedBy: null,
     });
     expect(await h.freeSeats(subscriptionId)).toBe(0);
@@ -113,7 +114,7 @@ describe('the grant of a seat over HTTP (integration, real PostgreSQL)', () => {
     expect(forAssignment.map((event) => event.action)).toEqual(['LICENSE_ASSIGNMENT.CREATED']);
     expect(forAssignment[0].after).toMatchObject({ source: 'REQUEST', requestId: task.requestId });
     expect(JSON.stringify(forAssignment[0].after)).not.toContain('e-7@acme.vn');
-    expect(forTask.map((event) => event.action)).toEqual(['PROVISIONING_TASK.CREATED']);
+    expect(forTask.map((event) => event.action)).toEqual(['PROVISIONING_TASK.CREATED', 'PROVISIONING_TASK.CLAIMED']);
     expect(forTask[0]).toMatchObject({
       actor_app_user_id: h.it1.appUserId,
       before: null,
@@ -210,7 +211,7 @@ describe('the grant of a seat over HTTP (integration, real PostgreSQL)', () => {
 
     const task = await h.granted(e6, k5);
 
-    expect(task).toMatchObject({ subscriptionId: null, plan: { provisioningType: 'K5' }, status: 'QUEUED' });
+    expect(task).toMatchObject({ subscriptionId: null, plan: { provisioningType: 'K5' }, status: 'IN_PROGRESS' });
     expect(
       (
         await h.ctx.sql.query<{ subscription_id: string | null }>(
@@ -528,7 +529,7 @@ describe('the grant of a seat over HTTP (integration, real PostgreSQL)', () => {
     expect(await assignmentsOf(e5)).toBe(held);
 
     const task = await h.granted(e5, planId, { subscriptionId });
-    expect(task.status).toBe('QUEUED');
+    expect(task.status).toBe('IN_PROGRESS');
     expect(
       (
         await h.ctx.sql.query<{ source: string }>(`SELECT source FROM license_assignments WHERE id = $1`, [

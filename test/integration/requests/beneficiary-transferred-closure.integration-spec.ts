@@ -176,7 +176,7 @@ describe('closing a request because its person was transferred (integration, rea
 
       expect(h.codeOf(refused)).toBe('ACCESS_REQUEST.EVIDENCE_REQUIRED');
       expect(await h.state(id)).toBe('EXECUTING');
-      expect(await taskOf(id)).toMatchObject({ status: 'QUEUED' });
+      expect(await taskOf(id)).toMatchObject({ status: 'IN_PROGRESS' });
 
       await h
         .closeForDeparture(id, { ...reason, evidence: 'Checked with the vendor and collected the invitation' }, h.it1)

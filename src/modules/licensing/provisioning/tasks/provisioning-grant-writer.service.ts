@@ -94,22 +94,85 @@ export class ProvisioningGrantWriter {
       maxAttempts,
       ...(bought && { purchase: bought }),
     });
+
+    return this.recordTask(tx, actor, {
+      task,
+      organizationId: organization.id,
+      assignmentId: assignment.id,
+      input,
+      holder,
+    });
+  }
+
+  /**
+   * The audit event of the task, then the claim of the IT Admin who made it (`QĐ-111m`), then the notice to the Super Admin when the IT
+   * Admin answers for the account themselves because no other can (`SoD-5`). Returns the task as it stands, taken.
+   */
+  private async recordTask(
+    tx: DbTx,
+    actor: AuthenticatedPrincipal,
+    facts: {
+      task: ProvisioningTaskRecord;
+      organizationId: string;
+      assignmentId: string;
+      input: GrantInput;
+      holder: { selfExecuted: boolean | null };
+    },
+  ): Promise<ProvisioningTaskRecord> {
+    const { task, organizationId, holder } = facts;
     await this.audit.record(
       tx,
       licensingAuditEvent(
         actor,
-        organization.id,
+        organizationId,
         'PROVISIONING_TASK.CREATED',
         'ProvisioningTask',
         task.id,
         null,
-        grantTaskAudit(input.requestId, assignment.id, task, holder.selfExecuted),
+        grantTaskAudit(facts.input.requestId, facts.assignmentId, task, holder.selfExecuted),
       ),
     );
-    // An IT Admin who answers for the account themselves because no other can is told to the Super Admin (`SoD-5`).
-    if (holder.selfExecuted === true) await this.frame.tellSuperAdmin(tx, organization.id, task.id, actor.employeeId);
+    const taken = await this.takeTask(tx, actor, { task, organizationId, selfExecuted: holder.selfExecuted });
+    if (holder.selfExecuted === true) await this.frame.tellSuperAdmin(tx, organizationId, task.id, actor.employeeId);
 
-    return task;
+    return taken;
+  }
+
+  /**
+   * The IT Admin who presses "Grant" takes the work (`QĐ-111m`): the task is theirs from the moment it exists, with the event of the claim as any
+   * other claim of a task has it (what the task was before, who took it).
+   */
+  private async takeTask(
+    tx: DbTx,
+    actor: AuthenticatedPrincipal,
+    facts: { task: ProvisioningTaskRecord; organizationId: string; selfExecuted: boolean | null },
+  ): Promise<ProvisioningTaskRecord> {
+    const { task } = facts;
+    await this.repo.markClaimed(tx, task.id, actor.appUserId, new Date());
+    await this.audit.record(
+      tx,
+      licensingAuditEvent(
+        actor,
+        facts.organizationId,
+        'PROVISIONING_TASK.CLAIMED',
+        'ProvisioningTask',
+        task.id,
+        {
+          status: task.status,
+          claimedBy: task.claimedByAppUserId,
+          attempts: task.attempts,
+          defaultResponsibleEmployeeId: task.defaultResponsibleEmployeeId,
+        },
+        {
+          status: 'IN_PROGRESS',
+          claimedBy: actor.appUserId,
+          defaultResponsibleEmployeeId: task.defaultResponsibleEmployeeId,
+          selfExecuted: facts.selfExecuted === true,
+        },
+      ),
+    );
+
+    return (await this.repo.find(task.id, tx)) ?? task;
   }
 
   /**

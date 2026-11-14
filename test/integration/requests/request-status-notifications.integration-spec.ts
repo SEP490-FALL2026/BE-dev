@@ -398,7 +398,8 @@ describe('the status of a request told to the people it concerns, over PostgreSQ
     it('tells the IT Admin and Finance once that what was held went back, and the IT Admin that the task of the grant was cancelled', async () => {
       const u = await example();
       const id = await approved(u);
-      const task = await granted(id);
+      // Nobody has worked it: the grant takes the work for whoever presses it, so this is a task put back in the queue after a failure.
+      const task = await h.unclaimed((await granted(id)).id);
 
       await h.withdrawRequest(id, {}, u.member.account).expect(200);
       await h.project();

@@ -117,6 +117,13 @@ describe('the requests and grants of a person who left (integration, real Postgr
   const granted = async (requestId: string, which = 0): Promise<string> =>
     h.dataOf<{ task: TaskWire }>(await h.grant({ requestId, subscriptionId: plans[which].subscriptionId }).expect(201))
       .task.id;
+  /** A task nobody has worked: the grant takes the work for whoever presses it, so it is one put back in the queue after a failure. */
+  const grantedInQueue = async (requestId: string, which = 0): Promise<string> => {
+    const id = await granted(requestId, which);
+    await h.unclaimed(id);
+
+    return id;
+  };
   /** The person has left: the departure is recorded and the day arrives. */
   const left = async (person: Person): Promise<CaseWire> => {
     const wire = await h.recordedCase(person);
@@ -285,7 +292,7 @@ describe('the requests and grants of a person who left (integration, real Postgr
     it('ends a request that holds money and a task nobody worked as cancelled: the seat is free, the money back, nothing failed', async () => {
       const u = await example();
       const id = await approvedFor(u, u.leaver, 15 * M);
-      const task = await granted(id);
+      const task = await grantedInQueue(id);
       // The seat is on the subscription the department of the request owns (QĐ-89a), not on the one of the seeded department.
       const ownSubscription = plans[0].subscriptionId;
       const free = await h.freeSeats(ownSubscription);
@@ -492,7 +499,7 @@ describe('the requests and grants of a person who left (integration, real Postgr
       const other = await h.worker(u.department, `LR-L${(n += 1)}`);
       const request = await approvedFor(u, other, 5 * M);
       const queued = await approvedFor(u, other, 5 * M, 1);
-      const task = await granted(queued, 1);
+      const task = await grantedInQueue(queued, 1);
       await left(other);
 
       const refusedGrant = await h.grant({ requestId: request, subscriptionId: plans[0].subscriptionId }).expect(409);
@@ -511,7 +518,7 @@ describe('the requests and grants of a person who left (integration, real Postgr
       const workingTask = await granted(working);
       await h.claim(workingTask).expect(200);
       const queued = await approvedFor(u, u.leaver, 5 * M, 1);
-      const queuedTask = await granted(queued, 1);
+      const queuedTask = await grantedInQueue(queued, 1);
       const fresh = await approvedFor(u, u.leaver, 5 * M, 2);
       const departure = await h.recordedCase(u.leaver);
       // Before the day of the block the grant goes on as it did: the person is still at work.
@@ -538,7 +545,7 @@ describe('the requests and grants of a person who left (integration, real Postgr
     it('holds the beneficiary FOR SHARE before it reads the block, as the grant does: a departure that blocks them meanwhile is seen', async () => {
       const u = await example();
       const queued = await approvedFor(u, u.leaver, 5 * M);
-      const task = await granted(queued);
+      const task = await grantedInQueue(queued);
       await h.recordedCase(u.leaver);
       const holder = new Client({ connectionString: h.ctx.database.url });
       await holder.connect();

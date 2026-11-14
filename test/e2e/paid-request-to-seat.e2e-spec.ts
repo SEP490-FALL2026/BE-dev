@@ -108,12 +108,11 @@ describe('a paid request from the employee to the seat (e2e, D-1)', () => {
     expect(waiting.items.map((item) => item.requestId)).toContain(requestId);
   });
 
-  it('the IT Admin grants, takes and completes the task: the employee holds the seat and the request is completed', async () => {
+  it('the IT Admin grants, which takes the task for them, and completes it: the employee holds the seat and the request is completed', async () => {
     task = h.dataOf<{ task: TaskWire }>(await h.grant({ requestId, subscriptionId }).expect(201)).task;
-    expect(task).toMatchObject({ kind: 'GRANT', status: 'QUEUED', requestId });
+    expect(task).toMatchObject({ kind: 'GRANT', status: 'IN_PROGRESS', requestId });
     expect((await requestOf(requestId)).state).toBe('EXECUTING');
 
-    await h.claim(task.id).expect(200);
     await h.complete(task.id, { evidence: 'Invited by work email' }).expect(200);
 
     expect((await requestOf(requestId)).state).toBe('COMPLETED');

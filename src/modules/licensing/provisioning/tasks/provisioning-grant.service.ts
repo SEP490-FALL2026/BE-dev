@@ -1,6 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { TransactionRunner } from '../../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../../infrastructure/security/tokens/access-token-verifier.port';
+import { GrantRequestRefusedError } from '../../public/licensing.errors';
+import { ProvisioningTaskRepo } from '../provisioning-task.repo';
 import { ProvisioningTaskViewService, type TaskView } from '../provisioning-task-view.service';
 import { ProvisioningGrantPlanner, type GrantInput } from './provisioning-grant-planner.service';
 import { grantWarnings } from './provisioning-grant.policy';
@@ -17,6 +19,11 @@ import { PurchaseNotAllowedError } from '../../shared-pool/shared-pool.errors';
  * SeatQuantityUnknownError, EmployeeNotFoundError, ProvisioningBeneficiaryDepartedError, ProvisioningBeneficiaryNotStartedError,
  * ProvisioningPersonalAccountError, ProvisioningAccountIdentifierRequiredError, ProvisioningResponsibleNotInDepartmentError,
  * ProvisioningResponsibleInvalidError, ProvisioningAnotherItAdminNeededError and AssignmentConflictError.
+ *
+ * The task is the IT Admin's from the moment it exists: whoever presses "Grant" takes the work (`QĐ-111m`). Pressing it again for the same
+ * request and person, or another IT Admin pressing it, makes nothing new: the answer is the task that exists, whoever took it, so that a double
+ * click or two IT Admins at once leave one seat and one task. A task that was cancelled or closed as failed is not an answer: the request
+ * ended with it.
  */
 @Injectable()
 export class ProvisioningGrantService {
@@ -26,17 +33,28 @@ export class ProvisioningGrantService {
     private readonly writer: ProvisioningGrantWriter,
     private readonly views: ProvisioningTaskViewService,
     private readonly refusals: ProvisioningPurchaseRefusal,
+    private readonly tasks: ProvisioningTaskRepo,
   ) {}
 
   async grant(
     actor: AuthenticatedPrincipal,
     input: GrantInput,
   ): Promise<{ task: TaskView; warnings: 'DEPARTMENT_WITHOUT_IT_ADMIN'[] }> {
-    const planned = await this.planner.plan(actor, input);
+    let planned;
+    try {
+      planned = await this.planner.plan(actor, input);
+    } catch (error) {
+      const taken = await this.takenBy(error, input);
+      if (taken) return taken;
+      throw error;
+    }
     let record;
     try {
       record = await this.runner.run((tx) => this.writer.write(tx, actor, input, planned));
     } catch (error) {
+      // Another press took the request between the read above and the lock of the write: its task is the answer.
+      const taken = await this.takenBy(error, input);
+      if (taken) return taken;
       // The grant rolled back with nothing kept; the refusal of the purchase is the one thing that is (`US-07-13` AC-2).
       if (error instanceof PurchaseNotAllowedError) {
         await this.refusals.record(actor, {
@@ -50,5 +68,15 @@ export class ProvisioningGrantService {
     }
 
     return { task: (await this.views.views([record]))[0], warnings: grantWarnings(planned.inCharge) };
+  }
+  /** The task that already answers for the request and the person, when the request is refused because it has been carried out; else null. */
+  private async takenBy(
+    error: unknown,
+    input: GrantInput,
+  ): Promise<{ task: TaskView; warnings: 'DEPARTMENT_WITHOUT_IT_ADMIN'[] } | null> {
+    if (!(error instanceof GrantRequestRefusedError) || error.reason !== 'ENDED') return null;
+    const task = await this.tasks.findGrantOf(input.requestId, input.beneficiaryEmployeeId);
+
+    return task ? { task: (await this.views.views([task]))[0], warnings: [] } : null;
   }
 }
