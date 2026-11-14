@@ -111,6 +111,13 @@ describe('BR-MF1-09: the commitment made on 01/01 for a right that goes on', () 
       });
     });
 
+    it('QĐ-111an: a price left in another currency is no price to commit: nothing converts it and nothing is held in its own currency', () => {
+      expect(amount([seat()], { ...MONTHLY, unitPrice: { amountMinor: 2000n, currency: 'USD' } })).toEqual({
+        status: 'SKIPPED',
+        reason: 'NO_PRICE',
+      });
+    });
+
     it('BR-MF1-09e: an amount larger than a money value may hold is told as such, not as a missing price', () => {
       const huge: YearStartPrice = { ...MONTHLY, unitPrice: { amountMinor: 10n ** 15n, currency: 'VND' } };
       expect(amount([seat()], huge)).toEqual({ status: 'SKIPPED', reason: 'AMOUNT_TOO_LARGE' });
@@ -171,6 +178,13 @@ describe('BR-MF1-09e: what the pass does with one request', () => {
     expect(judge({ seats: [seat({ expectedEndDate: '2026-12-31' })] })).toEqual({ status: 'NOTHING' });
     // No seat is judged before the Cost Center: a request that is over is never reported as missing one.
     expect(judge({ seats: [], costCenterId: null })).toEqual({ status: 'NOTHING' });
+  });
+
+  it('QĐ-111an: a plan priced in another currency is left out as a plan with no price', () => {
+    expect(judge({ price: { ...MONTHLY, unitPrice: { amountMinor: 2000n, currency: 'USD' } } })).toEqual({
+      status: 'LEFT_OUT',
+      reason: 'NO_PRICE',
+    });
   });
 
   it('BR-MF1-09e: an amount too large is left out with that reason', () => {

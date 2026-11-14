@@ -225,12 +225,11 @@ cùng cần; phần ghi nằm ở `assessment/assessment.repo.ts`.
   rồi khóa năm ngân sách (`budgets/budget/budget-year-lock.repo.ts`).
 - Khoản 01/01 (`year-start-commitments/`, `BudgetsApi.holdYearStart`): `YearStartCommitmentsSweeper` mỗi giờ trong tiến trình API (ADR-0018); lượt đầu
   của năm sau 00:00 giờ tổ chức giữ cho mỗi Request trả phí `K1`/`K2` đang chạy hoặc đã duyệt chi chưa cấp một khoản của năm mới (giá tháng của
-  gói hiệu lực ngày 01/01 × số tháng của năm, mỗi seat, quy về tiền tệ báo cáo bằng `FinanceApi.snapshotMoney` tỷ giá 01/01, không có thì tỷ giá
-  ngày chạy, không có nữa ⟹ bỏ qua `NO_RATE`), rồi ghi dấu `year_start_commitment_runs`; lượt sau trong năm không đọc gì. Seat đi theo chuỗi
+  gói hiệu lực ngày 01/01 × số tháng của năm, mỗi seat, bằng đồng như giá ghi — không quy đổi, giá còn ở ngoại tệ ⟹ bỏ qua `NO_PRICE`), rồi ghi dấu `year_start_commitment_runs`; lượt sau trong năm không đọc gì. Seat đi theo chuỗi
   `predecessor_id` tới bản ghi đang chạy; Cost Center của phòng sở hữu bản ghi đó (tài khoản dịch vụ bàn giao sang phòng khác ⟹ phòng mới). Request
   gia hạn (`RENEWAL`) giữ khoản của bản ghi kế tiếp nó tạo; Request cấp ban đầu không giữ phần đã được gia hạn. Mỗi bước (mở, mỗi lô) một
   transaction, trước hết `pg_try_advisory_xact_lock` theo (tổ chức, năm) — instance khác đang giữ thì bỏ lượt (`BUSY`); trong lô: khóa hàng Request
-  `FOR UPDATE` theo id, đọc grant (không khóa), tổ chức `FOR SHARE` khi quy đổi, rồi khóa năm của Cost Center theo id — cùng thứ tự với mọi ghi ngân
+  `FOR UPDATE` theo id, đọc grant (không khóa), rồi khóa năm của Cost Center theo id — cùng thứ tự với mọi ghi ngân
   sách. Lượt lỗi giữa chừng: lượt sau đi tiếp sau `resume_after_id`, không ghi lại audit bỏ qua. Tổ chức chưa có dấu: lượt đầu chỉ đánh dấu khi chưa
   có Request gửi trước năm đó; có dấu cũ nhưng thiếu năm trước ⟹ log cảnh báo. Chạy tay: `YearStartCommitmentsService.run(now)`. Chỉ Request có
   khoản; quyền không có Request thì không (QĐ-109a).

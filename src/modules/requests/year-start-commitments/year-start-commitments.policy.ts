@@ -1,5 +1,5 @@
 import { addDays, type BusinessDate } from '../../../core/business-date';
-import { MAX_AMOUNT_MINOR, type Money } from '../../../core/money/money';
+import { DONG, MAX_AMOUNT_MINOR, type Money } from '../../../core/money/money';
 import type { BillingCycleCode } from '../access-request/access-request.types';
 import { monthlyPriceOf, requestAmountOf } from '../access-request/pricing.policy';
 
@@ -36,22 +36,26 @@ export interface YearStartPrice {
 }
 
 export type YearStartSkipReason =
-  /** The plan has no usable recurring price: nothing is guessed (`QĐ-84e`). */
+  /** The plan has no usable recurring price, or its price is left in another currency than dong: nothing is guessed or converted (`QĐ-84e`, `QĐ-111an`). */
   | 'NO_PRICE'
   /** Nothing of the request is left to commit on 01/01: every seat is over, or none was ever made. */
   | 'NO_SEAT'
   /** The department that bears the cost has no Cost Center in use. */
   | 'NO_COST_CENTER'
-  /** The amount is more than a money value may hold, in the currency of the price or in the reporting currency. */
-  | 'AMOUNT_TOO_LARGE'
-  /** The price is in another currency than the reporting one and no rate was entered for 01/01 nor for the day of the pass. */
-  | 'NO_RATE'
-  /** The approved budget of the year is in another currency than the reporting one: nothing of two currencies is added together. */
-  | 'CURRENCY_MISMATCH';
+  /** The amount is more than a money value may hold. */
+  | 'AMOUNT_TOO_LARGE';
 
 export type YearStartAmount =
   | { status: 'PRICED'; amountMinor: bigint; seatMonthlyMinor: bigint; currency: string }
   | { status: 'SKIPPED'; reason: Extract<YearStartSkipReason, 'NO_PRICE' | 'NO_SEAT' | 'AMOUNT_TOO_LARGE'> };
+
+/**
+ * Whether a plan has a price to commit: a recurring one in dong. Every price is in dong (`QĐ-111an`) and nothing is converted, so a price an
+ * older release left in another currency holds nothing.
+ */
+function isRecurringPriceInDong(price: YearStartPrice | null): price is YearStartPrice {
+  return price !== null && price.kind === 'RECURRING' && price.unitPrice.currency === DONG;
+}
 
 /** The last day a seat is counted: the earlier of the expected end and the day before its period closes; null when it has no end. */
 export function lastDayOfSeat(seat: YearStartSeat): BusinessDate | null {
@@ -82,7 +86,7 @@ export function yearStartAmountOf(input: {
   const counted = input.seats.filter((seat) => seatCountsOn(seat, yearStart));
   if (counted.length === 0) return { status: 'SKIPPED', reason: 'NO_SEAT' };
   const { price } = input;
-  if (price === null || price.kind !== 'RECURRING') return { status: 'SKIPPED', reason: 'NO_PRICE' };
+  if (!isRecurringPriceInDong(price)) return { status: 'SKIPPED', reason: 'NO_PRICE' };
   const monthly = monthlyPriceOf({ unitPrice: price.unitPrice, billingCycle: price.billingCycle });
   if (monthly === null || monthly.amountMinor <= 0n) return { status: 'SKIPPED', reason: 'NO_PRICE' };
 

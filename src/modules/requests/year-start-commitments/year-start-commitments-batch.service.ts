@@ -1,12 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import type { BusinessDate } from '../../../core/business-date';
-import { MoneyOutOfRangeError } from '../../../core/money/money.errors';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { AuditApi } from '../../audit/public/audit.api';
 import { BudgetsApi } from '../../budgets/public/budgets.api';
 import type { YearStartHoldInput } from '../../budgets/public/budgets.types';
 import { CatalogApi } from '../../catalog/public/catalog.api';
-import { FinanceApi } from '../../finance/public/finance.api';
 import { LicensingOpenGrantsApi } from '../../licensing/public/licensing-open-grants.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { YearStartCommitmentsRepo, type YearStartCandidate } from './year-start-commitments.repo';
@@ -44,20 +42,20 @@ type LeftOut = { requestId: string; reason: YearStartSkipReason };
 /**
  * One batch of the pass of 01/01 (`FR-5.8`(6), `BR-MF1-09e`, `QĐ-109a`), in one transaction. The order of the locks is the one of the budgets
  * and of every transaction of a request, after the lock of the pass the caller took: (1) the rows of the requests of the batch, `FOR UPDATE` in
- * order of id, and what is judged is read after, from their state now; (2) the grants, read without a lock; (3) the organization `FOR SHARE`
- * while an amount is converted; (4) in `holdYearStart`, the lock of each Cost Center and year, the Cost Centers in order of id, then the
- * approved version of the year. The proposal and version rows of a budget are never taken after the year lock here, as nowhere else. So a
+ * order of id, and what is judged is read after, from their state now; (2) the grants, read without a lock; (3) in `holdYearStart`, the lock of
+ * each Cost Center and year, the Cost Centers in order of id, then the approved version of the year (no rate is read, so the organization is
+ * not locked here). The proposal and version rows of a budget are never taken after the year lock here, as nowhere else. So a
  * decision of a version that attaches the commitments that wait for it, a withdrawal of a request and the grant of one are each either read in
  * their new state or queue behind this batch; none waits for it in a circle.
  *
  * The seat of a request is followed along the chain of its records to the one that runs on 01/01: a service account handed over, a right
  * carried to a renewed subscription. A right that a renewal extended is the renewal's: the commitment of the year is held by the request that
- * extended it, not by the one that first granted it. The commitment is in the reporting currency, converted as the check of an approval does
- * (`FinanceApi.snapshotMoney`), at the rate of 01/01 or, when none was entered for that day, of the day of the pass.
+ * extended it, not by the one that first granted it. The commitment is in dong as the price stands: nothing is converted (`QĐ-111an`), as in
+ * the check of an approval.
  *
- * A request is left out, with an audit event and no commitment, when its plan has no price, its amount is too large, no rate converts it,
- * the department that bears it has no Cost Center in use, or the approved budget of the year is in another currency; one that has nothing to
- * commit (every seat is over, or it is free or a key) is left out in silence. A request that holds a commitment for the year already (it was
+ * A request is left out, with an audit event and no commitment, when its plan has no price (or a price left in another currency than dong),
+ * its amount is too large, or the department that bears it has no Cost Center in use; one that has nothing to commit (every seat is over, or
+ * it is free or a key) is left out in silence. A request that holds a commitment for the year already (it was
  * approved this year) is not touched. A batch is never judged twice: the pass goes on after the last request of the batch before.
  */
 @Injectable()
@@ -66,7 +64,6 @@ export class YearStartCommitmentsBatchService {
     private readonly repo: YearStartCommitmentsRepo,
     private readonly budgets: BudgetsApi,
     private readonly catalog: CatalogApi,
-    private readonly finance: FinanceApi,
     private readonly grants: LicensingOpenGrantsApi,
     private readonly organization: OrganizationReadApi,
     private readonly audit: AuditApi,
@@ -85,13 +82,18 @@ export class YearStartCommitmentsBatchService {
       now: pass.now,
       items,
     });
-    for (const refused of held.refused) leftOut.push({ requestId: refused.requestId, reason: refused.reason });
+    // The approved budget of a year is in dong like every amount, so the facade refuses nothing; a refusal means a budget in another currency.
+    if (held.refused.length > 0) {
+      throw new Error(
+        `The approved budget of the year ${pass.year} is not in dong: ${held.refused.length} commitment(s) of 01/01 cannot be held`,
+      );
+    }
     for (const left of leftOut) await this.recordSkipped(tx, pass, left);
 
     return { lastId, created: held.created.length, skipped: leftOut.length };
   }
 
-  /** What each candidate holds, in the reporting currency and the Cost Center of the department that bears it, or why it is left out. */
+  /** What each candidate holds, in dong and the Cost Center of the department that bears it, or why it is left out. */
   private async judgeAll(
     tx: DbTx,
     pass: YearStartPassContext,
@@ -111,8 +113,6 @@ export class YearStartCommitmentsBatchService {
     );
     const costCenters = await this.organization.getUnitCostCenterIds([...new Set(bearing.values())], tx);
     const prices = await this.pricesOf(tx, candidates, yearStart);
-    // The rate of 01/01 first; the day of the pass when none was entered for 01/01 (a holiday), as an approval that day would use.
-    const rateDays = [...new Set<BusinessDate>([yearStart, pass.today])];
     const items: HoldItem[] = [];
     const leftOut: LeftOut[] = [];
     for (const candidate of candidates) {
@@ -127,49 +127,16 @@ export class YearStartCommitmentsBatchService {
         leftOut.push({ requestId: candidate.id, reason: judgement.reason });
         continue;
       }
-      const reporting = await this.inReporting(tx, judgement, rateDays);
-      if (typeof reporting === 'string') leftOut.push({ requestId: candidate.id, reason: reporting });
-      else items.push({ requestId: candidate.id, costCenterId: judgement.costCenterId, ...reporting });
+      items.push({
+        requestId: candidate.id,
+        costCenterId: judgement.costCenterId,
+        amountMinor: judgement.amountMinor,
+        seatMonthlyMinor: judgement.seatMonthlyMinor,
+        currency: judgement.currency,
+      });
     }
 
     return { items, leftOut };
-  }
-
-  /**
-   * The amount of the year and the price of a month of a seat in the reporting currency, at the rate of the first of `rateDays` that has
-   * one (the reporting currency itself needs none). The reason it cannot be converted otherwise.
-   */
-  private async inReporting(
-    tx: DbTx,
-    amounts: { amountMinor: bigint; seatMonthlyMinor: bigint; currency: string },
-    rateDays: readonly BusinessDate[],
-  ): Promise<{ amountMinor: bigint; seatMonthlyMinor: bigint; currency: string } | YearStartSkipReason> {
-    try {
-      for (const day of rateDays) {
-        const amount = await this.finance.snapshotMoney(
-          tx,
-          { amountMinor: amounts.amountMinor, currency: amounts.currency },
-          day,
-        );
-        const monthly = await this.finance.snapshotMoney(
-          tx,
-          { amountMinor: amounts.seatMonthlyMinor, currency: amounts.currency },
-          day,
-        );
-        if (amount.status === 'MISSING_RATE' || monthly.status === 'MISSING_RATE') continue;
-        const amountMinor = amount.snapshot.reportingAmountMinor;
-        const seatMonthlyMinor = monthly.snapshot.reportingAmountMinor;
-        // A price so small that it rounds to nothing in the reporting currency is no price to hold.
-        if (amountMinor <= 0n || seatMonthlyMinor <= 0n) return 'NO_PRICE';
-
-        return { amountMinor, seatMonthlyMinor, currency: amount.snapshot.reportingCurrency };
-      }
-    } catch (error) {
-      if (error instanceof MoneyOutOfRangeError) return 'AMOUNT_TOO_LARGE';
-      throw error;
-    }
-
-    return 'NO_RATE';
   }
 
   /** Only the grants of a plan that costs money every month a seat is held: `K1` and `K2` (a key, or free software, holds nothing on 01/01). */
