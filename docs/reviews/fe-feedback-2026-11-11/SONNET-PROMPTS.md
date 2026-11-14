@@ -68,8 +68,9 @@ Cấm giống prompt 1. Xong: báo ngắn rồi DỪNG, chờ prompt 4.
 Tiếp tục cùng repo, cùng nhánh. Pha cuối theo PLAN §0 của ba PLAN:
 1. Tự review TOÀN BỘ diff `git diff origin/dev...HEAD` so với ba SPEC (bug-fix v1.2, MF-2/MF-3 v2.3, FE v2.1): mỗi điều kiện xong (S/D) có
    code + test; sửa chỗ lệch.
-2. Full test: pnpm check, pnpm test:http, pnpm test:integration, pnpm test:flows (DB test cô lập theo test/README.md). Sửa tới xanh,
-   ghi lệnh + kết quả thật.
+2. Full test = đủ mọi job CI (.github/workflows/ci.yml) chạy lại sau commit cuối cùng: pnpm check, pnpm test:http, pnpm test:integration,
+   pnpm test:integration:serial, pnpm test:e2e, pnpm test:integration:timing, pnpm test:flows, seed:local trên DB sạch (DB test cô lập theo
+   test/README.md). Sửa tới xanh, ghi bảng job → lệnh → kết quả thật → commit đã chạy.
 3. Gọi API thật trên DB local có dữ liệu (theo các kịch bản DEMO-1…15 trong SPEC FE §Z2 và kịch bản MF-2/MF-3 trong SPEC §Z).
 4. Seed: làm gói Z (MF-2/MF-3) và Z2 (FE) — ngày tương đối với hôm nay; reset DB local, pnpm seed:local, chạy lại test:flows + vài kịch
    bản tay; sửa seed tới khi sạch.
