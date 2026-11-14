@@ -95,6 +95,22 @@ describe('the pool fields of the period a renewal records (integration, real Pos
     expect((await rowOf(subscriptionId)).primary).toBe(false);
   });
 
+  it('QĐ-111an: refuses a new period priced in another currency: 409 PERIOD_REFUSED with the reason PRICE_NOT_VND, nothing written, and the case still waits for its outcome', async () => {
+    const { id } = await decidedRenewal({ primary: false });
+    const periods = await h.count('subscriptions');
+
+    const response = await h.outcome(id, {
+      outcome: 'AS_DECIDED',
+      nextPeriod: { ...nextYear('ANNUAL'), unitPrice: { amount: '40.00', currency: 'USD' } },
+    });
+
+    expect(response.status).toBe(409);
+    expect(h.codeOf(response)).toBe('SUBSCRIPTION_RENEWAL.PERIOD_REFUSED');
+    expect(h.detailsOf(response)).toEqual({ reason: 'PRICE_NOT_VND' });
+    expect(await h.count('subscriptions')).toBe(periods);
+    await h.outcome(id, { outcome: 'AS_DECIDED', nextPeriod: nextYear('ANNUAL') }).expect(200);
+  });
+
   it('refuses a new period paid by the year when the commitment it inherits is one month (R-G01, F-002), and writes nothing', async () => {
     const { subscriptionId, id } = await decidedRenewal({ primary: false, billingCycle: 'MONTHLY' });
     expect(await rowOf(subscriptionId)).toMatchObject({ commitment: 1 });
