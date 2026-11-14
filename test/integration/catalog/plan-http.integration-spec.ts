@@ -184,6 +184,28 @@ describe('plans and workspace profiles over HTTP (integration, real PostgreSQL)'
       }
     });
 
+    it('B-5: a plan whose kind of provisioning changes is priced again by its new kind (K2 to K4: none, K4 to K2: per seat), and keeps its model when the kind stays', async () => {
+      const app = await application();
+      const created = await plan(app, { name: unique('Repriced') });
+      expect(created.pricingModel).toBe('PER_SEAT');
+
+      const bought = dataOf<PlanWire>(await patchPlan(created.id, { provisioningType: 'K4' }).expect(200));
+      expect([bought.provisioningType, bought.pricingModel, bought.seatTracking]).toEqual([
+        'K4',
+        null,
+        'NOT_APPLICABLE',
+      ]);
+      const back = dataOf<PlanWire>(await patchPlan(created.id, { provisioningType: 'K2' }).expect(200));
+      expect([back.provisioningType, back.pricingModel, back.seatTracking]).toEqual(['K2', 'PER_SEAT', 'APPLICABLE']);
+
+      // A plan made before the derivation may keep another model: a change that leaves the kind alone does not touch it.
+      await ctx.sql.query(`UPDATE plans SET pricing_model = 'FLAT_RATE' WHERE id = $1`, [created.id]);
+      const renamed = dataOf<PlanWire>(await patchPlan(created.id, { name: unique('Renamed') }).expect(200));
+      expect(renamed.pricingModel).toBe('FLAT_RATE');
+      const sameKind = dataOf<PlanWire>(await patchPlan(created.id, { provisioningType: 'K2' }).expect(200));
+      expect(sameKind.pricingModel).toBe('FLAT_RATE');
+    });
+
     it('AC-3: a plan that is not per seat shows seats as not applicable, never as zero', async () => {
       const app = await application();
 
