@@ -15,6 +15,7 @@ const WITH_COST_CENTER = 'e-with-cost-center';
 const WITHOUT_COST_CENTER = 'e-without-cost-center';
 const NO_DEPARTMENT = 'e-no-department';
 
+const GROUP = { id: '3f0c7d54-9e1b-4f6a-8d2c-5b7a1e9c0d99', name: 'Khác' };
 const applications = [
   {
     id: SAAS_APP,
@@ -22,7 +23,7 @@ const applications = [
     kind: 'SAAS',
     logoUrl: null,
     vendorName: 'Figma Inc',
-    functionalGroup: null,
+    functionalGroup: GROUP,
     planCount: 1,
   },
   {
@@ -31,7 +32,7 @@ const applications = [
     kind: 'INTERNAL',
     logoUrl: null,
     vendorName: null,
-    functionalGroup: null,
+    functionalGroup: GROUP,
     planCount: 1,
   },
 ] as const;

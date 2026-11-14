@@ -33,7 +33,7 @@ export interface RequestableApplicationRecord {
   /** The https link to the logo image the IT Admin pasted, or null. */
   logoUrl: string | null;
   vendorName: string | null;
-  functionalGroup: { id: string; name: string } | null;
+  functionalGroup: { id: string; name: string };
   planCount: number;
 }
 

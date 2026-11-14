@@ -64,7 +64,7 @@ const requestableApplicationSummarySchema = z.strictObject({
       'The https link to the logo image, or null. It may be broken: show the first letter of the name when the image does not load.',
   }),
   vendorName: z.string().nullable(),
-  functionalGroup: z.strictObject({ id: z.uuid(), name: z.string() }).nullable(),
+  functionalGroup: z.strictObject({ id: z.uuid(), name: z.string() }),
   planCount: z.number().int().positive(),
   ...submission,
 });
