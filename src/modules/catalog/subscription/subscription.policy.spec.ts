@@ -10,7 +10,6 @@ import {
   declaredStateOf,
   deriveNotice,
   missingData,
-  missingDataOf,
   nextStateOf,
   noticeWarnings,
   sameUnitPrice,
@@ -344,16 +343,6 @@ describe('what an update of a subscription makes of its state, and when it is a 
     expect(
       subscriptionStatusOf({ pricingModel: 'PER_SEAT' }, 'TERM', { ...whole, unitPrice: { currency: 'USD' } }),
     ).toBe('DRAFT');
-  });
-
-  it('B1A-03: names what a state lacks, so a change that would lower an active subscription can say why (the price left in dollars)', () => {
-    expect(missingDataOf({ pricingModel: 'PER_SEAT' }, 'TERM', whole)).toEqual([]);
-    expect(missingDataOf({ pricingModel: 'PER_SEAT' }, 'TERM', { ...whole, unitPrice: { currency: 'USD' } })).toEqual([
-      'UNIT_PRICE',
-    ]);
-    expect(
-      missingDataOf({ pricingModel: 'PER_SEAT' }, 'TERM', { ...whole, purchasedQuantity: null, priceSnapshot: null }),
-    ).toEqual(['QUANTITY', 'UNIT_PRICE']);
   });
 });
 

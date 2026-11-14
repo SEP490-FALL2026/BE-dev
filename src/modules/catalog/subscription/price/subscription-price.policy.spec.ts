@@ -1,4 +1,5 @@
 import { SubscriptionPriceNotVndError } from '../subscription.errors';
+import { missingDataOf } from '../subscription.policy';
 import { PRICE_CURRENCY, assertPriceInDong, isPricedInDong, uniformSnapshotOf } from './subscription-price.policy';
 
 describe('QĐ-111an: the price of a subscription is in dong, with a snapshot of the same currency', () => {
@@ -64,5 +65,28 @@ describe('QĐ-111an: the price of a subscription is in dong, with a snapshot of 
     ])('is not %s', (_name, state) => {
       expect(isPricedInDong(state)).toBe(false);
     });
+  });
+});
+
+describe('B1A-03: what a state lacks, so a change that would lower an active subscription can say why', () => {
+  const whole = {
+    purchasedQuantity: 5,
+    startDate: '2026-01-01',
+    billingCycle: 'ANNUAL',
+    unitPrice: { currency: 'VND' },
+    priceSnapshot: {},
+  };
+
+  it('lacks nothing with a price in dong, and the price when it was left in dollars', () => {
+    expect(missingDataOf({ pricingModel: 'PER_SEAT' }, 'TERM', whole)).toEqual([]);
+    expect(missingDataOf({ pricingModel: 'PER_SEAT' }, 'TERM', { ...whole, unitPrice: { currency: 'USD' } })).toEqual([
+      'UNIT_PRICE',
+    ]);
+  });
+
+  it('names every missing item, in the fixed order', () => {
+    const lacking = { ...whole, purchasedQuantity: null, priceSnapshot: null };
+
+    expect(missingDataOf({ pricingModel: 'PER_SEAT' }, 'TERM', lacking)).toEqual(['QUANTITY', 'UNIT_PRICE']);
   });
 });

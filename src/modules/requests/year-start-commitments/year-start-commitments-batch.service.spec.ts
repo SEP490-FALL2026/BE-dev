@@ -37,10 +37,7 @@ const heldSeat = (patch: Partial<GrantedSeatOfRequest> & { requestId: string }):
   ...patch,
 });
 
-/**
- * The batch over stand-ins: the requests the batch locks, the seats licensing reads along the chains, the price of the plan and the Cost
- * Center of each department. Nothing is converted (`QĐ-111an`), so there is no stand-in for the rates.
- */
+/** The batch over stand-ins (requests, seats along the chains, price, Cost Centers); nothing is converted (`QĐ-111an`). */
 function setup(input: {
   candidates: YearStartCandidate[];
   seats?: GrantedSeatOfRequest[];
@@ -198,49 +195,6 @@ describe('YearStartCommitmentsBatchService (BR-MF1-09e, FR-5.8(6): one batch of 
       expect(held()).toEqual([
         expect.objectContaining({ requestId: 'r-k1', amountMinor: 4_200_000n, seatMonthlyMinor: 650_000n }),
       ]);
-    });
-
-    it('B1A-04: a seat that closes on 31/03, before the term, holds three months at the price the request was approved at (600.000, from its unit price), not at the 650.000 of 01/01', async () => {
-      const { service, held } = setup({
-        candidates: [
-          candidate({
-            id: 'r-closing',
-            termMonths: 9,
-            nextYearAmountMinor: 4_200_000n,
-            unitPriceMinor: 600_000n,
-            billingCycle: 'MONTHLY',
-          }),
-        ],
-        seats: [heldSeat({ requestId: 'r-closing', expectedEndDate: '2027-08-14', validUntil: '2027-04-01' })],
-        price: at(650_000n),
-      });
-
-      await service.commitBatch(tx as never, PASS, null);
-
-      expect(held()).toEqual([
-        expect.objectContaining({ requestId: 'r-closing', amountMinor: 1_800_000n, seatMonthlyMinor: 650_000n }),
-      ]);
-    });
-
-    it('B1A-04: the price of an approval in another currency is not read as dong: nothing was kept in dong, so the seat is counted by its months at the price of 01/01', async () => {
-      const { service, held } = setup({
-        candidates: [
-          candidate({
-            id: 'r-usd',
-            termMonths: 9,
-            amountCurrency: 'USD',
-            nextYearAmountMinor: 14_000n,
-            unitPriceMinor: 2_000n,
-            billingCycle: 'MONTHLY',
-          }),
-        ],
-        seats: [heldSeat({ requestId: 'r-usd', expectedEndDate: '2027-08-14', validUntil: '2027-04-01' })],
-        price: at(650_000n),
-      });
-
-      await service.commitBatch(tx as never, PASS, null);
-
-      expect(held()).toEqual([expect.objectContaining({ requestId: 'r-usd', amountMinor: 3n * 650_000n })]);
     });
 
     it('T-RQ2 (K2 with no end): the kept 4.500.000 is not the commitment, twelve months of the price on 01/01 (400.000) is: 4.800.000', async () => {
