@@ -1,5 +1,11 @@
 import request from 'supertest';
 import { addDays } from '../../../src/core/business-date';
+import { LicensingDepartmentToolsApi } from '../../../src/modules/licensing/public/licensing-department-tools.api';
+import {
+  DepartmentSoftwareNoteInvalidError,
+  DepartmentSoftwareNotInCatalogError,
+  ToolsDepartmentNotFoundError,
+} from '../../../src/modules/licensing/public/licensing.errors';
 import { declareApplication, declarePlan } from '../../support/builders/catalog.builder';
 import { AccessRequestWire, Department, Person, RequestHarness } from '../../support/request-harness';
 
@@ -448,6 +454,83 @@ describe('requests: case B against the catalog (integration, real PostgreSQL)', 
       expect(
         (await h.ctx.sql.query(`SELECT plan_id FROM access_requests WHERE id = $1`, [proposed.id])).rows[0],
       ).toEqual({ plan_id: plus });
+    });
+
+    describe('the list of the department behind the tick (D-118, D-122)', () => {
+      const facade = () => h.ctx.app.get(LicensingDepartmentToolsApi, { strict: false });
+      const planOf = async (id: string) =>
+        (await h.ctx.sql.query<{ plan_id: string | null }>(`SELECT plan_id FROM access_requests WHERE id = $1`, [id]))
+          .rows[0].plan_id;
+      const linkedEvents = async (id: string) =>
+        (await h.auditEvents('ACCESS_REQUEST', id)).filter((event) => event.action === 'ACCESS_REQUEST.CATALOG_LINKED');
+
+      it('never reaches the list when the IT Admin is not in charge of the department: the scope is judged before it, not after', async () => {
+        const proposed = await decidedForSpend();
+        const spy = jest.spyOn(facade(), 'addDepartmentSoftwareFromCatalogLink');
+        try {
+          await link(proposed.id, { planId: plus, addToDepartmentList: true }, otherIt.account).expect(403);
+
+          expect(spy).not.toHaveBeenCalled();
+        } finally {
+          spy.mockRestore();
+        }
+      });
+
+      it('reaches the list once, for the department of the request and the application and plan linked, and not at all without the tick', async () => {
+        const ticked = await decidedForSpend();
+        const plain = await decidedForSpend();
+        const spy = jest.spyOn(facade(), 'addDepartmentSoftwareFromCatalogLink');
+        try {
+          await link(plain.id, { planId: plus }).expect(200);
+          expect(spy).not.toHaveBeenCalled();
+
+          await link(ticked.id, { planId: plus, addToDepartmentList: true }).expect(200);
+
+          expect(spy).toHaveBeenCalledTimes(1);
+          expect(spy).toHaveBeenCalledWith(
+            expect.anything(),
+            expect.objectContaining({ employeeId: itInCharge.employeeId }),
+            { departmentId: design.id, applicationId: chatgpt, planId: plus },
+          );
+        } finally {
+          spy.mockRestore();
+        }
+      });
+
+      it.each([
+        [
+          'the place is not in the catalog',
+          422,
+          'DEPARTMENT_SOFTWARE.NOT_IN_CATALOG',
+          () => new DepartmentSoftwareNotInCatalogError([{ applicationId: chatgpt, planId: plus }]),
+        ],
+        [
+          'the note is not one the table keeps',
+          422,
+          'DEPARTMENT_SOFTWARE.NOTE_INVALID',
+          () => new DepartmentSoftwareNoteInvalidError('TOO_LONG'),
+        ],
+        ['the department is not there', 404, 'DEPARTMENT.NOT_FOUND', () => new ToolsDepartmentNotFoundError()],
+      ])(
+        'answers its refusal when %s, with its own code, and the link is undone: no plan, no entry, no event of the link',
+        async (_what, status, code, refusal) => {
+          const proposed = await decidedForSpend();
+          const entriesBefore = await entriesOf(design.id);
+          const spy = jest.spyOn(facade(), 'addDepartmentSoftwareFromCatalogLink').mockRejectedValueOnce(refusal());
+          try {
+            const refused = await link(proposed.id, { planId: plus, addToDepartmentList: true }).expect(status);
+
+            expect(h.codeOf(refused)).toBe(code);
+            expect(spy).toHaveBeenCalledTimes(1);
+          } finally {
+            spy.mockRestore();
+          }
+
+          expect(await planOf(proposed.id)).toBeNull();
+          expect(await entriesOf(design.id)).toEqual(entriesBefore);
+          expect(await linkedEvents(proposed.id)).toEqual([]);
+        },
+      );
     });
 
     describe('the months of the request, judged by the plan it is linked to (QĐ-111i)', () => {
