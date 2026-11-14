@@ -8,6 +8,7 @@ const task = (overrides: Partial<GrantExecution>): GrantExecution => ({
   status: 'IN_PROGRESS',
   channel: 'MANUAL',
   failureReason: null,
+  claimedByAppUserId: 'user-1',
   createdAt: new Date('2026-11-10T00:00:00Z'),
   ...overrides,
 });
@@ -23,6 +24,7 @@ describe('executionOf: the grant task a row of the queue shows', () => {
       taskId: 'task-1',
       status: 'IN_PROGRESS',
       failureReason: null,
+      claimedBy: 'user-1',
       availableActions: ['COMPLETE', 'REPORT_FAILURE'],
     });
   });

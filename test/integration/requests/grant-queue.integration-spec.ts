@@ -118,6 +118,7 @@ describe('the queue of approved requests, person by person (integration, real Po
           taskId: task.id,
           status: 'IN_PROGRESS',
           failureReason: null,
+          claimedBy: h.it1.appUserId,
           availableActions: ['COMPLETE', 'REPORT_FAILURE'],
         },
       });

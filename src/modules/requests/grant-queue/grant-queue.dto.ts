@@ -53,6 +53,10 @@ const grantQueueItemSchema = z.strictObject({
       taskId: z.uuid(),
       status: z.enum(['QUEUED', 'RETRY_SCHEDULED', 'IN_PROGRESS', 'COMPLETED', 'FAILED', 'CLOSED_FAILED', 'CANCELLED']),
       failureReason: z.string().nullable(),
+      claimedBy: z.uuid().nullable().meta({
+        description:
+          'The account of the IT Admin who took the task, the same value as claimedBy of the task; null while nobody has. Pressing "Grant" takes it, so another IT Admin sees here that the work is already someone\'s.',
+      }),
       availableActions: z
         .array(z.enum(['CLAIM', 'COMPLETE', 'REPORT_FAILURE', 'RETRY', 'HAND_OFF', 'CLOSE_FAILED', 'CANCEL']))
         .max(GRANT_EXECUTION_ACTIONS_MAX)

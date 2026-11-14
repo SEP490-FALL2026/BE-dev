@@ -21,6 +21,7 @@ export function executionOf(
     taskId: task.taskId,
     status: task.status,
     failureReason: task.failureReason,
+    claimedBy: task.claimedByAppUserId,
     availableActions: grantExecutionActions(task, row.withdrawing),
   };
 }

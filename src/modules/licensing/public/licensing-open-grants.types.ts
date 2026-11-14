@@ -71,5 +71,7 @@ export interface GrantExecution {
   status: ProvisioningTaskStatus;
   channel: ProvisioningChannel;
   failureReason: string | null;
+  /** The account of the IT Admin who took the task; null while nobody has (the same value as `claimedBy` of the task). */
+  claimedByAppUserId: string | null;
   createdAt: Date;
 }
