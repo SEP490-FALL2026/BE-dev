@@ -246,6 +246,43 @@ describe('the commitment of 01/01 is what the approval kept (T-RQ2 for 01/01, T-
     ]);
   });
 
+  it('B1A-01: a person of a group whose kept line an older release wrote in dollars is counted by the months of their seat at the price of 01/01, the others by their kept line, and the audit trail names the person', async () => {
+    const u = await unit();
+    const { subscription, plan } = await planAt('K2', 600_000);
+    const group = await people(u, 3);
+    const id = await groupApprovedOn(u, plan, group, `${h.year}-11-15`);
+    // The line of the last person is an older release's: 7 months at 20.00 a month, 14.000 cents. The table refuses a change of a line, so the
+    // trigger that guards it is off for this one statement.
+    await h.ctx.sql.query(
+      `BEGIN;
+       ALTER TABLE access_request_line_amounts DISABLE TRIGGER access_request_line_amounts_no_change;
+       UPDATE access_request_line_amounts SET currency = 'USD', amount_minor = 14000
+        WHERE request_id = '${id}' AND employee_id = '${group[2].employeeId}' AND budget_year = ${h.next} AND NOT held;
+       ALTER TABLE access_request_line_amounts ENABLE TRIGGER access_request_line_amounts_no_change;
+       COMMIT;`,
+    );
+    await setPrice(subscription, 650_000);
+
+    await passOn();
+
+    // Two people keep 4.200.000 each; the third is counted by the 9 months of use from 01/01 at 650.000, nothing of the 14.000 cents.
+    expect((await rows(id)).map((row) => row.amount_minor)).toEqual([String(2 * 4_200_000 + 9 * 650_000)]);
+    const events = await h.ctx.sql.query<{
+      after: { employeeId: string; currency: string; savedMinor: string; year: number };
+    }>(
+      `SELECT after FROM audit_events WHERE action = 'BUDGET_COMMITMENT.YEAR_START_SAVED_AMOUNT_IGNORED' AND resource_id = $1`,
+      [id],
+    );
+    expect(events.rows.map((row) => row.after)).toEqual([
+      expect.objectContaining({
+        employeeId: group[2].employeeId,
+        currency: 'USD',
+        savedMinor: '14000',
+        year: h.next,
+      }),
+    ]);
+  });
+
   it('QĐ-111ak: a request of an older release, which kept nothing, is counted by the months to the end of its seat at the price of 01/01', async () => {
     const u = await unit();
     const { subscription, plan } = await planAt('K1', 600_000);
