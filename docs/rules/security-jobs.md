@@ -201,9 +201,10 @@
   warning; a failed pass only logs and is tried again at the next hour. Run one by hand with `YearStartCommitmentsService.run(now)`; after 01/01 check `year_start_commitment_runs` has the year with `completed_at` and
   `budget_commitments` has rows with `origin = 'YEAR_START'`.
   The API also runs `NextYearReminderSweeper` once an hour (the first pass five minutes after start, unreferenced timer): on 01/12 in the time zone of
-  the organization and then on every Monday of December (`QĐ-111am`, B-4) it tells Finance and the spending approver, for each Cost Center in use of the
-  departments of the year after that has no approved budget of it (`BudgetFactsRepo.approvedOfCostCenters`), with the inbox notice `BUDGET_NEXT_YEAR_MISSING`
-  (the Cost Center and the year only, never a figure), and nothing on any other day, nor from 01/01. The key `nextYearBudget:<costCenterId>:<day>` is unique
+  the organization and then on every Monday, until a version is approved (`QĐ-111am`, B-4), it tells Finance and the spending approver, for each Cost Center
+  in use of the departments of the year asked for that has no approved budget of it (`BudgetFactsRepo.approvedOfCostCenters`), with the inbox notice
+  `BUDGET_NEXT_YEAR_MISSING` (the Cost Center and the year only, never a figure). The year asked for is the next one in December and the year that runs from
+  01/01 (the Mondays of January and after go on for it), and nothing is told on any other day. The key `nextYearBudget:<costCenterId>:<day>` is unique
   for a recipient, so a Cost Center is told once for each day however many instances or passes run; each Cost Center has a transaction of its own, a
   failure is logged and tried again at the next pass of the day without stopping the others, and a failed pass only logs. It only tells: no budget, version
   or request is changed. Run one by hand with `NextYearReminderService.noticeDue(now)`.

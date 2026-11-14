@@ -8,7 +8,7 @@ const PASS_EVERY_MS = 60 * 60 * 1000;
 
 /**
  * Once an hour tells Finance and the spending approver which Cost Centers have no approved budget of the year after (`QĐ-111am`, B-4): see
- * `NextYearReminderService`; it writes only on 01/12 and on the Mondays after it. Each instance runs it; a notice carries its own event key
+ * `NextYearReminderService`; it writes only on 01/12 and on Mondays. Each instance runs it; a notice carries its own event key
  * (the Cost Center and the day), so two instances, or a pass run again, write each notice once, and a failed pass only logs. The timer never
  * keeps the process alive. It stays in the API process, like the closure of the year (ADR-0018).
  */

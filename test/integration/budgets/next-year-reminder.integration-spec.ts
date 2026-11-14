@@ -6,22 +6,35 @@ import { pretendBusinessToday } from '../../support/pretend-today';
 const h = new BudgetHarness();
 
 /**
- * B-4, `QĐ-111am`: on 01/12 and then every Monday, Finance and the spending approver are told which Cost Centers have no approved budget of
- * the year after, once for each Cost Center and day, and no more once a version is approved. The days are those of the year of the suite: 01/12
- * (a Tuesday in 2026), the first Monday after it (07/12/2026) and the day after that Monday, which is neither.
+ * B-4, `QĐ-111am`: on 01/12 and then every Monday until a version is approved, Finance and the spending approver are told which Cost Centers
+ * have no approved budget of the year, once for each Cost Center and day: in December of the year after, from January of the year that runs.
+ * The days are those of the year of the suite: 01/12 (a Tuesday in 2026), the first Monday after it (07/12/2026), the day after that Monday,
+ * which is neither, and the first Mondays of January.
  */
-describe('the reminder of the budget of the year after, from 01/12 and every Monday (B-4, QĐ-111am; integration, real PostgreSQL)', () => {
+describe('the reminder of the budget of the year after, from 01/12 and every Monday until a version is approved (B-4, QĐ-111am; integration, real PostgreSQL)', () => {
   let counter = 0;
   let approver = '';
   const service = () => h.ctx.app.get(NextYearReminderService, { strict: false });
 
-  /** 01/12 of the year of the suite, the first Monday after it (never the 1st) and the day after that, which is not a Monday. */
+  const sinceMonday = (day: string) => (new Date(`${day}T00:00:00.000Z`).getUTCDay() + 6) % 7;
+  /**
+   * 01/12 of the year of the suite, the first Monday after it (never the 1st) and the day after that, which is not a Monday; a day of November
+   * that is no Monday; and the first two Mondays of January of the year after.
+   */
   const december = (() => {
     const first = `${h.year}-12-01`;
-    const sinceMonday = (new Date(`${first}T00:00:00.000Z`).getUTCDay() + 6) % 7;
-    const monday = addDays(first, 7 - sinceMonday);
+    const monday = addDays(first, 7 - sinceMonday(first));
+    const newYear = `${h.next}-01-01`;
+    const january = sinceMonday(newYear) === 0 ? newYear : addDays(newYear, 7 - sinceMonday(newYear));
 
-    return { first, monday, tuesday: addDays(monday, 1), before: `${h.year}-11-30`, january: `${h.next}-01-04` };
+    return {
+      first,
+      monday,
+      tuesday: addDays(monday, 1),
+      quietNovember: addDays(first, -2 - ((sinceMonday(first) + 6) % 7)),
+      january,
+      secondJanuary: addDays(january, 7),
+    };
   })();
 
   /** The notices of the reminder for the Cost Center, with who was told and the key of the notice. */
@@ -38,8 +51,13 @@ describe('the reminder of the budget of the year after, from 01/12 and every Mon
 
     return service().noticeDue(new Date());
   };
-  /** A department with a Cost Center and no budget of the year after. */
-  const bare = async () => (await h.departmentWithHead(`P-NYR${(counter += 1)}`)).department.unitId;
+  /** A department with a Cost Center that has the budget of the year that runs and none of the year after. */
+  const bare = async () => {
+    const unit = await h.departmentWithHead(`P-NYR${(counter += 1)}`);
+    await h.current((await h.budgetProposed(unit.head, unit.department.unitId, undefined, h.year)).id);
+
+    return unit.department.unitId;
+  };
   const bothTold = () => [h.finance.employeeId, approver].sort();
 
   beforeAll(async () => {
@@ -82,11 +100,11 @@ describe('the reminder of the budget of the year after, from 01/12 and every Mon
     expect(await noticesOf(lacking)).toHaveLength(2);
   });
 
-  it('tells again on the first Monday after, with a key of its own day, and on no day between: not the Tuesday after, not the day before 01/12', async () => {
+  it('tells again on the first Monday after, with a key of its own day, and on no day between: not the Tuesday after, not a day of November', async () => {
     const lacking = await bare();
     await passOn(december.first);
 
-    await passOn(december.before);
+    await passOn(december.quietNovember);
     expect(await noticesOf(lacking)).toHaveLength(2);
     await passOn(december.tuesday);
     expect(await noticesOf(lacking)).toHaveLength(2);
@@ -100,13 +118,35 @@ describe('the reminder of the budget of the year after, from 01/12 and every Mon
     ]);
   });
 
-  it('stops once a version of the year after is approved, and tells nothing from 01/01, when the year after is the year that runs', async () => {
+  it('goes on from January, every Monday, for the year that runs, until a version of it is approved: no end at 01/01 (B-4)', async () => {
     const unit = await h.departmentWithHead(`P-NYR${(counter += 1)}`);
     const lacking = unit.department.unitId;
     await passOn(december.first);
     expect(await noticesOf(lacking)).toHaveLength(2);
 
     await passOn(december.january);
+    const january = await noticesOf(lacking);
+    expect(january).toHaveLength(4);
+    // The year after has become the year that runs: it is the year the notice of January names.
+    expect(
+      january.filter((notice) => notice.event_key.endsWith(december.january)).map((notice) => notice.params),
+    ).toEqual([
+      { costCenterId: lacking, year: h.next },
+      { costCenterId: lacking, year: h.next },
+    ]);
+    await passOn(december.secondJanuary);
+    expect(await noticesOf(lacking)).toHaveLength(6);
+
+    const proposal = await h.budgetProposed(unit.head, lacking, undefined, h.next);
+    await h.current(proposal.id);
+    await passOn(addDays(december.secondJanuary, 7));
+    expect(await noticesOf(lacking)).toHaveLength(6);
+  });
+
+  it('stops in December once a version of the year after is approved', async () => {
+    const unit = await h.departmentWithHead(`P-NYR${(counter += 1)}`);
+    const lacking = unit.department.unitId;
+    await passOn(december.first);
     expect(await noticesOf(lacking)).toHaveLength(2);
 
     const proposal = await h.budgetProposed(unit.head, lacking, undefined, h.next);

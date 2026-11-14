@@ -13,10 +13,11 @@ export interface NextYearReminderResult {
 }
 
 /**
- * The reminder that the budget of the year after is not approved (`QĐ-111am`, B-4): on 01/12 and then every Monday, Finance and the
- * spending approver are told, for each Cost Center in use that has no approved budget of the next year, that it has none. A Cost Center
- * whose budget is approved is told no more; nothing is told from 01/01 (the year after has become the year that runs, and a request waits
- * for a budget as `QĐ-30b` says). The notice says the Cost Center and the year, never a figure. Its event key is the Cost Center and the
+ * The reminder that the budget of the year after is not approved (`QĐ-111am`, B-4): on 01/12 and then every Monday until a version is
+ * approved, Finance and the spending approver are told, for each Cost Center in use that has no approved budget of the year asked for, that it
+ * has none. In December the year asked for is the next one; from 01/01 it is the year that runs (the year after has become it, and a request
+ * waits for a budget as `QĐ-30b` says), so the Mondays of January and after go on for it. A Cost Center whose budget is approved is told no
+ * more. The notice says the Cost Center and the year, never a figure. Its event key is the Cost Center and the
  * day, so a pass that runs again, or on another instance, writes nothing new. Each Cost Center is told in a transaction of its own, so one
  * that fails does not stop the others and is tried again at the next pass of the same day. Reminders only: nothing is decided or changed.
  */

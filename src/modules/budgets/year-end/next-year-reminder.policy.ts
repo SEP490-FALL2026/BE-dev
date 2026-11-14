@@ -2,16 +2,18 @@ import { weekBoundsOf, type BusinessDate } from '../../../core/business-date';
 import { fiscalYearOf } from '../../../core/fiscal-year';
 
 /**
- * The days Finance and the spending approver are asked for the budget of the year after (`QĐ-111am`, B-4): from 01/12 of the year, on that
- * day and then every Monday of December, so they are told enough and not every day. The year it is asked for is the one that follows the
- * year of the day. Whether a Cost Center still lacks an approved budget of that year is for the service to say: the same day is a reminder
- * for each Cost Center that does, and none once its budget is approved. From 01/01 the year after has become the year that runs and
- * nothing is asked (`QĐ-30b` stays: a request waits for a budget until one is approved).
+ * The days Finance and the spending approver are asked for the budget of a year (`QĐ-111am`, B-4: "01/12, then every Monday until a version is
+ * approved"), and the year they are asked for. In December the year is the one after: on 01/12 and on every Monday of the month. From 01/01 that
+ * year is the year that runs, and the asking goes on every Monday for it, until a version of it is approved: the rule has no end at 01/01, only
+ * the approval (`QĐ-30b` keeps a request waiting for a budget meanwhile). Whether a Cost Center lacks an approved budget of that year is for the
+ * service to say: the same day is a reminder for each Cost Center that does, and none once its budget is approved. When the year ends, December
+ * asks for the next one and the old year is no longer asked for.
  */
 export function nextYearReminderOn(today: BusinessDate): { year: number } | null {
-  if (today.slice(5, 7) !== '12') return null;
-  const isFirst = today.slice(8, 10) === '01';
+  const year = fiscalYearOf(today);
   const isMonday = weekBoundsOf(today).start === today;
+  if (today.slice(5, 7) !== '12') return isMonday ? { year } : null;
+  const isFirst = today.slice(8, 10) === '01';
 
-  return isFirst || isMonday ? { year: fiscalYearOf(today) + 1 } : null;
+  return isFirst || isMonday ? { year: year + 1 } : null;
 }

@@ -115,7 +115,7 @@ import lõi (`pnpm arch:capabilities --module budgets`).
   gom số theo lô qua `PendingSpendContributions` cùng nguồn với kiểm ngân sách, gồm cam kết chưa attached khi đọc view.
 - `year-end/` — đóng ngân sách của năm đã hết (F62, `QĐ-91c`); `year-end.job.ts` chạy mỗi giờ trong tiến
   trình API (ADR-0018), `year-end.service.ts`.
-  Cũng ở đây: nhắc chưa có ngân sách năm sau (`QĐ-111am`, B-4) — `next-year-reminder.policy.ts` (ngày 01/12 rồi mỗi Thứ Hai của tháng 12),
+  Cũng ở đây: nhắc chưa có ngân sách năm sau (`QĐ-111am`, B-4) — `next-year-reminder.policy.ts` (ngày 01/12 rồi mỗi Thứ Hai tới khi có phiên bản được duyệt: tháng 12 nhắc năm sau, từ 01/01 nhắc năm đang chạy),
   `next-year-reminder.service.ts` (nhắc Finance + Người duyệt chi, mỗi Cost Center chưa có phiên bản được duyệt, khóa `nextYearBudget:<costCenterId>:<ngày>`),
   `next-year-reminder.job.ts` (chạy mỗi giờ trong tiến trình API, ADR-0018).
 - `attachment/` — tài liệu đính kèm của đề xuất và phiên bản ngân sách: khai báo, hoàn tất tải lên, kiểm tra chữ ký tệp (`UploadInspection`), gỡ khỏi phiên bản, danh sách và liên kết tải về có thời hạn (US-06-09, US-06-10, QĐ-93j); `budget-attachment-uploads.controller.ts`, `budget-attachment-reads.controller.ts`; `BudgetAttachmentDeclarationService`, `BudgetAttachmentCompletionService`, `BudgetAttachmentRemovalService`, `BudgetAttachmentDiscardService`, `BudgetAttachmentQueryService`, `BudgetAttachmentLinkService`, `ProposalAttachmentBinder`, `BudgetAttachmentRepo`, `budget-attachment.policy.ts`. `BudgetAttachmentExpirySweeper` chạy mỗi giờ quét tệp quá hạn (`BudgetAttachmentExpiryService`).
