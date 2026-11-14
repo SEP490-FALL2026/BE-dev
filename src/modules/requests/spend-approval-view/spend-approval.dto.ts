@@ -114,6 +114,24 @@ const budgetSnapshotSchema = z.strictObject({
   computedAt: z.iso.datetime(),
 });
 
+/**
+ * What is left of the budget of the year after for a request that goes into it (`QĐ-111al`, R-15, R-46), for the spending approver only: the
+ * approved budget (base and reserve), what is left after the other requests approved as spend (a right with no end included), and what is
+ * left once this one is approved. `warning` is true when this one takes more than what is left; the approval is still made. The figures are
+ * null while the Cost Center has no approved budget of the year after; the whole is null when the request keeps nothing of that year. Money
+ * in the currency of the budget.
+ */
+const nextYearBudgetSchema = z
+  .strictObject({
+    year: z.number().int(),
+    approved: money.nullable(),
+    remaining: money.nullable(),
+    /** Negative when the request takes more than what is left. */
+    remainingAfter: money.nullable(),
+    warning: z.boolean(),
+  })
+  .nullable();
+
 /** A request waiting for the approver: what it is, what it costs, and the first code of its check. */
 const approvalSummarySchema = z.strictObject({
   routing: z.strictObject({
@@ -140,6 +158,8 @@ const approvalSummarySchema = z.strictObject({
   primaryCode: codeSchema.nullable(),
   /** What the check the step was opened on said: within the base, or it uses the reserve (the head confirmed it). Null for an old step. */
   outcome: budgetOutcomeSchema.nullable(),
+  /** The part of the year after of the request against the approved budget of that year; null when it keeps nothing of it. */
+  nextYearBudget: nextYearBudgetSchema,
   /** The same person holds the need step and this one. */
   /** The batch it was last sent in, when it was sent in one. */
   batchId: z.uuid().nullable(),
@@ -208,6 +228,8 @@ const approvalDetailSchema = z.strictObject({
   assessment: assessmentSchema.nullable(),
   decision: decisionSchema.nullable(),
   budgetSnapshot: budgetSnapshotSchema.nullable(),
+  /** The part of the year after of the request against the approved budget of that year (`QĐ-111al`); null when it keeps nothing of it. */
+  nextYearBudget: nextYearBudgetSchema,
   /**
    * What the vendor is paid for a whole year when the plan is bought for the first time on a yearly price (the price of a year times the
    * people): shown beside the amount of the months left (`BR-MF1-07b`). Null when it is not a first purchase of a yearly plan.
@@ -248,6 +270,7 @@ export class BatchDecisionResponseDto extends createZodDto(
 ) {}
 
 export type ApprovalSummaryWire = z.infer<typeof approvalSummarySchema>;
+export type NextYearBudgetWire = z.infer<typeof nextYearBudgetSchema>;
 export type ApprovalDetailWire = z.infer<typeof approvalDetailSchema>;
 export type BatchDecisionResultWire = z.infer<typeof resultSchema>;
 export type SpendDecisionBody = z.infer<typeof spendDecisionBodySchema>;

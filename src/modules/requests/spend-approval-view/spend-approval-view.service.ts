@@ -39,7 +39,7 @@ export class SpendApprovalViewService {
     const step = await this.steps.findLatest(requestId, 'SPEND_APPROVAL');
     if (!request || !step || step.assigneeEmployeeId !== actor.employeeId) throw new SpendReviewNotFoundError();
 
-    const sources = await this.sources.load(requestId, request.branch, step.id);
+    const sources = await this.sources.load(request, step.id);
     const { decision, assessment, proposal, confirmation } = sources;
     const { plans, person, center, cost } = await this.lookups(request, step, sources);
 
@@ -62,6 +62,7 @@ export class SpendApprovalViewService {
         confirmation,
         person,
       }),
+      nextYearBudget: sources.nextYearBudget,
       annualVendorAmount: await this.snapshots.annualVendorAmountOf(request),
     });
   }

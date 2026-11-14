@@ -48,6 +48,7 @@ const lookups = (extra: Partial<QueueLookups> = {}): QueueLookups => ({
   units: new Map([['VND', 0]]),
   centers: [{ id: 'cc-1', code: 'CC-01' }] as unknown as QueueLookups['centers'],
   due: new Map([['step-1', '2026-10-05']]),
+  nextYear: new Map(),
   ...extra,
 });
 
@@ -69,6 +70,21 @@ describe('a row of the queue of the spending approver (US-06-01 AC-1)', () => {
       batchId: 'batch-1',
       routing: { mode: 'VIA_HEAD', oneStepReason: null },
     });
+  });
+
+  it('QĐ-111al: carries what is left of the budget of the year after for the request, null when it keeps nothing of that year', () => {
+    const nextYearBudget = {
+      year: 2027,
+      approved: { amount: '100000000', currency: 'VND' },
+      remaining: { amount: '40000000', currency: 'VND' },
+      remainingAfter: { amount: '-1000000', currency: 'VND' },
+      warning: true,
+    };
+
+    expect(
+      approvalSummaryOf(row(), lookups({ nextYear: new Map([['req-1', nextYearBudget]]) })).nextYearBudget,
+    ).toEqual(nextYearBudget);
+    expect(approvalSummaryOf(row(), lookups()).nextYearBudget).toBeNull();
   });
 
   it('BR-MF1-02 shows one-step routing without the retired same-person flag', () => {
@@ -146,6 +162,7 @@ describe('the spend step of one request and what surrounds it (US-06-01 AC-3, AC
       center: { id: 'cc-1', code: 'CC-01' },
       cost: null,
       budgetSnapshot: null,
+      nextYearBudget: null,
       annualVendorAmount: null,
       ...extra,
     }) as unknown as DetailFacts;
@@ -182,6 +199,19 @@ describe('the spend step of one request and what surrounds it (US-06-01 AC-3, AC
 
     expect(wire.termCost).toEqual(termCost);
     expect(wire.cost).toBeNull();
+  });
+
+  it('QĐ-111al: carries the budget of the year after beside the budget snapshot, as it is given', () => {
+    const nextYearBudget = {
+      year: 2027,
+      approved: { amount: '100000000', currency: 'VND' },
+      remaining: { amount: '40000000', currency: 'VND' },
+      remainingAfter: { amount: '15000000', currency: 'VND' },
+      warning: false,
+    };
+
+    expect(approvalDetailOf(facts({ nextYearBudget })).nextYearBudget).toEqual(nextYearBudget);
+    expect(approvalDetailOf(facts()).nextYearBudget).toBeNull();
   });
 
   it('BR-MF1-02 one-step detail has no need decision and no retired flags', () => {

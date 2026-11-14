@@ -191,6 +191,8 @@ export class SpendStepRepo {
               oneStepReason: true,
               amountMinor: true,
               amountCurrency: true,
+              budgetYear: true,
+              nextYearAmountMinor: true,
               offPlan: true,
               type: true,
               proposal: { select: { softwareName: true } },

@@ -144,7 +144,8 @@ cùng cần; phần ghi nằm ở `assessment/assessment.repo.ts`.
     và Finance đọc chi tiết/items mọi lô ở `spend-batch-view.service.ts`), `spend-approval/` (spending approver quyết định; US-06-01;
     `spend-approvals.controller.ts`, `spend-decision.service.ts` điều phối `spend-decision-recorder.service.ts`),
     `spend-approval-view/` (thẻ của approver: `spend-approval-queue.service.ts` hàng đợi, `spend-approval-view.service.ts` chi tiết,
-    `spend-approval.mapper.ts` dựng wire, `spend-approval.dto.ts`, dùng cả cho request nhóm).
+    `spend-approval.mapper.ts` dựng wire, `spend-approval.dto.ts`, dùng cả cho request nhóm; `next-year-budget.service.ts` + `.policy.ts` + `.repo.ts`: `nextYearBudget`
+    của chi tiết và hàng đợi — ngân sách năm sau đã duyệt trừ số năm sau đã lưu của Request đã duyệt chi, cảnh báo mềm `QĐ-111al`, chỉ người giữ bước duyệt chi đọc, S-3).
 - **Request cá nhân**
   - `request-submission/` — controller `access-requests.controller.ts` (gửi, xem, đọc: US-05-01 → US-05-03) và xem trước
     (`RequestPreviewService`). Hai route của bước nhu cầu nằm ở `need-decision/` (`need-decision.controller.ts`,
@@ -228,7 +229,7 @@ cùng cần; phần ghi nằm ở `assessment/assessment.repo.ts`.
   rồi khóa năm ngân sách (`budgets/budget/budget-year-lock.repo.ts`).
 - Khoản 01/01 (`year-start-commitments/`, `BudgetsApi.holdYearStart`): `YearStartCommitmentsSweeper` mỗi giờ trong tiến trình API (ADR-0018); lượt đầu
   của năm sau 00:00 giờ tổ chức giữ cho mỗi Request trả phí `K1`/`K2` đang chạy hoặc đã duyệt chi chưa cấp một khoản của năm mới (giá tháng của
-  gói hiệu lực ngày 01/01 × số tháng của năm, mỗi seat, bằng đồng như giá ghi — không quy đổi, giá còn ở ngoại tệ ⟹ bỏ qua `NO_PRICE`), rồi ghi dấu `year_start_commitment_runs`; lượt sau trong năm không đọc gì. Seat đi theo chuỗi
+  gói hiệu lực ngày 01/01 × 12 tháng cho quyền _Dùng lâu dài_; Request có _Thời gian dùng_ giữ **đúng số năm sau đã lưu lúc duyệt** của từng seat còn hiệu lực sau 31/12 — số của Request cá nhân, hàng `access_request_line_amounts` chưa giữ (`held = false`) của từng người trong Request nhóm, `QĐ-111ak`; Request cũ không có số đã lưu thì đếm theo tháng tới ngày kết thúc seat; bằng đồng như giá ghi — không quy đổi, giá còn ở ngoại tệ ⟹ bỏ qua `NO_PRICE`), rồi ghi dấu `year_start_commitment_runs`; lượt sau trong năm không đọc gì. Seat đi theo chuỗi
   `predecessor_id` tới bản ghi đang chạy; Cost Center của phòng sở hữu bản ghi đó (tài khoản dịch vụ bàn giao sang phòng khác ⟹ phòng mới). Request
   gia hạn (`RENEWAL`) giữ khoản của bản ghi kế tiếp nó tạo; Request cấp ban đầu không giữ phần đã được gia hạn. Mỗi bước (mở, mỗi lô) một
   transaction, trước hết `pg_try_advisory_xact_lock` theo (tổ chức, năm) — instance khác đang giữ thì bỏ lượt (`BUSY`); trong lô: khóa hàng Request

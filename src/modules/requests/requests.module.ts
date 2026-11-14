@@ -7,6 +7,7 @@ import { Module } from '@nestjs/common';
 import { DatabaseModule } from '../../infrastructure/database/database.module';
 import { AuditModule } from '../audit/audit.module';
 import { BudgetsModule } from '../budgets/budgets.module';
+import { BudgetsReadFacadeModule } from '../budgets/budgets-read-facade.module';
 import { CatalogModule } from '../catalog/catalog.module';
 import { LicensingModule } from '../licensing/licensing.module';
 import { FinanceModule } from '../finance/finance.module';
@@ -139,6 +140,8 @@ import { SpendHeadService } from './spend-submission/spend-head.service';
 import { SpendQueueService } from './spend-submission/spend-queue.service';
 import { SpendQueueOutcomeService } from './spend-submission/spend-queue-outcome.service';
 import { SpendApprovalSnapshotService } from './spend-approval-view/spend-approval-snapshot.service';
+import { NextYearBudgetRepo } from './spend-approval-view/next-year-budget.repo';
+import { NextYearBudgetService } from './spend-approval-view/next-year-budget.service';
 import { SpendWireViewService } from './spend/spend-wire-view.service';
 import { SpendSubmissionController } from './spend-submission/spend-submission.controller';
 import { SupplementRepo } from './spend-submission/supplement.repo';
@@ -201,6 +204,8 @@ import { MyRequestsService } from './my-requests/my-requests.service';
     CatalogModule,
     FinanceModule,
     BudgetsModule,
+    // What the spending approver reads of the approved budget of the year after (`NextYearBudgetService`).
+    BudgetsReadFacadeModule,
     LicensingModule,
     OperatingParametersModule,
     RequestsWorkFacadeModule,
@@ -307,6 +312,8 @@ import { MyRequestsService } from './my-requests/my-requests.service';
     SpendQueueService,
     SpendQueueOutcomeService,
     SpendApprovalSnapshotService,
+    NextYearBudgetRepo,
+    NextYearBudgetService,
     SupplementRepo,
     SupplementPricing,
     SupplementRecorder,

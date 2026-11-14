@@ -46,4 +46,31 @@ export class BudgetFactsRepo {
 
     return facts;
   }
+
+  /**
+   * The approved budget (base and reserve, the currency it is kept in) of one year in each of the Cost Centers, in one statement; a Cost
+   * Center with none is absent from the map, which is not a budget of nothing. What a notice about the year after reads (`QĐ-111al`).
+   */
+  async approvedOfCostCenters(
+    costCenterIds: readonly string[],
+    year: number,
+    tx?: DbTx,
+  ): Promise<Map<string, { currency: string; baseMinor: bigint; reserveMinor: bigint }>> {
+    const approved = new Map<string, { currency: string; baseMinor: bigint; reserveMinor: bigint }>();
+    if (costCenterIds.length === 0) return approved;
+    const versions = await (tx ?? this.prisma).budgetVersion.findMany({
+      where: { costCenterId: { in: [...new Set(costCenterIds)] }, year, ...REFERENCE_VERSION },
+      orderBy: [{ costCenterId: 'asc' }, { number: 'desc' }],
+    });
+    for (const version of versions) {
+      if (approved.has(version.costCenterId)) continue;
+      approved.set(version.costCenterId, {
+        currency: version.currency,
+        baseMinor: version.baseMinor,
+        reserveMinor: version.reserveMinor,
+      });
+    }
+
+    return approved;
+  }
 }

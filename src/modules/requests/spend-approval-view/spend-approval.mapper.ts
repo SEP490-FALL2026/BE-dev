@@ -25,6 +25,8 @@ export interface QueueLookups {
   centers: readonly CostCenter[];
   /** The day each step is due, by step id. */
   due: Map<string, string>;
+  /** What is left of the budget of the year after for each request, by request id (`QĐ-111al`); a request absent keeps nothing of it. */
+  nextYear: Map<string, ApprovalSummaryWire['nextYearBudget']>;
 }
 
 function planOf(
@@ -70,11 +72,22 @@ function dueOf(row: OpenSpendRow, lookups: QueueLookups): string {
   return due;
 }
 
+/** The first code of the check a step was opened on and what it said (within the base, or the reserve); none for a step with no check. */
+function checkOf(
+  check: ReturnType<QueueLookups['checks']['get']>,
+): Pick<ApprovalSummaryWire, 'primaryCode' | 'outcome'> {
+  if (!check) return { primaryCode: null, outcome: null };
+
+  return {
+    primaryCode: codesOf(check)[0] ?? null,
+    outcome: check.outcome === 'WITHIN_BASE' || check.outcome === 'USES_RESERVE' ? check.outcome : null,
+  };
+}
+
 /** A row of the queue (`US-06-01` AC-1): what the request is, what it costs, the first code of its check, and who holds which step. */
 export function approvalSummaryOf(row: OpenSpendRow, lookups: QueueLookups): ApprovalSummaryWire {
   const { request } = row;
   const { requester, beneficiary, center } = partiesOf(row, lookups);
-  const check = lookups.checks.get(row.requestId);
 
   return {
     requestId: row.requestId,
@@ -94,8 +107,8 @@ export function approvalSummaryOf(row: OpenSpendRow, lookups: QueueLookups): App
     lineCount: request._count.beneficiaries,
     costCenter: { id: center.id, code: center.code },
     amount: amountOf(request, lookups.units),
-    primaryCode: check ? (codesOf(check)[0] ?? null) : null,
-    outcome: check?.outcome === 'WITHIN_BASE' || check?.outcome === 'USES_RESERVE' ? check.outcome : null,
+    ...checkOf(lookups.checks.get(row.requestId)),
+    nextYearBudget: lookups.nextYear.get(row.requestId) ?? null,
     batchId: lookups.batches.get(row.requestId) ?? null,
   };
 }
@@ -118,6 +131,7 @@ export interface DetailFacts {
   cost: ApprovalDetailWire['cost'];
   termCost: ApprovalDetailWire['termCost'];
   budgetSnapshot: ApprovalDetailWire['budgetSnapshot'];
+  nextYearBudget: ApprovalDetailWire['nextYearBudget'];
   annualVendorAmount: ApprovalDetailWire['annualVendorAmount'];
 }
 
@@ -266,6 +280,7 @@ export function approvalDetailOf(facts: DetailFacts): ApprovalDetailWire {
         }
       : null,
     budgetSnapshot: facts.budgetSnapshot,
+    nextYearBudget: facts.nextYearBudget,
     annualVendorAmount: facts.annualVendorAmount,
   };
 }
