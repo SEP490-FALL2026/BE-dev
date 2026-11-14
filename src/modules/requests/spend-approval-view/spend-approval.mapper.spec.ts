@@ -136,6 +136,7 @@ describe('the spend step of one request and what surrounds it (US-06-01 AC-3, AC
       },
       decision: null,
       assessment: null,
+      termCost: null,
       softwareName: null,
       plans: [
         { planId: 'plan-1', planName: 'Team', applicationName: 'Tool' },
@@ -162,6 +163,25 @@ describe('the spend step of one request and what surrounds it (US-06-01 AC-3, AC
     });
     expect(wire.need).toEqual({ decidedBy: person('emp-4'), decidedAt: '2026-10-02T00:00:00.000Z', reason: null });
     expect([wire.assessment, wire.decision]).toEqual([null, null]);
+  });
+
+  it('QĐ-111k: carries the cost by the year, with the part of the year after, beside the estimate of tax that is called cost', () => {
+    const termCost = {
+      currentYear: { year: 2026, months: 2, amount: { amount: '1200000', currency: 'VND' } },
+      nextYear: {
+        from: '2027-01-01',
+        months: 7,
+        amount: { amount: '4200000', currency: 'VND' },
+        estimate: true as const,
+      },
+      termCutAt: null,
+      months: 9,
+    };
+
+    const wire = approvalDetailOf(facts({ termCost }));
+
+    expect(wire.termCost).toEqual(termCost);
+    expect(wire.cost).toBeNull();
   });
 
   it('BR-MF1-02 one-step detail has no need decision and no retired flags', () => {

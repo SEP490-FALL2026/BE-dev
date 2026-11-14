@@ -2,7 +2,7 @@ import { createZodDto } from '../../../infrastructure/http/dto/zod-dto';
 import { z } from 'zod';
 import { responseBusinessDate } from '../../../infrastructure/http/dto/business-date.dto';
 import { successEnvelopeSchema } from '../../../infrastructure/http/dto/success-envelope.dto';
-import { costEstimateSchema } from '../access-request/access-request.dto';
+import { costEstimateSchema, costViewSchema } from '../access-request/access-request.dto';
 import { BATCH_MAX } from '../spend/spend-submission.dto';
 
 const text = (max: number) => z.string().trim().min(1).max(max);
@@ -198,6 +198,12 @@ const approvalDetailSchema = z.strictObject({
     .nullable(),
   /** The cost with the tax that is deducted and the part that is not, as an estimate. */
   cost: costEstimateSchema.nullable(),
+  /**
+   * The cost by the year before tax, with the part of the year after, which is an estimate the approval keeps (`QĐ-111k`): the months that
+   * begin this year, those that begin the year after (twelve for a right with no end), the months that have begun by the end of the term and
+   * the day a contract cut it short. Named apart from `cost`, the estimate of tax. Null when nothing is priced by the month.
+   */
+  termCost: costViewSchema.nullable(),
   /** The assessment of software that was not in the catalog; null for any other request. */
   assessment: assessmentSchema.nullable(),
   decision: decisionSchema.nullable(),

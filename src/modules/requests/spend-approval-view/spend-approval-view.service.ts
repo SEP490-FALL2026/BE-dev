@@ -54,6 +54,7 @@ export class SpendApprovalViewService {
       person,
       center,
       cost,
+      termCost: await this.snapshots.termCostOf(request),
       budgetSnapshot: await this.snapshots.snapshotOf({
         request,
         step,

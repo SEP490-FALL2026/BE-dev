@@ -116,6 +116,7 @@ export interface DetailFacts {
   person: Person;
   center: { id: string; code: string };
   cost: ApprovalDetailWire['cost'];
+  termCost: ApprovalDetailWire['termCost'];
   budgetSnapshot: ApprovalDetailWire['budgetSnapshot'];
   annualVendorAmount: ApprovalDetailWire['annualVendorAmount'];
 }
@@ -254,6 +255,7 @@ export function approvalDetailOf(facts: DetailFacts): ApprovalDetailWire {
         }
       : null,
     cost: facts.cost,
+    termCost: facts.termCost,
     assessment: assessmentView(facts),
     decision: decision
       ? {
