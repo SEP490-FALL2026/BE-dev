@@ -67,6 +67,8 @@ export interface EmployeeRecord {
   status: EmployeeStatus;
   workState: EmployeeWorkState;
   hireDate: BusinessDate;
+  /** The last day of the contract of a person with a term, when it is known (R-38): a time of use that runs past it is cut there. */
+  contractEndsOn?: BusinessDate | null;
   /** The free-text title on the record (`QĐ-87e`); null when there is none. */
   jobTitle?: string | null;
 }

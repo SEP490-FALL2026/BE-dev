@@ -38,6 +38,7 @@ function toEmployeeRecord(row: {
   status: EmployeeRecord['status'];
   workState: EmployeeWorkState;
   hireDate: Date;
+  contractEndsOn: Date | null;
   jobTitle: string | null;
 }): EmployeeRecord {
   return {
@@ -50,6 +51,7 @@ function toEmployeeRecord(row: {
     status: row.status,
     workState: row.workState,
     hireDate: fromDateColumn(row.hireDate),
+    contractEndsOn: row.contractEndsOn ? fromDateColumn(row.contractEndsOn) : null,
     jobTitle: row.jobTitle,
   };
 }
