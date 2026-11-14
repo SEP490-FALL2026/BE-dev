@@ -166,7 +166,7 @@ export class SubscriptionsController {
     status: HttpStatus.CREATED,
     message: 'SUBSCRIPTION.CREATED',
     description:
-      'The subscription is stored: a draft while its data is incomplete, with what is missing; the unit price keeps the conversion at the rate of the day it was recorded.',
+      'The subscription is stored: a draft while its data is incomplete, with what is missing; the unit price is in dong, and the price in the currency of the vendor is kept beside it when given.',
   })
   @ApiErrorResponses(...AUTH_ERRORS, IT_ONLY, INVALID, DUPLICATE_PLAN_CONFLICT)
   async declare(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Body() body: DeclareSubscriptionBodyDto) {
@@ -204,7 +204,7 @@ export class SubscriptionsController {
   @ApiSuccessResponse(SubscriptionResponseDto, {
     message: 'SUBSCRIPTION.UPDATED',
     description:
-      'The subscription as it is after the change; a new unit price is converted again at the rate of today; a change of nothing is answered the same and not audited. The plan, the kind and the owner department cannot change.',
+      'The subscription as it is after the change; a new unit price is in dong and nothing is converted; a change of nothing is answered the same and not audited. The plan, the kind and the owner department cannot change.',
   })
   @ApiErrorResponses(...AUTH_ERRORS, IT_ONLY, INVALID_UPDATE, NOT_FOUND, UPDATE_CONFLICT)
   async update(
@@ -225,7 +225,7 @@ export class SubscriptionsController {
   @ApiSuccessResponse(SubscriptionResponseDto, {
     message: 'SUBSCRIPTION.COMPLETED',
     description:
-      'The draft becomes active once its data is whole; a price with no rate for its day is converted at the rate entered for that day. An active subscription is answered unchanged.',
+      'The draft becomes active once its data is whole; its unit price is in dong and nothing is converted. An active subscription is answered unchanged.',
   })
   @ApiErrorResponses(...AUTH_ERRORS, IT_ONLY, NOT_FOUND, DUPLICATE_PLAN_CONFLICT, {
     status: HttpStatus.UNPROCESSABLE_ENTITY,

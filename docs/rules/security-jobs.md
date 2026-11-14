@@ -181,8 +181,8 @@
   a request holds one commitment a year (unique key and a check under the row lock), the rows of the requests are locked `FOR UPDATE` in order of id
   before the lock of the Cost Center and year (the order of the budgets), the batches (at most 100 requests) are separate transactions, and the pass
   that completes the mark writes the audit event `BUDGET_COMMITMENT.YEAR_START_RUN` once (`BUDGET_COMMITMENT.CREATED` for each commitment and
-  `BUDGET_COMMITMENT.YEAR_START_SKIPPED` with `NO_PRICE`, `NO_COST_CENTER`, `AMOUNT_TOO_LARGE`, `NO_RATE` or `CURRENCY_MISMATCH` for a request left
-  out, all by the `SYSTEM`). The amount is the price of 01/01 converted into the reporting currency (rate of 01/01, else of the day of the pass). Each
+  `BUDGET_COMMITMENT.YEAR_START_SKIPPED` with `NO_PRICE`, `NO_COST_CENTER` or `AMOUNT_TOO_LARGE` for a request left
+  out, all by the `SYSTEM`). The amount is the price of 01/01 in dong as it stands: nothing is converted, and a price left in another currency is `NO_PRICE`. Each
   step (opening, each batch) first takes `pg_try_advisory_xact_lock` of the organization and year; an instance that finds it taken leaves the pass to
   the holder. Each batch records the last request it went through (`resume_after_id`) and adds its counts, so a pass after a failure goes on after it
   and writes no event twice. A year with no approved budget makes the commitment waiting for one (`NO_BUDGET`), attached when a version is approved;

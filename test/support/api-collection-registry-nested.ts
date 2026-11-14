@@ -79,8 +79,7 @@ const NESTED_ARRAYS_SECOND_HALF: readonly NestedArrayEntry[] = [
     owner: 'g3-subscription-purchase',
     businessMaximum: {
       maxItems: 4,
-      source:
-        'missingData in subscription.policy.ts: QUANTITY, START_DATE, BILLING_CYCLE and one of UNIT_PRICE or EXCHANGE_RATE',
+      source: 'missingData in subscription.policy.ts: QUANTITY, START_DATE, BILLING_CYCLE and UNIT_PRICE',
     },
     rationale: 'The data a subscription still lacks.',
     removeWhen: 'Review when missingData or MissingItem changes.',
@@ -118,8 +117,7 @@ const NESTED_ARRAYS_SECOND_HALF: readonly NestedArrayEntry[] = [
     owner: 'g3-subscription-purchase',
     businessMaximum: {
       maxItems: 4,
-      source:
-        'missingData in subscription.policy.ts: QUANTITY, START_DATE, BILLING_CYCLE and one of UNIT_PRICE or EXCHANGE_RATE',
+      source: 'missingData in subscription.policy.ts: QUANTITY, START_DATE, BILLING_CYCLE and UNIT_PRICE',
     },
     rationale: 'The data the subscription still lacks.',
     removeWhen: 'Review when missingData or MissingItem changes.',

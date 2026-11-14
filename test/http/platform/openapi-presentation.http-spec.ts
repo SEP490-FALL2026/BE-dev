@@ -273,6 +273,19 @@ describe('API inventory (e2e): openapi presentation and wire messages', () => {
       expect(missing).toEqual([]);
     });
 
+    it('QĐ-111an: says nothing of a rate, a conversion at a rate or a missing rate: every amount is in dong and nothing is converted', () => {
+      const STALE =
+        /RATE_MISSING|NO_RATE|EXCHANGE_RATE|exchange rate|at the rate|rate entered|rate missing|no rate for/i;
+      const stale: string[] = [];
+      visit(document, '#', (node, at) => {
+        for (const [key, value] of Object.entries(node)) {
+          if (typeof value === 'string' && STALE.test(value)) stale.push(`${at}/${key}`);
+        }
+      });
+
+      expect(stale).toEqual([]);
+    });
+
     it('keeps the account lockout branch next to the global limit where both can answer 429', () => {
       const description = (id: string) =>
         operations.find((operation) => operation.operationId === id)?.responses['429']?.description ?? '';
