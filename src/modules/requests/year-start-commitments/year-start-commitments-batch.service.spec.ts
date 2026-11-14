@@ -17,6 +17,9 @@ const candidate = (patch: Partial<YearStartCandidate> & { id: string }): YearSta
   planId: 'plan-1',
   departmentId: 'dep-request',
   expectedEndDate: null,
+  termMonths: null,
+  budgetYear: 2026,
+  nextYearAmountMinor: null,
   ...patch,
 });
 const heldSeat = (patch: Partial<GrantedSeatOfRequest> & { requestId: string }): GrantedSeatOfRequest => ({
@@ -41,10 +44,14 @@ function setup(input: {
   renewals?: { requestId: string; assignmentId: string }[];
   renewalsThatBegan?: Map<string, string>;
   price?: object | null;
+  /** The seats nobody holds yet, by request, and what the approval kept of each person of a group, by request and person. */
+  unclaimed?: Map<string, { expectedEndDate: string | null; employeeId: string | null }[]>;
+  kept?: Map<string, Map<string, bigint>>;
 }) {
   const repo = {
     lockBatch: jest.fn().mockResolvedValue(input.candidates),
-    unclaimedSeats: jest.fn().mockResolvedValue(new Map()),
+    unclaimedSeats: jest.fn().mockResolvedValue(input.unclaimed ?? new Map()),
+    keptNextYearOfLines: jest.fn().mockResolvedValue(input.kept ?? new Map()),
     renewalSuccessors: jest.fn().mockResolvedValue(input.renewals ?? []),
     renewalsThatBegan: jest.fn().mockResolvedValue(input.renewalsThatBegan ?? new Map()),
   };
@@ -161,6 +168,151 @@ describe('YearStartCommitmentsBatchService (BR-MF1-09e, FR-5.8(6): one batch of 
       await service.commitBatch(tx as never, PASS, null);
 
       expect([held(), skipped()]).toEqual([[], []]);
+    });
+  });
+
+  describe('QĐ-111ak: what the approval kept is what 01/01 holds', () => {
+    const at = (monthly: bigint) => ({
+      kind: 'RECURRING',
+      unitPrice: { amountMinor: monthly, currency: 'VND' },
+      billingCycle: 'MONTHLY',
+    });
+
+    it('T-RQ2 (K1): a request approved in 2026 that kept 4.200.000 of 2027 holds 4.200.000 although the price rose to 650.000', async () => {
+      const { service, held } = setup({
+        candidates: [candidate({ id: 'r-k1', termMonths: 9, nextYearAmountMinor: 4_200_000n })],
+        seats: [heldSeat({ requestId: 'r-k1', expectedEndDate: '2027-08-14' })],
+        price: at(650_000n),
+      });
+
+      await service.commitBatch(tx as never, PASS, null);
+
+      expect(held()).toEqual([
+        expect.objectContaining({ requestId: 'r-k1', amountMinor: 4_200_000n, seatMonthlyMinor: 650_000n }),
+      ]);
+    });
+
+    it('T-RQ2 (K2 with no end): the kept 4.500.000 is not the commitment, twelve months of the price on 01/01 (400.000) is: 4.800.000', async () => {
+      const { service, held } = setup({
+        candidates: [candidate({ id: 'r-k2', nextYearAmountMinor: 4_500_000n })],
+        seats: [heldSeat({ requestId: 'r-k2' })],
+        price: at(400_000n),
+      });
+
+      await service.commitBatch(tx as never, PASS, null);
+
+      expect(held()).toEqual([expect.objectContaining({ requestId: 'r-k2', amountMinor: 4_800_000n })]);
+    });
+
+    it('T-XY1: a group of three that kept 4.200.000 each holds 12.600.000; the one who left on 20/12 is not counted: 8.400.000', async () => {
+      const kept = new Map([
+        [
+          'r-group',
+          new Map([
+            ['e-1', 4_200_000n],
+            ['e-2', 4_200_000n],
+            ['e-3', 4_200_000n],
+          ]),
+        ],
+      ]);
+      const group = candidate({ id: 'r-group', type: 'GROUP_GRANT', termMonths: 9 });
+      const seats = (leaver?: string) =>
+        ['e-1', 'e-2', 'e-3'].map((employeeId) =>
+          heldSeat({
+            requestId: 'r-group',
+            rootAssignmentId: `a-${employeeId}`,
+            assignmentId: `a-${employeeId}`,
+            employeeId,
+            expectedEndDate: employeeId === leaver ? '2026-12-20' : '2027-08-14',
+          }),
+        );
+      const whole = setup({ candidates: [group], seats: seats(), price: at(650_000n), kept });
+      await whole.service.commitBatch(tx as never, PASS, null);
+      expect(whole.held()).toEqual([expect.objectContaining({ requestId: 'r-group', amountMinor: 12_600_000n })]);
+      expect(whole.repo.keptNextYearOfLines).toHaveBeenCalledWith(tx, ['r-group'], 2027);
+
+      // The seat of the person who left ends before 01/01, so it holds nothing.
+      const left = setup({ candidates: [group], seats: seats('e-3'), price: at(650_000n), kept });
+      await left.service.commitBatch(tx as never, PASS, null);
+      expect(left.held()).toEqual([expect.objectContaining({ requestId: 'r-group', amountMinor: 8_400_000n })]);
+    });
+
+    it('a person of a group whose line kept nothing is counted by the months to the end of their seat', async () => {
+      const { service, held } = setup({
+        candidates: [candidate({ id: 'r-group', type: 'GROUP_GRANT', termMonths: 9 })],
+        seats: [
+          heldSeat({ requestId: 'r-group', employeeId: 'e-1', expectedEndDate: '2027-08-14' }),
+          heldSeat({ requestId: 'r-group', employeeId: 'e-2', expectedEndDate: '2027-03-31' }),
+        ],
+        kept: new Map([['r-group', new Map([['e-1', 4_200_000n]])]]),
+        price: at(650_000n),
+      });
+
+      await service.commitBatch(tx as never, PASS, null);
+
+      expect(held()).toEqual([expect.objectContaining({ amountMinor: 4_200_000n + 3n * 650_000n })]);
+    });
+
+    it('what a request kept for another year than the one that begins is not read: the seat is counted by its months', async () => {
+      // Approved in 2025, the part of the year after that it kept is for 2026; the pass of 2027 counts the months.
+      const { service, held } = setup({
+        candidates: [candidate({ id: 'r-old', termMonths: 9, budgetYear: 2025, nextYearAmountMinor: 4_200_000n })],
+        seats: [heldSeat({ requestId: 'r-old', expectedEndDate: '2027-01-31' })],
+        price: at(650_000n),
+      });
+
+      await service.commitBatch(tx as never, PASS, null);
+
+      expect(held()).toEqual([expect.objectContaining({ amountMinor: 650_000n })]);
+    });
+
+    it('a seat approved and not yet granted holds what was kept; with nothing kept, the months of use from 01/01 (9 months)', async () => {
+      const kept = setup({
+        candidates: [
+          candidate({ id: 'r-wait', state: 'AWAITING_EXECUTION', termMonths: 9, nextYearAmountMinor: 4_200_000n }),
+        ],
+        unclaimed: new Map([['r-wait', [{ expectedEndDate: null, employeeId: null }]]]),
+        price: at(650_000n),
+      });
+      await kept.service.commitBatch(tx as never, PASS, null);
+      expect(kept.held()).toEqual([expect.objectContaining({ amountMinor: 4_200_000n })]);
+
+      const none = setup({
+        candidates: [candidate({ id: 'r-wait', state: 'AWAITING_EXECUTION', termMonths: 9 })],
+        unclaimed: new Map([['r-wait', [{ expectedEndDate: null, employeeId: null }]]]),
+        price: at(650_000n),
+      });
+      await none.service.commitBatch(tx as never, PASS, null);
+      expect(none.held()).toEqual([expect.objectContaining({ amountMinor: 9n * 650_000n })]);
+    });
+
+    it('a group line approved and not yet granted holds what its person kept', async () => {
+      const { service, held } = setup({
+        candidates: [candidate({ id: 'r-group', type: 'GROUP_GRANT', state: 'AWAITING_EXECUTION', termMonths: 9 })],
+        unclaimed: new Map([
+          [
+            'r-group',
+            [
+              { expectedEndDate: null, employeeId: 'e-1' },
+              { expectedEndDate: null, employeeId: 'e-2' },
+            ],
+          ],
+        ]),
+        kept: new Map([
+          [
+            'r-group',
+            new Map([
+              ['e-1', 4_200_000n],
+              ['e-2', 3_900_000n],
+            ]),
+          ],
+        ]),
+        price: at(650_000n),
+      });
+
+      await service.commitBatch(tx as never, PASS, null);
+
+      expect(held()).toEqual([expect.objectContaining({ amountMinor: 8_100_000n })]);
     });
   });
 

@@ -273,11 +273,14 @@ describe('the window and the IT extension of a renewal (integration, real Postgr
             planId: internalPlan,
             departmentId: unit.department.id,
             expectedEndDate: newEnd,
+            termMonths: 3,
+            budgetYear: null,
+            nextYearAmountMinor: null,
           },
         ]),
       );
 
-      expect(seats.get(request.id)).toEqual([{ expectedEndDate: newEnd }]);
+      expect(seats.get(request.id)).toEqual([{ expectedEndDate: newEnd, employeeId: null }]);
     });
 
     it('the database refuses an extension task with no request, and a second open one for the seat', async () => {

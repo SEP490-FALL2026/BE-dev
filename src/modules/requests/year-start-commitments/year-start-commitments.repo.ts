@@ -13,6 +13,11 @@ export interface YearStartCandidate {
   departmentId: string;
   /** The day the right the request is for ends, when it names one (a single request; a group names it for each person). */
   expectedEndDate: BusinessDate | null;
+  /** The months of use the request asked for (`QĐ-111i`); null for a right with no end, a purchase, or a request of an older release. */
+  termMonths: number | null;
+  /** The year the approval worked the amount out for, and what it kept of the year after (`QĐ-111k`): null when it kept nothing. */
+  budgetYear: number | null;
+  nextYearAmountMinor: bigint | null;
 }
 
 interface CandidateRow {
@@ -22,6 +27,9 @@ interface CandidateRow {
   plan_id: string;
   department_id: string;
   expected_end_date: Date | null;
+  term_months: number | null;
+  budget_year: number | null;
+  next_year_amount_minor: bigint | null;
 }
 
 /**
@@ -149,7 +157,8 @@ export class YearStartCommitmentsRepo {
   ): Promise<YearStartCandidate[]> {
     const after = afterId === null ? Prisma.empty : Prisma.sql`AND r."id" > ${afterId}::uuid`;
     const rows = await tx.$queryRaw<CandidateRow[]>`
-      SELECT r."id", r."type"::text AS "type", r."state"::text AS "state", r."plan_id", r."department_id", r."expected_end_date"
+      SELECT r."id", r."type"::text AS "type", r."state"::text AS "state", r."plan_id", r."department_id", r."expected_end_date",
+             r."term_months", r."budget_year", r."next_year_amount_minor"
         FROM "access_requests" r
        WHERE r."organization_id" = ${organizationId}::uuid
          AND r."type" IN ('GRANT', 'SERVICE_ACCOUNT', 'GROUP_GRANT', 'RENEWAL')
@@ -167,6 +176,9 @@ export class YearStartCommitmentsRepo {
       planId: row.plan_id,
       departmentId: row.department_id,
       expectedEndDate: row.expected_end_date ? fromDateColumn(row.expected_end_date) : null,
+      termMonths: row.term_months,
+      budgetYear: row.budget_year,
+      nextYearAmountMinor: row.next_year_amount_minor,
     }));
   }
 
@@ -180,15 +192,15 @@ export class YearStartCommitmentsRepo {
   async unclaimedSeats(
     tx: DbTx,
     candidates: readonly YearStartCandidate[],
-  ): Promise<Map<string, { expectedEndDate: BusinessDate | null }[]>> {
-    const seats = new Map<string, { expectedEndDate: BusinessDate | null }[]>();
-    const add = (requestId: string, expectedEndDate: BusinessDate | null): void => {
-      seats.set(requestId, [...(seats.get(requestId) ?? []), { expectedEndDate }]);
+  ): Promise<Map<string, { expectedEndDate: BusinessDate | null; employeeId: string | null }[]>> {
+    const seats = new Map<string, { expectedEndDate: BusinessDate | null; employeeId: string | null }[]>();
+    const add = (requestId: string, expectedEndDate: BusinessDate | null, employeeId: string | null): void => {
+      seats.set(requestId, [...(seats.get(requestId) ?? []), { expectedEndDate, employeeId }]);
     };
     for (const candidate of candidates) {
       const single = candidate.type === 'GRANT' || candidate.type === 'SERVICE_ACCOUNT' || candidate.type === 'RENEWAL';
       if (single && candidate.state === 'AWAITING_EXECUTION') {
-        add(candidate.id, candidate.expectedEndDate);
+        add(candidate.id, candidate.expectedEndDate, null);
       }
     }
     const groupIds = candidates
@@ -197,13 +209,40 @@ export class YearStartCommitmentsRepo {
     if (groupIds.length > 0) {
       const lines = await tx.accessRequestLine.findMany({
         where: { requestId: { in: groupIds }, state: 'APPROVED' },
-        select: { requestId: true, expectedEndDate: true },
+        select: { requestId: true, employeeId: true, expectedEndDate: true },
         orderBy: [{ requestId: 'asc' }, { employeeId: 'asc' }],
       });
-      for (const line of lines) add(line.requestId, line.expectedEndDate ? fromDateColumn(line.expectedEndDate) : null);
+      for (const line of lines) {
+        add(line.requestId, line.expectedEndDate ? fromDateColumn(line.expectedEndDate) : null, line.employeeId);
+      }
     }
 
     return seats;
+  }
+
+  /**
+   * What the approval kept of the year `year` for each person of these requests for a group (`QĐ-111k`, M-13): the rows of
+   * `access_request_line_amounts` that no commitment holds, by request and person. A person who has none kept nothing.
+   */
+  async keptNextYearOfLines(
+    tx: DbTx,
+    requestIds: readonly string[],
+    year: number,
+  ): Promise<Map<string, Map<string, bigint>>> {
+    const kept = new Map<string, Map<string, bigint>>();
+    if (requestIds.length === 0) return kept;
+    const rows = await tx.accessRequestLineAmount.findMany({
+      where: { requestId: { in: [...requestIds] }, budgetYear: year, held: false },
+      select: { requestId: true, employeeId: true, amountMinor: true },
+      orderBy: [{ requestId: 'asc' }, { employeeId: 'asc' }],
+    });
+    for (const row of rows) {
+      const ofRequest = kept.get(row.requestId) ?? new Map<string, bigint>();
+      ofRequest.set(row.employeeId, row.amountMinor);
+      kept.set(row.requestId, ofRequest);
+    }
+
+    return kept;
   }
 
   /** The record that follows the renewed one, for each of these renewals that was applied: the seat the renewal stands for. */

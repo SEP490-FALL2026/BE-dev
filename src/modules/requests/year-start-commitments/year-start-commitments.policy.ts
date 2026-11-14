@@ -4,10 +4,10 @@ import type { BillingCycleCode } from '../access-request/access-request.types';
 import { monthlyPriceOf, requestAmountOf } from '../access-request/pricing.policy';
 
 /**
- * What the commitment made on 01/01 holds (`FR-5.8`(6), `BR-MF1-09`, `QĐ-109a`), as pure decisions. A request whose right goes on into the
- * new year, or that was approved as spend and not yet granted, holds one commitment for that year: the price of a month on 01/01 times
- * the months of the year of every seat it stands for, the month of the end of a right counted whole. Nothing is judged against the
- * budget; the commitment is made, and waits for a budget when the year has none yet. A right that is not a request's (a seat of the
+ * What the commitment made on 01/01 holds (`FR-5.8`(6), `BR-MF1-09`, `QĐ-109a`, `QĐ-111ak`), as pure decisions. A request whose right goes on
+ * into the new year, or that was approved as spend and not yet granted, holds one commitment for that year: for each seat it stands for that
+ * still stands after 31/12, what its approval kept of the year after (a request for months of use), or twelve months of the price of a month
+ * on 01/01 (a right with no end). Nothing is judged against the budget; the commitment is made, and waits for a budget when the year has none yet. A right that is not a request's (a seat of the
  * baseline, a seat of a role) has no commitment (`QĐ-109a`).
  */
 
@@ -26,6 +26,10 @@ export interface YearStartSeat {
   expectedEndDate: BusinessDate | null;
   validUntil: BusinessDate | null;
   departmentId: string | null;
+  /** The request asked for months of use (`QĐ-111i`): the seat is not a right with no end, even while it has no end day yet. */
+  termLimited: boolean;
+  /** What the approval kept of this seat for the year that begins (`QĐ-111k`, M-13): null when it kept nothing (a request of an older release). */
+  savedMinor: bigint | null;
 }
 
 /** What a plan is bought at, as the catalog says it. */
@@ -73,9 +77,26 @@ export function seatCountsOn(seat: YearStartSeat, yearStart: BusinessDate): bool
 }
 
 /**
- * The amount of the commitment of one request: for each seat that counts, the months from January to the month of its last day (twelve with
- * no end in the year), at the monthly price of the plan, added up. It is worked out with the rule of the amount of a request
- * (`requestAmountOf`, the day it is checked on being 01/01), so the two cannot disagree on a month.
+ * Whether the number the approval kept holds for the seat: only for a seat of a request for months of use, that still ends the way the
+ * approval counted it. A seat that closes in the new year before its term (a revocation, a period that closes) is counted by the months it
+ * has left, at the price of 01/01, so the commitment never holds what nobody will use. A right with no end is never counted from the kept
+ * number: it holds twelve months of the price on 01/01 (`QĐ-111ak`, R-46), the kept number is for the warning of the approval only.
+ */
+function keptAmountOf(seat: YearStartSeat): bigint | null {
+  if (!seat.termLimited || seat.savedMinor === null) return null;
+  const closes = seat.validUntil === null ? null : addDays(seat.validUntil, -1);
+  const closesBeforeTerm = closes !== null && (seat.expectedEndDate === null || closes < seat.expectedEndDate);
+
+  return closesBeforeTerm ? null : seat.savedMinor;
+}
+
+/**
+ * The amount of the commitment of one request on 01/01 (`QĐ-111ak`, `QĐ-111k`, M-13), the one rule of the pass and of the amount the budget
+ * of the year after takes as carried over: of the seats that still stand after 31/12 (the person who left, the seat revoked, the right that
+ * ended hold nothing), a seat of a request for months of use holds exactly what the approval kept of it for the year; a seat with no end
+ * holds twelve months of the monthly price of 01/01; a seat of an older release, which kept nothing, the months from January to the month of
+ * its last day at that price, worked out with the rule of the amount of a request (`requestAmountOf`, the day it is checked on being 01/01),
+ * so the two cannot disagree on a month.
  */
 export function yearStartAmountOf(input: {
   year: number;
@@ -92,11 +113,16 @@ export function yearStartAmountOf(input: {
 
   // Seats that end on the same day cost the same: one calculation for each end date, not for each seat.
   const seatsByEnd = new Map<string | null, number>();
+  let total = 0n;
   for (const seat of counted) {
+    const kept = keptAmountOf(seat);
+    if (kept !== null) {
+      total += kept;
+      continue;
+    }
     const last = lastDayOfSeat(seat);
     seatsByEnd.set(last, (seatsByEnd.get(last) ?? 0) + 1);
   }
-  let total = 0n;
   for (const [endDate, beneficiaries] of seatsByEnd) {
     const priced = requestAmountOf({
       kind: 'RECURRING',

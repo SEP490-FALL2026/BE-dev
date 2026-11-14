@@ -1,3 +1,4 @@
+import { MAX_AMOUNT_MINOR } from '../../../core/money/money';
 import {
   bearingDepartmentOf,
   judgeYearStart,
@@ -17,6 +18,8 @@ const seat = (patch: Partial<YearStartSeat> = {}): YearStartSeat => ({
   expectedEndDate: null,
   validUntil: null,
   departmentId: null,
+  termLimited: false,
+  savedMinor: null,
   ...patch,
 });
 const amount = (seats: readonly YearStartSeat[], price: YearStartPrice | null = MONTHLY) =>
@@ -86,6 +89,81 @@ describe('BR-MF1-09: the commitment made on 01/01 for a right that goes on', () 
 
     it('BR-MF1-09e: a seat already over before 01/01 is left out of the amount', () => {
       expect(amount([seat({ expectedEndDate: '2026-12-31' }), seat()])).toMatchObject({ amountMinor: 240000n });
+    });
+  });
+
+  describe('QĐ-111ak: a right with a time of use holds what the approval kept, a right with no end the price of 01/01', () => {
+    const at = (monthly: bigint): YearStartPrice => ({
+      ...MONTHLY,
+      unitPrice: { amountMinor: monthly, currency: 'VND' },
+    });
+    /** A seat of a request for months of use, which kept `saved` of the year after at its approval. */
+    const limited = (saved: bigint | null, patch: Partial<YearStartSeat> = {}) =>
+      seat({ termLimited: true, expectedEndDate: '2027-08-14', savedMinor: saved, ...patch });
+
+    it('T-RQ2 (K1): 600.000 a month for 9 months approved on 15/11/2026 kept 4.200.000; on 01/01 the price is 650.000 and the commitment stays 4.200.000', () => {
+      expect(amount([limited(4_200_000n)], at(650_000n))).toEqual({
+        status: 'PRICED',
+        amountMinor: 4_200_000n,
+        seatMonthlyMinor: 650_000n,
+        currency: 'VND',
+      });
+    });
+
+    it('T-RQ2 (K2 with no end): kept 4.500.000 at 375.000 a month, and the commitment is twelve months of the price on 01/01, 400.000: 4.800.000, the kept number is for the warning only (R-46)', () => {
+      expect(amount([seat({ savedMinor: 4_500_000n })], at(400_000n))).toMatchObject({
+        status: 'PRICED',
+        amountMinor: 4_800_000n,
+      });
+    });
+
+    it('QĐ-111ak: a price that falls changes nothing either: the commitment is what the approval kept', () => {
+      expect(amount([limited(4_200_000n)], at(500_000n))).toMatchObject({ amountMinor: 4_200_000n });
+    });
+
+    it('T-XY1: three people of a group each kept 7 months at 600.000 (4.200.000) hold 12.600.000; one who leaves on 20/12 holds nothing, so 8.400.000 (M-13)', () => {
+      const group = [limited(4_200_000n), limited(4_200_000n), limited(4_200_000n)];
+      expect(amount(group, at(650_000n))).toMatchObject({ amountMinor: 12_600_000n });
+
+      const oneLeft = [group[0], group[1], limited(4_200_000n, { expectedEndDate: '2026-12-20' })];
+      expect(amount(oneLeft, at(650_000n))).toMatchObject({ amountMinor: 8_400_000n });
+      expect(judgeYearStart({ year: 2027, seats: oneLeft, price: at(650_000n), costCenterId: 'cc-1' })).toMatchObject({
+        status: 'COMMIT',
+        amountMinor: 8_400_000n,
+      });
+    });
+
+    it('QĐ-111ak: a person whose seat was closed on 20/12 (the period ends the day after) is no more counted than one who left', () => {
+      const closed = limited(4_200_000n, { expectedEndDate: null, validUntil: '2026-12-21' });
+      expect(amount([limited(4_200_000n), closed], at(650_000n))).toMatchObject({ amountMinor: 4_200_000n });
+    });
+
+    it('QĐ-111ak: a seat that closes in the new year before the term the approval counted holds the months to that day at the price of 01/01, not the kept number', () => {
+      const closing = limited(4_200_000n, { validUntil: '2027-03-01' });
+      expect(amount([closing], at(650_000n))).toMatchObject({ amountMinor: 2n * 650_000n });
+    });
+
+    it('a request of an older release kept nothing: its seat is counted by the months to its end at the price of 01/01, as before', () => {
+      expect(amount([limited(null, { expectedEndDate: '2027-03-31' })], at(650_000n))).toMatchObject({
+        amountMinor: 3n * 650_000n,
+      });
+    });
+
+    it('seats with and without a kept number are added up one by one', () => {
+      expect(
+        amount([limited(4_200_000n), seat(), limited(null, { expectedEndDate: '2027-02-28' })], at(650_000n)),
+      ).toMatchObject({ amountMinor: 4_200_000n + 12n * 650_000n + 2n * 650_000n });
+    });
+
+    it('QĐ-111an: a price in another currency than dong holds nothing even when the approval kept a number', () => {
+      expect(amount([limited(4_200_000n)], { ...MONTHLY, unitPrice: { amountMinor: 2000n, currency: 'USD' } })).toEqual(
+        { status: 'SKIPPED', reason: 'NO_PRICE' },
+      );
+    });
+
+    it('a kept number added up with others past what a money value may hold is told as such', () => {
+      const huge = limited(MAX_AMOUNT_MINOR);
+      expect(amount([huge, limited(1n)], at(650_000n))).toEqual({ status: 'SKIPPED', reason: 'AMOUNT_TOO_LARGE' });
     });
   });
 
