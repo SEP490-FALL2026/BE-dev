@@ -204,7 +204,7 @@
 - **File/commit:** `spend/spend-submission.policy.ts`, `spend/spend.errors.ts`, `spend-submission/supplement-pricing.service.ts`, `supplement.service.ts` — `fe6bd36e`.
 - **Đổi lại:** một nhánh của `checkSupplementTerm`.
 
-*Bổ sung D-17 (review 8):* `K1` + người có thời hạn: `termMonths: null` ⟹ `TERM_LONG_TERM_NOT_ALLOWED`, vắng ⟹ `TERM_REQUIRED` (T-R38 bullet 2); nhân sự chính thức trên `K1` vắng/`null` ⟹ `TERM_REQUIRED` — `64c3778b`.
+_Bổ sung D-17 (review 8):_ `K1` + người có thời hạn: `termMonths: null` ⟹ `TERM_LONG_TERM_NOT_ALLOWED`, vắng ⟹ `TERM_REQUIRED` (T-R38 bullet 2); nhân sự chính thức trên `K1` vắng/`null` ⟹ `TERM_REQUIRED` — `64c3778b`.
 
 ### D-26 — Hết _Thời gian dùng_: hệ thống mở thu hồi một lần cho mỗi quyền, không mở khi có Request tiếp tục chờ; nhắc của quyền đã duyệt gia hạn bị giữ lại
 
@@ -214,3 +214,20 @@
 - **File/commit:** `licensing/expiry/expiry.policy.ts` (`systemRevocationOwed`, `reminderHeldBack`, `reminderDayOf`, `revocationOpensOn`), `expiry-revocation.{repo,service,job}.ts`, `expiry-reminder.service.ts`, `licensing.module.ts`, `public/licensing-renewal.types.ts` (`PendingRenewal.approved`), `requests/renewal-apply/renewal-request.repo.ts`, `docs/rules/security-jobs.md` — `d19e6634`.
 - **Đổi lại:** (2) đổi `rightsToAsk` để bỏ điều kiện lý do (mở lại sau đóng thất bại); (1)/(3) bỏ `renewal` ở `ExpiryRevocationService.openDue` hoặc bỏ `notHeldBack` ở `ExpiryReminderService`.
 
+### D-27 — `RENEWAL_REQUEST.WINDOW_NOT_OPEN` đổi từ 409 sang 422
+
+- **Câu hỏi:** T-RQ3 ghi "Request tiếp tục gửi 04/10 ⟹ 422; gửi 05/10 ⟹ 201", nhưng code trả 409 cho cửa sổ chưa mở (và `api-contract.md` dặn một mã lỗi chỉ đi với một status).
+- **Phương án:** (a) giữ 409 và coi "422" của T-RQ3 là cách nói chung "bị từ chối"; (b) đổi hẳn mã sang 422 như D-13 đã làm với `OPEN_LIMIT_REACHED` theo T-RQ1.
+- **Đã chọn (tạm chốt):** (b). Căn cứ: SPEC §8 yêu cầu khẳng định đúng con số; giá trị gửi sai theo ngày là lỗi nghiệp vụ trên đầu vào (như `OPEN_LIMIT_REACHED`, `TERM_*`), không phải xung đột trạng thái. Mã vẫn một status duy nhất (409 không còn dùng cho mã này). Chi tiết `details { opensOn, windowDays }` giữ nguyên.
+- **File/commit:** `requests/renewal-request/renewal-request.http-errors.ts`, `renewal-requests.controller.ts` (khai ở 422), `test/support/openapi-example-route-codes-requests.ts`, `renewal-request` + `renewal-window-extension` integration — `e7ebdeaa`.
+- **Đổi lại:** trả `HttpStatus.CONFLICT` ở nhánh `RenewalWindowNotOpenError` và chuyển ví dụ về khối 409 của controller; sửa 4 chỗ test (`windowOpensFor`, 3 ca của `renewal-window-extension`, `renewal-term-end`).
+- **FE cần biết:** tài liệu API: `WINDOW_NOT_OPEN` thuộc 422.
+
+### D-28 — Request tiếp tục theo _Thời gian dùng_: `extensionMonths` hoặc `longTerm`, bỏ `newEndDate`; ngày kết thúc do hệ thống tính
+
+- **Câu hỏi:** SPEC RQ-3 nói body `extensionMonths` (`K1` 1–9, khác 1–12) hoặc `longTerm: true` (`K2`/`K5`; nhân sự có thời hạn ⟹ 422 và tự cắt như RQ-2), bỏ `newEndDate`. Chưa nói: mã lỗi nào; `K4`; `longTerm` của `K1`; ghi gì vào dòng chi tiết Request tiếp tục khi không có ngày kết thúc mới; số tháng liên tiếp (OI-07a) của quyền không kết thúc; hợp đồng đã hết trước ngày bắt đầu kỳ mới.
+- **Phương án:** (a) viết lại luật riêng cho Request tiếp tục; (b) dùng đúng hàm của RQ-2 (`checkTermMonths`, `termRunOf`, `RequestFactsService.assess`) với ngày bắt đầu kỳ mới = ngày sau ngày kết thúc cũ.
+- **Đã chọn (tạm chốt):** (b). (1) Mã lỗi là `ACCESS_REQUEST.TERM_*` của RQ-2 (422): `K1` > 9 hoặc 0/> 12 ⟹ `TERM_MONTHS_OUT_OF_RANGE`; `K1` + `longTerm` ⟹ `TERM_REQUIRED`; nhân sự có thời hạn + `longTerm` ⟹ `TERM_LONG_TERM_NOT_ALLOWED` (kể cả `K4`: Request tiếp tục không có đường cho `K4`, tháng ⟹ `TERM_NOT_ASKED`, không tháng ⟹ `TERM_LONG_TERM_NOT_ALLOWED`; `assess` nhận `termStart` thay cho `renewalEnd`/`pricingFrom`, `termOf` có cờ `renewing`). Schema chỉ kiểm số nguyên và đúng một trong hai khóa; khoảng tháng do miền kiểm (không còn 422 `VALIDATION_ERROR` cho 0 và 13). `RENEWAL_REQUEST.END_DATE_OUT_OF_RANGE` bỏ (không còn ngày nhập). (2) Cắt theo hợp đồng như RQ-2: ngày kết thúc kỳ mới = min(`termEndOf(ngày sau hạn cũ, tháng)`, ngày hết hợp đồng); hợp đồng đã hết trước ngày bắt đầu kỳ mới ⟹ cắt tại ngày bắt đầu, tính 1 tháng, không từ chối (giữ D-17(2)). (3) Quyền không kết thúc (`longTerm`): migration `20261113003300_rq3_renewal_long_term` bỏ NOT NULL của `access_request_renewals.new_expected_end_date` (expand, trigger bất biến và CHECK thứ tự đều coi NULL là không đổi/hợp lệ); Request lưu `term_months = NULL`, `expected_end_date = NULL`; bản ghi kế tiếp không có `expected_end_date`; số năm sau = 12 × giá tháng (R-46); `consecutive_months` đếm tới hết hạn hiện tại (tối thiểu 1). (4) Giữ cửa sổ theo tham số `RENEWAL_WINDOW_DAYS` (mặc định 30, `QĐ-108b`), giữ bước IT kéo dài (`BR-MF1-08d`) và không tính GH-2 (RQ-1 đã loại `RENEWAL`). Căn cứ: `QĐ-111l`, `QĐ-111i`, R-38, R-39, R-46, INV-07; không tự bịa luật mới.
+- **File/commit:** `e7ebdeaa` — `requests/renewal-request/*` (dto, policy `renewalTermMonthsOf`, service, writer, errors, http-errors, controller), `requests/access-request/request-facts.service.ts`, `access-request.dto.ts`/`.types.ts`/`access-request-record.mapper.ts`, `request-view/access-request-query.service.ts`, `renewal-apply/renewal-request.repo.ts`, `licensing/public/licensing-renewal.types.ts`, `prisma/models/requests.prisma`, `prisma/migrations/20261113003300_rq3_renewal_long_term`.
+- **Đổi lại:** (1) đổi một nhánh của `checkTermMonths`/`termOf`; (3) cột để nguyên (không drop), thêm lại NOT NULL bằng migration mới nếu bỏ `longTerm`.
+- **FE cần biết:** body Request tiếp tục `extensionMonths` | `longTerm: true`; `renewal.newExpectedEndDate` có thể `null`; xem trước/chi tiết `cost` như RQ-2.
