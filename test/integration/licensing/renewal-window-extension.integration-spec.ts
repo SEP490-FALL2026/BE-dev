@@ -10,7 +10,7 @@ const REASON = 'The work goes on';
 
 /**
  * The renewal of a right that ends on a day, over PostgreSQL (`BR-MF1-08`, `QĐ-108a`, `QĐ-108b`, `BR-MF1-08d`): sent only within the window
- * of `RENEWAL_WINDOW_DAYS` days before the approved end, with the new end date the holder enters (at most twelve months on); the window is
+ * of `RENEWAL_WINDOW_DAYS` days before the approved end, for the months of use the holder enters (or with no end, `QĐ-111l`); the window is
  * recorded once when it opens and its holder and head are told; approval opens an IT task EXTEND instead of extending the right, and the
  * record that follows the old one is written only when the IT Admin completes it. Until then the request is approved and not granted, for
  * the commitment of 01/01 too (RV-03).
@@ -39,7 +39,13 @@ describe('the window and the IT extension of a renewal (integration, real Postgr
 
     return { unit, assignmentId, end };
   };
-  const body = (assignmentId: string, newEndDate: string) => ({ assignmentId, newEndDate, businessReason: REASON });
+  const body = (assignmentId: string, extensionMonths: number) => ({
+    assignmentId,
+    extensionMonths,
+    businessReason: REASON,
+  });
+  /** The last day of a renewal of `months` months of a right that ends on `previousEnd`, as the server works it out from the day after. */
+  const endAfter = (previousEnd: string, months: number) => renewalEndOf({ previousEnd, today: h.today(), months });
   const extensionTaskOf = async (requestId: string) =>
     (
       await h.ctx.sql.query<{ id: string; kind: string; status: string; assignment_id: string }>(
@@ -52,7 +58,7 @@ describe('the window and the IT extension of a renewal (integration, real Postgr
     it('refuses a renewal sent before the window opens, with the day it opens and its days', async () => {
       const { unit, assignmentId, end } = await holder(45);
 
-      const refused = await h.renew(body(assignmentId, h.inDays(120)), unit.member.account).expect(409);
+      const refused = await h.renew(body(assignmentId, 3), unit.member.account).expect(422);
 
       expect(h.codeOf(refused)).toBe('RENEWAL_REQUEST.WINDOW_NOT_OPEN');
       expect(h.detailsOf(refused)).toEqual({ opensOn: renewalWindowStart(end, 30), windowDays: 30 });
@@ -62,8 +68,8 @@ describe('the window and the IT extension of a renewal (integration, real Postgr
       const first = await holder(30);
       const last = await holder(0);
 
-      await h.renew(body(first.assignmentId, h.inDays(90)), first.unit.member.account).expect(201);
-      await h.renew(body(last.assignmentId, h.inDays(60)), last.unit.member.account).expect(201);
+      await h.renew(body(first.assignmentId, 3), first.unit.member.account).expect(201);
+      await h.renew(body(last.assignmentId, 2), last.unit.member.account).expect(201);
     });
 
     it('QĐ-108b: a window recorded when it opened keeps its days when the parameter is lowered later', async () => {
@@ -71,7 +77,7 @@ describe('the window and the IT extension of a renewal (integration, real Postgr
       expect(await h.ctx.app.get(ExpiryRenewalWindowService).openDue()).toBeGreaterThan(0);
       await h.setParameter('RENEWAL_WINDOW_DAYS', 10).expect(200);
       try {
-        await h.renew(body(assignmentId, h.inDays(90)), unit.member.account).expect(201);
+        await h.renew(body(assignmentId, 3), unit.member.account).expect(201);
       } finally {
         await h.setParameter('RENEWAL_WINDOW_DAYS', 30).expect(200);
       }
@@ -81,7 +87,7 @@ describe('the window and the IT extension of a renewal (integration, real Postgr
       const { unit, assignmentId } = await holder(25);
       await h.setParameter('RENEWAL_WINDOW_DAYS', 10).expect(200);
       try {
-        const refused = await h.renew(body(assignmentId, h.inDays(90)), unit.member.account).expect(409);
+        const refused = await h.renew(body(assignmentId, 3), unit.member.account).expect(422);
         expect(h.codeOf(refused)).toBe('RENEWAL_REQUEST.WINDOW_NOT_OPEN');
       } finally {
         await h.setParameter('RENEWAL_WINDOW_DAYS', 30).expect(200);
@@ -120,26 +126,54 @@ describe('the window and the IT extension of a renewal (integration, real Postgr
     });
   });
 
-  describe('QĐ-108a RV-25: the new end date the holder enters', () => {
-    it('refuses an end not after the current one and one more than twelve months after it', async () => {
+  describe('QĐ-111l: the time of use the holder enters', () => {
+    it('refuses months the kind of the plan does not take, and works the end out from the day after the right ends', async () => {
       const { unit, assignmentId, end } = await holder(10);
-      const maxEnd = renewalEndOf({ previousEnd: end, today: h.today(), months: 12 });
 
-      for (const newEndDate of [end, h.inDays(5), nextDay(maxEnd)]) {
-        const refused = await h.renew(body(assignmentId, newEndDate), unit.member.account).expect(422);
-        expect(h.codeOf(refused)).toBe('RENEWAL_REQUEST.END_DATE_OUT_OF_RANGE');
-        expect(h.detailsOf(refused)).toEqual({ previousEndDate: end, maxEndDate: maxEnd });
+      for (const months of [0, 13]) {
+        const refused = await h.renew(body(assignmentId, months), unit.member.account).expect(422);
+        expect(h.codeOf(refused)).toBe('ACCESS_REQUEST.TERM_MONTHS_OUT_OF_RANGE');
       }
-      const { request } = await h.renewed(unit.member.account, body(assignmentId, maxEnd));
-      expect(request.renewal).toMatchObject({ previousExpectedEndDate: end, newExpectedEndDate: maxEnd });
+      const { request } = await h.renewed(unit.member.account, body(assignmentId, 12));
+      expect(request).toMatchObject({ termMonths: 12, expectedEndDate: endAfter(end, 12) });
+      expect(request.renewal).toMatchObject({ previousExpectedEndDate: end, newExpectedEndDate: endAfter(end, 12) });
     });
 
-    it('refuses a body with both the end date and the months, and one with neither', async () => {
+    it('takes a right that goes on with no end for internal software: no new end date, none on the record that follows (R-46)', async () => {
+      const { unit, assignmentId, end } = await holder(10);
+
+      const { request } = await h.renewed(unit.member.account, {
+        assignmentId,
+        longTerm: true,
+        businessReason: REASON,
+      });
+
+      expect(request).toMatchObject({ termMonths: null, expectedEndDate: null });
+      expect(request.renewal).toMatchObject({ previousExpectedEndDate: end, newExpectedEndDate: null });
+      await h.decide(request.id, { decision: 'APPROVE' }, unit.head.account).expect(200);
+      const [task] = await extensionTaskOf(request.id);
+      await h.claim(task.id).expect(200);
+      await h.complete(task.id, { evidence: 'Extended with the vendor, with no end' }).expect(200);
+
+      const [next] = await h.successorsOf(assignmentId);
+      expect(next).toMatchObject({
+        predecessor_id: assignmentId,
+        valid_from: end,
+        valid_until: null,
+        expected_end_date: null,
+      });
+      expect((await h.renewalOf(request.id)).new_expected_end_date).toBeNull();
+    });
+
+    it('refuses a body with both the months and a right with no end, one with neither, an end date and a false longTerm', async () => {
       const { unit, assignmentId } = await holder(10);
 
       for (const sent of [
-        { assignmentId, newEndDate: h.inDays(60), extensionMonths: 2, businessReason: REASON },
+        { assignmentId, longTerm: true, extensionMonths: 2, businessReason: REASON },
         { assignmentId, businessReason: REASON },
+        { assignmentId, newEndDate: h.inDays(60), extensionMonths: 2, businessReason: REASON },
+        { assignmentId, newEndDate: h.inDays(60), businessReason: REASON },
+        { assignmentId, longTerm: false, businessReason: REASON },
       ]) {
         const refused = await h.renew(sent, unit.member.account).expect(422);
         expect(h.codeOf(refused)).toBe('VALIDATION_ERROR');
@@ -150,8 +184,8 @@ describe('the window and the IT extension of a renewal (integration, real Postgr
   describe('BR-MF1-08d RV-03: approval opens an IT task EXTEND; the IT Admin extends the right', () => {
     it('approval leaves the right as it is and opens the task; completing it writes the record that follows', async () => {
       const { unit, assignmentId, end } = await holder(10);
-      const newEnd = h.inDays(100);
-      const { request } = await h.renewed(unit.member.account, body(assignmentId, newEnd));
+      const newEnd = endAfter(end, 3);
+      const { request } = await h.renewed(unit.member.account, body(assignmentId, 3));
 
       await h.decide(request.id, { decision: 'APPROVE' }, unit.head.account).expect(200);
 
@@ -178,7 +212,7 @@ describe('the window and the IT extension of a renewal (integration, real Postgr
 
     it('an extension task closed as failed ends the renewal as FAILED, writes no record that follows and leaves the right its old end', async () => {
       const { unit, assignmentId, end } = await holder(10);
-      const { request } = await h.renewed(unit.member.account, body(assignmentId, h.inDays(100)));
+      const { request } = await h.renewed(unit.member.account, body(assignmentId, 3));
       await h.decide(request.id, { decision: 'APPROVE' }, unit.head.account).expect(200);
       const [task] = await extensionTaskOf(request.id);
 
@@ -206,7 +240,7 @@ describe('the window and the IT extension of a renewal (integration, real Postgr
 
     it('a renewal withdrawn while its extension task is open cancels the task (out of the IT queue) and leaves the right its old end', async () => {
       const { unit, assignmentId, end } = await holder(10);
-      const { request } = await h.renewed(unit.member.account, body(assignmentId, h.inDays(100)));
+      const { request } = await h.renewed(unit.member.account, body(assignmentId, 3));
       await h.decide(request.id, { decision: 'APPROVE' }, unit.head.account).expect(200);
       expect((await extensionTaskOf(request.id))[0]).toMatchObject({ kind: 'EXTEND', status: 'QUEUED' });
 
@@ -225,9 +259,9 @@ describe('the window and the IT extension of a renewal (integration, real Postgr
     });
 
     it('RV-03: a renewal approved and not extended yet counts on 01/01 as approved and not granted, to its new end', async () => {
-      const { unit, assignmentId } = await holder(10);
-      const newEnd = h.inDays(100);
-      const { request } = await h.renewed(unit.member.account, body(assignmentId, newEnd));
+      const { unit, assignmentId, end } = await holder(10);
+      const newEnd = endAfter(end, 3);
+      const { request } = await h.renewed(unit.member.account, body(assignmentId, 3));
       await h.decide(request.id, { decision: 'APPROVE' }, unit.head.account).expect(200);
 
       const seats = await h.ctx.app.get(TransactionRunner).run((tx) =>
@@ -248,7 +282,7 @@ describe('the window and the IT extension of a renewal (integration, real Postgr
 
     it('the database refuses an extension task with no request, and a second open one for the seat', async () => {
       const { unit, assignmentId } = await holder(10);
-      const { request } = await h.renewed(unit.member.account, body(assignmentId, h.inDays(60)));
+      const { request } = await h.renewed(unit.member.account, body(assignmentId, 2));
       await h.decide(request.id, { decision: 'APPROVE' }, unit.head.account).expect(200);
       const [task] = await extensionTaskOf(request.id);
 
@@ -276,13 +310,6 @@ describe('the window and the IT extension of a renewal (integration, real Postgr
 function renewalWindowStart(end: string, days: number): string {
   const date = new Date(`${end}T00:00:00.000Z`);
   date.setUTCDate(date.getUTCDate() - days);
-
-  return date.toISOString().slice(0, 10);
-}
-
-function nextDay(day: string): string {
-  const date = new Date(`${day}T00:00:00.000Z`);
-  date.setUTCDate(date.getUTCDate() + 1);
 
   return date.toISOString().slice(0, 10);
 }

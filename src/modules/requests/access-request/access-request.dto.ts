@@ -224,7 +224,7 @@ export const requestSchema = z.strictObject({
     .strictObject({
       assignmentId: z.uuid(),
       previousExpectedEndDate: z.string(),
-      newExpectedEndDate: z.string(),
+      newExpectedEndDate: z.string().nullable(),
       consecutiveMonths: z.number().int().positive(),
       applied: z.strictObject({ successorAssignmentId: z.uuid(), appliedAt: z.iso.datetime() }).nullable(),
     })

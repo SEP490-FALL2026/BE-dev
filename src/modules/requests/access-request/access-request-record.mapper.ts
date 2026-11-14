@@ -1,5 +1,5 @@
 import type { Prisma } from '../../../generated/prisma/client';
-import { fromDateColumn } from '../../../core/business-date';
+import { fromDateColumn, type BusinessDate } from '../../../core/business-date';
 import { toPricing } from './access-request-pricing.mapper';
 import type { NeedStepState, AccessRequestRecord, ReadableNeedWaitingReason } from './access-request.types';
 import { requestPolicyJson } from './access-request.json';
@@ -136,6 +136,9 @@ export function limitExemptionOf(value: string | null): LimitExemption | null {
   return (LIMIT_EXEMPTIONS as readonly string[]).includes(value ?? '') ? (value as LimitExemption) : null;
 }
 
+/** A date column that may be empty, as a business date. */
+const dayOrNull = (value: Date | null): BusinessDate | null => (value === null ? null : fromDateColumn(value));
+
 export function toRecord(row: RequestRow): AccessRequestRecord {
   const sent = sentColumns(row);
   const needSteps = row.steps.map((step) => ({
@@ -223,7 +226,7 @@ export function toRecord(row: RequestRow): AccessRequestRecord {
         : {
             assignmentId: row.renewal.assignmentId,
             previousExpectedEndDate: fromDateColumn(row.renewal.previousExpectedEndDate),
-            newExpectedEndDate: fromDateColumn(row.renewal.newExpectedEndDate),
+            newExpectedEndDate: dayOrNull(row.renewal.newExpectedEndDate),
             consecutiveMonths: row.renewal.consecutiveMonths,
             successorAssignmentId: row.renewal.successorAssignmentId,
             appliedAt: row.renewal.appliedAt,

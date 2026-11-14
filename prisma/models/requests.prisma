@@ -1033,7 +1033,8 @@ model AccessRequestRenewal {
   requestId               String    @id @map("request_id") @db.Uuid
   assignmentId            String    @map("assignment_id") @db.Uuid
   previousExpectedEndDate DateTime  @map("previous_expected_end_date") @db.Date
-  newExpectedEndDate      DateTime  @map("new_expected_end_date") @db.Date
+  // Null for a renewal that goes on with no end (Dùng lâu dài, RQ-3.2).
+  newExpectedEndDate      DateTime? @map("new_expected_end_date") @db.Date
   // The months from the first of the chain of records that follow one another to the new end: more than twelve needs the
   // confirmation of the head in so many words (OI-07a).
   consecutiveMonths       Int       @map("consecutive_months")

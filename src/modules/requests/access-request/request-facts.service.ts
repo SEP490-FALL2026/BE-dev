@@ -83,10 +83,12 @@ export interface AssessmentInput {
    * asked by the month refuses.
    */
   termMonths?: number | null;
-  /** A request to go on using is priced to the end it asks for, which the holder gave: no time of use is judged (`QĐ-109b`; the renewal has its own rule). */
-  renewalEnd?: BusinessDate;
-  /** The day the new period begins for a request to go on using, when it is not today (`QĐ-109b`). */
-  pricingFrom?: BusinessDate;
+  /**
+   * The day the time of use begins when it is not today: a request to go on using begins the day after the right ends (`QĐ-98`, `QĐ-109b`). Given,
+   * the request is for the renewal of a right: the months are judged and run from that day as for any request (`QĐ-111l`), a plan bought once is
+   * refused (it has no end to move), and the end is kept as the end of the new period; a start in a year after today costs nothing in this one.
+   */
+  termStart?: BusinessDate;
   now: Date;
   settings: RequestSettings;
   /** Sending locks the department of the sender against change until commit; showing a preview locks nothing. */
@@ -145,18 +147,22 @@ export class RequestFactsService {
     if (input.lockDepartment) await this.organizationReads.lockDepartmentShared(tx, unit.departmentId);
 
     const employee = await this.organizationReads.getEmployee(input.employeeId, tx);
-    const judged =
-      input.renewalEnd === undefined
-        ? this.termOf({ today, kind: target.provisioningType, termMonths: input.termMonths, employee })
-        : { termRefusal: null, term: termRunOf({ start: today, months: null, contractEndDate: null }) };
+    const renewing = input.termStart !== undefined;
+    const judged = this.termOf({
+      today: input.termStart ?? today,
+      kind: target.provisioningType,
+      termMonths: input.termMonths,
+      employee,
+      renewing,
+    });
     const pricing = await this.priceFor(tx, {
       planId: input.planId,
       free: policy.branch === 'INTERNAL_FREE',
       beneficiaries: 1,
       checkDate: today,
-      endDate: input.renewalEnd ?? judged.term.end,
-      endIsDerived: input.renewalEnd === undefined,
-      from: input.pricingFrom,
+      endDate: judged.term.end,
+      endIsDerived: !renewing,
+      from: input.termStart,
     });
     const gathered = await this.routing.gather(tx, {
       requesterEmployeeId: input.requesterEmployeeId ?? input.employeeId,
@@ -240,13 +246,18 @@ export class RequestFactsService {
     kind: TermKind;
     termMonths: number | null | undefined;
     employee: { employmentType: string; contractEndDate?: BusinessDate | null } | null;
+    /**
+     * The time of use is the one of a request to go on using: a plan bought once has no end to move, so it is never renewed, and the end of the
+     * contract that lets a new request for it end there (`INV-07`) does not make a right with no end for a person with a term.
+     */
+    renewing?: boolean;
   }): Pick<Assessment, 'termRefusal' | 'term'> {
     const fixedTermPerson = (facts.employee?.employmentType ?? 'STAFF') !== 'STAFF';
     const termRefusal = checkTermMonths({
       kind: facts.kind,
       termMonths: facts.termMonths,
       fixedTermPerson,
-      contractEndKnown: (facts.employee?.contractEndDate ?? null) !== null,
+      contractEndKnown: facts.renewing !== true && (facts.employee?.contractEndDate ?? null) !== null,
     });
     const months = termRefusal === null && typeof facts.termMonths === 'number' ? facts.termMonths : null;
 

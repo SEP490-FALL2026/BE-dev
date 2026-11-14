@@ -272,4 +272,77 @@ describe('RequestFactsService.assess', () => {
       expect((await service.assess(tx, input())).termRefusal).toBeNull();
     });
   });
+
+  describe('T-RQ3: a request to go on using the right (QĐ-111l, R-38, R-39, R-46)', () => {
+    // A `K1` plan of 600.000 d a month granted on 05/08/2026 for 3 months ends on 04/11/2026; the holder asks for 3 months more on 05/10.
+    const vnd = (amountMinor: bigint) => ({ amountMinor, currency: 'VND' });
+    const price = { kind: 'RECURRING', unitPrice: vnd(600_000n), billingCycle: 'MONTHLY' };
+    const plan = (provisioningType: string) =>
+      catalog.findPlanSeatTargets.mockResolvedValue([
+        { planId: 'p-1', applicationKind: 'SAAS', applicationStatus: 'ACTIVE', provisioningType },
+      ]);
+    /** The new period begins the day after the right ends (`QĐ-98`). */
+    const renewing = (over: Partial<AssessmentInput> = {}) => input({ termStart: '2026-11-05', ...over });
+
+    beforeEach(() => {
+      organization.businessToday.mockResolvedValue('2026-10-05');
+      catalog.getPlanPrice.mockResolvedValue(price);
+      given(COST_CENTER, 'SAAS');
+    });
+
+    it('3 months from 05/11/2026 end on 04/02/2027 and cost 2 months of 2026 and 1 of 2027, by the months that begin', async () => {
+      plan('K1');
+
+      const assessed = await service.assess(tx, renewing({ termMonths: 3 }));
+
+      expect(assessed.termRefusal).toBeNull();
+      expect(assessed.term).toMatchObject({ start: '2026-11-05', end: '2027-02-04', cutAt: null, startedMonths: 3 });
+      expect(assessed.pricing).toMatchObject({ amountMonths: 2, budgetYear: 2026, expectedEndDate: '2027-02-04' });
+      expect(assessed.pricing.amount).toEqual(vnd(1_200_000n));
+      expect(assessed.pricing.nextYearAmount).toEqual(vnd(600_000n));
+    });
+
+    it('a right to go on with no end (K2, Dùng lâu dài) costs the months of 2026 that begin and twelve months of the year after', async () => {
+      plan('K2');
+
+      const assessed = await service.assess(tx, renewing({ termMonths: null }));
+
+      expect(assessed.termRefusal).toBeNull();
+      expect(assessed.term).toMatchObject({ start: '2026-11-05', end: null, cutAt: null });
+      expect(assessed.pricing).toMatchObject({ amountMonths: 2, expectedEndDate: null });
+      expect(assessed.pricing.amount).toEqual(vnd(1_200_000n));
+      expect(assessed.pricing.nextYearAmount).toEqual(vnd(7_200_000n));
+    });
+
+    it('a person with a term is cut at the end of the contract and not refused: 3 months from 05/11 end on 31/12/2026', async () => {
+      plan('K1');
+      organization.getEmployee.mockResolvedValue({ employmentType: 'INTERN', contractEndDate: '2026-12-31' });
+
+      const assessed = await service.assess(tx, renewing({ termMonths: 3 }));
+
+      expect(assessed.termRefusal).toBeNull();
+      expect(assessed.term).toMatchObject({ end: '2026-12-31', cutAt: '2026-12-31', startedMonths: 2 });
+      expect(assessed.pricing).toMatchObject({ amountMonths: 2, nextYearAmount: null, expectedEndDate: '2026-12-31' });
+    });
+
+    it('refuses what the kind of the plan does not take: K1 over 9 months, K2 over 12, a right with no end for K1 or for a person with a term', async () => {
+      plan('K1');
+      expect((await service.assess(tx, renewing({ termMonths: 10 }))).termRefusal).toBe('TERM_MONTHS_OUT_OF_RANGE');
+      expect((await service.assess(tx, renewing({ termMonths: 9 }))).termRefusal).toBeNull();
+      expect((await service.assess(tx, renewing({ termMonths: null }))).termRefusal).toBe('TERM_REQUIRED');
+      plan('K2');
+      expect((await service.assess(tx, renewing({ termMonths: 13 }))).termRefusal).toBe('TERM_MONTHS_OUT_OF_RANGE');
+      expect((await service.assess(tx, renewing({ termMonths: 12 }))).termRefusal).toBeNull();
+      organization.getEmployee.mockResolvedValue({ employmentType: 'FREELANCER', contractEndDate: '2027-06-30' });
+      expect((await service.assess(tx, renewing({ termMonths: null }))).termRefusal).toBe('TERM_LONG_TERM_NOT_ALLOWED');
+    });
+
+    it('a plan bought once is not renewed, whoever holds it and whatever the end of their contract: months are not asked, and no end is not given', async () => {
+      plan('K4');
+      organization.getEmployee.mockResolvedValue({ employmentType: 'INTERN', contractEndDate: '2027-01-31' });
+
+      expect((await service.assess(tx, renewing({ termMonths: 3 }))).termRefusal).toBe('TERM_NOT_ASKED');
+      expect((await service.assess(tx, renewing({ termMonths: null }))).termRefusal).toBe('TERM_LONG_TERM_NOT_ALLOWED');
+    });
+  });
 });

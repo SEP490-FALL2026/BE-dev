@@ -344,12 +344,12 @@ const DROPPED: Call[] = [
     dropped: { newExpectedEndDate: '2027-01-01' },
   },
   {
-    name: 'accessRequestRenewalSubmit: extensionMonths 13 (step 12)',
+    name: 'accessRequestRenewalSubmit: extensionMonths that is not whole (QĐ-111l: the range is judged by the kind of plan, not the schema)',
     method: 'post',
     path: '/api/v1/access-requests/renewals',
     role: 'EMPLOYEE',
     body: { assignmentId: ID, businessReason: 'Work' },
-    dropped: { extensionMonths: 13 },
+    dropped: { extensionMonths: 1.5 },
     control: { extensionMonths: 12 },
   },
   ...['/api/v1/group-requests', '/api/v1/group-requests/check'].map((path) => ({

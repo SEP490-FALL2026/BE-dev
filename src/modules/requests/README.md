@@ -186,8 +186,10 @@ cùng cần; phần ghi nằm ở `assessment/assessment.repo.ts`.
     dựng dòng và audit) với `renewal-apply/`
     (`renewal-apply.service.ts`, `renewal-request.repo.ts`: duyệt ⟹ mở tác vụ IT `EXTEND` (`requestExtension`), IT hoàn tất ⟹
     `AccessRequestGrantGate.reportExtended` ⟹ `apply` ghi Assignment kế tiếp, BR-MF1-08d). Không còn Request tài khoản dịch vụ (`QĐ-110m`): loại `SERVICE_ACCOUNT` chỉ còn để đọc lịch sử, Request còn mở lúc bỏ đã bị hệ thống hủy với nguyên nhân `SYSTEM_SCOPE_REMOVED`.
-    Request tiếp tục chỉ gửi trong cửa sổ `RENEWAL_WINDOW_DAYS` ngày trước ngày kết thúc (409 `RENEWAL_REQUEST.WINDOW_NOT_OPEN`;
-    cửa sổ đã ghi giữ số ngày lúc mở, QĐ-108b), body `newEndDate` ≤ ngày kết thúc + 12 tháng (422 `RENEWAL_REQUEST.END_DATE_OUT_OF_RANGE`).
+    Request tiếp tục chỉ gửi trong cửa sổ `RENEWAL_WINDOW_DAYS` ngày trước ngày kết thúc (422 `RENEWAL_REQUEST.WINDOW_NOT_OPEN`;
+    cửa sổ đã ghi giữ số ngày lúc mở, QĐ-108b); body `extensionMonths` (`K1` 1–9, khác 1–12) hoặc `longTerm: true` (`K2`/`K5`, không cho nhân sự có thời hạn),
+    luật `ACCESS_REQUEST.TERM_*` như Request mới (QĐ-111l): kỳ mới bắt đầu ngày sau ngày kết thúc cũ, cắt theo hợp đồng (R-38), tiền theo tháng bắt đầu và
+    số năm sau lưu lúc duyệt chi (R-39, R-46); `renewal.newExpectedEndDate` null khi không có ngày kết thúc.
 - **Trạng thái, SLA, chuyển bước**
   - `status/` — chiếu audit event của request thành thông báo inbox (US-05-15); nhóm `rules/` là bảng luật sự kiện → thông báo.
   - `timing/` (thời gian từng bước, KPI-2), `sla/` (nhắc bước trễ, tồn đọng, nghẽn; US-05-09, US-05-10),

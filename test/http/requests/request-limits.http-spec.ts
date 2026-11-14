@@ -58,20 +58,22 @@ describe('the forms that send a request for new access take no GH-3 reason (http
     });
   });
 
-  describe('accessRequestRenewalSubmit: the new end date (BR-MF1-08b, QĐ-108a)', () => {
+  describe('accessRequestRenewalSubmit: the time of use (QĐ-111l)', () => {
     const path = '/api/v1/access-requests/renewals';
     const base = { assignmentId: ID, businessReason: 'Work' };
 
-    it('takes a new end date, or the deprecated months, but not both and not neither', async () => {
-      const day = await post(path, { ...base, newEndDate: '2027-03-31' });
+    it('takes the months of use, or a right with no end, but not both, not neither and no end date', async () => {
       const months = await post(path, { ...base, extensionMonths: 3 });
-      const both = await post(path, { ...base, newEndDate: '2027-03-31', extensionMonths: 3 });
+      const noEnd = await post(path, { ...base, longTerm: true });
+      const both = await post(path, { ...base, longTerm: true, extensionMonths: 3 });
       const neither = await post(path, base);
-      const notADay = await post(path, { ...base, newEndDate: 'next month' });
+      const falseNoEnd = await post(path, { ...base, longTerm: false });
+      const day = await post(path, { ...base, newEndDate: '2027-03-31' });
+      const dayAndMonths = await post(path, { ...base, newEndDate: '2027-03-31', extensionMonths: 3 });
 
-      expect(bodyOf(day).error?.code).not.toBe('VALIDATION_ERROR');
       expect(bodyOf(months).error?.code).not.toBe('VALIDATION_ERROR');
-      for (const refused of [both, neither, notADay]) {
+      expect(bodyOf(noEnd).error?.code).not.toBe('VALIDATION_ERROR');
+      for (const refused of [both, neither, falseNoEnd, day, dayAndMonths]) {
         expect([refused.status, bodyOf(refused).error?.code]).toEqual([422, 'VALIDATION_ERROR']);
       }
     });

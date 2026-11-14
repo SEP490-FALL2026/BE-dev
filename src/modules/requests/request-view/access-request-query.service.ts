@@ -106,7 +106,7 @@ export interface AccessRequestView extends Omit<
 export interface RenewalView {
   assignmentId: string;
   previousExpectedEndDate: string;
-  newExpectedEndDate: string;
+  newExpectedEndDate: string | null;
   consecutiveMonths: number;
   /** The record approval wrote after the old one; null until the request is approved. */
   applied: { successorAssignmentId: string; appliedAt: Date } | null;

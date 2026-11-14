@@ -32,7 +32,8 @@ export interface RenewAssignmentInput {
   requestId: string;
   /** The end the request was made against: a seat whose end changed since is not renewed. */
   previousExpectedEndDate: BusinessDate;
-  newExpectedEndDate: BusinessDate;
+  /** The last day of the new period; null for a right that goes on with no end (_Dùng lâu dài_, `QĐ-111l`). */
+  newExpectedEndDate: BusinessDate | null;
   now: Date;
 }
 

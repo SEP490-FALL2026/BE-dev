@@ -73,7 +73,8 @@ export interface ServiceAccountRecord {
 export interface RenewalRecord {
   assignmentId: string;
   previousExpectedEndDate: BusinessDate;
-  newExpectedEndDate: BusinessDate;
+  /** Null for a renewal that goes on with no end (_Dùng lâu dài_). */
+  newExpectedEndDate: BusinessDate | null;
   /** The months the right would run on without a break once renewed; over twelve needs the confirmation of the head. */
   consecutiveMonths: number;
   /** The record that follows the old one, written when the request was approved; null until then. */

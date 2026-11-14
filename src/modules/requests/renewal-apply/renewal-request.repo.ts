@@ -8,7 +8,7 @@ export interface NewRenewalDetail {
   requestId: string;
   assignmentId: string;
   previousExpectedEndDate: BusinessDate;
-  newExpectedEndDate: BusinessDate;
+  newExpectedEndDate: BusinessDate | null;
   consecutiveMonths: number;
 }
 
@@ -30,7 +30,7 @@ export class RenewalRequestRepo {
         requestId: input.requestId,
         assignmentId: input.assignmentId,
         previousExpectedEndDate: toDateColumn(input.previousExpectedEndDate),
-        newExpectedEndDate: toDateColumn(input.newExpectedEndDate),
+        newExpectedEndDate: input.newExpectedEndDate === null ? null : toDateColumn(input.newExpectedEndDate),
         consecutiveMonths: input.consecutiveMonths,
       },
     });

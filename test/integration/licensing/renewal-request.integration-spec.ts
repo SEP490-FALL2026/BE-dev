@@ -65,7 +65,7 @@ describe('the renewal of a right that ends on a day over PostgreSQL (US-05-14)',
   const windowOpensFor = async (days: number, unit: Unit, assignmentId: string): Promise<boolean> => {
     await h.setParameter('RENEWAL_WINDOW_DAYS', 90).expect(200);
     if (days <= 90) return true;
-    const refused = await h.renew(body(assignmentId, 3), unit.member.account).expect(409);
+    const refused = await h.renew(body(assignmentId, 3), unit.member.account).expect(422);
     expect(h.codeOf(refused)).toBe('RENEWAL_REQUEST.WINDOW_NOT_OPEN');
 
     return false;
@@ -467,14 +467,13 @@ describe('the renewal of a right that ends on a day over PostgreSQL (US-05-14)',
       ).toBe(1);
     });
 
-    it('refuses a form that is not valid: months outside 1..12, a day in place of months, a missing field, a blank reason, an extra key', async () => {
+    it('refuses a form that is not valid: months that are not whole, a day in place of months, both months and no end, a missing field, a blank reason, an extra key', async () => {
       const { unit, assignmentId } = await holder({ planId: internalPlan }, 5);
       const before = await h.requestRows();
 
       for (const invalid of [
-        { assignmentId, extensionMonths: 0, businessReason: REASON },
-        { assignmentId, extensionMonths: 13, businessReason: REASON },
         { assignmentId, extensionMonths: 1.5, businessReason: REASON },
+        { assignmentId, extensionMonths: 3, longTerm: true, businessReason: REASON },
         { assignmentId, extensionMonths: '3', businessReason: REASON },
         { assignmentId, businessReason: REASON },
         { extensionMonths: 3, businessReason: REASON },
@@ -501,6 +500,18 @@ describe('the renewal of a right that ends on a day over PostgreSQL (US-05-14)',
       const { request } = await h.renewed(unit.member.account, body(assignmentId, 12));
 
       expect(request).toMatchObject({ termMonths: 12, expectedEndDate: endAfter(end, 12) });
+    });
+
+    it('refuses the months the plan does not take, 0 and 13, with the code of the time of use, and writes nothing (QĐ-111l)', async () => {
+      const { unit, assignmentId } = await holder({ planId: internalPlan }, 5);
+      const before = [await h.requestRows(), await h.count('access_request_renewals')];
+
+      for (const months of [0, 13]) {
+        const refused = await h.renew(body(assignmentId, months), unit.member.account).expect(422);
+        expect(h.codeOf(refused)).toBe('ACCESS_REQUEST.TERM_MONTHS_OUT_OF_RANGE');
+      }
+
+      expect([await h.requestRows(), await h.count('access_request_renewals')]).toEqual(before);
     });
   });
 
