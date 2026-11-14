@@ -163,6 +163,22 @@ describe('the run of a term: the months that begin, the end, and the cut at the 
     });
   });
 
+  it('a contract that ends on the very last day the months would give does not cut: nothing is cut, the end is the same day', () => {
+    expect(termRunOf({ start: '2026-11-10', months: 3, contractEndDate: '2027-02-09' })).toEqual({
+      start: '2026-11-10',
+      months: 3,
+      end: '2027-02-09',
+      cutAt: null,
+      startedMonths: 3,
+    });
+    // One day before it does cut, to that day, and the months that have begun are still the same three.
+    expect(termRunOf({ start: '2026-11-10', months: 3, contractEndDate: '2027-02-08' })).toMatchObject({
+      end: '2027-02-08',
+      cutAt: '2027-02-08',
+      startedMonths: 3,
+    });
+  });
+
   it('a right that has no end has no cut and no count of months', () => {
     expect(termRunOf({ start: '2026-11-20', months: null, contractEndDate: null })).toEqual({
       start: '2026-11-20',

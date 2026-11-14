@@ -130,14 +130,14 @@ describe('the spend of the people of a request for a group, decided one by one o
        * the staff months begin 10/11, 10/12 and then four of the year after (6.000.000 in all: 2.000.000 and 4.000.000), the intern's contract ends
        * 05/12, so only the month of 10/11 begins (1.000.000, nothing of the year after).
        */
-      const cutGroup = async () => {
+      const cutGroup = async (contractEnd = `${h.year}-12-05`) => {
         const u = await unit();
         await h.budgetFor(u, { total: 100_000 * M });
         await h.budgetFor(u, { total: 100_000 * M, year: h.next });
         const [e1, e2, e3] = await h.colleagues(u, 3);
         await h.ctx.sql.query(`UPDATE employees SET employment_type = 'INTERN', contract_end_date = $2 WHERE id = $1`, [
           e3.employeeId,
-          `${h.year}-12-05`,
+          contractEnd,
         ]);
         // The people are made on the real day: they are backdated to the first of the year so that the fixed day, which may come before the
         // real one, finds them in their department. The day is fixed for the sending and the decision.
@@ -214,6 +214,29 @@ describe('the spend of the people of a request for a group, decided one by one o
         );
         expect(rows.some((row) => row.employee_id === e3.employeeId)).toBe(false);
         expect(await kept(id)).toEqual({ amount_minor: '4000000', next_year_amount_minor: '8000000' });
+      });
+
+      it('a contract that ends in January cuts only the year after: the intern holds 2.000.000 now and keeps 1.000.000 of the next year, the staff 4.000.000 each (T-R38)', async () => {
+        // The intern months that begin by 31/01 are 10/11, 10/12 and 10/01: two this year and one the next. Counting the intern like the staff
+        // (no cut) would keep 4.000.000 of the year after instead of 1.000.000.
+        const { id, e1, e2, e3 } = await cutGroup(`${h.year + 1}-01-31`);
+
+        await h
+          .decideSpendLines(id, { lines: [e1, e2, e3].map((person) => approve(person.employeeId)) }, h.boss.account)
+          .expect(200);
+
+        expect((await h.commitments(id)).map((commitment) => [commitment.year, commitment.amount_minor])).toEqual([
+          [h.year, '6000000'],
+        ]);
+        const rows = await rowsOf(id);
+        expect(
+          Object.fromEntries(rows.filter((row) => !row.held).map((row) => [row.employee_id, row.amount_minor])),
+        ).toEqual({
+          [e1.employeeId]: '4000000',
+          [e2.employeeId]: '4000000',
+          [e3.employeeId]: '1000000',
+        });
+        expect(await kept(id)).toEqual({ amount_minor: '6000000', next_year_amount_minor: '9000000' });
       });
 
       it('approving all three holds 5.000.000: 2.000.000 for each of the staff and 1.000.000 for the intern, who keeps nothing of the year after', async () => {
