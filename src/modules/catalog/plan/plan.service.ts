@@ -89,12 +89,18 @@ export class PlanService {
   async list(query: {
     applicationId?: string;
     provisioningType?: ProvisioningType;
+    functionalGroupId?: string;
+    status?: 'APPROVED' | 'RETIRED';
+    search?: string;
     page: number;
     pageSize: number;
   }): Promise<Page<PlanSummaryRecord>> {
     const { items, total } = await this.plans.list({
       ...(query.applicationId ? { applicationId: query.applicationId } : {}),
       ...(query.provisioningType ? { provisioningType: query.provisioningType } : {}),
+      ...(query.functionalGroupId ? { functionalGroupId: query.functionalGroupId } : {}),
+      ...(query.status ? { status: query.status } : {}),
+      ...(query.search ? { search: query.search } : {}),
       skip: (query.page - 1) * query.pageSize,
       take: query.pageSize,
     });

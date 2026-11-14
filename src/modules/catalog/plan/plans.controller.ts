@@ -108,7 +108,8 @@ export class PlansController {
   @ApiOperation({ operationId: 'planList', summary: 'List plans' })
   @ApiSuccessResponse(PlanPageResponseDto, {
     message: 'PLAN.LISTED',
-    description: 'A page of plans by application then plan name, optionally for one application or one kind.',
+    description:
+      'A page of plans by application then plan name, optionally for one application, one kind of provisioning, the functional group or the catalog status of the application, or a search over the plan and application names.',
   })
   @ApiErrorResponses(...AUTH_ERRORS, READERS, {
     status: HttpStatus.UNPROCESSABLE_ENTITY,

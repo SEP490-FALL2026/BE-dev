@@ -67,6 +67,19 @@ export const workspaceProfileBodySchema = z.strictObject({
 export const listPlansQuerySchema = z.strictObject({
   applicationId: z.uuid().optional(),
   provisioningType: provisioningType.optional(),
+  functionalGroupId: z
+    .uuid()
+    .optional()
+    .meta({ description: 'Only the plans of the applications in this functional group.' }),
+  status: z
+    .enum(['APPROVED', 'RETIRED'])
+    .optional()
+    .meta({ description: 'Only the plans of the applications in this catalog status.' }),
+  search: z
+    .string()
+    .max(100)
+    .optional()
+    .meta({ description: 'Text in the name of the plan or of its application, ignoring case and accents.' }),
   page: z.coerce.number().int().positive().default(1),
   pageSize: z.coerce.number().int().positive().max(100).default(20),
 });

@@ -78,6 +78,11 @@ export interface WorkspaceProfileView {
 export interface PlanListFilter {
   applicationId?: string;
   provisioningType?: ProvisioningType;
+  functionalGroupId?: string;
+  /** The catalog status of the application of the plan. */
+  status?: 'APPROVED' | 'RETIRED';
+  /** Text in the name of the plan or of its application. */
+  search?: string;
   skip: number;
   take: number;
 }

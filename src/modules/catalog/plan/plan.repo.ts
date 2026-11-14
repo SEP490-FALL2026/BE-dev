@@ -4,6 +4,7 @@ import { fromDateColumn, toDateColumn } from '../../../core/business-date';
 import type { PlanRevocationInfo, PlanSummary, WorkspaceDuty } from '../public/catalog.types';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
+import { escapeLikePattern } from '../../../core/search-key';
 import { searchKey } from '../vendor-dictionary/vendor-matcher.policy';
 import type {
   NewPlan,
@@ -317,13 +318,21 @@ export class PlanRepo {
    * (up to 2000 characters a plan) is not selected: the list does not show it (`LD-05`).
    */
   async list(filter: PlanListFilter): Promise<{ items: PlanSummaryRecord[]; total: number }> {
+    const key = filter.search ? searchKey(filter.search) : '';
+    const application: Prisma.ApplicationWhereInput = {
+      ...(filter.functionalGroupId ? { functionalGroupId: filter.functionalGroupId } : {}),
+      ...(filter.status ? { catalogStatus: filter.status } : {}),
+    };
     const where: Prisma.PlanWhereInput = {
       ...(filter.applicationId ? { applicationId: filter.applicationId } : {}),
       ...(filter.provisioningType ? { provisioningType: filter.provisioningType } : {}),
+      ...(Object.keys(application).length > 0 ? { application: { is: application } } : {}),
     };
 
     return this.prisma.$transaction(
       async (tx) => {
+        // A search is text, not a pattern: a `%` or `_` in it matches itself, so the match is made in SQL with the pattern escaped.
+        if (key) where.id = { in: await this.idsMatching(tx, key) };
         const rows = await tx.plan.findMany({
           where,
           select: {
@@ -356,6 +365,16 @@ export class PlanRepo {
       },
       { isolationLevel: Prisma.TransactionIsolationLevel.RepeatableRead },
     );
+  }
+
+  /** The plans whose own name, or the name of their application, contains the text (a search key), the text taken literally. */
+  private async idsMatching(tx: DbTx, key: string): Promise<string[]> {
+    const pattern = `%${escapeLikePattern(key)}%`;
+    const rows = await tx.$queryRaw<{ id: string }[]>`
+      SELECT p.id FROM plans p JOIN applications a ON a.id = p.application_id
+       WHERE p.normalized_name LIKE ${pattern} ESCAPE '\\' OR a.normalized_name LIKE ${pattern} ESCAPE '\\'`;
+
+    return rows.map((row) => row.id);
   }
 
   async findProfile(planId: string, tx?: DbTx): Promise<WorkspaceProfileRecord | null> {
