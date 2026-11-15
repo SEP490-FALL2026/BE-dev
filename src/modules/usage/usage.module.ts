@@ -38,6 +38,7 @@ import { VendorImportRepo } from './vendor-import/vendor-import.repo';
 import { VendorImportService } from './vendor-import/vendor-import.service';
 import { VendorImportMatchService } from './vendor-import/match/vendor-import-match.service';
 import { VendorImportPreviewService } from './vendor-import/preview/vendor-import-preview.service';
+import { VendorSourceContractController } from './vendor-source/vendor-source-contract.controller';
 import { VendorSourceController } from './vendor-source/vendor-source.controller';
 import { VendorSourceQueryService } from './vendor-source/vendor-source-query.service';
 import { VendorSourceRepo } from './vendor-source/vendor-source.repo';
@@ -68,6 +69,7 @@ import { ToolStatusSnapshotService } from './tool-status/tool-status-snapshot.se
     ToolStatusController,
     IntakeRejectionController,
     VendorSourceController,
+    VendorSourceContractController,
     VendorImportController,
     IdentityController,
   ],

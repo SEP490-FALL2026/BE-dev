@@ -2,6 +2,7 @@ import type {
   DetectableGroup,
   EvidenceDirection,
   SourceCapabilities,
+  SourceStatus,
   SourceTemplate,
   UsageReportShape,
 } from './vendor-source.types';
@@ -107,6 +108,9 @@ export function limitationOf(capabilities: SourceCapabilities, direction: Eviden
 
   return null;
 }
+
+/** The status of a source that a contract shows (`US-04-13` AC-15): derived from the day it was retired, never stored. */
+export const sourceStatusOf = (retiredAt: Date | null): SourceStatus => (retiredAt ? 'RETIRED' : 'ACTIVE');
 
 export type ApplicationProblem =
   'APPLICATION_NOT_FOUND' | 'APPLICATION_INTERNAL' | 'APPLICATION_RETIRED' | 'COMMUNICATION_APP';

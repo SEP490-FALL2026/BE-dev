@@ -41,6 +41,9 @@ Tầng: T6 (`scripts/arch/tiers.cjs`). Phụ thuộc: devices, catalog, licensin
 - `allowlist/`, `intake-gate/`, `ai-usage/`, `tool-status/` — phía collector (xem bên dưới).
 - `vendor-source/` — khai nguồn (`usageSource*`): kiểm mẫu ↔ dạng báo cáo ↔ năng lực (`TEMPLATE_CAPABILITY_MISMATCH`), chặn ứng dụng nội bộ và
   ứng dụng liên lạc (`US-08-02` AC-3), trả nhóm phát hiện được (`FR-4.4`) và câu giới hạn (`US-08-01` AC-2). Sửa nguồn chỉ áp cho lần nhập sau.
+  `vendor-source-contract.controller.ts` (`usageSourceListOfContract`, `GET /contracts/{id}/usage-sources`, IT Admin và Finance, `US-04-13` AC-15): nguồn của
+  các ứng dụng của hợp đồng đó (đọc ứng dụng qua `CatalogContractApi`, tên ứng dụng qua `CatalogApi`), mỗi nguồn chỉ `id`, `name`, `application`, `status`
+  (`ACTIVE`, hoặc `RETIRED` khi nguồn đã ngừng); Finance không đọc route nguồn nào khác (`QĐ-101i`).
 - `identity/` — hàng đợi chưa khớp, ánh xạ (`Resolve` = ánh xạ `MANUAL` kèm chuỗi gốc; `Dismiss` ở lại hàng đợi; `MappingEnd` sửa ánh xạ sai) và
   phát hiện sai lệch.
 - `vendor-import/` — `parse/` (CSV theo mẫu / JSON `saas-sentry.vendor-usage-report/0.1-proposal`, cửa sổ bao phủ, phân loại sự kiện),

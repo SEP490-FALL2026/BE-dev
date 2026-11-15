@@ -38,6 +38,7 @@ unitPrice, reportingUnitPrice, billingCycle }`, thuê bao `PERPETUAL` có giá �
   - `getSubscriptionIdsOwnedBy`, `getApplicationsOwnedBy`, `getWorkspaceDutiesOf` — thứ một phòng ban/người đang giữ.
   - `registerInternalSoftware` — đăng ký phần mềm nội bộ trong transaction của bên gọi (US-05-20).
   - `getVendorName`, `getOnboardingFacts` — tên vendor; số ứng dụng/plan/subscription cho checklist onboarding.
+- `CatalogContractApi` ([public/catalog-contract.api.ts](public/catalog-contract.api.ts)) — `getApplicationIds(contractId)`: ứng dụng của các thuê bao đang liên kết hợp đồng, mỗi ứng dụng một lần (tối đa `CONTRACT_APPLICATIONS_READ_MAX` = 1 000, chỉ để chặn đọc), `null` khi không có hợp đồng, rỗng khi chưa liên kết thuê bao nào. Dùng bởi `usage` cho `GET /contracts/{id}/usage-sources` (`US-04-13` AC-15); catalog không đọc `usage` (T4 < T6).
 - `SubscriptionPeriodApi` ([public/subscription-period.api.ts](public/subscription-period.api.ts)) — kỳ subscription cho gia hạn
   (licensing): `getPeriods`, `lockPeriod`, `listRenewalSubjects`, `recordNextPeriod` (kỳ mới nối chuỗi `renewed_from_id`, một
   lần), `getRenewalAlertRecipient`; lỗi `public/subscription-period.errors.ts`, kiểu `public/subscription-period.types.ts`.

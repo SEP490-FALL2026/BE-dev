@@ -1,6 +1,6 @@
 import type { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { CONTRACT_DETAIL_ARRAY_MAX } from './contract-fields.policy';
-import { ContractQueryService } from './contract-query.service';
+import { CONTRACT_APPLICATIONS_READ_MAX, ContractQueryService } from './contract-query.service';
 import type { ContractSubscriptionBrief, ContractSubscriptionRepo } from './contract-subscription.repo';
 import { ContractNotFoundError } from './contract.errors';
 import type { ContractDetailRow, ContractRepo } from './contract.repo';
@@ -51,6 +51,7 @@ function serviceOf(held: { count: number; documents: number; applications: numbe
   const asked: Record<string, number> = {};
   const contracts = {
     findDetail: (id: string) => Promise.resolve(id === 'c1' ? row(held.count) : null),
+    find: (id: string) => Promise.resolve(id === 'c1' ? row(held.count) : null),
   } as unknown as ContractRepo;
   const links = {
     briefsOf: (_id: string, limit: number) => {
@@ -127,5 +128,21 @@ describe('the detail of a contract lists a bounded slice of what hangs on it (AP
     const { service } = serviceOf({ count: 0, documents: 0, applications: 0 });
 
     await expect(service.detail('c2')).rejects.toBeInstanceOf(ContractNotFoundError);
+  });
+});
+
+describe('the applications of a contract, which the usage module reads the sources through (US-04-13 AC-15)', () => {
+  it('lists the applications of the subscriptions that rest on a contract and asks for no more than the ceiling', async () => {
+    const { service, asked } = serviceOf({ count: 3, documents: 0, applications: 3 });
+
+    expect(await service.applicationIdsOf('c1')).toEqual(['a0', 'a1', 'a2']);
+    expect(asked.applications).toBe(CONTRACT_APPLICATIONS_READ_MAX);
+  });
+
+  it('answers null for a contract that does not exist, so the reader can tell it from a contract with no application', async () => {
+    const { service } = serviceOf({ count: 0, documents: 0, applications: 0 });
+
+    expect(await service.applicationIdsOf('c2')).toBeNull();
+    expect(await service.applicationIdsOf('c1')).toEqual([]);
   });
 });

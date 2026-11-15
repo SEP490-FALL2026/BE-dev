@@ -71,6 +71,8 @@ const PUBLIC_CONTRACT_EXPORTS: ReadonlySet<string> = new Set([
   'BudgetsModule: CommitmentRequestFactsHook',
   // G4 (ADR-0013): the catalog facade licensing reads the seat targets (subscription or internal plan) through.
   'CatalogModule: CatalogApi',
+  // B2D-01 (`US-04-13` AC-15): the usage module reads which applications rest on a contract through this facade, to show their sources at the contract.
+  'CatalogModule: CatalogContractApi',
   // X-IT.2: what an IT Admin answers for in the catalog (subscriptions and applications), counted and handed over by the hand-over of personnel.
   'CatalogModule: CatalogResponsibilityApi',
   // The extension point licensing binds its reader of occupied seats to (public/catalog.extension-points.ts).

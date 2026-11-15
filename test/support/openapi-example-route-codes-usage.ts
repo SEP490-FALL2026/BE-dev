@@ -17,6 +17,7 @@ const SOURCE_SAVE_422 = [
 export const ROUTE_ERROR_CODES_USAGE: Readonly<Record<string, Partial<Record<RouteErrorStatus, readonly string[]>>>> = {
   usageSourceCreate: { '409': ['USAGE_SOURCE.NAME_TAKEN'], '422': SOURCE_SAVE_422 },
   usageSourceGet: { '404': ['USAGE_SOURCE.NOT_FOUND'] },
+  usageSourceListOfContract: { '404': ['USAGE_SOURCE.CONTRACT_NOT_FOUND'] },
   usageSourceUpdate: {
     '404': ['USAGE_SOURCE.NOT_FOUND'],
     '409': ['USAGE_SOURCE.IN_USE', 'USAGE_SOURCE.NAME_TAKEN'],

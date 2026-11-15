@@ -9,6 +9,7 @@ import { NotificationsModule } from '../notifications/notifications.module';
 import { OperatingParametersModule } from '../operating-parameters/operating-parameters.module';
 import { OrganizationModule } from '../organization/organization.module';
 import { CatalogApi } from './public/catalog.api';
+import { CatalogContractApi } from './public/catalog-contract.api';
 import { CatalogResponsibilityApi } from './public/catalog-responsibility.api';
 import { SeatBaselinePhaseHook, SeatOccupancyHook } from './public/catalog.extension-points';
 import { ApplicationIntakeController } from './application-intake/application-intake.controller';
@@ -190,6 +191,7 @@ import { VendorRepo } from './vendor/vendor.repo';
     ApplicationRetirementRepo,
     ApplicationRetirementService,
     CatalogApi,
+    CatalogContractApi,
     CatalogResponsibilityApi,
     SubscriptionPeriodApi,
     RequestableSoftwareRepo,
@@ -197,7 +199,14 @@ import { VendorRepo } from './vendor/vendor.repo';
   ],
   // The facade licensing reads the seat targets through (ADR-0013), and the hook licensing binds its reader of occupied seats to
   // (`public/catalog.extension-points.ts`), and the facade the hand-over of an IT Admin who leaves moves their subscriptions and applications through
-  // (`public/catalog-responsibility.api.ts`); the capability services and repos stay private.
-  exports: [CatalogApi, CatalogResponsibilityApi, SubscriptionPeriodApi, SeatOccupancyHook, SeatBaselinePhaseHook],
+  // (`public/catalog-responsibility.api.ts`), and the facade `usage` reads the applications of a contract through (`public/catalog-contract.api.ts`); the capability services and repos stay private.
+  exports: [
+    CatalogApi,
+    CatalogContractApi,
+    CatalogResponsibilityApi,
+    SubscriptionPeriodApi,
+    SeatOccupancyHook,
+    SeatBaselinePhaseHook,
+  ],
 })
 export class CatalogModule {}

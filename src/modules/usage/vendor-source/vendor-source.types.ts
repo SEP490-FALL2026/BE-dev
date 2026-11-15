@@ -85,3 +85,15 @@ export interface SourceView extends SourceRecord {
   limitation: string | null;
   canConcludeAbsence: boolean;
 }
+
+/** Whether a source still reads reports (`ACTIVE`) or was retired (`RETIRED`). */
+export type SourceStatus = 'ACTIVE' | 'RETIRED';
+
+/** A source as a contract shows it (`US-04-13` AC-15): what it is called, of which application and its status; nothing of how it reads a report. */
+export interface ContractSourceView {
+  id: string;
+  name: string;
+  applicationId: string;
+  applicationName: string;
+  status: SourceStatus;
+}

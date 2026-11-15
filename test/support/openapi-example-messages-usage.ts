@@ -11,6 +11,7 @@ export const SUCCESS_MESSAGES_USAGE: Readonly<Record<string, string>> = {
   usageSourceCreate: 'USAGE_SOURCE.CREATED',
   usageSourceGet: 'USAGE_SOURCE.FETCHED',
   usageSourceList: 'USAGE_SOURCE.LISTED',
+  usageSourceListOfContract: 'USAGE_SOURCE.LISTED',
   usageSourceUpdate: 'USAGE_SOURCE.UPDATED',
   usageUnmatchedIdentityDismiss: 'USAGE_IDENTITY.DISMISSED',
   usageUnmatchedIdentityList: 'USAGE_IDENTITY.UNMATCHED_LISTED',

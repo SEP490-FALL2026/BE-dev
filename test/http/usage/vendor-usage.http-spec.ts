@@ -14,6 +14,7 @@ const OPERATIONS = [
   'usageSourceList',
   'usageSourceGet',
   'usageSourceUpdate',
+  'usageSourceListOfContract',
   'usageImportUpload',
   'usageImportGet',
   'usageImportRowList',
@@ -57,6 +58,7 @@ describe('vendor usage routes (http contract, no database)', () => {
     ['get', '/api/v1/usage-sources'],
     ['get', `/api/v1/usage-sources/${ID}`],
     ['patch', `/api/v1/usage-sources/${ID}`],
+    ['get', `/api/v1/contracts/${ID}/usage-sources`],
     ['post', '/api/v1/usage-imports'],
     ['get', `/api/v1/usage-imports/${ID}`],
     ['get', `/api/v1/usage-imports/${ID}/rows`],
@@ -138,5 +140,56 @@ describe('vendor usage routes (http contract, no database)', () => {
       422,
     );
     await asAdmin(request(server).post(`/api/v1/usage-identity-mappings/${ID}/end`).send({ reason: 'x' })).expect(422);
+  });
+
+  describe('the sources of the applications of a contract (US-04-13 AC-15, usageSourceListOfContract)', () => {
+    const PATH = `/api/v1/contracts/${ID}/usage-sources`;
+    const as = (req: request.Test, roles: string[]) => req.set('Authorization', bearer(principal(roles)));
+
+    it.each([
+      ['the department head', ['MANAGER']],
+      ['an employee', ['EMPLOYEE']],
+      ['the Super Admin', ['SUPER_ADMIN']],
+      ['an account with no role', []],
+    ])('refuses %s with 403 (QĐ-101i, SoD-2)', async (_name, roles) => {
+      const response = await as(request(app.getHttpServer()).get(PATH), roles).expect(403);
+
+      expect(bodyOf(response).error.code).toBe('AUTHORIZATION.FORBIDDEN');
+    });
+
+    it.each([
+      ['the IT Admin', ['IT_ADMIN']],
+      ['Finance', ['FINANCE']],
+    ])(
+      'lets %s through the guard: a query the route refuses is judged (422), not turned away (403)',
+      async (_name, roles) => {
+        const server = app.getHttpServer();
+
+        await as(request(server).get(PATH).query({ page: 0 }), roles).expect(422);
+        await as(request(server).get(PATH).query({ pageSize: 101 }), roles).expect(422);
+        await as(request(server).get(`/api/v1/contracts/not-a-uuid/usage-sources`), roles).expect(422);
+      },
+    );
+
+    it('opens nothing else of the usage to Finance: the sources, one source and its change stay with the IT Admin', async () => {
+      const server = app.getHttpServer();
+
+      for (const response of [
+        await as(request(server).get('/api/v1/usage-sources'), ['FINANCE']),
+        await as(request(server).get(`/api/v1/usage-sources/${ID}`), ['FINANCE']),
+        await as(request(server).post('/api/v1/usage-sources').send({}), ['FINANCE']),
+        await as(request(server).patch(`/api/v1/usage-sources/${ID}`).send({ name: 'x' }), ['FINANCE']),
+      ]) {
+        expect(response.status).toBe(403);
+      }
+    });
+
+    it('is in the OpenAPI document under its operation id, with no internal decision code in what it says', () => {
+      const operation = document.paths[`/api/v1/contracts/{id}/usage-sources`]?.get as
+        { operationId: string; description?: string; summary?: string } | undefined;
+
+      expect(operation?.operationId).toBe('usageSourceListOfContract');
+      expect(JSON.stringify(operation)).not.toMatch(/QĐ-/);
+    });
   });
 });

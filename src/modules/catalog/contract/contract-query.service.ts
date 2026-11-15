@@ -8,6 +8,12 @@ import { ContractNotFoundError } from './contract.errors';
 import { ContractRepo, type ContractDetailRow, type ContractSummaryRow } from './contract.repo';
 import { DocumentRepo, type AttachedDocumentRow } from './document.repo';
 
+/**
+ * The most applications `applicationIdsOf` reads for a contract. A contract rests on the few applications of one vendor, so the ceiling is never
+ * met in practice; it only keeps the read bounded.
+ */
+export const CONTRACT_APPLICATIONS_READ_MAX = 1000;
+
 export interface ContractSummaryView extends ContractSummaryRow {
   status: ContractStatus;
 }
@@ -92,5 +98,16 @@ export class ContractQueryService {
         applicationIds: applicationIds.length > CONTRACT_DETAIL_ARRAY_MAX,
       },
     };
+  }
+
+  /**
+   * The applications of the subscriptions that rest on a contract, each once (what the usage module reads the sources of a contract through,
+   * `US-04-13` AC-15); null when there is no such contract, so a contract with no subscription (an empty list) is not mistaken for one that
+   * does not exist.
+   */
+  async applicationIdsOf(id: string): Promise<string[] | null> {
+    if (!(await this.contracts.find(id))) return null;
+
+    return this.links.applicationIdsOf(id, CONTRACT_APPLICATIONS_READ_MAX);
   }
 }

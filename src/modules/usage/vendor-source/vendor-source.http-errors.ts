@@ -6,6 +6,7 @@ import { UsageSourceRefusedError, type UsageSourceProblem } from './vendor-sourc
 
 const STATUS: Record<UsageSourceProblem, HttpStatus> = {
   NOT_FOUND: HttpStatus.NOT_FOUND,
+  CONTRACT_NOT_FOUND: HttpStatus.NOT_FOUND,
   APPLICATION_NOT_FOUND: HttpStatus.UNPROCESSABLE_ENTITY,
   APPLICATION_INTERNAL: HttpStatus.UNPROCESSABLE_ENTITY,
   APPLICATION_RETIRED: HttpStatus.UNPROCESSABLE_ENTITY,
@@ -35,6 +36,7 @@ const example = (problem: UsageSourceProblem, details: Record<string, unknown> =
 
 export const USAGE_SOURCE_ERROR_EXAMPLES = {
   NOT_FOUND: example('NOT_FOUND'),
+  CONTRACT_NOT_FOUND: example('CONTRACT_NOT_FOUND'),
   APPLICATION_NOT_FOUND: example('APPLICATION_NOT_FOUND'),
   APPLICATION_INTERNAL: example('APPLICATION_INTERNAL'),
   APPLICATION_RETIRED: example('APPLICATION_RETIRED'),
