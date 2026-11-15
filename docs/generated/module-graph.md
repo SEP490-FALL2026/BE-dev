@@ -88,6 +88,7 @@ flowchart BT
   installation -->|2| finance
   installation -->|11| identity_access
   installation -->|8| organization
+  installation -->|2| policies
   licensing -->|30| audit
   licensing -->|53| catalog
   licensing -->|2| finance
@@ -144,4 +145,4 @@ flowchart BT
   usage -->|14| organization
 ```
 
-101 module edges.
+102 module edges.
