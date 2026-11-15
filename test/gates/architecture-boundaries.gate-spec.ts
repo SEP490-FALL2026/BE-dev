@@ -62,6 +62,7 @@ const PRISMA_MODEL_OWNER: Readonly<Record<string, string>> = {
   UsageSource: 'usage',
   UsageUnmatchedIdentity: 'usage',
   AiInvocationContent: 'ai-assist',
+  AvatarPurge: 'identity-access',
   Policy: 'policies',
   PolicyVersion: 'policies',
   PolicyAcknowledgement: 'policies',
