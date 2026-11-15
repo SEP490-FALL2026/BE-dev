@@ -119400,7 +119400,14 @@
                 "additionalProperties": false,
                 "nullable": true
               },
-              "sharedPoolOverReserve": { "type": "boolean", "nullable": true }
+              "sharedPoolOverReserve": { "type": "boolean", "nullable": true },
+              "seatMonthsWithoutCostCenter": {
+                "type": "object",
+                "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                "required": ["amount", "currency"],
+                "additionalProperties": false,
+                "nullable": true
+              }
             },
             "required": [
               "year",
@@ -119410,7 +119417,8 @@
               "lastInvoiceRecordedAt",
               "companySpent",
               "sharedPoolUnallocated",
-              "sharedPoolOverReserve"
+              "sharedPoolOverReserve",
+              "seatMonthsWithoutCostCenter"
             ],
             "additionalProperties": false,
             "nullable": true
@@ -121189,9 +121197,16 @@
                       "required": ["amount", "currency"],
                       "additionalProperties": false,
                       "description": "The line \"not allocated, shared pool\": the invoices of the month less the seat-months charged to departments."
+                    },
+                    "withoutCostCenter": {
+                      "type": "object",
+                      "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                      "required": ["amount", "currency"],
+                      "additionalProperties": false,
+                      "description": "The line \"not allocated to a Cost Center\": the part of the seat-months that fell to a department with no Cost Center yet. It is in no Cost Center and not in the line of the pool."
                     }
                   },
-                  "required": ["subscriptionId", "invoiced", "allocated", "unallocated"],
+                  "required": ["subscriptionId", "invoiced", "allocated", "unallocated", "withoutCostCenter"],
                   "additionalProperties": false
                 },
                 "description": "The line of the shared pool of each subscription with an invoice or a seat-month in the month (Finance only; empty for a manager)."
