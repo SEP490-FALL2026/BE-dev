@@ -34,6 +34,8 @@ export const RUNTIME_TABLE_EXCEPTIONS: Readonly<Record<string, readonly string[]
   // Which tools a collector may report, version by version: what was allowed on a day stays knowable.
   collector_allowlist_versions: ['INSERT', 'SELECT'],
   collector_allowlist_entries: ['INSERT', 'SELECT'],
+  // Who acknowledged which version of a policy is evidence: added to and never changed (its triggers refuse it first).
+  policy_acknowledgements: ['INSERT', 'SELECT'],
 };
 
 /** Sequence privileges the runtime role holds on every sequence of `public`: drawing numbers (`nextval`) and `currval`. */
