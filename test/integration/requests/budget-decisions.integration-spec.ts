@@ -238,7 +238,7 @@ describe('budgets over HTTP: the decision of the spending approver (integration,
         returned: null,
       });
       // The proposal was not given back, so it is not sent again; the need changed, so the head sends a new one that follows it.
-      expect(h.codeOf(await h.resubmit(proposal.id, { lines: [h.line()] }, head.account).expect(409))).toBe(
+      expect(h.codeOf(await h.resubmit(proposal.id, h.bm10(50_000_000), head.account).expect(409))).toBe(
         'BUDGET.PROPOSAL_CANNOT_RESUBMIT',
       );
       const successor = await h.submitProposal(h.proposalBody(department.unitId), head.account).expect(201);

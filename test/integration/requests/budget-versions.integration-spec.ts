@@ -20,10 +20,10 @@ describe('budgets over HTTP: the versions Finance builds (integration, real Post
   });
 
   /** A department of its own and a proposal of it that waits for Finance. */
-  const waiting = async (lines?: object[], year?: number) => {
+  const waiting = async (amount?: number, year?: number) => {
     counter += 1;
     const unit = await h.departmentWithHead(`P-V${counter}`);
-    const proposal = await h.budgetProposed(unit.head, unit.department.unitId, lines, year);
+    const proposal = await h.budgetProposed(unit.head, unit.department.unitId, amount, year);
 
     return { ...unit, proposal };
   };

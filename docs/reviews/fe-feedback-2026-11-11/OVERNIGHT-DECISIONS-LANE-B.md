@@ -65,6 +65,27 @@ Không làm ở FIX-LB1 (rẻ nhưng đổi hợp đồng hoặc chạm file lan
 - **Chọn:** giữ tên trường đang có trên dây (`base`, `reserve`, `reserveReason`) cho `baseAmount`/`reserveAmount` của SPEC, để FE hiện tại không phải đổi tên; chỉ bỏ `quarters`. Mã vượt Trần: `BUDGET_VERSION.OVER_CEILING`, `details.overBy` và `details.availableMinor` là số nhỏ nhất dạng chữ (cùng kiểu mọi `details` tiền khác). Cột `q1..q4_minor` và dòng `BM-10` cũ **không ghi nữa nhưng không xóa** (expand–contract).
 - **Việc BG-2 còn lại, chưa làm ở lượt này:** BG-2.1 `CarriedOverContributions` (budgets mở điểm mở rộng, `requests` gắn bằng hàm 01/01 của XY-1 — lane A đang sửa chính hàm đó nên chờ), BG-2.2 `BM-10` = tệp + `requestedAmount` + `note` + khóa sau hạn, BG-2.3 xóa route dòng/import, BG-2.5 phần còn lại (`reservePercent`, ≥ 1 tệp khi gửi, mặc định cơ sở = số chạy sang), BG-2.6 số liệu nền (`carriedOverNextYear`, `noProposalSubmitted`, `BASELINE_NO_PROPOSAL`, bỏ chặn `HAS_HEAD`), BG-2.7 quyết định chỉ `APPROVE`|`RETURN`.
 
+### D-B10 — phiên bản từ số liệu nền `BASELINE_NO_PROPOSAL` cần nới CHECK nguồn (nguyên nhân 500 của BG-2.1/2.6)
+
+- **Câu hỏi:** `POST /budget-versions` nguồn `BASELINE` trả 500 sau khi đổi `origin` sang `BASELINE_NO_PROPOSAL`.
+- **Nguyên nhân:** CHECK `budget_versions_source_check` (migration `20261108550000`) đòi `proposal_id IS NULL` ⟺ `origin = 'BASELINE_NO_HEAD'`; dòng mới có `proposal_id NULL` và origin mới ⟹ 23514 ⟹ 500.
+- **Chọn:** migration `20261113100600_bg2_baseline_no_proposal_source` thay CHECK bằng bản chỉ **nới** (`origin IN ('BASELINE_NO_HEAD','BASELINE_NO_PROPOSAL')`), mọi dòng cũ vẫn thỏa; không drop cột/bảng. `ADJUSTMENT` **chưa** thêm vào nhánh "không có proposal" — AD-1 (lane A) tự nới khi dùng. **Đổi lại:** migration mới thay CHECK.
+
+### D-B11 — xóa route dòng (BG-2.3): dashboard trưởng phòng, lịch sử, phiên bản từ đề nghị
+
+- **Chọn:** (1) mục `approvedBudgetLines` của `GET /dashboards/manager` trỏ sang `budgetMine` (giữ tên khóa để FE không vỡ; mô tả đổi) — đổi tên khóa để Z2/FE quyết; (2) lịch sử phiên bản vẫn **đọc** được mục `LINE_UPDATED`/`LINES_ADDED`/`LINES_IMPORTED` cũ, chỉ bỏ phần ghi (`lineEdited`, `linesAdded`, `lineChange`, `chunkSnapshots` + spec); (3) phiên bản tạo từ đề nghị **không chép dòng** nữa (route đọc dòng đã xóa nên dòng chép sang là dữ liệu chết); bảng `budget_version_lines`, `budget_proposal_lines` giữ, thôi ghi.
+- **Đổi lại:** khôi phục từ commit BG-2.3 nếu Owner muốn giữ route đọc dòng cũ.
+
+### D-B12 — `BM-10` (BG-2.2): `requestedAmount` ở `total_minor`, `costCenterId` vẫn tùy chọn, rút đề nghị cũng khóa sau hạn
+
+- **Chọn:** (1) `requestedAmount` lưu vào cột có sẵn `total_minor` (không thêm cột); response có cả `total` (giữ cho FE hiện tại) và `requestedAmount` + `note`; (2) `costCenterId` giữ **tùy chọn** như trước (chỉ bắt buộc khi người gửi phụ trách hơn một Cost Center trong năm — 422 `BUDGET.COST_CENTER_REQUIRED`), vì bắt buộc luôn là đổi hợp đồng không cần thiết; (3) `note` 1–1000 ký tự không toàn khoảng trắng (CHECK `budget_proposals_note_check`, migration `20261113100700`); (4) gửi, gửi lại **và rút** (đúng dòng SPEC) sau hạn nộp ⟹ 409 `BUDGET_CYCLE.LOCKED`; Finance trả về chỉ trước hạn (sau hạn 409 `BUDGET_CYCLE.LOCKED`, kỳ chưa mở 409 `BUDGET_CYCLE.NOT_OPEN`); luật thuần `proposalWorkRefusal` ở `cycle.policy.ts`; (5) số tiền 0 được nhận (không có luật nào cấm), âm ⟹ 422 như mọi số tiền.
+- **Xóa code chết:** `ProposalLineJudge`, `proposal-line-rules.policy` (ZBB, xếp hạng, cờ vượt Trần phòng) + spec, `BudgetProposalLinesInvalidError`, `BudgetPlanNotFoundError`, `requirePlans`/`planNames`, `patchChangesLine`, `versionLineOverCeiling`, đọc dòng của repo đề nghị.
+- **Đổi lại:** nếu Owner muốn `costCenterId` bắt buộc ⟹ bỏ `.optional()` ở `budget.dto.ts`.
+
+### D-B13 — test: tệp của ngân sách ghi bằng SQL khi suite không nói về tệp
+
+- **Chọn:** `test/support/budget-files.ts` ghi dòng `budget_attachments` hợp lệ (đề nghị: `UPLOADED`; phiên bản: `ATTACHED`) đúng như route để lại; `submitProposal`/`resubmit`/`sendVersion` của harness và `approvedBudget` tự thêm một tệp khi body không nêu; test luật "≥ 1 tệp" gọi route thô. Không đụng object storage.
+
 ## Optional và việc để lại
 
 - Báo cáo xác nhận chưa có tổng `done`/`pending` toàn tập (cần join chéo module); thêm khi FE đòi.
@@ -78,7 +99,7 @@ Không làm ở FIX-LB1 (rẻ nhưng đổi hợp đồng hoặc chạm file lan
 
 ## Bị chặn
 
-- (chưa có)
+- **BG-2.1 phía `requests` (chờ lane A):** `budgets` đã mở và đăng ký `CarriedOverContributions` (`budgets/public/budgets.extension-points.ts`, export ở `BudgetsModule`); `GET /budget-cycles/{year}/baseline` đọc `carriedOverNextYear` qua `CarriedOverContributions.totals(costCenterIds, year)` và phiên bản nguồn `BASELINE` lấy nó làm cơ sở điền sẵn. Chưa có nguồn nào bind ⟹ số chạy sang = 0 (Finance nhập). Lane A (chủ `requests/year-start-commitments/` và hàm XY-1.1) cần thêm một listener `requests/year-start-commitments/carried-over.listener.ts` với `static readonly binds = [CarriedOverContributions]`, trong `onModuleInit` gọi `contributions.add('requests', { carriedOverOf: (costCenterIds, year, tx) => … })` trả `Map<costCenterId, bigint>` bằng **đúng hàm của khoản 01/01**: dòng/quyền có thời hạn còn hiệu lực sau 31/12 ⟹ tổng số năm sau đã lưu; quyền _Dùng lâu dài_ đang chạy ⟹ 12 × giá tháng VND hiện hành. T-BG2: 10 quyền lâu dài × 1.000.000 × 12 + 3.000.000 đã lưu = **123.000.000 đ** (phía `budgets` đã chứng minh bằng nguồn giả ở `test/integration/budgets/budget-baseline-version.integration-spec.ts`). Có thể cần khai cạnh ở `test/gates/module-graph.gate-spec.ts` (`PUBLIC_CONTRACT_EXPORTS` của `BudgetsModule` thêm `CarriedOverContributions`) khi bind.
 
 ## Dừng ở đâu
 

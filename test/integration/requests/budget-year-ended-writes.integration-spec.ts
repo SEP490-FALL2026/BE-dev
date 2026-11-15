@@ -81,7 +81,7 @@ describe('writes on a year that has ended, before the closure has run (integrati
 
     await refusedAsEnded(await h.withdraw(waits.proposal.id, waits.head.account), before);
     await refusedAsEnded(await h.giveBack(waits.proposal.id, { reason: 'Too late' }, h.finance), before);
-    await refusedAsEnded(await h.resubmit(toReturn.proposal.id, { lines: [h.line()] }, toReturn.head.account), before);
+    await refusedAsEnded(await h.resubmit(toReturn.proposal.id, h.bm10(50_000_000), toReturn.head.account), before);
     await refusedAsEnded(
       await h.createVersion({
         proposalId: toBuild.proposal.id,

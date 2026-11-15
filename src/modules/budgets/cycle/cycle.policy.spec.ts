@@ -1,4 +1,5 @@
 import {
+  proposalWorkRefusal,
   cycleAcceptsWork,
   cycleStateOf,
   isPastYear,
@@ -174,5 +175,23 @@ describe('windowOf (the window a department may be made in, QĐ-111ba, R-16)', (
 
   it('leaves an organization with no cycle at all to the installation', () => {
     expect(windowOf({ nextYear: 2027, nextCycle: null, anyCycle: false })).toEqual({ kind: 'NO_CYCLE_YET' });
+  });
+});
+
+describe('proposalWorkRefusal (BM-10 is sent, sent again, taken back or given back only while the cycle is open, QĐ-111z, QĐ-111ab)', () => {
+  const open = { openedAt: new Date('2026-10-01T00:00:00Z'), submissionDeadline: '2026-12-15' };
+
+  it('allows the work through the day of the submission deadline', () => {
+    expect(proposalWorkRefusal(open, '2026-10-01')).toBeNull();
+    expect(proposalWorkRefusal(open, '2026-12-15')).toBeNull();
+  });
+
+  it('refuses it from the day after the deadline: the cycle is locked for good', () => {
+    expect(proposalWorkRefusal(open, '2026-12-16')).toBe('LOCKED');
+  });
+
+  it('refuses it while the cycle is a draft, or when the year has none', () => {
+    expect(proposalWorkRefusal({ ...open, openedAt: null }, '2026-10-01')).toBe('NOT_OPEN');
+    expect(proposalWorkRefusal(null, '2026-10-01')).toBe('NOT_OPEN');
   });
 });

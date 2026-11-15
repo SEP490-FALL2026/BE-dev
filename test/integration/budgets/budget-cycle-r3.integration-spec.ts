@@ -78,7 +78,7 @@ describe('the budget cycle: what the review of R3 asked for (integration, real P
       await holder.query('BEGIN');
       await holder.query(`SELECT id FROM budget_cycles WHERE year = $1 FOR UPDATE`, [h.next]);
 
-      const resent = h.resubmit(proposal.id, { lines: h.twoLines() }, u.head.account).then((response) => response);
+      const resent = h.resubmit(proposal.id, h.bm10(), u.head.account).then((response) => response);
       await waitForLockWaiters(observer, 1);
       // The resubmission waits for the cycle: it holds nothing of the proposal yet, so anybody else can lock the proposal.
       await observer.query('BEGIN');
@@ -107,7 +107,7 @@ describe('the budget cycle: what the review of R3 asked for (integration, real P
     ]);
 
     try {
-      const refused = await h.resubmit(proposal.id, { lines: h.twoLines() }, stranger.head.account).expect(404);
+      const refused = await h.resubmit(proposal.id, h.bm10(), stranger.head.account).expect(404);
 
       expect(h.codeOf(refused)).toBe('BUDGET.PROPOSAL_NOT_FOUND');
     } finally {

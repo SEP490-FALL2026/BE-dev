@@ -84,6 +84,8 @@ export class ProposalViewService {
           successorOfProposalId: proposal.successorOfProposalId,
           successorProposalId: proposal.successorProposalId,
           total: money(proposal.totalMinor),
+          requestedAmount: money(proposal.totalMinor),
+          note: proposal.note,
           submittedBy: people.get(proposal.submittedByEmployeeId) ?? null,
           submittedAt: proposal.submittedAt.toISOString(),
           returned:

@@ -3,23 +3,6 @@ import type { Prisma } from '../../../generated/prisma/client';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { ProposalState } from './budget.policy';
-import { proposalLineZbbJson } from './budget-line-zbb.json';
-import type { LineType, ZbbExplanation } from './budget-line-zbb.json';
-
-export interface ProposalLineRecord {
-  position: number;
-  description: string;
-  planId: string | null;
-  seats: number | null;
-  amountMinor: bigint;
-  note: string | null;
-  lineType: LineType;
-  zbb: ZbbExplanation | null;
-  /** Given by the head, once in the proposal (`QT 4.4`). */
-  priorityRank: number;
-  /** The part of the line that carries the proposal over the published ceiling of the department; null = no flag. Set by the server. */
-  overCeilingMinor: bigint | null;
-}
 
 export interface ProposalRecord {
   id: string;
@@ -32,7 +15,10 @@ export interface ProposalRecord {
   successorOfProposalId: string | null;
   /** The proposal that follows this one, if any: at most one. */
   successorProposalId: string | null;
+  /** The amount the head asks for (`requestedAmount`, `QĐ-111ab`); a proposal sent before kept the sum of its lines here. */
   totalMinor: bigint;
+  /** What the head wrote beside the amount; null when nothing (and on a proposal sent before). */
+  note: string | null;
   currency: string;
   submittedByEmployeeId: string;
   submittedAt: Date;
@@ -55,25 +41,10 @@ export interface NewProposal {
   successorOfProposalId?: string | null;
   currency: string;
   totalMinor: bigint;
+  note: string | null;
   submittedByEmployeeId: string;
   now: Date;
-  lines: Omit<ProposalLineRecord, 'position'>[];
 }
-
-type LineRow = Prisma.BudgetProposalLineGetPayload<object>;
-
-const toLine = (row: LineRow): ProposalLineRecord => ({
-  position: row.position,
-  description: row.description,
-  planId: row.planId,
-  seats: row.seats,
-  amountMinor: row.amountMinor,
-  note: row.note,
-  lineType: row.lineType,
-  zbb: proposalLineZbbJson.decode(row.zbb),
-  priorityRank: row.priorityRank,
-  overCeilingMinor: row.overCeilingMinor,
-});
 
 const WITH_SUCCESSOR = { successor: { select: { id: true } } } as const;
 
@@ -87,6 +58,7 @@ const toRecord = (row: Prisma.BudgetProposalGetPayload<{ include: typeof WITH_SU
   successorOfProposalId: row.successorOfProposalId,
   successorProposalId: row.successor?.id ?? null,
   totalMinor: row.totalMinor,
+  note: row.note,
   currency: row.currency,
   submittedByEmployeeId: row.submittedByEmployeeId,
   submittedAt: row.submittedAt,
@@ -107,7 +79,7 @@ export interface ProposalFilter {
   take: number;
 }
 
-/** The one writer of `budget_proposals` and `budget_proposal_lines`, and their reads. */
+/** The one writer of `budget_proposals`, and their reads (the lines of a proposal sent before `QĐ-111ab` are kept and no longer written). */
 @Injectable()
 export class ProposalRepo {
   constructor(private readonly prisma: PrismaService) {}
@@ -125,20 +97,7 @@ export class ProposalRepo {
         currency: input.currency,
         submittedByEmployeeId: input.submittedByEmployeeId,
         submittedAt: input.now,
-        lines: {
-          create: input.lines.map((line, index) => ({
-            position: index + 1,
-            priorityRank: line.priorityRank,
-            description: line.description,
-            planId: line.planId,
-            seats: line.seats,
-            amountMinor: line.amountMinor,
-            note: line.note,
-            lineType: line.lineType,
-            zbb: proposalLineZbbJson.encode(line.zbb),
-            overCeilingMinor: line.overCeilingMinor,
-          })),
-        },
+        note: input.note,
       },
       select: { id: true },
     });
@@ -223,15 +182,6 @@ export class ProposalRepo {
     });
 
     return row ? toRecord(row) : null;
-  }
-
-  async allLines(proposalId: string, tx?: DbTx): Promise<ProposalLineRecord[]> {
-    const rows = await (tx ?? this.prisma).budgetProposalLine.findMany({
-      where: { proposalId },
-      orderBy: { position: 'asc' },
-    });
-
-    return rows.map(toLine);
   }
 
   async page(filter: ProposalFilter): Promise<{ items: ProposalRecord[]; total: number }> {

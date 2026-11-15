@@ -35,7 +35,6 @@ import {
   BudgetNotAHistoryReaderError,
   BudgetNotAReaderError,
   BudgetNotFinanceError,
-  BudgetPlanNotFoundError,
   BudgetVersionNumberTakenError,
   BudgetCurrentExistsError,
   BudgetBaselineVersionNotAllowedError,
@@ -44,7 +43,6 @@ import {
   BudgetCycleCurrencyMismatchError,
   BudgetOverAnnualCeilingError,
   BudgetNotYourCostCenterError,
-  BudgetProposalLinesInvalidError,
   BudgetProposalNotFoundError,
   BudgetProposalOpenError,
   BudgetProposalStateError,
@@ -134,11 +132,6 @@ export function toBudgetApiException(error: unknown): unknown {
   if (error instanceof BudgetVersionNumberTakenError) {
     return refuse(HttpStatus.CONFLICT, 'BUDGET.VERSION_NUMBER_TAKEN', error.message);
   }
-  if (error instanceof BudgetPlanNotFoundError) {
-    return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'BUDGET.PLAN_NOT_FOUND', error.message, {
-      planIds: error.planIds,
-    });
-  }
   if (error instanceof BudgetBaselineVersionNotAllowedError) {
     return refuse(HttpStatus.CONFLICT, 'BUDGET.BASELINE_VERSION_NOT_ALLOWED', error.message, { reason: error.reason });
   }
@@ -204,11 +197,6 @@ export function toBudgetApiException(error: unknown): unknown {
   }
   if (error instanceof BudgetReasonRequiredError) {
     return refuse(HttpStatus.UNPROCESSABLE_ENTITY, `BUDGET.${error.what}_REASON_REQUIRED`, error.message);
-  }
-  if (error instanceof BudgetProposalLinesInvalidError) {
-    return refuse(HttpStatus.UNPROCESSABLE_ENTITY, `BUDGET.${error.rule}`, error.message, {
-      positions: error.positions,
-    });
   }
   if (error instanceof BudgetProposalOpenError) {
     return refuse(HttpStatus.CONFLICT, 'BUDGET.PROPOSAL_ALREADY_OPEN', error.message);
@@ -304,7 +292,6 @@ export const BUDGET_ERROR_EXAMPLES = {
   NOT_A_READER: example(new BudgetNotAReaderError()),
   NOT_A_HISTORY_READER: example(new BudgetNotAHistoryReaderError()),
   FINANCE_SETUP_INCOMPLETE: example(new FinanceSetupIncompleteError('<department-id>')),
-  PLAN_NOT_FOUND: example(new BudgetPlanNotFoundError(['<plan-id>'])),
   // Not shown in the routes: the year lock lets two writers of a Cost Center and year take the number one after the other.
   VERSION_NUMBER_TAKEN: example(new BudgetVersionNumberTakenError()),
   NOT_YOUR_COST_CENTER: example(new BudgetNotYourCostCenterError()),
@@ -326,10 +313,6 @@ export const BUDGET_ERROR_EXAMPLES = {
   CYCLE_NOT_OPEN: example(new BudgetCycleNotOpenError(2027)),
   CURRENCY_NOT_REPORTING: example(new BudgetCurrencyError('USD', 'VND')),
   RESERVE_REASON_REQUIRED: example(new BudgetReasonRequiredError('RESERVE')),
-  ADJUSTMENT_REASON_REQUIRED: example(new BudgetReasonRequiredError('ADJUSTMENT')),
-  PRIORITY_RANK_INVALID: example(new BudgetProposalLinesInvalidError('PRIORITY_RANK_INVALID', [1, 2])),
-  ZBB_REQUIRED: example(new BudgetProposalLinesInvalidError('ZBB_REQUIRED', [1])),
-  OVER_CEILING_NOTE_REQUIRED: example(new BudgetProposalLinesInvalidError('OVER_CEILING_NOTE_REQUIRED', [2])),
   // Not shown yet: two writers at once answer the same code with the message given for the unique index above.
   PROPOSAL_ALREADY_OPEN: example(new BudgetProposalOpenError()),
   PROPOSAL_CANNOT_WITHDRAW: example(new BudgetProposalStateError('WITHDRAW', 'REVIEWED')),

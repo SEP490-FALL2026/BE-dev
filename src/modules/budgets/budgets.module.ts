@@ -45,7 +45,6 @@ import { InvoiceService } from './invoice/invoice.service';
 import { DecisionRepo } from './budget/decision.repo';
 import { ProposalRepo } from './budget/proposal.repo';
 import { ProposalService } from './proposal/proposal.service';
-import { ProposalLineJudge } from './proposal/proposal-line-judge.service';
 import { ProposalSender } from './proposal/proposal-sender.service';
 import { ProposalAttachmentBinder } from './attachment/proposal-attachment-binder.service';
 import { ProposalViewService } from './proposal/proposal-view.service';
@@ -125,7 +124,6 @@ import { BudgetProposalTemplateListener } from './proposal/budget-proposal-templ
     BudgetNotifierService,
     ProposalViewService,
     ProposalService,
-    ProposalLineJudge,
     ProposalSender,
     ProposalAttachmentBinder,
     VersionViewService,

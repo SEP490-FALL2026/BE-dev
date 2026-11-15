@@ -1,3 +1,4 @@
+import { randomUUID } from 'node:crypto';
 import request from 'supertest';
 import type { ApiAccount } from '../../support/api-accounts';
 import type { Person } from '../../support/request-harness';
@@ -90,7 +91,7 @@ describe('the scope of the Manager: MANAGER held, no department headed (integrat
               .post('/api/v1/budget-proposals')
               .set(h.as(holder.account))
               // The lines of a proposal take the form of BM-10 (MF4-B); a valid body reaches the scope of the caller.
-              .send(h.proposalBody('', undefined, year())),
+              .send({ ...h.proposalBody('', undefined, year()), attachmentIds: [randomUUID()] }),
         ],
         [
           'budgetProposalAttachmentDeclare',
@@ -110,7 +111,7 @@ describe('the scope of the Manager: MANAGER held, no department headed (integrat
 
         await refusedWith(404, 'BUDGET.PROPOSAL_NOT_FOUND', () => h.withdraw(proposal.id, holder.account));
         await refusedWith(404, 'BUDGET.PROPOSAL_NOT_FOUND', () =>
-          h.resubmit(proposal.id, { lines: h.twoLines() }, holder.account),
+          h.resubmit(proposal.id, h.bm10(70_000_000, { attachmentIds: [randomUUID()] }), holder.account),
         );
       });
 

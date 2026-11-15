@@ -26,6 +26,21 @@ export function cycleStateOf(
   return today > cycle.submissionDeadline ? 'LOCKED' : 'OPEN';
 }
 
+/**
+ * Whether the work of `BM-10` may be done today (`QĐ-111z`, `QĐ-111ab`): a head sends, sends again or takes back a proposal, and Finance
+ * gives one back, only while the cycle of the year is open. A year with no cycle, or a draft one, is not open; from the day after the
+ * submission deadline the cycle is locked for good.
+ */
+export function proposalWorkRefusal(
+  cycle: { openedAt: Date | null; submissionDeadline: BusinessDate } | null,
+  today: BusinessDate,
+): 'NOT_OPEN' | 'LOCKED' | null {
+  if (cycle === null) return 'NOT_OPEN';
+  const state = cycleStateOf(cycle, today);
+
+  return state === 'DRAFT' ? 'NOT_OPEN' : state === 'LOCKED' ? 'LOCKED' : null;
+}
+
 /** What an update asks: each field is present only when the call gave it; amounts are already in minor units. */
 export interface CycleUpdate {
   submissionDeadline?: BusinessDate;

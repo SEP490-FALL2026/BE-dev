@@ -250,30 +250,31 @@ const DROPPED: Call[] = [
     },
   })),
   // `costCenterId` of the proposal is no longer dropped: a head who answers for two departments names the one (QĐ-106k, BUDGET.COST_CENTER_REQUIRED).
-  {
-    name: 'budgetProposalSubmit: lines[].amount.currency (step 11)',
-    method: 'post',
-    path: '/api/v1/budget-proposals',
-    role: 'MANAGER',
-    body: { year: 2027 },
-    dropped: {
-      lines: [{ lineType: 'RENEW', priorityRank: 1, description: 'Tool', amount: { amount: '100', currency: 'VND' } }],
-    },
-    at: 'lines.0.amount',
-    field: 'currency',
-  },
-  {
-    name: 'budgetProposalResubmit: lines[].amount.currency (step 11)',
-    method: 'post',
-    path: `/api/v1/budget-proposals/${ID}/resubmission`,
-    role: 'MANAGER',
-    body: {},
-    dropped: {
-      lines: [{ lineType: 'RENEW', priorityRank: 1, description: 'Tool', amount: { amount: '100', currency: 'VND' } }],
-    },
-    at: 'lines.0.amount',
-    field: 'currency',
-  },
+  ...['/api/v1/budget-proposals', `/api/v1/budget-proposals/${ID}/resubmission`].flatMap((path) => {
+    const name = path.includes('resubmission') ? 'budgetProposalResubmit' : 'budgetProposalSubmit';
+    const base = path.includes('resubmission') ? { attachmentIds: [ID] } : { year: 2027, attachmentIds: [ID] };
+
+    return [
+      {
+        name: `${name}: requestedAmount.currency (step 11)`,
+        method: 'post' as const,
+        path,
+        role: 'MANAGER',
+        body: base,
+        dropped: { requestedAmount: { amount: '100', currency: 'VND' } },
+        at: 'requestedAmount',
+        field: 'currency',
+      },
+      {
+        name: `${name}: lines (BG-2, BM-10 is files, an amount and a note)`,
+        method: 'post' as const,
+        path,
+        role: 'MANAGER',
+        body: { ...base, requestedAmount: { amount: '100' } },
+        dropped: { lines: [{ lineType: 'RENEW', priorityRank: 1, description: 'Tool', amount: { amount: '100' } }] },
+      },
+    ];
+  }),
   {
     name: 'budgetVersionCreate: base.currency (step 11)',
     method: 'post',
@@ -340,38 +341,6 @@ const DROPPED: Call[] = [
     at: 'lines.0',
     field: 'expectedEndDate',
   })),
-  ...['/api/v1/budget-proposals', `/api/v1/budget-proposals/${ID}/resubmission`].flatMap((path) =>
-    ['windowFrom', 'windowTo', 'servicePeriodMonths', 'repeatCycle', 'quoteValidUntil'].map((field) => ({
-      name: `${path.includes('resubmission') ? 'budgetProposalResubmit' : 'budgetProposalSubmit'}: lines[].${field} (step 12b)`,
-      method: 'post' as const,
-      path,
-      role: 'MANAGER',
-      body: path.includes('resubmission') ? {} : { year: 2027 },
-      dropped: {
-        lines: [
-          {
-            lineType: 'RENEW',
-            priorityRank: 1,
-            description: 'Tool',
-            amount: { amount: '100' },
-            [field]: field === 'servicePeriodMonths' ? 12 : field === 'repeatCycle' ? 'ANNUAL' : '2027-01-01',
-          },
-        ],
-      },
-      at: 'lines.0',
-      field,
-    })),
-  ),
-  {
-    name: 'budgetProposalSubmit: a line with neither plan nor description (step 12b)',
-    method: 'post',
-    path: '/api/v1/budget-proposals',
-    role: 'MANAGER',
-    body: { year: 2027 },
-    dropped: { lines: [{ lineType: 'RENEW', priorityRank: 1, amount: { amount: '100' } }] },
-    control: { lines: [{ lineType: 'RENEW', priorityRank: 1, description: 'Tool', amount: { amount: '100' } }] },
-    at: 'lines.0.description',
-  },
   {
     name: 'accessRequestNeedDecide: spend.planLine (step 12b)',
     method: 'post',

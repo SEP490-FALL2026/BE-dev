@@ -77,7 +77,10 @@ model BudgetProposal {
   // The proposal this one follows when the version made from that one was refused and the need changed (QĐ-92c(2)): a
   // proposal is a resubmission OR a successor, and has at most one successor. Set by the system, never by a client.
   successorOfProposalId String?             @unique @map("successor_of_proposal_id") @db.Uuid
+  // The amount the head asks for (BM-10 = files + one amount + a note, QD-111ab); a proposal sent before kept the sum of its lines here.
   totalMinor            BigInt              @map("total_minor")
+  // What the head wrote beside the amount (1 to 1000 characters), or nothing.
+  note                  String?
   currency              String              @db.Char(3)
   // Values, not foreign keys: the history outlives the account.
   submittedByEmployeeId String              @map("submitted_by_employee_id") @db.Uuid

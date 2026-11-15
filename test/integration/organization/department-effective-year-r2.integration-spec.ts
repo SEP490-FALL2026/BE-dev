@@ -78,7 +78,7 @@ describe('the head of a department that starts next year, after the review (inte
     const department = await upcoming();
     const head = await futureHead(department);
 
-    await h.submitProposal({ year: h.next, lines: h.twoLines() }, head.account).expect(201);
+    await h.submitProposal({ year: h.next, ...h.bm10() }, head.account).expect(201);
     await h.mine(head.account, h.next).expect(200);
 
     for (const path of [
@@ -95,7 +95,7 @@ describe('the head of a department that starts next year, after the review (inte
   it('still refuses the budget work to a person who was never granted MANAGER (guard unchanged)', async () => {
     const employee = await h.staff(origin, code('R2E'));
 
-    const refused = await h.submitProposal({ year: h.next, lines: h.twoLines() }, employee.account).expect(403);
+    const refused = await h.submitProposal({ year: h.next, ...h.bm10() }, employee.account).expect(403);
 
     expect(h.codeOf(refused)).toBe('AUTHORIZATION.FORBIDDEN');
   });

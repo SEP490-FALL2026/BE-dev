@@ -5,6 +5,7 @@ import type { AuthenticatedPrincipal } from '../../src/infrastructure/security/t
 import { BudgetYearEndService } from '../../src/modules/budgets/year-end/year-end.service';
 import { OrganizationHistoryApi } from '../../src/modules/organization/public/organization-history.api';
 import type { ApiAccount } from './api-accounts';
+import { afterPreparing, attachedVersionFile, withProposalFile } from './budget-files';
 import { Department, Person, RequestHarness } from './request-harness';
 
 export interface ProposalWire {
@@ -99,40 +100,25 @@ export class BudgetHarness extends RequestHarness {
 
   money = (amount: string | number) => ({ amount: String(amount) });
 
-  /** A line of a proposal as the head fills it; a line is a description, the seats, the amount of the year and a note (`QĐ-101n`). */
-  line = (extra: Record<string, unknown> = {}) => ({
-    description: 'Figma Organization 10 seats',
-    seats: 10,
-    amount: this.money(50_000_000),
-    lineType: 'RENEW',
+  /** `BM-10` (`QĐ-111ab`): the amount asked for the year (70 million unless the suite says) and anything else the suite adds. */
+  bm10 = (amount: number = 70_000_000, extra: Record<string, unknown> = {}) => ({
+    requestedAmount: this.money(amount),
     ...extra,
   });
 
-  /** Gives each line that has none its priority rank, by its place (`QT 4.4`): a test that does not care about the rank still sends a valid proposal. */
-  ranked = (lines: object[]): object[] =>
-    lines.map((line, index) => ({ lineType: 'RENEW', priorityRank: index + 1, ...line }));
+  proposalBody = (_costCenterId: string, amount?: number, year = this.next) => ({ year, ...this.bm10(amount) });
 
-  /** The two lines of the example of the stories: Figma 50 and Miro 20. */
-  twoLines = () => [
-    this.line(),
-    this.line({
-      description: 'Miro 5 seats',
-      seats: 5,
-      amount: this.money(20_000_000),
-    }),
-  ];
+  /** Sends `BM-10`; a body that names no file gets one the head uploaded just before (the form requires one at least). */
+  submitProposal = (body: { attachmentIds?: unknown; [field: string]: unknown }, account: ApiAccount) => {
+    const payload = { ...body };
 
-  proposalBody = (_costCenterId: string, lines: object[] = this.twoLines(), year = this.next) => ({
-    year,
-    lines: this.ranked(lines),
-  });
-
-  /** Sends a proposal; a line the test gives no kind or rank gets `RENEW` and its place (the form requires both, `QT 4.4`). */
-  submitProposal = (body: { lines?: object[]; [field: string]: unknown }, account: ApiAccount) =>
-    request(this.server())
-      .post('/api/v1/budget-proposals')
-      .set(this.as(account))
-      .send(body.lines ? { ...body, lines: this.ranked(body.lines) } : body);
+    return withProposalFile(
+      request(this.server()).post('/api/v1/budget-proposals').set(this.as(account)).send(payload),
+      this.ctx.sql,
+      account.employeeId,
+      payload,
+    );
+  };
   proposalList = (account: ApiAccount, query: Record<string, string | number> = {}) =>
     request(this.server()).get('/api/v1/budget-proposals').query(query).set(this.as(account));
   proposalOf = (id: string, account: ApiAccount) =>
@@ -141,15 +127,21 @@ export class BudgetHarness extends RequestHarness {
     request(this.server()).post(`/api/v1/budget-proposals/${id}/withdrawal`).set(this.as(account));
   giveBack = (id: string, body: object, account: ApiAccount) =>
     request(this.server()).post(`/api/v1/budget-proposals/${id}/return`).set(this.as(account)).send(body);
-  resubmit = (id: string, body: { lines?: object[]; [field: string]: unknown }, account: ApiAccount) =>
-    request(this.server())
-      .post(`/api/v1/budget-proposals/${id}/resubmission`)
-      .set(this.as(account))
-      .send(body.lines ? { ...body, lines: this.ranked(body.lines) } : body);
+  /** Sends `BM-10` again; a body that names no file gets one the head uploaded just before. */
+  resubmit = (id: string, body: { attachmentIds?: unknown; [field: string]: unknown }, account: ApiAccount) => {
+    const payload = { ...body };
 
-  /** The head sends a proposal and it is returned, failing on anything but 201. */
-  async budgetProposed(head: Person, costCenterId: string, lines?: object[], year?: number): Promise<ProposalWire> {
-    const response = await this.submitProposal(this.proposalBody(costCenterId, lines, year), head.account);
+    return withProposalFile(
+      request(this.server()).post(`/api/v1/budget-proposals/${id}/resubmission`).set(this.as(account)).send(payload),
+      this.ctx.sql,
+      account.employeeId,
+      payload,
+    );
+  };
+
+  /** The head sends `BM-10` and the proposal is returned, failing on anything but 201. */
+  async budgetProposed(head: Person, costCenterId: string, amount?: number, year?: number): Promise<ProposalWire> {
+    const response = await this.submitProposal(this.proposalBody(costCenterId, amount, year), head.account);
     if (response.status !== 201) throw new Error(`proposal: ${response.status} ${JSON.stringify(response.body)}`);
 
     return this.dataOf<{ proposal: ProposalWire }>(response).proposal;
@@ -167,8 +159,11 @@ export class BudgetHarness extends RequestHarness {
       .put(`/api/v1/budget-versions/${id}`)
       .set(this.as(account))
       .send('base' in body && !('baseReason' in body) ? { baseReason: 'Finance moved the base', ...body } : body);
+  /** Sends a version; one that can take a file and has none gets one first (a version is sent with one at least, `QĐ-111ac`). */
   sendVersion = (id: string, account: ApiAccount = this.finance) =>
-    request(this.server()).post(`/api/v1/budget-versions/${id}/submission`).set(this.as(account));
+    afterPreparing(request(this.server()).post(`/api/v1/budget-versions/${id}/submission`).set(this.as(account)), () =>
+      attachedVersionFile(this.ctx.sql, id, this.finance.employeeId),
+    );
   versionHistory = (id: string, account: ApiAccount = this.finance, query: Record<string, string | number> = {}) =>
     request(this.server()).get(`/api/v1/budget-versions/${id}/history`).query(query).set(this.as(account));
   mine = (account: ApiAccount, year: number) =>

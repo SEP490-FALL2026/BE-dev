@@ -51,12 +51,7 @@ describe('API inventory (e2e): responses the runtime answers and the contract us
     it('declares the 400 and 413 of the multipart limits on the four upload routes, which are the only multipart routes', () => {
       // usageImportUpload (MF-5) takes the report of a vendor under the same limits.
       // meAvatarUpload (PF-1) takes the picture of a person: one file of up to 1 MB, a little over which the policy answers and beyond which the parser does.
-      const uploads = [
-        'employeeImportUpload',
-        'meAvatarPut',
-        'seatBaselineImportUpload',
-        'usageImportUpload',
-      ];
+      const uploads = ['employeeImportUpload', 'meAvatarPut', 'seatBaselineImportUpload', 'usageImportUpload'];
       expect(idsWhere((candidate) => Boolean(candidate.requestBody?.content?.['multipart/form-data']))).toEqual(
         uploads,
       );

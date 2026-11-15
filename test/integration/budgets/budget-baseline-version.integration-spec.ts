@@ -124,7 +124,10 @@ describe('a version built from the baseline (integration, real PostgreSQL)', () 
 
     it('when a proposal waits, even though nobody heads the department any more', async () => {
       const unit = await h.departmentWithHead(`P-BVP${(counter += 1)}`);
+      // The proposal was sent before the deadline (after it the cycle is locked, QĐ-111z).
+      await setDeadline(h.year, addDays(h.today(), 5));
       await h.budgetProposed(unit.head, unit.department.unitId, undefined, h.year);
+      await setDeadline(h.year, addDays(h.today(), -1));
       await h.withoutHead(unit.department);
 
       refusedWith(await create(baselineBody(unit.department)), 'HAS_PROPOSAL');

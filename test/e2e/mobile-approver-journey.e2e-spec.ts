@@ -65,15 +65,7 @@ describe('the approvers on the phone: need step, spend step and the request a he
       .expect(200);
     unit = await h.departmentWithHead('P-DES');
     employee = await h.staff(unit.department, 'DES-E1', 'EMPLOYEE');
-    await h.budgetFor(unit, {
-      total: 100 * M,
-      lines: [
-        h.line({
-          description: 'Figma Organization 10 seats',
-          planId: plan,
-        }),
-      ],
-    });
+    await h.budgetFor(unit, { total: 100 * M });
     for (const account of [employee.account, unit.head.account, h.boss.account]) await signIn(account);
   }, 240000);
 

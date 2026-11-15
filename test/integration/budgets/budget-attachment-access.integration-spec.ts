@@ -44,7 +44,10 @@ describe('budget attachment access rules (integration)', () => {
     const documents: string[] = [];
     for (const name of proposalDocs) documents.push(await h.uploaded(pdf(name), unit.head.account));
     const response = await h
-      .submitProposal({ ...h.proposalBody(unit.department.unitId), attachmentIds: documents }, unit.head.account)
+      .submitProposal(
+        { ...h.proposalBody(unit.department.unitId), ...(documents.length > 0 ? { attachmentIds: documents } : {}) },
+        unit.head.account,
+      )
       .expect(201);
     const proposal = h.dataOf<{ proposal: { id: string } }>(response).proposal;
     const version = await h.built(proposal.id);

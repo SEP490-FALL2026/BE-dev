@@ -10,9 +10,7 @@ import { ProposalSender } from './proposal-sender.service';
 import { ProposalRepo, type ProposalRecord } from '../budget/proposal.repo';
 import { ProposalViewService } from './proposal-view.service';
 import { VersionRepo } from '../budget/version.repo';
-import type { BudgetProposalBodyDto, ProposalWire } from '../budget/budget.dto';
-
-type LineBody = BudgetProposalBodyDto['lines'][number];
+import type { BudgetProposalBodyDto, ProposalWire, ResubmissionBodyDto } from '../budget/budget.dto';
 
 /**
  * The proposals a head of department sends for the Cost Center of the department and a fiscal year (`US-06-10`): sent,
@@ -36,14 +34,14 @@ export class ProposalService {
 
   /**
    * Throws FinanceSetupIncompleteError, BudgetCostCenterNotFoundError, BudgetNotYourCostCenterError, BudgetYearEndedError,
-   * BudgetProposalIncompleteError, BudgetWindowBackwardsError, BudgetPlanNotFoundError, BudgetProposalOpenError,
-   * BudgetCurrencyError, the money errors and, with `attachmentIds`, BudgetAttachmentNotAttachableError.
+   * BudgetCycleNotOpenError, BudgetCycleLockedError, BudgetProposalOpenError, the money errors and BudgetAttachmentNotAttachableError.
    */
   async submit(actor: AuthenticatedPrincipal, body: BudgetProposalBodyDto): Promise<ProposalWire> {
     return this.runner.run(async (tx) => {
       const id = await this.sender.send(tx, actor, {
         year: body.year,
-        lines: body.lines,
+        requestedAmount: body.requestedAmount,
+        note: body.note,
         previous: null,
         attachmentIds: body.attachmentIds,
         costCenterId: body.costCenterId,
@@ -54,29 +52,23 @@ export class ProposalService {
   }
 
   /** Throws BudgetProposalNotFoundError, BudgetProposalStateError and the errors of `submit`. */
-  async resubmit(
-    actor: AuthenticatedPrincipal,
-    id: string,
-    lines: LineBody[],
-    attachmentIds?: readonly string[],
-  ): Promise<ProposalWire> {
+  async resubmit(actor: AuthenticatedPrincipal, id: string, body: ResubmissionBodyDto): Promise<ProposalWire> {
     return this.runner.run(async (tx) => {
       // Who may touch the proposal is judged first, without a lock: anybody else finds nothing, whatever the state of the cycle.
       const seen = await this.ownedUnlocked(tx, actor, id, true);
       // Then the cycle of the year (the order of the module: cycle, proposal, version, year); a year that has ended is refused as
       // ended below, before the cycle is asked about.
-      if (!yearHasEnded(seen.year, await this.facts.today(new Date(), tx))) {
-        await this.sender.requireOpenCycle(tx, seen.year);
-      }
+      await this.cycleUnlessEnded(tx, seen.year);
       const previous = await this.ownedLocked(tx, actor, id, true);
       const today = await this.facts.today(new Date(), tx);
       if (yearHasEnded(previous.year, today)) throw new BudgetYearEndedError(previous.year);
       if (!canResubmit(previous.state)) throw new BudgetProposalStateError('RESUBMIT', previous.state);
       const created = await this.sender.send(tx, actor, {
         year: previous.year,
-        lines,
+        requestedAmount: body.requestedAmount,
+        note: body.note,
         previous: previous.id,
-        attachmentIds,
+        attachmentIds: body.attachmentIds,
         costCenterId: previous.costCenterId,
       });
 
@@ -84,9 +76,14 @@ export class ProposalService {
     });
   }
 
-  /** The head takes the proposal back while Finance has not sent a version made from it (`US-06-10` AC-4). */
+  /**
+   * The head takes the proposal back while Finance has not sent a version made from it (`US-06-10` AC-4), and only while the cycle is
+   * open (`QĐ-111z`): from the day after the submission deadline it stays.
+   */
   async withdraw(actor: AuthenticatedPrincipal, id: string): Promise<ProposalWire> {
     return this.runner.run(async (tx) => {
+      const seen = await this.ownedUnlocked(tx, actor, id);
+      await this.cycleUnlessEnded(tx, seen.year);
       const proposal = await this.ownedLocked(tx, actor, id);
       const today = await this.facts.today(new Date(), tx);
       if (yearHasEnded(proposal.year, today)) throw new BudgetYearEndedError(proposal.year);
@@ -107,10 +104,14 @@ export class ProposalService {
     });
   }
 
-  /** Finance gives the proposal back with the reason that must go with it (`US-06-09` AC-15). */
+  /**
+   * Finance gives the proposal back with the reason that must go with it (`US-06-09` AC-15), only before the submission deadline: the
+   * head must still be able to send it again (`QĐ-111ab`).
+   */
   async giveBack(actor: AuthenticatedPrincipal, id: string, reason: string): Promise<ProposalWire> {
     this.facts.requireFinance(actor);
     return this.runner.run(async (tx) => {
+      await this.cycleUnlessEnded(tx, (await this.require(id, tx)).year);
       const proposal = await this.proposals.lockById(tx, id);
       if (!proposal) throw new BudgetProposalNotFoundError();
       const today = await this.facts.today(new Date(), tx);
@@ -133,6 +134,11 @@ export class ProposalService {
 
       return this.views.wire(returned);
     });
+  }
+
+  /** The cycle of the year must be open (`ProposalSender.requireOpenCycle`); a year that has ended is refused as ended after it, not here. */
+  private async cycleUnlessEnded(tx: DbTx, year: number): Promise<void> {
+    if (!yearHasEnded(year, await this.facts.today(new Date(), tx))) await this.sender.requireOpenCycle(tx, year);
   }
 
   private async require(id: string, tx?: DbTx): Promise<ProposalRecord> {

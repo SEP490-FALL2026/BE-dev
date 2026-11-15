@@ -1,5 +1,6 @@
 import request from 'supertest';
 import { BudgetHarness } from '../../support/budget-harness';
+import { addDays } from '../../support/department-harness';
 import type { ApiAccount } from '../../support/api-accounts';
 import type { Person } from '../../support/request-harness';
 
@@ -354,7 +355,7 @@ describe('the budget cycle: draft, open, locked (integration, real PostgreSQL)',
     it('refuses with no cycle and with a draft (409 BUDGET_CYCLE.NOT_OPEN), and accepts once it is open', async () => {
       const u = await h.departmentWithHead(`P-Q02${(counter += 1)}`);
       const year = nextYear();
-      const send = () => h.submitProposal(h.proposalBody(u.department.unitId, h.twoLines(), year), u.head.account);
+      const send = () => h.submitProposal(h.proposalBody(u.department.unitId, undefined, year), u.head.account);
 
       expect(h.codeOf(await send().expect(409))).toBe('BUDGET_CYCLE.NOT_OPEN');
       await create(body(year, { annualCeiling: money(1_000_000) })).expect(201);
@@ -362,6 +363,48 @@ describe('the budget cycle: draft, open, locked (integration, real PostgreSQL)',
       await open(year).expect(201);
 
       await send().expect(201);
+    });
+  });
+
+  describe('BM-10 after the submission deadline (QĐ-111z, QĐ-111ab, T-BG2)', () => {
+    it('refuses to send, send again or take back a proposal, and Finance to give one back: 409 BUDGET_CYCLE.LOCKED, nothing is written', async () => {
+      const u = await h.departmentWithHead(`P-LCK${(counter += 1)}`);
+      const other = await h.departmentWithHead(`P-LCO${(counter += 1)}`);
+      const waits = await h.budgetProposed(u.head, u.department.unitId);
+      const returned = await h.budgetProposed(other.head, other.department.unitId);
+      await h.giveBack(returned.id, { reason: 'Add the quotes' }, h.finance).expect(200);
+      const fresh = await h.departmentWithHead(`P-LCF${(counter += 1)}`);
+      const { rows } = await h.ctx.sql.query<{ deadline: string }>(
+        `SELECT submission_deadline::text AS deadline FROM budget_cycles WHERE year = $1`,
+        [h.next],
+      );
+      await h.ctx.sql.query(`UPDATE budget_cycles SET submission_deadline = $2 WHERE year = $1`, [
+        h.next,
+        addDays(h.today(), -1),
+      ]);
+
+      try {
+        const before = await h.budgetRows('budget_proposals');
+        const refused = [
+          await h.submitProposal(h.proposalBody(fresh.department.unitId), fresh.head.account),
+          await h.resubmit(returned.id, h.bm10(), other.head.account),
+          await h.withdraw(waits.id, u.head.account),
+          await h.giveBack(waits.id, { reason: 'Too late' }, h.finance),
+        ];
+
+        expect(refused.map((response) => [response.status, h.codeOf(response)])).toEqual(
+          Array.from({ length: 4 }, () => [409, 'BUDGET_CYCLE.LOCKED']),
+        );
+        expect(await h.budgetRows('budget_proposals')).toBe(before);
+        expect(
+          (await h.ctx.sql.query(`SELECT state::text FROM budget_proposals WHERE id = $1`, [waits.id])).rows[0],
+        ).toEqual({ state: 'SUBMITTED' });
+      } finally {
+        await h.ctx.sql.query(`UPDATE budget_cycles SET submission_deadline = $2 WHERE year = $1`, [
+          h.next,
+          rows[0].deadline,
+        ]);
+      }
     });
   });
 
@@ -375,7 +418,7 @@ describe('the budget cycle: draft, open, locked (integration, real PostgreSQL)',
       ]);
 
       try {
-        const refused = await h.resubmit(proposal.id, { lines: h.twoLines() }, u.head.account).expect(409);
+        const refused = await h.resubmit(proposal.id, h.bm10(), u.head.account).expect(409);
 
         expect(h.codeOf(refused)).toBe('BUDGET_CYCLE.NOT_OPEN');
       } finally {
@@ -384,7 +427,7 @@ describe('the budget cycle: draft, open, locked (integration, real PostgreSQL)',
           [h.next, h.finance.employeeId],
         );
       }
-      await h.resubmit(proposal.id, { lines: h.twoLines() }, u.head.account).expect(201);
+      await h.resubmit(proposal.id, h.bm10(), u.head.account).expect(201);
     });
   });
 

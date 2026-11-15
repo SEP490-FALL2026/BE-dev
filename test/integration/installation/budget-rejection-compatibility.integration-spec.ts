@@ -107,7 +107,7 @@ describe('the refusal of a first version, the detached drafts and the preflight 
       const { proposal, head } = await waiting();
 
       await h.giveBack(proposal.id, { reason: 'Add the quotes' }, h.finance).expect(200);
-      const again = await h.resubmit(proposal.id, { lines: [h.line()] }, head.account).expect(201);
+      const again = await h.resubmit(proposal.id, h.bm10(50_000_000), head.account).expect(201);
 
       expect(await proposalRow(proposal.id)).toMatchObject({ state: 'RETURNED', returned_reason: 'Add the quotes' });
       expect(h.dataOf<{ proposal: ProposalWire }>(again).proposal.state).toBe('SUBMITTED');

@@ -57,18 +57,17 @@ const HEAD_ROLE_ONLY = {
   description: HEAD_ONLY_DESCRIPTION,
   examples: [FORBIDDEN_EXAMPLE],
 } as const;
+/** The cycle of the year is not open: never opened, or locked from the day after the submission deadline (`QĐ-111z`). */
+const CYCLE_DESCRIPTION =
+  'Finance has not opened the budget cycle of the year yet (BUDGET_CYCLE.NOT_OPEN), or its submission deadline has passed and it is locked (BUDGET_CYCLE.LOCKED)';
 /** What a change of a proposal of a year that has ended answers, whether or not the closure of the year has run (`QĐ-91c`). */
 const YEAR_ENDED = {
   status: HttpStatus.UNPROCESSABLE_ENTITY,
   description: 'The fiscal year of the proposal has ended (BUDGET.YEAR_ENDED): nothing is saved.',
   examples: [VALIDATION_EXAMPLE, EXAMPLES.YEAR_ENDED],
 } as const;
-/** What sending the lines refuses after the request validation: a first proposal and one sent again alike. */
+/** What sending `BM-10` refuses after the request validation: a first proposal and one sent again alike. */
 const SEND_EXAMPLES = [
-  EXAMPLES.PRIORITY_RANK_INVALID,
-  EXAMPLES.ZBB_REQUIRED,
-  EXAMPLES.OVER_CEILING_NOTE_REQUIRED,
-  EXAMPLES.PLAN_NOT_FOUND,
   EXAMPLES.YEAR_ENDED,
   EXAMPLES.CURRENCY_NOT_REPORTING,
   EXAMPLES.CURRENCY_NOT_SUPPORTED,
@@ -99,7 +98,7 @@ export class BudgetProposalsController {
     status: HttpStatus.CREATED,
     message: 'BUDGET_PROPOSAL.SUBMITTED',
     description:
-      'The proposal of the department for a Cost Center and a year that is running or to come, with its lines and their total. Finance sees it in their queue.',
+      'The proposal of the department for a Cost Center and a year that is running or to come (BM-10): the files, the amount asked for the whole year and a note; there are no lines. Finance sees it in their queue.',
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,
@@ -111,14 +110,18 @@ export class BudgetProposalsController {
     },
     {
       status: HttpStatus.CONFLICT,
-      description:
-        'The department has no Cost Center in use yet (FINANCE.SETUP_INCOMPLETE), a proposal for the Cost Center and the year already waits or is being reviewed and no refused version leaves room for a successor (BUDGET.PROPOSAL_ALREADY_OPEN), or Finance has not opened the budget cycle of the year yet (BUDGET_CYCLE.NOT_OPEN).',
-      examples: [EXAMPLES.FINANCE_SETUP_INCOMPLETE, EXAMPLES.PROPOSAL_ALREADY_OPEN, EXAMPLES.CYCLE_NOT_OPEN],
+      description: `The department has no Cost Center in use yet (FINANCE.SETUP_INCOMPLETE), a proposal for the Cost Center and the year already waits or is being reviewed and no refused version leaves room for a successor (BUDGET.PROPOSAL_ALREADY_OPEN), or ${CYCLE_DESCRIPTION}.`,
+      examples: [
+        EXAMPLES.FINANCE_SETUP_INCOMPLETE,
+        EXAMPLES.PROPOSAL_ALREADY_OPEN,
+        EXAMPLES.CYCLE_NOT_OPEN,
+        EXAMPLES.CYCLE_LOCKED,
+      ],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
-        'The form is invalid (VALIDATION_ERROR), two lines share a priority rank (BUDGET.PRIORITY_RANK_INVALID, details.positions), a line lacks its zero-based-budget explanation (BUDGET.ZBB_REQUIRED, details.positions), a line that carries the proposal over the published ceiling of the department has no note (BUDGET.OVER_CEILING_NOTE_REQUIRED, details.positions), a line names a plan that does not exist (BUDGET.PLAN_NOT_FOUND), the year has ended (BUDGET.YEAR_ENDED) an amount is not in the reporting currency (BUDGET.CURRENCY_NOT_REPORTING), or the head answers for more than one Cost Center that year and names none (BUDGET.COST_CENTER_REQUIRED).',
+        'The form is invalid (VALIDATION_ERROR: no file, more than ten, a line of the old form), a file is not one the head uploaded for a proposal (BUDGET_ATTACHMENT.NOT_ATTACHABLE), the year has ended (BUDGET.YEAR_ENDED), the amount is not in the reporting currency (BUDGET.CURRENCY_NOT_REPORTING), or the head answers for more than one Cost Center that year and names none (BUDGET.COST_CENTER_REQUIRED).',
       examples: [VALIDATION_EXAMPLE, ...SEND_EXAMPLES, EXAMPLES.COST_CENTER_REQUIRED],
     },
   )
@@ -178,8 +181,8 @@ export class BudgetProposalsController {
     NOT_FOUND,
     {
       status: HttpStatus.CONFLICT,
-      description: 'The proposal is no longer waiting for Finance (BUDGET.PROPOSAL_CANNOT_WITHDRAW).',
-      examples: [EXAMPLES.PROPOSAL_CANNOT_WITHDRAW],
+      description: `The proposal is no longer waiting for Finance (BUDGET.PROPOSAL_CANNOT_WITHDRAW), or ${CYCLE_DESCRIPTION}.`,
+      examples: [EXAMPLES.PROPOSAL_CANNOT_WITHDRAW, EXAMPLES.CYCLE_NOT_OPEN, EXAMPLES.CYCLE_LOCKED],
     },
     YEAR_ENDED,
   )
@@ -197,7 +200,7 @@ export class BudgetProposalsController {
   @ApiSuccessResponse(ProposalResponseDto, {
     message: 'BUDGET_PROPOSAL.RETURNED',
     description:
-      'Finance gives the proposal back with the reason that must go with it; the head corrects it and sends it again.',
+      'Finance gives the proposal back with the reason that must go with it, before the submission deadline; the head corrects it and sends it again.',
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,
@@ -205,8 +208,8 @@ export class BudgetProposalsController {
     NOT_FOUND,
     {
       status: HttpStatus.CONFLICT,
-      description: 'The proposal is not waiting for Finance (BUDGET.PROPOSAL_CANNOT_RETURN).',
-      examples: [EXAMPLES.PROPOSAL_CANNOT_RETURN],
+      description: `The proposal is not waiting for Finance (BUDGET.PROPOSAL_CANNOT_RETURN), or ${CYCLE_DESCRIPTION}.`,
+      examples: [EXAMPLES.PROPOSAL_CANNOT_RETURN, EXAMPLES.CYCLE_NOT_OPEN, EXAMPLES.CYCLE_LOCKED],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
@@ -236,7 +239,8 @@ export class BudgetProposalsController {
   @ApiSuccessResponse(ProposalResponseDto, {
     status: HttpStatus.CREATED,
     message: 'BUDGET_PROPOSAL.RESUBMITTED',
-    description: 'A new proposal with the corrected lines, pointing at the one given back, which stays as it was.',
+    description:
+      'A new proposal with the corrected files, amount and note, pointing at the one given back, which stays as it was.',
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,
@@ -244,13 +248,13 @@ export class BudgetProposalsController {
     NOT_FOUND,
     {
       status: HttpStatus.CONFLICT,
-      description:
-        'The proposal was not given back (BUDGET.PROPOSAL_CANNOT_RESUBMIT), another waits (BUDGET.PROPOSAL_ALREADY_OPEN), the Cost Center of the department was retired and has none in use yet, though the head still owns the proposal given back (FINANCE.SETUP_INCOMPLETE), or the budget cycle of the year was never published (BUDGET_CYCLE.NOT_OPEN).',
+      description: `The proposal was not given back (BUDGET.PROPOSAL_CANNOT_RESUBMIT), another waits (BUDGET.PROPOSAL_ALREADY_OPEN), the Cost Center of the department was retired and has none in use yet, though the head still owns the proposal given back (FINANCE.SETUP_INCOMPLETE), or ${CYCLE_DESCRIPTION}.`,
       examples: [
         EXAMPLES.PROPOSAL_CANNOT_RESUBMIT,
         EXAMPLES.PROPOSAL_ALREADY_OPEN,
         EXAMPLES.FINANCE_SETUP_INCOMPLETE,
         EXAMPLES.CYCLE_NOT_OPEN,
+        EXAMPLES.CYCLE_LOCKED,
       ],
     },
     {
@@ -265,7 +269,7 @@ export class BudgetProposalsController {
     @Body() body: ResubmissionBodyDto,
   ) {
     try {
-      return { proposal: await this.proposals.resubmit(actor, params.id, body.lines, body.attachmentIds) };
+      return { proposal: await this.proposals.resubmit(actor, params.id, body) };
     } catch (error) {
       throw toBudgetAttachmentApiException(error);
     }

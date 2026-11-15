@@ -33,10 +33,7 @@ const UNIQUE_ARRAYS: readonly (readonly [operationId: string, path: readonly str
 ];
 
 /** The bodies that need at least one field, whatever the field. */
-const AT_LEAST_ONE_FIELD: readonly string[] = [
-  'budgetVersionUpdate',
-  'accessRequestAssessmentSave',
-];
+const AT_LEAST_ONE_FIELD: readonly string[] = ['budgetVersionUpdate', 'accessRequestAssessmentSave'];
 
 /** The description of a node of the document, or an empty string when it has none. */
 const descriptionOf = (node: Json | undefined): string =>

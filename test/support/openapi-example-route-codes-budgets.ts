@@ -101,17 +101,14 @@ export const ROUTE_ERROR_CODES_BUDGETS: Readonly<Record<string, Partial<Record<R
     budgetProposalResubmit: {
       '404': ['BUDGET.PROPOSAL_NOT_FOUND'],
       '409': [
+        'BUDGET_CYCLE.LOCKED',
         'BUDGET_CYCLE.NOT_OPEN',
         'BUDGET.PROPOSAL_ALREADY_OPEN',
         'BUDGET.PROPOSAL_CANNOT_RESUBMIT',
         'FINANCE.SETUP_INCOMPLETE',
       ],
       '422': [
-        'BUDGET.OVER_CEILING_NOTE_REQUIRED',
-        'BUDGET.PRIORITY_RANK_INVALID',
-        'BUDGET.ZBB_REQUIRED',
         'BUDGET.CURRENCY_NOT_REPORTING',
-        'BUDGET.PLAN_NOT_FOUND',
         'BUDGET.YEAR_ENDED',
         'BUDGET_ATTACHMENT.NOT_ATTACHABLE',
         'CURRENCY_NOT_SUPPORTED',
@@ -121,20 +118,21 @@ export const ROUTE_ERROR_CODES_BUDGETS: Readonly<Record<string, Partial<Record<R
     },
     budgetProposalReturn: {
       '404': ['BUDGET.PROPOSAL_NOT_FOUND'],
-      '409': ['BUDGET.PROPOSAL_CANNOT_RETURN'],
+      '409': ['BUDGET_CYCLE.LOCKED', 'BUDGET_CYCLE.NOT_OPEN', 'BUDGET.PROPOSAL_CANNOT_RETURN'],
       '422': ['BUDGET.YEAR_ENDED'],
     },
     budgetProposalSubmit: {
       '403': ['BUDGET.NOT_YOUR_COST_CENTER'],
       '404': ['BUDGET.COST_CENTER_NOT_FOUND'],
-      '409': ['BUDGET_CYCLE.NOT_OPEN', 'BUDGET.PROPOSAL_ALREADY_OPEN', 'FINANCE.SETUP_INCOMPLETE'],
+      '409': [
+        'BUDGET_CYCLE.LOCKED',
+        'BUDGET_CYCLE.NOT_OPEN',
+        'BUDGET.PROPOSAL_ALREADY_OPEN',
+        'FINANCE.SETUP_INCOMPLETE',
+      ],
       '422': [
-        'BUDGET.OVER_CEILING_NOTE_REQUIRED',
-        'BUDGET.PRIORITY_RANK_INVALID',
-        'BUDGET.ZBB_REQUIRED',
         'BUDGET.COST_CENTER_REQUIRED',
         'BUDGET.CURRENCY_NOT_REPORTING',
-        'BUDGET.PLAN_NOT_FOUND',
         'BUDGET.YEAR_ENDED',
         'BUDGET_ATTACHMENT.NOT_ATTACHABLE',
         'CURRENCY_NOT_SUPPORTED',
@@ -144,7 +142,7 @@ export const ROUTE_ERROR_CODES_BUDGETS: Readonly<Record<string, Partial<Record<R
     },
     budgetProposalWithdraw: {
       '404': ['BUDGET.PROPOSAL_NOT_FOUND'],
-      '409': ['BUDGET.PROPOSAL_CANNOT_WITHDRAW'],
+      '409': ['BUDGET_CYCLE.LOCKED', 'BUDGET_CYCLE.NOT_OPEN', 'BUDGET.PROPOSAL_CANNOT_WITHDRAW'],
       '422': ['BUDGET.YEAR_ENDED'],
     },
     budgetVersionAttachmentDeclare: {
