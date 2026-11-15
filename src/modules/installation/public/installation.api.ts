@@ -2,12 +2,12 @@ import { Injectable } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { TransactionRunner } from '../../../infrastructure/database/transaction-runner';
 import { AuditApi } from '../../audit/public/audit.api';
-import { CatalogBootstrapApi } from '../../catalog/public/catalog-bootstrap.api';
 import { FinanceApi } from '../../finance/public/finance.api';
 import { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
 import { OrganizationApi } from '../../organization/public/organization.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { AlreadyInstalledError, InstallationInputError } from './installation.errors';
+import { InstallationInitialDataService } from '../installation-initial-data.service';
 import { InstallationInput, installationInputSchema } from '../installation.dto';
 import { InstallationRepo } from '../installation.repo';
 
@@ -37,7 +37,7 @@ export class InstallationApi {
     private readonly audit: AuditApi,
     private readonly repo: InstallationRepo,
     private readonly finance: FinanceApi,
-    private readonly catalog: CatalogBootstrapApi,
+    private readonly initialData: InstallationInitialDataService,
   ) {}
 
   async install(rawInput: unknown, password: string): Promise<InstallationResult> {
@@ -92,13 +92,15 @@ export class InstallationApi {
         timeZone: input.timeZone,
         reportingCurrency: input.reportingCurrency,
       });
-      // QĐ-111bf: every application stands in a functional group, so the organization starts with the seven standard ones.
-      const standardFunctionalGroups = await this.catalog.seedStandardFunctionalGroups(tx, org.id);
+      // QĐ-111bf, QĐ-112b: every application stands in a functional group and every decision step has a policy, so the organization
+      // starts with the seven standard groups and the eight policies with their first version in force.
+      const { standardFunctionalGroups, initialPolicies } = await this.initialData.seed(tx, org.id);
       await record(org.id, 'INSTALLATION.ORGANIZATION_CREATED', 'Organization', org.id, {
         timeZone: input.timeZone,
         reportingCurrency: input.reportingCurrency,
         environment: input.environment,
         standardFunctionalGroups,
+        initialPolicies,
       });
 
       const department = await this.organization.createDepartment(tx, {

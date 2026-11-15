@@ -237,6 +237,37 @@ export class LibraryRepo {
     return last._max.versionNumber ?? 0;
   }
 
+  /** Adds a policy of the fixed set; only the installation does this, no route makes one. */
+  async insertPolicy(tx: DbTx, organizationId: string, code: string): Promise<{ id: string }> {
+    return tx.policy.create({ data: { organizationId, code }, select: { id: true } });
+  }
+
+  /** Writes a version as published at once, with the ground of its issue: the first version of a policy, written by the installation. */
+  async insertPublished(
+    tx: DbTx,
+    input: DraftValues & {
+      organizationId: string;
+      policyId: string;
+      versionNumber: number;
+      changeNote: string;
+      publishedAt: Date;
+    },
+  ): Promise<void> {
+    await tx.policyVersion.create({
+      data: {
+        organizationId: input.organizationId,
+        policyId: input.policyId,
+        versionNumber: input.versionNumber,
+        title: input.title,
+        content: policyContentJson.encode(input.content),
+        applicableRoles: input.applicableRoles,
+        changeNote: input.changeNote,
+        requiresReacknowledgement: true,
+        publishedAt: input.publishedAt,
+      },
+    });
+  }
+
   /** The one update that turns the draft into the published version. */
   async publishDraft(tx: DbTx, id: string, values: PublishValues): Promise<PublishedVersionRecord> {
     const row = await tx.policyVersion.update({

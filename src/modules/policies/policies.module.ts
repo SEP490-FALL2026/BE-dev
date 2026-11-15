@@ -13,7 +13,7 @@ import { PendingPolicyAcknowledgementListener } from './acknowledgement/pending-
 import { LibraryDraftController } from './library/library-draft.controller';
 import { LibraryDraftService } from './library/library-draft.service';
 import { LibraryPublishService } from './library/library-publish.service';
-import { LibraryRepo } from './library/library.repo';
+import { PoliciesBootstrapFacadeModule } from './policies-bootstrap-facade.module';
 import { PolicyReadingController } from './reading/policy-reading.controller';
 import { PolicyReadingQueryService } from './reading/policy-reading-query.service';
 
@@ -23,10 +23,16 @@ import { PolicyReadingQueryService } from './reading/policy-reading-query.servic
  * PL-1, PL-2 and PL-3 land; the module card lists what is wired.
  */
 @Module({
-  imports: [DatabaseModule, AuditModule, OrganizationModule, IdentityAccessFacadeModule, NotificationsModule],
+  imports: [
+    DatabaseModule,
+    AuditModule,
+    OrganizationModule,
+    IdentityAccessFacadeModule,
+    NotificationsModule,
+    PoliciesBootstrapFacadeModule,
+  ],
   controllers: [PolicyReadingController, LibraryDraftController, AcknowledgementController],
   providers: [
-    LibraryRepo,
     LibraryDraftService,
     LibraryPublishService,
     AcknowledgementRepo,

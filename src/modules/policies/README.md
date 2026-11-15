@@ -9,13 +9,15 @@ thấp hơn). Được dùng bởi: `src/app/app.module.ts`; module trên gọi 
 
 ## Trạng thái
 
-Gói PL-1 (thư viện + xác nhận đã đọc) đã nối; PL-2 (checklist khi quyết định) và PL-3 (file mẫu import) chưa có. Nội dung 8 chính sách
-khởi tạo (PL-1.5) nạp ở bước cài đặt — xem mục "Chưa làm".
+Gói PL-1 (thư viện, xác nhận đã đọc, 8 chính sách khởi tạo) đã nối; PL-2 (checklist khi quyết định) và PL-3 (file mẫu import) chưa có.
 
 ## Public API (`public/`)
 
 - `public/policies.types.ts` — `POLICY_ROLES`, `PolicyRole`: các vai một chính sách có thể áp dụng (cùng bộ với `identity-access`).
-- Chưa có facade `PoliciesApi`; thêm khi PL-2 (`PolicyChecklistApi`) và PL-1.5 (nạp bộ chính sách) cần.
+- `PoliciesBootstrapApi` ([public/policies-bootstrap.api.ts](public/policies-bootstrap.api.ts)): `seedInitialPolicies` — ghi 8 chính sách và bản 1 của
+  mỗi chính sách trong transaction của người gọi (lệnh cài đặt; seed demo sau này), chạy lại không đổi gì, không đụng bản đã có.
+  Nằm ở `policies-bootstrap-facade.module.ts` (không controller) để lệnh cài đặt không nạp cả thư viện.
+- Chưa có `PolicyChecklistApi`; thêm ở PL-2.
 
 ## Bảng sở hữu
 
@@ -32,6 +34,9 @@ khởi tạo (PL-1.5) nạp ở bước cài đặt — xem mục "Chưa làm".
 - `acknowledgement/` — `acknowledgement.policy.ts` là luật duy nhất "người này còn nợ xác nhận không" (`R-34`: V\* = bản mới nhất đòi xác nhận
   lại; bản 1 luôn đòi), `acknowledgement-facts.service.ts` (một câu cho phiên bản, một câu cho xác nhận, bất kể số chính sách),
   `acknowledgement.service.ts` (`POST` idempotent), `acknowledgement-report.service.ts` (báo cáo đã/chưa cho Super Admin).
+- `initial/` — dữ liệu bản 1 của 8 chính sách (`pol-*.types.ts`, sinh từ [POLICY-SEED-DRAFT](../../../docs/reviews/fe-feedback-2026-11-11/POLICY-SEED-DRAFT.md)
+  đã duyệt `QĐ-112b`), `initial-policies.policy.ts` (danh sách + căn cứ ban hành bản 1 mặc định), `initial-policies.service.ts` (ghi một lần, chạy lại an toàn). Bảy bước có
+  checklist của `QĐ-111ap` nằm đúng chính sách của luồng mình; spec khóa danh sách đó.
 - `reading/` — `GET /policies`, `/policies/{code}`, `/versions`, `/steps/{stepCode}`: mọi tài khoản đọc; `myAcknowledgement` theo
   `directRoles` (vai được cấp, giống `GET /me`).
 
@@ -43,5 +48,5 @@ khởi tạo (PL-1.5) nạp ở bước cài đặt — xem mục "Chưa làm".
 
 ## Chưa làm
 
-- PL-1.5: nạp 8 chính sách của [POLICY-SEED-DRAFT](../../../docs/reviews/fe-feedback-2026-11-11/POLICY-SEED-DRAFT.md) (dữ liệu của module
-  này, không phải demo seed); PL-2 checklist; PL-3 file mẫu import.
+- PL-2 checklist khi quyết định; PL-3 file mẫu import. Seed demo gọi `PoliciesBootstrapApi` với căn cứ riêng (việc của Z2). Mục `SYSTEM` của
+  checklist chưa đối chiếu với guard thật (CS-8): PL-2 làm.
