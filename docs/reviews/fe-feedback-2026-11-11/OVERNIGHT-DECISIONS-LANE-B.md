@@ -98,6 +98,8 @@ Không làm ở FIX-LB1 (rẻ nhưng đổi hợp đồng hoặc chạm file lan
 
 ## Optional và việc để lại
 
+- BG-2: `approvedBudgetLines` của dashboard trưởng phòng nên đổi tên khóa (vd. `approvedBudget`) khi FE đổi; `costCenterId` của `BM-10` vẫn tùy chọn (D-B12); `GET /budget-cycles/{year}/package` chưa trả `note` của đề nghị (FE đọc ở `GET /budget-proposals/{id}`); CHECK nguồn phiên bản chưa có nhánh `ADJUSTMENT` (AD-1 tự thêm); e2e `test/e2e/budget-version`, `mobile-approver-journey` đã sửa theo `BM-10` nhưng chưa chạy.
+
 - Báo cáo xác nhận chưa có tổng `done`/`pending` toàn tập (cần join chéo module); thêm khi FE đòi.
 - `GET /policies/{code}` cho phiên bản cũ trả `myAcknowledgement = null` (chỉ bản hiện hành có trạng thái).
 - FIX-LB2 Optional: LBF-04 (CHECK của migration `…100200` làm deploy hỏng nếu một DB đã có bản xuất bản vi phạm — chưa DB nào ngoài máy dev chạy PL-1, FYI, không cần Owner); LBF-05 (ca gọi `insertOnce` hai lần trong một transaction; CHECK bản 1 luôn đòi xác nhận lại; quyền runtime của `policy_acknowledgements`); LBF-06 phần còn lại (so mã `SYSTEM` theo cặp bước + mục, khóa chữ mục `SYSTEM` — cần Owner chốt nếu khóa chữ); LBF-07 (`publishedBy` có tên); LBF-08/09/10 (ghi chú thứ tự, lệch OVERNIGHT/HANDOFF, backfill so snapshot 1.0); PF1-04 (request bay lúc ghi `LEFT` đặt lại ảnh/SĐT), PF1-05 (sweeper gọi storage trong một transaction), PF1-06 (README module + `security-jobs.md` + chú thích client vẽ lại ảnh), PF1-07 (giới hạn điểm ảnh), PF1-08…12. Chi tiết ở `AUDIT-LB-FIX1-PF1.md`.
@@ -113,4 +115,4 @@ Không làm ở FIX-LB1 (rẻ nhưng đổi hợp đồng hoặc chạm file lan
 
 ## Dừng ở đâu
 
-- Xong PL-1, PL-3, PF-1, FIX-LB1, BG-1 (`1282e391`), FIX-LB2, BG-2.0 (`4d58016a`), BG-2.4 + một phần BG-2.5 (`09fb1d0e`). Việc tiếp: phần còn lại của BG-2 (xem D-B9), rồi dừng "LANE B CHỜ MERGE".
+- Xong PL-1, PL-3, PF-1, FIX-LB1, BG-1, FIX-LB2 và cả BG-2: BG-2.0 `4d58016a`, BG-2.4 `09fb1d0e`, BG-2.1 + một phần BG-2.6 `5a1dfc03`, BG-2.3 `a4ba8bec`, BG-2.2 `7f740cf4`, BG-2.5 + BG-2.6 `d2bad69f`, BG-2.7 `6c62609d`, BG-2-G `50d9ca2f`. Còn lại ngoài lane B: phía `requests` của BG-2.1 (mục "Bị chặn"), seed/flows (mục "Seed cần cho Z2" ở HANDOFF). Dừng "LANE B CHỜ MERGE".
