@@ -260,17 +260,20 @@ export class PlanRepo {
 
   /**
    * The plans of the other applications in the functional group of this plan's application: what a person may already
-   * have that does the same work (`US-05-04` AC-3). Empty when the application is in no group. The first `limit` by id.
+   * have that does the same work (`US-05-04` AC-3). Empty when the application is in no group, and when its group is the fixed
+   * one that takes every application declared with none (`Khác`, by its system key, not its name): two tools there have no
+   * function in common. The first `limit` by id.
    */
   async findSimilarIds(planId: string, limit: number, tx?: DbTx): Promise<string[]> {
     const rows = await (tx ?? this.prisma).$queryRaw<{ id: string }[]>`
       SELECT other.id
         FROM plans own
         JOIN applications own_app ON own_app.id = own.application_id
+        JOIN functional_groups own_group ON own_group.id = own_app.functional_group_id
         JOIN applications other_app
           ON other_app.functional_group_id = own_app.functional_group_id AND other_app.id <> own_app.id
         JOIN plans other ON other.application_id = other_app.id
-       WHERE own.id = ${planId}::uuid AND own_app.functional_group_id IS NOT NULL
+       WHERE own.id = ${planId}::uuid AND own_group.system_key IS DISTINCT FROM 'OTHER'
        ORDER BY other.id
        LIMIT ${limit}`;
 

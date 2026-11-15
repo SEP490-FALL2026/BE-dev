@@ -279,7 +279,7 @@ export class CatalogApi {
     return this.plans.revocationInfos(planIds, tx);
   }
 
-  /** The plans of the other applications in the functional group of the plan's application (at most `limit`, by id). */
+  /** The plans of the other applications in the functional group of the plan's application (at most `limit`, by id); none for the group Khác, which is no one function. */
   getSimilarPlanIds(planId: string, limit: number, tx?: DbTx): Promise<string[]> {
     return this.plans.similarIds(planId, limit, tx);
   }
