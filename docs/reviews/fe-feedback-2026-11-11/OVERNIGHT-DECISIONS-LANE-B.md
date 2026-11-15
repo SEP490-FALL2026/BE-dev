@@ -5,9 +5,9 @@
 
 ## Chờ Owner quyết
 
-| Mã | Câu hỏi | A | B | Khuyến nghị |
-| -- | ------- | - | - | ----------- |
-| (chưa có) | | | | |
+| Mã        | Câu hỏi | A   | B   | Khuyến nghị |
+| --------- | ------- | --- | --- | ----------- |
+| (chưa có) |         |     |     |             |
 
 ## Quyết định tự chốt (D-Bn)
 
@@ -24,9 +24,23 @@
 - **Phương án:** (A) vai được cấp và còn hiệu lực (`directRoles`, giống `roles` của `GET /me`); (B) vai hiệu lực (`roles` của principal).
 - **Chọn A:** khớp `GET /me` (FE chặn theo danh sách này) và khớp người nhận thông báo xuất bản (tài khoản giữ grant). **Đổi lại:** đổi nguồn vai ở `acknowledgement.service.ts`.
 
+### D-B3 — chủ sở hữu mục sổ collection của PL-1 là work item `us-01-bootstrap-login-session`
+
+- **Câu hỏi:** gate `api-collection-contract` đòi mỗi mảng lồng mới có `owner`/`item` là một thư mục có sẵn dưới `docs/workspace/items`; không có thư mục cho thư viện chính sách.
+- **Phương án:** (A) dùng work item EP-01 gần nhất có sẵn; (B) tạo thư mục work item mới (kèm README, dòng trong chỉ mục, rules:check).
+- **Chọn A** (US-01-13/14 thuộc EP-01; không tạo tài liệu chỉ để qua gate). **File:** `test/support/api-collection-registry-nested-pl1.ts`, `…-events-pl1.ts`. **Đổi lại:** đổi `OWNER`/`item` khi có work item riêng.
+
+### D-B4 — báo cáo xác nhận đã đọc không lọc theo trạng thái
+
+- **Câu hỏi:** `GET /policies/{code}/acknowledgements` ("báo cáo đã/chưa, phân trang") có cần lọc `state=PENDING|DONE`?
+- **Phương án:** (A) không lọc, trả trang theo mã nhân viên với `state` từng dòng; (B) lọc bằng SQL join `app_users`/`role_grants` (bảng của module khác) hoặc đọc cả tập rồi cắt trang trong bộ nhớ (cả hai vi phạm luật).
+- **Chọn A** (đúng chữ SPEC, không lách luật module/phân trang); FE lọc trang đang xem. **Đổi lại:** thêm điều kiện `state` vào `IdentityAccessApi.pageUsableRoleHolders` cùng một câu join `policy_acknowledgements` qua facade.
+
 ## Optional và việc để lại
 
-- (chưa có)
+- Báo cáo xác nhận chưa có tổng `done`/`pending` toàn tập (cần join chéo module); thêm khi FE đòi.
+- `GET /policies/{code}` cho phiên bản cũ trả `myAcknowledgement = null` (chỉ bản hiện hành có trạng thái).
+- Mã thông báo cũ `BUDGET_DEPARTMENT_CEILING_PUBLISHED` giữ (đọc được hàng cũ) — BG-1.3 chỉ ngừng phát.
 
 ## Seed cần cho Z2
 
@@ -38,4 +52,4 @@
 
 ## Dừng ở đâu
 
-- Đang làm PL-1.3.
+- Xong PL-1.1–PL-1.4 và gate cuối PL-1 (chưa PL-1.5: nạp 8 chính sách). Việc tiếp: PL-1.5 → PL-3 → PF-1 → BG-1 → BG-2.
