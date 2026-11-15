@@ -1,9 +1,11 @@
 import { Injectable } from '@nestjs/common';
-import { fromDateColumn, toDateColumn, type BusinessDate } from '../../../core/business-date';
+import { toDateColumn, type BusinessDate } from '../../../core/business-date';
 import { Prisma } from '../../../generated/prisma/client';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
-import type { RuleSubscription, StockPlanFilter, StockPlanPage } from '../public/catalog.types';
+import type { PoolSubscription, RuleSubscription, StockPlanFilter, StockPlanPage } from '../public/catalog.types';
+import { orderBySourcePreference, withoutPeriodsAhead } from './pool/subscription-pool.policy';
+import { withPriceSource } from './subscription-priced.repo';
 
 /**
  * A period a seat can still be taken from on `today` as far as its successor goes (`BR-MF1-09a`): no later period continues it, or the one
@@ -16,34 +18,66 @@ export const notTakenOverOn = (today: BusinessDate): Prisma.SubscriptionWhereInp
   ],
 });
 
-/**
- * Leaves out of `rows`, the subscriptions that grant seats on `today`, every period recorded ahead of its start whose previous period is among
- * them. The period that runs and the next one are one pool: the seats carried to the next period are the seats of the one that runs, and the
- * next adds none that can be given before it runs, so the pool counts them once (`QĐ-111n`: seats are counted, never subscription records).
- * A next period whose previous one is not in `rows` (it is over, or another IT Admin answers for it) stays: the pool lives on it. One reading
- * for the stock of a grant, the stock summary and the rules of wasted seats.
- */
-export function withoutPeriodsAhead<T extends { id: string; renewedFromId: string | null; startDate: Date | null }>(
-  rows: readonly T[],
-  today: BusinessDate,
-): T[] {
-  const ids = new Set(rows.map((row) => row.id));
-
-  return rows.filter(
-    (row) =>
-      !(
-        row.renewedFromId !== null &&
-        ids.has(row.renewedFromId) &&
-        row.startDate !== null &&
-        fromDateColumn(row.startDate) > today
-      ),
-  );
-}
-
 /** Reads which subscriptions grant seats on a day, the way the shared pool reads it: what the rules of wasted seats judge. */
 @Injectable()
 export class SubscriptionGrantingRepo {
   constructor(private readonly prisma: PrismaService) {}
+
+  /** The subscriptions of one plan a seat can be taken from on `today`, in the order a grant takes them (see `findGrantableOfPlans`). */
+  async findGrantableOfPlan(planId: string, today: BusinessDate, tx?: DbTx) {
+    return (await this.findGrantableOfPlans([planId], today, tx)).get(planId) ?? [];
+  }
+
+  /**
+   * The same for many plans in one read, by plan (a plan with none is absent). A draft is left out (its seats cannot be granted), and so is
+   * a subscription whose period already ended or that a later period has taken over (active and started: `notTakenOverOn`); a period
+   * recorded ahead of its start is left out while the one it continues is in (`withoutPeriodsAhead`: one pool, its seats counted once).
+   * Per plan the primary subscription comes first, then the one that
+   * would price the plan: the order a grant with no subscription named takes them.
+   */
+  async findGrantableOfPlans(
+    planIds: readonly string[],
+    today: BusinessDate,
+    tx?: DbTx,
+  ): Promise<Map<string, PoolSubscription[]>> {
+    const grantable = new Map<string, PoolSubscription[]>();
+    if (planIds.length === 0) return grantable;
+    const rows = await (tx ?? this.prisma).subscription.findMany({
+      where: {
+        planId: { in: [...planIds] },
+        status: 'ACTIVE',
+        AND: [notTakenOverOn(today), { OR: [{ endDate: null }, { endDate: { gte: toDateColumn(today) } }] }],
+      },
+      select: {
+        id: true,
+        planId: true,
+        purchasedQuantity: true,
+        startDate: true,
+        renewedFromId: true,
+        isPrimaryForPlan: true,
+        unitPriceMinor: true,
+        priceReportingMinor: true,
+        billingCycle: true,
+      },
+    });
+    type Source = ReturnType<typeof withPriceSource<(typeof rows)[number]>>;
+    const byPlan = new Map<string, Source[]>();
+    for (const row of withoutPeriodsAhead(rows, today)) {
+      byPlan.set(row.planId, [...(byPlan.get(row.planId) ?? []), withPriceSource(row)]);
+    }
+    for (const [planId, sources] of byPlan) {
+      grantable.set(
+        planId,
+        orderBySourcePreference(sources).map((row) => ({
+          subscriptionId: row.id,
+          purchasedQuantity: row.purchasedQuantity,
+          isPrimaryForPlan: row.isPrimaryForPlan,
+        })),
+      );
+    }
+
+    return grantable;
+  }
 
   /** Which of these subscriptions a later period continues (`renewed_from_id`): they are no longer the period that runs. One statement. */
   async idsWithSuccessor(ids: readonly string[]): Promise<ReadonlySet<string>> {

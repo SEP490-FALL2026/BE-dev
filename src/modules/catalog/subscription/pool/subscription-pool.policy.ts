@@ -1,3 +1,4 @@
+import { fromDateColumn, type BusinessDate } from '../../../../core/business-date';
 import {
   SubscriptionBillingCycleUnsupportedError,
   SubscriptionBillingLongerThanCommitmentError,
@@ -254,4 +255,28 @@ export function liveSiblingsOf(live: ReadonlyMap<string, readonly string[]>, pla
 /** Only the plans whose seats are one pool (K2 workspaces and K4 keys) have the rule against a second subscription. */
 export function isPooledPlan(type: ProvisioningType): boolean {
   return type === 'K2' || type === 'K4';
+}
+
+/**
+ * Leaves out of `rows`, the subscriptions that grant seats on `today`, every period recorded ahead of its start whose previous period is among
+ * them. The period that runs and the next one are one pool: the seats carried to the next period are the seats of the one that runs, and the
+ * next adds none that can be given before it runs, so the pool counts them once (`QĐ-111n`: seats are counted, never subscription records).
+ * A next period whose previous one is not in `rows` (it is over, or another IT Admin answers for it) stays: the pool lives on it. One reading
+ * for the stock of a grant, the stock summary and the rules of wasted seats.
+ */
+export function withoutPeriodsAhead<T extends { id: string; renewedFromId: string | null; startDate: Date | null }>(
+  rows: readonly T[],
+  today: BusinessDate,
+): T[] {
+  const ids = new Set(rows.map((row) => row.id));
+
+  return rows.filter(
+    (row) =>
+      !(
+        row.renewedFromId !== null &&
+        ids.has(row.renewedFromId) &&
+        row.startDate !== null &&
+        fromDateColumn(row.startDate) > today
+      ),
+  );
 }

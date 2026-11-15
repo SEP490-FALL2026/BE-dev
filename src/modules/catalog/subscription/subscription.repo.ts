@@ -4,10 +4,9 @@ import { formatRate, parseRate } from '../../../core/money/rate';
 import { Prisma } from '../../../generated/prisma/client';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
-import type { BaselineSubscription, PoolSubscription } from '../public/catalog.types';
-import { orderBySourcePreference, pickPriceSource, type LivenessFacts } from './pool/subscription-pool.policy';
+import type { BaselineSubscription } from '../public/catalog.types';
+import { pickPriceSource, type LivenessFacts } from './pool/subscription-pool.policy';
 import { livePricedOf, PLAN_KIND, PRICE_FIELDS, pricedOn, withPriceSource } from './subscription-priced.repo';
-import { notTakenOverOn, withoutPeriodsAhead } from './subscription-granting.repo';
 import type {
   NewSubscription,
   OriginalPriceRecord,
@@ -288,62 +287,6 @@ export class SubscriptionRepo {
       endDate: date(row.endDate),
       renewed: false,
     }));
-  }
-
-  /** The subscriptions of one plan a seat can be taken from on `today`, in the order a grant takes them (see `findGrantableOfPlans`). */
-  async findGrantableOfPlan(planId: string, today: BusinessDate, tx?: DbTx) {
-    return (await this.findGrantableOfPlans([planId], today, tx)).get(planId) ?? [];
-  }
-
-  /**
-   * The same for many plans in one read, by plan (a plan with none is absent). A draft is left out (its seats cannot be granted), and so is
-   * a subscription whose period already ended or that a later period has taken over (active and started: `notTakenOverOn`); a period
-   * recorded ahead of its start is left out while the one it continues is in (`withoutPeriodsAhead`: one pool, its seats counted once).
-   * Per plan the primary subscription comes first, then the one that
-   * would price the plan: the order a grant with no subscription named takes them.
-   */
-  async findGrantableOfPlans(
-    planIds: readonly string[],
-    today: BusinessDate,
-    tx?: DbTx,
-  ): Promise<Map<string, PoolSubscription[]>> {
-    const grantable = new Map<string, PoolSubscription[]>();
-    if (planIds.length === 0) return grantable;
-    const rows = await (tx ?? this.prisma).subscription.findMany({
-      where: {
-        planId: { in: [...planIds] },
-        status: 'ACTIVE',
-        AND: [notTakenOverOn(today), { OR: [{ endDate: null }, { endDate: { gte: toDateColumn(today) } }] }],
-      },
-      select: {
-        id: true,
-        planId: true,
-        purchasedQuantity: true,
-        startDate: true,
-        renewedFromId: true,
-        isPrimaryForPlan: true,
-        unitPriceMinor: true,
-        priceReportingMinor: true,
-        billingCycle: true,
-      },
-    });
-    type Source = ReturnType<typeof withPriceSource<(typeof rows)[number]>>;
-    const byPlan = new Map<string, Source[]>();
-    for (const row of withoutPeriodsAhead(rows, today)) {
-      byPlan.set(row.planId, [...(byPlan.get(row.planId) ?? []), withPriceSource(row)]);
-    }
-    for (const [planId, sources] of byPlan) {
-      grantable.set(
-        planId,
-        orderBySourcePreference(sources).map((row) => ({
-          subscriptionId: row.id,
-          purchasedQuantity: row.purchasedQuantity,
-          isPrimaryForPlan: row.isPrimaryForPlan,
-        })),
-      );
-    }
-
-    return grantable;
   }
 
   /**

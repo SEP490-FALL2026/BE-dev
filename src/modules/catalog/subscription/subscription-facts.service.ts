@@ -64,12 +64,12 @@ export class SubscriptionFactsService {
 
   /** The subscriptions of a plan a seat can be taken from today (the shared pool of the plan). */
   grantableOfPlan(planId: string, today: BusinessDate, tx?: DbTx) {
-    return this.subscriptions.findGrantableOfPlan(planId, today, tx);
+    return this.granting.findGrantableOfPlan(planId, today, tx);
   }
 
   /** The subscriptions a seat can be taken from today for many plans, in one read, by plan, each in the order a grant takes them. */
   grantableOfPlans(planIds: readonly string[], today: BusinessDate, tx?: DbTx) {
-    return this.subscriptions.findGrantableOfPlans(planIds, today, tx);
+    return this.granting.findGrantableOfPlans(planIds, today, tx);
   }
 
   /** One page of the plans that give out seats, keys or personal accounts, each with the subscriptions a seat can be taken from today (see `CatalogApi.getStockPlans`). */
