@@ -45,13 +45,13 @@ flowchart BT
   ai_assist -->|2| operating_parameters
   ai_assist -->|4| organization
   ai_assist -->|4| requests
-  budgets -->|20| audit
+  budgets -->|21| audit
   budgets -->|8| catalog
   budgets -->|2| finance
   budgets -->|5| identity_access
   budgets -->|5| licensing
-  budgets -->|7| notifications
-  budgets -->|3| operating_parameters
+  budgets -->|9| notifications
+  budgets -->|4| operating_parameters
   budgets -->|23| organization
   budgets -->|4| policies
   catalog -->|23| audit

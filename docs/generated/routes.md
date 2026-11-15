@@ -288,6 +288,7 @@ Find a route, open its controller, then the service it calls. Module of a file =
 | POST | `/budget-review-periods` | [budgets/review/budget-review.controller.ts](../../src/modules/budgets/review/budget-review.controller.ts) → `close` | [BudgetReviewSnapshotService](../../src/modules/budgets/review/budget-review-snapshot.service.ts) |
 | GET | `/budget-review-periods` | [budgets/review/budget-review.controller.ts](../../src/modules/budgets/review/budget-review.controller.ts) → `list` | [BudgetReviewQueryService](../../src/modules/budgets/review/budget-review-query.service.ts) |
 | GET | `/budget-review-periods/{id}` | [budgets/review/budget-review.controller.ts](../../src/modules/budgets/review/budget-review.controller.ts) → `get` | [BudgetReviewQueryService](../../src/modules/budgets/review/budget-review-query.service.ts) |
+| POST | `/budget-review-periods/{id}/signature` | [budgets/review/budget-review.controller.ts](../../src/modules/budgets/review/budget-review.controller.ts) → `sign` | [BudgetReviewSignatureService](../../src/modules/budgets/review/budget-review-signature.service.ts) |
 | POST | `/monitoring-notice-versions` | [devices/notice/notice.controller.ts](../../src/modules/devices/notice/notice.controller.ts) → `publish` | [NoticeService](../../src/modules/devices/notice/notice.service.ts) |
 | GET | `/monitoring-notices/current` | [devices/notice/notice.controller.ts](../../src/modules/devices/notice/notice.controller.ts) → `current` | [NoticeService](../../src/modules/devices/notice/notice.service.ts) |
 | POST | `/devices` | [devices/registry/registry.controller.ts](../../src/modules/devices/registry/registry.controller.ts) → `create` | [RegistryQueryService](../../src/modules/devices/registry/registry-query.service.ts), [RegistryService](../../src/modules/devices/registry/registry.service.ts) |
@@ -424,4 +425,4 @@ Find a route, open its controller, then the service it calls. Module of a file =
 | GET | `/dashboards/super-admin` | [dashboards/super-admin/super-admin-dashboard.controller.ts](../../src/modules/dashboards/super-admin/super-admin-dashboard.controller.ts) → `get` | [SuperAdminDashboardService](../../src/modules/dashboards/super-admin/super-admin-dashboard.service.ts) |
 | GET | `/reports/revocation-sla` | [dashboards/revocation-sla/revocation-sla.controller.ts](../../src/modules/dashboards/revocation-sla/revocation-sla.controller.ts) → `get` | [RevocationSlaQueryService](../../src/modules/dashboards/revocation-sla/revocation-sla-query.service.ts) |
 
-418 operations.
+419 operations.
