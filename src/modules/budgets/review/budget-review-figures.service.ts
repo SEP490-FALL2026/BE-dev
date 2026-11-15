@@ -33,6 +33,11 @@ export class BudgetReviewFiguresService {
     return (await this.seatMonths.yearTotals(year)).companyMinor;
   }
 
+  /** Whether any Cost Center has an effective budget of the year in `currency`: when none has there is nothing to review (`RV1-09`). */
+  async hasBudget(year: number, currency: string): Promise<boolean> {
+    return [...(await this.budgets.approvedOfYear(year)).values()].some((budget) => budget.currency === currency);
+  }
+
   /** The lines of the Cost Centers with a budget in `currency`, in order of id. A Cost Center with no budget has nothing to compare and no line. */
   async linesOf(tx: DbTx, year: number, month: number, currency: string): Promise<NewReviewLine[]> {
     const approved = [...(await this.budgets.approvedOfYear(year, tx))]

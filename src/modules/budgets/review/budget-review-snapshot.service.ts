@@ -12,6 +12,7 @@ import type { ReviewPeriodWire } from './budget-review.dto';
 import {
   BudgetReviewExistsError,
   BudgetReviewMonthNotEndedError,
+  BudgetReviewNoBudgetError,
   BudgetReviewSeatMonthsError,
 } from './budget-review.errors';
 import { reviewKindOf, reviewedMonthHasEnded } from './budget-review.policy';
@@ -46,7 +47,7 @@ export class BudgetReviewSnapshotService {
     private readonly query: BudgetReviewQueryService,
   ) {}
 
-  /** Throws BudgetReviewMonthNotEndedError, BudgetReviewExistsError, BudgetReviewSeatMonthsError. */
+  /** Throws BudgetReviewMonthNotEndedError, BudgetReviewExistsError, BudgetReviewNoBudgetError, BudgetReviewSeatMonthsError. */
   async close(
     actor: AuthenticatedPrincipal,
     body: { year: number; month: number },
@@ -61,9 +62,10 @@ export class BudgetReviewSnapshotService {
     if (await this.repo.findByMonth(organizationId, body.year, body.month)) {
       throw new BudgetReviewExistsError(body.year, body.month);
     }
+    const currency = await this.facts.reportingCurrency();
+    if (!(await this.figures.hasBudget(body.year, currency))) throw new BudgetReviewNoBudgetError(body.year);
     await this.chargeSeatMonths(body, now);
-    const [currency, pool, companyMinor] = await Promise.all([
-      this.facts.reportingCurrency(),
+    const [pool, companyMinor] = await Promise.all([
       this.poolWatch.figuresOf(organizationId, body.year, body.month),
       this.figures.companySpentMinor(body.year),
     ]);

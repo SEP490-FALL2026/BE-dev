@@ -5,6 +5,7 @@ import { toBudgetApiException } from '../budget/budget.http-errors';
 import {
   BudgetReviewExistsError,
   BudgetReviewMonthNotEndedError,
+  BudgetReviewNoBudgetError,
   BudgetReviewNotFoundError,
   BudgetReviewSeatMonthsError,
   BudgetReviewSignedError,
@@ -26,6 +27,11 @@ export function toBudgetReviewApiException(error: unknown): unknown {
     return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'BUDGET_REVIEW.MONTH_NOT_ENDED', error.message, {
       year: error.year,
       month: error.month,
+    });
+  }
+  if (error instanceof BudgetReviewNoBudgetError) {
+    return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'BUDGET_REVIEW.NO_BUDGET_FOR_YEAR', error.message, {
+      year: error.year,
     });
   }
   if (error instanceof BudgetReviewExistsError) {
@@ -50,6 +56,7 @@ const example = (error: Error) => errorExampleOf(toBudgetReviewApiException(erro
 export const BUDGET_REVIEW_ERROR_EXAMPLES = {
   NOT_FOUND: example(new BudgetReviewNotFoundError()),
   MONTH_NOT_ENDED: example(new BudgetReviewMonthNotEndedError(2026, 11)),
+  NO_BUDGET_FOR_YEAR: example(new BudgetReviewNoBudgetError(2025)),
   PERIOD_EXISTS: example(new BudgetReviewExistsError(2026, 10)),
   ALREADY_SIGNED: example(new BudgetReviewSignedError()),
   SEAT_MONTHS_NOT_READY: example(new BudgetReviewSeatMonthsError()),

@@ -20,6 +20,14 @@ export class BudgetReviewExistsError extends Error {
   }
 }
 
+/** The year has no Cost Center with an effective budget: there is nothing to take a picture of, and a period with no line could not be taken back (`RV1-09`). */
+export class BudgetReviewNoBudgetError extends Error {
+  constructor(readonly year: number) {
+    super(`The year ${year} has no effective budget to review.`);
+    this.name = 'BudgetReviewNoBudgetError';
+  }
+}
+
 /** The review period does not exist, or nothing of it is the caller's to read: the two answer alike so one cannot be probed. */
 export class BudgetReviewNotFoundError extends Error {
   constructor() {

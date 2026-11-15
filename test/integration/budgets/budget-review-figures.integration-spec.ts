@@ -242,4 +242,18 @@ describe('The figures of the close of a month are worked out as the documents de
       changedAfterSnapshot: { amount: String(10 * M) },
     });
   });
+
+  it('RV1-09: a month of a year with no effective budget is not closed: 422 and nothing is written, so there is no empty period that cannot be removed', async () => {
+    const refused = await closing({ year: 2020, month: 12 }).expect(422);
+    const list = h.dataOf<{ items: PeriodWire[] }>(
+      await request(h.server())
+        .get('/api/v1/budget-review-periods')
+        .query({ year: 2020 })
+        .set(h.as(h.finance))
+        .expect(200),
+    );
+
+    expect((refused.body as { error: { code: string } }).error.code).toBe('BUDGET_REVIEW.NO_BUDGET_FOR_YEAR');
+    expect(list.items).toEqual([]);
+  });
 });

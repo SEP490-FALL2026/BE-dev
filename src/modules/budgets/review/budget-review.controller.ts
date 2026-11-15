@@ -73,8 +73,8 @@ export class BudgetReviewController {
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
-        'The body is invalid (VALIDATION_ERROR), or the month has not ended (BUDGET_REVIEW.MONTH_NOT_ENDED).',
-      examples: [VALIDATION_EXAMPLE, EXAMPLES.MONTH_NOT_ENDED],
+        'The body is invalid (VALIDATION_ERROR), the month has not ended (BUDGET_REVIEW.MONTH_NOT_ENDED), or the year has no effective budget to review (BUDGET_REVIEW.NO_BUDGET_FOR_YEAR).',
+      examples: [VALIDATION_EXAMPLE, EXAMPLES.MONTH_NOT_ENDED, EXAMPLES.NO_BUDGET_FOR_YEAR],
     },
   )
   async close(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Body() body: CreateReviewPeriodBodyDto) {
