@@ -136,6 +136,13 @@ describe('the routes of purchase invoices (e2e, no database)', () => {
     ['a currency on the dong amount', { netAmount: { amount: '1', currency: 'VND' } }],
     ['a currency of two letters', { unitPriceOriginal: { amount: '15', currency: 'US' } }],
     ['a blank number', { vendorInvoiceNumber: '   ' }],
+    ['a number of 65 characters', { vendorInvoiceNumber: 'x'.repeat(65) }],
+    ['no date', { issuedOn: undefined }],
+    ['a date that does not exist', { issuedOn: '2026-02-30' }],
+    ['no price', { netAmount: undefined }],
+    ['an amount that is not text', { netAmount: { amount: 100 } }],
+    ['a currency on the tax', { deductibleTax: { amount: '1', currency: 'VND' } }],
+    ['a currency on the tax that cannot be deducted', { nonDeductibleTax: { amount: '1', currency: 'VND' } }],
     ['a field the form does not have', { departmentId: ID }],
   ])('refuses a submission with %s with 422', async (_name, over) => {
     const response = await request(app.getHttpServer())
