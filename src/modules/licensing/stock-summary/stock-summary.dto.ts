@@ -43,11 +43,10 @@ const stockSchema = z.discriminatedUnion('kind', [
   }),
   z.strictObject({
     kind: z.literal('KEYS'),
-    inStore: z
-      .number()
-      .int()
-      .nonnegative()
-      .meta({ description: 'The keys in the store that were not withdrawn: free to give.' }),
+    inStore: z.number().int().nonnegative().meta({
+      description:
+        'The keys in the store that were not withdrawn. A grant still in progress has not taken its key yet, so this is not the number of keys a grant can still take.',
+    }),
     assigned: z.number().int().nonnegative().meta({ description: 'The keys given to a seat.' }),
     withdrawn: z
       .number()
