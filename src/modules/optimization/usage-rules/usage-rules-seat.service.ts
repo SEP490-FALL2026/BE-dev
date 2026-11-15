@@ -155,16 +155,17 @@ export class UsageRulesSeatService {
   private async conclude(c: SeatCase, existing: GhostSeatRecord | null, finding: Finding): Promise<SeatOutcome> {
     const tier = finding.assessment.tier;
     const open = await this.record(c, null, tier ? 'INACTIVE' : 'ACTIVE', finding.assessment);
-    if (tier === null || tier === 'MONITOR') return this.watchOnly(c, existing, open);
+    if (tier === null) return this.activeAgain(c, existing, open);
 
     return existing ? this.keepExisting(c, existing, finding, open) : this.create(c, finding, open);
   }
 
   /**
-   * The watch tier (30 to 59 days) is shown on the board of the IT Admin only (`FR-4.12`): the state of the seat says it, and it is never a
-   * recommendation. A watch made before that is still undecided closes (`OUT_OF_SCOPE`), so it holds no place at gate 8 and counts nowhere.
+   * The seat has no inactivity worth a tier (under the watch threshold): the state of the seat says it. A watch of the IT Admin alone (the watch tier,
+   * 30 to 59 days, is a `MONITOR` row that no head is asked about: `FR-4.12`, `BR-MF5-01`, `QĐ-111ay`) that is still undecided closes (`OUT_OF_SCOPE`)
+   * when the seat is no longer inactive, so it holds no place at gate 8 and counts nowhere.
    */
-  private async watchOnly(c: SeatCase, existing: GhostSeatRecord | null, open: SeatOutcome): Promise<SeatOutcome> {
+  private async activeAgain(c: SeatCase, existing: GhostSeatRecord | null, open: SeatOutcome): Promise<SeatOutcome> {
     if (existing?.tier === 'MONITOR' && UNDECIDED_STATES.includes(existing.state)) {
       await this.ghostSeats.close(c.tx, existing, 'OUT_OF_SCOPE', SYSTEM, c.run.now);
       c.run.tally.closed();
