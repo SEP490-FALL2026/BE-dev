@@ -11,6 +11,7 @@ import {
   BudgetYearEndedError,
 } from '../budget/budget.errors';
 import { annualCheck, isEditable, versionAttachmentMissing, yearHasEnded } from '../budget/budget.policy';
+import { BudgetFactsRepo } from '../budget/budget-facts.repo';
 import { BudgetFactsService } from '../budget/budget-facts.service';
 import { VersionRepo, type VersionRecord } from '../budget/version.repo';
 import { cycleAcceptsWork } from '../cycle/cycle.policy';
@@ -28,6 +29,7 @@ export class VersionAccessService {
     private readonly versions: VersionRepo,
     private readonly facts: BudgetFactsService,
     private readonly cycles: CycleRepo,
+    private readonly budgetFacts: BudgetFactsRepo,
   ) {}
 
   /** Only Finance changes a version. */
@@ -97,7 +99,7 @@ export class VersionAccessService {
   async requireWithinAnnualCeiling(tx: DbTx, cycle: CycleRecord | null, version: VersionRecord): Promise<void> {
     if (cycle === null) return;
     const availableMinor = cycle.annualCeilingMinor - (cycle.sharedPoolReserveMinor ?? 0n);
-    const counted = await this.versions.countedInYear(version.organizationId, version.year, tx);
+    const counted = await this.countedWithAdjustments(tx, version);
     const verdict = annualCheck({
       cycleCurrency: cycle.currency,
       availableMinor,
@@ -106,5 +108,22 @@ export class VersionAccessService {
     });
     if (verdict.kind === 'CURRENCY') throw new BudgetCycleCurrencyMismatchError(cycle.currency, verdict.currency);
     if (verdict.kind === 'OVER') throw new BudgetOverAnnualCeilingError(verdict.gapMinor, availableMinor);
+  }
+
+  /**
+   * The versions that count towards the ceiling, the approved ones with the adjustments approved for them (`AD-1`, `QĐ-111ag`): what the Cost Centers hold together is
+   * what the ceiling is checked against, and an adjustment moves money between them without leaving the ceiling.
+   */
+  private async countedWithAdjustments(tx: DbTx, version: VersionRecord): Promise<VersionRecord[]> {
+    const counted = await this.versions.countedInYear(version.organizationId, version.year, tx);
+    const approved = new Map<string, string>();
+    for (const one of counted) if (one.state === 'APPROVED') approved.set(one.costCenterId, one.id);
+    const deltas = await this.budgetFacts.adjustmentsOf(version.year, approved, tx);
+
+    return counted.map((one) =>
+      one.state === 'APPROVED' && deltas.has(one.costCenterId)
+        ? { ...one, baseMinor: one.baseMinor + (deltas.get(one.costCenterId) as bigint) }
+        : one,
+    );
   }
 }

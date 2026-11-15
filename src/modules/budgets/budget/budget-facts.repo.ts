@@ -105,6 +105,11 @@ export class BudgetFactsRepo {
     return total;
   }
 
+  /** What the approved adjustments of the year added to the base of each Cost Center, given the version each reads as its budget (`AD-1`): what a version that is sent is added up with. */
+  adjustmentsOf(year: number, versionIdOf: ReadonlyMap<string, string>, tx?: DbTx): Promise<Map<string, bigint>> {
+    return this.deltasOf(tx ?? this.prisma, year, undefined, versionIdOf);
+  }
+
   private async effectiveOf(
     where: Prisma.BudgetVersionWhereInput,
     year: number,

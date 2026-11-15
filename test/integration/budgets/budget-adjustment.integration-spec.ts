@@ -291,6 +291,16 @@ describe('Finance asks for an adjustment of the budget and the spending approver
     expect(await ceilingOf()).toBe(ceiling - BigInt(9 * M));
   });
 
+  it('what an adjustment moved is counted when a version is sent: with nothing left after an approved supplement, a version of another Cost Center is over the annual ceiling', async () => {
+    await ceilingLeaving(10);
+    const asked = await made(supplement(sales, 10));
+    await decide(asked.id, { decision: 'APPROVE' }).expect(200);
+    const another = await h.departmentWithHead('P-AD1X');
+
+    await expect(h.budgetFor(another, { total: 5 * M })).rejects.toBeDefined();
+    expect(await facts(another)).toBeUndefined();
+  });
+
   it('is read by Finance and the spending approver in full, by the manager of a department for the Cost Centers of their own, with the filters and the pages', async () => {
     const read = async (account: Parameters<typeof h.as>[0], query: Record<string, unknown> = {}) =>
       h.dataOf<PageWire>(
