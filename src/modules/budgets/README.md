@@ -53,6 +53,7 @@ audit, notifications. Được dùng bởi: requests; gốc `src/app/app.module.
   `proposal/budget-head-change.listener.ts`; `organization.cost-center-use-readers` (`budgets.commitments`) —
   `commitment/budget-cost-center-use.listener.ts`. Năm ngân sách là năm dương lịch: không còn tham số tháng bắt đầu
   năm tài chính, không còn extension point khóa tham số (`QĐ-104e`(1)).
+- Đăng ký vào (thêm): `proposal/budget-proposal-template.listener.ts` góp biểu mẫu `BM-10` vào `ImportTemplateContributions` của `policies` (file mẫu `budget-proposal`, không parse).
 
 ## Capability và file chính
 

@@ -81,6 +81,8 @@ import { BudgetAttachmentQueryService } from './attachment/budget-attachment-que
 import { BudgetAttachmentLinkService } from './attachment/budget-attachment-link.service';
 import { BudgetAttachmentExpiryService } from './attachment/budget-attachment-expiry.service';
 import { BudgetAttachmentExpirySweeper } from './attachment/budget-attachment-expiry.job';
+import { PoliciesTemplateFacadeModule } from '../policies/policies-template-facade.module';
+import { BudgetProposalTemplateListener } from './proposal/budget-proposal-template.listener';
 
 /**
  * The budgets context (C5, ADR-0016): the proposals the heads of department send for a Cost Center and a fiscal year, and
@@ -93,6 +95,7 @@ import { BudgetAttachmentExpirySweeper } from './attachment/budget-attachment-ex
  */
 @Module({
   imports: [
+    PoliciesTemplateFacadeModule,
     BudgetsReadFacadeModule,
     DatabaseModule,
     AuditModule,
@@ -117,6 +120,7 @@ import { BudgetAttachmentExpirySweeper } from './attachment/budget-attachment-ex
     BudgetAttachmentReadsController,
   ],
   providers: [
+    BudgetProposalTemplateListener,
     ProposalRepo,
     VersionRepo,
     VersionLineRepo,

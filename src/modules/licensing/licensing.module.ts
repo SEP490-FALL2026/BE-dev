@@ -146,6 +146,8 @@ import { RenewalViewService } from './subscription-renewal/subscription-renewal-
 import { SubscriptionRenewalSweeper } from './subscription-renewal/subscription-renewal.job';
 import { SubscriptionRenewalRepo } from './subscription-renewal/subscription-renewal.repo';
 import { SubscriptionRenewalsController } from './subscription-renewal/subscription-renewals.controller';
+import { PoliciesTemplateFacadeModule } from '../policies/policies-template-facade.module';
+import { LicenseKeyTemplateListener } from './license-key/license-key-template.listener';
 
 /**
  * The licensing context (C3, ADR-0013): the assignments of seats, the closing of the seat baseline, the queue of
@@ -156,6 +158,7 @@ import { SubscriptionRenewalsController } from './subscription-renewal/subscript
  */
 @Module({
   imports: [
+    PoliciesTemplateFacadeModule,
     DatabaseModule,
     AuditModule,
     OrganizationModule,
@@ -183,6 +186,7 @@ import { SubscriptionRenewalsController } from './subscription-renewal/subscript
     StockSummaryController,
   ],
   providers: [
+    LicenseKeyTemplateListener,
     LicensingAlerts,
     AssignmentRepo,
     AssignmentRevocationRepo,

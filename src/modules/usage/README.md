@@ -87,6 +87,7 @@ qua ánh xạ còn hiệu lực lúc đọc, nên sửa ánh xạ sai là đủ 
 - Đăng ký vào `devices.collector-allowlist` (`CollectorAllowlistHook`) — `allowlist/allowlist-session.listener.ts`: `GET /device-session` có
   `allowlist: { version, entries }`.
 - Mở `UsageImportListeners` (xem Public API).
+- Đăng ký vào (thêm): `vendor-import/vendor-import-template.listener.ts` góp định nghĩa cột của báo cáo usage vào `ImportTemplateContributions` của `policies` (file mẫu `usage-csv`).
 
 ## Chưa làm
 

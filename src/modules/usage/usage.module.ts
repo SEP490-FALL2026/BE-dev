@@ -56,6 +56,8 @@ import { ToolStatusController } from './tool-status/tool-status.controller';
 import { ToolStatusQueryService } from './tool-status/tool-status-query.service';
 import { ToolStatusRepo } from './tool-status/tool-status.repo';
 import { ToolStatusSnapshotService } from './tool-status/tool-status-snapshot.service';
+import { PoliciesTemplateFacadeModule } from '../policies/policies-template-facade.module';
+import { VendorImportTemplateListener } from './vendor-import/vendor-import-template.listener';
 
 /**
  * What the collectors on company machines send and what is read of it (`G7`): the allowlist of tools, the days an AI tool was used,
@@ -64,6 +66,7 @@ import { ToolStatusSnapshotService } from './tool-status/tool-status-snapshot.se
  */
 @Module({
   imports: [
+    PoliciesTemplateFacadeModule,
     DatabaseModule,
     AuditModule,
     OrganizationModule,
@@ -86,6 +89,7 @@ import { ToolStatusSnapshotService } from './tool-status/tool-status-snapshot.se
     UsageEmployeeController,
   ],
   providers: [
+    VendorImportTemplateListener,
     AllowlistRepo,
     AllowlistFactsService,
     AllowlistPublishService,
