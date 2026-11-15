@@ -23,8 +23,8 @@ interface Seats {
 describe('the stock of a plan with several subscriptions, over HTTP (integration, real PostgreSQL)', () => {
   let itTwo: string;
   let itTwoAccount: ApiAccount;
-  const plans = { ahead: '', takenOver: '', draft: '', answered: '' };
-  const subs = { ahead: ['', ''], takenOver: ['', ''], draft: ['', ''], answered: ['', ''] };
+  const plans = { ahead: '', ended: '', takenOver: '', draft: '', answered: '' };
+  const subs = { ahead: ['', ''], ended: ['', ''], takenOver: ['', ''], draft: ['', ''], answered: ['', ''] };
 
   const stockOf = async (
     planId: string,
@@ -66,6 +66,9 @@ describe('the stock of a plan with several subscriptions, over HTTP (integration
 
     // The next period begins in thirty days: the seats are carried to it, so they are on both periods until it runs.
     [plans.ahead, subs.ahead[0], subs.ahead[1]] = await withNextPeriod('ACTIVE', h.inDays(30));
+    // The period that ran is over and the next begins in five days: only the next is counted, the period that ran is no longer grantable.
+    [plans.ended, subs.ended[0], subs.ended[1]] = await withNextPeriod('ACTIVE', h.inDays(5));
+    await h.ctx.sql.query(`UPDATE subscriptions SET end_date = $2::date WHERE id = $1`, [subs.ended[0], h.inDays(-1)]);
     // The next period begins today: it has taken the plan over, the period that ran is not counted any more.
     [plans.takenOver, subs.takenOver[0], subs.takenOver[1]] = await withNextPeriod('ACTIVE', h.today());
     // The next period is still a draft: only the period that runs is counted.
@@ -83,19 +86,24 @@ describe('the stock of a plan with several subscriptions, over HTTP (integration
   });
 
   describe('the period that runs and the next one recorded ahead of its start', () => {
-    it('adds the two while the next has not begun: the seats carried to it are on both, one pool as the queue of grants counts it', async () => {
-      expect(await stockOf(plans.ahead)).toEqual({ kind: 'SEATS', purchased: 20, assigned: 8, free: 12, revoking: 0 });
+    it('counts the seats once while the next has not begun: the seats carried to it are the same seats, and it adds none that can be given today', async () => {
+      expect(await stockOf(plans.ahead)).toEqual({ kind: 'SEATS', purchased: 10, assigned: 4, free: 6, revoking: 0 });
     });
 
-    it('is the sum of the seats of the two subscriptions in GET /subscriptions and the stock the queue of grants reads', async () => {
+    it('agrees with the stock the queue of grants reads, while each period in GET /subscriptions still shows its own seats', async () => {
       const rows = await seatsOfRows(plans.ahead);
       const pool = (await h.ctx.app.get(LicensingPoolStockApi).getStockOfPlans([plans.ahead])).get(plans.ahead);
 
       expect(rows.map((row) => row.id).sort()).toEqual([...subs.ahead].sort());
-      expect(rows.reduce((sum, row) => sum + row.purchased, 0)).toBe(20);
-      expect(rows.reduce((sum, row) => sum + row.assigned, 0)).toBe(8);
-      expect(rows.reduce((sum, row) => sum + row.free, 0)).toBe(12);
-      expect(pool).toMatchObject({ kind: 'SEATS', free: 12, inRevocation: 0 });
+      expect(rows.map((row) => [row.purchased, row.assigned, row.free])).toEqual([
+        [10, 4, 6],
+        [10, 4, 6],
+      ]);
+      expect(pool).toMatchObject({ kind: 'SEATS', free: 6, inRevocation: 0 });
+    });
+
+    it('counts the next period when the one it continues is over: the pool lives on it, with the seats carried to it', async () => {
+      expect(await stockOf(plans.ended)).toEqual({ kind: 'SEATS', purchased: 10, assigned: 4, free: 6, revoking: 0 });
     });
 
     it('counts only the next period once it has begun: the period it continues is taken over', async () => {
@@ -114,7 +122,7 @@ describe('the stock of a plan with several subscriptions, over HTTP (integration
   });
 
   describe('mine, with two subscriptions of a plan that two IT Admins answer for', () => {
-    it('counts for each IT Admin only the subscription they answer for, and for nobody in particular both', async () => {
+    it('counts for each IT Admin only the subscription they answer for, and for nobody in particular the seats once', async () => {
       expect(await stockOf(plans.answered, { mine: 'true' })).toEqual({
         kind: 'SEATS',
         purchased: 10,
@@ -129,19 +137,20 @@ describe('the stock of a plan with several subscriptions, over HTTP (integration
         free: 6,
         revoking: 0,
       });
+      // Asked for nobody in particular both periods are in the pool and the next, not begun, adds none: the seats are counted once.
       expect(await stockOf(plans.answered)).toEqual({
         kind: 'SEATS',
-        purchased: 20,
-        assigned: 8,
-        free: 12,
+        purchased: 10,
+        assigned: 4,
+        free: 6,
         revoking: 0,
       });
-      expect(await stockOf(plans.answered, { mine: 'false' }, itTwoAccount)).toMatchObject({ purchased: 20 });
+      expect(await stockOf(plans.answered, { mine: 'false' }, itTwoAccount)).toMatchObject({ purchased: 10, free: 6 });
     });
 
     it('does not list the plan for an IT Admin who answers for none of its subscriptions', async () => {
       expect(await stockOf(plans.ahead, { mine: 'true' }, itTwoAccount)).toBeUndefined();
-      expect(await stockOf(plans.ahead, { mine: 'true' })).toMatchObject({ purchased: 20 });
+      expect(await stockOf(plans.ahead, { mine: 'true' })).toMatchObject({ purchased: 10 });
     });
   });
 });

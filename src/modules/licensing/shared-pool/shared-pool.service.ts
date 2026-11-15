@@ -54,7 +54,8 @@ export class SharedPoolService {
 
   /**
    * What the subscriptions of the plan hold from today on: free seats are the seats bought less the most assignments held on any day from
-   * today on. The period that runs and the next one recorded ahead of its start are one pool (`getGrantableSubscriptions`).
+   * today on. The period that runs and the next one recorded ahead of its start are one pool: the next is not among the subscriptions
+   * (`getGrantableSubscriptions`), its seats being those of the one that runs (`QĐ-111n`).
    */
   async stockOf(
     tx: DbTx,

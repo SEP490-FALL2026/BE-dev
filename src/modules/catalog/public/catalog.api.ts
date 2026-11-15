@@ -153,7 +153,7 @@ export class CatalogApi {
     return this.subscriptions.priceOfPlan(planId, tx, on);
   }
 
-  /** The subscriptions of the plan a seat can be taken from today: the shared pool of the plan (`QĐ-103d`). */
+  /** The subscriptions of the plan a seat can be taken from today: the shared pool of the plan (`QĐ-103d`); a next period recorded ahead of its start is not one while the period it continues is (its seats are carried from it). */
   getGrantableSubscriptions(planId: string, today: BusinessDate, tx?: DbTx): Promise<PoolSubscription[]> {
     return this.subscriptions.grantableOfPlan(planId, today, tx);
   }

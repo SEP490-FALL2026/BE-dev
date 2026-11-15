@@ -7,7 +7,8 @@ const h = new RevocationHarness();
  * G9-01 (`BR-MF1-09a`, `BR-MF1-09b`, F-012), real PostgreSQL: the outcome of a renewal recorded ahead of the next period. Until the next
  * period runs, the period that runs and the next one are one pool, and a seat carried to the next period takes its place from its first
  * day, as the database counts it (`license_assignments_seat_capacity`): an IT Admin can buy when the pool is full, and a next period still
- * a draft leaves the period that runs grantable.
+ * a draft leaves the period that runs grantable. The seats carried to the next period are the seats of the period that runs, so the pool counts them once
+ * (`B2B-02`, `QĐ-111n`).
  */
 describe('G9-01 the shared pool between a renewal recorded and the next period (integration, real PostgreSQL)', () => {
   let counter = 0;
@@ -44,7 +45,21 @@ describe('G9-01 the shared pool between a renewal recorded and the next period (
     });
   });
 
-  it('G9-01 a free seat of the next period is free in the pool even when its seats start later', async () => {
+  it('B2B-02 the seats carried to a next period not started yet are the same seats: ten seats and four people leave six free, not twelve', async () => {
+    const running = await h.subscription(10, 'K2');
+    const planId = await h.planOf(running);
+    for (let index = 0; index < 4; index += 1) await h.seat({ subscriptionId: running }, code());
+    const startsOn = h.inDays(30);
+    const next = await nextPeriod(h, running, 'ACTIVE', startsOn);
+    await carry(h, running, next, startsOn);
+
+    const refused = await h.grant({ requestId: h.gate.grantable(person(), planId), purchase: {} }).expect(409);
+
+    expect(h.codeOf(refused)).toBe('PROVISIONING.PURCHASE_NOT_ALLOWED');
+    expect(h.detailsOf(refused)).toMatchObject({ freeSeats: 6, subscriptionIds: [running] });
+  });
+
+  it('B2B-02 the next period adds no seat to give before it runs: an extra seat it bought is not free today, so a grant that buys is recorded on the period that runs', async () => {
     const running = await h.subscription(1, 'K2');
     const planId = await h.planOf(running);
     await h.seat({ subscriptionId: running }, code());
@@ -53,9 +68,15 @@ describe('G9-01 the shared pool between a renewal recorded and the next period (
     await carry(h, running, next, startsOn);
     await h.ctx.sql.query(`UPDATE subscriptions SET purchased_quantity = 2 WHERE id = $1`, [next]);
 
-    const refused = await h.grant({ requestId: h.gate.grantable(person(), planId), purchase: {} }).expect(409);
-    expect(h.codeOf(refused)).toBe('PROVISIONING.PURCHASE_NOT_ALLOWED');
-    expect(h.detailsOf(refused)).toMatchObject({ freeSeats: 1, subscriptionIds: [next] });
+    const bought = await h.grant({ requestId: h.gate.grantable(person(), planId), purchase: {} }).expect(201);
+
+    const task = h.dataOf<{ task: { assignmentId: string; purchase: { kind: string } | null } }>(bought).task;
+    expect(task.purchase).toMatchObject({ kind: 'POOL_TOP_UP' });
+    const { rows } = await h.ctx.sql.query<{ subscription_id: string }>(
+      `SELECT subscription_id FROM license_assignments WHERE id = $1`,
+      [task.assignmentId],
+    );
+    expect(rows[0].subscription_id).toBe(running);
   });
 
   it('G9-05 a grant that names a period a next period that runs took over is 422 SUBSCRIPTION_NOT_GRANTABLE, and buys nothing on it', async () => {
