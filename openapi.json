@@ -68172,7 +68172,7 @@
             }
           },
           "422": {
-            "description": "The body is invalid (VALIDATION_ERROR), or the month has not ended (BUDGET_REVIEW.MONTH_NOT_ENDED).",
+            "description": "The body is invalid (VALIDATION_ERROR), the month has not ended (BUDGET_REVIEW.MONTH_NOT_ENDED), or the year has no effective budget to review (BUDGET_REVIEW.NO_BUDGET_FOR_YEAR).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -68197,6 +68197,18 @@
                         "code": "BUDGET_REVIEW.MONTH_NOT_ENDED",
                         "message": "The month 11/2026 has not ended.",
                         "details": { "year": 2026, "month": 11 },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "BUDGET_REVIEW.NO_BUDGET_FOR_YEAR": {
+                    "summary": "The year 2025 has no effective budget to review.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "BUDGET_REVIEW.NO_BUDGET_FOR_YEAR",
+                        "message": "The year 2025 has no effective budget to review.",
+                        "details": { "year": 2025 },
                         "requestId": "req_example"
                       }
                     }
@@ -122597,7 +122609,21 @@
                       "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
                       "required": ["amount", "currency"],
                       "additionalProperties": false,
-                      "description": "What the Cost Center spent in the year, the seat-months of the shared pool in it."
+                      "description": "What the Cost Center spent through the end of the month closed, by the month each invoice or seat-month pays for, the seat-months of the shared pool in it."
+                    },
+                    "spentAfterMonth": {
+                      "type": "object",
+                      "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                      "required": ["amount", "currency"],
+                      "additionalProperties": false,
+                      "description": "What was already recorded for the months after the one closed when it was closed: spent, and it took commitments down, so the forecast and what is left count it and the pace does not."
+                    },
+                    "changedAfterSnapshot": {
+                      "type": "object",
+                      "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                      "required": ["amount", "currency"],
+                      "additionalProperties": false,
+                      "description": "What the spent of the month closed is now over what the picture kept: an invoice that came late for a month already closed, or a seat-month charged again. The picture does not move; this is the change after it (negative when something was given back)."
                     },
                     "committed": {
                       "type": "object",
@@ -122618,13 +122644,13 @@
                       "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
                       "required": ["amount", "currency"],
                       "additionalProperties": false,
-                      "description": "The budget (base and reserve) less spent, held and waiting; negative when it is over."
+                      "description": "The budget (base and reserve) less spent, spent after the month, held and waiting; negative when it is over."
                     },
                     "variancePpm": {
                       "type": "integer",
                       "minimum": -9007199254740991,
                       "maximum": 9007199254740991,
-                      "description": "The difference k of the invoices of the year since 01/01, in millionths: what they cost over their price before tax, less one; 0 with no invoice."
+                      "description": "The difference k of the invoices of the commitments since 01/01, in millionths: what they cost (price, exchange rate, card fee and the tax that cannot be deducted) over the price in the commitment, less one; 0 with no such invoice."
                     },
                     "priceIncrease": {
                       "type": "object",
@@ -122638,13 +122664,13 @@
                       "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
                       "required": ["amount", "currency"],
                       "additionalProperties": false,
-                      "description": "The forecast of the end of the year: spent + (held + waiting) x (1 + k) + price increase already known."
+                      "description": "The forecast of the end of the year: spent + spent after the month + (held + waiting) x (1 + k) + price increase already known."
                     },
                     "paceBasisPoints": {
                       "type": "integer",
                       "minimum": -9007199254740991,
                       "maximum": 9007199254740991,
-                      "description": "The spent over the base of the months gone, in hundredths of a percent (11.200 is 112 %), rounded up; null when the Cost Center has no base.",
+                      "description": "The spent through the end of the month over the base of the months gone, in hundredths of a percent (11.200 is 112 %), rounded up; null when the Cost Center has no base.",
                       "nullable": true
                     },
                     "light": {
@@ -122659,6 +122685,8 @@
                     "base",
                     "reserve",
                     "spent",
+                    "spentAfterMonth",
+                    "changedAfterSnapshot",
                     "committed",
                     "pendingSpend",
                     "remaining",
