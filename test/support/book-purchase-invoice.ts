@@ -54,6 +54,7 @@ export function bookPurchaseInvoice(
       nonDeductibleTaxMinor: 0n,
       matchResult: 'MATCHED',
       chargedCostCenterId: null,
+      unallocated: null,
       now: new Date(),
       ...over,
     }),

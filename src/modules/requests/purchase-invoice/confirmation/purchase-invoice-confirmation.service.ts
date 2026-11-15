@@ -105,6 +105,7 @@ export class PurchaseInvoiceConfirmationService {
       row.linkKind === 'REQUEST' && row.requestId !== null
         ? await this.plans.poolSubscriptionOfRequest(row.requestId, tx)
         : null;
+    const unallocated = await this.unallocatedOf(tx, row);
     try {
       return await this.budgets.recordPurchaseInvoice(tx, actor, {
         organizationId: row.organizationId,
@@ -120,6 +121,7 @@ export class PurchaseInvoiceConfirmationService {
         nonDeductibleTaxMinor: row.nonDeductibleTaxMinor,
         matchResult: row.matchResult === 'PRICE_QUANTITY_EXCEPTION' ? 'PRICE_QUANTITY_EXCEPTION' : 'MATCHED',
         chargedCostCenterId: poolSubscriptionId === null ? row.chargedCostCenterId : null,
+        unallocated,
         now,
       });
     } catch (error) {
@@ -128,6 +130,18 @@ export class PurchaseInvoiceConfirmationService {
       }
       throw error;
     }
+  }
+
+  /** What the plan decided when the invoice was submitted: the line of the Cost Center not allocated, with the department of the user of the request. */
+  private async unallocatedOf(
+    tx: DbTx,
+    row: PurchaseInvoiceRow,
+  ): Promise<{ reason: 'K1_GRANT_FAILED'; departmentId: string } | null> {
+    if (row.unallocatedReason !== 'K1_GRANT_FAILED' || row.requestId === null) return null;
+    const request = await this.invoices.requestFacts(row.requestId, tx);
+    if (!request) throw new PurchaseInvoiceRefusedError('NO_PLACE');
+
+    return { reason: 'K1_GRANT_FAILED', departmentId: request.departmentId };
   }
 
   private async trail(

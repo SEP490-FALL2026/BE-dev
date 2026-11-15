@@ -400,7 +400,7 @@ enum InvoiceMatchResult {
 model Invoice {
   id                    String             @id @default(uuid(7)) @db.Uuid
   organizationId        String             @map("organization_id") @db.Uuid
-  // Null for an invoice booked to a subscription, to a Cost Center or to a case of SBF-07a (the CHECK `invoices_place_check` keeps one of the four).
+  // Null for an invoice booked to a subscription, to a Cost Center, to a case of SBF-07a or to the line not allocated (the CHECK `invoices_place_check` keeps one of the five).
   commitmentId          String?            @map("commitment_id") @db.Uuid
   vendorId              String             @map("vendor_id") @db.Uuid
   number                String
@@ -425,6 +425,10 @@ model Invoice {
   // Where an invoice with no commitment is booked (R-51: the department that held the right in the service month).
   costCenterId          String?            @map("cost_center_id") @db.Uuid
   outOfProcessCaseId    String?            @map("out_of_process_case_id") @db.Uuid
+  // The line of the Cost Center not allocated (QĐ-104k(4), FX3-01): why the invoice belongs to no Cost Center and the department of the user it is shown with.
+  // Both null for any other invoice; the CHECK `invoices_unallocated_check` keeps them together and the invoice with no other place.
+  unallocatedReason     String?            @map("unallocated_reason")
+  departmentId          String?            @map("department_id") @db.Uuid
 
   organization   Organization     @relation(fields: [organizationId], references: [id])
   commitment     BudgetCommitment? @relation(fields: [commitmentId], references: [id], onDelete: Restrict)

@@ -179,13 +179,18 @@ export interface PurchaseInvoiceRecordInput {
   matchResult: 'MATCHED' | 'PRICE_QUANTITY_EXCEPTION';
   /** The Cost Center of the department that held the right in the service month (`R-51`); null for an invoice of a subscription. */
   chargedCostCenterId: string | null;
+  /**
+   * Set for the invoice of a `K1` the IT Admin bought and whose grant then failed (`QĐ-104k`(4), `US-12-17` AC-11): it is a line of the Cost Center not
+   * allocated, shown with the department of the user, and no expense of any Cost Center; no commitment is taken down by it.
+   */
+  unallocated: { reason: 'K1_GRANT_FAILED'; departmentId: string } | null;
   now: Date;
 }
 
 export interface PurchaseInvoiceRecorded {
   invoiceId: string;
-  /** Where it was booked: into a commitment, as an expense of a Cost Center with no commitment, or as a line of a subscription. */
-  booking: 'COMMITMENT' | 'COST_CENTER' | 'SUBSCRIPTION';
+  /** Where it was booked: into a commitment, as an expense of a Cost Center with no commitment, as a line of a subscription or as a line not allocated. */
+  booking: 'COMMITMENT' | 'COST_CENTER' | 'SUBSCRIPTION' | 'UNALLOCATED';
   commitmentId: string | null;
   costCenterId: string | null;
   subscriptionId: string | null;

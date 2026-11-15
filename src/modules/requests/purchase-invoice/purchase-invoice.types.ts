@@ -33,6 +33,11 @@ export interface PurchaseInvoicePlan {
   chargedCostCenterId: string | null;
   /** The commitment of the year of the service month this invoice goes into, and what is left of it; null when it goes nowhere into a commitment. */
   commitment: { id: string; remainingMinor: bigint } | null;
+  /**
+   * Set when the invoice is of a `K1` the IT Admin bought and whose grant then failed: it goes to the line of the Cost Center not allocated with the
+   * department of the user, bears no Cost Center and takes no commitment down (`QĐ-104k`(4), `US-12-17` AC-11). Null for any other invoice.
+   */
+  unallocated: { reason: 'K1_GRANT_FAILED'; departmentId: string } | null;
   flags: PurchaseInvoiceFlag[];
 }
 

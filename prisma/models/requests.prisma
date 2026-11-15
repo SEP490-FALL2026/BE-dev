@@ -1226,6 +1226,8 @@ model PurchaseInvoice {
   paymentSource             PurchaseInvoicePaymentSource @map("payment_source")
   flags                     String[]                     @default([])
   chargedCostCenterId       String?                      @map("charged_cost_center_id") @db.Uuid
+  // Set when the plan sent the invoice to the line of the Cost Center not allocated (a `K1` bought and then failed to grant, QĐ-104k(4)); then no Cost Center bears it.
+  unallocatedReason         String?                      @map("unallocated_reason")
   state                     PurchaseInvoiceState         @default(SUBMITTED)
   submittedByEmployeeId     String                       @map("submitted_by_employee_id") @db.Uuid
   submittedAt               DateTime                     @map("submitted_at") @db.Timestamptz(3)

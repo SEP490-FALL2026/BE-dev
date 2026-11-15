@@ -29,6 +29,8 @@ export interface NewInvoice {
   costCenterId?: string | null;
   /** The case of `SBF-07a` this invoice is the money of (a value of the usage context). */
   outOfProcessCaseId?: string | null;
+  /** The line of the Cost Center not allocated: why, and the department of the user it is shown with (both or neither). */
+  unallocated?: { reason: 'K1_GRANT_FAILED'; departmentId: string } | null;
 }
 
 export interface InvoiceRecord {
@@ -106,6 +108,8 @@ export class InvoiceRepo {
         subscriptionId: input.subscriptionId ?? null,
         costCenterId: input.costCenterId ?? null,
         outOfProcessCaseId: input.outOfProcessCaseId ?? null,
+        unallocatedReason: input.unallocated?.reason ?? null,
+        departmentId: input.unallocated?.departmentId ?? null,
       },
     });
 

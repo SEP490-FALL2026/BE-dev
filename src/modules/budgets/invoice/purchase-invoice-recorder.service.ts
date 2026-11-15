@@ -15,7 +15,7 @@ import type { PurchaseInvoiceRecordInput, PurchaseInvoiceRecorded } from '../pub
 /**
  * Writes the one invoice of a purchase invoice Finance signed (`PI-1`, `D3`), in the transaction of the signature. It is booked to the month the
  * purchase pays for: into the commitment of that year when the department that bears it is the commitment's own, otherwise as an expense of that
- * department with no commitment, and as a line of the subscription for an invoice of a subscription. The price is never judged against the budget
+ * department with no commitment, and as a line of the subscription for an invoice of a subscription, and as a line of the Cost Center not allocated, with the commitment left as it is, for the invoice of a `K1` whose grant failed after the purchase (`QĐ-104k`(4)). The price is never judged against the budget
  * (`C-08`); what the invoice says about the count and the price of one is the match the purchase invoice already carries (`R-44`). The rows of the
  * commitments of the request are locked first, as a release does, so the two queue; the budget year is locked only for an expense with no commitment.
  */
@@ -39,7 +39,7 @@ export class PurchaseInvoiceRecorderService {
     }
     const serviceYear = Number(input.serviceMonth.slice(0, 4));
     const rows =
-      input.requestId !== null && input.subscriptionId === null
+      input.requestId !== null && input.subscriptionId === null && input.unallocated === null
         ? await this.commitments.lockOfRequest(tx, input.requestId)
         : [];
     const booking = bookPurchaseInvoice({
@@ -47,6 +47,7 @@ export class PurchaseInvoiceRecorderService {
       serviceYear,
       chargedCostCenterId: input.chargedCostCenterId,
       subscriptionId: input.subscriptionId,
+      unallocated: input.unallocated !== null,
     });
     if (booking.kind === 'UNPLACED') throw new PurchaseInvoiceRecordRefusedError('NO_PLACE');
     if (await this.invoices.exists(tx, input.organizationId, input.vendorId, input.number)) {
@@ -76,6 +77,7 @@ export class PurchaseInvoiceRecorderService {
       purchaseInvoiceId: input.purchaseInvoiceId,
       subscriptionId,
       costCenterId: placed.costCenterId,
+      unallocated: booking.kind === 'UNALLOCATED' ? input.unallocated : null,
     });
     await this.log(tx, actor, input, invoice.id, booking.kind, placed, actualCostMinor);
 

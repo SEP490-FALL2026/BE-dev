@@ -193,6 +193,18 @@ describe('bookPurchaseInvoice: where the invoice of a purchase is booked (PI-1, 
     ).toEqual({ kind: 'SUBSCRIPTION', subscriptionId: 's-1' });
   });
 
+  it('is a line of the Cost Center not allocated for a K1 whose grant failed after the purchase, whatever commitment is still held (QĐ-104k(4))', () => {
+    expect(
+      bookPurchaseInvoice({
+        commitments: [held],
+        serviceYear: 2026,
+        chargedCostCenterId: null,
+        subscriptionId: null,
+        unallocated: true,
+      }),
+    ).toEqual({ kind: 'UNALLOCATED' });
+  });
+
   it('has nowhere to go with no commitment, no subscription and no Cost Center', () => {
     expect(
       bookPurchaseInvoice({ commitments: [], serviceYear: 2026, chargedCostCenterId: null, subscriptionId: null }),

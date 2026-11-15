@@ -82,11 +82,13 @@ export type PurchaseBooking =
   | { kind: 'COST_CENTER'; costCenterId: string }
   /** A line of the subscription, to be shared among departments later (`QĐ-104c`). */
   | { kind: 'SUBSCRIPTION'; subscriptionId: string }
+  /** The line of the Cost Center not allocated: an expense of no Cost Center, and no commitment is taken down (`QĐ-104k`(4)). */
+  | { kind: 'UNALLOCATED' }
   | { kind: 'UNPLACED' };
 
 /**
  * Where the invoice of a purchase is booked (`PI-1`, `R-51`, `MIN-15`), as one pure decision. The invoice belongs to the year of the month it pays
- * for. An invoice of a subscription is a line of the subscription. Otherwise it goes into the commitment the request holds for that year when the Cost
+ * for. An invoice of a subscription is a line of the subscription; the invoice of a `K1` whose grant failed after the purchase is a line not allocated. Otherwise it goes into the commitment the request holds for that year when the Cost
  * Center that bears it (the department that held the right in the service month) is the commitment's own; a commitment that was let go, or another
  * department, takes it as an expense with no commitment. The price is never judged against the budget (`C-08`).
  */
@@ -95,8 +97,10 @@ export function bookPurchaseInvoice(input: {
   serviceYear: number;
   chargedCostCenterId: string | null;
   subscriptionId: string | null;
+  unallocated?: boolean;
 }): PurchaseBooking {
   if (input.subscriptionId !== null) return { kind: 'SUBSCRIPTION', subscriptionId: input.subscriptionId };
+  if (input.unallocated === true) return { kind: 'UNALLOCATED' };
   const ofYear = input.commitments.find((commitment) => commitment.year === input.serviceYear);
   if (
     ofYear &&

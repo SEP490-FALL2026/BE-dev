@@ -65,6 +65,7 @@ export interface NewPurchaseInvoice {
   paymentSource: 'COMPANY_CARD' | 'IT_ADVANCE';
   flags: string[];
   chargedCostCenterId: string | null;
+  unallocatedReason: 'K1_GRANT_FAILED' | null;
   submittedByEmployeeId: string;
   submittedAt: Date;
   resubmissionOfId: string | null;
@@ -187,6 +188,7 @@ export class PurchaseInvoiceRepo {
         paymentSource: input.paymentSource,
         flags: input.flags,
         chargedCostCenterId: input.chargedCostCenterId,
+        unallocatedReason: input.unallocatedReason,
         submittedByEmployeeId: input.submittedByEmployeeId,
         submittedAt: input.submittedAt,
         resubmissionOfId: input.resubmissionOfId,

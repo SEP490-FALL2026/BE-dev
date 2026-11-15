@@ -38,6 +38,7 @@ const input = (over: Partial<PurchaseInvoiceRecordInput> = {}): PurchaseInvoiceR
   nonDeductibleTaxMinor: 0n,
   matchResult: 'MATCHED',
   chargedCostCenterId: 'cc-1',
+  unallocated: null,
   now: new Date('2027-01-06T01:00:00.000Z'),
   ...over,
 });
@@ -89,6 +90,33 @@ describe('PurchaseInvoiceRecorderService.record (PI-1.5, PI-1.7)', () => {
     await service.record(TX, ACTOR, input());
 
     expect(calls).toEqual(['lock', 'apply', 'insert', 'audit']);
+  });
+
+  it('writes the invoice of a K1 whose grant failed to the line not allocated with the department of the user, and neither locks nor takes down any commitment (FX3-01, QĐ-104k(4))', async () => {
+    const { service, calls, lockOfRequest, applyInvoice, lock, insert } = build();
+
+    const recorded = await service.record(
+      TX,
+      ACTOR,
+      input({ chargedCostCenterId: null, unallocated: { reason: 'K1_GRANT_FAILED', departmentId: 'dept-1' } }),
+    );
+
+    expect(recorded).toMatchObject({
+      booking: 'UNALLOCATED',
+      commitmentId: null,
+      costCenterId: null,
+      appliedMinor: 0n,
+    });
+    expect(lockOfRequest).not.toHaveBeenCalled();
+    expect(applyInvoice).not.toHaveBeenCalled();
+    expect(lock).not.toHaveBeenCalled();
+    expect(calls).toEqual(['insert', 'audit']);
+    expect(insert.mock.calls[0][1]).toMatchObject({
+      commitmentId: null,
+      costCenterId: null,
+      subscriptionId: null,
+      unallocated: { reason: 'K1_GRANT_FAILED', departmentId: 'dept-1' },
+    });
   });
 
   it('records the vendor it is given, in dong, the month it pays for and the one who signed as the one who recorded it', async () => {

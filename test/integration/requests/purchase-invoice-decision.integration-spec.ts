@@ -20,6 +20,8 @@ interface Wire {
 interface InvoiceRow {
   commitment_id: string | null;
   cost_center_id: string | null;
+  unallocated_reason: string | null;
+  department_id: string | null;
   service_month: string;
   applied_minor: string;
   actual_cost_minor: string;
@@ -117,7 +119,8 @@ describe('Finance signs or returns a purchase invoice over PostgreSQL (integrati
   const invoiceOf = async (purchaseId: string) =>
     (
       await h.ctx.sql.query<InvoiceRow>(
-        `SELECT commitment_id, cost_center_id, to_char(service_month, 'YYYY-MM-DD') AS service_month, applied_minor::text,
+        `SELECT commitment_id, cost_center_id, unallocated_reason, department_id,
+                to_char(service_month, 'YYYY-MM-DD') AS service_month, applied_minor::text,
                 actual_cost_minor::text, match_result::text, recorded_by_employee_id
            FROM invoices WHERE purchase_invoice_id = $1`,
         [purchaseId],
@@ -304,24 +307,54 @@ describe('Finance signs or returns a purchase invoice over PostgreSQL (integrati
     ).toMatchObject({ spentMinor: 3_840_000n });
   });
 
-  it('takes the invoice of a K1 the IT Admin bought for a request whose grant then failed, and books it as an expense of the department of the user: the commitment stays released (B3B-04, QĐ-104k(4), QĐ-103r)', async () => {
+  /** A request of a `K1` whose grant failed after the IT Admin bought: the department of the user, the request and the invoice of 300.000 đ Finance signed. */
+  const failedPurchase = async (state: 'FAILED' | 'AWAITING_IT_CLOSE') => {
     const { unit, requestId } = await approved();
     const granted = h.dataOf<{ task: { id: string } }>(await h.grant({ requestId, subscriptionId }).expect(201));
     await h.claim(granted.task.id).expect(200);
     await h.fail(granted.task.id, { reason: 'The portal refused the account' }).expect(200);
-    await h.closeFailed(granted.task.id, { reason: 'The portal cannot hold the account' }).expect(200);
-    expect(await h.state(requestId)).toBe('FAILED');
-    expect(await commitmentOf(requestId)).toMatchObject({ state: 'RELEASED' });
-
+    if (state === 'FAILED') {
+      await h.closeFailed(granted.task.id, { reason: 'The portal cannot hold the account' }).expect(200);
+    } else {
+      await h.withdrawRequest(requestId, { reason: 'Not needed any more' }, unit.member.account).expect(200);
+    }
+    expect(await h.state(requestId)).toBe(state);
     const purchase = await submitted(requestId, { netAmount: { amount: '300000' } });
     await confirm(purchase.id).expect(201);
 
-    const [invoice] = await invoiceOf(purchase.id);
-    expect(invoice).toMatchObject({ commitment_id: null, cost_center_id: unit.department.unitId, applied_minor: '0' });
+    return { unit, requestId, invoice: (await invoiceOf(purchase.id))[0] };
+  };
+  const spentOfDepartment = async (unit: Unit): Promise<bigint> =>
+    (await h.ctx.app.get(BudgetsApi, { strict: false }).yearFacts(unit.department.unitId, [h.year])).get(h.year)
+      ?.spentMinor ?? 0n;
+
+  it('books the invoice of a K1 the IT Admin bought for a request whose grant then failed to the line of the Cost Center not allocated, with the department of the user: it is no expense of the department, the commitment stays released (FX3-01, QĐ-104k(4), US-12-17 AC-11, US-12-12 AC-15)', async () => {
+    const { unit, requestId, invoice } = await failedPurchase('FAILED');
+
+    expect(invoice).toMatchObject({
+      commitment_id: null,
+      cost_center_id: null,
+      unallocated_reason: 'K1_GRANT_FAILED',
+      department_id: unit.department.id,
+      applied_minor: '0',
+      actual_cost_minor: '300000',
+    });
     expect(await commitmentOf(requestId)).toMatchObject({ applied_minor: '0', state: 'RELEASED' });
-    expect(
-      (await h.ctx.app.get(BudgetsApi, { strict: false }).yearFacts(unit.department.unitId, [h.year])).get(h.year),
-    ).toMatchObject({ spentMinor: 300_000n });
+    expect(await spentOfDepartment(unit)).toBe(0n);
+  });
+
+  it('does the same for a request withdrawn after its grant failed, whose task still waits for the IT Admin to close it (AWAITING_IT_CLOSE): the commitment is not taken down by an invoice that is no expense of the department', async () => {
+    const { unit, requestId, invoice } = await failedPurchase('AWAITING_IT_CLOSE');
+
+    expect(invoice).toMatchObject({
+      commitment_id: null,
+      cost_center_id: null,
+      unallocated_reason: 'K1_GRANT_FAILED',
+      department_id: unit.department.id,
+      applied_minor: '0',
+    });
+    expect(await commitmentOf(requestId)).toMatchObject({ applied_minor: '0' });
+    expect(await spentOfDepartment(unit)).toBe(0n);
   });
 
   it('keeps the exception of a purchase invoice whose count or price differs on the invoice it writes, and never refuses it', async () => {

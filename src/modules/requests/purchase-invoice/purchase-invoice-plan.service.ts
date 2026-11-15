@@ -75,6 +75,11 @@ interface LinkFacts {
   /** The right is a person's own (`K1`): the department that bears it is the holder's. A `K4` key is the request's (`QĐ-103k`). */
   holderBound: boolean;
   /**
+   * The department of the user when the invoice is of a `K1` the IT Admin bought and whose grant then failed: the invoice is a line of the Cost Center not
+   * allocated, not an expense of that department (`QĐ-104k`(4)). Null for any other request.
+   */
+  failedGrantDepartmentId: string | null;
+  /**
    * The subscription of the shared pool the invoice is a line of, for a request of a `K2` plan (`QĐ-104c`(3), `QĐ-103k`): every invoice of a `K2`
    * pool goes to the pool, whatever it is linked to, and a department bears only the seat-months of the seats it holds. Null for any other kind.
    */
@@ -150,6 +155,10 @@ export class PurchaseInvoicePlanService {
       requestCostCenterId: request.costCenterId,
       requestId,
       holderBound: heldByPerson(request.state, target?.provisioningType),
+      failedGrantDepartmentId:
+        FAILED_AFTER_PURCHASE_STATES.has(request.state) && target?.provisioningType === 'K1'
+          ? request.departmentId
+          : null,
       poolSubscriptionId: pool.id,
       seatPricing: pool.pricing,
       renewedAssignmentId: request.renewedAssignmentId,
@@ -217,6 +226,7 @@ export class PurchaseInvoicePlanService {
       expectedQuantity: period.purchasedQuantity,
       expectedUnitPrice: await this.catalog.getSubscriptionOriginalPrice(subscriptionId, tx),
       requestCostCenterId: null,
+      failedGrantDepartmentId: null,
       requestId: null,
       holderBound: false,
       poolSubscriptionId: null,
@@ -286,8 +296,14 @@ export class PurchaseInvoicePlanService {
     });
     // An invoice of a K2 pool is a line of the pool, whatever it is linked to: no Cost Center bears it and no commitment is taken down by it (`QĐ-104c`(3)).
     const pooled = facts.poolSubscriptionId !== null;
-    const chargedCostCenterId = pooled ? null : await this.chargedCostCenterOf(facts, serviceMonth, tx);
-    const commitment = pooled ? null : await this.commitmentOf(facts, chargedCostCenterId, serviceMonth, tx);
+    // An invoice of a `K1` whose grant failed after the purchase is a line of the Cost Center not allocated: no Cost Center bears it, no commitment takes it (`QĐ-104k`(4)).
+    const unallocated =
+      facts.failedGrantDepartmentId === null
+        ? null
+        : ({ reason: 'K1_GRANT_FAILED', departmentId: facts.failedGrantDepartmentId } as const);
+    const placed = pooled || unallocated !== null;
+    const chargedCostCenterId = placed ? null : await this.chargedCostCenterOf(facts, serviceMonth, tx);
+    const commitment = placed ? null : await this.commitmentOf(facts, chargedCostCenterId, serviceMonth, tx);
 
     return {
       organizationId: facts.organizationId,
@@ -299,6 +315,7 @@ export class PurchaseInvoicePlanService {
       expected: { quantity: facts.expectedQuantity, unitPrice: facts.expectedUnitPrice },
       chargedCostCenterId,
       commitment,
+      unallocated,
       flags: flagsOfPurchaseInvoice({
         outsideTerm: period.outsideTerm,
         overApproved: this.overApproved(facts, serviceMonth, money, commitment),
