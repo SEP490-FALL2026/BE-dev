@@ -1232,7 +1232,7 @@ model PurchaseInvoice {
   decidedByEmployeeId       String?                      @map("decided_by_employee_id") @db.Uuid
   decidedAt                 DateTime?                    @map("decided_at") @db.Timestamptz(3)
   returnReason              String?                      @map("return_reason")
-  resubmissionOfId          String?                      @unique @map("resubmission_of_id") @db.Uuid
+  resubmissionOfId          String?                      @unique(map: "purchase_invoices_resubmission_key") @map("resubmission_of_id") @db.Uuid
   invoiceId                 String?                      @map("invoice_id") @db.Uuid
   // What the invoice was read against, kept so the case of an invoice that differs shows both sides (R-44): the seats of the request or the
   // count the subscription bought, and the price of one in the original currency of the plan or subscription. Null for a side nobody knew.
@@ -1247,9 +1247,9 @@ model PurchaseInvoice {
   discrepancyCase InvoiceDiscrepancyCase?
 
   // The partial unique index of the open number, the checks and the trigger are SQL in the migration (ADR-0005).
-  @@index([requestId, serviceMonth])
-  @@index([subscriptionId, serviceMonth])
-  @@index([organizationId, state, submittedAt, id])
+  @@index([requestId, serviceMonth], map: "purchase_invoices_request_service_month_idx")
+  @@index([subscriptionId, serviceMonth], map: "purchase_invoices_subscription_service_month_idx")
+  @@index([organizationId, state, submittedAt, id], map: "purchase_invoices_state_submitted_idx")
   @@map("purchase_invoices")
 }
 
@@ -1294,6 +1294,6 @@ model InvoiceDiscrepancyCase {
 
   purchaseInvoice PurchaseInvoice @relation(fields: [purchaseInvoiceId], references: [id], onDelete: Restrict)
 
-  @@index([organizationId, state, openedAt, id])
+  @@index([organizationId, state, openedAt, id], map: "invoice_discrepancy_cases_state_opened_idx")
   @@map("invoice_discrepancy_cases")
 }
