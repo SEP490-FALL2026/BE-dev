@@ -182,3 +182,5 @@ Không làm ở FIX-LB1 (rẻ nhưng đổi hợp đồng hoặc chạm file lan
 ## Dừng ở đâu
 
 - Xong PL-1, PL-3, PF-1, FIX-LB1, BG-1, FIX-LB2 và cả BG-2: BG-2.0 `4d58016a`, BG-2.4 `09fb1d0e`, BG-2.1 + một phần BG-2.6 `5a1dfc03`, BG-2.3 `a4ba8bec`, BG-2.2 `7f740cf4`, BG-2.5 + BG-2.6 `d2bad69f`, BG-2.7 `6c62609d`, BG-2-G `50d9ca2f`. Còn lại ngoài lane B: phía `requests` của BG-2.1 (mục "Bị chặn"), seed/flows (mục "Seed cần cho Z2" ở HANDOFF). Dừng "LANE B CHỜ MERGE".
+
+- **FIX-LB3 xong** (4 mục Required của AUDIT-LB-BG + Optional/Nit rẻ): LBG-01 `df8289da` (D-B16), LBG-02 `4e92423c` (D-B17), LBG-03 `96644b01` (D-B18, migration `20261113100800`), LBG-04 `511e9e41` (danh sách "Seed cần cho Z2" theo từng file), Optional/Nit LBG-17 `b41a12ed`, LBG-06 `99ff0e49`, danh sách còn lại + ba câu "Chờ Owner quyết" (LBG-12, LBG-08, LBG-13) `1a639286`, chore regenerate `e94863de`. Gate cuối gói xanh (xem HANDOFF dòng "FIX-LB3 (gate cuối gói)"). Còn lại ngoài lane B: phía `requests` của BG-2.1 ("Bị chặn"), seed/flows (Z2), lệch tên 4 index `purchase_invoices` của PI-1 (lane A). Dừng "LANE B CHỜ MERGE".
