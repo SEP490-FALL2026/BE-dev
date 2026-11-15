@@ -12,6 +12,9 @@ import { FinanceApi } from '../../finance/public/finance.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { usageAuditEvent } from '../usage-audit-event.mapper';
 import { closureRefusal } from './out-of-process-case.policy';
+
+/** The most files a case holds (the proofs of payment, then the proofs of a revocation). */
+const OUT_OF_PROCESS_DOCUMENTS_MAX = 20;
 import { VendorAccountReviewRefusedError } from './vendor-account-review.errors';
 import { VendorAccountReviewRepo } from './vendor-account-review.repo';
 import type { OutOfProcessCaseRecord, OutOfProcessOutcome } from './vendor-account-review.types';
@@ -68,9 +71,12 @@ export class OutOfProcessCaseClosureService {
       if (!locked || locked.organizationId !== organization.id)
         throw new VendorAccountReviewRefusedError('CASE_NOT_FOUND');
       if (locked.state === 'CLOSED') throw new VendorAccountReviewRefusedError('CASE_ALREADY_CLOSED');
+      this.refuseOnSpend(locked, input);
       const amountMinor = await this.judge(tx, locked, input);
       if (input.outcome === 'RECORD_SPENT') {
         await this.recordSpent(tx, actor, locked, input, amountMinor as bigint, now, organization);
+        // The money of a case on a company asset is an act on the open case: the IT Admin can still revoke the account afterwards (`US-13-05` AC-20, AC-25).
+        if (locked.companyAsset === true) return this.keepOpen(tx, actor, locked, input, amountMinor as bigint);
       } else if (input.outcome === 'REVOKED') {
         await this.attachProofs(tx, actor, locked, input);
       }
@@ -79,15 +85,75 @@ export class OutOfProcessCaseClosureService {
         note: input.note.trim(),
         byEmployeeId: actor.employeeId,
         at: now,
-        amountMinor,
-        costCenterId: input.outcome === 'RECORD_SPENT' ? (input.costCenterId ?? null) : null,
-        documentIds: input.documentIds,
+        ...this.moneyOf(locked, input, amountMinor),
         renewalCancelled: input.outcome === 'REVOKED',
       });
       await this.log(tx, actor, closed, input);
 
       return closed;
     });
+  }
+
+  /** Money already recorded on the open case is not recorded twice and is no false alarm; the proofs of a revocation come after the proofs of payment. */
+  private refuseOnSpend(locked: OutOfProcessCaseRecord, input: OutOfProcessClosureInput): void {
+    if (locked.amountMinor === null) return;
+    if (input.outcome === 'FALSE_ALARM') throw new VendorAccountReviewRefusedError('SPEND_RECORDED');
+    if (input.outcome === 'RECORD_SPENT') throw new VendorAccountReviewRefusedError('SPEND_ALREADY_RECORDED');
+    if (locked.documentIds.length + input.documentIds.length > OUT_OF_PROCESS_DOCUMENTS_MAX) {
+      throw new VendorAccountReviewRefusedError('DOCUMENT_INVALID', 'TOO_MANY');
+    }
+  }
+
+  /** The money the closed case carries: what the closing records, or what Finance recorded on the open case (kept as it was, with the proofs of the revocation after it). */
+  private moneyOf(
+    locked: OutOfProcessCaseRecord,
+    input: OutOfProcessClosureInput,
+    amountMinor: bigint | null,
+  ): { amountMinor: bigint | null; costCenterId: string | null; documentIds: readonly string[] } {
+    if (input.outcome === 'RECORD_SPENT') {
+      return { amountMinor, costCenterId: input.costCenterId ?? null, documentIds: input.documentIds };
+    }
+    if (locked.amountMinor === null) return { amountMinor: null, costCenterId: null, documentIds: input.documentIds };
+
+    return {
+      amountMinor: locked.amountMinor,
+      costCenterId: locked.costCenterId,
+      documentIds: [...locked.documentIds, ...input.documentIds],
+    };
+  }
+
+  /** The money is recorded on the case and the case stays open for the IT Admin to revoke (`US-13-05` AC-20). */
+  private async keepOpen(
+    tx: Parameters<VendorAccountReviewRepo['lockCase']>[0],
+    actor: AuthenticatedPrincipal,
+    locked: OutOfProcessCaseRecord,
+    input: OutOfProcessClosureInput,
+    amountMinor: bigint,
+  ): Promise<OutOfProcessCaseRecord> {
+    const kept = await this.repo.recordSpend(tx, locked.id, {
+      amountMinor,
+      costCenterId: input.costCenterId ?? null,
+      documentIds: input.documentIds,
+    });
+    await this.audit.record(
+      tx,
+      usageAuditEvent(
+        actor,
+        kept.organizationId,
+        'OUT_OF_PROCESS_CASE.SPEND_RECORDED',
+        'OutOfProcessCase',
+        kept.id,
+        { state: 'OPEN' },
+        {
+          state: 'OPEN',
+          amountMinor: amountMinor.toString(),
+          costCenterId: kept.costCenterId,
+          documentCount: input.documentIds.length,
+        },
+      ),
+    );
+
+    return kept;
   }
 
   /** What the closing says in money, in minor units, once it stands: the files are not twice the same, the amount is read and the outcome allows what is sent. */

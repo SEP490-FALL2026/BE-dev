@@ -48,13 +48,13 @@ const CLOSE_ERROR_RESPONSES = [
   {
     status: HttpStatus.CONFLICT,
     description:
-      'The case was closed already (OUT_OF_PROCESS_CASE.ALREADY_CLOSED), or the vendor has an invoice with its number (OUT_OF_PROCESS_CASE.NUMBER_TAKEN).',
-    examples: [EXAMPLES.CASE_ALREADY_CLOSED, EXAMPLES.NUMBER_TAKEN],
+      'The case was closed already (OUT_OF_PROCESS_CASE.ALREADY_CLOSED), the vendor has an invoice with its number (OUT_OF_PROCESS_CASE.NUMBER_TAKEN), or the money of the case is already recorded (OUT_OF_PROCESS_CASE.SPEND_ALREADY_RECORDED).',
+    examples: [EXAMPLES.CASE_ALREADY_CLOSED, EXAMPLES.NUMBER_TAKEN, EXAMPLES.SPEND_ALREADY_RECORDED],
   },
   {
     status: HttpStatus.UNPROCESSABLE_ENTITY,
     description:
-      'The note is missing (VALIDATION_ERROR); money is recorded with no proof of payment (OUT_OF_PROCESS_CASE.DOCUMENT_REQUIRED), with a file that is not a finished proof of payment of the person who closes it (OUT_OF_PROCESS_CASE.DOCUMENT_INVALID), without an amount or a Cost Center (OUT_OF_PROCESS_CASE.RECORD_FIELDS_MISSING) or with them on an outcome that records none (OUT_OF_PROCESS_CASE.RECORD_FIELDS_NOT_ALLOWED); the amount has digits after the point, is too large or is not above nothing (MONEY_SCALE_EXCEEDED, MONEY_OUT_OF_RANGE); the software has no vendor (OUT_OF_PROCESS_CASE.NO_VENDOR); the Cost Center does not exist (OUT_OF_PROCESS_CASE.COST_CENTER_NOT_FOUND); or a revocation is of a case that is not on a company asset (OUT_OF_PROCESS_CASE.REVOKE_NOT_ALLOWED) or lacks the cancelled renewal and its proof (OUT_OF_PROCESS_CASE.REVOKE_EVIDENCE_MISSING).',
+      'The note is missing (VALIDATION_ERROR); money is recorded with no proof of payment (OUT_OF_PROCESS_CASE.DOCUMENT_REQUIRED), with a file that is not a finished proof of payment of the person who closes it (OUT_OF_PROCESS_CASE.DOCUMENT_INVALID), without an amount or a Cost Center (OUT_OF_PROCESS_CASE.RECORD_FIELDS_MISSING) or with them on an outcome that records none (OUT_OF_PROCESS_CASE.RECORD_FIELDS_NOT_ALLOWED); the amount has digits after the point, is too large or is not above nothing (MONEY_SCALE_EXCEEDED, MONEY_OUT_OF_RANGE); the software has no vendor (OUT_OF_PROCESS_CASE.NO_VENDOR); the Cost Center does not exist (OUT_OF_PROCESS_CASE.COST_CENTER_NOT_FOUND); or a revocation is of a case that is not on a company asset (OUT_OF_PROCESS_CASE.REVOKE_NOT_ALLOWED) or lacks the cancelled renewal and its proof (OUT_OF_PROCESS_CASE.REVOKE_EVIDENCE_MISSING); or a case whose money is recorded is called a false alarm (OUT_OF_PROCESS_CASE.SPEND_RECORDED).',
     examples: [
       VALIDATION_EXAMPLE,
       EXAMPLES.DOCUMENT_REQUIRED,
@@ -67,6 +67,7 @@ const CLOSE_ERROR_RESPONSES = [
       EXAMPLES.COST_CENTER_NOT_FOUND,
       EXAMPLES.REVOKE_NOT_ALLOWED,
       EXAMPLES.REVOKE_EVIDENCE_MISSING,
+      EXAMPLES.SPEND_RECORDED,
     ],
   },
 ] as const;
@@ -106,7 +107,7 @@ export class OutOfProcessCasesController {
     status: HttpStatus.CREATED,
     message: 'OUT_OF_PROCESS_CASE.CLOSED',
     description:
-      'The case is closed once with a note. RECORD_SPENT, which only Finance closes with, records the money already spent as one expense in dong with no commitment, in the same step: it needs at least one proof of payment of the company, an amount and a Cost Center or UNALLOCATED. With no proof the case can only be a false alarm or a report.',
+      'The case is closed once with a note. RECORD_SPENT, which only Finance sends, records the money already spent as one expense in dong with no commitment, in the same step: it needs at least one proof of payment of the company, an amount and a Cost Center or UNALLOCATED. On a case on a company asset it records the money and the case stays OPEN with the money on it, so the IT Admin can still close it as REVOKED (the money stays as recorded) or as a report; on any other case it closes the case. A case with money is no false alarm and its money is not recorded twice. With no proof the case can only be a false alarm or a report.',
   })
   @ApiErrorResponses(...AUTH_ERRORS, ...CLOSE_ERROR_RESPONSES)
   async close(

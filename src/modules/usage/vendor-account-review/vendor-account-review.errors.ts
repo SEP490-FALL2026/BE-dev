@@ -26,7 +26,11 @@ export type VendorAccountReviewRefusal =
   /** Only the IT Admin closes a case as revoked (`US-13-05` AC-20, AC-25). */
   | 'IT_ADMIN_ONLY'
   /** Only Finance records the money already spent and chooses the Cost Center (`SBF-07a`, `US-13-05` AC-19). */
-  | 'FINANCE_ONLY';
+  | 'FINANCE_ONLY'
+  /** The money of the case is already recorded: it is not recorded twice (`US-13-05` AC-20). */
+  | 'SPEND_ALREADY_RECORDED'
+  /** A case whose money is recorded is no false alarm (`US-13-05` AC-20). */
+  | 'SPEND_RECORDED';
 
 export class VendorAccountReviewRefusedError extends Error {
   constructor(

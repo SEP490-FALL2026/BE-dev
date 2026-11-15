@@ -189,6 +189,20 @@ export class VendorAccountReviewRepo {
     return toCase(await tx.outOfProcessCase.findUniqueOrThrow({ where: { id } }));
   }
 
+  /** The money of an open case on a company asset, recorded by Finance while the case stays open (`US-13-05` AC-20). */
+  async recordSpend(
+    tx: DbTx,
+    id: string,
+    input: { amountMinor: bigint; costCenterId: string | null; documentIds: readonly string[] },
+  ): Promise<OutOfProcessCaseRecord> {
+    const row = await tx.outOfProcessCase.update({
+      where: { id },
+      data: { amountMinor: input.amountMinor, costCenterId: input.costCenterId, documentIds: [...input.documentIds] },
+    });
+
+    return toCase(row);
+  }
+
   async closeCase(
     tx: DbTx,
     id: string,
