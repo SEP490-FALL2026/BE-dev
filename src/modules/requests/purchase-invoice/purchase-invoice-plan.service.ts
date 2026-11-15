@@ -29,6 +29,15 @@ import type { PurchaseInvoiceLink, PurchaseInvoiceMoney, PurchaseInvoicePlan } f
  */
 const PURCHASABLE_STATES: ReadonlySet<string> = new Set(['AWAITING_EXECUTION', 'EXECUTING', 'COMPLETED']);
 
+/**
+ * The states of a request whose grant failed after the IT Admin bought (`QĐ-104k`(4), `QĐ-103r`): the money is already out, so the invoice still
+ * comes. The commitment was let go and nobody holds the right, so the department of the user bears it as an expense with no commitment.
+ */
+const FAILED_AFTER_PURCHASE_STATES: ReadonlySet<string> = new Set(['FAILED', 'AWAITING_IT_CLOSE']);
+
+const takesInvoice = (state: string): boolean =>
+  PURCHASABLE_STATES.has(state) || FAILED_AFTER_PURCHASE_STATES.has(state);
+
 /** What the link says of what was approved or bought, before the invoice is read against it. */
 interface LinkFacts {
   organizationId: string;
@@ -98,7 +107,7 @@ export class PurchaseInvoicePlanService {
   ): Promise<LinkFacts> {
     const request = await this.invoices.requestFacts(requestId, tx);
     if (!request || !scope.includes(request.departmentId)) throw new PurchaseInvoiceRefusedError('LINK_NOT_FOUND');
-    if (!PURCHASABLE_STATES.has(request.state) || request.planId === null) {
+    if (!takesInvoice(request.state) || request.planId === null) {
       throw new PurchaseInvoiceRefusedError('REQUEST_NOT_PURCHASABLE', 'STATE');
     }
     const vendorId = await this.catalog.getPlanVendorId(request.planId, tx);
@@ -118,7 +127,8 @@ export class PurchaseInvoicePlanService {
       expectedUnitPrice: await this.catalog.getPlanOriginalPrice(request.planId, tx, serviceMonth),
       requestCostCenterId: request.costCenterId,
       requestId,
-      holderBound: target?.provisioningType === 'K1' || target?.provisioningType === 'K4',
+      holderBound:
+        !FAILED_AFTER_PURCHASE_STATES.has(request.state) && ['K1', 'K4'].includes(target?.provisioningType ?? ''),
       poolSubscriptionId,
       renewedAssignmentId: request.renewedAssignmentId,
     };

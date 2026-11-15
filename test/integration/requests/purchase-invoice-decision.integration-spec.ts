@@ -304,6 +304,26 @@ describe('Finance signs or returns a purchase invoice over PostgreSQL (integrati
     ).toMatchObject({ spentMinor: 3_840_000n });
   });
 
+  it('takes the invoice of a K1 the IT Admin bought for a request whose grant then failed, and books it as an expense of the department of the user: the commitment stays released (B3B-04, QĐ-104k(4), QĐ-103r)', async () => {
+    const { unit, requestId } = await approved();
+    const granted = h.dataOf<{ task: { id: string } }>(await h.grant({ requestId, subscriptionId }).expect(201));
+    await h.claim(granted.task.id).expect(200);
+    await h.fail(granted.task.id, { reason: 'The portal refused the account' }).expect(200);
+    await h.closeFailed(granted.task.id, { reason: 'The portal cannot hold the account' }).expect(200);
+    expect(await h.state(requestId)).toBe('FAILED');
+    expect(await commitmentOf(requestId)).toMatchObject({ state: 'RELEASED' });
+
+    const purchase = await submitted(requestId, { netAmount: { amount: '300000' } });
+    await confirm(purchase.id).expect(201);
+
+    const [invoice] = await invoiceOf(purchase.id);
+    expect(invoice).toMatchObject({ commitment_id: null, cost_center_id: unit.department.unitId, applied_minor: '0' });
+    expect(await commitmentOf(requestId)).toMatchObject({ applied_minor: '0', state: 'RELEASED' });
+    expect(
+      (await h.ctx.app.get(BudgetsApi, { strict: false }).yearFacts(unit.department.unitId, [h.year])).get(h.year),
+    ).toMatchObject({ spentMinor: 300_000n });
+  });
+
   it('keeps the exception of a purchase invoice whose count or price differs on the invoice it writes, and never refuses it', async () => {
     const { requestId } = await approved();
     const purchase = await submitted(requestId, { quantity: 2 });
