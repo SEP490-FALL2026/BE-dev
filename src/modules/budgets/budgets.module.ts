@@ -89,6 +89,9 @@ import { BudgetReviewPoolWatchService } from './review/budget-review-pool-watch.
 import { BudgetReviewPriceService } from './review/budget-review-price.service';
 import { BudgetReviewQueryService } from './review/budget-review-query.service';
 import { BudgetReviewSnapshotService } from './review/budget-review-snapshot.service';
+import { BudgetReviewSignatureService } from './review/budget-review-signature.service';
+import { BudgetReviewReminderService } from './review/budget-review-reminder.service';
+import { BudgetReviewSweeper } from './review/budget-review.job';
 import { SeatMonthChargesController } from './seat-month/seat-month-charges.controller';
 import { SeatMonthPoolService } from './seat-month/seat-month-pool.service';
 import { SeatMonthQueryService } from './seat-month/seat-month-query.service';
@@ -192,6 +195,9 @@ import { BudgetProposalTemplateListener } from './proposal/budget-proposal-templ
     BudgetReviewPoolWatchService,
     BudgetReviewQueryService,
     BudgetReviewSnapshotService,
+    BudgetReviewSignatureService,
+    BudgetReviewReminderService,
+    BudgetReviewSweeper,
     SeatMonthSubscriptionService,
     SeatMonthService,
     SeatMonthPoolService,

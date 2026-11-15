@@ -19,6 +19,8 @@ describe('the routes of the close of a month (e2e, no database)', () => {
     request(app.getHttpServer()).post(PATH).set('Authorization', as(roles)).send(body);
   const list = (query: object, roles: string[] = ['FINANCE']) =>
     request(app.getHttpServer()).get(PATH).query(query).set('Authorization', as(roles));
+  const sign = (id: string, body: object = {}, roles: string[] = ['FINANCE']) =>
+    request(app.getHttpServer()).post(`${PATH}/${id}/signature`).set('Authorization', as(roles)).send(body);
   const one = (id: string, query: object = {}, roles: string[] = ['FINANCE']) =>
     request(app.getHttpServer()).get(`${PATH}/${id}`).query(query).set('Authorization', as(roles));
 
@@ -77,6 +79,19 @@ describe('the routes of the close of a month (e2e, no database)', () => {
       await one('not-an-id').expect(422),
       await one(ID, { pageSize: 101 }).expect(422),
       await one(ID, { page: 0 }).expect(422),
+    ]) {
+      expect(bodyOf(response).error.code).toBe('VALIDATION_ERROR');
+    }
+  });
+  it('lets only Finance sign, and refuses an id that is not one, an empty note and a key it does not know, before reading anything', async () => {
+    for (const roles of [['EMPLOYEE'], ['SPENDING_APPROVER'], ['MANAGER'], ['IT_ADMIN'], ['SUPER_ADMIN']]) {
+      expect(bodyOf(await sign(ID, {}, roles).expect(403)).error.code).toBe('AUTHORIZATION.FORBIDDEN');
+    }
+    for (const response of [
+      await sign('not-an-id').expect(422),
+      await sign(ID, { note: '' }).expect(422),
+      await sign(ID, { note: 'x'.repeat(2001) }).expect(422),
+      await sign(ID, { unknown: 'x' }).expect(422),
     ]) {
       expect(bodyOf(response).error.code).toBe('VALIDATION_ERROR');
     }

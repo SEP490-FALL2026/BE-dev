@@ -116,6 +116,7 @@ export const SUCCESS_MESSAGES: Readonly<Record<string, string>> = {
   budgetReviewPeriodClose: 'BUDGET_REVIEW.CLOSED',
   budgetReviewPeriodGet: 'BUDGET_REVIEW.RETRIEVED',
   budgetReviewPeriodList: 'BUDGET_REVIEW.LISTED',
+  budgetReviewPeriodSign: 'BUDGET_REVIEW.SIGNED',
   budgetCycleDelete: 'BUDGET_CYCLE.DELETED',
   budgetCycleOpen: 'BUDGET_CYCLE.OPENED',
   budgetCycleUpdate: 'BUDGET_CYCLE.UPDATED',

@@ -12,6 +12,7 @@ import { RequireRoles } from '../../../infrastructure/security/decorators/access
 import { CurrentPrincipal } from '../../../infrastructure/security/models/current-principal';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { BudgetReviewQueryService } from './budget-review-query.service';
+import { BudgetReviewSignatureService } from './budget-review-signature.service';
 import { BudgetReviewSnapshotService } from './budget-review-snapshot.service';
 import {
   CreateReviewPeriodBodyDto,
@@ -21,6 +22,7 @@ import {
   ReviewPeriodListResponseDto,
   ReviewPeriodQueryDto,
   ReviewPeriodResponseDto,
+  SignReviewPeriodBodyDto,
 } from './budget-review.dto';
 import { BUDGET_REVIEW_ERROR_EXAMPLES as EXAMPLES, toBudgetReviewApiException } from './budget-review.http-errors';
 
@@ -43,6 +45,7 @@ export class BudgetReviewController {
   constructor(
     private readonly snapshots: BudgetReviewSnapshotService,
     private readonly queries: BudgetReviewQueryService,
+    private readonly signatures: BudgetReviewSignatureService,
   ) {}
 
   @Post()
@@ -140,6 +143,44 @@ export class BudgetReviewController {
   ) {
     try {
       return await this.queries.detail(actor, params.id, query);
+    } catch (error) {
+      throw toBudgetReviewApiException(error);
+    }
+  }
+  @Post(':id/signature')
+  @RequireRoles('FINANCE')
+  @ApiOperation({ operationId: 'budgetReviewPeriodSign', summary: 'Sign a month that was closed' })
+  @ApiSuccessResponse(ReviewPeriodResponseDto, {
+    message: 'BUDGET_REVIEW.SIGNED',
+    description:
+      'Finance signs the period: who and when are kept and the period never changes again. Only Finance signs, not the spending approver. Signing locks no data: an invoice that comes later is read in the next month. The spending approver is told the summary of the month with how many Cost Centers have each light.',
+  })
+  @ApiErrorResponses(
+    ...AUTH_ERRORS,
+    {
+      status: HttpStatus.FORBIDDEN,
+      description: 'Only Finance signs a review period.',
+      examples: [FORBIDDEN_EXAMPLE],
+    },
+    NOT_FOUND,
+    {
+      status: HttpStatus.CONFLICT,
+      description: 'The period was signed already (BUDGET_REVIEW.ALREADY_SIGNED).',
+      examples: [EXAMPLES.ALREADY_SIGNED],
+    },
+    {
+      status: HttpStatus.UNPROCESSABLE_ENTITY,
+      description: 'The id or the body is invalid (VALIDATION_ERROR).',
+      examples: [VALIDATION_EXAMPLE],
+    },
+  )
+  async sign(
+    @CurrentPrincipal() actor: AuthenticatedPrincipal,
+    @Param() params: ReviewPeriodIdParamDto,
+    @Body() body: SignReviewPeriodBodyDto,
+  ) {
+    try {
+      return await this.signatures.sign(actor, params.id, body);
     } catch (error) {
       throw toBudgetReviewApiException(error);
     }

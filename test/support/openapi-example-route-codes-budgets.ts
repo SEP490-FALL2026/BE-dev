@@ -59,6 +59,10 @@ export const ROUTE_ERROR_CODES_BUDGETS: Readonly<Record<string, Partial<Record<R
     budgetReviewPeriodGet: {
       '404': ['BUDGET_REVIEW.NOT_FOUND'],
     },
+    budgetReviewPeriodSign: {
+      '404': ['BUDGET_REVIEW.NOT_FOUND'],
+      '409': ['BUDGET_REVIEW.ALREADY_SIGNED'],
+    },
     budgetCycleDelete: {
       '404': ['BUDGET.CYCLE_NOT_FOUND'],
       '409': ['BUDGET_CYCLE.NOT_DRAFT'],
