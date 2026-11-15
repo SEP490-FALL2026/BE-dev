@@ -44,6 +44,11 @@ interface LinkFacts {
   requestId: string | null;
   /** The right is a person's own (`K1`, `K4`): the department that bears it is the holder's. */
   holderBound: boolean;
+  /**
+   * The subscription of the shared pool the invoice is a line of, for a request of a `K2` plan (`QĐ-104c`(3), `QĐ-103k`): every invoice of a `K2`
+   * pool goes to the pool, whatever it is linked to, and a department bears only the seat-months of the seats it holds. Null for any other kind.
+   */
+  poolSubscriptionId: string | null;
   renewedAssignmentId: string | null;
 }
 
@@ -99,6 +104,8 @@ export class PurchaseInvoicePlanService {
     const vendorId = await this.catalog.getPlanVendorId(request.planId, tx);
     if (vendorId === null) throw new PurchaseInvoiceRefusedError('NO_VENDOR');
     const [target] = await this.catalog.findPlanSeatTargets([request.planId], tx);
+    const poolSubscriptionId =
+      target?.provisioningType === 'K2' ? await this.poolSubscriptionOfPlan(request.planId, tx) : null;
 
     return {
       organizationId: request.organizationId,
@@ -112,8 +119,33 @@ export class PurchaseInvoicePlanService {
       requestCostCenterId: request.costCenterId,
       requestId,
       holderBound: target?.provisioningType === 'K1' || target?.provisioningType === 'K4',
+      poolSubscriptionId,
       renewedAssignmentId: request.renewedAssignmentId,
     };
+  }
+
+  /**
+   * The subscription of the pool a `K2` request's invoice is booked to: the one a grant takes first (`QĐ-104k`(3): one pool for each plan).
+   * Throws PurchaseInvoiceRefusedError('NO_PLACE') when the plan has none that can be taken from today, since there is no pool line to book to.
+   */
+  private async poolSubscriptionOfPlan(planId: string, tx?: DbTx): Promise<string> {
+    const today = await this.organizationReads.businessToday(new Date(), tx);
+    const [pool] = await this.catalog.getGrantableSubscriptions(planId, today, tx);
+    if (!pool) throw new PurchaseInvoiceRefusedError('NO_PLACE');
+
+    return pool.subscriptionId;
+  }
+
+  /**
+   * The subscription of the pool a request's invoice is a line of when Finance signs it: that of a `K2` plan, null for any other kind (booked to the
+   * commitment or the Cost Center that bears it). Throws PurchaseInvoiceRefusedError('NO_PLACE') for a `K2` plan with no pool to book to.
+   */
+  async poolSubscriptionOfRequest(requestId: string, tx?: DbTx): Promise<string | null> {
+    const request = await this.invoices.requestFacts(requestId, tx);
+    if (!request || request.planId === null) return null;
+    const [target] = await this.catalog.findPlanSeatTargets([request.planId], tx);
+
+    return target?.provisioningType === 'K2' ? this.poolSubscriptionOfPlan(request.planId, tx) : null;
   }
 
   /**
@@ -142,6 +174,7 @@ export class PurchaseInvoicePlanService {
       requestCostCenterId: null,
       requestId: null,
       holderBound: false,
+      poolSubscriptionId: null,
       renewedAssignmentId: null,
     };
   }
@@ -205,8 +238,10 @@ export class PurchaseInvoicePlanService {
       expectedQuantity: facts.expectedQuantity,
       expectedUnitPrice: facts.expectedUnitPrice,
     });
-    const chargedCostCenterId = await this.chargedCostCenterOf(facts, serviceMonth, tx);
-    const commitment = await this.commitmentOf(facts, chargedCostCenterId, serviceMonth, tx);
+    // An invoice of a K2 pool is a line of the pool, whatever it is linked to: no Cost Center bears it and no commitment is taken down by it (`QĐ-104c`(3)).
+    const pooled = facts.poolSubscriptionId !== null;
+    const chargedCostCenterId = pooled ? null : await this.chargedCostCenterOf(facts, serviceMonth, tx);
+    const commitment = pooled ? null : await this.commitmentOf(facts, chargedCostCenterId, serviceMonth, tx);
 
     return {
       organizationId: facts.organizationId,

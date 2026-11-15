@@ -8,6 +8,7 @@ import { PurchaseInvoiceRecordRefusedError } from '../../../budgets/public/budge
 import { NotificationsApi } from '../../../notifications/public/notifications.api';
 import { InvoiceDiscrepancyOpeningService } from '../../invoice-discrepancy/invoice-discrepancy-opening.service';
 import { mismatchesOfRow } from '../purchase-invoice-match.policy';
+import { PurchaseInvoicePlanService } from '../purchase-invoice-plan.service';
 import { PurchaseInvoiceRefusedError } from '../purchase-invoice.errors';
 import { PurchaseInvoiceRepo, type PurchaseInvoiceRow } from '../purchase-invoice.repo';
 
@@ -29,6 +30,7 @@ export class PurchaseInvoiceConfirmationService {
     private readonly notifications: NotificationsApi,
     private readonly audit: AuditApi,
     private readonly discrepancies: InvoiceDiscrepancyOpeningService,
+    private readonly plans: PurchaseInvoicePlanService,
   ) {}
 
   /** Throws PurchaseInvoiceRefusedError (NOT_FOUND, NOT_SUBMITTED, SAME_PERSON, NUMBER_TAKEN, NO_PLACE). */
@@ -83,12 +85,17 @@ export class PurchaseInvoiceConfirmationService {
   }
 
   private async record(tx: DbTx, actor: AuthenticatedPrincipal, row: PurchaseInvoiceRow, now: Date) {
+    // An invoice of a request of a K2 plan is a line of the pool of the plan, not of the commitment or of a department (`QĐ-104c`(3), `B3B-01`).
+    const poolSubscriptionId =
+      row.linkKind === 'REQUEST' && row.requestId !== null
+        ? await this.plans.poolSubscriptionOfRequest(row.requestId, tx)
+        : null;
     try {
       return await this.budgets.recordPurchaseInvoice(tx, actor, {
         organizationId: row.organizationId,
         purchaseInvoiceId: row.id,
         requestId: row.requestId,
-        subscriptionId: row.linkKind === 'SUBSCRIPTION' ? row.subscriptionId : null,
+        subscriptionId: row.linkKind === 'SUBSCRIPTION' ? row.subscriptionId : poolSubscriptionId,
         vendorId: row.vendorId,
         number: row.number,
         issuedOn: fromDateColumn(row.issuedOn),
@@ -97,7 +104,7 @@ export class PurchaseInvoiceConfirmationService {
         deductibleTaxMinor: row.deductibleTaxMinor,
         nonDeductibleTaxMinor: row.nonDeductibleTaxMinor,
         matchResult: row.matchResult === 'PRICE_QUANTITY_EXCEPTION' ? 'PRICE_QUANTITY_EXCEPTION' : 'MATCHED',
-        chargedCostCenterId: row.chargedCostCenterId,
+        chargedCostCenterId: poolSubscriptionId === null ? row.chargedCostCenterId : null,
         now,
       });
     } catch (error) {

@@ -32,19 +32,25 @@ interface InvoiceRow {
  * and the year of the period, never by the person who submitted it, and returning it needs a reason and writes nothing. On real PostgreSQL.
  */
 describe('Finance signs or returns a purchase invoice over PostgreSQL (integration; PI-1.6, T-PI)', () => {
+  /** The plan of the requests whose invoices go into their commitment: a `K1` (a personal account), whose cost follows the person who holds it. */
   let plan: string;
   let subscriptionId: string;
+  /** A plan of the shared pool (`K2`): its invoices are lines of the pool, whatever they are linked to (`QĐ-104c`(3), B3B-01). */
+  let poolPlan: string;
+  let poolSubscriptionId: string;
   let counter = 0;
   let numbers = 0;
 
   beforeAll(async () => {
     await h.start();
     await h.withApprover();
-    subscriptionId = await h.subscription(20, 'K2');
+    subscriptionId = await h.subscription(20, 'K1');
     plan = await h.planOf(subscriptionId);
+    poolSubscriptionId = await takeOwnerOff(h, await h.subscription(20, 'K2', h.seed.departmentId));
+    poolPlan = await h.planOf(poolSubscriptionId);
     await h.ctx.sql.query(
-      `UPDATE subscriptions SET original_unit_price_minor = 1500, original_currency = 'USD' WHERE id = $1`,
-      [subscriptionId],
+      `UPDATE subscriptions SET original_unit_price_minor = 1500, original_currency = 'USD' WHERE id = ANY($1::uuid[])`,
+      [[subscriptionId, poolSubscriptionId]],
     );
   }, 240000);
 
@@ -54,12 +60,15 @@ describe('Finance signs or returns a purchase invoice over PostgreSQL (integrati
 
   const api = (method: 'get' | 'post', path: string, account: ApiAccount) =>
     request(h.server())[method](`/api/v1/purchase-invoices${path}`).set(h.as(account));
-  const approved = async (): Promise<{ unit: Unit; requestId: string }> => {
+  const approved = async (
+    planId: string = plan,
+    amount: number = 20 * M,
+  ): Promise<{ unit: Unit; requestId: string }> => {
     counter += 1;
     const unit = await h.departmentWithHead(`P-PD${counter}`);
     await h.setItAdminInCharge(unit.department, { employeeId: h.it1.employeeId, account: h.it1 });
     await h.budgetFor(unit, { total: 100 * M });
-    const requestId = await h.waitingForApprover(unit, plan, { amount: 20 * M });
+    const requestId = await h.waitingForApprover(unit, planId, { amount });
     await h.decideSpend(requestId, { decision: 'APPROVE' }, h.boss.account).expect(200);
 
     return { unit, requestId };
@@ -237,6 +246,42 @@ describe('Finance signs or returns a purchase invoice over PostgreSQL (integrati
     expect(invoice.cost_center_id).not.toBeNull();
     expect(invoice.applied_minor).toBe('0');
     expect(await commitmentOf(requestId)).toMatchObject({ applied_minor: '0', state: 'HELD' });
+  });
+
+  it('books the invoice of a K2 request as a line of the pool, not into the commitment or the spend of the department: a commitment of 800.000 đ and an invoice of 4.800.000 đ leave both as they were (B3B-01, QĐ-104c(3), MG-03)', async () => {
+    const { unit, requestId } = await approved(poolPlan, 800_000);
+    const purchase = await submitted(requestId, { netAmount: { amount: '4800000' } });
+
+    await confirm(purchase.id).expect(201);
+
+    const rows = await h.ctx.sql.query<{
+      commitment_id: string | null;
+      cost_center_id: string | null;
+      subscription_id: string | null;
+      applied_minor: string;
+      actual_cost_minor: string;
+    }>(
+      `SELECT commitment_id, cost_center_id, subscription_id, applied_minor::text, actual_cost_minor::text
+         FROM invoices WHERE purchase_invoice_id = $1`,
+      [purchase.id],
+    );
+    expect(rows.rows).toEqual([
+      {
+        commitment_id: null,
+        cost_center_id: null,
+        subscription_id: poolSubscriptionId,
+        applied_minor: '0',
+        actual_cost_minor: '4800000',
+      },
+    ]);
+    expect(await commitmentOf(requestId)).toMatchObject({ applied_minor: '0', state: 'HELD' });
+    expect(
+      (await h.ctx.app.get(BudgetsApi, { strict: false }).yearFacts(unit.department.unitId, [h.year])).get(h.year),
+    ).toMatchObject({ spentMinor: 0n, heldMinor: 800_000n });
+    expect(
+      (await h.ctx.sql.query(`SELECT charged_cost_center_id FROM purchase_invoices WHERE id = $1`, [purchase.id]))
+        .rows[0],
+    ).toEqual({ charged_cost_center_id: null });
   });
 
   it('keeps the exception of a purchase invoice whose count or price differs on the invoice it writes, and never refuses it', async () => {

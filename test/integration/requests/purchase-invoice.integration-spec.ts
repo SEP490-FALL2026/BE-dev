@@ -50,7 +50,7 @@ describe('purchase invoices over PostgreSQL (integration; PI-1.4, T-PI)', () => 
     await h.start();
     await h.withApprover();
     it2 = await handOthersToSecondItAdmin(h);
-    subscriptionId = await h.subscription(20, 'K2');
+    subscriptionId = await h.subscription(20, 'K1');
     plan = await h.planOf(subscriptionId);
     vendorId = (await h.vendorOf(plan)).id;
     await h.ctx.sql.query(
