@@ -179,6 +179,14 @@ export class PurchaseInvoiceRepo {
     });
   }
 
+  /** The label and the way of payment of the purchases with these ids, in one read; an id that is not one is left out. */
+  labelsOf(ids: readonly string[]): Promise<Array<Pick<PurchaseInvoiceRow, 'id' | 'label' | 'paymentSource'>>> {
+    return this.prisma.purchaseInvoice.findMany({
+      where: { id: { in: [...ids] } },
+      select: { id: true, label: true, paymentSource: true },
+    });
+  }
+
   find(id: string, tx?: DbTx): Promise<PurchaseInvoiceRow | null> {
     return (tx ?? this.prisma).purchaseInvoice.findUnique({ where: { id } });
   }

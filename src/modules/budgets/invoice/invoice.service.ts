@@ -17,7 +17,11 @@ import { planInvoice } from '../budget/invoice.policy';
 import { InvoiceRepo, type InvoiceRecord } from '../budget/invoice.repo';
 import { CommitmentService } from '../commitment/commitment.service';
 import type { CommitmentWire } from '../commitment/commitment.dto';
-import { CommitmentRequestFactsHook } from '../public/budgets.extension-points';
+import {
+  CommitmentRequestFactsHook,
+  PurchaseInvoiceFactsHook,
+  type PurchaseInvoiceFactsView,
+} from '../public/budgets.extension-points';
 import type { InvoiceBodyDto, InvoiceWire } from './invoice.dto';
 
 /**
@@ -37,6 +41,7 @@ export class InvoiceService {
     private readonly audit: AuditApi,
     private readonly requestFacts: CommitmentRequestFactsHook,
     private readonly commitmentViews: CommitmentService,
+    private readonly purchaseFacts: PurchaseInvoiceFactsHook,
   ) {}
 
   /** Throws BudgetCommitmentNotFoundError, InvoiceVendorUnknownError, InvoiceCommitmentReleasedError, InvoiceDuplicateError and the money errors. */
@@ -135,13 +140,22 @@ export class InvoiceService {
     }
   }
 
+  /** The label and the way of payment of the purchase invoices behind the rows: one read for the page, none when no row came from a purchase. */
+  private async purchasesBehind(rows: readonly InvoiceRecord[]): Promise<Map<string, PurchaseInvoiceFactsView>> {
+    const ids = [...new Set(rows.flatMap((row) => (row.purchaseInvoiceId === null ? [] : [row.purchaseInvoiceId])))];
+
+    return ids.length === 0 ? new Map<string, PurchaseInvoiceFactsView>() : this.purchaseFacts.get().factsOf(ids);
+  }
+
   private async wires(rows: readonly InvoiceRecord[]): Promise<InvoiceWire[]> {
     const people = await this.facts.people(rows.map((row) => row.recordedByEmployeeId));
+    const purchases = await this.purchasesBehind(rows);
     const formatters = new Map<string, Awaited<ReturnType<BudgetFactsService['formatter']>>>();
     for (const code of new Set(rows.map((row) => row.currency))) formatters.set(code, await this.facts.formatter(code));
 
     return rows.map((row): InvoiceWire => {
       const money = formatters.get(row.currency) as Awaited<ReturnType<BudgetFactsService['formatter']>>;
+      const purchase = row.purchaseInvoiceId === null ? undefined : purchases.get(row.purchaseInvoiceId);
 
       return {
         id: row.id,
@@ -152,6 +166,9 @@ export class InvoiceService {
         nonDeductibleTax: money(row.nonDeductibleTaxMinor),
         actualCost: money(row.actualCostMinor),
         matchResult: row.matchResult,
+        servicePeriodMonth: row.serviceMonth === null ? null : row.serviceMonth.slice(0, 7),
+        label: purchase?.label ?? null,
+        paymentSource: purchase?.paymentSource ?? null,
         note: row.note,
         recordedBy: people.get(row.recordedByEmployeeId) ?? null,
         recordedAt: row.recordedAt.toISOString(),

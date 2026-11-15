@@ -545,6 +545,29 @@ describe('invoices booked against commitments over PostgreSQL (US-12-02, US-06-0
     });
   });
 
+  describe('what the list says of where an invoice came from (PI-1.7)', () => {
+    it('leaves the month, the label and the way of payment empty for an invoice kept from before, and gives the month for a booked one the purchase of which is not known', async () => {
+      const target = await committed();
+      await h.invoiceOf(target.commitment.id, 1 * M, 'OLD-1');
+      const booked = await record(target, { net: 2 * M, number: 'NEW-1' });
+
+      const all = h.dataOf<{ items: Array<InvoiceWire & Record<string, unknown>> }>(
+        await h.invoicesOf(target.commitment.id).expect(200),
+      ).items;
+
+      expect(all.find((item) => item.number === 'OLD-1')).toMatchObject({
+        servicePeriodMonth: null,
+        label: null,
+        paymentSource: null,
+      });
+      expect(all.find((item) => item.id === booked.invoice.id)).toMatchObject({
+        servicePeriodMonth: `${h.year}-11`,
+        label: null,
+        paymentSource: null,
+      });
+    });
+  });
+
   describe('two invoices at the same time (A7)', () => {
     const queued = (target: Committed, numbers: [string, string], net: number) =>
       h.queuedOnCommitment(

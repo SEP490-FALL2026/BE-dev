@@ -13,7 +13,12 @@ import type { BudgetFactsService } from '../budget/budget-facts.service';
 import type { CommitmentRepo } from '../budget/commitment.repo';
 import type { InvoiceRecord, InvoiceRepo } from '../budget/invoice.repo';
 import type { CommitmentService } from '../commitment/commitment.service';
-import { CommitmentRequestFactsHook, type CommitmentRequestView } from '../public/budgets.extension-points';
+import {
+  CommitmentRequestFactsHook,
+  PurchaseInvoiceFactsHook,
+  type CommitmentRequestView,
+  type PurchaseInvoiceFactsView,
+} from '../public/budgets.extension-points';
 import type { InvoiceBodyDto } from './invoice.dto';
 import { InvoiceService } from './invoice.service';
 
@@ -51,7 +56,13 @@ const view = (over: Partial<CommitmentRequestView> = {}): CommitmentRequestView 
 });
 
 function build(
-  opts: { row?: ReturnType<typeof row> | null; view?: CommitmentRequestView | null; exists?: boolean } = {},
+  opts: {
+    row?: ReturnType<typeof row> | null;
+    view?: CommitmentRequestView | null;
+    exists?: boolean;
+    pageRows?: InvoiceRecord[];
+    purchaseFacts?: Map<string, PurchaseInvoiceFactsView>;
+  } = {},
 ) {
   const calls: string[] = [];
   const lockById = jest.fn(() => {
@@ -81,6 +92,8 @@ function build(
       note: input.note,
       recordedByEmployeeId: input.recordedByEmployeeId,
       recordedAt: new Date('2027-01-06T01:00:00.000Z'),
+      serviceMonth: null,
+      purchaseInvoiceId: null,
     } as InvoiceRecord);
   });
   const exists = jest.fn().mockResolvedValue(opts.exists ?? false);
@@ -96,10 +109,19 @@ function build(
   );
   hook.bind({ factsOf });
   const page = jest.fn().mockResolvedValue({ items: [{ id: COMMITMENT, state: 'HELD' }] });
+  const purchaseHook = new PurchaseInvoiceFactsHook();
+  const purchaseFactsOf = jest.fn(() => Promise.resolve(opts.purchaseFacts ?? new Map()));
+  purchaseHook.bind({ factsOf: purchaseFactsOf });
+  const rows = opts.pageRows ?? [];
   const service = new InvoiceService(
     { run: (fn: (tx: unknown) => unknown) => fn({}) } as unknown as TransactionRunner,
-    { lockById, applyInvoice, exists: jest.fn() } as unknown as CommitmentRepo,
-    { insert, exists, netRecorded: jest.fn().mockResolvedValue(0n) } as unknown as InvoiceRepo,
+    { lockById, applyInvoice, exists: jest.fn().mockResolvedValue(true) } as unknown as CommitmentRepo,
+    {
+      insert,
+      exists,
+      netRecorded: jest.fn().mockResolvedValue(0n),
+      page: jest.fn().mockResolvedValue({ rows, total: rows.length }),
+    } as unknown as InvoiceRepo,
     {
       moneyIn,
       people: jest
@@ -110,9 +132,10 @@ function build(
     { record } as unknown as AuditApi,
     hook,
     { page } as unknown as CommitmentService,
+    purchaseHook,
   );
 
-  return { service, calls, lockById, applyInvoice, insert, exists, moneyIn, factsOf, record };
+  return { service, calls, lockById, applyInvoice, insert, exists, moneyIn, factsOf, record, purchaseFactsOf };
 }
 
 describe('InvoiceService.record', () => {
@@ -250,5 +273,67 @@ describe('InvoiceService.record', () => {
 
       await expect(service.record(ACTOR, COMMITMENT, body())).rejects.toThrow('connection lost');
     });
+  });
+});
+
+const stored = (id: string, over: Partial<InvoiceRecord> = {}): InvoiceRecord => ({
+  id,
+  commitmentId: COMMITMENT,
+  number: `N-${id}`,
+  issuedOn: '2027-01-05',
+  currency: 'VND',
+  netMinor: 1_000n,
+  deductibleTaxMinor: 0n,
+  nonDeductibleTaxMinor: 0n,
+  actualCostMinor: 1_000n,
+  matchResult: 'MATCHED',
+  note: null,
+  recordedByEmployeeId: 'finance-1',
+  recordedAt: new Date('2027-01-06T01:00:00.000Z'),
+  serviceMonth: null,
+  purchaseInvoiceId: null,
+  ...over,
+});
+
+describe('InvoiceService.page (PI-1.7)', () => {
+  it('adds the month it pays for, its label and how it was paid to an invoice of a purchase, reading the purchases of the page once', async () => {
+    const { service, purchaseFactsOf } = build({
+      pageRows: [
+        stored('a', { serviceMonth: '2027-03-01', purchaseInvoiceId: 'p-1' }),
+        stored('b', { serviceMonth: '2027-04-01', purchaseInvoiceId: 'p-2' }),
+      ],
+      purchaseFacts: new Map([
+        ['p-1', { label: 'NEW_PURCHASE', paymentSource: 'COMPANY_CARD' }],
+        ['p-2', { label: 'PERIOD', paymentSource: 'IT_ADVANCE' }],
+      ]),
+    });
+
+    const page = await service.page(COMMITMENT, { page: 1, pageSize: 20 });
+
+    expect(page.items).toMatchObject([
+      { id: 'a', servicePeriodMonth: '2027-03', label: 'NEW_PURCHASE', paymentSource: 'COMPANY_CARD' },
+      { id: 'b', servicePeriodMonth: '2027-04', label: 'PERIOD', paymentSource: 'IT_ADVANCE' },
+    ]);
+    expect(purchaseFactsOf).toHaveBeenCalledTimes(1);
+    expect(purchaseFactsOf).toHaveBeenCalledWith(['p-1', 'p-2']);
+  });
+
+  it('leaves the three empty for an invoice that is not of a purchase, and does not ask for purchases when the page holds none', async () => {
+    const { service, purchaseFactsOf } = build({ pageRows: [stored('old')] });
+
+    const page = await service.page(COMMITMENT, { page: 1, pageSize: 20 });
+
+    expect(page.items[0]).toMatchObject({ servicePeriodMonth: null, label: null, paymentSource: null });
+    expect(purchaseFactsOf).not.toHaveBeenCalled();
+  });
+
+  it('keeps the month and leaves label and way of payment empty for a purchase the requests cannot tell about', async () => {
+    const { service } = build({
+      pageRows: [stored('lost', { serviceMonth: '2027-05-01', purchaseInvoiceId: 'p-gone' })],
+    });
+
+    const page = await service.page(COMMITMENT, { page: 1, pageSize: 20 });
+
+    expect(page.items[0]).toMatchObject({ servicePeriodMonth: '2027-05', label: null, paymentSource: null });
   });
 });

@@ -29,6 +29,7 @@ import {
   CommitmentReleaseGuardHook,
   CommitmentRequestFactsHook,
   PendingSpendContributions,
+  PurchaseInvoiceFactsHook,
 } from './public/budgets.extension-points';
 import { BudgetCommitmentsController } from './commitment/budget-commitments.controller';
 import { CommitmentService } from './commitment/commitment.service';
@@ -171,6 +172,7 @@ import { BudgetAttachmentExpirySweeper } from './attachment/budget-attachment-ex
     PendingSpendContributions,
     CommitmentReleaseGuardHook,
     CommitmentRequestFactsHook,
+    PurchaseInvoiceFactsHook,
     BudgetCostCenterUseReader,
     BudgetHeadChangeListener,
     BudgetSpendingApproverGrantCheck,
@@ -180,6 +182,12 @@ import { BudgetAttachmentExpirySweeper } from './attachment/budget-attachment-ex
     PurchaseInvoiceRecorderService,
     BudgetsApi,
   ],
-  exports: [BudgetsApi, PendingSpendContributions, CommitmentReleaseGuardHook, CommitmentRequestFactsHook],
+  exports: [
+    BudgetsApi,
+    PendingSpendContributions,
+    CommitmentReleaseGuardHook,
+    CommitmentRequestFactsHook,
+    PurchaseInvoiceFactsHook,
+  ],
 })
 export class BudgetsModule {}

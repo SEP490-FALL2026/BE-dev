@@ -166,6 +166,40 @@ describe('Finance signs or returns a purchase invoice over PostgreSQL (integrati
     ).toBe(1);
   });
 
+  it('shows each signed invoice on the invoices of its commitment with the month it pays for, its label and how it was paid (PI-1.7)', async () => {
+    const { requestId } = await approved();
+    const first = await submitted(requestId);
+    const second = await submitted(requestId, { servicePeriodMonth: `${h.year}-12`, paymentSource: 'IT_ADVANCE' });
+    await confirm(first.id).expect(201);
+    await confirm(second.id).expect(201);
+    const commitmentId = h.dataOf<{ items: Array<{ id: string }> }>(
+      await h.commitmentList(h.finance, { requestId }).expect(200),
+    ).items[0].id;
+
+    const listed = h.dataOf<{
+      items: Array<{
+        id: string;
+        servicePeriodMonth: string | null;
+        label: string | null;
+        paymentSource: string | null;
+      }>;
+    }>(await h.invoicesOf(commitmentId).expect(200)).items;
+
+    const stored = await h.ctx.sql.query<{ invoice_id: string; label: string; payment_source: string }>(
+      `SELECT invoice_id, label::text, payment_source::text FROM purchase_invoices WHERE id = ANY($1::uuid[])`,
+      [[first.id, second.id]],
+    );
+    expect(listed).toHaveLength(2);
+    expect(stored.rows.map((row) => row.payment_source).sort()).toEqual(['COMPANY_CARD', 'IT_ADVANCE']);
+    for (const row of stored.rows) {
+      expect(listed.find((item) => item.id === row.invoice_id)).toMatchObject({
+        label: row.label,
+        paymentSource: row.payment_source,
+      });
+    }
+    expect(listed.map((item) => item.servicePeriodMonth).sort()).toEqual([`${h.year}-11`, `${h.year}-12`]);
+  });
+
   it('books the invoice of December paid in January to the year of December (T-PI)', async () => {
     const { unit, requestId } = await approved();
     const purchase = await submitted(requestId, {

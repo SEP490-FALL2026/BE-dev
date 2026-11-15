@@ -19,6 +19,9 @@ const RECORDED = {
     nonDeductibleTax: money('0'),
     actualCost: money('12000000'),
     matchResult: 'TAX_ONLY',
+    servicePeriodMonth: '2026-11',
+    label: 'NEW_PURCHASE',
+    paymentSource: 'COMPANY_CARD',
     note: 'first half',
     recordedBy: { employeeId: '5f0c7d54-9e1b-4f6a-8d2c-5b7a1e9c0d33', employeeCode: 'NV-1', fullName: 'An Nguyen' },
     recordedAt: '2026-11-03T02:00:00.000Z',
@@ -167,5 +170,27 @@ describe('the invoice routes of a commitment (HTTP contract, no database)', () =
 
     expect((response.body as { message: string }).message).toBe('BUDGET_COMMITMENT.INVOICES_LISTED');
     expect(page).toHaveBeenCalledWith(ID, expect.objectContaining({ page: 2, pageSize: 5 }));
+  });
+
+  it('shows the month, the label and the way of payment of an invoice of a purchase, and nothing of them for one kept from before', async () => {
+    const old = { ...RECORDED.invoice, id: '8f0c7d54-9e1b-4f6a-8d2c-5b7a1e9c0d66', servicePeriodMonth: null };
+    const items = [
+      RECORDED.invoice,
+      { ...old, label: null, paymentSource: null },
+      {
+        ...RECORDED.invoice,
+        id: '9f0c7d54-9e1b-4f6a-8d2c-5b7a1e9c0d77',
+        label: 'RENEWAL',
+        paymentSource: 'IT_ADVANCE',
+      },
+    ];
+    page.mockResolvedValue({ items, pagination: { page: 1, pageSize: 20, totalItems: 3, totalPages: 1 } });
+
+    const response = await request(app.getHttpServer())
+      .get(`/api/v1/budget-commitments/${ID}/invoices`)
+      .set('Authorization', FINANCE)
+      .expect(200);
+
+    expect((response.body as { data: { items: unknown[] } }).data.items).toEqual(items);
   });
 });
