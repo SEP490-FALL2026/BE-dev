@@ -82,6 +82,7 @@ export class SeatMonthQueryService {
       invoiced: money(line.invoicedMinor),
       allocated: money(line.allocatedMinor),
       unallocated: money(stockLineMinor({ invoicedMinor: line.invoicedMinor, allocatedMinor: line.allocatedMinor })),
+      withoutCostCenter: money(line.withoutCostCenterMinor),
     }));
   }
 

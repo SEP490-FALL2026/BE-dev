@@ -90,7 +90,12 @@ export class BudgetTableViewService {
     year: number,
     reserveMinor: bigint | null,
     money: ((minor: bigint) => MoneyView) | null,
-  ): Promise<Pick<BudgetSummaryWire, 'companySpent' | 'sharedPoolUnallocated' | 'sharedPoolOverReserve'>> {
+  ): Promise<
+    Pick<
+      BudgetSummaryWire,
+      'companySpent' | 'sharedPoolUnallocated' | 'sharedPoolOverReserve' | 'seatMonthsWithoutCostCenter'
+    >
+  > {
     const company = await this.seatMonths.yearTotals(year);
     const unallocatedMinor = stockLineMinor({
       invoicedMinor: company.poolInvoicedMinor,
@@ -101,6 +106,7 @@ export class BudgetTableViewService {
       companySpent: money ? money(company.companyMinor) : null,
       sharedPoolUnallocated: money ? money(unallocatedMinor) : null,
       sharedPoolOverReserve: reserveMinor === null ? null : unallocatedMinor > reserveMinor,
+      seatMonthsWithoutCostCenter: money ? money(company.withoutCostCenterMinor) : null,
     };
   }
 

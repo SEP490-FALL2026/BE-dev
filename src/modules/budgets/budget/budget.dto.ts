@@ -353,6 +353,8 @@ const budgetSummarySchema = z.strictObject({
   sharedPoolUnallocated: moneyView.nullable(),
   /** Whether the line of the pool is more than the pool reserve of the cycle (Finance is warned); null when the cycle sets no reserve. */
   sharedPoolOverReserve: z.boolean().nullable(),
+  /** The line "not allocated to a Cost Center": the seat-months of the year that fell to a department with no Cost Center yet (`SM1-05`); in no Cost Center and not in the line of the pool. */
+  seatMonthsWithoutCostCenter: moneyView.nullable(),
 });
 export const mineVersionSummarySchema = z.strictObject({
   id: z.uuid(),

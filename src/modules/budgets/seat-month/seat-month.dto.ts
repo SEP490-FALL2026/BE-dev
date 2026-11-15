@@ -38,6 +38,10 @@ const poolLineSchema = z.strictObject({
     description:
       'The line "not allocated, shared pool": the invoices of the month less the seat-months charged to departments.',
   }),
+  withoutCostCenter: moneyView.meta({
+    description:
+      'The line "not allocated to a Cost Center": the part of the seat-months that fell to a department with no Cost Center yet. It is in no Cost Center and not in the line of the pool.',
+  }),
 });
 
 const pagination = z.strictObject({

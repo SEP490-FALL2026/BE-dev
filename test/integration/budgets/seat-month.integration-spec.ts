@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import request from 'supertest';
 import { BudgetsApi } from '../../../src/modules/budgets/public/budgets.api';
+import { OrganizationReadApi } from '../../../src/modules/organization/public/organization-read.api';
 import { SeatMonthSubscriptionService } from '../../../src/modules/budgets/seat-month/seat-month-subscription.service';
 import { SeatMonthRepo } from '../../../src/modules/budgets/seat-month/seat-month.repo';
 import { SeatMonthService } from '../../../src/modules/budgets/seat-month/seat-month.service';
@@ -313,6 +314,52 @@ describe('a month of the seats of a K2 pool is charged to the departments of the
     for (const pool of [first, second, third]) expect(await rowsOf(pool)).toHaveLength(1);
   });
 
+  it('SM1-05: the days of a department that has no Cost Center yet are the line "not allocated to a Cost Center", not nothing: the departments, the line of the pool and that line add up to the invoice', async () => {
+    const pool = await newPool();
+    const planId = await h.planOf(pool);
+    const vendorId = (await h.vendorOf(planId)).id;
+    const [withCenter, without] = [await department(), await department()];
+    await seat(pool, planId, await holder('E-SM-CC1', withCenter));
+    await seat(pool, planId, await holder('E-SM-CC2', without));
+    const invoice = await h.recordPurchase(vendorId, {
+      subscriptionId: pool,
+      serviceMonth: month(),
+      netMinor: 800_000n,
+    });
+    const organization = h.ctx.app.get(OrganizationReadApi, { strict: false });
+    const original = organization.getUnitCostCenterIds.bind(organization);
+    jest.spyOn(organization, 'getUnitCostCenterIds').mockImplementation(async (ids, tx) => {
+      const found = await original(ids, tx);
+      found.delete(without.department.id);
+
+      return found;
+    });
+
+    await service().chargeMonth(month());
+    jest.restoreAllMocks();
+
+    const rows = new Map((await rowsOf(pool)).map((row) => [row.department_id, row]));
+    expect(rows.get(without.department.id)).toMatchObject({ cost_center_id: null, amount_minor: '400000' });
+    const [line] = await h.ctx.app.get(SeatMonthRepo, { strict: false }).poolLinesOfMonth(month(), pool, 10);
+    expect(line).toEqual({
+      subscriptionId: pool,
+      invoicedMinor: 800_000n,
+      allocatedMinor: 800_000n,
+      withoutCostCenterMinor: 400_000n,
+    });
+    const departments = (await facts(withCenter))?.spentMinor ?? 0n;
+    expect(departments).toBe(400_000n);
+    expect(departments + line.withoutCostCenterMinor + (line.invoicedMinor - line.allocatedMinor)).toBe(
+      invoice.actualCostMinor,
+    );
+    const year = await h.ctx.app.get(SeatMonthRepo, { strict: false }).yearTotals(h.year);
+    expect(year.withoutCostCenterMinor).toBeGreaterThanOrEqual(400_000n);
+    const summary = h.dataOf<{ seatMonthsWithoutCostCenter: { amount: string } }>(
+      await h.summary(h.finance, { year: h.year }).expect(200),
+    );
+    expect(BigInt(summary.seatMonthsWithoutCostCenter.amount)).toBe(year.withoutCostCenterMinor);
+  });
+
   const facts = async (unit: Unit) =>
     (await h.ctx.app.get(BudgetsApi, { strict: false }).yearFacts(unit.department.unitId, [h.year])).get(h.year);
 
@@ -348,7 +395,12 @@ describe('a month of the seats of a K2 pool is charged to the departments of the
     expect(await facts(x)).toMatchObject({ spentMinor: 6n * 400_000n });
     expect(await facts(y)).toMatchObject({ spentMinor: 2n * 400_000n });
     const [line] = await h.ctx.app.get(SeatMonthRepo, { strict: false }).poolLinesOfMonth(month(), pool, 10);
-    expect(line).toEqual({ subscriptionId: pool, invoicedMinor: 4_000_000n, allocatedMinor: 3_200_000n });
+    expect(line).toEqual({
+      subscriptionId: pool,
+      invoicedMinor: 4_000_000n,
+      allocatedMinor: 3_200_000n,
+      withoutCostCenterMinor: 0n,
+    });
     // The company spent the invoice: the departments' share and the line of the pool add up to it, and the seat-months leave the invoice as it was.
     expect(6n * 400_000n + 2n * 400_000n + (line.invoicedMinor - line.allocatedMinor)).toBe(invoice.actualCostMinor);
     const summary = h.dataOf<{ companySpent: { amount: string }; sharedPoolUnallocated: { amount: string } }>(
