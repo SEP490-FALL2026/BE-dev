@@ -40,6 +40,12 @@ export interface ImportTemplateColumn {
   constraint: string;
   /** The codes the parser gives a row it refuses for this column, so the instruction sheet and the parser say the same. */
   refusedWith?: string[];
+  /** How a person reads it in a form made for people; the header of the file otherwise, which for a file a parser reads is `key`. */
+  label?: string;
+  /** `integer` and `vnd` are numbers (formatted by the thousand); anything else is text, which a spreadsheet must not turn into a number or a date. */
+  kind?: 'text' | 'integer' | 'vnd';
+  /** The cell of an example line is this formula (`{row}` is the number of its row): the amount of a line is made of the cells beside it. */
+  formula?: string;
 }
 
 /**
@@ -52,6 +58,11 @@ export interface ImportTemplateDefinition {
   /** The formats the file is read in, the first the default: a template in a format the parser does not read would be refused whole. */
   formats: ImportTemplateFormat[];
   columns: ImportTemplateColumn[];
+  /**
+   * A form for people rather than a file for a parser (the budget form `BM-10`): a title, lines to fill in about who made it, headers in the reader's
+   * words, and a total under the lines.
+   */
+  form?: { title: string; fields: string[]; totalLabel: string | null };
   /** Each row has one cell per column, in the order of `columns`. */
   sampleRows: string[][];
   /** Lines under the table of the instruction sheet: what the file may not contain, how many rows, who confirms. */

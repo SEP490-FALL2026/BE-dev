@@ -27,7 +27,7 @@ export function guideRowsOf(definition: ImportTemplateDefinition): string[][] {
   return [
     ['Cột', 'Bắt buộc', 'Mô tả', 'Định dạng', 'Ví dụ', 'Ràng buộc', 'Mã lỗi khi từ chối'],
     ...definition.columns.map((column) => [
-      column.key,
+      column.label ?? column.key,
       column.required ? 'Có' : 'Không',
       column.description,
       column.format,
