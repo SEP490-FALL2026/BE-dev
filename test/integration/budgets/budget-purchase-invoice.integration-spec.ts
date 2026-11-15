@@ -222,6 +222,24 @@ describe('the invoice Finance signs for a purchase is booked to the month it pay
     expect(await commitmentApplied(requestId)).toMatchObject({ state: 'EXPENSED' });
   });
 
+  it('tells the commitments a request holds with what is left of each: what the preview of a purchase invoice shows', async () => {
+    const { unit, requestId } = await committed();
+    const api = () => h.ctx.app.get(BudgetsApi, { strict: false });
+
+    const [before] = await api().commitmentsOfRequest(requestId);
+    expect(before).toMatchObject({
+      year: h.year,
+      costCenterId: unit.department.unitId,
+      state: 'HELD',
+      amountMinor: BigInt(20 * M),
+      remainingMinor: BigInt(20 * M),
+    });
+    await record({ requestId, chargedCostCenterId: unit.department.unitId, netMinor: BigInt(6 * M) });
+
+    expect(await api().commitmentsOfRequest(requestId)).toEqual([{ ...before, remainingMinor: BigInt(14 * M) }]);
+    expect(await api().commitmentsOfRequest(randomUUID())).toEqual([]);
+  });
+
   it('refuses a number the vendor already has, a purchase invoice recorded twice, and a place that is nowhere', async () => {
     const unit = await department();
     const purchaseInvoiceId = randomUUID();

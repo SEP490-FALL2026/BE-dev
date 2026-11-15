@@ -138,6 +138,16 @@ export interface CommittedAmount {
   currency: string;
 }
 
+/** A commitment a request holds, with what is left of it to be invoiced against (`PI-1`): nothing once it is let go or became an expense. */
+export interface RequestCommitment {
+  id: string;
+  year: number;
+  costCenterId: string;
+  state: 'HELD' | 'RELEASED' | 'EXPENSED';
+  amountMinor: bigint;
+  remainingMinor: bigint;
+}
+
 /** What a request still holds and has not spent or given back, in one currency: the part of a commitment that going back to the budget would free. */
 export interface HeldAmount {
   requestId: string;

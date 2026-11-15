@@ -12,6 +12,7 @@ import type {
   PurchaseInvoiceRecorded,
   PurchaseInvoiceRecordInput,
   ReleasedCommitment,
+  RequestCommitment,
   SeatCommitment,
   YearBudgetFacts,
   YearStartHoldInput,
@@ -91,6 +92,11 @@ export class BudgetsApi {
    */
   heldByRequests(requestIds: readonly string[], tx?: DbTx): Promise<HeldAmount[]> {
     return this.commitments.heldBy(requestIds, tx);
+  }
+
+  /** The commitments the request holds, the oldest year first, with what is left of each to be invoiced against (`PI-1`); one read that locks nothing. */
+  commitmentsOfRequest(requestId: string, tx?: DbTx): Promise<RequestCommitment[]> {
+    return this.commitments.commitmentsOf(requestId, tx);
   }
 
   /** Whether the request holds a commitment, which is what lets Finance read it (`US-06-09` AC-2). */

@@ -36,7 +36,7 @@ import {
 import { budgetAuditEvent, BudgetFactsService } from '../budget/budget-facts.service';
 import { CommitmentRepo } from '../budget/commitment.repo';
 import { InvoiceRepo } from '../budget/invoice.repo';
-import type { CommittedAmount, HeldAmount } from '../public/budgets.types';
+import type { CommittedAmount, HeldAmount, RequestCommitment } from '../public/budgets.types';
 import type { CommitmentWire, ReleaseWire } from './commitment.dto';
 
 /**
@@ -317,6 +317,11 @@ export class CommitmentService {
   /** What each of the requests still holds and has not spent or given back, in one read that locks nothing (a preview of a release). */
   heldBy(requestIds: readonly string[], tx?: DbTx): Promise<HeldAmount[]> {
     return this.commitments.heldOfRequests(requestIds, tx);
+  }
+
+  /** The commitments of the request with what is left of each (`PI-1`), in the caller's transaction when it has one. */
+  commitmentsOf(requestId: string, tx?: DbTx): Promise<RequestCommitment[]> {
+    return this.commitments.ofRequest(requestId, tx);
   }
 
   async heldFor(requestId: string): Promise<boolean> {
