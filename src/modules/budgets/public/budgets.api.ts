@@ -2,12 +2,15 @@ import { Injectable } from '@nestjs/common';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { BudgetFactsRepo } from '../budget/budget-facts.repo';
 import { CommitmentService } from '../commitment/commitment.service';
+import { PurchaseInvoiceRecorderService } from '../invoice/purchase-invoice-recorder.service';
 import type {
   CommittedAmount,
   CommitmentHoldInput,
   CommitmentReleaseInput,
   HeldAmount,
   HeldCommitment,
+  PurchaseInvoiceRecorded,
+  PurchaseInvoiceRecordInput,
   ReleasedCommitment,
   SeatCommitment,
   YearBudgetFacts,
@@ -26,6 +29,7 @@ export class BudgetsApi {
   constructor(
     private readonly facts: BudgetFactsRepo,
     private readonly commitments: CommitmentService,
+    private readonly purchaseInvoices: PurchaseInvoiceRecorderService,
   ) {}
 
   /** The current budget of each of the years; a year without one is absent from the map, which is not a budget of nothing. */
@@ -92,5 +96,19 @@ export class BudgetsApi {
   /** Whether the request holds a commitment, which is what lets Finance read it (`US-06-09` AC-2). */
   requestHoldsCommitment(requestId: string): Promise<boolean> {
     return this.commitments.heldFor(requestId);
+  }
+
+  /**
+   * The invoice Finance signed for a purchase (`PI-1`, `D3`) is written as the one invoice of that purchase, in the transaction of the signature, booked to
+   * the month and the year the purchase pays for: into the commitment of the request for that year when the department that bears it is the
+   * commitment's own, as an expense of that department with no commitment otherwise, and as a line of the subscription for a renewal. It is never
+   * refused for being more than the budget (`C-08`). Throws PurchaseInvoiceRecordRefusedError.
+   */
+  recordPurchaseInvoice(
+    tx: DbTx,
+    actor: AuthenticatedPrincipal,
+    input: PurchaseInvoiceRecordInput,
+  ): Promise<PurchaseInvoiceRecorded> {
+    return this.purchaseInvoices.record(tx, actor, input);
   }
 }

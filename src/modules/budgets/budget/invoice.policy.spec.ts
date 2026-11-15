@@ -1,4 +1,4 @@
-import { planInvoice, type InvoiceCommitment, type InvoiceFigures } from './invoice.policy';
+import { bookPurchaseInvoice, planInvoice, type InvoiceCommitment, type InvoiceFigures } from './invoice.policy';
 
 const commitment = (over: Partial<InvoiceCommitment> = {}): InvoiceCommitment => ({
   amountMinor: 20_000n,
@@ -156,5 +156,92 @@ describe('planInvoice: what an invoice does to the commitment it is recorded aga
 
       expect(plan).toMatchObject({ ok: true, matchResult: 'PRICE_QUANTITY_EXCEPTION', stateAfter: 'EXPENSED' });
     });
+  });
+});
+
+describe('bookPurchaseInvoice: where the invoice of a purchase is booked (PI-1, R-51, MIN-15)', () => {
+  const held = { id: 'c-2026', year: 2026, costCenterId: 'cc-old', state: 'HELD' as const };
+
+  it('goes into the commitment of the year when the Cost Center that bears it is the one of the commitment', () => {
+    expect(
+      bookPurchaseInvoice({
+        commitments: [held],
+        serviceYear: 2026,
+        chargedCostCenterId: 'cc-old',
+        subscriptionId: null,
+      }),
+    ).toEqual({ kind: 'COMMITMENT', commitmentId: 'c-2026' });
+  });
+
+  it('goes into a commitment that is already an expense: what it did not hold is still booked to it', () => {
+    expect(
+      bookPurchaseInvoice({
+        commitments: [{ ...held, state: 'EXPENSED' }],
+        serviceYear: 2026,
+        chargedCostCenterId: 'cc-old',
+        subscriptionId: null,
+      }),
+    ).toEqual({ kind: 'COMMITMENT', commitmentId: 'c-2026' });
+  });
+
+  it('is an expense with no commitment of the new department when the right moved (T-PI: transfer on 16/11, period 11/2026)', () => {
+    expect(
+      bookPurchaseInvoice({
+        commitments: [held],
+        serviceYear: 2026,
+        chargedCostCenterId: 'cc-new',
+        subscriptionId: null,
+      }),
+    ).toEqual({ kind: 'COST_CENTER', costCenterId: 'cc-new' });
+  });
+
+  it('is an expense with no commitment when the commitment was let go', () => {
+    expect(
+      bookPurchaseInvoice({
+        commitments: [{ ...held, state: 'RELEASED' }],
+        serviceYear: 2026,
+        chargedCostCenterId: 'cc-old',
+        subscriptionId: null,
+      }),
+    ).toEqual({ kind: 'COST_CENTER', costCenterId: 'cc-old' });
+  });
+
+  it('looks at the commitment of the year the service month falls in: December paid in January is the year before', () => {
+    const commitments = [held, { id: 'c-2027', year: 2027, costCenterId: 'cc-old', state: 'HELD' as const }];
+
+    expect(
+      bookPurchaseInvoice({ commitments, serviceYear: 2026, chargedCostCenterId: 'cc-old', subscriptionId: null }),
+    ).toEqual({ kind: 'COMMITMENT', commitmentId: 'c-2026' });
+    expect(
+      bookPurchaseInvoice({ commitments, serviceYear: 2027, chargedCostCenterId: 'cc-old', subscriptionId: null }),
+    ).toEqual({ kind: 'COMMITMENT', commitmentId: 'c-2027' });
+  });
+
+  it('is an expense of the Cost Center when the request holds nothing for that year', () => {
+    expect(
+      bookPurchaseInvoice({
+        commitments: [held],
+        serviceYear: 2027,
+        chargedCostCenterId: 'cc-old',
+        subscriptionId: null,
+      }),
+    ).toEqual({ kind: 'COST_CENTER', costCenterId: 'cc-old' });
+  });
+
+  it('is a line of the subscription, with no commitment, when the invoice is of a subscription', () => {
+    expect(
+      bookPurchaseInvoice({
+        commitments: [held],
+        serviceYear: 2026,
+        chargedCostCenterId: 'cc-old',
+        subscriptionId: 's-1',
+      }),
+    ).toEqual({ kind: 'SUBSCRIPTION', subscriptionId: 's-1' });
+  });
+
+  it('has nowhere to go with no commitment, no subscription and no Cost Center', () => {
+    expect(
+      bookPurchaseInvoice({ commitments: [], serviceYear: 2026, chargedCostCenterId: null, subscriptionId: null }),
+    ).toEqual({ kind: 'UNPLACED' });
   });
 });

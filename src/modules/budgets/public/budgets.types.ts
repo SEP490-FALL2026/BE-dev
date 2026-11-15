@@ -144,3 +144,44 @@ export interface HeldAmount {
   currency: string;
   heldMinor: bigint;
 }
+
+/**
+ * What Finance signed for a purchase invoice (`PI-1`, `D3`): the one invoice the budgets write, booked to the month the purchase pays for. The
+ * figures are in the reporting currency (VND, `QĐ-111an`) and are what was taken out of the company (`R-4`).
+ */
+export interface PurchaseInvoiceRecordInput {
+  organizationId: string;
+  /** The purchase invoice of the requests context; it comes once. */
+  purchaseInvoiceId: string;
+  /** The request the commitment is held for; null for an invoice of a subscription. */
+  requestId: string | null;
+  /** Set for an invoice of a subscription (a renewal): it is booked as a line of the subscription, with no commitment. */
+  subscriptionId: string | null;
+  vendorId: string;
+  number: string;
+  issuedOn: string;
+  /** The first day of the month the purchase pays for: the month and the year the expense belongs to. */
+  serviceMonth: string;
+  netMinor: bigint;
+  deductibleTaxMinor: bigint;
+  nonDeductibleTaxMinor: bigint;
+  /** What the purchase invoice already says about the count and the price of one (`R-44`). */
+  matchResult: 'MATCHED' | 'PRICE_QUANTITY_EXCEPTION';
+  /** The Cost Center of the department that held the right in the service month (`R-51`); null for an invoice of a subscription. */
+  chargedCostCenterId: string | null;
+  now: Date;
+}
+
+export interface PurchaseInvoiceRecorded {
+  invoiceId: string;
+  /** Where it was booked: into a commitment, as an expense of a Cost Center with no commitment, or as a line of a subscription. */
+  booking: 'COMMITMENT' | 'COST_CENTER' | 'SUBSCRIPTION';
+  commitmentId: string | null;
+  costCenterId: string | null;
+  subscriptionId: string | null;
+  /** The price before tax and the tax that cannot be deducted. */
+  actualCostMinor: bigint;
+  /** What of the price took the commitment down. */
+  appliedMinor: bigint;
+  matchResult: 'MATCHED' | 'TAX_ONLY' | 'PRICE_QUANTITY_EXCEPTION';
+}
