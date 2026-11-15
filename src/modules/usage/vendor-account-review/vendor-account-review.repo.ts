@@ -195,13 +195,22 @@ export class VendorAccountReviewRepo {
     return { rows: page.rows.map(toCase), total: page.total };
   }
 
-  /** The findings and the identifiers of the application nobody has dealt with: what the review is made from (`usage` tables, same module). */
-  async openFindingsOf(tx: DbTx, applicationId: string) {
-    return tx.usageNoAssignmentFinding.findMany({ where: { applicationId, status: 'OPEN' }, orderBy: { id: 'asc' } });
+  /**
+   * The findings and the identifiers of the application nobody has dealt with that the report just confirmed contains: what the review is made from
+   * (`usage` tables, same module). One that an older report held and this one did not is not seen again, so its day of evidence does not move.
+   */
+  async openFindingsOf(tx: DbTx, applicationId: string, importId: string) {
+    return tx.usageNoAssignmentFinding.findMany({
+      where: { applicationId, status: 'OPEN', lastImportId: importId },
+      orderBy: { id: 'asc' },
+    });
   }
 
-  async openUnmatchedOf(tx: DbTx, applicationId: string) {
-    return tx.usageUnmatchedIdentity.findMany({ where: { applicationId, status: 'OPEN' }, orderBy: { id: 'asc' } });
+  async openUnmatchedOf(tx: DbTx, applicationId: string, importId: string) {
+    return tx.usageUnmatchedIdentity.findMany({
+      where: { applicationId, status: 'OPEN', lastImportId: importId },
+      orderBy: { id: 'asc' },
+    });
   }
 
   /**

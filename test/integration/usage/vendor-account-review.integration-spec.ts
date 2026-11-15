@@ -56,6 +56,8 @@ describe('the review of the accounts at the vendors over PostgreSQL (integration
   let applicationId: string;
   let vendorId: string;
   let plan: string;
+  /** The report the identifiers and the findings of the tests were last seen in; `confirmed` confirms it unless a test names another. */
+  const seenIn = randomUUID();
 
   beforeAll(async () => {
     await h.start({
@@ -95,31 +97,31 @@ describe('the review of the accounts at the vendors over PostgreSQL (integration
     h.dataOf<Page<Difference>>(await differences('get', `?pageSize=100${query}`, account).expect(200));
 
   /** A report of the vendor was confirmed: what the review is made from is read in the transaction of the confirmation, as the confirmation does. */
-  const confirmed = (): Promise<void> =>
+  const confirmed = (importId: string = seenIn, coverageTo: string = `${h.year}-10-31`): Promise<void> =>
     h.ctx.app.get(TransactionRunner).run((tx) =>
       h.ctx.app.get(UsageImportListeners, { strict: false }).emit(tx, {
         moment: 'CONFIRMED',
-        importId: randomUUID(),
+        importId,
         sourceId: randomUUID(),
         applicationId,
-        coverageTo: `${h.year}-10-31`,
+        coverageTo,
       }),
     );
-  const noSeat = async (employeeId: string): Promise<string> =>
+  const noSeat = async (employeeId: string, lastImportId: string = seenIn): Promise<string> =>
     (
       await h.ctx.sql.query<{ id: string }>(
         `INSERT INTO usage_no_assignment_findings (organization_id, application_id, employee_id, first_activity_date, last_activity_date, last_import_id, status)
          VALUES ($1, $2, $3, $4, $5, $6, 'OPEN') RETURNING id`,
-        [h.seed.organizationId, applicationId, employeeId, `${h.year}-10-01`, `${h.year}-10-20`, randomUUID()],
+        [h.seed.organizationId, applicationId, employeeId, `${h.year}-10-01`, `${h.year}-10-20`, lastImportId],
       )
     ).rows[0].id;
-  const nobodys = async (raw: string): Promise<string> =>
+  const nobodys = async (raw: string, lastImportId: string = seenIn): Promise<string> =>
     (
       await h.ctx.sql.query<{ id: string }>(
         `INSERT INTO usage_unmatched_identities (organization_id, application_id, source_id, identifier_type, normalized_identifier, raw_identifier,
            reason, status, candidate_employee_ids, first_import_id, last_import_id)
          VALUES ($1, $2, $3, 'EMAIL', lower($4), $4, 'NOT_FOUND', 'OPEN', '{}', $5, $5) RETURNING id`,
-        [h.seed.organizationId, applicationId, randomUUID(), raw, randomUUID()],
+        [h.seed.organizationId, applicationId, randomUUID(), raw, lastImportId],
       )
     ).rows[0].id;
   const rowsOfCase = async (caseId: string) =>
@@ -211,6 +213,24 @@ describe('the review of the accounts at the vendors over PostgreSQL (integration
           ])
         ).rowCount,
       ).toBe(2);
+    });
+
+    it('moves the day of the evidence only of what the confirmed report contained: an identifier seen in an older report keeps the day it was seen (B3C-05)', async () => {
+      const older = randomUUID();
+      const newer = randomUUID();
+      await nobodys('stale-b3c05@gmail.com', older);
+      await confirmed(older, `${h.year}-10-31`);
+      await nobodys('fresh-b3c05@gmail.com', newer);
+
+      await confirmed(newer, `${h.year}-12-31`);
+
+      const open = (await listed('&state=OPEN&source=UNMATCHED_IDENTITY')).items;
+      expect(open.find((item) => item.identity === 'stale-b3c05@gmail.com')).toMatchObject({
+        evidenceOn: `${h.year}-10-31`,
+      });
+      expect(open.find((item) => item.identity === 'fresh-b3c05@gmail.com')).toMatchObject({
+        evidenceOn: `${h.year}-12-31`,
+      });
     });
 
     it('makes exactly one for an invoice Finance closes as a suspicion, with what was bought and what the invoice says, and none for one it explains', async () => {

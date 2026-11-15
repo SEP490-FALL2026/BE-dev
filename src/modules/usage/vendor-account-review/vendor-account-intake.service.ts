@@ -29,10 +29,10 @@ export class VendorAccountIntakeService {
     private readonly finance: FinanceApi,
   ) {}
 
-  /** The open findings and open identifiers of the application the report was about; returns how many differences are new. */
+  /** The open findings and open identifiers the confirmed report contains; returns how many differences are new. */
   async fromImport(tx: DbTx, event: UsageImportConfirmedEvent, now: Date = new Date()): Promise<number> {
-    const findings = await this.repo.openFindingsOf(tx, event.applicationId);
-    const unmatched = await this.repo.openUnmatchedOf(tx, event.applicationId);
+    const findings = await this.repo.openFindingsOf(tx, event.applicationId, event.importId);
+    const unmatched = await this.repo.openUnmatchedOf(tx, event.applicationId, event.importId);
     if (findings.length === 0 && unmatched.length === 0) return 0;
     const vendorId = (await this.catalog.getCatalogEntry(tx, event.applicationId))?.vendor?.id ?? null;
     const rows: NewDiscrepancy[] = [
