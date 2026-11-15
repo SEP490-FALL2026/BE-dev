@@ -66,12 +66,14 @@ export function assertPurposeAvailable(purpose: DocumentPurpose): void {
 /** A file is attached to what its purpose names and to nothing else. Throws DocumentPurposeMismatchError. */
 export function assertPurposeAttachesTo(
   purpose: DocumentPurpose,
-  target: 'CONTRACT' | 'SIGNER' | 'PURCHASE_INVOICE',
+  target: 'CONTRACT' | 'SIGNER' | 'PURCHASE_INVOICE' | 'OUT_OF_PROCESS_CASE',
 ): void {
   const targets = {
     CONTRACT: ATTACHES_TO_CONTRACT,
     SIGNER: ATTACHES_TO_SIGNER,
     PURCHASE_INVOICE: ATTACHES_TO_PURCHASE_INVOICE,
+    // A proof of payment is a purchase document, whoever it is attached to.
+    OUT_OF_PROCESS_CASE: ATTACHES_TO_PURCHASE_INVOICE,
   } as const;
   const fits = targets[target].has(purpose);
   if (!fits) throw new DocumentPurposeMismatchError();

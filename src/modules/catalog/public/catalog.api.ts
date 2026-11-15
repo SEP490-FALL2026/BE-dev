@@ -212,6 +212,26 @@ export class CatalogApi {
     }
   }
 
+  /**
+   * Attaches the proofs of payment a case outside the process (`SBF-07a`) was closed with to it in the transaction of the caller: only `PURCHASE_DOCUMENT` files
+   * the actor uploaded that are uploaded and not attached yet. Throws DocumentAttachRefusedError.
+   */
+  async attachOutOfProcessCaseDocuments(
+    tx: DbTx,
+    actor: AuthenticatedPrincipal,
+    input: { documentIds: readonly string[]; outOfProcessCaseId: string },
+  ): Promise<void> {
+    try {
+      await this.documents.attachOutOfProcessCaseDocuments(tx, actor, input);
+    } catch (error) {
+      if (error instanceof DocumentNotFoundError) throw new DocumentAttachRefusedError('NOT_FOUND');
+      if (error instanceof DocumentAlreadyAttachedError) throw new DocumentAttachRefusedError('ALREADY_ATTACHED');
+      if (error instanceof DocumentNotReadyToAttachError) throw new DocumentAttachRefusedError('NOT_READY_TO_ATTACH');
+      if (error instanceof DocumentPurposeMismatchError) throw new DocumentAttachRefusedError('PURPOSE_MISMATCH');
+      throw error;
+    }
+  }
+
   /** The price the vendor quoted for the main subscription of the plan, in the currency it was quoted in (`R-44`); null when none was kept. */
   getPlanOriginalPrice(planId: string, tx?: DbTx, on?: BusinessDate) {
     return this.subscriptions.originalPriceOfPlan(planId, tx, on);

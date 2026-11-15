@@ -126,6 +126,14 @@ export class DocumentRepo {
     });
   }
 
+  /** A proof of payment belongs to the case outside the process it was closed with, in the transaction of the caller. */
+  async markAttachedToOutOfProcessCase(tx: DbTx, id: string, outOfProcessCaseId: string, now: Date): Promise<void> {
+    await tx.documentAttachment.update({
+      where: { id },
+      data: { status: 'READY', outOfProcessCaseId, attachedAt: now },
+    });
+  }
+
   /** A signed record belongs to the person who signed it, in the transaction of the caller. */
   async markAttachedToSigner(tx: DbTx, id: string, signerEmployeeId: string, now: Date): Promise<void> {
     await tx.documentAttachment.update({
