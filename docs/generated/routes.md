@@ -268,7 +268,6 @@ Find a route, open its controller, then the service it calls. Module of a file =
 | GET | `/budget-commitments` | [budgets/commitment/budget-commitments.controller.ts](../../src/modules/budgets/commitment/budget-commitments.controller.ts) → `list` | [CommitmentService](../../src/modules/budgets/commitment/commitment.service.ts) |
 | GET | `/budget-commitments/{id}/releases` | [budgets/commitment/budget-commitments.controller.ts](../../src/modules/budgets/commitment/budget-commitments.controller.ts) → `releases` | [CommitmentService](../../src/modules/budgets/commitment/commitment.service.ts) |
 | POST | `/budget-commitments/{id}/release` | [budgets/commitment/budget-commitments.controller.ts](../../src/modules/budgets/commitment/budget-commitments.controller.ts) → `release` | [CommitmentService](../../src/modules/budgets/commitment/commitment.service.ts) |
-| POST | `/budget-commitments/{id}/invoices` | [budgets/invoice/budget-invoices.controller.ts](../../src/modules/budgets/invoice/budget-invoices.controller.ts) → `record` | [InvoiceService](../../src/modules/budgets/invoice/invoice.service.ts) |
 | GET | `/budget-commitments/{id}/invoices` | [budgets/invoice/budget-invoices.controller.ts](../../src/modules/budgets/invoice/budget-invoices.controller.ts) → `list` | [InvoiceService](../../src/modules/budgets/invoice/invoice.service.ts) |
 | POST | `/budget-cycles` | [budgets/cycle/budget-cycles.controller.ts](../../src/modules/budgets/cycle/budget-cycles.controller.ts) → `open` | [CycleService](../../src/modules/budgets/cycle/cycle.service.ts) |
 | GET | `/budget-cycles` | [budgets/cycle/budget-cycles.controller.ts](../../src/modules/budgets/cycle/budget-cycles.controller.ts) → `list` | [CycleService](../../src/modules/budgets/cycle/cycle.service.ts) |
@@ -403,4 +402,4 @@ Find a route, open its controller, then the service it calls. Module of a file =
 | GET | `/dashboards/super-admin` | [dashboards/super-admin/super-admin-dashboard.controller.ts](../../src/modules/dashboards/super-admin/super-admin-dashboard.controller.ts) → `get` | [SuperAdminDashboardService](../../src/modules/dashboards/super-admin/super-admin-dashboard.service.ts) |
 | GET | `/reports/revocation-sla` | [dashboards/revocation-sla/revocation-sla.controller.ts](../../src/modules/dashboards/revocation-sla/revocation-sla.controller.ts) → `get` | [RevocationSlaQueryService](../../src/modules/dashboards/revocation-sla/revocation-sla-query.service.ts) |
 
-397 operations.
+396 operations.

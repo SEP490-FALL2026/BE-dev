@@ -44,7 +44,7 @@ flowchart BT
   ai_assist -->|2| operating_parameters
   ai_assist -->|4| organization
   ai_assist -->|4| requests
-  budgets -->|20| audit
+  budgets -->|19| audit
   budgets -->|5| catalog
   budgets -->|3| finance
   budgets -->|5| identity_access
@@ -122,7 +122,7 @@ flowchart BT
   personnel -->|97| organization
   personnel -->|8| requests
   requests -->|60| audit
-  requests -->|28| budgets
+  requests -->|29| budgets
   requests -->|40| catalog
   requests -->|9| finance
   requests -->|36| identity_access
