@@ -626,6 +626,62 @@ model SeatMonthRun {
   @@map("seat_month_runs")
 }
 
+/// RV-1 (QĐ-111ae, R-2): the close of a month. A picture of the figures of each Cost Center that has an effective budget of the year, and of the company, taken when Finance
+/// closes a month that has ended; the figures are never changed (a trigger), a late invoice is a change after the picture. `kind` is QUARTER for March, June and September;
+/// `state` moves SNAPSHOT, AWAITING_EXPLANATIONS (RV-3), SIGNED, forward only. The ids of other contexts are values, not foreign keys.
+model BudgetReviewPeriod {
+  id                         String    @id @default(uuid(7)) @db.Uuid
+  organizationId             String    @map("organization_id") @db.Uuid
+  year                       Int
+  month                      Int
+  kind                       String
+  state                      String    @default("SNAPSHOT")
+  currency                   String    @db.Char(3)
+  snapshotByEmployeeId       String    @map("snapshot_by_employee_id") @db.Uuid
+  snapshotAt                 DateTime  @map("snapshot_at") @db.Timestamptz(3)
+  signedByEmployeeId         String?   @map("signed_by_employee_id") @db.Uuid
+  signedAt                   DateTime? @map("signed_at") @db.Timestamptz(3)
+  note                       String?
+  // What the company spent in the year up to the close, the shared pool in it (MG-03), and the line of the pool against the reserve of the cycle.
+  companySpentMinor          BigInt    @map("company_spent_minor")
+  sharedPoolUnallocatedMinor BigInt    @map("shared_pool_unallocated_minor")
+  sharedPoolReserveMinor     BigInt?   @map("shared_pool_reserve_minor")
+  annualCeilingMinor         BigInt?   @map("annual_ceiling_minor")
+
+  lines BudgetReviewLine[]
+
+  @@unique([organizationId, year, month])
+  @@index([year, month])
+  @@map("budget_review_periods")
+}
+
+/// RV-1: one Cost Center in a period: its effective budget, what it spent, held, had waiting for the spend decision, what was left, the difference k of its invoices, the price
+/// increase already known, the forecast of the end of the year, the pace and the light. All figure columns are refused to every UPDATE (a trigger).
+model BudgetReviewLine {
+  id                 String  @id @default(uuid(7)) @db.Uuid
+  periodId           String  @map("period_id") @db.Uuid
+  costCenterId       String  @map("cost_center_id") @db.Uuid
+  baseMinor          BigInt  @map("base_minor")
+  reserveMinor       BigInt  @map("reserve_minor")
+  spentMinor         BigInt  @map("spent_minor")
+  committedMinor     BigInt  @map("committed_minor")
+  pendingSpendMinor  BigInt  @map("pending_spend_minor")
+  remainingMinor     BigInt  @map("remaining_minor")
+  invoiceNetMinor    BigInt  @map("invoice_net_minor")
+  invoiceActualMinor BigInt  @map("invoice_actual_minor")
+  variancePpm        BigInt  @map("variance_ppm")
+  priceIncreaseMinor BigInt  @map("price_increase_minor")
+  forecastMinor      BigInt  @map("forecast_minor")
+  paceBasisPoints    BigInt? @map("pace_basis_points")
+  light              String
+
+  period BudgetReviewPeriod @relation(fields: [periodId], references: [id], onDelete: Restrict)
+
+  @@unique([periodId, costCenterId])
+  @@index([costCenterId])
+  @@map("budget_review_lines")
+}
+
 /// FIX-SM1 SM1-06: what a seat-month gave back to a commitment when the month was charged again (the seat was taken back, its days moved, the department changed
 /// Cost Center). Append-only: the database refuses to change or remove a row, and refuses to lower `applied_minor` of a commitment by anything but what these rows
 /// add up to (`seat_month_reversed_minor`). The ids of other contexts are values, not foreign keys.

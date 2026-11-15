@@ -82,6 +82,7 @@ import { BudgetAttachmentLinkService } from './attachment/budget-attachment-link
 import { BudgetAttachmentExpiryService } from './attachment/budget-attachment-expiry.service';
 import { BudgetAttachmentExpirySweeper } from './attachment/budget-attachment-expiry.job';
 import { SeatMonthRepo } from './seat-month/seat-month.repo';
+import { BudgetReviewRepo } from './review/budget-review.repo';
 import { SeatMonthChargesController } from './seat-month/seat-month-charges.controller';
 import { SeatMonthPoolService } from './seat-month/seat-month-pool.service';
 import { SeatMonthQueryService } from './seat-month/seat-month-query.service';
@@ -178,6 +179,7 @@ import { BudgetProposalTemplateListener } from './proposal/budget-proposal-templ
     CarriedOverContributions,
     BaselineFlags,
     SeatMonthRepo,
+    BudgetReviewRepo,
     SeatMonthSubscriptionService,
     SeatMonthService,
     SeatMonthPoolService,
