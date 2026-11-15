@@ -171,6 +171,10 @@ export const IN_APP_NOTIFICATION_CODES = [
   'REQUEST_CANCELLED_BENEFICIARY_GONE',
   // The grant of a request of that person is being carried out, so the system did not close it: the IT Admin checks the vendor and closes it.
   'REQUEST_BENEFICIARY_GONE_IT_CHECK',
+  // A purchase invoice waits for Finance to sign the money out (`QĐ-111u`); and, for the IT Admin who submitted it, Finance signed it or returned it with a reason.
+  'PURCHASE_INVOICE_SUBMITTED',
+  'PURCHASE_INVOICE_CONFIRMED',
+  'PURCHASE_INVOICE_RETURNED',
   'DEPARTMENT_SOFTWARE_PROPOSED',
   'DEPARTMENT_SOFTWARE_PROPOSAL_DECIDED',
   'VENDOR_ADMINS_BELOW_MINIMUM',
