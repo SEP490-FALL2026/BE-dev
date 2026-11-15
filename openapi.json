@@ -67706,7 +67706,7 @@
         ],
         "responses": {
           "200": {
-            "description": "A page of machines ordered by asset code, each with its holder and the state of collection; filter by holder, by state or by a search on the asset code and the hostname.",
+            "description": "A page of machines ordered by asset code, each with its holder, the state of collection and the last time an intake from it was accepted; filter by holder, by state or by a search on the asset code and the hostname.",
             "content": {
               "application/json": {
                 "schema": {
@@ -67849,6 +67849,193 @@
         },
         "security": [{ "bearer": [] }],
         "summary": "List the company machines",
+        "tags": ["devices"]
+      }
+    },
+    "/api/v1/devices/{id}/registrations": {
+      "get": {
+        "operationId": "deviceRegistrationList",
+        "parameters": [
+          { "name": "id", "required": true, "in": "path", "schema": { "format": "uuid", "type": "string" } },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": { "minimum": 1, "maximum": 9007199254740991, "default": 1, "type": "integer" }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": { "minimum": 1, "maximum": 100, "default": 20, "type": "integer" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A page of the registrations of the machine, the newest first (the open one, then the ones that ended): the holder, the days, how each ended, whether it was signed and acknowledged, and the last time an intake was accepted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/DeviceRegistrationPageResponseDto" },
+                    { "properties": { "message": { "example": "DEVICE_REGISTRATION.LISTED" } } }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHENTICATION_REQUIRED": {
+                    "summary": "A Bearer access token is required.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHENTICATION_REQUIRED",
+                        "message": "A Bearer access token is required.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "INVALID_ACCESS_TOKEN": {
+                    "summary": "The access token is invalid.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "INVALID_ACCESS_TOKEN",
+                        "message": "The access token is invalid.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only an IT Admin reads the register of machines.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHORIZATION.FORBIDDEN": {
+                    "summary": "You do not have permission to perform this action.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHORIZATION.FORBIDDEN",
+                        "message": "You do not have permission to perform this action.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The machine is not in the register (DEVICE.NOT_FOUND).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "DEVICE.NOT_FOUND": {
+                    "summary": "The device does not exist.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "DEVICE.NOT_FOUND",
+                        "message": "The device does not exist.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The id or the query is invalid (VALIDATION_ERROR).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "VALIDATION_ERROR": {
+                    "summary": "Request validation failed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "VALIDATION_ERROR",
+                        "message": "Request validation failed.",
+                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_TOO_MANY_REQUESTS": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_TOO_MANY_REQUESTS",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "TOKEN_VERIFICATION_UNAVAILABLE": {
+                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
+                        "message": "Authentication is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SERVICE_UNAVAILABLE": {
+                    "summary": "The service is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SERVICE_UNAVAILABLE",
+                        "message": "The service is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "bearer": [] }],
+        "summary": "List who held a company machine",
         "tags": ["devices"]
       }
     },
@@ -89275,6 +89462,254 @@
         },
         "security": [{ "bearer": [] }],
         "summary": "Give back to the head a reclaim they decided, with a reason (once)",
+        "tags": ["ghost-seats"]
+      }
+    },
+    "/api/v1/ghost-seat-recommendations/escalations": {
+      "post": {
+        "operationId": "ghostSeatEscalationCreate",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "description": "A key the caller makes once for this batch (16 to 128 letters, digits, - or _); sending the same batch with it again answers what was done, another batch with it is refused.",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/EscalationBodyDto" } } }
+        },
+        "responses": {
+          "201": {
+            "description": "One result for each recommendation named, in order: pushed to the queue of the head (or waiting for one) or left as it was with the reason. A recommendation that cannot be pushed is not an error.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/EscalationResponseDto" },
+                    { "properties": { "message": { "example": "GHOST_SEAT_ESCALATION.CREATED" } } }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_BAD_REQUEST": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_BAD_REQUEST",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHENTICATION_REQUIRED": {
+                    "summary": "A Bearer access token is required.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHENTICATION_REQUIRED",
+                        "message": "A Bearer access token is required.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "INVALID_ACCESS_TOKEN": {
+                    "summary": "The access token is invalid.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "INVALID_ACCESS_TOKEN",
+                        "message": "The access token is invalid.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only an IT Admin pushes a recommendation to a head.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHORIZATION.FORBIDDEN": {
+                    "summary": "You do not have permission to perform this action.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHORIZATION.FORBIDDEN",
+                        "message": "You do not have permission to perform this action.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The Idempotency-Key was used for another batch (GHOST_SEAT.ESCALATION_KEY_REUSED).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "GHOST_SEAT.ESCALATION_KEY_REUSED": {
+                    "summary": "The Idempotency-Key was used for another batch of recommendations.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "GHOST_SEAT.ESCALATION_KEY_REUSED",
+                        "message": "The Idempotency-Key was used for another batch of recommendations.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_PAYLOAD_TOO_LARGE": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_PAYLOAD_TOO_LARGE",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_UNSUPPORTED_MEDIA_TYPE": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_UNSUPPORTED_MEDIA_TYPE",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The body or the Idempotency-Key is invalid (VALIDATION_ERROR).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "VALIDATION_ERROR": {
+                    "summary": "Request validation failed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "VALIDATION_ERROR",
+                        "message": "Request validation failed.",
+                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_TOO_MANY_REQUESTS": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_TOO_MANY_REQUESTS",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "TOKEN_VERIFICATION_UNAVAILABLE": {
+                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
+                        "message": "Authentication is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SERVICE_UNAVAILABLE": {
+                    "summary": "The service is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SERVICE_UNAVAILABLE",
+                        "message": "The service is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "bearer": [] }],
+        "summary": "Push watch-tier recommendations to the head of the department",
         "tags": ["ghost-seats"]
       }
     },
@@ -115329,6 +115764,23 @@
                 "type": "string",
                 "enum": ["RETIRED", "UNREGISTERED", "COLLECTION_STOPPED", "ACTIVE", "AWAITING_ACKNOWLEDGEMENT"]
               },
+              "collection": {
+                "type": "object",
+                "properties": {
+                  "state": {
+                    "type": "string",
+                    "enum": ["RETIRED", "UNREGISTERED", "COLLECTION_STOPPED", "ACTIVE", "AWAITING_ACKNOWLEDGEMENT"]
+                  },
+                  "lastAcceptedAt": {
+                    "type": "string",
+                    "format": "date-time",
+                    "description": "The latest instant any credential of the open registration was accepted (usage or tool status); null while nothing was and for a machine nobody holds. State ACTIVE alone only says the holder acknowledged the notice.",
+                    "nullable": true
+                  }
+                },
+                "required": ["state", "lastAcceptedAt"],
+                "additionalProperties": false
+              },
               "signatureRecorded": { "type": "boolean" },
               "retiredAt": { "type": "string", "format": "date-time", "nullable": true },
               "acknowledgedFrom": { "type": "string", "format": "date-time", "nullable": true },
@@ -115397,6 +115849,7 @@
               "registrationId",
               "registeredFrom",
               "state",
+              "collection",
               "signatureRecorded",
               "retiredAt",
               "acknowledgedFrom",
@@ -115451,6 +115904,29 @@
                       "type": "string",
                       "enum": ["RETIRED", "UNREGISTERED", "COLLECTION_STOPPED", "ACTIVE", "AWAITING_ACKNOWLEDGEMENT"]
                     },
+                    "collection": {
+                      "type": "object",
+                      "properties": {
+                        "state": {
+                          "type": "string",
+                          "enum": [
+                            "RETIRED",
+                            "UNREGISTERED",
+                            "COLLECTION_STOPPED",
+                            "ACTIVE",
+                            "AWAITING_ACKNOWLEDGEMENT"
+                          ]
+                        },
+                        "lastAcceptedAt": {
+                          "type": "string",
+                          "format": "date-time",
+                          "description": "The latest instant any credential of the open registration was accepted (usage or tool status); null while nothing was and for a machine nobody holds. State ACTIVE alone only says the holder acknowledged the notice.",
+                          "nullable": true
+                        }
+                      },
+                      "required": ["state", "lastAcceptedAt"],
+                      "additionalProperties": false
+                    },
                     "signatureRecorded": { "type": "boolean" },
                     "retiredAt": { "type": "string", "format": "date-time", "nullable": true }
                   },
@@ -115463,8 +115939,109 @@
                     "registrationId",
                     "registeredFrom",
                     "state",
+                    "collection",
                     "signatureRecorded",
                     "retiredAt"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "pagination": {
+                "type": "object",
+                "properties": {
+                  "page": { "type": "integer", "exclusiveMinimum": true, "maximum": 9007199254740991, "minimum": 0 },
+                  "pageSize": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "maximum": 9007199254740991,
+                    "minimum": 0
+                  },
+                  "totalItems": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                  "totalPages": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+                },
+                "required": ["page", "pageSize", "totalItems", "totalPages"],
+                "additionalProperties": false
+              }
+            },
+            "required": ["items", "pagination"],
+            "additionalProperties": false,
+            "nullable": true
+          }
+        },
+        "required": ["success", "message", "data"],
+        "additionalProperties": false
+      },
+      "DeviceRegistrationPageResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "enum": [true] },
+          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "items": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": { "type": "string", "format": "uuid" },
+                    "holder": {
+                      "type": "object",
+                      "properties": {
+                        "id": { "type": "string", "format": "uuid" },
+                        "employeeCode": { "type": "string" },
+                        "fullName": { "type": "string" }
+                      },
+                      "required": ["id", "employeeCode", "fullName"],
+                      "additionalProperties": false,
+                      "description": "Null only when the person record can no longer be read.",
+                      "nullable": true
+                    },
+                    "validFrom": {
+                      "type": "string",
+                      "format": "date",
+                      "description": "A calendar date as YYYY-MM-DD."
+                    },
+                    "validUntil": {
+                      "type": "string",
+                      "format": "date",
+                      "description": "The last day of the registration; null while it is open.",
+                      "nullable": true
+                    },
+                    "endedAt": { "type": "string", "format": "date-time", "nullable": true },
+                    "endCause": {
+                      "type": "string",
+                      "enum": [
+                        "HOLDER_CHANGED",
+                        "DEVICE_RETIRED",
+                        "DEPARTURE",
+                        "EMPLOYEE_LEFT",
+                        "DEPARTURE_BLOCKED",
+                        null
+                      ],
+                      "nullable": true
+                    },
+                    "acknowledgedFrom": { "type": "string", "format": "date-time", "nullable": true },
+                    "collectionStoppedAt": { "type": "string", "format": "date-time", "nullable": true },
+                    "signatureRecorded": { "type": "boolean" },
+                    "lastAcceptedAt": {
+                      "type": "string",
+                      "format": "date-time",
+                      "description": "The latest instant any credential of this registration was accepted.",
+                      "nullable": true
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "holder",
+                    "validFrom",
+                    "validUntil",
+                    "endedAt",
+                    "endCause",
+                    "acknowledgedFrom",
+                    "collectionStoppedAt",
+                    "signatureRecorded",
+                    "lastAcceptedAt"
                   ],
                   "additionalProperties": false
                 }
@@ -121690,6 +122267,89 @@
               }
             },
             "required": ["recommendation"],
+            "additionalProperties": false,
+            "nullable": true
+          }
+        },
+        "required": ["success", "message", "data"],
+        "additionalProperties": false
+      },
+      "EscalationBodyDto": {
+        "type": "object",
+        "properties": {
+          "recommendationIds": {
+            "minItems": 1,
+            "maxItems": 100,
+            "type": "array",
+            "items": { "type": "string", "format": "uuid" },
+            "description": "The recommendations to push, at most 100; one named twice counts once."
+          },
+          "note": {
+            "description": "A word of the IT Admin for the batch, kept with it; the head does not read it.",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500
+          }
+        },
+        "required": ["recommendationIds"],
+        "additionalProperties": false
+      },
+      "EscalationResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "enum": [true] },
+          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string", "format": "uuid" },
+              "escalated": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+              "skipped": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+              "replayed": {
+                "type": "boolean",
+                "description": "The same Idempotency-Key was answered before: nothing was done again."
+              },
+              "results": {
+                "maxItems": 100,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "recommendationId": { "type": "string", "format": "uuid" },
+                    "outcome": { "type": "string", "enum": ["ESCALATED", "SKIPPED"] },
+                    "reason": {
+                      "type": "string",
+                      "enum": [
+                        "NOT_FOUND",
+                        "NOT_WATCH",
+                        "SEAT_ENDED",
+                        "MACHINE_ACCOUNT",
+                        "TRANSFER_GRACE",
+                        "NO_DEPARTMENT",
+                        null
+                      ],
+                      "description": "Why it was not pushed; null when it was.",
+                      "nullable": true
+                    },
+                    "state": {
+                      "type": "string",
+                      "enum": ["AWAITING_DECISION", "WAITING_FOR_HEAD", null],
+                      "description": "Where it went: the queue of the head, or waiting for one; null when it was not pushed.",
+                      "nullable": true
+                    },
+                    "departmentId": {
+                      "type": "string",
+                      "format": "uuid",
+                      "description": "The department whose head is asked; null when it was not pushed.",
+                      "nullable": true
+                    }
+                  },
+                  "required": ["recommendationId", "outcome", "reason", "state", "departmentId"],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": ["id", "escalated", "skipped", "replayed", "results"],
             "additionalProperties": false,
             "nullable": true
           }

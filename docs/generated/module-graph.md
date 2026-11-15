@@ -104,11 +104,11 @@ flowchart BT
   optimization -->|7| audit
   optimization -->|8| catalog
   optimization -->|5| identity_access
-  optimization -->|24| licensing
+  optimization -->|25| licensing
   optimization -->|7| notifications
   optimization -->|6| operating_parameters
-  optimization -->|18| organization
-  optimization -->|6| personnel
+  optimization -->|19| organization
+  optimization -->|7| personnel
   optimization -->|9| usage
   organization -->|10| audit
   organization -->|5| notifications
