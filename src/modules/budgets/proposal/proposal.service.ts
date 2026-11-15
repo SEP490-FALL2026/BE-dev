@@ -66,7 +66,7 @@ export class ProposalService {
       // Then the cycle of the year (the order of the module: cycle, proposal, version, year); a year that has ended is refused as
       // ended below, before the cycle is asked about.
       if (!yearHasEnded(seen.year, await this.facts.today(new Date(), tx))) {
-        await this.sender.requirePublishedCycle(tx, seen.year);
+        await this.sender.requireOpenCycle(tx, seen.year);
       }
       const previous = await this.ownedLocked(tx, actor, id, true);
       const today = await this.facts.today(new Date(), tx);

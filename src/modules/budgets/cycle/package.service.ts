@@ -15,8 +15,6 @@ type Money = (minor: bigint) => { amount: string; currency: string };
 
 /** What the package knows of one department before it is written out. */
 interface DepartmentFacts {
-  ceiling: bigint | undefined;
-  publishedCeiling: bigint | null | undefined;
   proposal: ProposalRecord | undefined;
   lines: readonly ProposalLineRecord[];
   version: VersionRecord | undefined;
@@ -33,20 +31,18 @@ const linesOf = (lines: readonly ProposalLineRecord[], format: Money) =>
     overCeiling: line.overCeilingMinor === null ? null : format(line.overCeilingMinor),
   }));
 
-/** One department of the package: its ceiling, the open proposal with its ranked lines, the version counted for it, and whether Finance may build it from the baseline. */
+/** One department of the package: the open proposal with its ranked lines, the version counted for it, and whether Finance may build it from the baseline. */
 function departmentOf(
   brief: { id: string; code: string; name: string },
   facts: DepartmentFacts,
   format: Money,
 ): PackageWire['departments'][number] {
-  const { ceiling, proposal, version, head } = facts;
+  const { proposal, version, head } = facts;
 
   return {
     departmentId: brief.id,
     departmentCode: brief.code,
     departmentName: brief.name,
-    ceiling: ceiling === undefined ? null : format(ceiling),
-    publishedCeiling: facts.publishedCeiling == null ? null : format(facts.publishedCeiling),
     headStatus: head.status,
     baselineAllowed: head.refusal === null,
     baselineRefusal: head.refusal,
@@ -74,7 +70,7 @@ function departmentOf(
 }
 
 /**
- * The year against its annual ceiling (`AC-12`, `R-I06`): the ceiling of each department, what its head proposed, the version counted
+ * The year against its annual ceiling (`AC-12`, `R-I06`): what the head of each department proposed, the version counted
  * for it, and the sums that say how far the proposals and the versions are from what is available (the annual ceiling less the
  * shared-pool reserve). Finance and the spending approver read it. Read-only; a fixed number of statements for any number of departments.
  */
@@ -125,18 +121,15 @@ export class PackageService {
     const proposalsTotal = [...proposals.values()].reduce((total, proposal) => total + proposal.totalMinor, 0n);
     const listed = inOrderOf(listedIds, briefs).map((brief) => {
       const costCenterId = costCenters.get(brief.id) ?? '';
-      const ceiling = cycle.ceilings.find((entry) => entry.departmentId === brief.id);
       const proposal = proposals.get(costCenterId);
 
       return departmentOf(
         brief,
         {
-          ceiling: ceiling?.totalMinor,
-          publishedCeiling: ceiling?.publishedTotalMinor,
           proposal,
           lines: (proposal && lines.get(proposal.id)) ?? [],
           version: counted.get(costCenterId),
-          head: heads.get(brief.id) ?? { status: 'NO_HEAD', refusal: 'CYCLE_NOT_PUBLISHED' },
+          head: heads.get(brief.id) ?? { status: 'NO_HEAD', refusal: 'CYCLE_NOT_OPEN' },
         },
         format,
       );
@@ -171,14 +164,13 @@ export class PackageService {
   ): Promise<Map<string, DepartmentFacts['head']>> {
     const today = await this.facts.today(new Date());
     const heading = await this.organizationReads.getDepartmentHeads([...departmentIds], today);
-    const inCycle = new Set(cycle.ceilings.map((ceiling) => ceiling.departmentId));
     const entries = await Promise.all(
       departmentIds.map(async (departmentId) => {
         const headsToday = heading.has(departmentId);
         const headToCome = !headsToday && (await this.organizationReads.hasHeadStartingAfter(departmentId, today));
         const refusal = baselineVersionRefusal({
-          cyclePublishedOnce: cycle.firstPublishedAt !== null,
-          inCycle: inCycle.has(departmentId),
+          cycleOpen: cycle.openedAt !== null,
+          inCycle: true,
           today,
           submissionDeadline: cycle.submissionDeadline,
           headsToday,

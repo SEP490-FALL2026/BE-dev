@@ -33,20 +33,11 @@ describe('a version built from the baseline (integration, real PostgreSQL)', () 
       deadline,
       addDays(deadline, 10),
     ]);
-  /** The department has a ceiling in the cycle of the year, as the cycle gives one to each department it divides the budget among. */
-  const inCycle = (department: Department, year = h.year) =>
-    h.ctx.sql.query(
-      `INSERT INTO budget_department_ceilings (cycle_id, department_id, signed_commitments_minor, planned_seats_minor, priority_minor, total_minor)
-       SELECT c.id, $2, 0, 0, 0, 0 FROM budget_cycles c WHERE c.year = $1
-       ON CONFLICT DO NOTHING`,
-      [year, department.id],
-    );
-  /** A department in the cycle with a Cost Center, a subscription of 10 seats and nobody heading it. */
+  /** A department of the year with a Cost Center, a subscription of 10 seats and nobody heading it. */
   const headless = async (): Promise<Department> => {
     counter += 1;
     const department = await h.departmentWithUnit(`P-BV${counter}`);
     await h.subscription(10, 'K2', department.id);
-    await inCycle(department);
 
     return department;
   };
@@ -127,14 +118,12 @@ describe('a version built from the baseline (integration, real PostgreSQL)', () 
 
     it('when somebody heads the department', async () => {
       const unit = await h.departmentWithHead(`P-BVH${(counter += 1)}`);
-      await inCycle(unit.department);
 
       refusedWith(await create(baselineBody(unit.department)), 'HAS_HEAD');
     });
 
     it('when a proposal waits, even though nobody heads the department any more', async () => {
       const unit = await h.departmentWithHead(`P-BVP${(counter += 1)}`);
-      await inCycle(unit.department);
       await h.budgetProposed(unit.head, unit.department.unitId, undefined, h.year);
       await h.withoutHead(unit.department);
 
@@ -145,7 +134,6 @@ describe('a version built from the baseline (integration, real PostgreSQL)', () 
       const department = await headless();
       const start = `${h.next}-01-01`;
       await setDeadline(h.next, addDays(h.today(), -1));
-      await inCycle(department, h.next);
       await h.ctx.sql.query(`UPDATE departments SET effective_from = $2 WHERE id = $1`, [department.id, start]);
       const person = await h.unplacedStaff(`BVN${counter}`, 'MANAGER');
       const asAdmin = { Authorization: `Bearer ${h.admin}` };
@@ -163,13 +151,10 @@ describe('a version built from the baseline (integration, real PostgreSQL)', () 
       refusedWith(await create(baselineBody(department, h.next)), 'HAS_SUCCESSOR');
     });
 
-    it('when the department is not in the cycle of the year: no ceiling there, or it takes effect after the year (F-078)', async () => {
-      counter += 1;
-      const noCeiling = await h.departmentWithUnit(`P-BVC${counter}`);
+    it('when the department takes effect after the year: it is not among the departments of the cycle (F-078)', async () => {
       const later = await headless();
       await h.ctx.sql.query(`UPDATE departments SET effective_from = $2 WHERE id = $1`, [later.id, `${h.next}-01-01`]);
 
-      refusedWith(await create(baselineBody(noCeiling)), 'DEPARTMENT_NOT_IN_CYCLE');
       refusedWith(await create(baselineBody(later)), 'DEPARTMENT_NOT_IN_CYCLE');
     });
 
@@ -196,17 +181,16 @@ describe('a version built from the baseline (integration, real PostgreSQL)', () 
       await create(baselineBody(other)).expect(201);
     });
 
-    it('when the cycle of the year was never published', async () => {
+    it('when the cycle of the year is not open (a draft)', async () => {
       const department = await headless();
-      await h.ctx.sql.query(
-        `UPDATE budget_cycles SET first_published_at = NULL, published_at = NULL, published_by_employee_id = NULL WHERE year = $1`,
-        [h.year],
-      );
+      await h.ctx.sql.query(`UPDATE budget_cycles SET opened_at = NULL, opened_by_employee_id = NULL WHERE year = $1`, [
+        h.year,
+      ]);
       try {
-        refusedWith(await create(baselineBody(department)), 'CYCLE_NOT_PUBLISHED');
+        refusedWith(await create(baselineBody(department)), 'CYCLE_NOT_OPEN');
       } finally {
         await h.ctx.sql.query(
-          `UPDATE budget_cycles SET first_published_at = now(), published_at = now(), published_by_employee_id = $2 WHERE year = $1`,
+          `UPDATE budget_cycles SET opened_at = now(), opened_by_employee_id = $2 WHERE year = $1`,
           [h.year, h.finance.employeeId],
         );
       }
@@ -224,26 +208,9 @@ describe('a version built from the baseline (integration, real PostgreSQL)', () 
     expect(h.codeOf(refused)).toBe('FINANCE.SETUP_INCOMPLETE');
   });
 
-  it('goes on when the cycle was published once and is open again: the first publication counts, not the last (F-085)', async () => {
-    const department = await headless();
-    await h.ctx.sql.query(
-      `UPDATE budget_cycles SET published_at = NULL, published_by_employee_id = NULL WHERE year = $1`,
-      [h.year],
-    );
-    try {
-      await create(baselineBody(department)).expect(201);
-    } finally {
-      await h.ctx.sql.query(
-        `UPDATE budget_cycles SET published_at = now(), published_by_employee_id = $2 WHERE year = $1`,
-        [h.year, h.finance.employeeId],
-      );
-    }
-  });
-
   it('builds a version with a base of zero for a department that runs nothing, and leaves out a line that costs nothing (F-086)', async () => {
     counter += 1;
     const empty = await h.departmentWithUnit(`P-BVZ${counter}`);
-    await inCycle(empty);
     // The 10 seats are bought and none is held: a line of seats nobody holds costs nothing.
     const free = await headless();
     const emptyMade = h.dataOf<VersionBody>(await create(baselineBody(empty)).expect(201)).version;

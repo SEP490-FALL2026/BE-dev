@@ -356,20 +356,17 @@ const budgetNumbersSchema = {
   remainingWithReserve: moneyView.nullable(),
   overBudget: z.boolean(),
 };
-/** The head reads their own figures and the published department ceiling, without company totals. */
+/** The head reads their own figures and the state of the cycle of the year, without company totals. */
 const mineSchema = z.strictObject({
   costCenter: costCenterRef,
   year: z.number().int(),
   status: z.enum(['ACTIVE', 'NO_ACTIVE_BUDGET']),
   ...budgetNumbersSchema,
-  departmentCeiling: z
-    .strictObject({ total: moneyView, signedCommitments: moneyView, plannedSeats: moneyView, priority: moneyView })
-    .nullable(),
   cycle: z
     .strictObject({
       submissionDeadline: responseBusinessDate,
       decisionDeadline: responseBusinessDate,
-      published: z.boolean(),
+      status: z.enum(['DRAFT', 'OPEN', 'LOCKED']),
     })
     .nullable(),
   version: z.strictObject({ id: z.uuid(), number: z.number().int().positive() }).nullable(),

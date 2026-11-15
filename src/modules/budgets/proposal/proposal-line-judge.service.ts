@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { CatalogApi } from '../../catalog/public/catalog.api';
 import { OperatingParametersApi } from '../../operating-parameters/public/operating-parameters.api';
-import { BudgetCycleNotPublishedError, BudgetProposalLinesInvalidError } from '../budget/budget.errors';
+import { BudgetCycleNotOpenError, BudgetProposalLinesInvalidError } from '../budget/budget.errors';
 import { BudgetFactsService } from '../budget/budget-facts.service';
 import type { ProposalLineRecord } from '../budget/proposal.repo';
 import { monthlyUnitPrice } from '../cycle/baseline.policy';
@@ -36,14 +36,13 @@ export class ProposalLineJudge {
   ) {}
 
   /**
-   * A head proposes only once the cycle of the year was published, and may go on while it is changed (`Q-02`). The cycle is read
+   * A head proposes only once Finance opened the cycle of the year (`QĐ-111z`). The cycle is read
    * `FOR SHARE`, so a change of it waits for the sending. It is taken first, before the proposal and the year (the order of the
-   * module: cycle, proposal, version, year). Returns the cycle, whose published ceilings the lines are judged against (`S4-01`).
-   * Throws BudgetCycleNotPublishedError.
+   * module: cycle, proposal, version, year). Returns the cycle. Throws BudgetCycleNotOpenError.
    */
-  async requirePublishedCycle(tx: DbTx, year: number): Promise<CycleRecord> {
+  async requireOpenCycle(tx: DbTx, year: number): Promise<CycleRecord> {
     const cycle = await this.cycles.lockByYear(tx, await this.facts.organizationId(tx), year, 'SHARE');
-    if (!cycle || !cycleAcceptsWork(cycle)) throw new BudgetCycleNotPublishedError(year);
+    if (!cycle || !cycleAcceptsWork(cycle)) throw new BudgetCycleNotOpenError(year);
 
     return cycle;
   }

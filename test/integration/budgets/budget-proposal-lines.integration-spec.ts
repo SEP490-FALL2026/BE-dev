@@ -111,35 +111,7 @@ describe('budget proposal lines over HTTP (integration, real PostgreSQL)', () =>
     });
   });
 
-  describe('the ceiling that was published (S4-01, AC-20) and the Cancel line (QĐ-109c)', () => {
-    it('BR-MF4-04: flags the line that carries the proposal over the published ceiling, and every line after it, and asks their notes', async () => {
-      // Finance is editing 500 M now; the head was told 90 M, and that is what the flag is judged against.
-      const { head, department } = await withCeiling(500_000_000, 90_000_000);
-      const lines = rank([lineOf('One', 50_000_000), lineOf('Two', 70_000_000), lineOf('Three', 40_000_000)]);
-
-      const refused = await send(head, department.unitId, lines).expect(422);
-      expect(h.codeOf(refused)).toBe('BUDGET.OVER_CEILING_NOTE_REQUIRED');
-      expect(detailsOf(refused)).toEqual([2, 3]);
-
-      const noted = lines.map((line, index) => (index === 0 ? line : { ...line, note: 'Needed for the launch' }));
-      const sent = proposalOf(await send(head, department.unitId, noted).expect(201));
-
-      expect((await linesOf(sent.id)).map((line) => line.overCeiling?.amount ?? null)).toEqual([
-        null,
-        '30000000',
-        '40000000',
-      ]);
-      expect(sent.total.amount).toBe('160000000');
-    });
-
-    it('S4-01: no flag when the department has no published ceiling, even if the one being edited is small', async () => {
-      const { head, department } = await withCeiling(1, null);
-
-      const sent = proposalOf(await send(head, department.unitId, rank([lineOf('Big', 900_000_000)])).expect(201));
-
-      expect((await linesOf(sent.id))[0].overCeiling).toBeNull();
-    });
-
+  describe('the Cancel line (QĐ-109c); there is no ceiling of a department to flag against any more (QĐ-111aa)', () => {
     it('QĐ-109c: a CANCEL line of 50 million is shown and changes neither the total nor the flags, and asks no note', async () => {
       const { head, department } = await withCeiling(90_000_000, 90_000_000);
 
@@ -184,8 +156,8 @@ describe('budget proposal lines over HTTP (integration, real PostgreSQL)', () =>
         ['RENEW', 1, false],
         ['NEW', 2, true],
       ]);
-      // 40 M + 30 M = 70 M over 60 M: the second line carries the part over (10 M).
-      expect(copied.map((line) => line.overCeiling?.amount ?? null)).toEqual([null, '10000000']);
+      // No department ceiling is published (QĐ-111aa): no line carries a part over it.
+      expect(copied.map((line) => line.overCeiling?.amount ?? null)).toEqual([null, null]);
     });
 
     it('asks Finance the kind of a line it adds, and takes it without a rank or an explanation', async () => {
@@ -250,7 +222,7 @@ describe('budget proposal lines over HTTP (integration, real PostgreSQL)', () =>
   });
 
   describe('the package of the year (B4, C4-13)', () => {
-    it('lists the lines of the open proposal by rank with the flag, counts a Cancel line at no total, and tells who may build from the baseline', async () => {
+    it('lists the lines of the open proposal by rank by rank, counts a Cancel line at no total, and tells who may build from the baseline', async () => {
       const { head, department } = await withCeiling(40_000_000, 40_000_000);
       const proposal = await h.budgetProposed(
         head,
@@ -278,12 +250,10 @@ describe('budget proposal lines over HTTP (integration, real PostgreSQL)', () =>
         ]),
       ).toEqual([
         [1, 'RENEW', '20000000', null],
-        [2, 'RENEW', '30000000', '10000000'],
+        [2, 'RENEW', '30000000', null],
         [3, 'CANCEL', '50000000', null],
       ]);
       expect(entry).toMatchObject({
-        publishedCeiling: { amount: '40000000' },
-        ceiling: { amount: '40000000' },
         headStatus: 'HAS_HEAD',
         baselineAllowed: false,
       });

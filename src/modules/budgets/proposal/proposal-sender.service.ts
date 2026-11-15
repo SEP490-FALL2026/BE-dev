@@ -38,9 +38,9 @@ export class ProposalSender {
     private readonly judge: ProposalLineJudge,
   ) {}
 
-  /** A head proposes only once the cycle of the year was published, and may go on while it is changed (`Q-02`); see `ProposalLineJudge`. */
-  requirePublishedCycle(tx: DbTx, year: number): Promise<CycleRecord> {
-    return this.judge.requirePublishedCycle(tx, year);
+  /** A head proposes only once Finance opened the cycle of the year (`QĐ-111z`); see `ProposalLineJudge`. */
+  requireOpenCycle(tx: DbTx, year: number): Promise<CycleRecord> {
+    return this.judge.requireOpenCycle(tx, year);
   }
 
   async send(tx: DbTx, actor: AuthenticatedPrincipal, input: ProposalSendInput): Promise<string> {
@@ -53,16 +53,14 @@ export class ProposalSender {
     });
     const costCenter = await this.facts.costCenterInUse(own, tx);
     if (!yearIsOpen(input.year, today)) throw new BudgetYearEndedError(input.year);
-    const cycle = await this.requirePublishedCycle(tx, input.year);
+    await this.requireOpenCycle(tx, input.year);
 
     await this.facts.requirePlans(input.lines.map((line) => line.planId));
 
     const reporting = await this.facts.reportingCurrency(tx);
-    // The ceiling the head was told is the one that was published, not the one Finance may be editing now (S4-01).
-    const ceiling = cycle.ceilings.find((entry) => entry.departmentId === costCenter.departmentId);
     const lines = await this.judge.judge(tx, {
       lines: await this.buildProposalLines(tx, input.lines, reporting),
-      ceilingMinor: ceiling?.publishedTotalMinor ?? null,
+      ceilingMinor: null,
       currency: reporting,
       now,
     });

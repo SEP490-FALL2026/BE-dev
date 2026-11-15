@@ -4,26 +4,15 @@ import { App } from 'supertest/types';
 import { bodyOf } from '../../support/api-body';
 import { bearer, createHttpContractApp, principal } from '../../support/http-contract-app';
 
-const DEPARTMENT = '3f0c7d54-9e1b-4f6a-8d2c-5b7a1e9c0d11';
-const OPEN = {
+const CREATE = {
   year: 2031,
   submissionDeadline: '2030-12-01',
   decisionDeadline: '2030-12-15',
   annualCeiling: { amount: '1000' },
-};
-const DIVISION = {
-  sharedPoolReserve: { amount: '0' },
-  departments: [
-    {
-      departmentId: DEPARTMENT,
-      signedCommitments: { amount: '1' },
-      plannedSeats: { amount: '0' },
-      priority: { amount: '0' },
-    },
-  ],
+  sharedPoolReserve: { amount: '100' },
 };
 
-/** `QĐ-103i`: the routes of the budget cycle (contract, no database): who may call, and what the validation turns away. */
+/** `QĐ-111z`, `QĐ-111aa`: the routes of the budget cycle (contract, no database): who may call, what the validation turns away, and the routes that are gone. */
 describe('budget cycle routes (HTTP contract, no database)', () => {
   let app: INestApplication<App>;
 
@@ -36,14 +25,14 @@ describe('budget cycle routes (HTTP contract, no database)', () => {
   });
 
   const routes = [
-    ['post', '/api/v1/budget-cycles', OPEN],
+    ['post', '/api/v1/budget-cycles', CREATE],
     ['get', '/api/v1/budget-cycles', undefined],
     ['get', '/api/v1/budget-cycles/2031', undefined],
     ['get', '/api/v1/budget-cycles/2031/baseline', undefined],
     ['get', '/api/v1/budget-cycles/2031/package', undefined],
     ['patch', '/api/v1/budget-cycles/2031', { priorities: 'x' }],
-    ['put', '/api/v1/budget-cycles/2031/department-ceilings', DIVISION],
-    ['post', '/api/v1/budget-cycles/2031/publish', undefined],
+    ['delete', '/api/v1/budget-cycles/2031', undefined],
+    ['post', '/api/v1/budget-cycles/2031/opening', undefined],
   ] as const;
 
   it.each(routes)('answers 401 to %s %s without a token', async (method, path, body) => {
@@ -53,7 +42,7 @@ describe('budget cycle routes (HTTP contract, no database)', () => {
     expect(bodyOf(response).error.code).toBe('AUTHENTICATION_REQUIRED');
   });
 
-  it('refuses the four routes that write to every role but Finance with 403', async () => {
+  it('refuses the routes that write to every role but Finance with 403', async () => {
     const writes = routes.filter(([method]) => method !== 'get');
     for (const roles of [['SUPER_ADMIN'], ['IT_ADMIN'], ['EMPLOYEE'], ['MANAGER'], ['SPENDING_APPROVER'], []]) {
       for (const [method, path, body] of writes) {
@@ -97,28 +86,24 @@ describe('budget cycle routes (HTTP contract, no database)', () => {
       undefined,
     ],
     ['a package of a year out of range', 'get', '/api/v1/budget-cycles/1999/package', undefined],
-    ['an opening with no ceiling', 'post', '/api/v1/budget-cycles', { ...OPEN, annualCeiling: undefined }],
+    ['a draft with no ceiling', 'post', '/api/v1/budget-cycles', { ...CREATE, annualCeiling: undefined }],
+    ['a draft with no reserve', 'post', '/api/v1/budget-cycles', { ...CREATE, sharedPoolReserve: undefined }],
     [
-      'an opening that names a currency',
+      'a draft that names a currency',
       'post',
       '/api/v1/budget-cycles',
-      { ...OPEN, annualCeiling: { amount: '1', currency: 'USD' } },
+      { ...CREATE, annualCeiling: { amount: '1', currency: 'USD' } },
     ],
-    ['an opening with an unknown field', 'post', '/api/v1/budget-cycles', { ...OPEN, extra: 1 }],
+    ['a draft with an unknown field', 'post', '/api/v1/budget-cycles', { ...CREATE, extra: 1 }],
     ['a deadline that is not a date', 'patch', '/api/v1/budget-cycles/2031', { submissionDeadline: '2030-13-40' }],
-    ['a division with no reserve', 'put', '/api/v1/budget-cycles/2031/department-ceilings', { departments: [] }],
     [
-      'a division that names a department twice',
-      'put',
-      '/api/v1/budget-cycles/2031/department-ceilings',
-      { ...DIVISION, departments: [DIVISION.departments[0], DIVISION.departments[0]] },
+      'a reserve that names a currency',
+      'patch',
+      '/api/v1/budget-cycles/2031',
+      { sharedPoolReserve: { amount: '1', currency: 'USD' } },
     ],
-    [
-      'an explanation that is empty',
-      'put',
-      '/api/v1/budget-cycles/2031/department-ceilings',
-      { ...DIVISION, departments: [{ ...DIVISION.departments[0], explanation: '  ' }] },
-    ],
+    ['a deletion of a year out of range', 'delete', '/api/v1/budget-cycles/1999', undefined],
+    ['an opening of a year that is not a number', 'post', '/api/v1/budget-cycles/next/opening', undefined],
   ] as const)('turns away %s with 422', async (_name, method, path, body) => {
     const req = request(app.getHttpServer())
       [method](path)
@@ -127,5 +112,15 @@ describe('budget cycle routes (HTTP contract, no database)', () => {
     const response = await (body === undefined ? req : req.send(body)).expect(422);
 
     expect(bodyOf(response).error.code).toBe('VALIDATION_ERROR');
+  });
+
+  it.each([
+    ['divide the annual ceiling among the departments', 'put', '/api/v1/budget-cycles/2031/department-ceilings'],
+    ['publish the division', 'post', '/api/v1/budget-cycles/2031/publish'],
+  ] as const)('no longer has the route to %s (QĐ-111aa)', async (_name, method, path) => {
+    await request(app.getHttpServer())
+      [method](path)
+      .set('Authorization', bearer(principal(['FINANCE'])))
+      .expect(404);
   });
 });

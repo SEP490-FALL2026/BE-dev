@@ -108,6 +108,9 @@ export const IN_APP_NOTIFICATION_CODES = [
   'BUDGET_PROPOSAL_TASK_ASSIGNED',
   'BUDGET_PROPOSAL_TASK_WAITING',
   'BUDGET_CYCLE_OPENED',
+  // The submission deadline of an open cycle moved, with a reason kept in the Audit Trail (`QĐ-111z`, `US-06-15` AC-21).
+  'BUDGET_CYCLE_DEADLINE_MOVED',
+  // No longer sent (`QĐ-111aa`: there is no ceiling of a department to publish); notices written before it stay readable.
   'BUDGET_DEPARTMENT_CEILING_PUBLISHED',
   // The deadlines of the cycle (`QĐ-103i`, `R-I05`): a head who has not proposed, the departments nobody heads, how many departments have
   // not proposed, the versions still waiting after the decision deadline, a department with no Cost Center yet, and a head named after a

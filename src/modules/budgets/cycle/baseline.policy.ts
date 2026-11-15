@@ -150,12 +150,12 @@ export function poolIdleSeats(provisioningType: string, purchased: number | null
 }
 
 /**
- * Whether Finance may build the first version of a department from the baseline (`QĐ-100h`, `R-I05`): the cycle of the year was
- * published once and the department is in it (a ceiling there, in effect by the end of the year); the day is after the submission deadline; nobody heads the department today and nobody is to head it later (a
+ * Whether Finance may build the first version of a department from the baseline (`QĐ-100h`, `R-I05`): the cycle of the year is open
+ * and the department is in it (in effect by the end of the year); the day is after the submission deadline; nobody heads the department today and nobody is to head it later (a
  * successor, a department made for next year included); and no proposal waits or is being reviewed. The first that fails is named.
  */
 export function baselineVersionRefusal(input: {
-  cyclePublishedOnce: boolean;
+  cycleOpen: boolean;
   inCycle: boolean;
   today: BusinessDate;
   submissionDeadline: BusinessDate;
@@ -163,7 +163,7 @@ export function baselineVersionRefusal(input: {
   headToCome: boolean;
   openProposal: boolean;
 }): BaselineVersionRefusal | null {
-  if (!input.cyclePublishedOnce) return 'CYCLE_NOT_PUBLISHED';
+  if (!input.cycleOpen) return 'CYCLE_NOT_OPEN';
   if (!input.inCycle) return 'DEPARTMENT_NOT_IN_CYCLE';
   if (input.today <= input.submissionDeadline) return 'BEFORE_DEADLINE';
   if (input.headsToday) return 'HAS_HEAD';

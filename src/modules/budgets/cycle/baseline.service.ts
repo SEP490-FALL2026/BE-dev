@@ -274,31 +274,17 @@ export class BaselineService {
     const unit = await this.facts.costCenterInUse(costCenterId, tx);
     const heads = await this.organizationReads.getDepartmentHeads([unit.departmentId], today, tx);
     const refusal = baselineVersionRefusal({
-      cyclePublishedOnce: cycle !== null && cycle.firstPublishedAt !== null,
-      inCycle: cycle !== null && (await this.isInCycle(cycle, unit.departmentId, year, tx)),
+      cycleOpen: cycle !== null && cycle.openedAt !== null,
+      inCycle: (await this.organizationReads.getActiveDepartmentIds(year, tx)).includes(unit.departmentId),
       today,
       submissionDeadline: cycle?.submissionDeadline ?? today,
       headsToday: heads.has(unit.departmentId),
       headToCome: await this.organizationReads.hasHeadStartingAfter(unit.departmentId, today, tx),
       openProposal: (await this.proposals.openOfCostCenters([costCenterId], year, tx)).has(costCenterId),
     });
-    if (refusal !== null || cycle === null)
-      throw new BudgetBaselineVersionNotAllowedError(refusal ?? 'CYCLE_NOT_PUBLISHED');
+    if (refusal !== null || cycle === null) throw new BudgetBaselineVersionNotAllowedError(refusal ?? 'CYCLE_NOT_OPEN');
 
     return { departmentId: unit.departmentId, currency: cycle.currency };
-  }
-
-  /** Whether the department is in the cycle of the year: it has a ceiling there and takes effect no later than the year ends. */
-  private async isInCycle(
-    cycle: { ceilings: readonly { departmentId: string }[] },
-    departmentId: string,
-    year: number,
-    tx: DbTx,
-  ): Promise<boolean> {
-    if (!cycle.ceilings.some((ceiling) => ceiling.departmentId === departmentId)) return false;
-    const [brief] = await this.organizationReads.getDepartmentBriefs([departmentId], tx);
-
-    return brief !== undefined && brief.effectiveFrom <= `${year}-12-31`;
   }
 
   /**

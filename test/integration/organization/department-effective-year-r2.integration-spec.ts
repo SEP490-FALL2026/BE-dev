@@ -120,35 +120,27 @@ describe('the head of a department that starts next year, after the review (inte
     expect(placements.every((row) => row.department_id !== department.id || row.valid_from >= start)).toBe(true);
   });
 
-  it('tells the ceiling to the head who is to take office, and gives the proposal back to them, not to a department with no head (F-036)', async () => {
+  it('tells the opening of the cycle to the head who is to take office, and gives the proposal back to them, not to a department with no head (F-036)', async () => {
     const department = await upcoming();
     const head = await futureHead(department);
-    const division = {
-      sharedPoolReserve: h.money(0),
-      departments: (
-        await h.ctx.sql.query<{ id: string }>(
-          `SELECT id FROM departments WHERE status = 'ACTIVE' AND effective_from <= make_date($1, 12, 31)`,
-          [h.next],
-        )
-      ).rows.map((row) => ({
-        departmentId: row.id,
-        // G5-05: a proposal over the ceiling needs a note on its lines; the ceiling covers the two lines the head sends (70 000 000).
-        signedCommitments: h.money(100_000_000),
-        plannedSeats: h.money(0),
-        priority: h.money(0),
-        explanation: 'Basis of the ceiling',
-      })),
-    };
+    // The cycle of next year is made as a draft and opened now, so its opening is told to the heads of the departments of that year.
+    await h.ctx.sql.query(`DELETE FROM budget_cycles WHERE year = $1`, [h.next]);
     await request(h.server())
-      .put(`/api/v1/budget-cycles/${h.next}/department-ceilings`)
+      .post('/api/v1/budget-cycles')
       .set(h.as(h.finance))
-      .send(division)
-      .expect(200);
-    await request(h.server()).post(`/api/v1/budget-cycles/${h.next}/publish`).set(h.as(h.finance)).expect(201);
+      .send({
+        year: h.next,
+        submissionDeadline: `${h.next}-06-30`,
+        decisionDeadline: `${h.next}-07-15`,
+        annualCeiling: h.money(100_000_000_000),
+        sharedPoolReserve: h.money(0),
+      })
+      .expect(201);
+    await request(h.server()).post(`/api/v1/budget-cycles/${h.next}/opening`).set(h.as(h.finance)).expect(201);
     const cycleId = (await h.ctx.sql.query<{ id: string }>(`SELECT id FROM budget_cycles WHERE year = $1`, [h.next]))
       .rows[0].id;
 
-    const told = await h.budgetNoticesOf('BUDGET_DEPARTMENT_CEILING_PUBLISHED', cycleId);
+    const told = await h.budgetNoticesOf('BUDGET_CYCLE_OPENED', cycleId);
     const proposal = await h.budgetProposed(head, department.unitId);
     await h.giveBack(proposal.id, { reason: 'Add the seats' }, h.finance).expect(200);
     const notices = (
@@ -158,9 +150,7 @@ describe('the head of a department that starts next year, after the review (inte
       )
     ).rows;
 
-    expect(
-      told.filter((notice) => notice.params.departmentId === department.id).map((n) => n.recipient_employee_id),
-    ).toEqual([head.employeeId]);
+    expect(told.map((notice) => notice.recipient_employee_id)).toContain(head.employeeId);
     expect(notices.filter((notice) => notice.recipient_employee_id === head.employeeId).map((n) => n.code)).toContain(
       'BUDGET_PROPOSAL_RETURNED',
     );

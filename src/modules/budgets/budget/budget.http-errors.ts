@@ -12,13 +12,14 @@ import { errorExampleOf } from '../../../infrastructure/http/openapi-error-examp
 import { isCheckViolation, isUniqueViolation } from '../../../infrastructure/database/unique-violation';
 import { FinanceSetupIncompleteError } from '../../organization/public/organization.errors';
 import {
-  BudgetCeilingDepartmentInvalidError,
-  BudgetCeilingsIncompleteError,
-  BudgetCeilingsOverAnnualError,
   BudgetCycleDeadlinesInvalidError,
   BudgetCycleExistsError,
   BudgetCycleNotFoundError,
-  BudgetCycleNotPublishedError,
+  BudgetCycleAlreadyOpenError,
+  BudgetCycleDeadlinePassedError,
+  BudgetCycleLockedError,
+  BudgetCycleNotDraftError,
+  BudgetCycleNotOpenError,
   BudgetCycleReasonRequiredError,
   BudgetCycleYearPastError,
   BudgetCommitmentExistsError,
@@ -171,7 +172,7 @@ export function toBudgetApiException(error: unknown): unknown {
     return refuse(HttpStatus.NOT_FOUND, 'BUDGET.CYCLE_NOT_FOUND', error.message);
   }
   if (error instanceof BudgetCycleExistsError || isUniqueViolation(error, 'budget_cycles_organization_id_year_key')) {
-    return refuse(HttpStatus.CONFLICT, 'BUDGET.CYCLE_EXISTS', 'The budget cycle of that year is already open.');
+    return refuse(HttpStatus.CONFLICT, 'BUDGET.CYCLE_EXISTS', 'The budget cycle of that year already exists.');
   }
   if (error instanceof BudgetCycleYearPastError) {
     return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'BUDGET.CYCLE_YEAR_PAST', error.message, { year: error.year });
@@ -182,29 +183,20 @@ export function toBudgetApiException(error: unknown): unknown {
   if (error instanceof BudgetCycleReasonRequiredError) {
     return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'BUDGET.CYCLE_REASON_REQUIRED', error.message);
   }
-  if (isUniqueViolation(error, 'budget_department_ceilings_pkey')) {
-    return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'VALIDATION_ERROR', 'A department is named once.');
+  if (error instanceof BudgetCycleLockedError) {
+    return refuse(HttpStatus.CONFLICT, 'BUDGET_CYCLE.LOCKED', error.message, { year: error.year });
   }
-  if (error instanceof BudgetCeilingDepartmentInvalidError) {
-    return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'BUDGET.CEILING_DEPARTMENT_INVALID', error.message, {
-      departmentIds: error.departmentIds,
-    });
+  if (error instanceof BudgetCycleNotDraftError) {
+    return refuse(HttpStatus.CONFLICT, 'BUDGET_CYCLE.NOT_DRAFT', error.message, { year: error.year });
   }
-  if (error instanceof BudgetCeilingsIncompleteError) {
-    return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'BUDGET.CEILINGS_INCOMPLETE', error.message, {
-      missingDepartmentIds: error.missingDepartmentIds,
-      staleDepartmentIds: error.staleDepartmentIds,
-      explanationMissingDepartmentIds: error.explanationMissingDepartmentIds,
-      reserveMissing: error.reserveMissing,
-    });
+  if (error instanceof BudgetCycleAlreadyOpenError) {
+    return refuse(HttpStatus.CONFLICT, 'BUDGET_CYCLE.ALREADY_OPEN', error.message, { year: error.year });
   }
-  if (error instanceof BudgetCeilingsOverAnnualError) {
-    return refuse(HttpStatus.CONFLICT, 'BUDGET.CEILINGS_OVER_ANNUAL', error.message, {
-      gapMinor: error.gapMinor.toString(),
-    });
+  if (error instanceof BudgetCycleDeadlinePassedError) {
+    return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'BUDGET_CYCLE.DEADLINE_PASSED', error.message);
   }
-  if (error instanceof BudgetCycleNotPublishedError) {
-    return refuse(HttpStatus.CONFLICT, 'BUDGET.CYCLE_NOT_PUBLISHED', error.message, { year: error.year });
+  if (error instanceof BudgetCycleNotOpenError) {
+    return refuse(HttpStatus.CONFLICT, 'BUDGET_CYCLE.NOT_OPEN', error.message, { year: error.year });
   }
   if (error instanceof BudgetYearEndedError) {
     return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'BUDGET.YEAR_ENDED', error.message, { year: error.year });
@@ -342,10 +334,11 @@ export const BUDGET_ERROR_EXAMPLES = {
   CYCLE_YEAR_PAST: example(new BudgetCycleYearPastError(2025)),
   CYCLE_DEADLINES_INVALID: example(new BudgetCycleDeadlinesInvalidError()),
   CYCLE_REASON_REQUIRED: example(new BudgetCycleReasonRequiredError()),
-  CEILING_DEPARTMENT_INVALID: example(new BudgetCeilingDepartmentInvalidError(['<department-id>'])),
-  CEILINGS_INCOMPLETE: example(new BudgetCeilingsIncompleteError(['<department-id>'], [], true, [])),
-  CEILINGS_OVER_ANNUAL: example(new BudgetCeilingsOverAnnualError(1n)),
-  CYCLE_NOT_PUBLISHED: example(new BudgetCycleNotPublishedError(2027)),
+  CYCLE_LOCKED: example(new BudgetCycleLockedError(2027)),
+  CYCLE_NOT_DRAFT: example(new BudgetCycleNotDraftError(2027)),
+  CYCLE_ALREADY_OPEN: example(new BudgetCycleAlreadyOpenError(2027)),
+  CYCLE_DEADLINE_PASSED: example(new BudgetCycleDeadlinePassedError()),
+  CYCLE_NOT_OPEN: example(new BudgetCycleNotOpenError(2027)),
   CURRENCY_NOT_REPORTING: example(new BudgetCurrencyError('USD', 'VND')),
   QUARTERS_MISMATCH: example(new BudgetQuartersMismatchError()),
   RESERVE_REASON_REQUIRED: example(new BudgetReasonRequiredError('RESERVE')),

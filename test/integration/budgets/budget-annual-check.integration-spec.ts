@@ -195,25 +195,24 @@ describe('the annual check of a version and the reason of the base (integration,
     expect(h.codeOf(loser)).toBe('BUDGET.OVER_ANNUAL_CEILING');
   });
 
-  it('refuses to send a version of a year whose cycle was never published (R-I06)', async () => {
+  it('refuses to send a version of a year whose cycle is not open (R-I06, QĐ-111z)', async () => {
     const year = h.year + 2;
     await cycleOf(year, 10 * VERSION_TOTAL);
     const a = await built(year);
-    await h.ctx.sql.query(
-      `UPDATE budget_cycles SET first_published_at = NULL, published_at = NULL, published_by_employee_id = NULL WHERE year = $1`,
-      [year],
-    );
+    await h.ctx.sql.query(`UPDATE budget_cycles SET opened_at = NULL, opened_by_employee_id = NULL WHERE year = $1`, [
+      year,
+    ]);
 
     try {
       const refused = await h.sendVersion(a.id).expect(409);
 
-      expect(h.codeOf(refused)).toBe('BUDGET.CYCLE_NOT_PUBLISHED');
+      expect(h.codeOf(refused)).toBe('BUDGET_CYCLE.NOT_OPEN');
     } finally {
-      await h.publishedCycle(year);
-      await h.ctx.sql.query(
-        `UPDATE budget_cycles SET first_published_at = now(), published_at = now(), published_by_employee_id = $2 WHERE year = $1`,
-        [year, h.finance.employeeId],
-      );
+      await h.openedCycle(year);
+      await h.ctx.sql.query(`UPDATE budget_cycles SET opened_at = now(), opened_by_employee_id = $2 WHERE year = $1`, [
+        year,
+        h.finance.employeeId,
+      ]);
     }
   });
 

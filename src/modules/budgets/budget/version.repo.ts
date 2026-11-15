@@ -434,6 +434,16 @@ export class VersionRepo {
     });
   }
 
+  /** Whether any version of the year was ever sent to the spending approver, in any state it is in now (the first sending of the cycle, `R-16`). */
+  async anySentOfYear(organizationId: string, year: number, tx?: DbTx): Promise<boolean> {
+    return (
+      (await (tx ?? this.prisma).budgetVersion.count({
+        where: { organizationId, year, sentAt: { not: null } },
+        take: 1,
+      })) > 0
+    );
+  }
+
   async setState(tx: DbTx, id: string, state: VersionState): Promise<void> {
     await tx.budgetVersion.update({ where: { id }, data: { state } });
   }

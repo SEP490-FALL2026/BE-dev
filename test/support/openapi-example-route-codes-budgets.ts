@@ -53,30 +53,28 @@ export const ROUTE_ERROR_CODES_BUDGETS: Readonly<Record<string, Partial<Record<R
     budgetCyclePackage: {
       '404': ['BUDGET.CYCLE_NOT_FOUND'],
     },
-    budgetCycleOpen: {
+    budgetCycleCreate: {
       '409': ['BUDGET.CYCLE_EXISTS'],
       '422': ['BUDGET.CYCLE_DEADLINES_INVALID', 'BUDGET.CYCLE_YEAR_PAST', 'MONEY_OUT_OF_RANGE', 'MONEY_SCALE_EXCEEDED'],
     },
-    budgetCyclePublish: {
+    budgetCycleDelete: {
       '404': ['BUDGET.CYCLE_NOT_FOUND'],
-      '409': ['BUDGET.CEILINGS_OVER_ANNUAL'],
-      '422': ['BUDGET.CEILINGS_INCOMPLETE', 'BUDGET.CYCLE_YEAR_PAST'],
+      '409': ['BUDGET_CYCLE.NOT_DRAFT'],
+      '422': ['BUDGET.CYCLE_YEAR_PAST'],
+    },
+    budgetCycleOpen: {
+      '404': ['BUDGET.CYCLE_NOT_FOUND'],
+      '409': ['BUDGET_CYCLE.ALREADY_OPEN', 'BUDGET_CYCLE.LOCKED'],
+      '422': ['BUDGET.CYCLE_YEAR_PAST', 'BUDGET_CYCLE.DEADLINE_PASSED'],
     },
     budgetCycleUpdate: {
       '404': ['BUDGET.CYCLE_NOT_FOUND'],
+      '409': ['BUDGET_CYCLE.LOCKED'],
       '422': [
         'BUDGET.CYCLE_DEADLINES_INVALID',
         'BUDGET.CYCLE_REASON_REQUIRED',
         'BUDGET.CYCLE_YEAR_PAST',
-        'MONEY_OUT_OF_RANGE',
-        'MONEY_SCALE_EXCEEDED',
-      ],
-    },
-    budgetDepartmentCeilingsSet: {
-      '404': ['BUDGET.CYCLE_NOT_FOUND'],
-      '422': [
-        'BUDGET.CEILING_DEPARTMENT_INVALID',
-        'BUDGET.CYCLE_YEAR_PAST',
+        'BUDGET_CYCLE.DEADLINE_PASSED',
         'MONEY_OUT_OF_RANGE',
         'MONEY_SCALE_EXCEEDED',
       ],
@@ -110,7 +108,7 @@ export const ROUTE_ERROR_CODES_BUDGETS: Readonly<Record<string, Partial<Record<R
     budgetProposalResubmit: {
       '404': ['BUDGET.PROPOSAL_NOT_FOUND'],
       '409': [
-        'BUDGET.CYCLE_NOT_PUBLISHED',
+        'BUDGET_CYCLE.NOT_OPEN',
         'BUDGET.PROPOSAL_ALREADY_OPEN',
         'BUDGET.PROPOSAL_CANNOT_RESUBMIT',
         'FINANCE.SETUP_INCOMPLETE',
@@ -136,7 +134,7 @@ export const ROUTE_ERROR_CODES_BUDGETS: Readonly<Record<string, Partial<Record<R
     budgetProposalSubmit: {
       '403': ['BUDGET.NOT_YOUR_COST_CENTER'],
       '404': ['BUDGET.COST_CENTER_NOT_FOUND'],
-      '409': ['BUDGET.CYCLE_NOT_PUBLISHED', 'BUDGET.PROPOSAL_ALREADY_OPEN', 'FINANCE.SETUP_INCOMPLETE'],
+      '409': ['BUDGET_CYCLE.NOT_OPEN', 'BUDGET.PROPOSAL_ALREADY_OPEN', 'FINANCE.SETUP_INCOMPLETE'],
       '422': [
         'BUDGET.OVER_CEILING_NOTE_REQUIRED',
         'BUDGET.PRIORITY_RANK_INVALID',
@@ -247,7 +245,7 @@ export const ROUTE_ERROR_CODES_BUDGETS: Readonly<Record<string, Partial<Record<R
       '404': ['BUDGET.VERSION_NOT_FOUND'],
       '409': [
         'BUDGET.CYCLE_CURRENCY_MISMATCH',
-        'BUDGET.CYCLE_NOT_PUBLISHED',
+        'BUDGET_CYCLE.NOT_OPEN',
         'BUDGET.OVER_ANNUAL_CEILING',
         'BUDGET.PROPOSAL_NOT_SUBMITTED',
         'BUDGET.VERSION_NOT_EDITABLE',

@@ -171,20 +171,19 @@ describe('the deadlines of the budget cycle and the head named after a baseline 
     expect(await noticesOf('BUDGET_SUBMISSION_DEADLINE_PASSED')).toHaveLength(0);
   });
 
-  it('a cycle that was never published tells nobody', async () => {
+  it('a cycle that is still a draft tells nobody', async () => {
     await setDeadlines(addDays(h.today(), -3), addDays(h.today(), -1));
-    await h.ctx.sql.query(
-      `UPDATE budget_cycles SET first_published_at = NULL, published_at = NULL, published_by_employee_id = NULL WHERE year = $1`,
-      [h.year],
-    );
+    await h.ctx.sql.query(`UPDATE budget_cycles SET opened_at = NULL, opened_by_employee_id = NULL WHERE year = $1`, [
+      h.year,
+    ]);
     const before = await h.budgetRows('in_app_notifications');
     try {
       await service().run();
     } finally {
-      await h.ctx.sql.query(
-        `UPDATE budget_cycles SET first_published_at = now(), published_at = now(), published_by_employee_id = $2 WHERE year = $1`,
-        [h.year, h.finance.employeeId],
-      );
+      await h.ctx.sql.query(`UPDATE budget_cycles SET opened_at = now(), opened_by_employee_id = $2 WHERE year = $1`, [
+        h.year,
+        h.finance.employeeId,
+      ]);
     }
 
     expect(await h.budgetRows('in_app_notifications')).toBe(before);

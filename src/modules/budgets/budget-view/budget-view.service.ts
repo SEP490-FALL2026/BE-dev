@@ -8,6 +8,7 @@ import { BudgetTableViewService } from './budget-table-view.service';
 import { budgetNumbers } from './budget-view.mapper';
 import { DecisionRepo } from '../budget/decision.repo';
 import { ProposalRepo } from '../budget/proposal.repo';
+import { cycleStateOf } from '../cycle/cycle.policy';
 import { VersionLineRepo } from '../budget/version-line.repo';
 import { VersionRepo, type VersionRecord } from '../budget/version.repo';
 import { VersionViewService } from '../budget/version-view.service';
@@ -69,28 +70,13 @@ export class BudgetViewService {
     const format = await this.facts.formatter(current?.currency ?? (await this.facts.reportingCurrency()));
     const totals = (await this.numbers.totals([{ costCenterId: ownId, year }])).get(`${ownId}:${year}`)!;
     const cycle = await this.numbers.cycle(year);
-    const departmentId = (await this.facts.departmentsOf([ownId])).get(ownId);
-    // The head reads the ceiling they were told when the cycle was published (S4-01), never the figure Finance may be editing.
-    const ceiling = cycle?.publishedAt
-      ? cycle.ceilings.find((entry) => entry.departmentId === departmentId && entry.publishedTotalMinor !== null)
-      : null;
-    const ceilingMoney = cycle ? await this.facts.formatter(cycle.currency) : null;
     return {
       ...budgetNumbers(current ?? { baseMinor: null, reserveMinor: null, totalMinor: null }, totals, format),
-      departmentCeiling:
-        ceiling && ceilingMoney
-          ? {
-              total: ceilingMoney(ceiling.publishedTotalMinor!),
-              signedCommitments: ceilingMoney(ceiling.signedCommitmentsMinor),
-              plannedSeats: ceilingMoney(ceiling.plannedSeatsMinor),
-              priority: ceilingMoney(ceiling.priorityMinor),
-            }
-          : null,
       cycle: cycle
         ? {
             submissionDeadline: cycle.submissionDeadline,
             decisionDeadline: cycle.decisionDeadline,
-            published: cycle.publishedAt !== null,
+            status: cycleStateOf(cycle, await this.facts.today(new Date())),
           }
         : null,
     };

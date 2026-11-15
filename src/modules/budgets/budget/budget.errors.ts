@@ -283,7 +283,7 @@ export class BudgetCycleNotFoundError extends Error {
 /** A year has one budget cycle. */
 export class BudgetCycleExistsError extends Error {
   constructor(readonly year: number) {
-    super(`The budget cycle of ${year} is already open.`);
+    super(`The budget cycle of ${year} already exists.`);
     this.name = 'BudgetCycleExistsError';
   }
 }
@@ -303,48 +303,53 @@ export class BudgetCycleDeadlinesInvalidError extends Error {
   }
 }
 
-/** A new annual ceiling is entered with the reason the leaders changed it (`US-06-15` AC-8). */
+/** Moving the submission deadline of an open cycle, or changing its annual ceiling or shared-pool reserve, is entered with the reason (`US-06-15` AC-8, AC-21). */
 export class BudgetCycleReasonRequiredError extends Error {
   constructor() {
-    super('Changing the annual ceiling needs the reason.');
+    super(
+      'Moving the submission deadline, or changing the annual ceiling or the shared-pool reserve of an open cycle, needs the reason.',
+    );
     this.name = 'BudgetCycleReasonRequiredError';
   }
 }
 
-/** A ceiling is named for a department that is not among the departments of the year. */
-export class BudgetCeilingDepartmentInvalidError extends Error {
-  constructor(readonly departmentIds: string[]) {
-    super('A ceiling names a department that is not among the departments of the year.');
-    this.name = 'BudgetCeilingDepartmentInvalidError';
-  }
-}
-
-/** The division cannot be published: a department has no ceiling, a ceiling is for a department that left, a ceiling has no explanation, or the reserve is not entered. */
-export class BudgetCeilingsIncompleteError extends Error {
-  constructor(
-    readonly missingDepartmentIds: string[],
-    readonly staleDepartmentIds: string[],
-    readonly reserveMissing: boolean,
-    readonly explanationMissingDepartmentIds: string[] = [],
-  ) {
-    super('The division of the ceiling is not complete.');
-    this.name = 'BudgetCeilingsIncompleteError';
-  }
-}
-
-/** The ceilings and the shared-pool reserve add up to more than the annual ceiling (`R-I04`). */
-export class BudgetCeilingsOverAnnualError extends Error {
-  constructor(readonly gapMinor: bigint) {
-    super('The ceilings of the departments and the shared-pool reserve are more than the annual ceiling.');
-    this.name = 'BudgetCeilingsOverAnnualError';
-  }
-}
-
-/** The department head proposes only once the cycle of the year was published (`Q-02`). */
-export class BudgetCycleNotPublishedError extends Error {
+/** The cycle is locked: its submission deadline has passed, and a locked cycle is never opened again (`QĐ-111z`, `R-14`). */
+export class BudgetCycleLockedError extends Error {
   constructor(readonly year: number) {
-    super(`The budget cycle of ${year} was not published yet.`);
-    this.name = 'BudgetCycleNotPublishedError';
+    super(`The budget cycle of ${year} is locked: its submission deadline has passed.`);
+    this.name = 'BudgetCycleLockedError';
+  }
+}
+
+/** Only a draft cycle is deleted (`QĐ-111z`). */
+export class BudgetCycleNotDraftError extends Error {
+  constructor(readonly year: number) {
+    super(`The budget cycle of ${year} was opened: only a draft is deleted.`);
+    this.name = 'BudgetCycleNotDraftError';
+  }
+}
+
+/** The cycle was opened already (`QĐ-111z`). */
+export class BudgetCycleAlreadyOpenError extends Error {
+  constructor(readonly year: number) {
+    super(`The budget cycle of ${year} is open already.`);
+    this.name = 'BudgetCycleAlreadyOpenError';
+  }
+}
+
+/** The submission deadline is before today: a cycle is not opened with it, and an open one is not moved to it (`QĐ-111z`). */
+export class BudgetCycleDeadlinePassedError extends Error {
+  constructor() {
+    super('The submission deadline is before today.');
+    this.name = 'BudgetCycleDeadlinePassedError';
+  }
+}
+
+/** The department head proposes only once Finance opened the cycle of the year (`QĐ-111z`, was `Q-02`). */
+export class BudgetCycleNotOpenError extends Error {
+  constructor(readonly year: number) {
+    super(`The budget cycle of ${year} is not open yet.`);
+    this.name = 'BudgetCycleNotOpenError';
   }
 }
 
@@ -380,7 +385,7 @@ export class BudgetBaseReasonRequiredError extends Error {
 
 /** Why a version cannot be built from the baseline (`QĐ-100h`): the reasons of `details.reason`, in the order they are checked. */
 export type BaselineVersionRefusal =
-  'CYCLE_NOT_PUBLISHED' | 'DEPARTMENT_NOT_IN_CYCLE' | 'BEFORE_DEADLINE' | 'HAS_HEAD' | 'HAS_SUCCESSOR' | 'HAS_PROPOSAL';
+  'CYCLE_NOT_OPEN' | 'DEPARTMENT_NOT_IN_CYCLE' | 'BEFORE_DEADLINE' | 'HAS_HEAD' | 'HAS_SUCCESSOR' | 'HAS_PROPOSAL';
 
 /** A version cannot be built from the baseline: the cycle, the day, the head or the proposal does not allow it (`QĐ-100h`). */
 export class BudgetBaselineVersionNotAllowedError extends Error {

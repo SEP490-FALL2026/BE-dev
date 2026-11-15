@@ -1,50 +1,79 @@
 import { Injectable } from '@nestjs/common';
+import { pageOf, type Page } from '../../../core/application/pagination';
 import type { BusinessDate } from '../../../core/business-date';
 import { TransactionRunner, type DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../../audit/public/audit.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import {
-  BudgetCeilingDepartmentInvalidError,
-  BudgetCeilingsIncompleteError,
-  BudgetCeilingsOverAnnualError,
+  BudgetCycleAlreadyOpenError,
+  BudgetCycleDeadlinePassedError,
   BudgetCycleDeadlinesInvalidError,
   BudgetCycleExistsError,
+  BudgetCycleLockedError,
+  BudgetCycleNotDraftError,
   BudgetCycleNotFoundError,
   BudgetCycleReasonRequiredError,
   BudgetCycleYearPastError,
 } from '../budget/budget.errors';
 import { BudgetNotifierService } from '../budget/budget-notifier.service';
 import { budgetAuditEvent, BudgetFactsService } from '../budget/budget-facts.service';
-import { pageOf, type Page } from '../../../core/application/pagination';
 import type {
+  CreateCycleBodyDto,
   CycleSummaryWire,
   CycleWire,
   ListCyclesQueryDto,
-  OpenCycleBodyDto,
-  SetCeilingsBodyDto,
   UpdateCycleBodyDto,
 } from './cycle.dto';
 import {
-  ceilingAuditValue,
-  ceilingTotal,
-  changedCeilings,
-  changesNumbers,
-  planUpdate,
-  departmentsToTell,
+  cycleStateOf,
   isPastYear,
-  judgePublish,
-  leavesUnexplained,
-  type PublishVerdict,
+  judgeDelete,
+  judgeOpening,
+  planCycleChange,
+  type CycleChangePlan,
+  type CycleState,
+  type CycleUpdate,
 } from './cycle.policy';
-import { CycleRepo, figuresOf, type CycleFigures, type CycleRecord } from './cycle.repo';
+import { CycleRepo, type CycleRecord } from './cycle.repo';
 
 type Formatter = Awaited<ReturnType<BudgetFactsService['formatter']>>;
 
+/** The cycle as the audit record keeps it, the amounts as text. */
+const auditValue = (cycle: CycleRecord) => ({
+  year: cycle.year,
+  submissionDeadline: cycle.submissionDeadline,
+  decisionDeadline: cycle.decisionDeadline,
+  annualCeilingMinor: cycle.annualCeilingMinor.toString(),
+  sharedPoolReserveMinor: cycle.sharedPoolReserveMinor?.toString() ?? null,
+  priorities: cycle.priorities,
+});
+
+/** What the call asks, the amounts read in the currency of the cycle. */
+const updateOf = (body: UpdateCycleBodyDto, parse: (money: { amount: string }) => bigint): CycleUpdate => ({
+  submissionDeadline: body.submissionDeadline,
+  decisionDeadline: body.decisionDeadline,
+  priorities: body.priorities,
+  annualCeilingMinor: body.annualCeiling ? parse(body.annualCeiling) : undefined,
+  sharedPoolReserveMinor: body.sharedPoolReserve ? parse(body.sharedPoolReserve) : undefined,
+  reason: body.reason,
+});
+
+/** The columns an update writes: only what the call gave. */
+const changeOf = (update: CycleUpdate) => ({
+  ...(update.submissionDeadline ? { submissionDeadline: update.submissionDeadline } : {}),
+  ...(update.decisionDeadline ? { decisionDeadline: update.decisionDeadline } : {}),
+  ...(update.priorities !== undefined ? { priorities: update.priorities } : {}),
+  ...(update.annualCeilingMinor !== undefined ? { annualCeilingMinor: update.annualCeilingMinor } : {}),
+  ...(update.sharedPoolReserveMinor !== undefined ? { sharedPoolReserveMinor: update.sharedPoolReserveMinor } : {}),
+});
+
 /**
- * The budget cycle of a year (`QĐ-103i`, `BR-MF4-01`, `BR-MF4-02`, `US-06-15`): Finance opens it, changes the annual ceiling with the
- * reason, divides the ceiling among the departments and into the shared-pool reserve, and publishes it. Locks are taken in the order
- * of the module: the cycle first, then proposal, version and year. Finance and the spending approver read it.
+ * The budget cycle of a year (`QĐ-111z`, `QĐ-111aa`, `BR-MF4-01`, `US-06-15`): Finance makes it as a draft with the deadlines, the annual
+ * ceiling and the reserve of the shared pool, opens it (the heads hear it), may move the submission deadline and change the two amounts
+ * while it is open, and from the day after the submission deadline it is locked for good. There is no division of the ceiling among the
+ * departments. Locks are taken in the order of the module: the cycle first, then proposal, version and year. Finance and the spending
+ * approver read it.
  */
 @Injectable()
 export class CycleService {
@@ -57,20 +86,18 @@ export class CycleService {
     private readonly runner: TransactionRunner,
   ) {}
 
-  /** The departments a division of the year is made among (`QĐ-103i`): the active ones that take effect by the end of that year. */
-  ceilingDepartments(tx: DbTx, year: number): Promise<string[]> {
-    return this.organizationReads.getActiveDepartmentIds(year, tx);
-  }
-
-  /** Throws BudgetNotFinanceError, BudgetCycleYearPastError, BudgetCycleExistsError, BudgetCycleDeadlinesInvalidError and the money errors. */
-  async open(actor: AuthenticatedPrincipal, body: OpenCycleBodyDto): Promise<CycleWire> {
+  /**
+   * Makes the cycle of a year, a draft. Throws BudgetNotFinanceError, BudgetCycleYearPastError, BudgetCycleExistsError,
+   * BudgetCycleDeadlinesInvalidError and the money errors.
+   */
+  async create(actor: AuthenticatedPrincipal, body: CreateCycleBodyDto): Promise<CycleWire> {
     this.facts.requireFinance(actor);
-    const now = new Date();
-    const today = await this.facts.today(now);
+    const today = await this.facts.today(new Date());
     if (isPastYear(body.year, Number(today.slice(0, 4)))) throw new BudgetCycleYearPastError(body.year);
     if (body.decisionDeadline < body.submissionDeadline) throw new BudgetCycleDeadlinesInvalidError();
     const reporting = await this.facts.reportingCurrency();
     const annualCeilingMinor = await this.facts.money(body.annualCeiling, reporting);
+    const sharedPoolReserveMinor = await this.facts.money(body.sharedPoolReserve, reporting);
     const organizationId = await this.facts.organizationId();
 
     const created = await this.runner.run(async (tx) => {
@@ -81,48 +108,42 @@ export class CycleService {
         submissionDeadline: body.submissionDeadline,
         decisionDeadline: body.decisionDeadline,
         annualCeilingMinor,
+        sharedPoolReserveMinor,
         currency: reporting,
         priorities: body.priorities ?? null,
-        openedByEmployeeId: actor.employeeId,
-        openedAt: now,
       });
       await this.audit.record(
         tx,
-        budgetAuditEvent(actor, organizationId, 'BUDGET_CYCLE.OPENED', 'BudgetCycle', cycle.id, {
-          year: cycle.year,
-          submissionDeadline: cycle.submissionDeadline,
-          decisionDeadline: cycle.decisionDeadline,
-          annualCeilingMinor: annualCeilingMinor.toString(),
-          priorities: cycle.priorities,
-        }),
+        budgetAuditEvent(actor, organizationId, 'BUDGET_CYCLE.CREATED', 'BudgetCycle', cycle.id, auditValue(cycle)),
       );
-      const heads: (string | null)[] = [];
-      for (const departmentId of await this.ceilingDepartments(tx, body.year)) {
-        heads.push(await this.facts.currentHeadOf(departmentId, today, tx));
-      }
-      await this.notifier.cycleOpened(tx, cycle, heads);
 
       return cycle;
     });
 
-    return this.wire(created);
+    return this.wire(created, today);
   }
 
   /** The cycles, the latest year first, in pages: the page and the count are cut by the database. Throws BudgetNotAReaderError. */
   async list(actor: AuthenticatedPrincipal, query: ListCyclesQueryDto): Promise<Page<CycleSummaryWire>> {
     await this.facts.requireVersionReader(actor);
+    const today = await this.facts.today(new Date());
     const { items, total } = await this.cycles.page(
       await this.facts.organizationId(),
       (query.page - 1) * query.pageSize,
       query.pageSize,
     );
-    const formats = new Map<string, Awaited<ReturnType<BudgetFactsService['formatter']>>>();
+    const formats = new Map<string, Formatter>();
     for (const currency of new Set(items.map((item) => item.currency))) {
       formats.set(currency, await this.facts.formatter(currency));
     }
 
     return pageOf(
-      items.map((item) => this.summary(item, formats.get(item.currency) as Formatter)),
+      items.map((item) => {
+        const { priorities, ...summary } = this.view(item, formats.get(item.currency) as Formatter, today);
+        void priorities;
+
+        return summary;
+      }),
       total,
       query.page,
       query.pageSize,
@@ -135,24 +156,23 @@ export class CycleService {
     const cycle = await this.cycles.findByYear(await this.facts.organizationId(), year);
     if (!cycle) throw new BudgetCycleNotFoundError();
 
-    return this.wire(cycle);
+    return this.wire(cycle, await this.facts.today(new Date()));
   }
 
   /**
-   * Changes the deadlines, the priorities and the annual ceiling (with the reason). A new annual ceiling unpublishes the cycle: it is
-   * checked again when Finance publishes. Throws BudgetNotFinanceError, BudgetCycleNotFoundError, BudgetCycleYearPastError,
-   * BudgetCycleDeadlinesInvalidError, BudgetCycleReasonRequiredError and the money errors.
+   * Changes a cycle by its state (`QĐ-111z`): a draft takes any change; an open one moves the submission deadline (to today or later, with the
+   * reason, the heads are told) and changes the annual ceiling or the reserve (with the reason); a locked one takes none. Throws
+   * BudgetNotFinanceError, BudgetCycleNotFoundError, BudgetCycleYearPastError, BudgetCycleLockedError, BudgetCycleDeadlinesInvalidError,
+   * BudgetCycleDeadlinePassedError, BudgetCycleReasonRequiredError and the money errors.
    */
   async update(actor: AuthenticatedPrincipal, year: number, body: UpdateCycleBodyDto): Promise<CycleWire> {
     this.facts.requireFinance(actor);
     const organizationId = await this.facts.organizationId();
-    const currentYear = Number((await this.facts.today(new Date())).slice(0, 4));
+    const today = await this.facts.today(new Date());
 
-    const updated = await this.runner.run((tx) =>
-      this.updateIn(tx, { actor, organizationId, year, currentYear, body }),
-    );
+    const updated = await this.runner.run((tx) => this.updateIn(tx, { actor, organizationId, year, today, body }));
 
-    return this.wire(updated);
+    return this.wire(updated, today);
   }
 
   private async updateIn(
@@ -161,55 +181,24 @@ export class CycleService {
       actor: AuthenticatedPrincipal;
       organizationId: string;
       year: number;
-      currentYear: number;
+      today: BusinessDate;
       body: UpdateCycleBodyDto;
     },
   ): Promise<CycleRecord> {
-    const { actor, organizationId, year, currentYear, body } = call;
+    const { actor, organizationId, year, today, body } = call;
     const cycle = await this.cycles.lockByYear(tx, organizationId, year, 'UPDATE');
     if (!cycle) throw new BudgetCycleNotFoundError();
-    if (isPastYear(year, currentYear)) throw new BudgetCycleYearPastError(year);
-    // The amount is read in the currency the cycle was opened in, not in the reporting currency of today.
-    const ceiling = body.annualCeiling
-      ? (await this.facts.parserOf(cycle.currency, tx))(body.annualCeiling)
-      : undefined;
-    const plan = planUpdate(body, cycle, ceiling);
-    if (plan.decision < plan.submission) throw new BudgetCycleDeadlinesInvalidError();
-    if (plan.ceilingChanged && !body.reason) throw new BudgetCycleReasonRequiredError();
-    // Nothing to change: the cycle is answered as it is, with no write and no record.
-    if (!plan.changes) return cycle;
+    if (isPastYear(year, Number(today.slice(0, 4)))) throw new BudgetCycleYearPastError(year);
+    // The amounts are read in the currency the cycle was made in, not in the reporting currency of today.
+    const update = updateOf(body, await this.facts.parserOf(cycle.currency, tx));
+    const state = cycleStateOf(cycle, today);
+    const plan = planCycleChange(state, update, cycle, today);
+    if (plan.kind === 'NOTHING') return cycle;
+    if (plan.kind !== 'CHANGE') throw this.refusal(plan, year);
 
-    await this.cycles.update(tx, cycle.id, {
-      ...(body.submissionDeadline ? { submissionDeadline: body.submissionDeadline } : {}),
-      ...(body.decisionDeadline ? { decisionDeadline: body.decisionDeadline } : {}),
-      ...(body.priorities !== undefined ? { priorities: body.priorities } : {}),
-      ...(plan.ceilingChanged ? { annualCeilingMinor: ceiling } : {}),
-      unpublish: plan.ceilingChanged,
-    });
-    await this.recordUpdate(tx, { actor, organizationId, ceiling, body }, cycle, {
-      submission: plan.submission,
-      decision: plan.decision,
-      ceilingChanged: plan.ceilingChanged,
-    });
-
-    return (await this.cycles.findByYear(organizationId, year, tx)) as CycleRecord;
-  }
-
-  private recordUpdate(
-    tx: DbTx,
-    call: {
-      actor: AuthenticatedPrincipal;
-      organizationId: string;
-      ceiling: bigint | undefined;
-      body: UpdateCycleBodyDto;
-    },
-    cycle: CycleRecord,
-    change: { submission: BusinessDate; decision: BusinessDate; ceilingChanged: boolean },
-  ): Promise<void> {
-    const { actor, organizationId, ceiling, body } = call;
-    const annualCeilingMinor = change.ceilingChanged ? (ceiling as bigint) : cycle.annualCeilingMinor;
-
-    return this.audit.record(
+    await this.cycles.update(tx, cycle.id, changeOf(update));
+    const after = (await this.cycles.findByYear(organizationId, year, tx)) as CycleRecord;
+    await this.audit.record(
       tx,
       budgetAuditEvent(
         actor,
@@ -217,181 +206,111 @@ export class CycleService {
         'BUDGET_CYCLE.UPDATED',
         'BudgetCycle',
         cycle.id,
-        {
-          submissionDeadline: change.submission,
-          decisionDeadline: change.decision,
-          annualCeilingMinor: annualCeilingMinor.toString(),
-          priorities: body.priorities !== undefined ? body.priorities : cycle.priorities,
-          reason: body.reason ?? null,
-        },
-        {
-          submissionDeadline: cycle.submissionDeadline,
-          decisionDeadline: cycle.decisionDeadline,
-          annualCeilingMinor: cycle.annualCeilingMinor.toString(),
-          priorities: cycle.priorities,
-        },
+        { ...auditValue(after), reason: body.reason ?? null },
+        auditValue(cycle),
       ),
     );
+    if (state === 'OPEN' && plan.submissionMoved) {
+      await this.notifier.cycleDeadlineMoved(
+        tx,
+        after,
+        { submissionDeadline: after.submissionDeadline, previousSubmissionDeadline: cycle.submissionDeadline },
+        await this.headsOf(tx, year, today),
+      );
+    }
+
+    return after;
   }
 
-  /**
-   * Replaces the division of the ceiling and the shared-pool reserve; the cycle is unpublished and must be published again. Throws
-   * BudgetNotFinanceError, BudgetCycleNotFoundError, BudgetCycleYearPastError, BudgetCeilingDepartmentInvalidError and the money errors.
-   */
-  async setCeilings(actor: AuthenticatedPrincipal, year: number, body: SetCeilingsBodyDto): Promise<CycleWire> {
+  /** The head of each department of the year, today (none for a department nobody heads): the active departments that take effect by the end of that year. */
+  private async headsOf(tx: DbTx, year: number, today: BusinessDate): Promise<(string | null)[]> {
+    const heads: (string | null)[] = [];
+    for (const departmentId of await this.organizationReads.getActiveDepartmentIds(year, tx)) {
+      heads.push(await this.facts.currentHeadOf(departmentId, today, tx));
+    }
+
+    return heads;
+  }
+
+  /** Deletes a draft cycle. Throws BudgetNotFinanceError, BudgetCycleNotFoundError, BudgetCycleYearPastError and BudgetCycleNotDraftError. */
+  async remove(actor: AuthenticatedPrincipal, year: number): Promise<{ year: number }> {
     this.facts.requireFinance(actor);
     const organizationId = await this.facts.organizationId();
-    const currentYear = Number((await this.facts.today(new Date())).slice(0, 4));
+    const today = await this.facts.today(new Date());
 
-    const updated = await this.runner.run(async (tx) => {
+    await this.runner.run(async (tx) => {
       const cycle = await this.cycles.lockByYear(tx, organizationId, year, 'UPDATE');
       if (!cycle) throw new BudgetCycleNotFoundError();
-      if (isPastYear(year, currentYear)) throw new BudgetCycleYearPastError(year);
-      const inSet = new Set(await this.ceilingDepartments(tx, year));
-      const strangers = [
-        ...new Set(body.departments.map((row) => row.departmentId).filter((id) => !inSet.has(id))),
-      ].sort();
-      if (strangers.length > 0) throw new BudgetCeilingDepartmentInvalidError(strangers);
-
-      // The amounts are read in the currency of the cycle, the minor unit read once.
-      const parse = await this.facts.parserOf(cycle.currency, tx);
-      const reserve = parse(body.sharedPoolReserve);
-      const rows = body.departments.map((row) => {
-        const parts = {
-          departmentId: row.departmentId,
-          signedCommitmentsMinor: parse(row.signedCommitments),
-          plannedSeatsMinor: parse(row.plannedSeats),
-          priorityMinor: parse(row.priority),
-          explanation: row.explanation ?? null,
-        };
-
-        return { ...parts, totalMinor: ceilingTotal(parts) };
-      });
-      const changes = changedCeilings(cycle.ceilings, rows);
-      const reserveChanged = reserve !== cycle.sharedPoolReserveMinor;
-      // The same division again changes nothing: the cycle stays published and nothing is recorded.
-      if (changes.length === 0 && !reserveChanged) return cycle;
-
-      // A change of the explanation alone keeps the cycle published; a change of a number takes it back (R-I04), and so does a
-      // division with a ceiling that has no explanation, which could not be published (W2-N4).
-      const unpublish = changesNumbers(changes, reserveChanged) || leavesUnexplained(rows);
-      await this.cycles.replaceCeilings(tx, cycle, reserve, rows, unpublish);
+      if (isPastYear(year, Number(today.slice(0, 4)))) throw new BudgetCycleYearPastError(year);
+      if (judgeDelete(cycleStateOf(cycle, today)).kind !== 'OK') throw new BudgetCycleNotDraftError(year);
+      await this.cycles.remove(tx, cycle.id);
       await this.audit.record(
         tx,
         budgetAuditEvent(
           actor,
           organizationId,
-          'BUDGET_CYCLE.CEILINGS_SET',
+          'BUDGET_CYCLE.DELETED',
           'BudgetCycle',
           cycle.id,
-          {
-            sharedPoolReserveMinor: reserve.toString(),
-            changes: changes.map((change) => ({
-              departmentId: change.departmentId,
-              before: change.before && ceilingAuditValue(change.before),
-              after: change.after && ceilingAuditValue(change.after),
-            })),
-          },
-          { sharedPoolReserveMinor: cycle.sharedPoolReserveMinor?.toString() ?? null },
+          { deleted: true },
+          auditValue(cycle),
         ),
       );
-
-      return (await this.cycles.findByYear(organizationId, year, tx)) as CycleRecord;
     });
 
-    return this.wire(updated);
+    return { year };
   }
 
   /**
-   * Publishes the division: every department of the year has a ceiling, the reserve is entered and the total is within the annual
-   * ceiling. A refusal is recorded in the Audit Trail with its code. The heads of the departments whose total changed hear it.
-   * Throws BudgetNotFinanceError, BudgetCycleNotFoundError, BudgetCycleYearPastError, BudgetCeilingsIncompleteError and
-   * BudgetCeilingsOverAnnualError.
+   * Opens a draft (`QĐ-111z`): the heads of the departments of the year hear the deadline and which form to fill in. Throws BudgetNotFinanceError,
+   * BudgetCycleNotFoundError, BudgetCycleYearPastError, BudgetCycleAlreadyOpenError, BudgetCycleLockedError and BudgetCycleDeadlinePassedError.
    */
-  async publish(actor: AuthenticatedPrincipal, year: number): Promise<CycleWire> {
+  async open(actor: AuthenticatedPrincipal, year: number): Promise<CycleWire> {
     this.facts.requireFinance(actor);
     const organizationId = await this.facts.organizationId();
     const now = new Date();
     const today = await this.facts.today(now);
 
-    const outcome = await this.runner.run((tx) => this.publishIn(tx, { actor, organizationId, year, now, today }));
+    const opened = await this.runner.run(async (tx) => {
+      const cycle = await this.cycles.lockByYear(tx, organizationId, year, 'UPDATE');
+      if (!cycle) throw new BudgetCycleNotFoundError();
+      if (isPastYear(year, Number(today.slice(0, 4)))) throw new BudgetCycleYearPastError(year);
+      const verdict = judgeOpening(cycleStateOf(cycle, today), cycle.submissionDeadline, today);
+      if (verdict.kind === 'LOCKED') throw new BudgetCycleLockedError(year);
+      if (verdict.kind === 'ALREADY_OPEN') throw new BudgetCycleAlreadyOpenError(year);
+      if (verdict.kind === 'DEADLINE_PASSED') throw new BudgetCycleDeadlinePassedError();
 
-    if (outcome.kind === 'REFUSED') throw this.refusal(outcome.verdict);
-
-    return this.wire(outcome.published);
-  }
-
-  private async publishIn(
-    tx: DbTx,
-    call: { actor: AuthenticatedPrincipal; organizationId: string; year: number; now: Date; today: BusinessDate },
-  ): Promise<
-    | { kind: 'REFUSED'; verdict: Exclude<PublishVerdict, { kind: 'OK' }> }
-    | { kind: 'PUBLISHED'; published: CycleRecord }
-  > {
-    const { actor, organizationId, year, now, today } = call;
-    const cycle = await this.cycles.lockByYear(tx, organizationId, year, 'UPDATE');
-    if (!cycle) throw new BudgetCycleNotFoundError();
-    if (isPastYear(year, Number(today.slice(0, 4)))) throw new BudgetCycleYearPastError(year);
-    const verdict = judgePublish({
-      departmentIds: await this.ceilingDepartments(tx, year),
-      ceilings: cycle.ceilings,
-      reserveMinor: cycle.sharedPoolReserveMinor,
-      annualCeilingMinor: cycle.annualCeilingMinor,
-    });
-    if (verdict.kind !== 'OK') {
+      await this.cycles.open(tx, cycle.id, actor.employeeId, now);
+      const after = (await this.cycles.findByYear(organizationId, year, tx)) as CycleRecord;
       await this.audit.record(
         tx,
-        budgetAuditEvent(actor, organizationId, 'BUDGET_CYCLE.PUBLISH_REFUSED', 'BudgetCycle', cycle.id, {
-          code: verdict.kind === 'INCOMPLETE' ? 'CEILINGS_INCOMPLETE' : 'CEILINGS_OVER_ANNUAL',
-          gapMinor: verdict.kind === 'OVER_ANNUAL' ? verdict.gapMinor.toString() : null,
-        }),
+        budgetAuditEvent(actor, organizationId, 'BUDGET_CYCLE.OPENED', 'BudgetCycle', cycle.id, auditValue(after)),
       );
+      await this.notifier.cycleOpened(tx, after, await this.headsOf(tx, year, today));
 
-      return { kind: 'REFUSED', verdict };
-    }
+      return after;
+    });
 
-    const toTell = departmentsToTell(cycle.ceilings);
-    await this.cycles.publish(tx, cycle, actor.employeeId, now);
-    await this.audit.record(
-      tx,
-      budgetAuditEvent(actor, organizationId, 'BUDGET_CYCLE.PUBLISHED', 'BudgetCycle', cycle.id, {
-        year: cycle.year,
-        totalMinor: verdict.totalMinor.toString(),
-        departments: toTell,
-      }),
-    );
-    for (const departmentId of toTell) {
-      await this.notifier.ceilingPublished(tx, cycle, {
-        departmentId,
-        headEmployeeId: await this.facts.currentHeadOf(departmentId, today, tx),
-        publication: now.toISOString(),
-      });
-    }
-
-    return { kind: 'PUBLISHED', published: (await this.cycles.findByYear(organizationId, year, tx)) as CycleRecord };
+    return this.wire(opened, today);
   }
 
-  private refusal(verdict: Exclude<PublishVerdict, { kind: 'OK' }>): Error {
-    return verdict.kind === 'INCOMPLETE'
-      ? new BudgetCeilingsIncompleteError(
-          verdict.missingDepartmentIds,
-          verdict.staleDepartmentIds,
-          verdict.reserveMissing,
-          verdict.explanationMissingDepartmentIds,
-        )
-      : new BudgetCeilingsOverAnnualError(verdict.gapMinor);
+  private refusal(plan: Exclude<CycleChangePlan, { kind: 'CHANGE' | 'NOTHING' }>, year: number): Error {
+    switch (plan.kind) {
+      case 'LOCKED':
+        return new BudgetCycleLockedError(year);
+      case 'DEADLINES_INVALID':
+        return new BudgetCycleDeadlinesInvalidError();
+      case 'DEADLINE_IN_PAST':
+        return new BudgetCycleDeadlinePassedError();
+      case 'REASON_REQUIRED':
+        return new BudgetCycleReasonRequiredError();
+    }
   }
 
-  /** The figures of a cycle as they are answered; the sums come from the stored figures, never stored. */
-  private summary(cycle: CycleFigures, format: Formatter): CycleSummaryWire {
-    const allocated = cycle.ceilingsTotalMinor + (cycle.sharedPoolReserveMinor ?? 0n);
-    const left = cycle.annualCeilingMinor - allocated;
-    const status =
-      cycle.publishedAt !== null
-        ? 'PUBLISHED'
-        : cycle.firstPublishedAt !== null
-          ? 'CHANGED_AFTER_PUBLISH'
-          : 'NOT_PUBLISHED';
+  /** The figures of a cycle as they are answered; the state and what is available are worked out from the stored figures, never stored. */
+  private view(cycle: CycleRecord, format: Formatter, today: BusinessDate): CycleWire {
+    const state: CycleState = cycleStateOf(cycle, today);
+    const available = cycle.annualCeilingMinor - (cycle.sharedPoolReserveMinor ?? 0n);
 
     return {
       year: cycle.year,
@@ -399,30 +318,14 @@ export class CycleService {
       decisionDeadline: cycle.decisionDeadline,
       annualCeiling: format(cycle.annualCeilingMinor),
       sharedPoolReserve: cycle.sharedPoolReserveMinor === null ? null : format(cycle.sharedPoolReserveMinor),
+      available: format(available > 0n ? available : 0n),
       priorities: cycle.priorities,
-      status,
+      status: state,
       openedAt: cycle.openedAt?.toISOString() ?? null,
-      publishedAt: cycle.publishedAt?.toISOString() ?? null,
-      firstPublishedAt: cycle.firstPublishedAt?.toISOString() ?? null,
-      allocated: format(allocated),
-      unallocated: format(left > 0n ? left : 0n),
     };
   }
 
-  /** The cycle with the ceiling of each department, by the id of the department. */
-  private async wire(cycle: CycleRecord): Promise<CycleWire> {
-    const format = await this.facts.formatter(cycle.currency);
-    const ceilings: CycleWire['ceilings'] = {};
-    for (const ceiling of cycle.ceilings) {
-      ceilings[ceiling.departmentId] = {
-        explanation: ceiling.explanation,
-        signedCommitments: format(ceiling.signedCommitmentsMinor),
-        plannedSeats: format(ceiling.plannedSeatsMinor),
-        priority: format(ceiling.priorityMinor),
-        total: format(ceiling.totalMinor),
-      };
-    }
-
-    return { ...this.summary(figuresOf(cycle), format), ceilings };
+  private async wire(cycle: CycleRecord, today: BusinessDate): Promise<CycleWire> {
+    return this.view(cycle, await this.facts.formatter(cycle.currency), today);
   }
 }

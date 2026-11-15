@@ -76,7 +76,7 @@ export class CycleDeadlineService {
       today,
       submissionDeadline: cycle.submissionDeadline,
       decisionDeadline: cycle.decisionDeadline,
-      publishedOnce: cycle.firstPublishedAt !== null,
+      opened: cycle.openedAt !== null,
     });
     const departmentIds = await this.organizationReads.getActiveDepartmentIds(cycle.year, tx);
     const pass: Pass = {

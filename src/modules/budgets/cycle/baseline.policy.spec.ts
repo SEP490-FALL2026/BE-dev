@@ -171,7 +171,7 @@ describe('the cost of one subscription over a year (R-I03)', () => {
 
 describe('when a version may be built from the baseline (QĐ-100h, R-I05)', () => {
   const ready = {
-    cyclePublishedOnce: true,
+    cycleOpen: true,
     inCycle: true,
     today: '2026-12-20',
     submissionDeadline: '2026-12-15',
@@ -185,7 +185,7 @@ describe('when a version may be built from the baseline (QĐ-100h, R-I05)', () =
   });
 
   it.each([
-    ['the cycle was never published', { cyclePublishedOnce: false }, 'CYCLE_NOT_PUBLISHED'],
+    ['the cycle is not open (a draft)', { cycleOpen: false }, 'CYCLE_NOT_OPEN'],
     ['the department is not in the cycle', { inCycle: false }, 'DEPARTMENT_NOT_IN_CYCLE'],
     ['it is the day of the deadline', { today: '2026-12-15' }, 'BEFORE_DEADLINE'],
     ['it is before the deadline', { today: '2026-12-01' }, 'BEFORE_DEADLINE'],
@@ -197,9 +197,7 @@ describe('when a version may be built from the baseline (QĐ-100h, R-I05)', () =
   });
 
   it('names the first thing that is wrong, in the order a person would fix it', () => {
-    expect(baselineVersionRefusal({ ...ready, cyclePublishedOnce: false, headsToday: true })).toBe(
-      'CYCLE_NOT_PUBLISHED',
-    );
+    expect(baselineVersionRefusal({ ...ready, cycleOpen: false, headsToday: true })).toBe('CYCLE_NOT_OPEN');
     expect(baselineVersionRefusal({ ...ready, inCycle: false, today: '2026-12-01' })).toBe('DEPARTMENT_NOT_IN_CYCLE');
     expect(baselineVersionRefusal({ ...ready, headsToday: true, openProposal: true })).toBe('HAS_HEAD');
   });
