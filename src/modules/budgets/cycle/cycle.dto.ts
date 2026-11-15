@@ -103,6 +103,14 @@ const baselineDepartmentView = z.strictObject({
     description:
       'The invoices recorded this year against every Cost Center the department ever had (the seat-months of K2 are not in it yet).',
   }),
+  carriedOverNextYear: moneyView.meta({
+    description:
+      'What the Cost Center carries into the year of the cycle: the amount already saved for it by the requests approved so far (a right with an end at what its approval kept, a right with no end at twelve months of its monthly price), the figure the base of its version is filled in with. Zero when it has none, and for a department with no Cost Center.',
+  }),
+  noProposalSubmitted: z.boolean().meta({
+    description:
+      'The submission deadline has passed and the department has no proposal (QĐ-111bb): Finance builds its version from this baseline, flagged for the spending approver.',
+  }),
   estimatedAnnualCost: moneyView,
   hasUnknownCost: z.boolean().meta({
     description: 'A subscription its people hold has no price the baseline can use: its cost is left out of the total.',
@@ -184,7 +192,7 @@ const packageDepartmentView = z.strictObject({
       'Finance may build the first version of the department from the baseline now: the same check as the version of source BASELINE.',
   }),
   baselineRefusal: z
-    .enum(['CYCLE_NOT_OPEN', 'DEPARTMENT_NOT_IN_CYCLE', 'BEFORE_DEADLINE', 'HAS_HEAD', 'HAS_SUCCESSOR', 'HAS_PROPOSAL'])
+    .enum(['CYCLE_NOT_OPEN', 'DEPARTMENT_NOT_IN_CYCLE', 'BEFORE_DEADLINE', 'HAS_PROPOSAL'])
     .nullable()
     .meta({ description: 'The first thing that stops it, or null when `baselineAllowed`.' }),
   proposal: z

@@ -2,11 +2,14 @@ import { Client } from 'pg';
 import request from 'supertest';
 import { addDays } from '../../support/department-harness';
 import { BudgetHarness } from '../../support/budget-harness';
+import { CarriedOverContributions } from '../../../src/modules/budgets/public/budgets.extension-points';
 import { budgetYearLockKey } from '../../../src/modules/budgets/public/budget-year-lock-key.policy';
 import { waitForLockWaiters } from '../../support/lock-wait';
 import type { Department } from '../../support/request-harness';
 
 const h = new BudgetHarness();
+/** What a context that adds its part says each Cost Center carries into the year: the requests context is not bound to it yet (BG-2.1). */
+const carriedOver = new Map<string, bigint>();
 
 interface VersionBody {
   version: {
@@ -67,6 +70,9 @@ describe('a version built from the baseline (integration, real PostgreSQL)', () 
 
   beforeAll(async () => {
     await h.start();
+    h.ctx.app.get(CarriedOverContributions, { strict: false }).add('test', {
+      carriedOverOf: (ids) => Promise.resolve(new Map([...carriedOver].filter(([id]) => ids.includes(id)))),
+    });
     // The deadline of the year has passed: yesterday.
     await setDeadline(h.year, addDays(h.today(), -1));
   }, 240000);
@@ -82,7 +88,7 @@ describe('a version built from the baseline (integration, real PostgreSQL)', () 
     const made = h.dataOf<VersionBody>(await create(baselineBody(department)).expect(201)).version;
 
     // 10 seats bought, 6 held, at 1,000,000 a month, running since January 2026: twelve months, for the six held (F-066).
-    expect(made.origin).toBe('BASELINE_NO_HEAD');
+    expect(made.origin).toBe('BASELINE_NO_PROPOSAL');
     expect(made.proposalId).toBeNull();
     expect(made.base.amount).toBe('72000000');
     expect(made.reserve.amount).toBe('7200000');
@@ -116,12 +122,6 @@ describe('a version built from the baseline (integration, real PostgreSQL)', () 
       await setDeadline(h.year, addDays(h.today(), -1));
     });
 
-    it('when somebody heads the department', async () => {
-      const unit = await h.departmentWithHead(`P-BVH${(counter += 1)}`);
-
-      refusedWith(await create(baselineBody(unit.department)), 'HAS_HEAD');
-    });
-
     it('when a proposal waits, even though nobody heads the department any more', async () => {
       const unit = await h.departmentWithHead(`P-BVP${(counter += 1)}`);
       await h.budgetProposed(unit.head, unit.department.unitId, undefined, h.year);
@@ -130,55 +130,11 @@ describe('a version built from the baseline (integration, real PostgreSQL)', () 
       refusedWith(await create(baselineBody(unit.department)), 'HAS_PROPOSAL');
     });
 
-    it('when somebody is to head the department (a department that starts next year with its head named)', async () => {
-      const department = await headless();
-      const start = `${h.next}-01-01`;
-      await setDeadline(h.next, addDays(h.today(), -1));
-      await h.ctx.sql.query(`UPDATE departments SET effective_from = $2 WHERE id = $1`, [department.id, start]);
-      const person = await h.unplacedStaff(`BVN${counter}`, 'MANAGER');
-      const asAdmin = { Authorization: `Bearer ${h.admin}` };
-      await request(h.server())
-        .post(`/api/v1/employees/${person.employeeId}/first-placements`)
-        .set(asAdmin)
-        .send({ departmentId: department.id, effectiveFrom: start })
-        .expect(201);
-      await request(h.server())
-        .post(`/api/v1/departments/${department.id}/head-assignments`)
-        .set(asAdmin)
-        .send({ employeeId: person.employeeId, effectiveFrom: start })
-        .expect(200);
-
-      refusedWith(await create(baselineBody(department, h.next)), 'HAS_SUCCESSOR');
-    });
-
     it('when the department takes effect after the year: it is not among the departments of the cycle (F-078)', async () => {
       const later = await headless();
       await h.ctx.sql.query(`UPDATE departments SET effective_from = $2 WHERE id = $1`, [later.id, `${h.next}-01-01`]);
 
       refusedWith(await create(baselineBody(later)), 'DEPARTMENT_NOT_IN_CYCLE');
-    });
-
-    it('when the department has a successor named from tomorrow, and counts neither a term that was cancelled nor another department (F-080)', async () => {
-      const successor = await headless();
-      const cancelled = await headless();
-      const other = await headless();
-      const tomorrow = addDays(h.today(), 1);
-      // The table keeps no term that ends before it begins: a term cancelled before it began is gone.
-      const head = async (department: Department) => {
-        const person = await h.staff(department, `BVN${(counter += 1)}`, 'MANAGER');
-        await h.ctx.sql.query(
-          `INSERT INTO department_head_periods (id, organization_id, department_id, employee_id, valid_from)
-           VALUES (gen_random_uuid(), $1, $2, $3, $4::date)`,
-          [h.seed.organizationId, department.id, person.employeeId, tomorrow],
-        );
-      };
-      await head(successor);
-      await head(cancelled);
-      await h.withoutHead(cancelled);
-
-      refusedWith(await create(baselineBody(successor)), 'HAS_SUCCESSOR');
-      await create(baselineBody(cancelled)).expect(201);
-      await create(baselineBody(other)).expect(201);
     });
 
     it('when the cycle of the year is not open (a draft)', async () => {
@@ -206,6 +162,46 @@ describe('a version built from the baseline (integration, real PostgreSQL)', () 
     const refused = await create(baselineBody(department)).expect(409);
 
     expect(h.codeOf(refused)).toBe('FINANCE.SETUP_INCOMPLETE');
+  });
+
+  it('builds the version of a department whatever its head: one that submitted nothing by the deadline, or is to head it from tomorrow (QĐ-111bb)', async () => {
+    const headed = await h.departmentWithHead(`P-BVH${(counter += 1)}`);
+    const successor = await headless();
+    const person = await h.staff(successor, `BVN${(counter += 1)}`, 'MANAGER');
+    await h.ctx.sql.query(
+      `INSERT INTO department_head_periods (id, organization_id, department_id, employee_id, valid_from)
+       VALUES (gen_random_uuid(), $1, $2, $3, $4::date)`,
+      [h.seed.organizationId, successor.id, person.employeeId, addDays(h.today(), 1)],
+    );
+
+    const first = h.dataOf<VersionBody>(await create(baselineBody(headed.department)).expect(201)).version;
+    const second = h.dataOf<VersionBody>(await create(baselineBody(successor)).expect(201)).version;
+
+    expect([first.origin, second.origin]).toEqual(['BASELINE_NO_PROPOSAL', 'BASELINE_NO_PROPOSAL']);
+  });
+
+  it('shows in the baseline what each Cost Center carries into the year, from the contexts that add it, and the department with no proposal by the deadline (QĐ-111ac, QĐ-111bb)', async () => {
+    const quiet = await headless();
+    const proposed = await h.departmentWithHead(`P-BVQ${(counter += 1)}`);
+    await h.ctx.sql.query(
+      `INSERT INTO budget_proposals (id, organization_id, cost_center_id, year, state, total_minor, currency,
+         submitted_by_employee_id, submitted_at, updated_at)
+       SELECT gen_random_uuid(), id, $1, $2, 'SUBMITTED', 0, $3, $4, now(), now() FROM organizations LIMIT 1`,
+      [proposed.department.unitId, h.year, h.reporting, proposed.head.employeeId],
+    );
+    // A context that carries ten rights of 1,000,000 a month with no end (twelve months each) and 3,000,000 saved for a right with an end.
+    carriedOver.set(quiet.unitId, 10n * 1_000_000n * 12n + 3_000_000n);
+
+    const wire = h.dataOf<{
+      departments: { departmentId: string; carriedOverNextYear: { amount: string }; noProposalSubmitted: boolean }[];
+    }>(await request(h.server()).get(`/api/v1/budget-cycles/${h.year}/baseline`).set(h.as(h.finance)).expect(200));
+    const of = (id: string) => wire.departments.find((department) => department.departmentId === id);
+
+    expect(of(quiet.id)).toMatchObject({ carriedOverNextYear: { amount: '123000000' }, noProposalSubmitted: true });
+    expect(of(proposed.department.id)).toMatchObject({
+      carriedOverNextYear: { amount: '0' },
+      noProposalSubmitted: false,
+    });
   });
 
   it('builds a version with a base of zero for a department that runs nothing, and leaves out a line that costs nothing (F-086)', async () => {

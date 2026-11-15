@@ -28,6 +28,7 @@ import { BudgetsApi } from './public/budgets.api';
 import {
   CommitmentReleaseGuardHook,
   CommitmentRequestFactsHook,
+  CarriedOverContributions,
   PendingSpendContributions,
 } from './public/budgets.extension-points';
 import { BudgetCommitmentsController } from './commitment/budget-commitments.controller';
@@ -172,6 +173,7 @@ import { BudgetProposalTemplateListener } from './proposal/budget-proposal-templ
     CycleDeadlineSweeper,
     DepartmentCreationWindowListener,
     PendingSpendContributions,
+    CarriedOverContributions,
     CommitmentReleaseGuardHook,
     CommitmentRequestFactsHook,
     BudgetCostCenterUseReader,
@@ -182,6 +184,12 @@ import { BudgetProposalTemplateListener } from './proposal/budget-proposal-templ
     InvoiceService,
     BudgetsApi,
   ],
-  exports: [BudgetsApi, PendingSpendContributions, CommitmentReleaseGuardHook, CommitmentRequestFactsHook],
+  exports: [
+    BudgetsApi,
+    PendingSpendContributions,
+    CarriedOverContributions,
+    CommitmentReleaseGuardHook,
+    CommitmentRequestFactsHook,
+  ],
 })
 export class BudgetsModule {}

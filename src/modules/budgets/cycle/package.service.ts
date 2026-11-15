@@ -173,8 +173,6 @@ export class PackageService {
           inCycle: true,
           today,
           submissionDeadline: cycle.submissionDeadline,
-          headsToday,
-          headToCome,
           openProposal: proposals.has(costCenters.get(departmentId) ?? ''),
         });
         const status = headsToday ? 'HAS_HEAD' : headToCome ? 'HEAD_TO_COME' : 'NO_HEAD';

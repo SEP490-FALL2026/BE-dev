@@ -376,8 +376,7 @@ export class BudgetBaseReasonRequiredError extends Error {
 }
 
 /** Why a version cannot be built from the baseline (`QĐ-100h`): the reasons of `details.reason`, in the order they are checked. */
-export type BaselineVersionRefusal =
-  'CYCLE_NOT_OPEN' | 'DEPARTMENT_NOT_IN_CYCLE' | 'BEFORE_DEADLINE' | 'HAS_HEAD' | 'HAS_SUCCESSOR' | 'HAS_PROPOSAL';
+export type BaselineVersionRefusal = 'CYCLE_NOT_OPEN' | 'DEPARTMENT_NOT_IN_CYCLE' | 'BEFORE_DEADLINE' | 'HAS_PROPOSAL';
 
 /** A version cannot be built from the baseline: the cycle, the day, the head or the proposal does not allow it (`QĐ-100h`). */
 export class BudgetBaselineVersionNotAllowedError extends Error {

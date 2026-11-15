@@ -10,6 +10,7 @@ import {
   BudgetCycleNotFoundError,
   BudgetNotYourCostCenterError,
 } from '../budget/budget.errors';
+import { CarriedOverContributions } from '../public/budgets.extension-points';
 import { BudgetFactsService } from '../budget/budget-facts.service';
 import { CommitmentRepo, heldKey } from '../budget/commitment.repo';
 import { ProposalRepo } from '../budget/proposal.repo';
@@ -53,6 +54,7 @@ export function departmentOf(
   costCenterId: string | null,
   subscriptions: readonly BaselineSubscription[],
   reading: Reading,
+  carried: { carriedOver: bigint; noProposalSubmitted: boolean } = { carriedOver: 0n, noProposalSubmitted: false },
 ): BaselineWire['departments'][number] {
   const { year, today, seats, ending, kpi3ByPlan, spent, format } = reading;
   const software: BaselineWire['departments'][number]['software'] = [];
@@ -91,6 +93,8 @@ export function departmentOf(
     departmentCode: brief.code,
     departmentName: brief.name,
     costCenterId,
+    carriedOverNextYear: format(carried.carriedOver),
+    noProposalSubmitted: carried.noProposalSubmitted,
     spentThisYear: format(spent),
     estimatedAnnualCost: format(total),
     hasUnknownCost: unknown,
@@ -169,6 +173,7 @@ export class BaselineService {
     private readonly licensing: LicensingApi,
     private readonly commitments: CommitmentRepo,
     private readonly proposals: ProposalRepo,
+    private readonly carriedOver: CarriedOverContributions,
   ) {}
 
   /** Throws BudgetCycleNotFoundError and BudgetNotYourCostCenterError (a head asking for a department that is not theirs, or for none). */
@@ -192,6 +197,10 @@ export class BaselineService {
     const kpi3ByPlan = await this.catalog.getPlanKpi3([...new Set(subscriptions.map((one) => one.planId))]);
     const spentOf = await this.spentByDepartment(history, today);
 
+    const costCenterIds = [...costCenters.values()];
+    const carriedOver = await this.carriedOver.totals(costCenterIds, year);
+    const proposed = await this.proposals.proposedCostCenters(costCenterIds, year);
+    const locked = today > cycle.submissionDeadline;
     const departments = inOrderOf(wanted, briefs).map((brief) => {
       const seats = allocation.byDepartment.get(brief.id) ?? new Map<string, number>();
 
@@ -200,6 +209,10 @@ export class BaselineService {
         costCenters.get(brief.id) ?? null,
         subscriptions.filter((subscription) => (seats.get(subscription.subscriptionId) ?? 0) > 0),
         { year, today, seats, ending, kpi3ByPlan, spent: spentOf(brief.id), format },
+        {
+          carriedOver: carriedOver.get(costCenters.get(brief.id) ?? '') ?? 0n,
+          noProposalSubmitted: locked && !proposed.has(costCenters.get(brief.id) ?? ''),
+        },
       );
     });
 
@@ -272,14 +285,11 @@ export class BaselineService {
   ): Promise<{ departmentId: string; currency: string }> {
     const cycle = await this.cycles.lockByYear(tx, await this.facts.organizationId(tx), year, 'UPDATE');
     const unit = await this.facts.costCenterInUse(costCenterId, tx);
-    const heads = await this.organizationReads.getDepartmentHeads([unit.departmentId], today, tx);
     const refusal = baselineVersionRefusal({
       cycleOpen: cycle !== null && cycle.openedAt !== null,
       inCycle: (await this.organizationReads.getActiveDepartmentIds(year, tx)).includes(unit.departmentId),
       today,
       submissionDeadline: cycle?.submissionDeadline ?? today,
-      headsToday: heads.has(unit.departmentId),
-      headToCome: await this.organizationReads.hasHeadStartingAfter(unit.departmentId, today, tx),
       openProposal: (await this.proposals.openOfCostCenters([costCenterId], year, tx)).has(costCenterId),
     });
     if (refusal !== null || cycle === null) throw new BudgetBaselineVersionNotAllowedError(refusal ?? 'CYCLE_NOT_OPEN');

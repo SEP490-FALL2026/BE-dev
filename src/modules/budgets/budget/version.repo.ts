@@ -264,7 +264,7 @@ export class VersionRepo {
     const rows = await (tx ?? this.prisma).budgetVersion.findMany({
       where: {
         costCenterId,
-        origin: 'BASELINE_NO_HEAD',
+        origin: { in: ['BASELINE_NO_HEAD', 'BASELINE_NO_PROPOSAL'] },
         state: { in: ['DRAFT', 'SENT', 'CHANGES_REQUESTED'] },
         detachedAt: null,
       },

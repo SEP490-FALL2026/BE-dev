@@ -175,12 +175,10 @@ describe('when a version may be built from the baseline (QĐ-100h, R-I05)', () =
     inCycle: true,
     today: '2026-12-20',
     submissionDeadline: '2026-12-15',
-    headsToday: false,
-    headToCome: false,
     openProposal: false,
   };
 
-  it('is allowed after the deadline for a department nobody heads, nobody is to head and nobody proposed for', () => {
+  it('is allowed after the deadline for a department nobody proposed for, whoever heads it, or is to head it (QĐ-111bb: a head that did not submit, or a department made after the deadline)', () => {
     expect(baselineVersionRefusal(ready)).toBeNull();
   });
 
@@ -189,17 +187,15 @@ describe('when a version may be built from the baseline (QĐ-100h, R-I05)', () =
     ['the department is not in the cycle', { inCycle: false }, 'DEPARTMENT_NOT_IN_CYCLE'],
     ['it is the day of the deadline', { today: '2026-12-15' }, 'BEFORE_DEADLINE'],
     ['it is before the deadline', { today: '2026-12-01' }, 'BEFORE_DEADLINE'],
-    ['somebody heads the department', { headsToday: true }, 'HAS_HEAD'],
-    ['somebody is to head it (a successor, or a department of next year)', { headToCome: true }, 'HAS_SUCCESSOR'],
     ['a proposal waits or is being reviewed', { openProposal: true }, 'HAS_PROPOSAL'],
   ] as const)('is refused when %s', (_name, patch, expected) => {
     expect(baselineVersionRefusal({ ...ready, ...patch })).toBe(expected);
   });
 
   it('names the first thing that is wrong, in the order a person would fix it', () => {
-    expect(baselineVersionRefusal({ ...ready, cycleOpen: false, headsToday: true })).toBe('CYCLE_NOT_OPEN');
+    expect(baselineVersionRefusal({ ...ready, cycleOpen: false, openProposal: true })).toBe('CYCLE_NOT_OPEN');
     expect(baselineVersionRefusal({ ...ready, inCycle: false, today: '2026-12-01' })).toBe('DEPARTMENT_NOT_IN_CYCLE');
-    expect(baselineVersionRefusal({ ...ready, headsToday: true, openProposal: true })).toBe('HAS_HEAD');
+    expect(baselineVersionRefusal({ ...ready, today: '2026-12-01', openProposal: true })).toBe('BEFORE_DEADLINE');
   });
 });
 
