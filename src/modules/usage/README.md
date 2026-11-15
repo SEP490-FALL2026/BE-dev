@@ -44,9 +44,9 @@ Tầng: T6 (`scripts/arch/tiers.cjs`). Phụ thuộc: devices, catalog, licensin
   `vendor-source-contract.controller.ts` (`usageSourceListOfContract`, `GET /contracts/{id}/usage-sources`, IT Admin và Finance, `US-04-13` AC-15): nguồn của
   các ứng dụng của hợp đồng đó (đọc ứng dụng qua `CatalogContractApi`, tên ứng dụng qua `CatalogApi`), mỗi nguồn chỉ `id`, `name`, `application`, `status`
   (`ACTIVE`, hoặc `RETIRED` khi nguồn đã ngừng); Finance không đọc route nguồn nào khác (`QĐ-101i`).
-- `identity/` — hàng đợi chưa khớp, ánh xạ (`Resolve` = ánh xạ `MANUAL` kèm chuỗi gốc; `Dismiss` ở lại hàng đợi; `MappingEnd` sửa ánh xạ sai) và
+- `identity/` — hàng đợi chưa khớp (lọc `importId`: định danh mà dòng của lần import đó không khớp hoặc khớp hai người, kể cả lần đầu/lần cuối gặp; gán hoặc bỏ qua vẫn qua route theo id của mục), ánh xạ (`Resolve` = ánh xạ `MANUAL` kèm chuỗi gốc; `Dismiss` ở lại hàng đợi; `MappingEnd` sửa ánh xạ sai) và
   phát hiện sai lệch.
-- `vendor-import/` — `parse/` (CSV theo mẫu / JSON `saas-sentry.vendor-usage-report/0.1-proposal`, cửa sổ bao phủ, phân loại sự kiện),
+- `vendor-import/` — lịch sử `GET /usage-imports` (lọc nguồn, ứng dụng, trạng thái; `duplicateOfImportId`) và cảnh báo `DUPLICATE_FILE` khi xem trước đúng tệp (`content_hash`) mà một lần import đã xác nhận của cùng nguồn đang giữ (cảnh báo, không chặn); `parse/` (CSV theo mẫu / JSON `saas-sentry.vendor-usage-report/0.1-proposal`, cửa sổ bao phủ, phân loại sự kiện),
   `match/` (khớp danh tính lúc đọc: ánh xạ → email/tài khoản chính xác → quy tắc bí danh; mơ hồ không đoán), `preview/` (xem trước, không ghi
   ngày), `confirmation/` (khóa nguồn → khóa import, tính lại preview, **báo người giữ trước khi ghi**, ghi theo chunk ≤ 5 000, chồng lấn,
   ánh xạ, hàng đợi, sai lệch, phát `UsageImportListeners`).

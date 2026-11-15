@@ -32,9 +32,11 @@ import {
   ConfirmUsageImportBodyDto,
   idempotencyKeySchema,
   ListUsageImportRowsQueryDto,
+  ListUsageImportsQueryDto,
   UploadUsageImportBodyDto,
   UsageImportConfirmationResponseDto,
   UsageImportIdParamDto,
+  UsageImportListResponseDto,
   UsageImportResponseDto,
   UsageImportRowsResponseDto,
 } from './vendor-import.dto';
@@ -43,7 +45,7 @@ import { toUsageImportApiException, USAGE_IMPORT_ERROR_EXAMPLES as EXAMPLES } fr
 import { VendorImportConfirmationService } from './confirmation/vendor-import-confirmation.service';
 import { VendorImportQueryService } from './vendor-import-query.service';
 import { VendorImportService } from './vendor-import.service';
-import { MAX_REPORT_BYTES, type ImportView, type StoredRow } from './vendor-import.types';
+import { MAX_REPORT_BYTES, type ImportListItem, type ImportView, type StoredRow } from './vendor-import.types';
 
 /** One file and three short fields, nothing else, of no more than the size of a report (`SEC-06`). */
 const UPLOAD_LIMITS = { fileSize: MAX_REPORT_BYTES, files: 1, fields: 3, fieldSize: 64, parts: 4 };
@@ -85,6 +87,12 @@ const NOT_FOUND = {
 const INVALID_ID = {
   status: HttpStatus.UNPROCESSABLE_ENTITY,
   description: 'The identifier is not a UUID (VALIDATION_ERROR).',
+  examples: [VALIDATION_EXAMPLE],
+} as const;
+
+const INVALID_QUERY = {
+  status: HttpStatus.UNPROCESSABLE_ENTITY,
+  description: 'The query is invalid (VALIDATION_ERROR).',
   examples: [VALIDATION_EXAMPLE],
 } as const;
 
@@ -157,6 +165,22 @@ export function importToWire(view: ImportView) {
   };
 }
 
+const listItemToWire = (item: ImportListItem) => ({
+  id: item.id,
+  source: { id: item.sourceId, name: item.sourceName },
+  application: item.application,
+  status: item.status,
+  format: item.format,
+  coverage: { from: item.coverageFrom, to: item.coverageTo },
+  totalRows: item.totalRows,
+  matched: item.matched,
+  unmatched: item.unmatched,
+  ambiguous: item.ambiguous,
+  createdAt: item.createdAt.toISOString(),
+  confirmedAt: item.confirmedAt ? item.confirmedAt.toISOString() : null,
+  duplicateOfImportId: item.duplicateOfImportId,
+});
+
 const rowToWire = (row: StoredRow) => ({
   lineNumber: row.lineNumber,
   identifier: row.identifierRaw,
@@ -200,7 +224,7 @@ export class VendorImportController {
     status: HttpStatus.CREATED,
     message: 'USAGE_IMPORT.UPLOADED',
     description:
-      'The report was read and every row judged against the people and the seats as they are: nothing of the usage is written yet. The summary gives the window it covers, the rows not matched, the seats it affects, the groups it can detect and what counts as activity.',
+      'The report was read and every row judged against the people and the seats as they are: nothing of the usage is written yet. The summary gives the window it covers, the rows not matched, the seats it affects, the groups it can detect and what counts as activity. When a confirmed import of the same source holds exactly this file, the warnings say DUPLICATE_FILE and duplicateOfImportId names it: it is a warning, and the file can still be confirmed.',
   })
   @ApiErrorResponses(...UPLOAD_ERRORS)
   async upload(
@@ -219,6 +243,24 @@ export class VendorImportController {
           ...(body.coverageTo ? { coverageTo: body.coverageTo } : {}),
         }),
       );
+    } catch (error) {
+      throw toUsageImportApiException(error);
+    }
+  }
+
+  @Get()
+  @ApiOperation({ operationId: 'usageImportList', summary: 'List the usage imports' })
+  @ApiSuccessResponse(UsageImportListResponseDto, {
+    message: 'USAGE_IMPORT.LISTED',
+    description:
+      'The history of the imports, the newest first, filtered by source, application or status: the window each covers, how many rows were matched, not matched or ambiguous, when it was uploaded and confirmed, and duplicateOfImportId when an earlier confirmed import of the same source holds exactly the same file. The rows themselves are in the import.',
+  })
+  @ApiErrorResponses(...COMMON_ERRORS, INVALID_QUERY)
+  async list(@Query() query: ListUsageImportsQueryDto) {
+    try {
+      const page = await this.queries.list(query);
+
+      return { items: page.items.map(listItemToWire), pagination: page.pagination };
     } catch (error) {
       throw toUsageImportApiException(error);
     }

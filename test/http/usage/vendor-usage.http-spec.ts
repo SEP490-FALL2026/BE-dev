@@ -16,6 +16,7 @@ const OPERATIONS = [
   'usageSourceUpdate',
   'usageSourceListOfContract',
   'usageImportUpload',
+  'usageImportList',
   'usageImportGet',
   'usageImportRowList',
   'usageImportCancel',
@@ -60,6 +61,7 @@ describe('vendor usage routes (http contract, no database)', () => {
     ['patch', `/api/v1/usage-sources/${ID}`],
     ['get', `/api/v1/contracts/${ID}/usage-sources`],
     ['post', '/api/v1/usage-imports'],
+    ['get', '/api/v1/usage-imports'],
     ['get', `/api/v1/usage-imports/${ID}`],
     ['get', `/api/v1/usage-imports/${ID}/rows`],
     ['post', `/api/v1/usage-imports/${ID}/cancel`],
@@ -89,6 +91,7 @@ describe('vendor usage routes (http contract, no database)', () => {
       await as(request(server).get('/api/v1/usage-sources')),
       await as(request(server).get(`/api/v1/usage-sources/${ID}`)),
       await as(request(server).post('/api/v1/usage-sources').send({})),
+      await as(request(server).get('/api/v1/usage-imports')),
       await as(request(server).get(`/api/v1/usage-imports/${ID}`)),
       await as(request(server).get(`/api/v1/usage-imports/${ID}/rows`)),
       await as(request(server).post(`/api/v1/usage-imports/${ID}/cancel`)),
@@ -135,6 +138,8 @@ describe('vendor usage routes (http contract, no database)', () => {
     await asAdmin(request(server).get('/api/v1/usage-imports/not-a-uuid')).expect(422);
     await asAdmin(request(server).get(`/api/v1/usage-imports/${ID}/rows`).query({ pageSize: 101 })).expect(422);
     await asAdmin(request(server).get('/api/v1/usage-sources').query({ page: 0 })).expect(422);
+    await asAdmin(request(server).get('/api/v1/usage-imports').query({ pageSize: 101 })).expect(422);
+    await asAdmin(request(server).get('/api/v1/usage-unmatched-identities').query({ importId: 'x' })).expect(422);
     await asAdmin(request(server).post(`/api/v1/usage-imports/${ID}/confirm`).send({ previewVersion: 0 })).expect(422);
     await asAdmin(request(server).post(`/api/v1/usage-unmatched-identities/${ID}/dismiss`).send({ note: '' })).expect(
       422,

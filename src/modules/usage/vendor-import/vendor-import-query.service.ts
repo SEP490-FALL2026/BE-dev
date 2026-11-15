@@ -1,14 +1,48 @@
 import { Injectable } from '@nestjs/common';
 import { pageOf, type Page } from '../../../core/application/pagination';
+import { CatalogApi } from '../../catalog/public/catalog.api';
 import { UsageImportNotFoundError } from './vendor-import.errors';
 import { VendorImportRepo } from './vendor-import.repo';
 import { toImportView } from './vendor-import.service';
-import type { ImportView, RowOutcome, StoredRow } from './vendor-import.types';
+import type { ImportListFilter, ImportListItem, ImportView, RowOutcome, StoredRow } from './vendor-import.types';
 
 /** Reads of an import and its rows for the IT Admin. An identifier that looks like a secret is already masked in the row. */
 @Injectable()
 export class VendorImportQueryService {
-  constructor(private readonly repo: VendorImportRepo) {}
+  constructor(
+    private readonly repo: VendorImportRepo,
+    private readonly catalog: CatalogApi,
+  ) {}
+
+  /** The history of imports, the newest first; the name and the logo of each application come in one read for the whole page. */
+  async list(
+    query: Omit<ImportListFilter, 'skip' | 'take'> & { page: number; pageSize: number },
+  ): Promise<Page<ImportListItem>> {
+    const { rows, total } = await this.repo.pageList({
+      ...(query.sourceId ? { sourceId: query.sourceId } : {}),
+      ...(query.applicationId ? { applicationId: query.applicationId } : {}),
+      ...(query.status ? { status: query.status } : {}),
+      skip: (query.page - 1) * query.pageSize,
+      take: query.pageSize,
+    });
+    const ids = [...new Set(rows.map((row) => row.applicationId))];
+    const found = ids.length > 0 ? await this.catalog.getCollectorApplications(ids) : [];
+    const applications = new Map(found.map((app) => [app.id, { id: app.id, name: app.name, logoUrl: app.logoUrl }]));
+
+    return pageOf(
+      rows.map((row) => ({
+        ...row,
+        application: applications.get(row.applicationId) ?? {
+          id: row.applicationId,
+          name: row.applicationId,
+          logoUrl: null,
+        },
+      })),
+      total,
+      query.page,
+      query.pageSize,
+    );
+  }
 
   async view(id: string): Promise<ImportView> {
     const record = await this.repo.find(id);

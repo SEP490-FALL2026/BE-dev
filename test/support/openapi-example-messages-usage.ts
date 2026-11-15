@@ -5,6 +5,7 @@ export const SUCCESS_MESSAGES_USAGE: Readonly<Record<string, string>> = {
   usageImportCancel: 'USAGE_IMPORT.CANCELLED',
   usageImportConfirm: 'USAGE_IMPORT.CONFIRMED',
   usageImportGet: 'USAGE_IMPORT.FETCHED',
+  usageImportList: 'USAGE_IMPORT.LISTED',
   usageImportRowList: 'USAGE_IMPORT.ROWS_LISTED',
   usageImportUpload: 'USAGE_IMPORT.UPLOADED',
   usageNoAssignmentFindingList: 'USAGE_IDENTITY.FINDINGS_LISTED',

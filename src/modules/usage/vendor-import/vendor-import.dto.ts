@@ -25,6 +25,14 @@ export const listUsageImportRowsQuerySchema = z.strictObject({
   pageSize: z.coerce.number().int().positive().max(100).default(50),
 });
 
+export const listUsageImportsQuerySchema = z.strictObject({
+  sourceId: z.uuid().optional(),
+  applicationId: z.uuid().optional(),
+  status: z.enum(['PREVIEW', 'COMPLETED', 'CANCELLED']).optional(),
+  page: z.coerce.number().int().positive().default(1),
+  pageSize: z.coerce.number().int().positive().max(100).default(20),
+});
+
 const importSchema = z.strictObject({
   id: z.uuid(),
   sourceId: z.uuid(),
@@ -38,6 +46,22 @@ const importSchema = z.strictObject({
   expiresAt: z.iso.datetime(),
   confirmedAt: z.iso.datetime().nullable(),
   cancelledAt: z.iso.datetime().nullable(),
+});
+/** One import in the history: what it was about, how it stands, its counts and whether it repeats the file of an earlier confirmed import. */
+const importListItemSchema = z.strictObject({
+  id: z.uuid(),
+  source: z.strictObject({ id: z.uuid(), name: z.string() }),
+  application: z.strictObject({ id: z.uuid(), name: z.string(), logoUrl: z.string().nullable() }),
+  status: z.enum(['PREVIEW', 'COMPLETED', 'CANCELLED']),
+  format: z.enum(['JSON', 'CSV']),
+  coverage: z.strictObject({ from: date, to: date }),
+  totalRows: z.number().int().nonnegative(),
+  matched: z.number().int().nonnegative(),
+  unmatched: z.number().int().nonnegative(),
+  ambiguous: z.number().int().nonnegative(),
+  createdAt: z.iso.datetime(),
+  confirmedAt: z.iso.datetime().nullable(),
+  duplicateOfImportId: z.uuid().nullable(),
 });
 const rowSchema = z.strictObject({
   lineNumber: z.number().int().positive(),
@@ -57,6 +81,7 @@ const rowSchema = z.strictObject({
   errors: z.array(z.strictObject({ code: z.string(), detail: z.string().optional() })).max(MAX_ROW_ERRORS),
 });
 
+export class ListUsageImportsQueryDto extends createZodDto(listUsageImportsQuerySchema) {}
 export class UploadUsageImportBodyDto extends createZodDto(uploadUsageImportBodySchema) {}
 export class ConfirmUsageImportBodyDto extends createZodDto(confirmUsageImportBodySchema) {}
 export class UsageImportIdParamDto extends createZodDto(usageImportIdParamSchema) {}
@@ -69,6 +94,19 @@ export class UsageImportRowsResponseDto extends createZodDto(
   successEnvelopeSchema(
     z.strictObject({
       items: z.array(rowSchema),
+      pagination: z.strictObject({
+        page: z.number().int().positive(),
+        pageSize: z.number().int().positive(),
+        totalItems: z.number().int().nonnegative(),
+        totalPages: z.number().int().nonnegative(),
+      }),
+    }),
+  ),
+) {}
+export class UsageImportListResponseDto extends createZodDto(
+  successEnvelopeSchema(
+    z.strictObject({
+      items: z.array(importListItemSchema),
       pagination: z.strictObject({
         page: z.number().int().positive(),
         pageSize: z.number().int().positive(),

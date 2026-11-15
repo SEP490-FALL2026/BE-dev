@@ -30,12 +30,14 @@ export class IdentityQueryService {
 
   async queue(query: {
     applicationId?: string;
+    importId?: string;
     status?: UnmatchedStatus;
     page: number;
     pageSize: number;
   }): Promise<Page<UnmatchedView>> {
     const { items, total } = await this.repo.pageUnmatched({
       ...(query.applicationId ? { applicationId: query.applicationId } : {}),
+      ...(query.importId ? { importId: query.importId } : {}),
       statuses: queueStatuses(query.status),
       skip: (query.page - 1) * query.pageSize,
       take: query.pageSize,

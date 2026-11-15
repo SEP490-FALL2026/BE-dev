@@ -24,6 +24,8 @@ export const MAX_UNMAPPED_EVENT_TYPES = 200;
 export const MAX_DAYS_PER_ROW = 400;
 /** The most faults one row names. */
 export const MAX_ROW_ERRORS = 20;
+/** The warning of a preview of the very file a confirmed import of the same source already holds. */
+export const DUPLICATE_FILE_WARNING = 'DUPLICATE_FILE';
 /** The schema of a JSON report the system reads. */
 export const REPORT_SCHEMA = 'saas-sentry.vendor-usage-report/0.1-proposal';
 
@@ -81,6 +83,8 @@ export interface ImportSummary {
   /** Whether this is the first report of the application, which the holders must be told of before it is written (`US-08-05`). */
   trackingNoticeRequired: boolean;
   recordedOn: BusinessDate;
+  /** The earlier confirmed import of the same source with exactly this file, when there is one: the warning `DUPLICATE_FILE` says it (`US-08-02`). */
+  duplicateOfImportId?: string;
 }
 
 export interface ImportResult {
@@ -160,4 +164,36 @@ export interface ImportView {
 export interface IdentifierRef {
   identifierType: UsageIdentifierType;
   normalizedIdentifier: string;
+}
+
+/** One import in the history of imports: what it was about, how it ended and whether it is the same file as an earlier confirmed one. */
+export interface ImportListRow {
+  id: string;
+  sourceId: string;
+  sourceName: string;
+  applicationId: string;
+  status: ImportStatus;
+  format: ImportFormat;
+  coverageFrom: BusinessDate;
+  coverageTo: BusinessDate;
+  totalRows: number;
+  matched: number;
+  unmatched: number;
+  ambiguous: number;
+  createdAt: Date;
+  confirmedAt: Date | null;
+  duplicateOfImportId: string | null;
+}
+
+export interface ImportListFilter {
+  sourceId?: string | undefined;
+  applicationId?: string | undefined;
+  status?: ImportStatus | undefined;
+  skip: number;
+  take: number;
+}
+
+/** An import of the history with the application it is about, by name and logo. */
+export interface ImportListItem extends ImportListRow {
+  application: { id: string; name: string; logoUrl: string | null };
 }
