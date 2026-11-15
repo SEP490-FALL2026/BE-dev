@@ -54,7 +54,7 @@ export const ROUTE_ERROR_CODES_BUDGETS: Readonly<Record<string, Partial<Record<R
     },
     budgetReviewPeriodClose: {
       '409': ['BUDGET_REVIEW.PERIOD_EXISTS', 'BUDGET_REVIEW.SEAT_MONTHS_NOT_READY'],
-      '422': ['BUDGET_REVIEW.MONTH_NOT_ENDED'],
+      '422': ['BUDGET_REVIEW.MONTH_NOT_ENDED', 'BUDGET_REVIEW.NO_BUDGET_FOR_YEAR'],
     },
     budgetReviewPeriodGet: {
       '404': ['BUDGET_REVIEW.NOT_FOUND'],
