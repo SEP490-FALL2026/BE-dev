@@ -344,8 +344,18 @@ describe('API inventory (e2e): openapi presentation and wire messages', () => {
         if (at.endsWith('/daysLeft') && typeof description === 'string') daysLeft.push(description);
       });
       expect(daysLeft.length).toBeGreaterThan(0);
+      const kinds: string[] = [];
+      visit(document, '#', (node, at) => {
+        const description = (node as { description?: unknown }).description;
+        if (at.endsWith('/deadlineKind') && typeof description === 'string') kinds.push(description);
+      });
+      expect(kinds.length).toBeGreaterThan(0);
+      // Once EXPIRED the kind is the one of the last day: not only the renewal or the end day, also the payment day and the deadline itself.
+      expect(kinds.filter((description) => !/once EXPIRED, the last day of the period/.test(description))).toEqual([]);
       expect(
-        daysLeft.filter((description) => !description.includes('once EXPIRED it counts from the renewal day')),
+        daysLeft.filter(
+          (description) => !description.includes('once EXPIRED it counts from the last day of the period'),
+        ),
       ).toEqual([]);
     });
 
