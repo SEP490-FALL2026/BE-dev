@@ -63,7 +63,8 @@ export class VersionCreationService {
       if (await this.versions.inFlight(proposal.costCenterId, proposal.year, tx))
         throw new BudgetVersionInFlightError();
 
-      const figures = await this.figures.figures(tx, proposal.currency, { ...body, defaultPercent });
+      const carriedOverMinor = await this.figures.carriedOverOf(proposal.costCenterId, proposal.year, tx);
+      const figures = await this.figures.figures(tx, proposal.currency, { ...body, defaultPercent, carriedOverMinor });
 
       const id = await this.versions.insert(tx, {
         organizationId: proposal.organizationId,
@@ -78,7 +79,6 @@ export class VersionCreationService {
         reason: null,
         createdByEmployeeId: actor.employeeId,
         now: new Date(),
-        lines: [],
       });
       await this.trail.created(tx, actor, {
         id,

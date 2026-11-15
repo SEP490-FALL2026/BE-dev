@@ -1,5 +1,8 @@
 import type { BusinessDate } from '../../../core/business-date';
 import {
+  belowCarriedOver,
+  versionAttachmentMissing,
+  versionFiguresOf,
   defaultReserveOf,
   reserveReasonMissing,
   checkVersionDecision,
@@ -11,7 +14,6 @@ import {
   closesAtYearEnd,
   deciderOf,
   isEditable,
-  copiedLineOf,
   versionDecidedDetail,
   proposalIsSucceedable,
   totalOf,
@@ -239,36 +241,6 @@ describe('what the decision of the spending approver on a version of a budget re
   });
 });
 
-describe('what a version copies from the line before it (US-06-09)', () => {
-  const line = {
-    description: 'Giấy phép',
-    planId: 'plan-1',
-    seats: 10,
-    amountMinor: 1_000n,
-    financeComment: 'đã có',
-    adjustmentReason: 'đổi giá',
-    lineType: 'CHANGE' as const,
-    zbb: null,
-    priorityRank: 2,
-  };
-
-  it('copies the line with where it came from, and starts it without a comment of Finance or a reason to adjust it', () => {
-    expect(copiedLineOf(line, { proposalId: 'prop-1', proposalPosition: 3 })).toEqual({
-      proposalId: 'prop-1',
-      proposalPosition: 3,
-      description: 'Giấy phép',
-      planId: 'plan-1',
-      seats: 10,
-      amountMinor: 1_000n,
-      financeComment: null,
-      adjustmentReason: null,
-      lineType: 'CHANGE',
-      zbb: null,
-      priorityRank: 2,
-    });
-  });
-});
-
 describe('the default reserve of a version (US-06-09 AC-30, QĐ-98)', () => {
   it('is the share of the base rounded to the nearest minor unit', () => {
     expect(defaultReserveOf(1_000_000n, 10)).toBe(100_000n);
@@ -284,5 +256,44 @@ describe('the default reserve of a version (US-06-09 AC-30, QĐ-98)', () => {
     expect(reserveReasonMissing({ ...version, reserveMinor: 150n })).toBe(true);
     expect(reserveReasonMissing({ ...version, reserveMinor: 150n, reserveReason: 'Kế hoạch mua thêm' })).toBe(false);
     expect(reserveReasonMissing({ ...version, reserveMinor: 150n, reservePercent: null })).toBe(false);
+  });
+});
+
+describe('the figures of a version as Finance gives them (QĐ-111ac, BG-2.5)', () => {
+  it('fills the base in with what the Cost Center carries into the year when Finance gives none', () => {
+    expect(versionFiguresOf({ carriedOverMinor: 123_000_000n, defaultPercent: 10 })).toEqual({
+      baseMinor: 123_000_000n,
+      reserveMinor: 12_300_000n,
+      reservePercent: 10,
+    });
+    expect(versionFiguresOf({ baseMinor: 0n, carriedOverMinor: 123_000_000n, defaultPercent: 10 }).baseMinor).toBe(0n);
+  });
+
+  it('takes the reserve as a share Finance chooses, or as an amount kept against the default share', () => {
+    expect(
+      versionFiguresOf({ baseMinor: 1_000n, reservePercent: 15, carriedOverMinor: 0n, defaultPercent: 10 }),
+    ).toEqual({
+      baseMinor: 1_000n,
+      reserveMinor: 150n,
+      reservePercent: 15,
+    });
+    expect(versionFiguresOf({ baseMinor: 1_000n, reserveMinor: 7n, carriedOverMinor: 0n, defaultPercent: 10 })).toEqual(
+      {
+        baseMinor: 1_000n,
+        reserveMinor: 7n,
+        reservePercent: 10,
+      },
+    );
+  });
+
+  it('raises the red flag when the base is below what the Cost Center carries into the year, and never otherwise', () => {
+    expect(belowCarriedOver(122_999_999n, 123_000_000n)).toBe(true);
+    expect(belowCarriedOver(123_000_000n, 123_000_000n)).toBe(false);
+    expect(belowCarriedOver(0n, 0n)).toBe(false);
+  });
+
+  it('sends a version only with one file at least that explains it', () => {
+    expect(versionAttachmentMissing(0)).toBe(true);
+    expect(versionAttachmentMissing(1)).toBe(false);
   });
 });

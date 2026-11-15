@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import {
+  BudgetVersionAttachmentRequiredError,
   BudgetCycleCurrencyMismatchError,
   BudgetCycleNotOpenError,
   BudgetOverAnnualCeilingError,
@@ -9,7 +10,7 @@ import {
   BudgetVersionNotFoundError,
   BudgetYearEndedError,
 } from '../budget/budget.errors';
-import { annualCheck, isEditable, yearHasEnded } from '../budget/budget.policy';
+import { annualCheck, isEditable, versionAttachmentMissing, yearHasEnded } from '../budget/budget.policy';
 import { BudgetFactsService } from '../budget/budget-facts.service';
 import { VersionRepo, type VersionRecord } from '../budget/version.repo';
 import { cycleAcceptsWork } from '../cycle/cycle.policy';
@@ -79,6 +80,13 @@ export class VersionAccessService {
     if (!cycle || !cycleAcceptsWork(cycle)) throw new BudgetCycleNotOpenError(version.year);
 
     return cycle;
+  }
+
+  /** One file at least explains a version that is sent (`QĐ-111ac`); a draft is saved without one. Throws BudgetVersionAttachmentRequiredError. */
+  async requireExplained(tx: DbTx, versionId: string): Promise<void> {
+    if (versionAttachmentMissing(await this.versions.countAttachedFiles(tx, versionId))) {
+      throw new BudgetVersionAttachmentRequiredError();
+    }
   }
 
   /**

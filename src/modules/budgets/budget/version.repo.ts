@@ -3,7 +3,6 @@ import { Prisma } from '../../../generated/prisma/client';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { VersionStateName } from './budget.policy';
-import { lineData, type VersionLineRecord } from './version-line.repo';
 
 export type VersionState = VersionStateName;
 
@@ -66,7 +65,6 @@ export interface NewVersion {
   reason: string | null;
   createdByEmployeeId: string;
   now: Date;
-  lines: Omit<VersionLineRecord, 'position'>[];
 }
 
 /** The fields of a version Finance changes while it is a draft: a key that is present is written. */
@@ -74,6 +72,8 @@ export interface VersionPatch {
   baseMinor?: bigint;
   baseReason?: string | null;
   reserveMinor?: bigint;
+  /** The share of the base the reserve is, when Finance chose one (`QĐ-111ac`). */
+  reservePercent?: number;
   reserveReason?: string | null;
   reason?: string | null;
 }
@@ -175,7 +175,6 @@ export class VersionRepo {
         reason: input.reason,
         createdByEmployeeId: input.createdByEmployeeId,
         createdAt: input.now,
-        lines: { create: input.lines.map((line, index) => ({ position: index + 1, ...lineData(line) })) },
       },
       select: { id: true },
     });
@@ -396,6 +395,7 @@ export class VersionRepo {
         reserveMinor: nextReserve,
         totalMinor: nextBase + nextReserve,
         ...(patch.reserveReason !== undefined ? { reserveReason: patch.reserveReason } : {}),
+        ...(patch.reservePercent !== undefined ? { reservePercent: patch.reservePercent } : {}),
         ...(patch.baseReason !== undefined ? { baseReason: patch.baseReason } : {}),
       },
     });
@@ -481,6 +481,29 @@ export class VersionRepo {
   }
 
   /** The newest version of the Cost Center and year that is read as its budget or is not closed: what the head is told of. */
+  /** How many files are attached to the version now (a removed one is not): what its sending needs one of (`QĐ-111ac`). */
+  countAttachedFiles(tx: DbTx, versionId: string): Promise<number> {
+    return tx.budgetAttachment.count({ where: { versionId, status: 'ATTACHED' } });
+  }
+
+  /** The newest version of each of these Cost Centers for the year that is not detached, whatever its state, by Cost Center: one statement. */
+  async latestOfCostCenters(
+    costCenterIds: readonly string[],
+    year: number,
+    tx?: DbTx,
+  ): Promise<Map<string, VersionRecord>> {
+    const latest = new Map<string, VersionRecord>();
+    if (costCenterIds.length === 0) return latest;
+    const rows = await (tx ?? this.prisma).budgetVersion.findMany({
+      where: { costCenterId: { in: [...costCenterIds] }, year, detachedAt: null },
+      orderBy: [{ costCenterId: 'asc' }, { number: 'desc' }],
+      distinct: ['costCenterId'],
+    });
+    for (const row of rows) latest.set(row.costCenterId, toRecord(row));
+
+    return latest;
+  }
+
   async latestOf(costCenterId: string, year: number): Promise<VersionRecord | null> {
     const row = await this.prisma.budgetVersion.findFirst({
       where: { costCenterId, year, neverCurrent: false },

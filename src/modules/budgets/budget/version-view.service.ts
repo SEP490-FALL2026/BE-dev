@@ -3,9 +3,10 @@ import { Page, pageOf } from '../../../core/application/pagination';
 
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { BudgetCostCenterNotFoundError, BudgetVersionNotFoundError } from './budget.errors';
-import { defaultReserveOf, versionWaitingReason, type VersionStateName } from './budget.policy';
+import { belowCarriedOver, defaultReserveOf, versionWaitingReason, type VersionStateName } from './budget.policy';
 import { BudgetFactsService } from './budget-facts.service';
 import { DecisionRepo, type DecisionRecord } from './decision.repo';
+import { CarriedOverContributions } from '../public/budgets.extension-points';
 import { VersionRepo, type VersionRecord, type VersionState } from './version.repo';
 import type { VersionSummaryWire, VersionWire } from './budget.dto';
 
@@ -16,6 +17,7 @@ export class VersionViewService {
     private readonly versions: VersionRepo,
     private readonly decisions: DecisionRepo,
     private readonly facts: BudgetFactsService,
+    private readonly carried: CarriedOverContributions,
   ) {}
 
   async require(id: string): Promise<VersionRecord> {
@@ -63,6 +65,7 @@ export class VersionViewService {
       ...versions.map((version) => version.createdByEmployeeId),
       ...[...latest.values()].map((decision) => decision.decidedByEmployeeId),
     ]);
+    const carriedOver = await this.carriedOverOf(versions);
 
     return Promise.all(
       versions.map(async (version) => {
@@ -83,6 +86,9 @@ export class VersionViewService {
           reservePercent: version.reservePercent,
           defaultReserve:
             version.reservePercent === null ? null : money(defaultReserveOf(version.baseMinor, version.reservePercent)),
+          carriedOverNextYear: money(carriedOver(version)),
+          belowCarriedOver: belowCarriedOver(version.baseMinor, carriedOver(version)),
+          noProposalSubmitted: version.origin === 'BASELINE_NO_PROPOSAL',
           reserveReason: version.reserveReason,
           baseReason: version.baseReason,
           origin: version.origin,
@@ -99,6 +105,17 @@ export class VersionViewService {
         };
       }),
     );
+  }
+
+  /** What each Cost Center carries into the year of each version (`QĐ-111ac`): one ask of the contexts for each year on the page. */
+  private async carriedOverOf(versions: readonly VersionRecord[]): Promise<(version: VersionRecord) => bigint> {
+    const byYear = new Map<number, Map<string, bigint>>();
+    for (const year of new Set(versions.map((version) => version.year))) {
+      const ids = [...new Set(versions.filter((version) => version.year === year).map((one) => one.costCenterId))];
+      byYear.set(year, await this.carried.totals(ids, year));
+    }
+
+    return (version) => byYear.get(version.year)?.get(version.costCenterId) ?? 0n;
   }
 }
 

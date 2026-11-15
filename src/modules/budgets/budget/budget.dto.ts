@@ -68,41 +68,72 @@ export const decisionBodySchema = z
   });
 
 const versionFigures = {
-  base: money,
-  reserve: money,
+  base: money.meta({
+    description:
+      'The base of the year. Left out, it is filled in with what the Cost Center carries into the year (carriedOverNextYear).',
+  }),
+  reserve: money.meta({
+    description:
+      'The reserve as an amount; not with reservePercent. An amount that is not the default share asks a reason.',
+  }),
+  reservePercent: z.number().int().min(0).max(100).meta({
+    description:
+      'The reserve as a share of the base, in whole percent; not with reserve. The default share when neither is given.',
+  }),
   /** Why the reserve is not the default share of the base; asked when the version is sent (`US-06-09` AC-30). */
   reserveReason: text(REASON_MAX),
 };
-/** A first version from the proposal that waits for Finance (`source` PROPOSAL, the default): the proposal and the base. */
+/** The reserve is an amount or a share, not both (`QĐ-111ac`). */
+const oneReserve = (body: { reserve?: unknown; reservePercent?: unknown }, ctx: z.RefinementCtx) => {
+  if (body.reserve !== undefined && body.reservePercent !== undefined) {
+    ctx.addIssue({
+      code: 'custom',
+      path: ['reservePercent'],
+      message: 'Give the reserve as an amount or as a share, not both.',
+    });
+  }
+};
+/** The figures Finance may give when a version is made: all optional, the base filled in with what is carried over. */
+const newVersionFigures = {
+  base: versionFigures.base.optional(),
+  reserve: versionFigures.reserve.optional(),
+  reservePercent: versionFigures.reservePercent.optional(),
+  reserveReason: versionFigures.reserveReason.optional(),
+};
+/** A first version from the proposal that waits for Finance (`source` PROPOSAL, the default). */
 const proposalVersionBody = z.strictObject({
   source: z.literal('PROPOSAL').optional(),
   proposalId: z.uuid(),
-  base: versionFigures.base,
-  reserve: versionFigures.reserve.optional(),
-  reserveReason: versionFigures.reserveReason.optional(),
+  ...newVersionFigures,
 });
-/** A first version built from the baseline (`source` BASELINE): only the Cost Center and the year; the base and the lines are the baseline's. */
+/** A first version built from the baseline (`source` BASELINE): the Cost Center and the year, and the figures Finance gives, if any. */
 const baselineVersionBody = z.strictObject({
   source: z.literal('BASELINE'),
   costCenterId: z.uuid(),
   year: z.number().int().min(2000).max(2200),
+  ...newVersionFigures,
 });
 /**
  * A first version of a Cost Center and year: from the proposal that waits for Finance (`source` PROPOSAL, the default), or from the
- * baseline when nobody heads the department at the deadline (`source` BASELINE, `QĐ-100h`). A field of the other source is a 422 `unrecognized_keys`.
+ * baseline when the department has no proposal at the deadline (`source` BASELINE, `QĐ-111bb`). A field of the other source is a 422
+ * `unrecognized_keys`.
  */
-export const versionBodySchema = z.discriminatedUnion('source', [proposalVersionBody, baselineVersionBody]);
+export const versionBodySchema = z
+  .discriminatedUnion('source', [proposalVersionBody, baselineVersionBody])
+  .superRefine(oneReserve);
 export const versionPatchSchema = z
   .strictObject({
     base: versionFigures.base,
     /** Why the base is changed: required when `base` differs from the one the draft has (`QĐ-100v`). */
     baseReason: text(REASON_MAX),
     reserve: versionFigures.reserve,
+    reservePercent: versionFigures.reservePercent,
     /** `null` takes the reason away: the reserve is the default share again, or is sent with another reason. */
     reserveReason: versionFigures.reserveReason.nullable(),
   })
   .partial()
   .refine((body) => Object.keys(body).length > 0, { message: 'Give at least one field.' })
+  .superRefine(oneReserve)
   .meta({ minProperties: 1, description: 'Give at least one field.' });
 
 export const pageQuery = {
@@ -207,6 +238,16 @@ const versionSchema = z.strictObject({
   reserveReason: z.string().nullable(),
   total: moneyView,
   reason: z.string().nullable(),
+  carriedOverNextYear: moneyView.meta({
+    description:
+      'What the Cost Center carries into the year of the version: the amount the requests approved so far already saved for it (zero until the requests context tells it).',
+  }),
+  belowCarriedOver: z.boolean().meta({
+    description: 'The red flag: the base is below carriedOverNextYear. It never stops a sending or a decision.',
+  }),
+  noProposalSubmitted: z.boolean().meta({
+    description: 'Finance built the version from the baseline because the department had no proposal at the deadline.',
+  }),
   /** Set while the version was sent and nobody who works holds the role of the spending approver: nobody else decides it (`QĐ-93d`(1)). */
   waitingReason: z.enum(['NO_SPENDING_APPROVER']).nullable(),
   /** The latest decision of the spending approver on it. */

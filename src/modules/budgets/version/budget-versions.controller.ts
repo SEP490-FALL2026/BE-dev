@@ -79,9 +79,8 @@ const MONEY_EXAMPLES = [
 ] as const;
 
 /**
- * The versions of a budget as Finance builds them (`US-06-09`): a first version from the proposal that waits, lines adjusted
- * with a comment and a reason, a forecast by quarter that never limits a payment, a file of lines, and the sending to the
- * spending approver. Only Finance does this: the head, the IT Admin, the Super Admin and
+ * The versions of a budget as Finance builds them (`US-06-09`, `QĐ-111ac`): one figure for the year from the proposal that waits or
+ * from the baseline, the files that explain it, and the sending to the spending approver. Only Finance does this: the head, the IT Admin, the Super Admin and
  * the spending approver cannot, and nobody here makes a version current.
  */
 @ApiTags('budget-versions')
@@ -106,7 +105,7 @@ export class BudgetVersionsController {
     status: HttpStatus.CREATED,
     message: 'BUDGET_VERSION.CREATED',
     description:
-      'A draft with the base and the reserve (the default share of the base unless Finance gives another with its reason), and the lines of the proposal copied to be reviewed; the proposal itself is not changed. A proposal whose latest version was refused is made again the same way: the new draft points at the refused one (rejectedPredecessorId). With source BASELINE (costCenterId and year, no proposal and no base) the draft is built from the baseline of the department when nobody heads it at the deadline: one Renew line for each subscription that runs in the year, the base is their sum, origin is BASELINE_NO_HEAD.',
+      'A draft with one figure for the year and no line: the base Finance gives, or what the Cost Center carries into the year when it gives none (carriedOverNextYear), and the reserve as a share (reservePercent, the default share when nothing is given) or as an amount with its reason; the proposal itself is not changed. Saving a draft is never refused for its figures. A proposal whose latest version was refused is made again the same way: the new draft points at the refused one (rejectedPredecessorId). With source BASELINE (costCenterId and year, no proposal) the draft is built after the deadline for a department that has no proposal (a head that sent none, or a department made after the deadline), the same way; origin is BASELINE_NO_PROPOSAL and noProposalSubmitted is true.',
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,
@@ -120,7 +119,7 @@ export class BudgetVersionsController {
     {
       status: HttpStatus.CONFLICT,
       description:
-        'The proposal is neither waiting nor reviewed with its latest version refused and nobody following it (BUDGET.PROPOSAL_NOT_SUBMITTED), the Cost Center is no longer in use (FINANCE.SETUP_INCOMPLETE), has a current budget (BUDGET.CURRENT_EXISTS) or a version in progress (BUDGET.VERSION_IN_FLIGHT), or a version built from the baseline is not allowed: the cycle was never published, the department is not in the cycle of the year (DEPARTMENT_NOT_IN_CYCLE), the deadline has not passed, somebody heads the department or is to, or a proposal waits (BUDGET.BASELINE_VERSION_NOT_ALLOWED, details.reason).',
+        'The proposal is neither waiting nor reviewed with its latest version refused and nobody following it (BUDGET.PROPOSAL_NOT_SUBMITTED), the Cost Center is no longer in use (FINANCE.SETUP_INCOMPLETE), has a current budget (BUDGET.CURRENT_EXISTS) or a version in progress (BUDGET.VERSION_IN_FLIGHT), or a version built from the baseline is not allowed: the cycle was never published, the department is not in the cycle of the year (DEPARTMENT_NOT_IN_CYCLE), the deadline has not passed, or a proposal waits (BUDGET.BASELINE_VERSION_NOT_ALLOWED, details.reason).',
       // CURRENT_EXISTS is not shown: a current budget keeps the proposal behind it REVIEWED, so none can wait beside it.
       examples: [
         EXAMPLES.FINANCE_SETUP_INCOMPLETE,
@@ -131,7 +130,8 @@ export class BudgetVersionsController {
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
-      description: 'The body is invalid (VALIDATION_ERROR) or the year has ended (BUDGET.YEAR_ENDED).',
+      description:
+        'The body is invalid (VALIDATION_ERROR: the reserve given both as an amount and as a share) or the year has ended (BUDGET.YEAR_ENDED).',
       examples: [VALIDATION_EXAMPLE, EXAMPLES.YEAR_ENDED, ...MONEY_EXAMPLES],
     },
   )
@@ -198,7 +198,8 @@ export class BudgetVersionsController {
   @ApiOperation({ operationId: 'budgetVersionGet', summary: 'Get a version of a budget' })
   @ApiSuccessResponse(VersionResponseDto, {
     message: 'BUDGET_VERSION.FETCHED',
-    description: 'The version without its lines, which are a paged list of their own.',
+    description:
+      'One figure for the year: the base, the reserve and their total, what the Cost Center carries into the year (carriedOverNextYear) with the red flag when the base is below it (belowCarriedOver, never a refusal), and whether Finance built it from the baseline because the department had no proposal (noProposalSubmitted).',
   })
   @ApiErrorResponses(...AUTH_ERRORS, READERS_ONLY, NOT_FOUND, INVALID)
   async get(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Param() params: IdParamDto) {
@@ -215,7 +216,7 @@ export class BudgetVersionsController {
   @ApiSuccessResponse(VersionResponseDto, {
     message: 'BUDGET_VERSION.UPDATED',
     description:
-      'The base, and the reserve with its reason; the total is the base and the reserve, one amount for the whole year. A reserve that is still the default share of the base follows the base.',
+      'The base, and the reserve as a share (reservePercent) or as an amount with its reason, not both; the total is the base and the reserve, one amount for the whole year. A reserve that is still its share of the base follows the base. A draft is saved whatever its figures: the ceiling is checked when it is sent.',
   })
   @ApiErrorResponses(...AUTH_ERRORS, FINANCE_ONLY, NOT_FOUND, NOT_EDITABLE, {
     status: HttpStatus.UNPROCESSABLE_ENTITY,
@@ -241,7 +242,7 @@ export class BudgetVersionsController {
   @ApiSuccessResponse(VersionResponseDto, {
     message: 'BUDGET_VERSION.SENT',
     description:
-      'The version waits for the spending approver. A reserve that is not the default share of the base is sent with its reason. The versions of the year (this one in the place of the one of its own Cost Center) must add up to no more than the annual ceiling less the shared-pool reserve of the budget cycle.',
+      'The version waits for the spending approver. It is sent with one file at least that explains it, and a reserve that is not its share of the base with its reason. The versions of the year (this one in the place of the one of its own Cost Center) must add up to no more than the annual ceiling less the shared-pool reserve of the budget cycle (BUDGET_VERSION.OVER_CEILING, details.overBy).',
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,
@@ -262,8 +263,13 @@ export class BudgetVersionsController {
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
-        'A reserve that is not the default share of the base has no reason (BUDGET.RESERVE_REASON_REQUIRED) or the year has ended (BUDGET.YEAR_ENDED).',
-      examples: [VALIDATION_EXAMPLE, EXAMPLES.RESERVE_REASON_REQUIRED, EXAMPLES.YEAR_ENDED],
+        'The version has no file that explains it (BUDGET_VERSION.ATTACHMENT_REQUIRED), a reserve that is not its share of the base has no reason (BUDGET.RESERVE_REASON_REQUIRED) or the year has ended (BUDGET.YEAR_ENDED).',
+      examples: [
+        VALIDATION_EXAMPLE,
+        EXAMPLES.ATTACHMENT_REQUIRED,
+        EXAMPLES.RESERVE_REASON_REQUIRED,
+        EXAMPLES.YEAR_ENDED,
+      ],
     },
   )
   async send(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Param() params: IdParamDto) {

@@ -106,6 +106,10 @@ const baselineDepartmentView = z.strictObject({
     description:
       'What the Cost Center carries into the year of the cycle: the amount already saved for it by the requests approved so far (a right with an end at what its approval kept, a right with no end at twelve months of its monthly price), the figure the base of its version is filled in with. Zero when it has none, and for a department with no Cost Center.',
   }),
+  belowCarriedOver: z.boolean().meta({
+    description:
+      'The red flag: the newest version of the Cost Center for the year has a base below carriedOverNextYear. False when it has none; it never stops anything.',
+  }),
   noProposalSubmitted: z.boolean().meta({
     description:
       'The submission deadline has passed and the department has no proposal: Finance builds its version from this baseline, flagged for the spending approver.',

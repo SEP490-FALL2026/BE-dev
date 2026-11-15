@@ -78,6 +78,7 @@ export class VersionService {
       if (version.kind === 'REVISION') throw new BudgetVersionNotEditableError(version.state);
       // A reserve that is not the default share of the base says why; a version made before the share was kept asks nothing.
       if (reserveReasonMissing(version)) throw new BudgetReasonRequiredError('RESERVE');
+      await this.access.requireExplained(tx, id);
       if (version.proposalId && (!proposal || (proposal.state !== 'SUBMITTED' && proposal.state !== 'REVIEWED'))) {
         throw new BudgetProposalStateError('REVIEW', proposal?.state ?? 'MISSING');
       }

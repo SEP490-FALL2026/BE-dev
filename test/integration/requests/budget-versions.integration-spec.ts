@@ -1,3 +1,5 @@
+import request from 'supertest';
+import { attachedVersionFile } from '../../support/budget-files';
 import { BudgetHarness, Pageable, VersionWire } from '../../support/budget-harness';
 import type { Person } from '../../support/request-harness';
 
@@ -157,6 +159,75 @@ describe('budgets over HTTP: the versions Finance builds (integration, real Post
         total: { amount: '70000000' },
       });
       expect(h.codeOf(await h.updateVersion(version.id, {}).expect(422))).toBe('VALIDATION_ERROR');
+    });
+  });
+
+  describe('the figures, the files and the ceiling of a version (QĐ-111ac, T-BG2)', () => {
+    it('fills the base in with what is carried over (zero while nothing tells it) and takes the reserve as a share or an amount, not both', async () => {
+      const { proposal } = await waiting();
+
+      const both = await h
+        .createVersion({ proposalId: proposal.id, reserve: h.money(1), reservePercent: 10 })
+        .expect(422);
+      const filled = h.dataOf<{ version: VersionWire & { carriedOverNextYear: { amount: string } } }>(
+        await h.createVersion({ proposalId: proposal.id, reservePercent: 15 }).expect(201),
+      ).version;
+      const shared = h.dataOf<{ version: VersionWire }>(
+        await h.updateVersion(filled.id, { base: h.money(1_000_000), reservePercent: 20 }).expect(200),
+      ).version;
+
+      expect(h.codeOf(both)).toBe('VALIDATION_ERROR');
+      expect(filled).toMatchObject({ base: { amount: '0' }, carriedOverNextYear: { amount: '0' }, reservePercent: 15 });
+      expect(shared).toMatchObject({ reserve: { amount: '200000' }, reservePercent: 20, reserveReason: null });
+    });
+
+    it('saves a draft with no file, and sends it only with one: 422 BUDGET_VERSION.ATTACHMENT_REQUIRED, nothing is written', async () => {
+      const { proposal } = await waiting();
+      const version = await h.built(proposal.id);
+      await h.updateVersion(version.id, { reserve: h.money(10_000_000) }).expect(200);
+      // The route itself: the harness would attach a file first.
+      const send = () =>
+        request(h.server()).post(`/api/v1/budget-versions/${version.id}/submission`).set(h.as(h.finance));
+
+      const refused = await send().expect(422);
+
+      expect(h.codeOf(refused)).toBe('BUDGET_VERSION.ATTACHMENT_REQUIRED');
+      expect(await stateOf(version.id)).toBe('DRAFT');
+      expect(await proposalState(proposal.id)).toBe('SUBMITTED');
+      await attachedVersionFile(h.ctx.sql, version.id, h.finance.employeeId);
+      await send().expect(200);
+    });
+
+    it('saves a draft over the ceiling and refuses to send it: 2,000 million less a reserve of 200, a total of 1,850 is 50 million over (409)', async () => {
+      const year = h.next + 2;
+      await h.ctx.sql.query(
+        `UPDATE budget_cycles SET annual_ceiling_minor = 2000000000, shared_pool_reserve_minor = 200000000 WHERE year = $1`,
+        [year],
+      );
+      try {
+        const { proposal } = await waiting(undefined, year);
+        const draft = await h
+          .createVersion({
+            proposalId: proposal.id,
+            base: h.money(1_700_000_000),
+            reserve: h.money(150_000_000),
+            reserveReason: 'The figures of the example',
+          })
+          .expect(201);
+        const version = h.dataOf<{ version: VersionWire }>(draft).version;
+        await h.updateVersion(version.id, { reserve: h.money(150_000_000) }).expect(200);
+
+        const refused = await h.sendVersion(version.id).expect(409);
+
+        expect(h.codeOf(refused)).toBe('BUDGET_VERSION.OVER_CEILING');
+        expect(h.detailsOf(refused)).toMatchObject({ overBy: '50000000' });
+        expect(await stateOf(version.id)).toBe('DRAFT');
+      } finally {
+        await h.ctx.sql.query(
+          `UPDATE budget_cycles SET annual_ceiling_minor = 100000000000000, shared_pool_reserve_minor = 0 WHERE year = $1`,
+          [year],
+        );
+      }
     });
   });
 

@@ -86,6 +86,11 @@ Không làm ở FIX-LB1 (rẻ nhưng đổi hợp đồng hoặc chạm file lan
 
 - **Chọn:** `test/support/budget-files.ts` ghi dòng `budget_attachments` hợp lệ (đề nghị: `UPLOADED`; phiên bản: `ATTACHED`) đúng như route để lại; `submitProposal`/`resubmit`/`sendVersion` của harness và `approvedBudget` tự thêm một tệp khi body không nêu; test luật "≥ 1 tệp" gọi route thô. Không đụng object storage.
 
+### D-B14 — số liệu phiên bản (BG-2.5/2.6): dự phòng theo tỷ lệ hay số tiền, cờ đỏ so cơ sở, gửi cần tệp
+
+- **Chọn:** (1) `reservePercent` (0–100, số nguyên) **hoặc** `reserve` (loại trừ nhau ⟹ 422); tỷ lệ Finance chọn được lưu vào `reserve_percent` nên không cần lý do; số tiền giữ so với tỷ lệ mặc định ⟹ khác tỷ lệ thì vẫn cần `reserveReason` khi gửi (luật US-06-09 AC-30 có sẵn, SPEC ghi `reserveReason?` nên không bỏ luật); (2) `base` bỏ trống ⟹ điền `carriedOverNextYear` (cả nguồn `PROPOSAL` lẫn `BASELINE`; nguồn chạy sang chưa bind ⟹ 0); `PUT` không tự đổi cơ sở theo số chạy sang; (3) `belowCarriedOver` = **cơ sở** < số chạy sang (cam kết chạy sang tiêu vào cơ sở, dự phòng là phần dự trữ); ở số liệu nền cờ lấy theo phiên bản mới nhất (không tách rời) của Cost Center trong năm, không có phiên bản ⟹ `false`; (4) đếm tệp đính kèm khi gửi đọc `budget_attachments` qua `VersionRepo.countAttachedFiles` (capability `attachment` đã phụ thuộc `version`, import ngược tạo vòng — gate capability graph); (5) BG-2.5 và BG-2.6 vào một commit vì cùng DTO và cùng `VersionFigures`.
+- **Đổi lại:** đổi so sánh ở `belowCarriedOver` (một dòng, có test) nếu Owner muốn so tổng (cơ sở + dự phòng).
+
 ## Optional và việc để lại
 
 - Báo cáo xác nhận chưa có tổng `done`/`pending` toàn tập (cần join chéo module); thêm khi FE đòi.

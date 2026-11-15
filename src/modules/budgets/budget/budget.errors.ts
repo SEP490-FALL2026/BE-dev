@@ -186,6 +186,14 @@ export class BudgetNotAHistoryReaderError extends Error {
   }
 }
 
+/** A version is sent with one file at least that explains it (`QĐ-111ac`): it has none. */
+export class BudgetVersionAttachmentRequiredError extends Error {
+  constructor() {
+    super('A version is sent with one file at least that explains it.');
+    this.name = 'BudgetVersionAttachmentRequiredError';
+  }
+}
+
 /** Another writer took the number of the next version of the Cost Center and year first (F39): read again and send again. */
 export class BudgetVersionNumberTakenError extends Error {
   constructor() {

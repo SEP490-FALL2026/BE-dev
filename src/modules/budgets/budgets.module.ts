@@ -24,6 +24,7 @@ import { BudgetTableViewService } from './budget-view/budget-table-view.service'
 import { BudgetViewService } from './budget-view/budget-view.service';
 import { BudgetsController } from './budget-view/budgets.controller';
 import { BudgetsApi } from './public/budgets.api';
+import { BaselineFlags } from './cycle/baseline-flags.service';
 import {
   CommitmentReleaseGuardHook,
   CommitmentRequestFactsHook,
@@ -164,6 +165,7 @@ import { BudgetProposalTemplateListener } from './proposal/budget-proposal-templ
     DepartmentCreationWindowListener,
     PendingSpendContributions,
     CarriedOverContributions,
+    BaselineFlags,
     CommitmentReleaseGuardHook,
     CommitmentRequestFactsHook,
     BudgetCostCenterUseReader,

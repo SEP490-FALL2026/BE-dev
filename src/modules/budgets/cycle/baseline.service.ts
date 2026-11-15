@@ -10,20 +10,17 @@ import {
   BudgetCycleNotFoundError,
   BudgetNotYourCostCenterError,
 } from '../budget/budget.errors';
-import { CarriedOverContributions } from '../public/budgets.extension-points';
+import { BaselineFlags } from './baseline-flags.service';
 import { BudgetFactsService } from '../budget/budget-facts.service';
 import { CommitmentRepo, heldKey } from '../budget/commitment.repo';
 import { ProposalRepo } from '../budget/proposal.repo';
 import {
   allocateSeats,
-  baselineLinesOf,
-  type BaselineLine,
   inOrderOf,
   listedDepartments,
   poolIdleSeats,
   SOFTWARE_LISTED_MAX,
   baselineVersionRefusal,
-  cancelledCost,
   type SeatAllocation,
   shouldSuggestRenewal,
   subscriptionCost,
@@ -54,7 +51,11 @@ export function departmentOf(
   costCenterId: string | null,
   subscriptions: readonly BaselineSubscription[],
   reading: Reading,
-  carried: { carriedOver: bigint; noProposalSubmitted: boolean } = { carriedOver: 0n, noProposalSubmitted: false },
+  carried: { carriedOver: bigint; noProposalSubmitted: boolean; belowCarriedOver: boolean } = {
+    carriedOver: 0n,
+    noProposalSubmitted: false,
+    belowCarriedOver: false,
+  },
 ): BaselineWire['departments'][number] {
   const { year, today, seats, ending, kpi3ByPlan, spent, format } = reading;
   const software: BaselineWire['departments'][number]['software'] = [];
@@ -95,6 +96,7 @@ export function departmentOf(
     costCenterId,
     carriedOverNextYear: format(carried.carriedOver),
     noProposalSubmitted: carried.noProposalSubmitted,
+    belowCarriedOver: carried.belowCarriedOver,
     spentThisYear: format(spent),
     estimatedAnnualCost: format(total),
     hasUnknownCost: unknown,
@@ -173,7 +175,7 @@ export class BaselineService {
     private readonly licensing: LicensingApi,
     private readonly commitments: CommitmentRepo,
     private readonly proposals: ProposalRepo,
-    private readonly carriedOver: CarriedOverContributions,
+    private readonly flags: BaselineFlags,
   ) {}
 
   /** Throws BudgetCycleNotFoundError and BudgetNotYourCostCenterError (a head asking for a department that is not theirs, or for none). */
@@ -198,9 +200,7 @@ export class BaselineService {
     const spentOf = await this.spentByDepartment(history, today);
 
     const costCenterIds = [...costCenters.values()];
-    const carriedOver = await this.carriedOver.totals(costCenterIds, year);
-    const proposed = await this.proposals.proposedCostCenters(costCenterIds, year);
-    const locked = today > cycle.submissionDeadline;
+    const carriedOf = await this.flags.of(costCenterIds, year, today > cycle.submissionDeadline);
     const departments = inOrderOf(wanted, briefs).map((brief) => {
       const seats = allocation.byDepartment.get(brief.id) ?? new Map<string, number>();
 
@@ -209,10 +209,7 @@ export class BaselineService {
         costCenters.get(brief.id) ?? null,
         subscriptions.filter((subscription) => (seats.get(subscription.subscriptionId) ?? 0) > 0),
         { year, today, seats, ending, kpi3ByPlan, spent: spentOf(brief.id), format },
-        {
-          carriedOver: carriedOver.get(costCenters.get(brief.id) ?? '') ?? 0n,
-          noProposalSubmitted: locked && !proposed.has(costCenters.get(brief.id) ?? ''),
-        },
+        carriedOf(costCenters.get(brief.id) ?? ''),
       );
     });
 
@@ -295,35 +292,6 @@ export class BaselineService {
     if (refusal !== null || cycle === null) throw new BudgetBaselineVersionNotAllowedError(refusal ?? 'CYCLE_NOT_OPEN');
 
     return { departmentId: unit.departmentId, currency: cycle.currency };
-  }
-
-  /**
-   * The lines of a first version built from the baseline (`QĐ-100h`, `C4-14`), read the way the baseline reads the department
-   * (`QĐ-103k`): one `Renew` line for what each plan its people hold seats of costs in the year at a known price (the months before an
-   * ordered end included), and a `Cancel` line (shown, not added) for what ending one that was ordered to end saves. The idle seats of the
-   * shared pool are no department's line. Throws nothing; a department whose people hold nothing gives none.
-   */
-  async renewalLinesOf(departmentId: string, year: number, today: BusinessDate, tx?: DbTx): Promise<BaselineLine[]> {
-    const subscriptions = await this.catalog.getBaselineSubscriptions(tx);
-    const { allocation, ending } = await this.seatsOf(subscriptions, today, tx);
-    const seats = allocation.byDepartment.get(departmentId) ?? new Map<string, number>();
-
-    return baselineLinesOf(
-      subscriptions
-        .filter((subscription) => (seats.get(subscription.subscriptionId) ?? 0) > 0)
-        .map((subscription) => {
-          const held = seats.get(subscription.subscriptionId) ?? 0;
-          const terminated = ending.has(subscription.subscriptionId);
-
-          return {
-            planId: subscription.planId,
-            label: `${subscription.applicationName} ${subscription.planName}`,
-            seats: held,
-            costMinor: subscriptionCost(year, today, held, subscription, terminated).costMinor,
-            cancelledMinor: terminated ? cancelledCost(year, held, subscription) : null,
-          };
-        }),
-    );
   }
 
   /** A head reads the baseline of their own department only, and names it. */

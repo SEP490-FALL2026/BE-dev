@@ -18,12 +18,15 @@ interface VersionBody {
     proposalId: string | null;
     base: { amount: string };
     reserve: { amount: string };
+    carriedOverNextYear: { amount: string };
+    belowCarriedOver: boolean;
+    noProposalSubmitted: boolean;
   };
 }
 
 /**
- * `qd103-budget-baseline-annual-check`, Task 3 (QĐ-100h, R-I05, AC-5): after the submission deadline Finance builds the first version
- * of a department nobody heads, is to head and proposed for, from the baseline: the lines are the Renew lines the baseline gives.
+ * `qd103-budget-baseline-annual-check`, Task 3, as `QĐ-111bb` changed it: after the submission deadline Finance builds the version of a
+ * department that has no proposal, from the baseline: one figure for the year, the base filled in with what the Cost Center carries into it.
  */
 describe('a version built from the baseline (integration, real PostgreSQL)', () => {
   let counter = 0;
@@ -81,28 +84,42 @@ describe('a version built from the baseline (integration, real PostgreSQL)', () 
     await h.stop();
   });
 
-  it('builds the first version from the baseline: a Renew line for what runs, the base is their sum, origin BASELINE_NO_HEAD', async () => {
+  it('builds the version from the baseline with one figure for the year: the base is what the Cost Center carries into it, the reserve its share, and no line (QĐ-111bb, T-BG2)', async () => {
     const department = await headless();
     await holdSeats(department, 6);
+    carriedOver.set(department.unitId, 10n * 1_000_000n * 12n + 3_000_000n);
 
     const made = h.dataOf<VersionBody>(await create(baselineBody(department)).expect(201)).version;
 
-    // 10 seats bought, 6 held, at 1,000,000 a month, running since January 2026: twelve months, for the six held (F-066).
-    expect(made.origin).toBe('BASELINE_NO_PROPOSAL');
-    expect(made.proposalId).toBeNull();
-    expect(made.base.amount).toBe('72000000');
-    expect(made.reserve.amount).toBe('7200000');
-    const lines = await h.ctx.sql.query<{
-      description: string;
-      seats: number;
-      amount_minor: string;
-      proposal_id: string | null;
-    }>(`SELECT description, seats, amount_minor::text, proposal_id FROM budget_version_lines WHERE version_id = $1`, [
-      made.id,
-    ]);
-    expect(lines.rows).toHaveLength(1);
-    expect(lines.rows[0]).toMatchObject({ seats: 6, amount_minor: '72000000', proposal_id: null });
-    expect(lines.rows[0].description).toMatch(/^Renew /);
+    expect(made).toMatchObject({
+      origin: 'BASELINE_NO_PROPOSAL',
+      proposalId: null,
+      base: { amount: '123000000' },
+      reserve: { amount: '12300000' },
+      carriedOverNextYear: { amount: '123000000' },
+      belowCarriedOver: false,
+      noProposalSubmitted: true,
+    });
+    expect(await h.budgetRows(`budget_version_lines WHERE version_id = '${made.id}'`)).toBe(0);
+  });
+
+  it('takes the figures Finance gives instead: a base below what is carried over raises the red flag and is still saved and sent (QĐ-111ac)', async () => {
+    const department = await headless();
+    carriedOver.set(department.unitId, 50_000_000n);
+
+    const made = h.dataOf<VersionBody>(
+      await create({ ...baselineBody(department), base: h.money(40_000_000), reservePercent: 5 }).expect(201),
+    ).version;
+
+    expect(made).toMatchObject({
+      base: { amount: '40000000' },
+      reserve: { amount: '2000000' },
+      carriedOverNextYear: { amount: '50000000' },
+      belowCarriedOver: true,
+    });
+    const read = h.dataOf<VersionBody>(await h.versionOf(made.id).expect(200)).version;
+    expect(read).toMatchObject({ belowCarriedOver: true, noProposalSubmitted: true });
+    await h.sendVersion(made.id).expect(200);
   });
 
   describe('refuses with 409 BUDGET.BASELINE_VERSION_NOT_ALLOWED naming the reason', () => {
@@ -207,17 +224,17 @@ describe('a version built from the baseline (integration, real PostgreSQL)', () 
     });
   });
 
-  it('builds a version with a base of zero for a department that runs nothing, and leaves out a line that costs nothing (F-086)', async () => {
+  it('builds a version with a base of zero for a department that carries nothing into the year, whatever it runs (F-086)', async () => {
     counter += 1;
     const empty = await h.departmentWithUnit(`P-BVZ${counter}`);
-    // The 10 seats are bought and none is held: a line of seats nobody holds costs nothing.
-    const free = await headless();
+    const running = await headless();
+    await holdSeats(running, 6);
     const emptyMade = h.dataOf<VersionBody>(await create(baselineBody(empty)).expect(201)).version;
-    const freeMade = h.dataOf<VersionBody>(await create(baselineBody(free)).expect(201)).version;
+    const runningMade = h.dataOf<VersionBody>(await create(baselineBody(running)).expect(201)).version;
 
-    expect([emptyMade.base.amount, freeMade.base.amount]).toEqual(['0', '0']);
+    expect([emptyMade.base.amount, runningMade.base.amount]).toEqual(['0', '0']);
     const lines = await h.ctx.sql.query(`SELECT 1 FROM budget_version_lines WHERE version_id = ANY($1::uuid[])`, [
-      [emptyMade.id, freeMade.id],
+      [emptyMade.id, runningMade.id],
     ]);
     expect(lines.rows).toHaveLength(0);
   });
@@ -313,13 +330,12 @@ describe('a version built from the baseline (integration, real PostgreSQL)', () 
     const bodies: [object, string, string][] = [
       [{ source: 'BASELINE', costCenterId: department.unitId }, 'invalid_type', 'year'],
       [{ ...baselineBody(department), proposalId }, 'unrecognized_keys', ''],
-      [{ ...baselineBody(department), base: h.money(1) }, 'unrecognized_keys', ''],
-      [{ ...baselineBody(department), reserve: h.money(1) }, 'unrecognized_keys', ''],
-      [{ ...baselineBody(department), reserveReason: 'x' }, 'unrecognized_keys', ''],
+      // The figures are Finance's to give on either source (QĐ-111ac); the reserve is an amount or a share, not both.
+      [{ ...baselineBody(department), reserve: h.money(1), reservePercent: 10 }, 'custom', 'reservePercent'],
       [{ ...baselineBody(department), quarters: null }, 'unrecognized_keys', ''],
       [{ proposalId, base: h.money(1), year: h.year }, 'unrecognized_keys', ''],
       [{ proposalId, base: h.money(1), costCenterId: department.unitId }, 'unrecognized_keys', ''],
-      [{ proposalId }, 'invalid_type', 'base'],
+      [{ proposalId, base: h.money(1), reservePercent: 101 }, 'too_big', 'reservePercent'],
       [{ source: 'OTHER', proposalId, base: h.money(1) }, 'invalid_union', 'source'],
     ];
 

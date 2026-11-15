@@ -36,6 +36,7 @@ import {
   BudgetNotAReaderError,
   BudgetNotFinanceError,
   BudgetVersionNumberTakenError,
+  BudgetVersionAttachmentRequiredError,
   BudgetCurrentExistsError,
   BudgetBaselineVersionNotAllowedError,
   BudgetBaseReasonRequiredError,
@@ -128,6 +129,9 @@ export function toBudgetApiException(error: unknown): unknown {
   // The department has no Cost Center in use yet (`QĐ-87d(1)`): Finance makes one first. Nothing was written (F27).
   if (error instanceof FinanceSetupIncompleteError) {
     return refuse(HttpStatus.CONFLICT, 'FINANCE.SETUP_INCOMPLETE', error.message);
+  }
+  if (error instanceof BudgetVersionAttachmentRequiredError) {
+    return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'BUDGET_VERSION.ATTACHMENT_REQUIRED', error.message);
   }
   if (error instanceof BudgetVersionNumberTakenError) {
     return refuse(HttpStatus.CONFLICT, 'BUDGET.VERSION_NUMBER_TAKEN', error.message);
@@ -307,6 +311,7 @@ export const BUDGET_ERROR_EXAMPLES = {
   CYCLE_DEADLINES_INVALID: example(new BudgetCycleDeadlinesInvalidError()),
   CYCLE_REASON_REQUIRED: example(new BudgetCycleReasonRequiredError()),
   CYCLE_LOCKED: example(new BudgetCycleLockedError(2027)),
+  ATTACHMENT_REQUIRED: example(new BudgetVersionAttachmentRequiredError()),
   CYCLE_NOT_DRAFT: example(new BudgetCycleNotDraftError(2027)),
   CYCLE_ALREADY_OPEN: example(new BudgetCycleAlreadyOpenError(2027)),
   CYCLE_DEADLINE_PASSED: example(new BudgetCycleDeadlinePassedError()),

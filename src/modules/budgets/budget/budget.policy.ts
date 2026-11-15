@@ -1,6 +1,5 @@
 import type { BusinessDate } from '../../../core/business-date';
 import { fiscalYearOf } from '../../../core/fiscal-year';
-import type { LineType, ZbbExplanation } from './budget-line-zbb.json';
 
 /**
  * The rules of budget proposals and versions (`US-06-09`, `US-06-10`), as pure decisions: what a line must say, which
@@ -18,16 +17,6 @@ export const LINE_DESCRIPTION_MAX = 200;
  * that has ended does not (`US-06-10` AC-9, `US-06-09` AC-11).
  */
 export const yearIsOpen = (year: number, today: BusinessDate): boolean => year >= fiscalYearOf(today);
-
-/**
- * Whether a line is a saving that is shown and not counted: a `CANCEL` line gives up spend, so its amount is never added to the total of
- * the proposal, the package or the ceiling check (`QĐ-109c`, C4-16).
- */
-export const isNotCounted = (line: { lineType: LineType }): boolean => line.lineType === 'CANCEL';
-
-/** The sum a proposal is worth: every line but the `CANCEL` ones (`QĐ-109c`). */
-export const countedTotalOf = (lines: readonly { lineType: LineType; amountMinor: bigint }[]): bigint =>
-  lines.reduce((sum, line) => (isNotCounted(line) ? sum : sum + line.amountMinor), 0n);
 
 export const totalOf = (lines: readonly { amountMinor: bigint }[]): bigint =>
   lines.reduce((sum, line) => sum + line.amountMinor, 0n);
@@ -189,34 +178,6 @@ export function commitmentAttachedAfter(
   };
 }
 
-/** The line of a version made from a line before it (of a proposal, or of the current budget): where it came from, and none of the work on it. */
-export function copiedLineOf(
-  line: {
-    description: string;
-    planId: string | null;
-    seats: number | null;
-    amountMinor: bigint;
-    lineType: LineType;
-    zbb: ZbbExplanation | null;
-    priorityRank: number | null;
-  },
-  origin: { proposalId: string | null; proposalPosition: number | null },
-) {
-  return {
-    proposalId: origin.proposalId,
-    proposalPosition: origin.proposalPosition,
-    description: line.description,
-    planId: line.planId,
-    seats: line.seats,
-    amountMinor: line.amountMinor,
-    financeComment: null,
-    adjustmentReason: null,
-    lineType: line.lineType,
-    zbb: line.zbb,
-    priorityRank: line.priorityRank,
-  };
-}
-
 /** The reserve a version has when Finance gives none: `percent` of the base, rounded to the nearest minor unit (`QĐ-98`). */
 export const defaultReserveOf = (baseMinor: bigint, percent: number): bigint =>
   (baseMinor * BigInt(percent) + 50n) / 100n;
@@ -231,6 +192,33 @@ export const reserveReasonMissing = (version: {
   version.reservePercent !== null &&
   version.reserveMinor !== defaultReserveOf(version.baseMinor, version.reservePercent) &&
   !version.reserveReason;
+
+/**
+ * The figures of a version as Finance gives them (`QĐ-111ac`): the base, filled in with what the Cost Center carries into the year when
+ * Finance gives none; the reserve as a share Finance chooses (the share is kept, so it asks no reason) or as an amount (kept against the
+ * default share, so an amount that is not that share asks a reason when the version is sent), the default share when neither is given.
+ */
+export function versionFiguresOf(input: {
+  baseMinor?: bigint;
+  reservePercent?: number;
+  reserveMinor?: bigint;
+  carriedOverMinor: bigint;
+  defaultPercent: number;
+}): { baseMinor: bigint; reserveMinor: bigint; reservePercent: number } {
+  const baseMinor = input.baseMinor ?? input.carriedOverMinor;
+  if (input.reserveMinor !== undefined) {
+    return { baseMinor, reserveMinor: input.reserveMinor, reservePercent: input.defaultPercent };
+  }
+  const reservePercent = input.reservePercent ?? input.defaultPercent;
+
+  return { baseMinor, reserveMinor: defaultReserveOf(baseMinor, reservePercent), reservePercent };
+}
+
+/** The red flag of a version (`QĐ-111ac`): its base is below what the Cost Center carries into the year. It never stops anything. */
+export const belowCarriedOver = (baseMinor: bigint, carriedOverMinor: bigint): boolean => baseMinor < carriedOverMinor;
+
+/** A version is sent with one file at least that explains it (`QĐ-111ac`); saving a draft asks for none. */
+export const versionAttachmentMissing = (attachedCount: number): boolean => attachedCount < 1;
 
 /** A version as the annual check reads it. */
 export interface CountedVersion {
