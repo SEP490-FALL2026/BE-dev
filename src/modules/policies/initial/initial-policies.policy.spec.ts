@@ -63,7 +63,7 @@ describe('the initial set of policies (QĐ-112b, POLICY-SEED-DRAFT)', () => {
     }
   });
 
-  it('has a ground of issue for version one', () => {
-    expect(INITIAL_CHANGE_NOTE.trim().length).toBeGreaterThan(10);
+  it('has the ground of issue of version one that the official text of the set gives for an installation (QĐ-112b)', () => {
+    expect(INITIAL_CHANGE_NOTE).toBe('Bộ mẫu SaaS-Sentry 1.0 — công ty xuất bản phiên bản 2 kèm quyết định của mình');
   });
 });

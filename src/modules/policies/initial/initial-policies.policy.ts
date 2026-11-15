@@ -27,4 +27,4 @@ export const INITIAL_POLICIES: readonly InitialPolicy[] = [
  * The ground of the issue of version one on a real installation: the set is the template of the product, and the company publishes version
  * two with its own decision. The demo dataset writes its own ground when it installs the set.
  */
-export const INITIAL_CHANGE_NOTE = 'Bộ mẫu SaaS-Sentry v1.9 — công ty xuất bản phiên bản 2 kèm quyết định của mình';
+export const INITIAL_CHANGE_NOTE = 'Bộ mẫu SaaS-Sentry 1.0 — công ty xuất bản phiên bản 2 kèm quyết định của mình';

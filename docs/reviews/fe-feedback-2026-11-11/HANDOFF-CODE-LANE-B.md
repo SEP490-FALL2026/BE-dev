@@ -30,5 +30,5 @@
 
 ## Seed cần cho Z2
 
-- Demo dataset cài đặt qua lệnh cài đặt thì đã có 8 chính sách bản 1 với căn cứ mặc định ("Bộ mẫu SaaS-Sentry v1.9 …"); muốn căn cứ "Quyết định số 01/2026/QĐ-GĐ …" như POLICY-SEED-DRAFT thì Z2 xuất bản bản 2, hoặc gọi `PoliciesBootstrapApi.seedInitialPolicies(tx, orgId, changeNote)` trước khi có bản nào.
+- Demo dataset cài đặt qua lệnh cài đặt thì đã có 8 chính sách bản 1 với căn cứ mặc định ("Bộ mẫu SaaS-Sentry 1.0 …"); muốn căn cứ "Quyết định số 01/2026/QĐ-GĐ …" như POLICY-SEED-DRAFT thì Z2 xuất bản bản 2, hoặc gọi `PoliciesBootstrapApi.seedInitialPolicies(tx, orgId, changeNote)` trước khi có bản nào.
 - Cần thêm: một Super Admin xuất bản vài bản 2 và vài tài khoản đã xác nhận / chưa xác nhận để demo `GET /me` và báo cáo.

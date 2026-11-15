@@ -38,7 +38,7 @@
 
 ### D-B5 — căn cứ ban hành bản 1 khi cài đặt và nơi nạp 8 chính sách
 
-- **Câu hỏi:** POLICY-SEED-DRAFT ghi căn cứ demo ("Quyết định số 01/2026/QĐ-GĐ") và đề xuất cho cài đặt thật "Bộ mẫu SaaS-Sentry v1.9 — công ty xuất bản phiên bản 2 kèm quyết định của mình"; nạp ở đâu khi PLAN ghi `src/cli/seed/**`, bootstrap cài đặt còn lệnh giao việc cấm sửa demo seed?
+- **Câu hỏi:** POLICY-SEED-DRAFT ghi căn cứ demo ("Quyết định số 01/2026/QĐ-GĐ") và đề xuất cho cài đặt thật "Bộ mẫu SaaS-Sentry 1.0 — công ty xuất bản phiên bản 2 kèm quyết định của mình"; nạp ở đâu khi PLAN ghi `src/cli/seed/**`, bootstrap cài đặt còn lệnh giao việc cấm sửa demo seed?
 - **Phương án:** (A) lệnh cài đặt nạp bản 1 với căn cứ bộ mẫu, seed demo gọi cùng API với căn cứ riêng; (B) chỉ seed demo nạp (cài đặt thật không có chính sách ⟹ mọi bước duyệt bị khóa vì không có bản hiện hành); (C) migration dữ liệu (không có tổ chức lúc migrate).
 - **Chọn A:** đúng "Không nạp nháp, vì checklist cần bản hiện hành" (điểm Owner 6) và không đụng demo seed. `PoliciesBootstrapApi.seedInitialPolicies(tx, orgId, changeNote?)` chạy lại an toàn. Cài đặt gọi qua `InstallationInitialDataService` (nhóm chức năng + chính sách) vì constructor `InstallationApi` đã 8 tham số.
 - **File:** `policies/initial/*`, `policies/public/policies-bootstrap.api.ts`, `installation/installation-initial-data.service.ts`. **Đổi lại:** bỏ lời gọi ở service; hoặc đổi `INITIAL_CHANGE_NOTE`.
