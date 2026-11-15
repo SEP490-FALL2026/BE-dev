@@ -54,13 +54,17 @@ export function releaseOnLateGrant(input: {
 
 /**
  * The days a seat is in force: from the day the right begins (the day the grant was completed, else the day the seat was decided) up to the first day
- * it no longer holds (`until`, null while open). Null when the period is empty (the seat was taken back before the right began): it costs nothing.
+ * it no longer holds (`until`, null while open). A seat a Request asked for (`needsGrant`) has no right until its grant is completed, and begins on that
+ * day, never on the day it was decided (`QĐ-103f`(3), `SM1-02`). Null when the period is empty (the seat was taken back before the right began, or is
+ * still waiting for its grant): it costs nothing.
  */
 export function seatHeldRange(input: {
   validFrom: BusinessDate;
   grantedOn: BusinessDate | null;
   validUntil: BusinessDate | null;
+  needsGrant?: boolean;
 }): { from: BusinessDate; until: BusinessDate | null } | null {
+  if (input.needsGrant === true && input.grantedOn === null) return null;
   const from = input.grantedOn ?? input.validFrom;
   if (input.validUntil !== null && input.validUntil <= from) return null;
 

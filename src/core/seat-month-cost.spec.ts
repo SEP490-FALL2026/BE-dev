@@ -68,6 +68,15 @@ describe('seatHeldRange (SM-1.3)', () => {
     });
   });
 
+  it('SM1-02: is nothing for a seat a Request asked for until the grant is completed, and begins on the day it was, whatever day the seat was decided', () => {
+    const waiting = { validFrom: '2026-03-25', grantedOn: null, validUntil: null, needsGrant: true };
+
+    expect(seatHeldRange(waiting)).toBeNull();
+    expect(seatHeldRange({ ...waiting, grantedOn: '2026-04-02' })).toEqual({ from: '2026-04-02', until: null });
+    // A seat no Request asked for (the baseline, a renewal, a handover) is in force from the day it was decided.
+    expect(seatHeldRange({ ...waiting, needsGrant: false })).toEqual({ from: '2026-03-25', until: null });
+  });
+
   it('is nothing for a seat whose period is empty: taken back on or before the day the right would have begun', () => {
     expect(seatHeldRange({ validFrom: '2026-10-05', grantedOn: '2026-10-09', validUntil: '2026-10-09' })).toBeNull();
     expect(seatHeldRange({ validFrom: '2026-10-05', grantedOn: null, validUntil: '2026-10-05' })).toBeNull();

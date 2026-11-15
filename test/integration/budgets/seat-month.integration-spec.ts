@@ -231,6 +231,36 @@ describe('a month of the seats of a K2 pool is charged to the departments of the
     expect(await commitmentOf(requestId)).toMatchObject({ applied_minor: row.applied_minor });
   });
 
+  it('SM1-02: a seat a Request asked for is charged from the day the grant was completed, not from the day it was decided: nothing for the days it waited, nothing at all for a grant that failed', async () => {
+    const pool = await newPool();
+    const planId = await h.planOf(pool);
+    const unit = await department();
+    const waiting = await seat(pool, planId, await holder('E-SM-WAIT', unit), {
+      validFrom: `${h.year}-03-25`,
+      grantedOn: null,
+    });
+    await seat(pool, planId, await holder('E-SM-FAIL', unit), {
+      validFrom: `${h.year}-03-25`,
+      validUntil: `${h.year}-03-25`,
+      grantedOn: null,
+      failedAt: `${h.year}-04-05T03:00:00Z`,
+    });
+    const march = `${h.year}-03-01`;
+    const april = `${h.year}-04-01`;
+
+    await service().chargeMonth(march);
+    expect(await rowsOf(pool, march)).toEqual([]);
+
+    await h.ctx.sql.query(`UPDATE license_assignments SET granted_on = $2 WHERE id = $1`, [waiting, `${h.year}-04-02`]);
+    await service().chargeMonth(march);
+    await service().chargeMonth(april);
+
+    expect(await rowsOf(pool, march)).toEqual([]);
+    expect(await rowsOf(pool, april)).toMatchObject([
+      { department_id: unit.department.id, days: 29, amount_minor: '386667' },
+    ]);
+  });
+
   const facts = async (unit: Unit) =>
     (await h.ctx.app.get(BudgetsApi, { strict: false }).yearFacts(unit.department.unitId, [h.year])).get(h.year);
 

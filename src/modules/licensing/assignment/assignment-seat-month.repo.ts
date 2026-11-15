@@ -46,6 +46,7 @@ export class AssignmentSeatMonthRepo {
         planId: true,
         employeeId: true,
         kind: true,
+        source: true,
         owningDepartmentId: true,
         validFrom: true,
         grantedOn: true,
@@ -64,6 +65,8 @@ export class AssignmentSeatMonthRepo {
         validFrom: fromDateColumn(row.validFrom),
         grantedOn: row.grantedOn ? fromDateColumn(row.grantedOn) : null,
         validUntil: row.validUntil ? fromDateColumn(row.validUntil) : null,
+        // A seat a Request asked for begins with its grant, never with the day it was decided (`SM1-02`).
+        needsGrant: row.source === 'REQUEST',
       });
       if (!held || row.subscriptionId === null) return [];
       if (held.from >= nextStart || (held.until !== null && held.until <= start)) return [];
