@@ -364,6 +364,7 @@ Find a route, open its controller, then the service it calls. Module of a file =
 | POST | `/policies/{code}/draft/publish` | [policies/library/library-draft.controller.ts](../../src/modules/policies/library/library-draft.controller.ts) → `publish` | [LibraryPublishService](../../src/modules/policies/library/library-publish.service.ts) |
 | POST | `/policies/{code}/acknowledgements` | [policies/acknowledgement/acknowledgement.controller.ts](../../src/modules/policies/acknowledgement/acknowledgement.controller.ts) → `acknowledge` | [AcknowledgementService](../../src/modules/policies/acknowledgement/acknowledgement.service.ts) |
 | GET | `/policies/{code}/acknowledgements` | [policies/acknowledgement/acknowledgement.controller.ts](../../src/modules/policies/acknowledgement/acknowledgement.controller.ts) → `report` | [AcknowledgementReportService](../../src/modules/policies/acknowledgement/acknowledgement-report.service.ts) |
+| GET | `/import-templates/{kind}` | [policies/import-template/import-template.controller.ts](../../src/modules/policies/import-template/import-template.controller.ts) → `get` | [ImportTemplateService](../../src/modules/policies/import-template/import-template.service.ts) |
 | POST | `/auth/login` | [identity-access/auth/auth.controller.ts](../../src/modules/identity-access/auth/auth.controller.ts) → `login` | [LoginService](../../src/modules/identity-access/auth/login.service.ts) |
 | POST | `/auth/refresh` | [identity-access/auth/auth.controller.ts](../../src/modules/identity-access/auth/auth.controller.ts) → `refresh` | [SessionService](../../src/modules/identity-access/auth/session.service.ts) |
 | POST | `/auth/logout` | [identity-access/auth/auth.controller.ts](../../src/modules/identity-access/auth/auth.controller.ts) → `logout` | [SessionService](../../src/modules/identity-access/auth/session.service.ts) |
@@ -404,4 +405,4 @@ Find a route, open its controller, then the service it calls. Module of a file =
 | GET | `/dashboards/super-admin` | [dashboards/super-admin/super-admin-dashboard.controller.ts](../../src/modules/dashboards/super-admin/super-admin-dashboard.controller.ts) → `get` | [SuperAdminDashboardService](../../src/modules/dashboards/super-admin/super-admin-dashboard.service.ts) |
 | GET | `/reports/revocation-sla` | [dashboards/revocation-sla/revocation-sla.controller.ts](../../src/modules/dashboards/revocation-sla/revocation-sla.controller.ts) → `get` | [RevocationSlaQueryService](../../src/modules/dashboards/revocation-sla/revocation-sla-query.service.ts) |
 
-398 operations.
+399 operations.
