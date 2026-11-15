@@ -42,11 +42,22 @@ export interface AssignmentView extends AssignmentRecord {
   effectiveFromLabel: string | null;
 }
 
-/** An assignment of a list, with who holds it, which plan it is of and which Cost Center it is charged to. */
+/**
+ * The revocation a seat has: the task that takes it back, which is open (not completed, closed as failed or cancelled), and whether it may be taken
+ * now (`false` while a reason asks for a day not before that has not come). The IT Admin presses "Revoke" only where there is one (`QĐ-111p`).
+ */
+export interface AssignmentRevocation {
+  taskId: string;
+  status: ProvisioningTaskStatus;
+  claimableNow: boolean;
+}
+
+/** An assignment of a list, with who holds it, which plan it is of, which Cost Center it is charged to and the revocation open for it. */
 export interface AssignmentSummaryView extends AssignmentView {
   employee: { employeeId: string; employeeCode: string; fullName: string };
-  plan: { planId: string; planName: string; applicationName: string };
+  plan: { planId: string; planName: string; applicationName: string; logoUrl: string | null };
   costCenter: { id: string; code: string; name: string } | null;
+  revocation: AssignmentRevocation | null;
 }
 
 /** Who holds the seat a request is granted and under which account, with what a service account says besides (`US-05-21`). */
@@ -126,6 +137,8 @@ export interface AssignmentListFilter {
   employeeId?: string;
   source?: AssignmentSource;
   kind?: AssignmentKind;
+  /** Only the rights in force as of this day: not ended, not failed, not cancelled (one that begins later is in force already). */
+  holdingOn?: BusinessDate;
   skip: number;
   take: number;
 }

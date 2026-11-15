@@ -65,10 +65,11 @@ describe('assignment and license key read contracts (integration, real PostgreSQ
     expect(items).toHaveLength(40);
     expect(dataStatements(many.statements)).toHaveLength(dataStatements(few.statements).length);
     const reads = dataStatements(many.statements);
-    // After the guard's reads: the page and its count, then the people, the plans (with their applications) and the Cost Centers.
-    expect(
-      reads.slice(reads.findIndex((statement) => tablesOf(statement).includes('license_assignments'))),
-    ).toHaveLength(6);
+    // After the guard's reads: the page and its count, then the people, the plans (with their applications), the Cost Centers and the revocation
+    // tasks that are open for the page (QĐ-111p): one statement for each, whatever the number of rows.
+    const afterGuard = reads.slice(reads.findIndex((statement) => tablesOf(statement).includes('license_assignments')));
+    expect(afterGuard).toHaveLength(7);
+    expect(afterGuard.filter((statement) => tablesOf(statement).includes('provisioning_tasks'))).toHaveLength(1);
     const service = items.find((item) => item.kind === 'SERVICE');
     expect(service).toMatchObject({
       employee: { employeeCode: 'LD10A3', fullName: 'LD10A3' },

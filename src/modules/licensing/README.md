@@ -96,7 +96,12 @@ dịch vụ nào đọc cả ghế lẫn thu hồi thì đứng trên cả hai (
 ## Capability → file chính
 
 - `assignment/` — assignment ghế (đọc danh sách) và ghế của subscription; `assignments.controller.ts`,
-  `subscription-seats.controller.ts`; `AssignmentService`. Con: `renewal/` (US-05-14). Không còn tài khoản dịch vụ (`QĐ-110m`): các dòng
+  `subscription-seats.controller.ts`; `AssignmentService`. `GET /license-assignments` (IT Admin, `QĐ-111n`/`QĐ-111p`): lọc `subscriptionId`, `planId`,
+  `employeeId`, `activeOnly=true` (quyền đang giữ hôm nay: chưa kết thúc, chưa hỏng/hủy, kể cả quyền bắt đầu sau; một câu `HOLDING` như đếm ghế) — danh sách người giữ của
+  một thuê bao, mỗi khóa `K4` đã cấp là một dòng người giữ (không có route `holders` riêng); mỗi dòng có `plan.logoUrl` và `revocation { taskId, status, claimableNow } | null` =
+  tác vụ thu hồi đang mở của quyền đó (`AssignmentRevocationRepo.openOf`: chưa `COMPLETED`/`CLOSED_FAILED`/`CANCELLED`, cùng nghĩa với số ghế đang thu hồi; một câu cho
+  cả trang), `claimableNow` = `notBefore` đã tới (`revocationOf`, `assignment.policy.ts`). FE bật "Thu hồi" chỉ khi `revocation` khác null; hoàn tất qua
+  `POST /provisioning-tasks/{id}/revocation-completion` (K4 kèm `keyDisposition`). Con: `renewal/` (US-05-14). Không còn tài khoản dịch vụ (`QĐ-110m`): các dòng
   `kind = 'SERVICE'` cũ chỉ còn là lịch sử (hoặc đợi chuyển, xem `…_licensing_service_accounts_converted`).
 - `machine-account/` — cờ _dùng cho tài khoản máy_ trên seat cá nhân của IT Admin (`QĐ-110m`, R-9): `POST /license-assignments/{id}/machine-account`;
   `machine-account.controller.ts`, `MachineAccountService`, `machine-account.policy.ts` (thuần: loại seat, đang mở, người giữ là IT Admin dùng

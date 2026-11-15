@@ -1,5 +1,5 @@
 import type { AssignmentRecord } from '../public/licensing.types';
-import { effectiveFromLabel, replacedByGrant, toAssignmentView, usableDayOf } from './assignment.policy';
+import { effectiveFromLabel, replacedByGrant, revocationOf, toAssignmentView, usableDayOf } from './assignment.policy';
 
 const bot: AssignmentRecord = {
   id: 'a1',
@@ -120,5 +120,24 @@ describe('the right a grant replaces on the same subscription (R-49, QĐ-110q)',
     ['a right that begins after the day of the grant', { effectiveFrom: '2026-11-19' }],
   ])('is not touched when it is %s', (_name, over) => {
     expect(replacedByGrant({ ...old, ...over }, grant())).toBe(false);
+  });
+});
+
+describe('revocationOf (QĐ-111p: the revocation a seat has, from the task that is open for it)', () => {
+  const task = { id: 't1', status: 'QUEUED' as const, notBefore: null };
+
+  it('names the task and its state, and is claimable at once when no reason asks for a day not before', () => {
+    expect(revocationOf(task, '2026-11-15')).toEqual({ taskId: 't1', status: 'QUEUED', claimableNow: true });
+  });
+
+  it('is not claimable while the day not before is still ahead, and is on that day', () => {
+    expect(revocationOf({ ...task, notBefore: '2026-11-20' }, '2026-11-19').claimableNow).toBe(false);
+    expect(revocationOf({ ...task, notBefore: '2026-11-20' }, '2026-11-20').claimableNow).toBe(true);
+    expect(revocationOf({ ...task, notBefore: '2026-11-20' }, '2026-11-25').claimableNow).toBe(true);
+  });
+
+  it('carries the state of a task that is being worked or has failed', () => {
+    expect(revocationOf({ ...task, status: 'IN_PROGRESS' }, '2026-11-15').status).toBe('IN_PROGRESS');
+    expect(revocationOf({ ...task, status: 'FAILED' }, '2026-11-15').status).toBe('FAILED');
   });
 });

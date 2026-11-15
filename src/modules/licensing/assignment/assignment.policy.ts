@@ -1,5 +1,11 @@
 import type { BusinessDate } from '../../../core/business-date';
-import type { AssignmentDateBasis, AssignmentRecord, AssignmentView } from '../public/licensing.types';
+import type {
+  AssignmentDateBasis,
+  AssignmentRecord,
+  AssignmentRevocation,
+  AssignmentView,
+  ProvisioningTaskStatus,
+} from '../public/licensing.types';
 
 /** What the audit event of a new assignment says of it; the account identifier and the purpose are never written to the trail. */
 export const assignmentCreatedSnapshot = (record: AssignmentRecord, importId: string | null) => ({
@@ -34,6 +40,17 @@ export function toAssignmentView(record: AssignmentRecord): AssignmentView {
     grantedOn: record.effectiveFromBasis === 'ACTUAL' ? record.effectiveFrom : null,
     effectiveFromLabel: effectiveFromLabel(record.effectiveFromBasis, record.effectiveFrom),
   };
+}
+
+/**
+ * The revocation a seat has from the task that is open for it (`QĐ-111p`): the task and its state, and whether it may be taken today, which is the
+ * reading the task itself gives (`claimableNow`): only a reason that asks for a day not before, still ahead, holds it back.
+ */
+export function revocationOf(
+  task: { id: string; status: ProvisioningTaskStatus; notBefore: BusinessDate | null },
+  today: BusinessDate,
+): AssignmentRevocation {
+  return { taskId: task.id, status: task.status, claimableNow: task.notBefore === null || task.notBefore <= today };
 }
 
 /** The day a first assignment could be used from its `valid_from` and its grant tasks that were not dropped; null while one is still open. */

@@ -16,6 +16,7 @@ import { AssignmentDepartmentRepo } from './assignment/assignment-department.rep
 import { RevocationCompletedFactsReader } from './provisioning/revocation-completion/revocation-completed-facts.service';
 import { AssignmentChainRepo } from './assignment/assignment-chain.repo';
 import { AssignmentRepo } from './assignment/assignment.repo';
+import { AssignmentRevocationRepo } from './assignment/assignment-revocation.repo';
 import { UsageFactsRepo } from './assignment/usage-facts.repo';
 import { RuleSeatsFactsService } from './assignment/rule-seats-facts.service';
 import { RuleSeatsRepo } from './assignment/rule-seats.repo';
@@ -184,6 +185,7 @@ import { SubscriptionRenewalsController } from './subscription-renewal/subscript
   providers: [
     LicensingAlerts,
     AssignmentRepo,
+    AssignmentRevocationRepo,
     AssignmentChainRepo,
     RevocationCompletedFactsReader,
     AssignmentDepartmentRepo,

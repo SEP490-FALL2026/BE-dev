@@ -37,7 +37,7 @@ export class AssignmentsController {
   @ApiSuccessResponse(AssignmentPageResponseDto, {
     message: 'LICENSE_ASSIGNMENT.LISTED',
     description:
-      'A page of assignments by start date, each with the person, the plan and the Cost Center it names. source tells a baseline assignment from one that came from a request, a renewal or the conversion of a former service account (MACHINE_ACCOUNT_CONVERSION); isMachineAccount is on for the seat of an IT Admin used for a machine account, with its reason in machineAccountNote; a start that is only the day of recording has no grantedOn and carries a label.',
+      'A page of assignments by start date, each with the person, the plan with the logo of its application, the Cost Center it names and the revocation task that is open for it (revocation, null when nobody is taking it back, claimableNow false while it is still in its grace). subscriptionId lists the holders of a subscription (a person for each seat, and for each key of a license-key subscription); activeOnly=true keeps the rights in force today. source tells a baseline assignment from one that came from a request, a renewal or the conversion of a former service account (MACHINE_ACCOUNT_CONVERSION); isMachineAccount is on for the seat of an IT Admin used for a machine account, with its reason in machineAccountNote; a start that is only the day of recording has no grantedOn and carries a label.',
   })
   @ApiErrorResponses(...AUTH_ERRORS, IT_ONLY, {
     status: HttpStatus.UNPROCESSABLE_ENTITY,
