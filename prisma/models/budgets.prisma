@@ -35,6 +35,10 @@ enum BudgetLineType {
 enum BudgetVersionOrigin {
   PROPOSAL
   BASELINE_NO_HEAD
+  // A department that submitted no BM-10 by the deadline: Finance built the version from the baseline (QĐ-111bb). New versions of that kind use this; BASELINE_NO_HEAD stays for those written before.
+  BASELINE_NO_PROPOSAL
+  // A change of the budget in the year (QĐ-111ag), used from AD-1.
+  ADJUSTMENT
 }
 
 enum BudgetVersionKind {
