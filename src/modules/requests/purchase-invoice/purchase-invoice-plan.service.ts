@@ -18,7 +18,7 @@ import {
 } from './labels/purchase-invoice-labels.policy';
 import { bearsByHolder, chargedCostCenterOf, holderDayOf } from './purchase-invoice-charge.policy';
 import { PurchaseInvoiceRefusedError } from './purchase-invoice.errors';
-import { matchPurchaseInvoice, type OriginalPrice } from './purchase-invoice-match.policy';
+import { matchPurchaseInvoice, pooledInvoiceCeilingMinor, type OriginalPrice } from './purchase-invoice-match.policy';
 import { PurchaseInvoiceRepo, type RequestPurchaseFacts } from './purchase-invoice.repo';
 import type { PurchaseInvoiceFormInput } from './purchase-invoice.dto';
 import type { PurchaseInvoiceLink, PurchaseInvoiceMoney, PurchaseInvoicePlan } from './purchase-invoice.types';
@@ -35,8 +35,29 @@ const PURCHASABLE_STATES: ReadonlySet<string> = new Set(['AWAITING_EXECUTION', '
  */
 const FAILED_AFTER_PURCHASE_STATES: ReadonlySet<string> = new Set(['FAILED', 'AWAITING_IT_CLOSE']);
 
+const pricingOf = (facts: {
+  monthlyPriceMinor: bigint | null;
+  cycleMonths: number | null;
+  renewalDate: BusinessDate | null;
+}): SeatPricing => ({
+  monthlyMinor: facts.monthlyPriceMinor,
+  cycleMonths: facts.cycleMonths,
+  renewalDate: facts.renewalDate,
+});
+
+/** The cost follows the person who holds the right: a `K1` whose grant did not fail (nobody holds a right that failed). */
+const heldByPerson = (state: string, provisioningType: string | undefined): boolean =>
+  !FAILED_AFTER_PURCHASE_STATES.has(state) && bearsByHolder(provisioningType);
+
 const takesInvoice = (state: string): boolean =>
   PURCHASABLE_STATES.has(state) || FAILED_AFTER_PURCHASE_STATES.has(state);
+
+/** What a seat of a subscription costs a month and when it renews: the mark of an invoice of a subscription or of the pool is read against it. */
+interface SeatPricing {
+  monthlyMinor: bigint | null;
+  cycleMonths: number | null;
+  renewalDate: BusinessDate | null;
+}
 
 /** What the link says of what was approved or bought, before the invoice is read against it. */
 interface LinkFacts {
@@ -58,6 +79,8 @@ interface LinkFacts {
    * pool goes to the pool, whatever it is linked to, and a department bears only the seat-months of the seats it holds. Null for any other kind.
    */
   poolSubscriptionId: string | null;
+  /** The price and the renewal day of the subscription the invoice is a line of (the one it names, or the pool of a `K2` request); null for a request of another kind. */
+  seatPricing: SeatPricing | null;
   renewedAssignmentId: string | null;
 }
 
@@ -113,8 +136,7 @@ export class PurchaseInvoicePlanService {
     const vendorId = await this.catalog.getPlanVendorId(request.planId, tx);
     if (vendorId === null) throw new PurchaseInvoiceRefusedError('NO_VENDOR');
     const [target] = await this.catalog.findPlanSeatTargets([request.planId], tx);
-    const poolSubscriptionId =
-      target?.provisioningType === 'K2' ? await this.poolSubscriptionOfPlan(request.planId, tx) : null;
+    const pool = await this.poolOf(target?.provisioningType, request.planId, tx);
 
     return {
       organizationId: request.organizationId,
@@ -127,10 +149,24 @@ export class PurchaseInvoicePlanService {
       expectedUnitPrice: await this.catalog.getPlanOriginalPrice(request.planId, tx, serviceMonth),
       requestCostCenterId: request.costCenterId,
       requestId,
-      holderBound: !FAILED_AFTER_PURCHASE_STATES.has(request.state) && bearsByHolder(target?.provisioningType),
-      poolSubscriptionId,
+      holderBound: heldByPerson(request.state, target?.provisioningType),
+      poolSubscriptionId: pool.id,
+      seatPricing: pool.pricing,
       renewedAssignmentId: request.renewedAssignmentId,
     };
+  }
+
+  /** The pool a `K2` request's invoice is a line of, with its price and renewal day; none for any other kind of plan. */
+  private async poolOf(
+    provisioningType: string | undefined,
+    planId: string,
+    tx?: DbTx,
+  ): Promise<{ id: string | null; pricing: SeatPricing | null }> {
+    if (provisioningType !== 'K2') return { id: null, pricing: null };
+    const id = await this.poolSubscriptionOfPlan(planId, tx);
+    const [facts] = await this.periods.getPurchaseFacts([id], tx);
+
+    return { id, pricing: facts ? pricingOf(facts) : null };
   }
 
   /**
@@ -184,6 +220,7 @@ export class PurchaseInvoicePlanService {
       requestId: null,
       holderBound: false,
       poolSubscriptionId: null,
+      seatPricing: pricingOf(period),
       renewedAssignmentId: null,
     };
   }
@@ -264,9 +301,32 @@ export class PurchaseInvoicePlanService {
       commitment,
       flags: flagsOfPurchaseInvoice({
         outsideTerm: period.outsideTerm,
-        overApproved: commitment !== null && money.netMinor > commitment.remainingMinor,
+        overApproved: this.overApproved(facts, serviceMonth, money, commitment),
       }),
     };
+  }
+
+  /**
+   * An invoice of a request goes over what the commitment still holds; an invoice that is a line of a subscription or of the pool goes over the seats
+   * bought times the price of a month times the months to the renewal day (`QĐ-103w`(3), `QĐ-104c`(3), `QĐ-104d`). What nobody knows is not judged.
+   */
+  private overApproved(
+    facts: LinkFacts,
+    serviceMonth: BusinessDate,
+    money: PurchaseInvoiceMoney,
+    commitment: { remainingMinor: bigint } | null,
+  ): boolean {
+    if (commitment !== null) return money.netMinor > commitment.remainingMinor;
+    if (facts.seatPricing === null) return false;
+    const ceiling = pooledInvoiceCeilingMinor({
+      quantity: facts.expectedQuantity,
+      monthlyMinor: facts.seatPricing.monthlyMinor,
+      cycleMonths: facts.seatPricing.cycleMonths,
+      serviceMonth,
+      renewalDate: facts.seatPricing.renewalDate,
+    });
+
+    return ceiling !== null && money.netMinor > ceiling;
   }
 
   /** The department that held the right in the month the invoice pays for bears it (`R-51`); the request's own Cost Center for what is not a person's. */

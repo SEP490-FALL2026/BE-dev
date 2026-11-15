@@ -361,6 +361,45 @@ describe('purchase invoices over PostgreSQL (integration; PI-1.4, T-PI)', () => 
     await submitFor(k2, h.boss.account, 403);
   });
 
+  it('marks over an invoice of the shared pool, linked to the pool or to a K2 request, and the invoice of a renewal, by the seats bought times the price of a month times the months to the renewal day, and never refuses it (B3B-06, QĐ-103w(3), QĐ-104c(3), QĐ-104d)', async () => {
+    const pool = await takeOwnerOff(h, await h.subscription(10, 'K2', h.seed.departmentId));
+    // 10 seats at 1.000.000 đ a month (the harness price); the renewal day is 05/12, so September has three months to it.
+    await h.ctx.sql.query(
+      `UPDATE subscriptions SET renewal_date = $2, original_unit_price_minor = 1500, original_currency = 'USD' WHERE id = $1`,
+      [pool, `${h.year}-12-05`],
+    );
+    const flagsOf = async (link: object, month: string, net: string, quantity = 10) =>
+      h.dataOf<Preview>(
+        await api('post', '/preview', h.it1)
+          .send(
+            form(randomUUID(), {
+              link,
+              quantity,
+              servicePeriodMonth: `${h.year}-${month}`,
+              netAmount: { amount: net },
+            }),
+          )
+          .expect(200),
+      );
+    const onPool = { subscriptionId: pool };
+
+    expect(await flagsOf(onPool, '09', '45000000')).toMatchObject({ flags: ['OVER_APPROVED'], matchResult: 'MATCHED' });
+    expect(await flagsOf(onPool, '09', '30000000')).toMatchObject({ flags: [] });
+    // The renewal pays for the month of the renewal day: ten seats for one month.
+    expect(await flagsOf(onPool, '12', '10000001')).toMatchObject({ flags: ['OVER_APPROVED'] });
+    expect(await flagsOf(onPool, '12', '10000000')).toMatchObject({ flags: [] });
+
+    // A request of a K2 plan: one seat, three months to the renewal day is 3.000.000 đ.
+    const unit = await h.departmentWithHead(`P-PIK2${counter++}`);
+    await h.setItAdminInCharge(unit.department, { employeeId: h.it1.employeeId, account: h.it1 });
+    await h.budgetFor(unit, { total: 100 * M });
+    const k2Request = await h.waitingForApprover(unit, await h.planOf(pool), { amount: 3 * M });
+    await h.decideSpend(k2Request, { decision: 'APPROVE' }, h.boss.account).expect(200);
+
+    expect(await flagsOf({ requestId: k2Request }, '09', '4800000', 1)).toMatchObject({ flags: ['OVER_APPROVED'] });
+    expect(await flagsOf({ requestId: k2Request }, '09', '3000000', 1)).toMatchObject({ flags: [] });
+  });
+
   it('submits a returned invoice again, once, with the number it had, and not one that was not returned', async () => {
     const { requestId } = await approved();
     const original = wire(await submit(requestId, { vendorInvoiceNumber: 'RET-1' }));

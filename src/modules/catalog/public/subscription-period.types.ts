@@ -93,4 +93,10 @@ export interface SubscriptionPurchaseFacts {
   /** The IT Admin who answers for the subscription; null when it names none (`QĐ-103v`(4)). */
   responsibleItAdminEmployeeId: string | null;
   purchasedQuantity: number | null;
+  /** What one seat costs a month in dong: the price of a cycle over its months, rounded up; null when the price or the cycle is not known. */
+  monthlyPriceMinor: bigint | null;
+  /** The months a payment pays for (1, 3 or 12); null for another cycle or none. */
+  cycleMonths: number | null;
+  /** The day the period renews; null when none is set. */
+  renewalDate: BusinessDate | null;
 }

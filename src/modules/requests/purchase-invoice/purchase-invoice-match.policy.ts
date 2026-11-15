@@ -66,3 +66,26 @@ export function mismatchesOfRow(row: KeptPurchaseInvoiceFigures): PurchaseInvoic
         : null,
   }).reasons;
 }
+
+/**
+ * What the invoice of a subscription, or of the shared pool, may cost before it is marked over (`QĐ-103w`(3), `QĐ-104c`(3), `QĐ-104d`): the seats
+ * bought times the price of a month times the months to the renewal day, and for the invoice of a renewal (it pays for the month of the renewal day
+ * or after, or no renewal day is known) the seats of the period times the price of the cycle. Null when a side is not known, as for `R-44`: what
+ * nobody knows is not judged.
+ */
+export function pooledInvoiceCeilingMinor(input: {
+  quantity: number | null;
+  monthlyMinor: bigint | null;
+  cycleMonths: number | null;
+  /** The first day of the month the invoice pays for. */
+  serviceMonth: string;
+  renewalDate: string | null;
+}): bigint | null {
+  if (input.quantity === null || input.monthlyMinor === null) return null;
+  const monthsOf = (day: string): number => Number(day.slice(0, 4)) * 12 + Number(day.slice(5, 7));
+  const ahead = input.renewalDate === null ? 0 : monthsOf(input.renewalDate) - monthsOf(input.serviceMonth);
+  const months = ahead > 0 ? ahead : input.cycleMonths;
+  if (months === null) return null;
+
+  return BigInt(input.quantity) * input.monthlyMinor * BigInt(months);
+}
