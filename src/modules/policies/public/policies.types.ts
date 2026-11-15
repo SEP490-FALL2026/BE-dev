@@ -2,3 +2,48 @@
 export const POLICY_ROLES = ['SUPER_ADMIN', 'IT_ADMIN', 'FINANCE', 'EMPLOYEE', 'MANAGER', 'SPENDING_APPROVER'] as const;
 
 export type PolicyRole = (typeof POLICY_ROLES)[number];
+
+/** The files an IT Admin, a head, Finance or the Super Admin may ask a template of (`QĐ-111as`). There is no template of a bank statement. */
+export const IMPORT_TEMPLATE_KINDS = [
+  'employees',
+  'seat-baseline',
+  'license-keys',
+  'usage-csv',
+  'budget-proposal',
+] as const;
+export type ImportTemplateKind = (typeof IMPORT_TEMPLATE_KINDS)[number];
+
+/** Who may download the template of each kind: the people who do that import (the head and Finance for the form `BM-10`). */
+export const IMPORT_TEMPLATE_ROLES: Readonly<Record<ImportTemplateKind, readonly PolicyRole[]>> = {
+  employees: ['SUPER_ADMIN'],
+  'seat-baseline': ['IT_ADMIN'],
+  'license-keys': ['IT_ADMIN'],
+  'usage-csv': ['IT_ADMIN'],
+  'budget-proposal': ['MANAGER', 'FINANCE'],
+};
+
+/** One column of a template, as the instruction sheet describes it. `key` is the header written in the file: the one the parser reads. */
+export interface ImportTemplateColumn {
+  key: string;
+  description: string;
+  required: boolean;
+  /** How the value is written: a date as YYYY-MM-DD, an amount in VND with digits only. */
+  format: string;
+  example: string;
+  /** What the parser refuses: a length, a list of values, a rule. */
+  constraint: string;
+}
+
+/**
+ * What the module that reads a kind of file says about it: the columns it reads and example rows that it reads back without a single error
+ * (fictitious people, accounts and amounts, never real data). The library builds the file from this, so the template cannot drift from the parser.
+ */
+export interface ImportTemplateDefinition {
+  kind: ImportTemplateKind;
+  title: string;
+  columns: ImportTemplateColumn[];
+  /** Each row has one cell per column, in the order of `columns`. */
+  sampleRows: string[][];
+  /** Lines under the table of the instruction sheet: what the file may not contain, how many rows, who confirms. */
+  notes: string[];
+}

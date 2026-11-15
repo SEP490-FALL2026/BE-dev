@@ -10,10 +10,13 @@ import { AcknowledgementReportService } from './acknowledgement/acknowledgement-
 import { AcknowledgementRepo } from './acknowledgement/acknowledgement.repo';
 import { AcknowledgementService } from './acknowledgement/acknowledgement.service';
 import { PendingPolicyAcknowledgementListener } from './acknowledgement/pending-acknowledgements.listener';
+import { ImportTemplateController } from './import-template/import-template.controller';
+import { ImportTemplateService } from './import-template/import-template.service';
 import { LibraryDraftController } from './library/library-draft.controller';
 import { LibraryDraftService } from './library/library-draft.service';
 import { LibraryPublishService } from './library/library-publish.service';
 import { PoliciesBootstrapFacadeModule } from './policies-bootstrap-facade.module';
+import { PoliciesTemplateFacadeModule } from './policies-template-facade.module';
 import { PolicyReadingController } from './reading/policy-reading.controller';
 import { PolicyReadingQueryService } from './reading/policy-reading-query.service';
 
@@ -30,8 +33,9 @@ import { PolicyReadingQueryService } from './reading/policy-reading-query.servic
     IdentityAccessFacadeModule,
     NotificationsModule,
     PoliciesBootstrapFacadeModule,
+    PoliciesTemplateFacadeModule,
   ],
-  controllers: [PolicyReadingController, LibraryDraftController, AcknowledgementController],
+  controllers: [PolicyReadingController, LibraryDraftController, AcknowledgementController, ImportTemplateController],
   providers: [
     LibraryDraftService,
     LibraryPublishService,
@@ -41,6 +45,7 @@ import { PolicyReadingQueryService } from './reading/policy-reading-query.servic
     AcknowledgementReportService,
     PendingPolicyAcknowledgementListener,
     PolicyReadingQueryService,
+    ImportTemplateService,
   ],
 })
 export class PoliciesModule {}
