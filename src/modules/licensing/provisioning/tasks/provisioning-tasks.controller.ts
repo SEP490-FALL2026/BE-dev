@@ -72,7 +72,7 @@ export class ProvisioningTasksController {
     status: HttpStatus.CREATED,
     message: 'PROVISIONING_TASK.CREATED',
     description:
-      'The seat is taken from today by an assignment of source REQUEST, and a manual task is made that the IT Admin who pressed has already taken: it is in progress (IN_PROGRESS) under their account (claimedBy), whoever is in charge of the beneficiary department by default (defaultResponsibleEmployeeId; none: the general queue, with a warning). Pressing again for the same request (for a request for a group, the same person), or another IT Admin pressing, makes nothing new: the answer is the task that exists, 201 with no warnings, still taken by whoever took it first. K5 takes no subscription and no seat. For the request of a service account the IT Admin enters the account identifier (not read from the request) and may name another active person of the owning department to answer for it (responsibleEmployeeId); the assignment is a service one, owned by that department and charged to its Unit Cost Center, with the purpose as its reason.',
+      'The seat is taken from today by an assignment of source REQUEST, and a manual task is made that the IT Admin who pressed has already taken: it is in progress (IN_PROGRESS) under their account (claimedBy), whoever is in charge of the beneficiary department by default (defaultResponsibleEmployeeId; none: the general queue, with a warning). Pressing again for the same request (for a request for a group, the same person), or another IT Admin pressing, makes nothing new: the answer is the task that exists, 201 with no warnings, still taken by whoever took it first. K5 takes no subscription and no seat. The task of a K1 grant carries k1Checklist (variant GRANT) to tick before it is completed. For the request of a service account the IT Admin enters the account identifier (not read from the request) and may name another active person of the owning department to answer for it (responsibleEmployeeId); the assignment is a service one, owned by that department and charged to its Unit Cost Center, with the purpose as its reason.',
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,
@@ -141,7 +141,7 @@ export class ProvisioningTasksController {
   @ApiSuccessResponse(TaskResponseDto, {
     message: 'PROVISIONING_TASK.FETCHED',
     description:
-      'The task with the steps of its kind of provisioning and what ends it. A K1 revocation also carries k1Checklist: the steps the IT Admin ticks to complete it, DEPARTURE or STILL_EMPLOYED as the server decides from why the seat is revoked, each with its order and, once completed, the instant it was ticked.',
+      'The task with the steps of its kind of provisioning and what ends it. A K1 task also carries k1Checklist: the steps the IT Admin ticks to complete it, each with its order and, once completed, the instant it was ticked. The grant of a K1 seat has the variant GRANT (register on the company email of the person themself; do not turn on multi-factor sign-in with a personal device); a K1 revocation has DEPARTURE or STILL_EMPLOYED as the server decides from why the seat is revoked.',
   })
   @ApiErrorResponses(...AUTH_ERRORS, IT_ONLY, NOT_FOUND, {
     status: HttpStatus.UNPROCESSABLE_ENTITY,
@@ -198,7 +198,7 @@ export class ProvisioningTasksController {
   @ApiSuccessResponse(TaskResponseDto, {
     message: 'PROVISIONING_TASK.COMPLETED',
     description:
-      'The task is completed under the name of this IT Admin, whoever is in charge by default. The evidence is a note of what was done, never a password or a key. A K4 grant names the free key of the store its seat is given (licenseKeyId; a key bought with the grant is imported into the store first): the key becomes ASSIGNED to the seat in the same transaction (LICENSE_KEY.ASSIGNED in the audit trail). A K2 or K4 grant taken from the pool with nothing bought records the cost it avoided; the request of a K4 grant taken from the pool gives back all of its commitment (GRANTED_FROM_POOL). A task of the kind EXTEND (the extension of a right whose renewal was approved, BR-MF1-08d) grants nothing: completing it writes the record that follows the renewed one and completes the renewal.',
+      'The task is completed under the name of this IT Admin, whoever is in charge by default. The evidence is a note of what was done, never a password or a key. A K4 grant names the free key of the store its seat is given (licenseKeyId; a key bought with the grant is imported into the store first): the key becomes ASSIGNED to the seat in the same transaction (LICENSE_KEY.ASSIGNED in the audit trail). A K2 or K4 grant taken from the pool with nothing bought records the cost it avoided; the request of a K4 grant taken from the pool gives back all of its commitment (GRANTED_FROM_POOL). A task of the kind EXTEND (the extension of a right whose renewal was approved, BR-MF1-08d) grants nothing: completing it writes the record that follows the renewed one and completes the renewal. The grant of a K1 seat is completed with k1Checklist: both steps of the card ticked (done true, each with the instant it was done, in the order of the card) and the evidence, written in k1Checklist.evidence or beside it; the steps are kept with the task and shown on its card. Another kind of grant, and an extension, take no k1Checklist.',
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,
@@ -224,12 +224,15 @@ export class ProvisioningTasksController {
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
-        'The request is invalid (VALIDATION_ERROR), has no evidence (PROVISIONING_TASK.EVIDENCE_REQUIRED), a K4 grant names no key (PROVISIONING.KEY_REQUIRED) or a grant of another kind names one (PROVISIONING.KEY_NOT_APPLICABLE): the task is unchanged.',
+        'The request is invalid (VALIDATION_ERROR), has no evidence (PROVISIONING_TASK.EVIDENCE_REQUIRED), a K4 grant names no key (PROVISIONING.KEY_REQUIRED) or a grant of another kind names one (PROVISIONING.KEY_NOT_APPLICABLE), or the checklist of a K1 grant is refused: a step missing, not ticked or with no time, or no evidence, or no checklist (PROVISIONING.K1_CHECKLIST_INCOMPLETE), a step timed before one that comes first (PROVISIONING.K1_CHECKLIST_OUT_OF_ORDER), a step the grant does not have or sent twice, or a checklist sent for a grant that takes none (PROVISIONING.K1_CHECKLIST_NOT_ALLOWED). A refused checklist of a K1 grant tells details.variant (GRANT) and details.codes, the steps expected in order. The task is unchanged.',
       examples: [
         VALIDATION_EXAMPLE,
         PROVISIONING_ERROR_EXAMPLES.EVIDENCE_REQUIRED,
         PROVISIONING_ERROR_EXAMPLES.KEY_REQUIRED,
         PROVISIONING_ERROR_EXAMPLES.KEY_NOT_APPLICABLE,
+        PROVISIONING_ERROR_EXAMPLES.GRANT_K1_CHECKLIST_INCOMPLETE,
+        PROVISIONING_ERROR_EXAMPLES.GRANT_K1_CHECKLIST_OUT_OF_ORDER,
+        PROVISIONING_ERROR_EXAMPLES.GRANT_K1_CHECKLIST_NOT_ALLOWED,
       ],
     },
   )

@@ -192,11 +192,14 @@ export class ProvisioningTaskViewService {
     const context = await this.contextOf(records, true);
     const checklists = await this.checklists.cardsOf(
       records
+        // The grant of a K1 seat and the revocation of one have a checklist; an extension, and every other kind of seat, have none.
         .filter(
-          (task) => task.kind === 'REVOKE' && context.plans.get(task.assignment.planId)?.provisioningType === 'K1',
+          (task): task is ProvisioningTaskRecord & { kind: 'GRANT' | 'REVOKE' } =>
+            task.kind !== 'EXTEND' && context.plans.get(task.assignment.planId)?.provisioningType === 'K1',
         )
         .map((task) => ({
           id: task.id,
+          kind: task.kind,
           assignmentId: task.assignmentId,
           status: task.status,
           employeeId: task.assignment.employeeId,

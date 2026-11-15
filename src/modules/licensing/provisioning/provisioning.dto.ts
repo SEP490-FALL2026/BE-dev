@@ -28,31 +28,14 @@ export const grantBodySchema = z.strictObject({
   /** Record a purchase with the grant when the pool has nothing free; the kind of purchase follows from the plan (`BR-MF1-09b`). */
   purchase: purchaseBodySchema.optional(),
 });
-export const completeBodySchema = z.strictObject({
-  evidence: z.string().max(EVIDENCE_MAX_LENGTH).default(''),
-  /** K4 only, and then required: the free key of the store the seat is given (`QĐ-103d`); a purchased key is imported first. */
-  licenseKeyId: z.uuid().optional(),
-});
-export const failureBodySchema = z.strictObject({ reason: z.string().max(FAILURE_REASON_MAX_LENGTH).default('') });
-/** A hand-off carries nothing: it changes only the channel, and the evidence is asked when the manual work completes (`QĐ-90a`). */
-export const handOffBodySchema = z.strictObject({});
-export const closeFailedBodySchema = failureBodySchema;
-const COMPLETIONS = [
-  'ACCOUNT_REMOVED',
-  'ALREADY_GONE',
-  'RENEWAL_CANCELLED',
-  'OFF_SYSTEM_REVOKED',
-  'KEY_DEACTIVATED',
-] as const;
-
-/** The most steps a K1 checklist holds (a departure has six). */
+/** The most steps a K1 checklist holds (a departure has six, a grant two). */
 const K1_CHECKLIST_MAX_ITEMS = 10;
 
 /**
- * The checklist the IT Admin ticks to complete the revocation of a K1 seat (`QĐ-111az`, P25): which steps the task has depends on its variant,
- * which the server decides and the card tells (`k1Checklist.variant`). A step is judged by the policy and answers with its own code: one that is
- * missing, not ticked or timed badly (`REVOCATION.K1_CHECKLIST_INCOMPLETE`), ticked out of its order (`K1_CHECKLIST_OUT_OF_ORDER`), or one the
- * variant does not have (`COMPLETION_NOT_ALLOWED`). Only the shape is checked here.
+ * The checklist the IT Admin ticks to complete the grant or the revocation of a K1 seat (`QĐ-111az`, P25): which steps the task has depends on its
+ * variant, which the server decides and the card tells (`k1Checklist.variant`). A step is judged by the policy and answers with its own code: one that is
+ * missing, not ticked or timed badly (`K1_CHECKLIST_INCOMPLETE`), ticked out of its order (`K1_CHECKLIST_OUT_OF_ORDER`), or one the variant does not
+ * have (`COMPLETION_NOT_ALLOWED` on a revocation, `K1_CHECKLIST_NOT_ALLOWED` on a grant). Only the shape is checked here.
  */
 const k1ChecklistBodySchema = z.strictObject({
   items: z
@@ -66,6 +49,25 @@ const k1ChecklistBodySchema = z.strictObject({
     .max(K1_CHECKLIST_MAX_ITEMS),
   evidence: z.string().max(EVIDENCE_MAX_LENGTH).optional(),
 });
+
+export const completeBodySchema = z.strictObject({
+  evidence: z.string().max(EVIDENCE_MAX_LENGTH).default(''),
+  /** K4 only, and then required: the free key of the store the seat is given (`QĐ-103d`); a purchased key is imported first. */
+  licenseKeyId: z.uuid().optional(),
+  /** K1 grant only, and then required (422 `PROVISIONING.K1_CHECKLIST_INCOMPLETE`): the two steps done, each with the instant it was done (`QĐ-111az`). */
+  k1Checklist: k1ChecklistBodySchema.optional(),
+});
+export const failureBodySchema = z.strictObject({ reason: z.string().max(FAILURE_REASON_MAX_LENGTH).default('') });
+/** A hand-off carries nothing: it changes only the channel, and the evidence is asked when the manual work completes (`QĐ-90a`). */
+export const handOffBodySchema = z.strictObject({});
+export const closeFailedBodySchema = failureBodySchema;
+const COMPLETIONS = [
+  'ACCOUNT_REMOVED',
+  'ALREADY_GONE',
+  'RENEWAL_CANCELLED',
+  'OFF_SYSTEM_REVOKED',
+  'KEY_DEACTIVATED',
+] as const;
 
 /**
  * How a revocation was completed. Which way fits which kind of provisioning, which of the fields it needs (a K1 completion
@@ -264,7 +266,7 @@ const taskSchema = taskSummarySchema.extend({
   k1Checklist: k1ChecklistCardSchema
     .nullable()
     .describe(
-      'Present on a K1 revocation that can still be completed (the steps to tick) and on one completed with a checklist (what was ticked and when). The variant is decided by the server from why the seat is revoked: DEPARTURE (a person who leaves: reset the mailbox password, Forgot password on the software, sign out every session, turn off the renewal, record the evidence and, only on the last K1 revocation of the person, lock the mailbox: while another K1 revocation of the same person is not over this task has the five steps before the lock) or STILL_EMPLOYED (turn off the renewal, record the evidence). The system does not control Google or Microsoft 365: the IT Admin does the steps there and ticks them here, in order. Null on any other task, on a K1 revocation completed before the checklist, and on one cancelled or closed as failed.',
+      'Present on a K1 task that can still be completed (the steps to tick) and on one completed with a checklist (what was ticked and when). The variant is decided by the server. GRANT is the grant of a K1 seat: register on the company email of the person themself, and do not turn on multi-factor sign-in with a personal device. For a K1 revocation it comes from why the seat is revoked: DEPARTURE (a person who leaves: reset the mailbox password, Forgot password on the software, sign out every session, turn off the renewal, record the evidence and, only on the last K1 revocation of the person, lock the mailbox: while another K1 revocation of the same person is not over this task has the five steps before the lock) or STILL_EMPLOYED (turn off the renewal, record the evidence). The system does not control Google or Microsoft 365: the IT Admin does the steps there and ticks them here, in order. Null on any other task (an extension, another kind of seat), on a K1 task completed before the checklist, and on one cancelled or closed as failed.',
     ),
 });
 const pagination = z.strictObject({

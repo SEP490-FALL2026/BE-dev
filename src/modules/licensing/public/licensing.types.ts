@@ -304,14 +304,15 @@ export type KeyDisposition = 'RETURN_TO_STORE' | 'WITHDRAW';
 export type AccessState = 'CUT' | 'UNTIL_PAID_END';
 
 /**
- * Which list of steps the IT Admin ticks to complete the revocation of a K1 seat (`QĐ-111az`, `US-07-05` AC-19): the server decides it from why the
- * seat is revoked. `DEPARTURE` is for a person who leaves (the mailbox is reset and locked); `STILL_EMPLOYED` is for any other source, where the
- * person still works and only the renewal is turned off.
+ * Which list of steps the IT Admin ticks to complete a K1 task (`QĐ-111az`, `US-07-01` AC-7, `US-07-05` AC-19): the server decides it. `GRANT` is
+ * the grant of the seat (register on the company email of the person, no multi-factor sign-in on a personal device). The others are for the
+ * revocation, from why the seat is revoked: `DEPARTURE` is for a person who leaves (the mailbox is reset and locked); `STILL_EMPLOYED` is for
+ * any other source, where the person still works and only the renewal is turned off.
  */
-export const K1_CHECKLIST_VARIANTS = ['DEPARTURE', 'STILL_EMPLOYED'] as const;
+export const K1_CHECKLIST_VARIANTS = ['DEPARTURE', 'STILL_EMPLOYED', 'GRANT'] as const;
 export type K1ChecklistVariant = (typeof K1_CHECKLIST_VARIANTS)[number];
 
-/** Every step a K1 revocation checklist can hold; which of them a task has depends on its variant. */
+/** Every step a K1 checklist can hold; which of them a task has depends on its variant. */
 export const K1_CHECKLIST_CODES = [
   'MAILBOX_PASSWORD_RESET',
   'SOFTWARE_FORGOT_PASSWORD',
@@ -319,6 +320,8 @@ export const K1_CHECKLIST_CODES = [
   'RENEWAL_DISABLED',
   'EVIDENCE_RECORDED',
   'MAILBOX_LOCKED',
+  'COMPANY_EMAIL_REGISTERED',
+  'NO_PERSONAL_DEVICE_MFA',
 ] as const;
 export type K1ChecklistCode = (typeof K1_CHECKLIST_CODES)[number];
 

@@ -6,6 +6,7 @@ import { ProvisioningItAdminRequiredError } from '../../../src/modules/licensing
 import { ProvisioningService } from '../../../src/modules/licensing/provisioning/tasks/provisioning.service';
 import type { AuthenticatedPrincipal } from '../../../src/infrastructure/security/tokens/access-token-verifier.port';
 import type { ApiAccount } from '../../support/api-accounts';
+import { k1Checklist } from '../../support/k1-checklist';
 import { ProvisioningHarness } from '../../support/provisioning-harness';
 
 const h = new ProvisioningHarness();
@@ -195,7 +196,12 @@ describe('the grant of a seat and the work on a task: the department of the seat
         expect(await taskStatus(id)).toBe('IN_PROGRESS');
 
         await h
-          .complete(id, { evidence: `đã làm ${kind}`, ...(kind === 'K4' ? { licenseKeyId: k4Key } : {}) })
+          .complete(id, {
+            evidence: `đã làm ${kind}`,
+            ...(kind === 'K4' ? { licenseKeyId: k4Key } : {}),
+            // The grant of a K1 seat is completed with its checklist as well as the evidence (QĐ-111az).
+            ...(kind === 'K1' ? { k1Checklist: k1Checklist('GRANT') } : {}),
+          })
           .expect(200);
         expect(await taskStatus(id)).toBe('COMPLETED');
       },

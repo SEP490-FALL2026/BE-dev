@@ -1,9 +1,9 @@
 /**
- * The checklist the IT Admin sends to complete the revocation of a K1 seat (`QĐ-111az`, P25): every step of a variant ticked, one minute
- * apart and in the order of the list, ending a minute ago. The variant is the server's (a departure among the reasons of the revocation makes
- * it `DEPARTURE`); a test that completes a K1 revocation names the one its source gives. No assertion lives here.
+ * The checklist the IT Admin sends to complete a K1 task (`QĐ-111az`, P25): every step of a variant ticked, one second apart and in the order of
+ * the list, from a second ahead of now. The variant is the server's: `GRANT` for the grant of a K1 seat; for a revocation a departure among its
+ * reasons makes it `DEPARTURE`, and a test that completes a K1 revocation names the one its source gives. No assertion lives here.
  */
-export type K1Variant = 'DEPARTURE' | 'STILL_EMPLOYED';
+export type K1Variant = 'DEPARTURE' | 'STILL_EMPLOYED' | 'GRANT';
 
 export type K1ChecklistCode =
   | 'MAILBOX_PASSWORD_RESET'
@@ -11,9 +11,11 @@ export type K1ChecklistCode =
   | 'SESSIONS_SIGNED_OUT'
   | 'RENEWAL_DISABLED'
   | 'EVIDENCE_RECORDED'
-  | 'MAILBOX_LOCKED';
+  | 'MAILBOX_LOCKED'
+  | 'COMPANY_EMAIL_REGISTERED'
+  | 'NO_PERSONAL_DEVICE_MFA';
 
-/** The checklist on the card of a K1 revocation, as the wire has it. */
+/** The checklist on the card of a K1 task, as the wire has it. */
 export interface K1ChecklistCardWire {
   variant: K1Variant;
   items: { code: K1ChecklistCode; label: string; order: number; doneAt: string | null }[];
@@ -35,6 +37,7 @@ export const K1_CODES: Record<K1Variant, readonly K1ChecklistCode[]> = {
     'MAILBOX_LOCKED',
   ],
   STILL_EMPLOYED: ['RENEWAL_DISABLED', 'EVIDENCE_RECORDED'],
+  GRANT: ['COMPANY_EMAIL_REGISTERED', 'NO_PERSONAL_DEVICE_MFA'],
 };
 
 /**

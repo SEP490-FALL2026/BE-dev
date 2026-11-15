@@ -3,7 +3,7 @@ import { nullableJsonColumn } from '../../../../infrastructure/database/json-col
 import { K1_CHECKLIST_CODES, K1_CHECKLIST_VARIANTS } from '../../public/licensing.types';
 import type { StoredK1Checklist } from './provisioning-k1-checklist.policy';
 
-/** The most steps a checklist holds (the longest, the one of a departure, has six). */
+/** The most steps a checklist holds (the longest, the one of a departure, has six; a grant has two). */
 const MAX_ITEMS = 10;
 
 const schema = z.strictObject({
@@ -21,8 +21,8 @@ const schema = z.strictObject({
 }) satisfies z.ZodType<StoredK1Checklist>;
 
 /**
- * `provisioning_tasks.k1_checklist`: the checklist the IT Admin ticked to complete the revocation of a K1 seat (`QĐ-111az`), written once with
- * the completion. NULL for a task that is not a K1 revocation, that is not completed, or that was completed before the checklist existed. The
+ * `provisioning_tasks.k1_checklist`: the checklist the IT Admin ticked to complete the grant or the revocation of a K1 seat (`QĐ-111az`), written once
+ * with the completion. NULL for a task that is not a K1 grant or revocation, that is not completed, or that was completed before the checklist existed. The
  * evidence the checklist stands on is the `evidence` column of the task, not kept here twice.
  */
 export const k1ChecklistJson = nullableJsonColumn({

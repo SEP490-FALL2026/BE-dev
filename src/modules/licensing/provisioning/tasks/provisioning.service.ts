@@ -5,6 +5,7 @@ import { OrganizationReadApi } from '../../../organization/public/organization-r
 import { ProvisioningTaskNotFoundError } from '../../public/licensing.errors';
 import { RevocationListeners } from '../../public/licensing.extension-points';
 import type { ProvisioningChannel, ProvisioningTaskStatus } from '../../public/licensing.types';
+import type { K1ChecklistClaim } from '../k1-checklist/provisioning-k1-checklist.policy';
 import { cleanEvidence, cleanFailureReason, nextStatus } from '../provisioning.policy';
 import { assertNotBefore, assertNotRevocationTask } from '../revocation.policy';
 import { ProvisioningTaskFrame } from '../provisioning-task-frame.service';
@@ -114,14 +115,16 @@ export class ProvisioningService {
    * the store its seat is given (`licenseKeyId`, `QĐ-103d`). Throws ProvisioningEvidenceRequiredError, the errors of `claim` except the
    * departed beneficiary, ProvisioningTaskStateError (`IS_REVOCATION` for a revocation), ProvisioningKeyError, LicenseKeyNotFoundError and
    * LicenseKeyStateError. A grant taken from the pool, with nothing bought for it, records the cost it avoided once (`BR-MF1-09c`). The day
-   * it is completed is the day the right begins (`BR-MF1-06a`).
+   * it is completed is the day the right begins (`BR-MF1-06a`). The grant of a K1 seat is completed with the checklist of its two steps and the
+   * evidence, which may be written in the checklist (`QĐ-111az`; ProvisioningK1ChecklistError): a body that sends one is not asked for the
+   * evidence beside it here, the checklist judges it.
    */
   async complete(
     actor: AuthenticatedPrincipal,
     id: string,
-    input: { evidence: string; licenseKeyId?: string | undefined },
+    input: { evidence: string; licenseKeyId?: string | undefined; k1Checklist?: K1ChecklistClaim | undefined },
   ): Promise<TaskView> {
-    const evidence = cleanEvidence(input.evidence);
+    const evidence = input.k1Checklist === undefined ? cleanEvidence(input.evidence) : input.evidence.trim();
     const task = await this.frame.work(actor, id, {
       check: (locked) => {
         assertNotRevocationTask(locked.kind);
@@ -132,7 +135,7 @@ export class ProvisioningService {
           tx,
           actor,
           { task: locked, now, organizationId },
-          { evidence, licenseKeyId: input.licenseKeyId },
+          { evidence, licenseKeyId: input.licenseKeyId, k1Checklist: input.k1Checklist },
         );
         const after = {
           status: 'COMPLETED',

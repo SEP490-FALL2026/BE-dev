@@ -3,6 +3,7 @@ import { TransactionRunner } from '../../../src/infrastructure/database/transact
 import { ExpiryRenewalWindowService } from '../../../src/modules/licensing/expiry/expiry-renewal-window.service';
 import { LicensingRenewalApi } from '../../../src/modules/licensing/public/licensing-renewal.api';
 import { YearStartCommitmentsRepo } from '../../../src/modules/requests/year-start-commitments/year-start-commitments.repo';
+import { k1Checklist } from '../../support/k1-checklist';
 import { ReturnHarness, type RenewalWire } from '../../support/return-harness';
 
 const h = new ReturnHarness();
@@ -199,6 +200,12 @@ describe('the window and the IT extension of a renewal (integration, real Postgr
       expect(await h.ctx.app.get(LicensingRenewalApi).hasPendingRenewal(assignmentId)).toBe(true);
 
       await h.claim(task.id).expect(200);
+      // An extension grants nothing and takes no checklist: the checklist of K1 is the one of a grant and of a revocation (QĐ-111az).
+      const misplaced = await h
+        .complete(task.id, { evidence: 'Extended', k1Checklist: k1Checklist('GRANT') })
+        .expect(422);
+      expect(h.codeOf(misplaced)).toBe('PROVISIONING.K1_CHECKLIST_NOT_ALLOWED');
+      expect((await extensionTaskOf(request.id))[0].status).toBe('IN_PROGRESS');
       await h.complete(task.id, { evidence: 'Extended with the vendor until the new end' }).expect(200);
 
       const [next] = await h.successorsOf(assignmentId);

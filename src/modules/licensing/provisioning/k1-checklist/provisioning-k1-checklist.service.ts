@@ -2,7 +2,12 @@ import { Injectable } from '@nestjs/common';
 import type { DbTx } from '../../../../infrastructure/database/transaction-runner';
 import { CatalogApi } from '../../../catalog/public/catalog.api';
 import { OrganizationReadApi } from '../../../organization/public/organization-read.api';
-import type { ProvisioningKind, ProvisioningTaskStatus, RevocationSource } from '../../public/licensing.types';
+import type {
+  ProvisioningKind,
+  ProvisioningTaskKind,
+  ProvisioningTaskStatus,
+  RevocationSource,
+} from '../../public/licensing.types';
 import { ProvisioningTaskReasonRepo } from '../provisioning-task-reason.repo';
 import { ProvisioningK1ChecklistRepo } from './provisioning-k1-checklist.repo';
 import {
@@ -10,6 +15,7 @@ import {
   k1ChecklistShown,
   k1VariantOf,
   planK1Checklist,
+  planK1GrantChecklist,
   type K1ChecklistCard,
   type K1ChecklistClaim,
   type K1ChecklistPlan,
@@ -29,7 +35,7 @@ const isLastOfPerson = (
   (still?.tasks ?? []).every((id) => id === task.id) && (still?.seats ?? []).every((id) => id === task.assignmentId);
 
 /**
- * The checklist of the revocation of a K1 seat (`QĐ-111az`, P25): which steps the IT Admin ticks, judged when the revocation is completed,
+ * The checklist of the grant and of the revocation of a K1 seat (`QĐ-111az`, P25): which steps the IT Admin ticks, judged when the task is completed,
  * kept with it and shown on the card. The system controls neither Google nor Microsoft 365: it asks for what the IT Admin says was done, in the
  * order it was done. The variant is the server's, read from the reasons that stand (a person who leaves, or not). The lock of the mailbox is
  * a step of the last K1 revocation of the person only: while another K1 revocation of the same person is not over, this one does not take it.
@@ -94,6 +100,19 @@ export class ProvisioningK1Checklist {
     return planK1Checklist({ ...input, sources, lastOfPerson: isLastOfPerson(still, task) });
   }
 
+  /**
+   * What the completion of the grant of a seat stores of the checklist: the two steps of a K1 grant, judged as the ones of a revocation, or null
+   * for a grant of another kind (which refuses one). Nothing is read: the steps of a grant do not depend on the person's other seats.
+   * Throws ProvisioningK1ChecklistError (`K1_CHECKLIST_NOT_ALLOWED`, `K1_CHECKLIST_INCOMPLETE`, `K1_CHECKLIST_OUT_OF_ORDER`).
+   */
+  planGrant(input: {
+    type: ProvisioningKind;
+    claim: K1ChecklistClaim | undefined;
+    evidence: string;
+  }): K1ChecklistPlan | null {
+    return planK1GrantChecklist(input);
+  }
+
   /** Keeps the checklist on the task, in the transaction of the completion and before the task is marked completed. */
   record(tx: DbTx, taskId: string, plan: K1ChecklistPlan): Promise<void> {
     return this.checklists.write(tx, taskId, { variant: plan.variant, items: plan.items });
@@ -123,13 +142,15 @@ export class ProvisioningK1Checklist {
   }
 
   /**
-   * The checklist on the card of each of these K1 revocations that shows one: the list to tick while the task is open, what was ticked once it
-   * is completed. `reasons` are the ones that stand. Reads the completed tasks' checklists in one query and the K1 revocations still to do of
-   * the people of the open tasks in another, to tell whether an open task is the last of its person (the steps it has depend on it).
+   * The checklist on the card of each of these K1 tasks (the revocation of a K1 seat, or the grant of one) that shows one: the list to tick while
+   * the task is open, what was ticked once it is completed. `reasons` are the ones that stand. Reads the completed tasks' checklists in one
+   * query and the K1 revocations still to do of the people of the open revocations in another, to tell whether an open revocation is the last of
+   * its person (the steps it has depend on it); the steps of a grant do not.
    */
   async cardsOf(
     tasks: readonly {
       id: string;
+      kind: Extract<ProvisioningTaskKind, 'GRANT' | 'REVOKE'>;
       assignmentId: string;
       status: ProvisioningTaskStatus;
       employeeId: string;
@@ -141,10 +162,14 @@ export class ProvisioningK1Checklist {
       tasks.filter((task) => task.status === 'COMPLETED').map((task) => task.id),
     );
     const shown = tasks.filter((task) => k1ChecklistShown(task.status, kept.has(task.id)));
-    const open = shown.filter((task) => task.status !== 'COMPLETED');
+    const open = shown.filter((task) => task.kind === 'REVOKE' && task.status !== 'COMPLETED');
     const live = await this.k1StillToDoOf([...new Set(open.map((task) => task.employeeId))]);
     const cards = new Map<string, K1ChecklistCard>();
     for (const task of shown) {
+      if (task.kind === 'GRANT') {
+        cards.set(task.id, k1ChecklistCard('GRANT', kept.get(task.id) ?? null, true));
+        continue;
+      }
       const variant = k1VariantOf(sourcesOf(task.reasons, task.revocationSource));
       const lastOfPerson = isLastOfPerson(live.get(task.employeeId), task);
       cards.set(task.id, k1ChecklistCard(variant, kept.get(task.id) ?? null, lastOfPerson));

@@ -44,7 +44,11 @@ import {
   PurchaseReasonRequiredError,
 } from '../shared-pool/shared-pool.errors';
 import { LicenseKeyStateError } from '../license-key/license-key.errors';
-import { ProvisioningItAdminRequiredError, ProvisioningKeyError } from './provisioning.errors';
+import {
+  ProvisioningItAdminRequiredError,
+  ProvisioningK1ChecklistError,
+  ProvisioningKeyError,
+} from './provisioning.errors';
 
 const refuse = (status: HttpStatus, code: string, message: string, details?: Record<string, unknown>): ApiException =>
   new ApiException(status, { code, message, ...(details ? { details } : {}) });
@@ -179,6 +183,15 @@ export function toProvisioningApiException(error: unknown): unknown {
   }
   if (error instanceof ProvisioningKeyError)
     return refuse(UNPROCESSABLE, `PROVISIONING.${error.problem}`, error.message);
+  if (error instanceof ProvisioningK1ChecklistError) {
+    // A refused checklist of a K1 grant tells the variant and the two steps the server expects; another kind of grant has none to tell.
+    return refuse(
+      UNPROCESSABLE,
+      `PROVISIONING.${error.problem}`,
+      error.message,
+      error.expected ? { variant: error.expected.variant, codes: error.expected.codes } : undefined,
+    );
+  }
   if (error instanceof LicenseKeyNotFoundError)
     return refuse(HttpStatus.NOT_FOUND, 'LICENSE_KEY.NOT_FOUND', error.message);
   if (error instanceof LicenseKeyStateError) return refuse(CONFLICT, `LICENSE_KEY.${error.problem}`, error.message);
@@ -201,6 +214,12 @@ const K1_DEPARTURE_EXPECTED: K1ChecklistExpectation = {
     'EVIDENCE_RECORDED',
     'MAILBOX_LOCKED',
   ],
+};
+
+/** What a refused checklist of the grant of a K1 seat tells the client: the variant and the two steps, in their order. */
+const K1_GRANT_EXPECTED: K1ChecklistExpectation = {
+  variant: 'GRANT',
+  codes: ['COMPANY_EMAIL_REGISTERED', 'NO_PERSONAL_DEVICE_MFA'],
 };
 
 /**
@@ -234,6 +253,13 @@ export const PROVISIONING_ERROR_EXAMPLES = {
   KEY_DISPOSITION_REQUIRED: example(new RevocationCompletionError('KEY_DISPOSITION_REQUIRED')),
   K1_CHECKLIST_INCOMPLETE: example(new RevocationCompletionError('K1_CHECKLIST_INCOMPLETE', K1_DEPARTURE_EXPECTED)),
   K1_CHECKLIST_OUT_OF_ORDER: example(new RevocationCompletionError('K1_CHECKLIST_OUT_OF_ORDER', K1_DEPARTURE_EXPECTED)),
+  GRANT_K1_CHECKLIST_INCOMPLETE: example(
+    new ProvisioningK1ChecklistError('K1_CHECKLIST_INCOMPLETE', K1_GRANT_EXPECTED),
+  ),
+  GRANT_K1_CHECKLIST_OUT_OF_ORDER: example(
+    new ProvisioningK1ChecklistError('K1_CHECKLIST_OUT_OF_ORDER', K1_GRANT_EXPECTED),
+  ),
+  GRANT_K1_CHECKLIST_NOT_ALLOWED: example(new ProvisioningK1ChecklistError('K1_CHECKLIST_NOT_ALLOWED')),
   KEY_REQUIRED: example(new ProvisioningKeyError('KEY_REQUIRED')),
   KEY_NOT_APPLICABLE: example(new ProvisioningKeyError('KEY_NOT_APPLICABLE')),
   KEY_NOT_FOUND: example(new LicenseKeyNotFoundError()),

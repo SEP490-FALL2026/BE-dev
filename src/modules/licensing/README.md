@@ -137,9 +137,9 @@ dịch vụ nào đọc cả ghế lẫn thu hồi thì đứng trên cả hai (
   `ProvisioningGrantWriter` (ghi trong transaction; Request xin lại trong ân hạn điều chuyển có `replacesAssignmentId` ⟹ `AssignmentService.endReplacedByGrant` kết thúc quyền cũ cùng thuê bao
   `valid_until` = ngày cấp trước khi chèn quyền mới, R-49; cấp hỏng/hủy ⟹ `giveBackReplaced` mở lại; `LicensingApi.listRegrantedAssignments`), `provisioning-grant.policy.ts`; `ProvisioningService` giữ danh sách,
   claim, hoàn tất, báo lỗi; `ProvisioningDecisionService`; người bấm "Cấp" tự nhận tác vụ ngay trong giao dịch cấp (`IN_PROGRESS`, sự kiện `CLAIMED` sau `CREATED`, QĐ-111m); bấm lại hoặc IT khác bấm cho cùng Request và người trả về tác vụ đã có (`takenBy`, không cấp lần hai); `public/licensing-grant-execution.policy.ts` nói nút nào bật ở mỗi trạng thái tác vụ), `revocation-completion/`
-  (`revocation-tasks.controller.ts`), `grant-cancellation/`, `open-grants/`, `department-use/`, `k1-checklist/` (checklist thu hồi `K1`,
-  `QĐ-111az`: biến thể `DEPARTURE` 6 mục / `STILL_EMPLOYED` 2 mục suy từ các lý do còn đứng, kiểm đủ tick + bằng chứng + `doneAt` không giảm theo
-  `order`; cột `provisioning_tasks.k1_checklist`, codec `provisioning-k1-checklist.json.ts`; `RevocationAftermath.keepChecklist` gọi lúc hoàn tất).
+  (`revocation-tasks.controller.ts`), `grant-cancellation/`, `open-grants/`, `department-use/`, `k1-checklist/` (checklist `K1`,
+  `QĐ-111az`: thu hồi — biến thể `DEPARTURE` 6 mục / `STILL_EMPLOYED` 2 mục suy từ các lý do còn đứng; cấp — biến thể `GRANT` 2 mục; kiểm đủ tick + bằng chứng + `doneAt` không giảm theo
+  `order`; cột `provisioning_tasks.k1_checklist`, codec `provisioning-k1-checklist.json.ts`; `RevocationAftermath.keepChecklist` và `ProvisioningGrantCompletion` gọi lúc hoàn tất).
 - `expiry/` — quyền đã hết hạn, nhắc trước 7 ngày (US-03-05); `expiry.controller.ts`; `expiry-reminder.job.ts` (không nhắc quyền có Request tiếp tục
   đã duyệt đang chờ IT kéo dài: ngày kết thúc sắp dời, R-27). Đầu ngày sau ngày kết thúc `expiry-revocation.job.ts` mở tác vụ thu hồi
   `TIME_LIMITED_EXPIRY` do hệ thống tạo (`SystemActor`, `created_by_system`) qua cổng `RevocationService.open`: một lần cho mỗi quyền (khóa là dòng
@@ -226,6 +226,13 @@ dịch vụ nào đọc cả ghế lẫn thu hồi thì đứng trên cả hai (
   khi người đó còn tác vụ thu hồi `K1` khác chưa `COMPLETED`/`CANCELLED`/`CLOSED_FAILED` (kể cả `FAILED`), thẻ chỉ có 5 mục và gửi mục 6 ⟹ `COMPLETION_NOT_ALLOWED`;
   tác vụ cuối có 6 mục và `doneCodes` chứa `MAILBOX_LOCKED` chỉ khi đã tick. Hai tác vụ của một người hoàn tất cùng lúc được xét lần lượt bằng khóa advisory
   theo người (`k1-checklist:<employeeId>`, lấy sau khóa task và khóa ghế): đúng một tác vụ là cuối.
+- Hoàn tất cấp `K1` (`QĐ-111az`, R-19, `US-07-01` AC-7; K1-GR): cùng nhóm `k1-checklist/`, biến thể `GRANT` hai mục `COMPANY_EMAIL_REGISTERED` → `NO_PERSONAL_DEVICE_MFA`
+  (đăng ký bằng email công ty của chính người dùng; không bật MFA bằng thiết bị cá nhân). `POST /provisioning-tasks/{id}/complete` của tác vụ `GRANT` loại `K1` đòi
+  `k1Checklist { items[{ code, done, doneAt }], evidence? }` (bằng chứng trong checklist hoặc `evidence` ngoài): thiếu mục/tick/thời điểm/bằng chứng hoặc không gửi ⟹ 422
+  `PROVISIONING.K1_CHECKLIST_INCOMPLETE`, `doneAt` giảm theo `order` ⟹ `K1_CHECKLIST_OUT_OF_ORDER`, mục ngoài biến thể/trùng, hoặc `k1Checklist` cho loại ghế khác
+  hay tác vụ `EXTEND` ⟹ `K1_CHECKLIST_NOT_ALLOWED` (hai mã đầu mang `details { variant, codes }`). Cùng hàm xét `judgeChecklist` với thu hồi; ghi vào cột `k1_checklist`
+  trong giao dịch hoàn tất, trước khi tác vụ `COMPLETED` (CHECK nới thành `REVOKE` hoặc `GRANT`, migration `20261113004100`). Thẻ trả `k1Checklist { variant: GRANT, items }`
+  từ lúc IT bấm "Cấp" cho tới khi tác vụ kết thúc, cái đã tick khi `COMPLETED`.
 - **Lý do đã gỡ không được đọc ở đâu** (chỉ `listAllOf` cho lịch sử trên thẻ tác vụ): `find`, `listOf`, `countOf`,
   `listRevocationsOpenedFor`, `listPersonalSeatsOf` (đang thu hồi) đều lọc `withdrawn_at IS NULL`; index
   duy nhất lý do là partial `WHERE withdrawn_at IS NULL` nên mở lại cùng `(source, reference)` trên cùng tác vụ được.
