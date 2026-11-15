@@ -65,6 +65,27 @@ export class VendorAccountReviewRepo {
     return inserted.filter((row) => row.inserted).length;
   }
 
+  /**
+   * The identifier at the vendor of the account a difference is about, as the usage module normalized it, whichever source saw the account: the
+   * identifier nobody owns is named by its own row, an account with activity and no seat by the identifier the person is tied to at that vendor
+   * (the newest tie still in force). Null when nothing names it (the row of the identifier is gone, or the person has no tie); the key then falls back
+   * to what the difference holds (`openCaseKeyOf`). FX3-03.
+   */
+  async accountIdentifierOf(tx: DbTx, discrepancyId: string): Promise<string | null> {
+    const rows = await tx.$queryRaw<{ identifier: string | null }[]>`
+      SELECT CASE d.source::text
+        WHEN 'UNMATCHED_IDENTITY' THEN (
+          SELECT u.normalized_identifier FROM usage_unmatched_identities u WHERE u.id::text = d.source_ref)
+        WHEN 'NO_ASSIGNMENT' THEN (
+          SELECT m.normalized_identifier FROM usage_identity_mappings m
+           WHERE m.application_id = d.application_id AND m.employee_id = d.employee_id AND m.ended_at IS NULL
+           ORDER BY m.created_at DESC, m.id LIMIT 1)
+      END AS identifier
+        FROM vendor_account_discrepancies d WHERE d.id = ${discrepancyId}::uuid`;
+
+    return rows[0]?.identifier ?? null;
+  }
+
   /** Locks the difference for the decision and returns it; null when there is none. */
   async lockDiscrepancy(tx: DbTx, id: string): Promise<DiscrepancyRecord | null> {
     const locked = await tx.$queryRaw<
