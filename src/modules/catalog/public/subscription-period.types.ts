@@ -65,12 +65,13 @@ export type PeriodRefusal =
 
 /**
  * What the payment days of a subscription follow (`PI-2`): the cycle it is paid by, the days it begins, ends and renews, whether it renews itself,
- * and the day the system came to know it. Of a subscription a department owns that runs a period.
+ * and the day the system came to know it. Of a subscription that runs a period, owned by a department or by the shared pool.
  */
 export interface PaymentScheduleFacts {
   subscriptionId: string;
   planId: string;
-  ownerDepartmentId: string;
+  /** The department that owns it; null for a subscription of the shared pool (K2 workspaces, K4 keys), which every IT Admin works. */
+  ownerDepartmentId: string | null;
   billingCycle: 'MONTHLY' | 'QUARTERLY' | 'ANNUAL';
   startDate: BusinessDate;
   endDate: BusinessDate | null;
@@ -78,4 +79,18 @@ export interface PaymentScheduleFacts {
   autoRenew: boolean;
   /** The instant the subscription was recorded: a period paid before it is not one the system answers for. */
   recordedAt: Date;
+}
+
+/**
+ * What a purchase invoice reads of the subscription it names (`PI-1`): the plan, how many were bought, who owns it and who answers for it. Of any
+ * subscription, one a department owns and one of the shared pool alike (the facts of a renewal leave the pool out: nobody decides its renewal).
+ */
+export interface SubscriptionPurchaseFacts {
+  subscriptionId: string;
+  planId: string;
+  /** The department that owns it; null for a subscription of the shared pool, which every IT Admin may submit an invoice for. */
+  ownerDepartmentId: string | null;
+  /** The IT Admin who answers for the subscription; null when it names none (`QĐ-103v`(4)). */
+  responsibleItAdminEmployeeId: string | null;
+  purchasedQuantity: number | null;
 }

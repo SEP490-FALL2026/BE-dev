@@ -31,9 +31,9 @@ type Unpaid = Omit<MissingInvoicePeriod, 'dueDate'>;
 
 /**
  * The periods of a right paid by the month or the year that have no invoice past the fifth working day after their payment day (`PI-2`, `QĐ-111x`,
- * `R-30`): the months of a `K1` right a request granted while a seat of it is still held, and the payments of a subscription a department owns,
- * by the cycle of its plan. An invoice that was returned does not count; one that was submitted or signed does, whatever it says. The mark is
- * read, never kept, so it goes the day an invoice is submitted. Finance reads every period; an IT Admin those of the departments they work (`D8`).
+ * `R-30`): the months of a `K1` right a request granted while a seat of it is still held, and the payments of a subscription, a department's
+ * or the shared pool's, by the cycle of its plan. An invoice that was returned does not count; one that was submitted or signed does, whatever it says. The mark is
+ * read, never kept, so it goes the day an invoice is submitted. Finance reads every period; an IT Admin those of the departments they work and of the shared pool, which every IT Admin works (`D8`, `PI-1c`).
  * The periods are derived from the rights that are still held, a set the grants and subscriptions bound, so they are cut into pages after the
  * count; the number of statements does not grow with them.
  */
@@ -200,8 +200,9 @@ export class PurchaseInvoiceMissingPeriodsQueryService {
         plan,
       ]),
     );
+    const departmentIds = new Set(rows.flatMap((row) => (row.departmentId === null ? [] : [row.departmentId])));
     const departments = new Map(
-      (await this.organizationReads.getDepartmentBriefs([...new Set(rows.map((row) => row.departmentId))])).map(
+      (departmentIds.size === 0 ? [] : await this.organizationReads.getDepartmentBriefs([...departmentIds])).map(
         (department) => [department.id, department],
       ),
     );
@@ -216,7 +217,10 @@ export class PurchaseInvoiceMissingPeriodsQueryService {
           applicationName: plan?.applicationName ?? '',
           logoUrl: plan?.applicationLogoUrl ?? null,
         },
-        department: { id: row.departmentId, name: departments.get(row.departmentId)?.name ?? '' },
+        department:
+          row.departmentId === null
+            ? null
+            : { id: row.departmentId, name: departments.get(row.departmentId)?.name ?? '' },
       });
     });
   }

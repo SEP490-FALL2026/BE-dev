@@ -523,19 +523,19 @@ export class SubscriptionRepo {
   }
 
   /**
-   * The subscriptions a department owns that run a period and are paid by a cycle from a start day, whose payment days an invoice follows
-   * (`PI-2`); every owner when `departmentIds` is null, none for an empty list. Only the columns the payment days are worked out from,
-   * one statement, by id. A subscription no department owns (the shared pool) is not among them: an invoice names only an owned one.
+   * The subscriptions that run a period and are paid by a cycle from a start day, whose payment days an invoice follows (`PI-2`): those of the
+   * `departmentIds` and of the shared pool, which no department owns and every IT Admin submits the invoice of (`PI-1c`); every one when
+   * `departmentIds` is null. An empty list is the pool alone. Only the columns the payment days are worked out from, one statement, by id.
    */
   async listPaidTerms(departmentIds: readonly string[] | null, tx?: DbTx): Promise<PaidTermRow[]> {
-    if (departmentIds !== null && departmentIds.length === 0) return [];
-
     return (tx ?? this.prisma).subscription.findMany({
       where: {
         ...RUNS_A_PERIOD,
         startDate: { not: null },
         billingCycle: { in: ['MONTHLY', 'QUARTERLY', 'ANNUAL'] },
-        ownerDepartmentId: departmentIds === null ? { not: null } : { in: [...departmentIds] },
+        ...(departmentIds === null
+          ? {}
+          : { OR: [{ ownerDepartmentId: null }, { ownerDepartmentId: { in: [...departmentIds] } }] }),
       },
       select: {
         id: true,

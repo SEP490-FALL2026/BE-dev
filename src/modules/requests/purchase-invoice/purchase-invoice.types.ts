@@ -41,7 +41,8 @@ export type MissingInvoiceScope = { kind: 'ALL' } | { kind: 'DEPARTMENTS'; depar
 export interface MissingInvoicePeriod {
   link: { kind: 'REQUEST'; requestId: string } | { kind: 'SUBSCRIPTION'; subscriptionId: string };
   planId: string;
-  departmentId: string;
+  /** The department of the request or the one that owns the subscription; null for a subscription of the shared pool. */
+  departmentId: string | null;
   label: PurchaseInvoiceLabel;
   periodIndex: number | null;
   periodCount: number | null;

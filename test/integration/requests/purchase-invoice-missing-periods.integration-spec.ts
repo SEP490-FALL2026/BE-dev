@@ -7,6 +7,7 @@ import { PgRelay } from '../../support/pg-relay';
 import { pretendBusinessToday } from '../../support/pretend-today';
 import { dataStatements, QueryCounter } from '../../support/query-count';
 import { handOthersToSecondItAdmin } from '../../support/second-it-admin';
+import { takeOwnerOff } from '../../support/shared-pool-subscription';
 import type { Unit } from '../../support/spend-harness';
 
 const h = new GroupHarness();
@@ -23,7 +24,7 @@ interface MissingWire {
   paymentDate: string;
   dueDate: string;
   plan: { planId: string; planName: string; applicationName: string; logoUrl: string | null };
-  department: { id: string; name: string };
+  department: { id: string; name: string } | null;
 }
 interface Page {
   items: MissingWire[];
@@ -178,7 +179,7 @@ describe('the periods that have no invoice over PostgreSQL (PI-2, T-PI)', () => 
       plan: { planId: k1 },
     });
     expect(row.plan.applicationName).toEqual(expect.any(String));
-    expect(row.department.name).toEqual(expect.any(String));
+    expect(row.department?.name).toEqual(expect.any(String));
     expect(await ofRequest(h.finance, requestId)).toEqual([row]);
   });
 
@@ -252,6 +253,26 @@ describe('the periods that have no invoice over PostgreSQL (PI-2, T-PI)', () => 
     await submitted({ subscriptionId: owned }, '2026-11');
     expect((await ofSubscription(h.it1, owned)).map((row) => row.servicePeriodMonth)).toEqual(['2026-10', '2026-12']);
     expect(await ofSubscription(it2, owned)).toEqual([]);
+  });
+
+  it('gives the periods of a subscription of the shared pool to every IT Admin and to Finance, with no department, and a submitted invoice takes the mark off (PI-1c)', async () => {
+    const pool = await takeOwnerOff(h, await h.subscription(10, 'K2', h.seed.departmentId));
+    await h.ctx.sql.query(`UPDATE subscriptions SET created_at = '2026-10-01T03:00:00Z' WHERE id = $1`, [pool]);
+
+    day('2026-12-14');
+    const seen = await ofSubscription(h.it1, pool);
+
+    expect(seen.map((row) => [row.servicePeriodMonth, row.paymentDate, row.label])).toEqual([
+      ['2026-10', '2026-10-05', 'RENEWAL'],
+      ['2026-11', '2026-11-05', 'RENEWAL'],
+      ['2026-12', '2026-12-05', 'RENEWAL'],
+    ]);
+    expect(seen.map((row) => row.department)).toEqual([null, null, null]);
+    expect(await ofSubscription(it2, pool)).toEqual(seen);
+    expect(await ofSubscription(h.finance, pool)).toEqual(seen);
+
+    await submitted({ subscriptionId: pool }, '2026-11');
+    expect((await ofSubscription(it2, pool)).map((row) => row.servicePeriodMonth)).toEqual(['2026-10', '2026-12']);
   });
 
   it('pages the periods with a total that does not move and an order with no tie', async () => {

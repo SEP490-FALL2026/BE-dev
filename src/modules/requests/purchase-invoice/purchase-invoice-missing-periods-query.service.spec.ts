@@ -261,6 +261,38 @@ describe('PurchaseInvoiceMissingPeriodsQueryService (PI-2, QĐ-111x, R-30)', () 
     });
   });
 
+  describe('the subscription of the shared pool, which no department owns (PI-1c)', () => {
+    const pooled: World = { schedules: [schedule({ ownerDepartmentId: null })], today: '2026-12-14' };
+
+    it('is marked like any other, with no department on the period, for Finance and for an IT Admin of any department', async () => {
+      const forFinance = await serviceIn(pooled).service.pageFor(finance, all);
+      const forItAdmin = await serviceIn({ ...pooled, scope: ['d-9'] }).service.pageFor(itAdmin, all);
+
+      expect(forFinance.items.map((row) => row.servicePeriodMonth)).toEqual(['2026-10', '2026-11', '2026-12']);
+      expect(forFinance.items.map((row) => row.department)).toEqual([null, null, null]);
+      expect(forItAdmin.items).toEqual(forFinance.items);
+    });
+
+    it('reads no department name when no period of the page has a department, and the departments of the others', async () => {
+      const mixed: World = {
+        schedules: [schedule({ ownerDepartmentId: null }), schedule({ subscriptionId: 's-2' })],
+        today: '2026-12-14',
+      };
+      const { items } = await serviceIn(mixed).service.pageFor(finance, all);
+
+      expect(items.filter((row) => row.subscriptionId === 's-1').map((row) => row.department)).toEqual([
+        null,
+        null,
+        null,
+      ]);
+      expect(items.filter((row) => row.subscriptionId === 's-2').map((row) => row.department)).toEqual([
+        { id: 'd-1', name: 'Department d-1' },
+        { id: 'd-1', name: 'Department d-1' },
+        { id: 'd-1', name: 'Department d-1' },
+      ]);
+    });
+  });
+
   describe('whose periods are read, how they are ordered and paged', () => {
     it('reads the departments the IT Admin works and every owner for Finance', async () => {
       const forIt = serviceIn({ scope: ['d-1', 'd-2'] });

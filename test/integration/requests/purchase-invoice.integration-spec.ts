@@ -3,6 +3,7 @@ import request from 'supertest';
 import type { ApiAccount } from '../../support/api-accounts';
 import { InvoiceHarness } from '../../support/invoice-harness';
 import { handOthersToSecondItAdmin } from '../../support/second-it-admin';
+import { takeOwnerOff } from '../../support/shared-pool-subscription';
 import type { Unit } from '../../support/spend-harness';
 
 const h = new InvoiceHarness();
@@ -308,6 +309,56 @@ describe('purchase invoices over PostgreSQL (integration; PI-1.4, T-PI)', () => 
       chargedCostCenterId: null,
     });
     expect(vendorId).toBeDefined();
+  });
+
+  it('takes the invoice of a subscription of the shared pool, K2 or K4, from the IT Admin who answers for it and from every other IT Admin, and from nobody who is not one (PI-1c)', async () => {
+    const pool = async (type: 'K2' | 'K4'): Promise<string> => {
+      const id = await takeOwnerOff(h, await h.subscription(10, type, h.seed.departmentId));
+      await h.ctx.sql.query(
+        `UPDATE subscriptions SET original_unit_price_minor = 1500, original_currency = 'USD' WHERE id = $1`,
+        [id],
+      );
+
+      return id;
+    };
+    const submitFor = async (
+      subscription: string,
+      account: ApiAccount,
+      status: number,
+      over: Record<string, unknown> = {},
+    ): Promise<request.Response> =>
+      api('post', '', account)
+        .send({
+          ...form(randomUUID(), { link: { subscriptionId: subscription }, quantity: 10, ...over }),
+          documentIds: [await document(account)],
+        })
+        .expect(status);
+    const k2 = await pool('K2');
+    const k4 = await pool('K4');
+
+    const byResponsible = wire(await submitFor(k2, h.it1, 201));
+    const byOther = wire(await submitFor(k2, it2, 201, { servicePeriodMonth: `${h.year}-12` }));
+    const ofKey = wire(await submitFor(k4, it2, 201));
+
+    for (const kept of [byResponsible, byOther, ofKey]) {
+      expect(kept).toMatchObject({ label: 'RENEWAL', matchResult: 'MATCHED', chargedCostCenterId: null });
+    }
+    // The preview reads it the same way, and a subscription that is not the pool's is still the IT Admin of its department's only.
+    expect(
+      h.dataOf<Preview>(
+        await api('post', '/preview', it2)
+          .send(form(randomUUID(), { link: { subscriptionId: k2 }, quantity: 10 }))
+          .expect(200),
+      ),
+    ).toMatchObject({ label: 'RENEWAL', matchResult: 'MATCHED' });
+    const unit = await h.departmentWithHead(`P-PIP${counter++}`);
+    await h.setItAdminInCharge(unit.department, { employeeId: h.it1.employeeId, account: h.it1 });
+    const owned = await h.subscription(10, 'K2', unit.department.id);
+    expect(((await submitFor(owned, it2, 404)).body as { error: { code: string } }).error.code).toBe(
+      'PURCHASE_INVOICE.LINK_NOT_FOUND',
+    );
+    await submitFor(k2, h.finance, 403);
+    await submitFor(k2, h.boss.account, 403);
   });
 
   it('submits a returned invoice again, once, with the number it had, and not one that was not returned', async () => {

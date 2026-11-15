@@ -173,8 +173,9 @@ const missingPeriodSchema = z.strictObject({
         'The https link to the logo image of the application that the IT Admin pasted, or null. The server never checks it: it may be broken, so show the first letter of the name when the image does not load.',
     }),
   }),
-  department: z.strictObject({ id: z.uuid(), name: z.string() }).meta({
-    description: 'The department of the request, or the one that owns the subscription.',
+  department: z.strictObject({ id: z.uuid(), name: z.string() }).nullable().meta({
+    description:
+      'The department of the request, or the one that owns the subscription; null for a subscription of the shared pool, which no department owns.',
   }),
 });
 

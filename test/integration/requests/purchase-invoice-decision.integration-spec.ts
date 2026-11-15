@@ -3,6 +3,7 @@ import request from 'supertest';
 import { BudgetsApi } from '../../../src/modules/budgets/public/budgets.api';
 import type { ApiAccount } from '../../support/api-accounts';
 import { InvoiceHarness } from '../../support/invoice-harness';
+import { takeOwnerOff } from '../../support/shared-pool-subscription';
 import type { Unit } from '../../support/spend-harness';
 
 const h = new InvoiceHarness();
@@ -370,5 +371,39 @@ describe('Finance signs or returns a purchase invoice over PostgreSQL (integrati
       purchase.id,
     ]);
     expect(rows.rows).toEqual([{ commitment_id: null, cost_center_id: null, subscription_id: owned }]);
+  });
+  it('writes the one invoice of a subscription of the shared pool as a line of the subscription too, with no department to bear it (PI-1c)', async () => {
+    const pool = await takeOwnerOff(h, await h.subscription(10, 'K2', h.seed.departmentId));
+    await h.ctx.sql.query(
+      `UPDATE subscriptions SET original_unit_price_minor = 1500, original_currency = 'USD' WHERE id = $1`,
+      [pool],
+    );
+    numbers += 1;
+    const purchase = h.dataOf<Wire>(
+      await api('post', '', h.it1)
+        .send({
+          link: { subscriptionId: pool },
+          vendorInvoiceNumber: `PDP-${numbers}`,
+          issuedOn: `${h.year}-11-02`,
+          servicePeriodMonth: `${h.year}-11`,
+          quantity: 10,
+          unitPriceOriginal: { amount: '15', currency: 'USD' },
+          netAmount: { amount: '3840000' },
+          paymentSource: 'COMPANY_CARD',
+          documentIds: [await document()],
+        })
+        .expect(201),
+    );
+
+    await confirm(purchase.id).expect(201);
+
+    const rows = await h.ctx.sql.query<{
+      commitment_id: string | null;
+      cost_center_id: string | null;
+      subscription_id: string;
+    }>(`SELECT commitment_id, cost_center_id, subscription_id FROM invoices WHERE purchase_invoice_id = $1`, [
+      purchase.id,
+    ]);
+    expect(rows.rows).toEqual([{ commitment_id: null, cost_center_id: null, subscription_id: pool }]);
   });
 });

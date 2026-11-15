@@ -87,7 +87,7 @@ export function toMissingPeriod(
   row: MissingInvoicePeriod,
   names: {
     plan: { planId: string; planName: string; applicationName: string; logoUrl: string | null };
-    department: { id: string; name: string };
+    department: { id: string; name: string } | null;
   },
 ): PurchaseInvoiceMissingPeriodWire {
   return {
