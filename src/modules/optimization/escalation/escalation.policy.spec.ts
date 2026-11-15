@@ -6,6 +6,7 @@ const GOOD: EscalationFacts = {
   record: WATCH,
   seat: { isMachineAccount: false },
   inTransfer: false,
+  onLeaveOrHandover: false,
   placementDepartmentId: 'd1',
 };
 const verdict = (over: Partial<EscalationFacts>) => escalationVerdictOf({ ...GOOD, ...over });
@@ -34,6 +35,18 @@ describe('who the IT Admin may push early from the watch tier to the review tier
     ['one with no seat chain', { seatChainId: null }],
   ])('refuses %s as NOT_WATCH: only a watch that is still open can be pushed', (_name, over) => {
     expect(verdict({ record: record(over) })).toEqual({ kind: 'SKIP', reason: 'NOT_WATCH' });
+  });
+
+  it('refuses a holder on long leave today or handing over before leaving (LEAVE_OR_HANDOVER, FR-4.12: the early push still passes the eight gates of FR-4.9)', () => {
+    expect(verdict({ onLeaveOrHandover: true })).toEqual({ kind: 'SKIP', reason: 'LEAVE_OR_HANDOVER' });
+  });
+
+  it('judges the transfer before the leave, and the leave before the department', () => {
+    expect(verdict({ inTransfer: true, onLeaveOrHandover: true })).toEqual({ kind: 'SKIP', reason: 'TRANSFER_GRACE' });
+    expect(verdict({ onLeaveOrHandover: true, placementDepartmentId: null })).toEqual({
+      kind: 'SKIP',
+      reason: 'LEAVE_OR_HANDOVER',
+    });
   });
 
   it('refuses a seat that no longer holds a seat (SEAT_ENDED): the next run closes the recommendation', () => {

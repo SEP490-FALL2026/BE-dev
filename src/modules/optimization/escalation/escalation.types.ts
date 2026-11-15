@@ -7,6 +7,7 @@ export const ESCALATION_SKIP_REASONS = [
   'SEAT_ENDED',
   'MACHINE_ACCOUNT',
   'TRANSFER_GRACE',
+  'LEAVE_OR_HANDOVER',
   'NO_DEPARTMENT',
 ] as const;
 export type EscalationSkipReason = (typeof ESCALATION_SKIP_REASONS)[number];
@@ -35,6 +36,8 @@ export interface EscalationFacts {
   seat: { isMachineAccount: boolean } | null;
   /** The holder is in a transfer that has taken effect and is not closed (the grace of `QĐ-110p`). */
   inTransfer: boolean;
+  /** The holder is on a long leave today or is handing over before leaving (gate 3 of `FR-4.9`, which the early push still passes: `FR-4.12`). */
+  onLeaveOrHandover: boolean;
   /** The department the holder is placed in today; null when none. */
   placementDepartmentId: string | null;
 }

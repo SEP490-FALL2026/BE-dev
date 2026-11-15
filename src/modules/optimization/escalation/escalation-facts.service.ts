@@ -11,6 +11,7 @@ import type { EscalationFacts } from './escalation.types';
 export interface EscalationBatchFacts {
   seats: Map<string, { isMachineAccount: boolean }>;
   inTransfer: Set<string>;
+  leaveOrHandover: Set<string>;
   placements: Map<string, string>;
 }
 
@@ -29,9 +30,11 @@ export class EscalationFactsService {
   /** The seats that hold a seat today, the holders in a transfer in force and the departments the holders are in, of the recommendations named. */
   async ofBatch(tx: DbTx, today: BusinessDate, records: readonly GhostSeatRecord[]): Promise<EscalationBatchFacts> {
     const employeeIds = [...new Set(records.flatMap((record) => (record.employeeId ? [record.employeeId] : [])))];
-    if (employeeIds.length === 0) return { seats: new Map(), inTransfer: new Set(), placements: new Map() };
+    if (employeeIds.length === 0)
+      return { seats: new Map(), inTransfer: new Set(), leaveOrHandover: new Set(), placements: new Map() };
     const seats = await this.licensing.listSeatsForRules({ asOf: today, employeeIds }, tx);
     const transfers = await this.personnel.getTransfersInOverlap(employeeIds, today);
+    const leaveOrHandover = await this.leaveOrHandoverOf(employeeIds, today);
     const placements = new Map<string, string>();
     for (const employeeId of employeeIds) {
       const placement = await this.organizationReads.getEmployeePlacement(employeeId, today, tx);
@@ -41,8 +44,20 @@ export class EscalationFactsService {
     return {
       seats: new Map(seats.map((seat) => [seat.chainRootId, { isMachineAccount: seat.isMachineAccount }])),
       inTransfer: new Set(transfers.map((transfer) => transfer.employeeId)),
+      leaveOrHandover,
       placements,
     };
+  }
+
+  /** The holders on a long leave today (the same rule as the weekly pass: begun, and not ended before tomorrow) and the ones handing over before leaving. */
+  private async leaveOrHandoverOf(employeeIds: readonly string[], today: BusinessDate): Promise<Set<string>> {
+    const away = new Set<string>();
+    for (const leave of await this.personnel.getLeaveIntervals(employeeIds, today, today)) {
+      if (leave.startedOn <= today && (leave.endedOn === null || leave.endedOn > today)) away.add(leave.employeeId);
+    }
+    for (const handover of await this.personnel.getHandingOverCases(employeeIds)) away.add(handover.employeeId);
+
+    return away;
   }
 
   /** What the rule reads of one recommendation, out of what the batch read. */
@@ -51,6 +66,7 @@ export class EscalationFactsService {
       record,
       seat: record?.seatChainId ? (batch.seats.get(record.seatChainId) ?? null) : null,
       inTransfer: record?.employeeId ? batch.inTransfer.has(record.employeeId) : false,
+      onLeaveOrHandover: record?.employeeId ? batch.leaveOrHandover.has(record.employeeId) : false,
       placementDepartmentId: record?.employeeId ? (batch.placements.get(record.employeeId) ?? null) : null,
     };
   }

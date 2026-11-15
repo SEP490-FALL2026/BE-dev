@@ -143,6 +143,25 @@ describe('the early push of a watch to the head of the department (integration, 
     expect((await w.ghostRows('id = $1', [id]))[0]).toMatchObject({ tier: 'REVIEW', state: 'WAITING_FOR_HEAD' });
   });
 
+  it('leaves a watch as it was when its holder began a long leave after the pass made it: LEAVE_OR_HANDOVER, the head is not told (B3A-02, FR-4.12, FR-4.9 gate 3)', async () => {
+    const { dept, holder, id } = await watchOf('P-ESL');
+    await w.ctx.sql.query(
+      `INSERT INTO employee_leaves (id, organization_id, employee_id, started_on, approved_return_on, status, grounds_type,
+                                    grounds_reference, grounds_issuer, grounds_issued_on, started_by_app_user_id)
+       VALUES (gen_random_uuid(), $1, $2, (now() AT TIME ZONE 'Asia/Ho_Chi_Minh')::date - 1, (now() AT TIME ZONE 'Asia/Ho_Chi_Minh')::date + 60,
+               'ACTIVE', 'T', 'B3A-02', 'I', (now() AT TIME ZONE 'Asia/Ho_Chi_Minh')::date - 1, gen_random_uuid())`,
+      [w.seed.organizationId, holder.employeeId],
+    );
+
+    const batch = batchOf(await post({ recommendationIds: [id] }).expect(201));
+
+    expect(batch).toMatchObject({ escalated: 0, skipped: 1 });
+    expect(batch.results[0]).toMatchObject({ recommendationId: id, outcome: 'SKIPPED', reason: 'LEAVE_OR_HANDOVER' });
+    const [row] = await w.ghostRows('id = $1', [id]);
+    expect(row).toMatchObject({ tier: 'MONITOR', state: 'OPEN' });
+    expect(await w.noticesOf('GHOST_SEAT_NEW', dept.headEmployeeId)).toHaveLength(0);
+  });
+
   it('answers each recommendation in the order named: what is not a watch, a machine account, a holder in a transfer, a paused or closed one and an unknown id is left as it was, with its reason', async () => {
     const good = await watchOf('P-ES5');
     const review = await watchOf('P-ES6', { tier: 'REVIEW' });

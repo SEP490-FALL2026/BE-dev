@@ -14,8 +14,9 @@ function isUsageWatch(record: EscalationCandidate): boolean {
 /**
  * Whether the IT Admin may push a recommendation from the watch tier to the review tier before the weekly pass would (`QĐ-111ay`, `FR-4.12`): only a
  * `G3`/`G4` of the watch tier that no head was asked about, on a seat that still holds a seat, that is not used for a machine account (`QĐ-110m`)
- * and whose holder is not in the grace of a transfer (`QĐ-110p`: the recommendation of such a holder is paused), and whose holder has a department
- * for the queue of a head to be found. The eight gates were passed when the recommendation was made; nothing here judges the days again.
+ * and whose holder is not in the grace of a transfer (`QĐ-110p`: the recommendation of such a holder is paused), nor on a long leave today, nor handing
+ * over before leaving (gate 3 of `FR-4.9`: the days between the weekly pass and the push may have brought one of them), and whose holder has a department
+ * for the queue of a head to be found. The other gates were passed when the recommendation was made; the days of inactivity are not judged again.
  */
 export function escalationVerdictOf(facts: EscalationFacts): EscalationVerdict {
   const { record } = facts;
@@ -24,6 +25,7 @@ export function escalationVerdictOf(facts: EscalationFacts): EscalationVerdict {
   if (!facts.seat) return { kind: 'SKIP', reason: 'SEAT_ENDED' };
   if (facts.seat.isMachineAccount) return { kind: 'SKIP', reason: 'MACHINE_ACCOUNT' };
   if (facts.inTransfer || record.state === 'PAUSED') return { kind: 'SKIP', reason: 'TRANSFER_GRACE' };
+  if (facts.onLeaveOrHandover) return { kind: 'SKIP', reason: 'LEAVE_OR_HANDOVER' };
   if (facts.placementDepartmentId === null) return { kind: 'SKIP', reason: 'NO_DEPARTMENT' };
 
   return { kind: 'ESCALATE' };
