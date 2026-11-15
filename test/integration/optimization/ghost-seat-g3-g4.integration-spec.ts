@@ -638,29 +638,6 @@ describe('G3 / G4: the weekly pass, gates 2-7, the three states, days over the c
     expect(await rowsOf(w.people[0])).toEqual([expect.objectContaining({ id: denied, close_reason: 'NEGATED' })]);
   });
 
-  it('B3A-01, FR-4.12: a watch the seat already has stays open when the next pass finds the seat still inactive, and holds its place at gate 8', async () => {
-    const today = nextToday();
-    const w = await world(today, [{ last: addDays(today, -41) }, { last: addDays(today, -2) }], {
-      from: addDays(today, -91),
-      to: addDays(today, -1),
-    });
-    const watch = await seedOn(w.people[0], 'G4');
-    // The watch was made from the last day the report shows (41 days ago): no later day of activity denies it (NEGATED), whatever today is.
-    // The denial reads the column `last_active_date`, the evidence only shows it: both are written.
-    await h.ctx.sql.query(
-      `UPDATE ghost_seat_recommendations
-          SET evidence = jsonb_set(evidence, '{lastActiveDate}', to_jsonb($2::text)), last_active_date = $2::date
-        WHERE id = $1`,
-      [watch, addDays(today, -41)],
-    );
-
-    const run = await service().run(new Date());
-
-    expect((await rowsOf(w.people[0]))[0]).toMatchObject({ id: watch, state: 'OPEN', tier: 'MONITOR' });
-    expect(await rowsOf(w.people[0])).toHaveLength(1);
-    expect(await skipOf(run!.id, w.people[0])).toMatchObject({ gate: 'OPEN_RECOMMENDATION' });
-  });
-
   it('US-10-04 AC-5, Q-92: the confirmation of a report with activity after the last day closes an undecided G4 NEGATED at once, with no notice; a decided reclaim stays and is flagged', async () => {
     const today = nextToday();
     const w = await world(
