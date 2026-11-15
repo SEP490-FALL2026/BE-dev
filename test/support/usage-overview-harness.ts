@@ -48,19 +48,26 @@ export class UsageOverviewHarness extends UsageHarness {
     });
   }
 
-  /** A person of the second department, with the work email `code@acme.vn` and the name `Person code`. */
+  /**
+   * A person of the second department, with the work email `code@acme.vn` and the name `Person code`. The manual entry places the person from
+   * the real day of the database, and the world is on a fixed day before it (`USAGE_TODAY`): the department an IT Admin reads is the one of
+   * today (`QĐ-111ax`), so the placement goes back to the hire date, as the placements of the people of the seeded department are (the
+   * fixture of `person` places them from their hire date).
+   */
   async personOfOtherDepartment(code: string): Promise<string> {
-    return (
-      await enterEmployee(this.ctx, this.admin, {
-        employeeCode: code,
-        fullName: `Person ${code}`,
-        workEmail: `${code.toLowerCase()}@acme.vn`,
-        employmentType: 'STAFF',
-        hireDate: '2026-01-05',
-        departmentCode: this.otherDepartment.code,
-        jobTitle: 'Tester',
-      })
-    ).id;
+    const hireDate = '2026-01-05';
+    const { id } = await enterEmployee(this.ctx, this.admin, {
+      employeeCode: code,
+      fullName: `Person ${code}`,
+      workEmail: `${code.toLowerCase()}@acme.vn`,
+      employmentType: 'STAFF',
+      hireDate,
+      departmentCode: this.otherDepartment.code,
+      jobTitle: 'Tester',
+    });
+    await this.ctx.sql.query(`UPDATE employee_placements SET valid_from = $2 WHERE employee_id = $1`, [id, hireDate]);
+
+    return id;
   }
 
   /**

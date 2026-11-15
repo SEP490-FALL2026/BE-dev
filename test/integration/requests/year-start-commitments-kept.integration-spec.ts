@@ -74,11 +74,17 @@ describe('the commitment of 01/01 is what the approval kept (T-RQ2 for 01/01, T-
 
     return { subscription, plan: await h.planOf(subscription) };
   };
-  /** The people of a department for a group: they are made on the real day, and the fixed day comes after their start. */
+  /**
+   * The people of a department for a group: they are made on the real day, and the fixed days come after their start, so the hire date and
+   * the day they belong to the department (`valid_from` of the placement, the real day of today) go back to 01/01 as `unit()` does for the
+   * first ones. Left at the real day, the people belong to the department only from today and the days after 15/11 count them out.
+   */
   const people = async (u: Unit, count: number): Promise<Colleague[]> => {
     const made = await h.colleagues(u, count);
-    await h.ctx.sql.query(`UPDATE employees SET hire_date = $2 WHERE id = ANY($1::uuid[])`, [
-      made.map((person) => person.employeeId),
+    const ids = made.map((person) => person.employeeId);
+    await h.ctx.sql.query(`UPDATE employees SET hire_date = $2 WHERE id = ANY($1::uuid[])`, [ids, `${h.year}-01-01`]);
+    await h.ctx.sql.query(`UPDATE employee_placements SET valid_from = $2 WHERE employee_id = ANY($1::uuid[])`, [
+      ids,
       `${h.year}-01-01`,
     ]);
 
