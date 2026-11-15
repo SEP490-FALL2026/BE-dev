@@ -4,7 +4,7 @@ import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { RoutingFactsService } from '../access-request/routing-facts.service';
-import { routeNeedStep } from '../access-request/routing.policy';
+import { routeNeedStep, type RoutingDecision } from '../access-request/routing.policy';
 import { routeSpendStep } from './spend-routing.policy';
 import { needStepTarget, type StepTarget } from './reassignment.policy';
 import type { ReassignableRequest, ReassignableStep } from './step-reassignment.repo';
@@ -68,10 +68,11 @@ export class StepTargetService {
     };
     switch (step.kind) {
       case 'NEED': {
+        const departmentId = await this.needDepartment(tx, request, facts.today);
         const gathered = (
           await this.routing.gather(tx, {
             requesterEmployeeId: request.requesterEmployeeId,
-            departmentId: await this.needDepartment(tx, request, facts.today),
+            departmentId,
             today: facts.today,
             chainHasSpendStep: request.chainHasSpendStep,
           })
@@ -81,7 +82,11 @@ export class StepTargetService {
         const holdsHead =
           head !== null && request.lines.some((line) => line.needStepId === step.id && line.employeeId === head);
 
-        return needStepTarget(routeNeedStep(holdsHead ? { ...gathered, requesterEmployeeId: head } : gathered));
+        const decision = routeNeedStep(holdsHead ? { ...gathered, requesterEmployeeId: head } : gathered);
+
+        return needStepTarget(decision, {
+          successorRecorded: await this.successorRecorded(tx, decision, departmentId, facts.today),
+        });
       }
       case 'SPEND_APPROVAL': {
         const assignment = routeSpendStep(people, facts.spendingApproverEmployeeId);
@@ -98,6 +103,21 @@ export class StepTargetService {
           : { assigneeEmployeeId: null, reason: 'NO_IT_ADMIN_IN_CHARGE' };
       }
     }
+  }
+
+  /**
+   * Whether a head is recorded to follow, asked only when the table says free software of a department with no head needs nobody (`QĐ-110h`:
+   * the work that waits goes to the head who starts, so a department with a successor is not left without one). Nothing else reads it.
+   */
+  private async successorRecorded(
+    tx: DbTx,
+    decision: RoutingDecision,
+    departmentId: string,
+    today: BusinessDate,
+  ): Promise<boolean> {
+    if (decision.outcome !== 'NOT_REQUIRED' || decision.oneStepReason !== 'NO_DEPARTMENT_HEAD') return false;
+
+    return (await this.organizationReads.nextHeadPeriodOf(departmentId, today, tx)) !== null;
   }
 
   /**

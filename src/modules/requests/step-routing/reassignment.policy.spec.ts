@@ -216,27 +216,36 @@ describe('free internal software of a department that lost its head (QĐ-110i, Q
 });
 
 describe('who the need step is given to by the routing table (needStepTarget)', () => {
+  const free = { successorRecorded: false };
+  const noHeadFree = { outcome: 'NOT_REQUIRED', row: 4, reason: null, oneStepReason: 'NO_DEPARTMENT_HEAD' } as const;
+
   it('names the head when the table assigns the step', () => {
-    expect(needStepTarget({ outcome: 'ASSIGNED', row: 1, assigneeEmployeeId: NEW, role: 'MANAGER' })).toEqual({
+    expect(needStepTarget({ outcome: 'ASSIGNED', row: 1, assigneeEmployeeId: NEW, role: 'MANAGER' }, free)).toEqual({
       assigneeEmployeeId: NEW,
       routingRow: 1,
     });
   });
 
-  it('says nobody needs to decide the step of free software when the department has no head, on the row of a new request', () => {
-    expect(
-      needStepTarget({ outcome: 'NOT_REQUIRED', row: 4, reason: null, oneStepReason: 'NO_DEPARTMENT_HEAD' }),
-    ).toEqual({ assigneeEmployeeId: null, notRequired: 'NO_DEPARTMENT_HEAD', routingRow: 4 });
+  it('says nobody needs to decide the step of free software when the department has no head and none is recorded to follow, on the row of a new request', () => {
+    expect(needStepTarget(noHeadFree, free)).toEqual({
+      assigneeEmployeeId: null,
+      notRequired: 'NO_DEPARTMENT_HEAD',
+      routingRow: 4,
+    });
   });
 
-  it('keeps making a step wait for the reason the table gives, and for a head when the requester is the head (not an end of the step)', () => {
-    expect(needStepTarget({ outcome: 'WAITING', row: 4, reason: 'NO_DEPARTMENT_HEAD' })).toEqual(nobody);
-    expect(needStepTarget({ outcome: 'WAITING', row: 8, reason: 'NO_SPENDING_APPROVER' })).toEqual({
+  it('makes the step of free software wait while a head is recorded to follow: the work goes to that head the day the period starts (QĐ-110h, B2A-R2)', () => {
+    expect(needStepTarget(noHeadFree, { successorRecorded: true })).toEqual(nobody);
+  });
+
+  it('keeps making a step wait for the reason the table gives', () => {
+    expect(needStepTarget({ outcome: 'WAITING', row: 4, reason: 'NO_DEPARTMENT_HEAD' }, free)).toEqual(nobody);
+    expect(needStepTarget({ outcome: 'WAITING', row: 8, reason: 'NO_SPENDING_APPROVER' }, free)).toEqual({
       assigneeEmployeeId: null,
       reason: 'NO_SPENDING_APPROVER',
     });
     expect(
-      needStepTarget({ outcome: 'NOT_REQUIRED', row: 2, reason: null, oneStepReason: 'REQUESTER_IS_HEAD' }),
+      needStepTarget({ outcome: 'NOT_REQUIRED', row: 2, reason: null, oneStepReason: 'REQUESTER_IS_HEAD' }, free),
     ).toEqual(nobody);
   });
 });

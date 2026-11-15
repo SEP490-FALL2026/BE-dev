@@ -321,12 +321,13 @@ describe('a department with no head: paid requests and case B wait for one, over
       expect(await h.audit('ACCESS_REQUEST.NO_NEED_APPROVER', free.id)).toHaveLength(1);
     });
 
-    it('is moved on the day the head leaves, not on the day a successor starts, as a request sent in that gap would go', async () => {
+    it('goes on waiting through the gap while a successor is recorded, and goes to that head the day the period starts, not to the IT Admin (QĐ-110h, B2A-R2)', async () => {
       n += 1;
       const unit = await h.departmentWithHead(`P-XJ${n}`);
       const free = await h.sent(unit.member, internal);
       const sentPaid = await h.sent(unit.member, paid);
-      const { endedPeriodId } = await recordSuccessorForTomorrow(unit, `XJ-H${n}`);
+      const before = await h.stepOf(free.id, 'NEED');
+      const { next, endedPeriodId, successorPeriodId } = await recordSuccessorForTomorrow(unit, `XJ-H${n}`);
 
       await h.emit({
         kind: 'HEAD_PERIOD_END',
@@ -336,14 +337,68 @@ describe('a department with no head: paid requests and case B wait for one, over
         effectiveOn: h.today(),
       });
 
-      expect(await readBy(free.id, unit.member)).toMatchObject(oneStepShape);
-      const gapMember = await h.staff(unit.department, `XJ-E${n}`);
-      expect(await h.sent(gapMember, internal)).toMatchObject(oneStepShape);
-      // The paid one waits for the head who starts tomorrow, as before.
+      // The waiting of the work moves to the successor on the day the period starts (QĐ-110h): the request is not sent to the IT Admin, as the audit trail shows.
+      expect(await h.stepOf(free.id, 'NEED')).toMatchObject({
+        id: before.id,
+        state: 'WAITING',
+        assignee_employee_id: null,
+        waiting_reason: 'NO_DEPARTMENT_HEAD',
+        created_at: before.created_at,
+      });
+      expect(await requestRow(free.id)).toEqual({
+        routing_mode: 'VIA_HEAD',
+        one_step_reason: null,
+        state: 'WAITING_CONTROLLED',
+      });
+      expect(await h.audit('ACCESS_REQUEST.STEP_NOT_REQUIRED', before.id)).toEqual([]);
+      expect(await h.audit('ACCESS_REQUEST.NO_NEED_APPROVER', free.id)).toEqual([]);
       expect(await h.stepOf(sentPaid.id, 'NEED')).toMatchObject({
         state: 'WAITING',
         waiting_reason: 'NO_DEPARTMENT_HEAD',
       });
+      // Nothing the worker does in the gap moves it (a recorded successor is not a gap to put right).
+      await h.sweep();
+      expect(await h.stepOf(free.id, 'NEED')).toMatchObject({ state: 'WAITING', waiting_reason: 'NO_DEPARTMENT_HEAD' });
+      expect(await h.audit('ACCESS_REQUEST.STEP_NOT_REQUIRED', before.id)).toEqual([]);
+
+      await h.ctx.sql.query(`UPDATE department_head_periods SET valid_from = $2 WHERE id = $1`, [
+        successorPeriodId,
+        h.today(),
+      ]);
+      await h.emit({
+        kind: 'HEAD_PERIOD_START',
+        periodId: successorPeriodId,
+        departmentId: unit.department.id,
+        headEmployeeId: next.employeeId,
+        previousHeadEmployeeId: unit.head.employeeId,
+        effectiveOn: h.today(),
+      });
+
+      expect(await h.stepOf(free.id, 'NEED')).toMatchObject({
+        id: before.id,
+        state: 'PENDING',
+        assignee_employee_id: next.employeeId,
+        created_at: before.created_at,
+      });
+      expect(await requestRow(free.id)).toMatchObject({ routing_mode: 'VIA_HEAD', state: 'PENDING' });
+      expect(await h.audit('ACCESS_REQUEST.STEP_NOT_REQUIRED', before.id)).toEqual([]);
+    });
+
+    it('leaves the sending as it was: a request of free internal software sent into the gap goes in one step (B2A-R2 changes only what already waits)', async () => {
+      n += 1;
+      const unit = await h.departmentWithHead(`P-XK${n}`);
+      const { endedPeriodId } = await recordSuccessorForTomorrow(unit, `XK-H${n}`);
+      await h.emit({
+        kind: 'HEAD_PERIOD_END',
+        periodId: endedPeriodId,
+        departmentId: unit.department.id,
+        headEmployeeId: unit.head.employeeId,
+        effectiveOn: h.today(),
+      });
+
+      const gapMember = await h.staff(unit.department, `XK-E${n}`);
+
+      expect(await h.sent(gapMember, internal)).toMatchObject(oneStepShape);
     });
 
     it('also puts right a request that waited for a head under the rule before this one: the next pass of the worker sends it on', async () => {

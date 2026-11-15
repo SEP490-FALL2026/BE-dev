@@ -44,8 +44,9 @@ export interface OpenStep {
 
 /**
  * Who the routing table gives the step on today's data: a person, nobody and why, or nobody because nobody needs to decide it. The last
- * is the need step of free internal software in a department with no head: it has no spend step, so it goes straight to the IT Admin as
- * one sent now would (`QĐ-111bc`, `routeNeedStep`); a paid request never gets it, it waits for a head (`QĐ-110i`).
+ * is the need step of free internal software in a department with no head and none recorded to follow: it has no spend step, so it goes straight to
+ * the IT Admin as one sent now would (`QĐ-111bc`, `routeNeedStep`); a paid request never gets it, it waits for a head (`QĐ-110i`), and neither does
+ * free software while a head is recorded to follow: what waits goes to that head the day the period starts (`QĐ-110h`).
  */
 export type StepTarget =
   | { assigneeEmployeeId: string; routingRow: number | null }
@@ -133,14 +134,20 @@ export function decideReassignment(
 
 /**
  * What the routing table of the need step says, as the target the reassignment reads. Free internal software of a department with no head
- * needs nobody to decide it (`QĐ-111bc`); every other request that has no head waits for one (`QĐ-110i`), and so does one whose requester
- * heads the department today, as before (a head's own request is not ended here).
+ * needs nobody to decide it (`QĐ-111bc`) unless a head is recorded to follow (`successorRecorded`): the work that waits moves to that head on the
+ * day the period starts (`QĐ-110h`, `QĐ-110i`: the successor is required, so "no head" with none to follow is the department that never had
+ * one), so it waits. Every other request that has no head waits for one (`QĐ-110i`), and so does one whose requester heads the department
+ * today, as before (a head's own request is not ended here). A request sent now is routed by the table alone and is not changed by this.
  */
-export function needStepTarget(decision: RoutingDecision): StepTarget {
+export function needStepTarget(decision: RoutingDecision, facts: { successorRecorded: boolean }): StepTarget {
   if (decision.outcome === 'ASSIGNED') {
     return { assigneeEmployeeId: decision.assigneeEmployeeId, routingRow: decision.row };
   }
-  if (decision.outcome === 'NOT_REQUIRED' && decision.oneStepReason === 'NO_DEPARTMENT_HEAD') {
+  if (
+    decision.outcome === 'NOT_REQUIRED' &&
+    decision.oneStepReason === 'NO_DEPARTMENT_HEAD' &&
+    !facts.successorRecorded
+  ) {
     return { assigneeEmployeeId: null, notRequired: 'NO_DEPARTMENT_HEAD', routingRow: decision.row };
   }
 
