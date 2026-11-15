@@ -10,7 +10,7 @@ export interface SeatToCharge {
   fixedDepartmentId: string | null;
   held: HeldRange;
   placements: readonly PlacementPeriod[];
-  commitment: { id: string; costCenterId: string; seatMonthlyMinor: bigint | null } | null;
+  commitment: { id: string; costCenterId: string } | null;
 }
 
 /** What a row of the month already applied to a commitment, found again when the month is charged again. */
@@ -45,8 +45,9 @@ const keyOf = (assignmentId: string, departmentId: string): string => `${assignm
  * What a month of a subscription costs each department and what of it takes a commitment down (`SM-1`). Pure: the caller gives the seats with where
  * their holders were placed, the Cost Center of each department, what each commitment still holds, and the rows the month already has.
  *
- * The price of a month of a seat is the one on its commitment when it has one, else the subscription's (a seat with neither costs no department
- * anything: its days fall to the pool line). A row takes the commitment of the seat down by its whole amount, no more than the commitment still
+ * The price of a month of a seat is the subscription's, the same for every seat of the month and for a seat a renewal carried on (`SM1-07`, `QĐ-103r`,
+ * `QĐ-104c`: the monthly price converted from the cycle); a subscription with no known price costs no department anything: its days fall to the pool
+ * line. A row takes the commitment of the seat down by its whole amount, no more than the commitment still
  * holds, when the Cost Center of the department is the commitment's own. What a row applied before still counts as held by it, so charging the
  * same month again applies nothing twice and never less than before.
  */
@@ -64,7 +65,8 @@ export function planSeatMonth(input: {
   const rows: PlannedRow[] = [];
 
   for (const seat of input.seats) {
-    const monthlyPriceMinor = seat.commitment?.seatMonthlyMinor ?? input.subscriptionMonthlyPriceMinor;
+    // One price for every seat of the month: the subscription's, whatever price the commitment of a request recorded (`SM1-07`).
+    const monthlyPriceMinor = input.subscriptionMonthlyPriceMinor;
     if (monthlyPriceMinor === null) continue;
     for (const segment of splitSeatMonth({
       monthlyPriceMinor,

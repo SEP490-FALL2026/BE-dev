@@ -122,9 +122,7 @@ export class SeatMonthSubscriptionService {
         fixedDepartmentId: seat.kind === 'SERVICE' ? seat.owningDepartmentId : null,
         held: { from: seat.heldFrom, until: seat.heldUntil },
         placements: placements.get(seat.employeeId) ?? [],
-        commitment: commitment
-          ? { id: commitment.id, costCenterId: commitment.costCenterId, seatMonthlyMinor: commitment.seatMonthlyMinor }
-          : null,
+        commitment: commitment ? { id: commitment.id, costCenterId: commitment.costCenterId } : null,
       };
     });
   }

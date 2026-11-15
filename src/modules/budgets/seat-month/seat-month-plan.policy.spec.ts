@@ -40,6 +40,32 @@ describe('the plan of a month of a subscription (SM-1.4; T-SM1)', () => {
     ]);
   });
 
+  it('SM1-07: the price of a month is the subscription`s for every seat in it, whatever price a commitment recorded: two seats of one month cost the same', () => {
+    const asked = { id: 'c-1', costCenterId: 'cc-a' };
+    const { rows } = plan({
+      subscriptionMonthlyPriceMinor: 350_000n,
+      seats: [
+        seat({
+          assignmentId: 'seat-a',
+          commitment: asked,
+          held: { from: '2026-01-01', until: null },
+          placements: [{ departmentId: A, from: '2026-01-01', to: null }],
+        }),
+        seat({
+          assignmentId: 'seat-b',
+          held: { from: '2026-01-01', until: null },
+          placements: [{ departmentId: A, from: '2026-01-01', to: null }],
+        }),
+      ],
+      heldByCommitment: new Map([['c-1', 3_600_000n]]),
+    });
+
+    expect(rows.map((row) => [row.assignmentId, row.monthlyPriceMinor, row.amountMinor])).toEqual([
+      ['seat-a', 350_000n, 350_000n],
+      ['seat-b', 350_000n, 350_000n],
+    ]);
+  });
+
   it('leaves the Cost Center empty for a department that has none, so the amount is the line "not allocated to a Cost Center"', () => {
     const { rows } = plan({ costCenterOfDepartment: new Map([[A, 'cc-a']]) });
 
@@ -47,7 +73,7 @@ describe('the plan of a month of a subscription (SM-1.4; T-SM1)', () => {
   });
 
   it('takes the commitment of the seat down only by the days of the department whose Cost Center is the commitment`s, never by the new department after the transfer', () => {
-    const commitment = { id: 'c-1', costCenterId: 'cc-a', seatMonthlyMinor: 400_000n };
+    const commitment = { id: 'c-1', costCenterId: 'cc-a' };
     const { rows, takenByCommitment } = plan({
       seats: [seat({ commitment })],
       heldByCommitment: new Map([['c-1', 1_200_000n]]),
@@ -60,19 +86,19 @@ describe('the plan of a month of a subscription (SM-1.4; T-SM1)', () => {
     expect(takenByCommitment).toEqual(new Map([['c-1', 322_581n]]));
   });
 
-  it('takes no more than the commitment still holds, and uses the price on the commitment before the price of the subscription', () => {
-    const commitment = { id: 'c-1', costCenterId: 'cc-a', seatMonthlyMinor: 300_000n };
+  it('takes no more than the commitment still holds', () => {
+    const commitment = { id: 'c-1', costCenterId: 'cc-a' };
     const { rows, takenByCommitment } = plan({
       seats: [seat({ commitment, placements: [{ departmentId: A, from: '2026-01-01', to: null }] })],
       heldByCommitment: new Map([['c-1', 100_000n]]),
     });
 
-    expect(rows).toMatchObject([{ amountMinor: 300_000n, monthlyPriceMinor: 300_000n, appliedMinor: 100_000n }]);
+    expect(rows).toMatchObject([{ amountMinor: 400_000n, monthlyPriceMinor: 400_000n, appliedMinor: 100_000n }]);
     expect(takenByCommitment).toEqual(new Map([['c-1', 100_000n]]));
   });
 
   it('charges the same month again with the same rows and applies nothing more: what a row applied before counts as still held', () => {
-    const commitment = { id: 'c-1', costCenterId: 'cc-a', seatMonthlyMinor: null };
+    const commitment = { id: 'c-1', costCenterId: 'cc-a' };
     const first = plan({ seats: [seat({ commitment })], heldByCommitment: new Map([['c-1', 1_200_000n]]) });
     const prior: PriorRow[] = first.rows.map((row) => ({
       assignmentId: row.assignmentId,
@@ -93,7 +119,7 @@ describe('the plan of a month of a subscription (SM-1.4; T-SM1)', () => {
   });
 
   it('never applies less than a row applied before, even when its department no longer bears the commitment (an expense does not come back)', () => {
-    const commitment = { id: 'c-1', costCenterId: 'cc-b', seatMonthlyMinor: 400_000n };
+    const commitment = { id: 'c-1', costCenterId: 'cc-b' };
     const prior: PriorRow[] = [
       { assignmentId: 'seat-1', departmentId: A, appliedMinor: 322_581n, commitmentId: 'c-1' },
     ];
@@ -111,7 +137,7 @@ describe('the plan of a month of a subscription (SM-1.4; T-SM1)', () => {
   });
 
   it('applies what is more than before when the commitment holds more now: 100.000 before and 50.000 held make 150.000, 50.000 more', () => {
-    const commitment = { id: 'c-1', costCenterId: 'cc-a', seatMonthlyMinor: 400_000n };
+    const commitment = { id: 'c-1', costCenterId: 'cc-a' };
     const prior: PriorRow[] = [
       { assignmentId: 'seat-1', departmentId: A, appliedMinor: 100_000n, commitmentId: 'c-1' },
     ];
