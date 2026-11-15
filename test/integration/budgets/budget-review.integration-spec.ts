@@ -13,6 +13,7 @@ interface LineWire {
   spent: { amount: string };
   committed: { amount: string };
   pendingSpend: { amount: string };
+  changedAfterSnapshot: { amount: string };
   remaining: { amount: string };
   variancePpm: number;
   priceIncrease: { amount: string };
@@ -171,7 +172,11 @@ describe('Finance closes a month and the picture of each Cost Center is kept (in
     await expense(a, version.rows[0].id, 10 * M, 0, `${h.year}-05-01`);
     const next = h.dataOf<PeriodWire>(await closing({ year: h.year, month: 7 }).expect(201));
 
-    expect(lineOf(await detail(closed.id), a)).toEqual(before);
+    // The picture keeps every figure it was written with; the only thing that moved is what the line says changed after it (`RV1-06`).
+    expect(lineOf(await detail(closed.id), a)).toEqual({
+      ...before,
+      changedAfterSnapshot: { ...before?.changedAfterSnapshot, amount: String(10 * M) },
+    });
     expect(next).toMatchObject({ month: 7, kind: 'MONTH' });
     expect(lineOf(await detail(next.id), a)).toMatchObject({ spent: { amount: String(178 * M) } });
   });

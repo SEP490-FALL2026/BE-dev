@@ -10,6 +10,7 @@ interface LineWire {
   costCenter: { id: string } | null;
   spent: { amount: string };
   spentAfterMonth: { amount: string };
+  changedAfterSnapshot: { amount: string };
   committed: { amount: string };
   remaining: { amount: string };
   variancePpm: number;
@@ -131,7 +132,10 @@ describe('The figures of the close of a month are worked out as the documents de
   }
 
   /** One department for each case: a month is closed once and the figures of a Cost Center are read by its own line. */
-  const units: Record<'outside' | 'basis' | 'pace', Unit> = {} as Record<'outside' | 'basis' | 'pace', Unit>;
+  const units: Record<'outside' | 'basis' | 'pace' | 'late', Unit> = {} as Record<
+    'outside' | 'basis' | 'pace' | 'late',
+    Unit
+  >;
   const versions: Record<string, string> = {};
 
   beforeAll(async () => {
@@ -141,6 +145,7 @@ describe('The figures of the close of a month are worked out as the documents de
       ['outside', 'P-K2'],
       ['basis', 'P-K1'],
       ['pace', 'P-K3'],
+      ['late', 'P-K4'],
     ] as const) {
       units[key] = await h.departmentWithHead(code);
       versions[key] = (await h.budgetFor(units[key], { total: 300 * M, reserve: 30 * M })).id;
@@ -212,6 +217,29 @@ describe('The figures of the close of a month are worked out as the documents de
       forecast: { amount: String(275 * M) },
       paceBasisPoints: 10_000,
       light: 'GREEN',
+    });
+  });
+
+  it('RV1-06: an invoice that comes late for a month already closed is a change after the picture: the picture keeps its figure, the line says how much changed since', async () => {
+    const unit = units.late;
+    await expense(unit, versions.late, {
+      committed: 160 * M,
+      net: 160 * M,
+      tax: 8 * M,
+      serviceMonth: `${h.year}-03-01`,
+    });
+    const closed = await close(8);
+    const before = lineOf(await detail(closed.id), unit);
+
+    await expense(unit, versions.late, { committed: 10 * M, net: 10 * M, tax: 0, serviceMonth: `${h.year}-05-01` });
+    // An invoice of a month after the one closed is no change of that month: it is spent after it, and the picture of a later month will read it.
+    await expense(unit, versions.late, { committed: 5 * M, net: 5 * M, tax: 0, serviceMonth: `${h.year}-10-01` });
+    const after = lineOf(await detail(closed.id), unit);
+
+    expect(before).toMatchObject({ spent: { amount: String(168 * M) }, changedAfterSnapshot: { amount: '0' } });
+    expect(after).toMatchObject({
+      spent: { amount: String(168 * M) },
+      changedAfterSnapshot: { amount: String(10 * M) },
     });
   });
 });

@@ -1,7 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { pageOf, type Page } from '../../../core/application/pagination';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
+import { monthBoundsOf } from '../../../core/business-date';
 import { BudgetFactsService, type MoneyView } from '../budget/budget-facts.service';
+import { heldKey } from '../budget/commitment.repo';
+import { InvoiceRepo } from '../budget/invoice.repo';
 import { BudgetReviewNotFoundError } from './budget-review.errors';
 import type { ReviewLineWire, ReviewPeriodWire } from './budget-review.dto';
 import {
@@ -27,6 +30,7 @@ export class BudgetReviewQueryService {
   constructor(
     private readonly repo: BudgetReviewRepo,
     private readonly facts: BudgetFactsService,
+    private readonly invoices: InvoiceRepo,
   ) {}
 
   async list(
@@ -135,6 +139,7 @@ export class BudgetReviewQueryService {
       this.facts.costCenters(rows.map((row) => row.costCenterId)),
       this.facts.formatter(period.currency),
     ]);
+    const now = await this.spentNow(period, rows);
 
     return rows.map((row) => ({
       id: row.id,
@@ -143,6 +148,7 @@ export class BudgetReviewQueryService {
       reserve: money(row.reserveMinor),
       spent: money(row.spentMinor),
       spentAfterMonth: money(row.spentAfterMonthMinor),
+      changedAfterSnapshot: money((now.get(heldKey(row.costCenterId, period.year)) ?? 0n) - row.spentMinor),
       committed: money(row.committedMinor),
       pendingSpend: money(row.pendingSpendMinor),
       remaining: money(row.remainingMinor),
@@ -152,5 +158,20 @@ export class BudgetReviewQueryService {
       paceBasisPoints: row.paceBasisPoints === null ? null : Number(row.paceBasisPoints),
       light: row.light,
     }));
+  }
+
+  /**
+   * What each Cost Center of the page spent through the end of the month of the period as it stands now, by the month each invoice or seat-month pays for: what the
+   * picture kept is read against it (`QĐ-111ae`: an invoice that comes late for a month is a change after the picture). Worked out when read, never kept, so the
+   * picture stays as it was written.
+   */
+  private async spentNow(period: ReviewPeriodRecord, rows: readonly ReviewLineRecord[]): Promise<Map<string, bigint>> {
+    const first = `${period.year}-${String(period.month).padStart(2, '0')}-01`;
+
+    return this.invoices.spentOf(
+      rows.map((row) => ({ costCenterId: row.costCenterId, year: period.year })),
+      undefined,
+      monthBoundsOf(first).nextStart,
+    );
   }
 }
