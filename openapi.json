@@ -60595,7 +60595,7 @@
         ],
         "responses": {
           "200": {
-            "description": "One figure for the year: the base, the reserve and their total, what the Cost Center carries into the year (carriedOverNextYear) with the red flag when the base is below it (belowCarriedOver, never a refusal), and whether Finance built it from the baseline because the department had no proposal (noProposalSubmitted).",
+            "description": "One figure for the year: the base, the reserve and their total, what the Cost Center carries into the year (carriedOverNextYear) with the red flag when the base and the reserve together are below it (belowCarriedOver, never a refusal) and the amount that is missing (carriedOverShortfall), and whether Finance built it from the baseline because the department had no proposal (noProposalSubmitted).",
             "content": {
               "application/json": {
                 "schema": {
@@ -61259,7 +61259,7 @@
             }
           },
           "422": {
-            "description": "The version has no file that explains it (BUDGET_VERSION.ATTACHMENT_REQUIRED), a reserve that is not its share of the base has no reason (BUDGET.RESERVE_REASON_REQUIRED) or the year has ended (BUDGET.YEAR_ENDED).",
+            "description": "The version has no file that explains it (BUDGET_VERSION.ATTACHMENT_REQUIRED), a reserve that is not the default share of the organization has no reason (BUDGET.RESERVE_REASON_REQUIRED) or the year has ended (BUDGET.YEAR_ENDED).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -116260,13 +116260,13 @@
                 "properties": { "amount": { "type": "string", "maxLength": 40 } },
                 "required": ["amount"],
                 "additionalProperties": false,
-                "description": "The reserve as an amount; not with reservePercent. An amount that is not the default share asks a reason."
+                "description": "The reserve as an amount; not with reservePercent. An amount that is not the default share of the base asks a reason when the version is sent."
               },
               "reservePercent": {
                 "type": "integer",
                 "minimum": 0,
                 "maximum": 100,
-                "description": "The reserve as a share of the base, in whole percent; not with reserve. The default share when neither is given."
+                "description": "The reserve as a share of the base, in whole percent; not with reserve. The default share when neither is given. A share that is not the default asks reserveReason when the version is sent."
               },
               "reserveReason": { "type": "string", "minLength": 1, "maxLength": 1000 }
             },
@@ -116291,13 +116291,13 @@
                 "properties": { "amount": { "type": "string", "maxLength": 40 } },
                 "required": ["amount"],
                 "additionalProperties": false,
-                "description": "The reserve as an amount; not with reservePercent. An amount that is not the default share asks a reason."
+                "description": "The reserve as an amount; not with reservePercent. An amount that is not the default share of the base asks a reason when the version is sent."
               },
               "reservePercent": {
                 "type": "integer",
                 "minimum": 0,
                 "maximum": 100,
-                "description": "The reserve as a share of the base, in whole percent; not with reserve. The default share when neither is given."
+                "description": "The reserve as a share of the base, in whole percent; not with reserve. The default share when neither is given. A share that is not the default asks reserveReason when the version is sent."
               },
               "reserveReason": { "type": "string", "minLength": 1, "maxLength": 1000 }
             },
@@ -116383,7 +116383,14 @@
                   },
                   "belowCarriedOver": {
                     "type": "boolean",
-                    "description": "The red flag: the base is below carriedOverNextYear. It never stops a sending or a decision."
+                    "description": "The red flag: the budget of the department, the base and the reserve together (total), is below carriedOverNextYear. It never stops a sending or a decision."
+                  },
+                  "carriedOverShortfall": {
+                    "type": "object",
+                    "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                    "required": ["amount", "currency"],
+                    "additionalProperties": false,
+                    "description": "What the base and the reserve lack of carriedOverNextYear: zero when they cover it, the amount to tell with the red flag when they do not."
                   },
                   "noProposalSubmitted": {
                     "type": "boolean",
@@ -116448,6 +116455,7 @@
                   "reason",
                   "carriedOverNextYear",
                   "belowCarriedOver",
+                  "carriedOverShortfall",
                   "noProposalSubmitted",
                   "waitingReason",
                   "decision",
@@ -116673,13 +116681,13 @@
             "properties": { "amount": { "type": "string", "maxLength": 40 } },
             "required": ["amount"],
             "additionalProperties": false,
-            "description": "The reserve as an amount; not with reservePercent. An amount that is not the default share asks a reason."
+            "description": "The reserve as an amount; not with reservePercent. An amount that is not the default share of the base asks a reason when the version is sent."
           },
           "reservePercent": {
             "type": "integer",
             "minimum": 0,
             "maximum": 100,
-            "description": "The reserve as a share of the base, in whole percent; not with reserve. The default share when neither is given."
+            "description": "The reserve as a share of the base, in whole percent; not with reserve. The default share when neither is given. A share that is not the default asks reserveReason when the version is sent."
           },
           "reserveReason": { "type": "string", "minLength": 1, "maxLength": 1000, "nullable": true }
         },
@@ -117937,7 +117945,14 @@
                     },
                     "belowCarriedOver": {
                       "type": "boolean",
-                      "description": "The red flag: the newest version of the Cost Center for the year has a base below carriedOverNextYear. False when it has none; it never stops anything."
+                      "description": "The red flag: the newest version of the Cost Center for the year has a base and a reserve (its total) below carriedOverNextYear. False when it has none; it never stops anything."
+                    },
+                    "carriedOverShortfall": {
+                      "type": "object",
+                      "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                      "required": ["amount", "currency"],
+                      "additionalProperties": false,
+                      "description": "What the base and the reserve of that version lack of carriedOverNextYear: zero when they cover it or when there is no version."
                     },
                     "noProposalSubmitted": {
                       "type": "boolean",
@@ -118029,6 +118044,7 @@
                     "spentThisYear",
                     "carriedOverNextYear",
                     "belowCarriedOver",
+                    "carriedOverShortfall",
                     "noProposalSubmitted",
                     "estimatedAnnualCost",
                     "hasUnknownCost",
