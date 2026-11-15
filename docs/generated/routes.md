@@ -329,6 +329,7 @@ Find a route, open its controller, then the service it calls. Module of a file =
 | GET | `/usage-sources` | [usage/vendor-source/vendor-source.controller.ts](../../src/modules/usage/vendor-source/vendor-source.controller.ts) → `list` | [VendorSourceQueryService](../../src/modules/usage/vendor-source/vendor-source-query.service.ts) |
 | GET | `/usage-sources/{id}` | [usage/vendor-source/vendor-source.controller.ts](../../src/modules/usage/vendor-source/vendor-source.controller.ts) → `get` | [VendorSourceQueryService](../../src/modules/usage/vendor-source/vendor-source-query.service.ts) |
 | PATCH | `/usage-sources/{id}` | [usage/vendor-source/vendor-source.controller.ts](../../src/modules/usage/vendor-source/vendor-source.controller.ts) → `update` | [VendorSourceService](../../src/modules/usage/vendor-source/vendor-source.service.ts), [VendorSourceQueryService](../../src/modules/usage/vendor-source/vendor-source-query.service.ts) |
+| GET | `/contracts/{id}/usage-sources` | [usage/vendor-source/vendor-source-contract.controller.ts](../../src/modules/usage/vendor-source/vendor-source-contract.controller.ts) → `list` | [VendorSourceQueryService](../../src/modules/usage/vendor-source/vendor-source-query.service.ts) |
 | POST | `/usage-imports` | [usage/vendor-import/vendor-import.controller.ts](../../src/modules/usage/vendor-import/vendor-import.controller.ts) → `upload` | [VendorImportService](../../src/modules/usage/vendor-import/vendor-import.service.ts) |
 | GET | `/usage-imports/{id}` | [usage/vendor-import/vendor-import.controller.ts](../../src/modules/usage/vendor-import/vendor-import.controller.ts) → `get` | [VendorImportQueryService](../../src/modules/usage/vendor-import/vendor-import-query.service.ts) |
 | GET | `/usage-imports/{id}/rows` | [usage/vendor-import/vendor-import.controller.ts](../../src/modules/usage/vendor-import/vendor-import.controller.ts) → `rows` | [VendorImportQueryService](../../src/modules/usage/vendor-import/vendor-import-query.service.ts) |
@@ -389,4 +390,4 @@ Find a route, open its controller, then the service it calls. Module of a file =
 | GET | `/dashboards/super-admin` | [dashboards/super-admin/super-admin-dashboard.controller.ts](../../src/modules/dashboards/super-admin/super-admin-dashboard.controller.ts) → `get` | [SuperAdminDashboardService](../../src/modules/dashboards/super-admin/super-admin-dashboard.service.ts) |
 | GET | `/reports/revocation-sla` | [dashboards/revocation-sla/revocation-sla.controller.ts](../../src/modules/dashboards/revocation-sla/revocation-sla.controller.ts) → `get` | [RevocationSlaQueryService](../../src/modules/dashboards/revocation-sla/revocation-sla-query.service.ts) |
 
-383 operations.
+384 operations.

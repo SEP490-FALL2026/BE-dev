@@ -131,7 +131,7 @@ flowchart BT
   requests -->|11| operating_parameters
   requests -->|92| organization
   usage -->|7| audit
-  usage -->|7| catalog
+  usage -->|8| catalog
   usage -->|15| devices
   usage -->|7| licensing
   usage -->|2| notifications
