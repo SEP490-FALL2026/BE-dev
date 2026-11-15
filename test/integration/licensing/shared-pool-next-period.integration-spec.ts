@@ -98,6 +98,26 @@ describe('G9-01 the shared pool between a renewal recorded and the next period (
     expect(rows[0].q).toBe(1);
   });
 
+  it('B2B-02 a grant that names a next period not started yet is 422 SUBSCRIPTION_NOT_GRANTABLE: the seat is taken on the period that runs, and nothing is bought on either', async () => {
+    const running = await h.subscription(2, 'K2');
+    const planId = await h.planOf(running);
+    await h.seat({ subscriptionId: running }, code());
+    const startsOn = h.inDays(30);
+    const next = await nextPeriod(h, running, 'ACTIVE', startsOn);
+    await carry(h, running, next, startsOn);
+
+    const refused = await h
+      .grant({ requestId: h.gate.grantable(person(), planId), subscriptionId: next, purchase: {} })
+      .expect(422);
+
+    expect(h.codeOf(refused)).toBe('PROVISIONING.SUBSCRIPTION_NOT_GRANTABLE');
+    const { rows } = await h.ctx.sql.query<{ id: string; q: number }>(
+      `SELECT id, purchased_quantity AS q FROM subscriptions WHERE id = ANY($1::uuid[]) ORDER BY id`,
+      [[running, next]],
+    );
+    expect(rows.map((row) => row.q)).toEqual([2, 2]);
+  });
+
   it('G9-01 (F-012) a next period still a draft leaves the period that runs grantable and pricing the plan', async () => {
     const running = await h.subscription(2, 'K2');
     const planId = await h.planOf(running);
