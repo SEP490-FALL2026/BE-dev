@@ -159,6 +159,7 @@ export const API_COVERAGE_MANIFEST: readonly string[] = [
   'POST /api/v1/provisioning-tasks/{id}/access-cut',
   'GET /api/v1/ghost-seat-recommendations',
   'GET /api/v1/ghost-seat-recommendations/{id}',
+  'POST /api/v1/ghost-seat-recommendations/escalations',
   'POST /api/v1/ghost-seat-recommendations/{id}/return',
   'GET /api/v1/ghost-seat-queue',
   'GET /api/v1/ghost-seat-decisions',

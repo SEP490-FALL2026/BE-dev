@@ -16,7 +16,7 @@ operating-parameters, notifications, audit. Được dùng bởi: `dashboards` (
 
 - `ghost_seat_recommendations` (bằng chứng `evidence` bất biến — trigger; partial UNIQUE cổng 8: một khuyến nghị chưa đóng cho mỗi thuê bao
   `G1` và cho mỗi chuỗi seat), `ghost_seat_rule_runs` (UNIQUE `(tổ chức, bộ luật, kỳ)`), `ghost_seat_rule_skips` (chỉ ghi thêm — trigger)
-  (`prisma/models/optimization.prisma`). Mọi `*_id` sang module khác là giá trị, không FK (Prisma buộc model của module kia nhắc tới module này).
+  (`prisma/models/optimization.prisma`), `ghost_seat_escalations` (mỗi `Idempotency-Key` của một người một dòng: dấu vân tay yêu cầu, ghi chú, kết quả đã trả). Mọi `*_id` sang module khác là giá trị, không FK (Prisma buộc model của module kia nhắc tới module này).
 
 ## Capability (không vòng: `ghost-seat`, `rule-run` L0 ← `internal-rules` L1 ← `board` L3)
 
@@ -45,6 +45,12 @@ operating-parameters, notifications, audit. Được dùng bởi: `dashboards` (
   `ghostSeatDecisionList` (SUPER_ADMIN), `ghostSeatExemptionList` (MANAGER phòng mình, IT_ADMIN đọc); `ghostSeatRecommendationGet` mở cho MANAGER là người quyết;
   `ghostSeatRecommendationReclaim` mở lại `G3`/`G4` `RECLAIM_DECIDED` sau đóng thất bại (Q-95). SQL quyết định/trả lại/miễn trừ ở
   `ghost-seat/ghost-seat-decision.repo.ts` (L0, dùng chung `board` và `decision`).
+
+- `escalation/` (L3, import `decision` để định tuyến và `ghost-seat` L0; không ai import) — `QĐ-111ay`: IT đẩy sớm khuyến nghị `G3`/`G4` tầng _Theo dõi_ (`MONITOR`, còn `OPEN`) sang
+  _Cần xem xét_ trước lượt tuần: `escalation.policy.ts` (ai đủ điều kiện: không phải tài khoản máy `QĐ-110m`, không ở ân hạn điều chuyển `QĐ-110p`, seat còn giữ ghế, người giữ có phòng),
+  `escalation.service.ts` (một lô một transaction: lấy khóa `Idempotency-Key` trước, khóa khuyến nghị theo `id` tăng dần, nâng tầng `GhostSeatService.raiseTierEarly` — chỉ đổi `tier`, bằng chứng giữ nguyên —
+  rồi `DecisionRoutingService.enterQueue` vào hàng của trưởng phòng hoặc chờ), `escalation.repo.ts` + `escalation-results.json.ts` (bảng khóa/kết quả để cùng khóa trả lại đúng kết quả cũ, khác danh sách ⟹ 409).
+  HTTP: `ghostSeatEscalationCreate` (`POST /ghost-seat-recommendations/escalations`, IT_ADMIN, kết quả từng mục, mục không đẩy được không làm lô lỗi). Lượt tuần hiện **không** tạo dòng `MONITOR` (`M5-18`): xem OVERNIGHT-DECISIONS `D-73`.
 
 - `usage-rules/` (L3 vì nhóm `threshold/` có controller; không ai import) — `G3`/`G4` hằng tuần (`qd103-ghost-seat-g3-g4`): `usage-rules.service.ts` (lượt `RULE_SCHEDULE_G3_G4`,
   `rule_set = G3_G4`), `usage-rules-context.service.ts` (đọc một lần: bàn giao, điều chuyển, miễn trừ, khuyến nghị có sẵn; mỗi ứng dụng một `evidenceFor`),
