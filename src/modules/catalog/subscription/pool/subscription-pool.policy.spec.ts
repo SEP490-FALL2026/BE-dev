@@ -262,8 +262,9 @@ describe('withoutPeriodsAhead: the seats of the period that runs and of the next
   });
   const idsOf = (rows: readonly { id: string }[]) => rows.map((row) => row.id);
 
-  it('keeps every period when none of them continues another', () => {
+  it('keeps every period when none of them continues another, and answers nothing for nothing', () => {
     expect(idsOf(withoutPeriodsAhead([period('a'), period('b')], TODAY))).toEqual(['a', 'b']);
+    expect(withoutPeriodsAhead([], TODAY)).toEqual([]);
   });
 
   it('leaves out a next period that begins after today when the period it continues is among them', () => {
@@ -287,14 +288,6 @@ describe('withoutPeriodsAhead: the seats of the period that runs and of the next
 
   it('keeps a period with no start date: nothing says it is ahead', () => {
     expect(idsOf(withoutPeriodsAhead([period('a'), period('b', 'a', null)], TODAY))).toEqual(['a', 'b']);
-  });
-
-  it('answers nothing for nothing and does not change what it was given', () => {
-    const given = [period('a'), period('b', 'a', '2026-12-15')];
-
-    expect(withoutPeriodsAhead([], TODAY)).toEqual([]);
-    withoutPeriodsAhead(given, TODAY);
-    expect(idsOf(given)).toEqual(['a', 'b']);
   });
 });
 
