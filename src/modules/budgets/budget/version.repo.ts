@@ -379,21 +379,28 @@ export class VersionRepo {
     );
   }
 
+  /**
+   * Writes what Finance changed. The forecast by quarter is gone (`QĐ-111ac`) but a draft or a version sent back that an older release
+   * left can still hold it, and the database wants the four quarters to add up to the total or to be all empty
+   * (`budget_versions_quarters_check`): when the total moves, the quarters are let go.
+   */
   async patch(tx: DbTx, id: string, patch: VersionPatch): Promise<void> {
     const base = patch.baseMinor;
     const reserve = patch.reserveMinor;
     const current = await tx.budgetVersion.findUniqueOrThrow({
       where: { id },
-      select: { baseMinor: true, reserveMinor: true },
+      select: { baseMinor: true, reserveMinor: true, totalMinor: true },
     });
     const nextBase = base ?? current.baseMinor;
     const nextReserve = reserve ?? current.reserveMinor;
+    const nextTotal = nextBase + nextReserve;
     await tx.budgetVersion.update({
       where: { id },
       data: {
         baseMinor: nextBase,
         reserveMinor: nextReserve,
-        totalMinor: nextBase + nextReserve,
+        totalMinor: nextTotal,
+        ...(nextTotal !== current.totalMinor ? { q1Minor: null, q2Minor: null, q3Minor: null, q4Minor: null } : {}),
         ...(patch.reserveReason !== undefined ? { reserveReason: patch.reserveReason } : {}),
         ...(patch.reservePercent !== undefined ? { reservePercent: patch.reservePercent } : {}),
         ...(patch.baseReason !== undefined ? { baseReason: patch.baseReason } : {}),
