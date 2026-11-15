@@ -4,7 +4,13 @@ import type { AuthenticatedPrincipal } from '../../../infrastructure/security/to
 import { AuditApi } from '../../audit/public/audit.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { policiesEvent } from '../policies-audit-event.mapper';
-import { PolicyDraftNotFoundError, PolicyNotFoundError, PolicyNotPublishedError } from './library.errors';
+import { refuseContent } from './library-content.policy';
+import {
+  contentRefusalError,
+  PolicyDraftNotFoundError,
+  PolicyNotFoundError,
+  PolicyNotPublishedError,
+} from './library.errors';
 import { draftValuesOf, type DraftChange } from './library.policy';
 import { LibraryRepo } from './library.repo';
 import type { DraftValues, PolicyVersionRecord } from './library.types';
@@ -40,8 +46,9 @@ export class LibraryDraftService {
   }
 
   /**
-   * Opens the draft as a copy of the version in force when there is none, then puts what was given over it. Throws PolicyNotFoundError and
-   * PolicyNotPublishedError (a policy with nothing in force and no draft has nothing to copy).
+   * Opens the draft as a copy of the version in force when there is none, then puts what was given over it. Throws PolicyNotFoundError,
+   * PolicyNotPublishedError (a policy with nothing in force and no draft has nothing to copy), PolicyStepSetFixedError and
+   * PolicySystemItemUnknownError.
    */
   async write(actor: AuthenticatedPrincipal, code: string, change: DraftChange): Promise<PolicyVersionRecord> {
     const organization = await this.requireOrganization();
@@ -53,6 +60,10 @@ export class LibraryDraftService {
       const base = draft ?? (await this.repo.current(policy.id, tx));
       if (!base) throw new PolicyNotPublishedError();
       const values = draftValuesOf(valuesOf(base), change);
+      // The steps and the questions answered by the system are the ones of the version in force: a policy's words change, its rules do not.
+      const inForce = await this.repo.current(policy.id, tx);
+      const refusal = inForce ? refuseContent(inForce.content, values.content) : null;
+      if (refusal) throw contentRefusalError(refusal);
       const saved = draft
         ? await this.repo.updateDraft(tx, draft.id, values)
         : await this.repo.insertDraft(tx, {

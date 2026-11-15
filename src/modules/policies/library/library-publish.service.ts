@@ -6,7 +6,8 @@ import { IdentityAccessApi } from '../../identity-access/public/identity-access.
 import { NotificationsApi } from '../../notifications/public/notifications.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { policiesEvent } from '../policies-audit-event.mapper';
-import { PolicyDraftNotFoundError, PolicyNotFoundError } from './library.errors';
+import { refuseContent } from './library-content.policy';
+import { contentRefusalError, PolicyDraftNotFoundError, PolicyNotFoundError } from './library.errors';
 import { publishValuesOf, type PublishInput } from './library.policy';
 import { LibraryRepo } from './library.repo';
 import type { PublishedVersionRecord } from './library.types';
@@ -48,6 +49,9 @@ export class LibraryPublishService {
       if (!policy) throw new PolicyNotFoundError();
       const draft = await this.repo.draft(policy.id, tx);
       if (!draft) throw new PolicyDraftNotFoundError();
+      const inForce = await this.repo.current(policy.id, tx);
+      const refusal = inForce ? refuseContent(inForce.content, draft.content) : null;
+      if (refusal) throw contentRefusalError(refusal);
       const values = publishValuesOf(await this.repo.lastNumber(tx, policy.id), input);
       const version = await this.repo.publishDraft(tx, draft.id, {
         ...values,

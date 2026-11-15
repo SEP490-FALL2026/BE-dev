@@ -3,7 +3,11 @@ import request from 'supertest';
 import { App } from 'supertest/types';
 import { LibraryDraftService } from '../../../src/modules/policies/library/library-draft.service';
 import { LibraryPublishService } from '../../../src/modules/policies/library/library-publish.service';
-import { PolicyDraftNotFoundError } from '../../../src/modules/policies/library/library.errors';
+import {
+  PolicyDraftNotFoundError,
+  PolicyStepSetFixedError,
+  PolicySystemItemUnknownError,
+} from '../../../src/modules/policies/library/library.errors';
 import type { PolicyVersionRecord, PublishedVersionRecord } from '../../../src/modules/policies/library/library.types';
 import { bodyOf } from '../../support/api-body';
 import { bearer, createHttpContractApp, principal } from '../../support/http-contract-app';
@@ -120,6 +124,30 @@ describe('policy draft routes (http contract, no database)', () => {
 
   it('refuses a code that is not a policy code (422)', async () => {
     await asSuperAdmin(request(app.getHttpServer()).get(`${POLICIES}/pol_mf1/draft`)).expect(422);
+  });
+
+  it('answers 422 POLICY.STEP_SET_FIXED, naming the steps, when a text adds or takes away a decision step (QĐ-112a)', async () => {
+    drafts.write.mockRejectedValueOnce(new PolicyStepSetFixedError(['1.9'], ['1.6']));
+
+    const response = await asSuperAdmin(request(app.getHttpServer()).put(DRAFT).send({})).expect(422);
+
+    expect(bodyOf(response).error).toMatchObject({
+      code: 'POLICY.STEP_SET_FIXED',
+      details: { added: ['1.9'], removed: ['1.6'] },
+    });
+  });
+
+  it('answers 422 POLICY.SYSTEM_ITEM_UNKNOWN when a text marks a question as answered by the system that is not', async () => {
+    publication.publish.mockRejectedValueOnce(new PolicySystemItemUnknownError(['1.2-04']));
+
+    const response = await asSuperAdmin(
+      request(app.getHttpServer()).post(`${DRAFT}/publish`).send(PUBLISH_BODY),
+    ).expect(422);
+
+    expect(bodyOf(response).error).toMatchObject({
+      code: 'POLICY.SYSTEM_ITEM_UNKNOWN',
+      details: { items: ['1.2-04'] },
+    });
   });
 
   it('answers 404 POLICY.DRAFT_NOT_FOUND when there is nothing to publish', async () => {
