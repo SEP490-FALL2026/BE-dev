@@ -22,6 +22,7 @@ import { ROUTE_ERROR_CODES_CATALOG } from './openapi-example-route-codes-catalog
 import { ROUTE_ERROR_CODES_DATA_IMPORT } from './openapi-example-route-codes-data-import';
 import { SUCCESS_MESSAGES_DEVICES } from './openapi-example-messages-devices';
 import { SUCCESS_MESSAGES_OPTIMIZATION } from './openapi-example-messages-optimization';
+import { SUCCESS_MESSAGES_PURCHASE_INVOICE } from './openapi-example-messages-purchase-invoice';
 import { SUCCESS_MESSAGES_USAGE } from './openapi-example-messages-usage';
 import { ROUTE_ERROR_CODES_DEVICES } from './openapi-example-route-codes-devices';
 import { ROUTE_ERROR_CODES_HEALTH } from './openapi-example-route-codes-health';
@@ -40,6 +41,7 @@ export type RouteErrorStatus = '400' | '401' | '403' | '404' | '409' | '413' | '
 export const SUCCESS_MESSAGES: Readonly<Record<string, string>> = {
   ...SUCCESS_MESSAGES_DEVICES,
   ...SUCCESS_MESSAGES_OPTIMIZATION,
+  ...SUCCESS_MESSAGES_PURCHASE_INVOICE,
   ...SUCCESS_MESSAGES_USAGE,
   accessRequestAssessmentComplete: 'ACCESS_REQUEST.ASSESSMENT_COMPLETED',
   accessRequestAssessmentGet: 'ACCESS_REQUEST.ASSESSMENT_FETCHED',
@@ -210,11 +212,6 @@ export const SUCCESS_MESSAGES: Readonly<Record<string, string>> = {
   functionalGroupList: 'FUNCTIONAL_GROUP.LISTED',
   functionalGroupUpdate: 'FUNCTIONAL_GROUP.UPDATED',
   grantQueueList: 'GRANT_QUEUE.LISTED',
-  purchaseInvoiceGet: 'PURCHASE_INVOICE.READ',
-  purchaseInvoiceList: 'PURCHASE_INVOICE.LISTED',
-  purchaseInvoicePreview: 'PURCHASE_INVOICE.PREVIEWED',
-  purchaseInvoiceResubmit: 'PURCHASE_INVOICE.RESUBMITTED',
-  purchaseInvoiceSubmit: 'PURCHASE_INVOICE.SUBMITTED',
   groupRequestCandidateList: 'GROUP_REQUEST.CANDIDATES_LISTED',
   groupRequestCheck: 'GROUP_REQUEST.CHECKED',
   groupRequestSubmit: 'GROUP_REQUEST.SUBMITTED',
@@ -372,11 +369,9 @@ export const SUCCESS_MESSAGES: Readonly<Record<string, string>> = {
   vendorTaxProfileHistory: 'VENDOR_TAX_PROFILE.HISTORY_LISTED',
   vendorTaxProfileSet: 'VENDOR_TAX_PROFILE.DECLARED',
 };
-
 export const BODYLESS_RESPONSES: Readonly<Record<string, string>> = {
   'authLogout 204': 'Signed out: 204 No Content has no body (@RawResponse).',
 };
-
 export const NO_EXAMPLE_RESPONSES: Readonly<Record<string, string>> = {};
 
 /**

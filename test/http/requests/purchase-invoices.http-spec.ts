@@ -38,6 +38,48 @@ describe('the routes of purchase invoices (e2e, no database)', () => {
     await app?.close();
   });
 
+  it('needs a token to sign and to return, and refuses everyone but Finance with 403', async () => {
+    for (const url of [`${URL}/${ID}/confirmation`, `${URL}/${ID}/return`]) {
+      const unauthenticated = await request(app.getHttpServer()).post(url).send({ reason: 'x' }).expect(401);
+      expect(bodyOf(unauthenticated).error.code).toBe('AUTHENTICATION_REQUIRED');
+      for (const roles of [['IT_ADMIN'], ['EMPLOYEE'], ['SUPER_ADMIN']]) {
+        const refused = await request(app.getHttpServer())
+          .post(url)
+          .set('Authorization', as(roles))
+          .send({ reason: 'x' })
+          .expect(403);
+        expect(bodyOf(refused).error.code).toBe('AUTHORIZATION.FORBIDDEN');
+      }
+    }
+  });
+
+  it.each([
+    ['no reason', {}],
+    ['a blank reason', { reason: '   ' }],
+    ['a reason of 1001 characters', { reason: 'x'.repeat(1001) }],
+    ['a field the return does not have', { reason: 'x', note: 'y' }],
+  ])('refuses a return with %s with 422', async (_name, body) => {
+    const response = await request(app.getHttpServer())
+      .post(`${URL}/${ID}/return`)
+      .set('Authorization', as(['FINANCE']))
+      .send(body)
+      .expect(422);
+
+    expect(bodyOf(response).error.code).toBe('VALIDATION_ERROR');
+  });
+
+  it('refuses a signature or a return whose id is not an id with 422', async () => {
+    for (const path of ['confirmation', 'return']) {
+      const response = await request(app.getHttpServer())
+        .post(`${URL}/hoa-don/${path}`)
+        .set('Authorization', as(['FINANCE']))
+        .send({ reason: 'x' })
+        .expect(422);
+
+      expect(bodyOf(response).error.code).toBe('VALIDATION_ERROR');
+    }
+  });
+
   it.each([
     ['preview', 'post', `${URL}/preview`],
     ['submission', 'post', URL],

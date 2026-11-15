@@ -189,6 +189,8 @@ import { MyRequestsRepo } from './my-requests/my-requests.repo';
 import { MyRequestsService } from './my-requests/my-requests.service';
 import { PurchaseInvoicePlanService } from './purchase-invoice/purchase-invoice-plan.service';
 import { PurchaseInvoiceQueryService } from './purchase-invoice/purchase-invoice-query.service';
+import { PurchaseInvoiceConfirmationService } from './purchase-invoice/confirmation/purchase-invoice-confirmation.service';
+import { PurchaseInvoiceDecisionsController } from './purchase-invoice/purchase-invoice-decisions.controller';
 import { PurchaseInvoiceRepo } from './purchase-invoice/purchase-invoice.repo';
 import { PurchaseInvoiceSubmissionService } from './purchase-invoice/purchase-invoice-submission.service';
 import { PurchaseInvoicesController } from './purchase-invoice/purchase-invoices.controller';
@@ -239,6 +241,7 @@ import { PurchaseInvoicesController } from './purchase-invoice/purchase-invoices
     ReturnRequestsController,
     RenewalRequestsController,
     PurchaseInvoicesController,
+    PurchaseInvoiceDecisionsController,
     ControlledWaitController,
     RequestTimingsController,
     CongestionController,
@@ -364,6 +367,7 @@ import { PurchaseInvoicesController } from './purchase-invoice/purchase-invoices
     PurchaseInvoicePlanService,
     PurchaseInvoiceSubmissionService,
     PurchaseInvoiceQueryService,
+    PurchaseInvoiceConfirmationService,
     RenewalApplyService,
     RenewalRequestTrail,
     RenewalHoldReader,

@@ -264,6 +264,19 @@ export const ROUTE_ERROR_CODES_REQUESTS: Readonly<
   purchaseInvoiceGet: {
     '404': ['PURCHASE_INVOICE.NOT_FOUND'],
   },
+  purchaseInvoiceConfirm: {
+    '404': ['PURCHASE_INVOICE.NOT_FOUND'],
+    '409': [
+      'PURCHASE_INVOICE.NO_PLACE',
+      'PURCHASE_INVOICE.NOT_SUBMITTED',
+      'PURCHASE_INVOICE.NUMBER_TAKEN',
+      'PURCHASE_INVOICE.SAME_PERSON',
+    ],
+  },
+  purchaseInvoiceReturn: {
+    '404': ['PURCHASE_INVOICE.NOT_FOUND'],
+    '409': ['PURCHASE_INVOICE.NOT_SUBMITTED'],
+  },
   stepCongestionIncidentRecord: {
     '404': ['STEP_CONGESTION.HOLDER_NOT_FOUND'],
   },
