@@ -45936,7 +45936,7 @@
             }
           },
           "409": {
-            "description": "The request is not waiting for its assessment (ACCESS_REQUEST.NOT_AWAITING_ASSESSMENT), internal software is completed by registering it (ASSESSMENT.INTERNAL_COMPLETES_BY_REGISTRATION), or a tool that cannot be controlled is refused at the gate (ASSESSMENT.CONTROL_LEVEL_UNCONTROLLABLE).",
+            "description": "The request is not waiting for its assessment (ACCESS_REQUEST.NOT_AWAITING_ASSESSMENT), internal software is completed by registering it (ASSESSMENT.INTERNAL_COMPLETES_BY_REGISTRATION), a tool that cannot be controlled is refused at the gate (ASSESSMENT.CONTROL_LEVEL_UNCONTROLLABLE), or a short proposal names internal software, whose plans are free (ASSESSMENT.SHORT_PROPOSAL_FREE_PLAN): add the plan to the catalog and reject the proposal as not eligible, naming that plan, for the person to ask for it from the catalog.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -45970,6 +45970,17 @@
                       "error": {
                         "code": "ASSESSMENT.CONTROL_LEVEL_UNCONTROLLABLE",
                         "message": "A tool that cannot be controlled is refused at the gate, not completed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "ASSESSMENT.SHORT_PROPOSAL_FREE_PLAN": {
+                    "summary": "A plan of internal software is free: add it to the catalog and reject the proposal for the person to ask for it from there.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "ASSESSMENT.SHORT_PROPOSAL_FREE_PLAN",
+                        "message": "A plan of internal software is free: add it to the catalog and reject the proposal for the person to ask for it from there.",
                         "requestId": "req_example"
                       }
                     }
@@ -47023,7 +47034,7 @@
             }
           },
           "422": {
-            "description": "The body is invalid (VALIDATION_ERROR), or the plan is of another kind than the assessment concluded and the months of use the person gave do not fit it (ASSESSMENT.TERM_NOT_FIT_KIND, with details.provisioningType, termMonths, maxMonths and the reason: link a plan of a kind that takes them, or reject the request for the person to propose again), or the catalog no longer offers what the list of the department would hold (DEPARTMENT_SOFTWARE.NOT_IN_CATALOG). Nothing is written. A plan bought once takes no months: linking it clears any the person gave.",
+            "description": "The body is invalid (VALIDATION_ERROR), or the plan is of another kind than the assessment concluded and the months of use the person gave do not fit it (ASSESSMENT.TERM_NOT_FIT_KIND, with details.provisioningType, termMonths, maxMonths and the reason: link a plan of a kind that takes them, or reject the request for the person to propose again), or the proposal is a short one that names an application of the catalog and the plan belongs to another application (ACCESS_REQUEST.CATALOG_LINK_APPLICATION_MISMATCH, with details.expectedApplicationId: only the plan of that application was assessed; a proposal of software that is new links to any plan), or the catalog no longer offers what the list of the department would hold (DEPARTMENT_SOFTWARE.NOT_IN_CATALOG). Nothing is written. A plan bought once takes no months: linking it clears any the person gave.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -47053,6 +47064,18 @@
                           "maxMonths": 9,
                           "reason": "TERM_MONTHS_OUT_OF_RANGE"
                         },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "ACCESS_REQUEST.CATALOG_LINK_APPLICATION_MISMATCH": {
+                    "summary": "The proposal names another application than the one the plan belongs to.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "ACCESS_REQUEST.CATALOG_LINK_APPLICATION_MISMATCH",
+                        "message": "The proposal names another application than the one the plan belongs to.",
+                        "details": { "expectedApplicationId": "<application-id>" },
                         "requestId": "req_example"
                       }
                     }
@@ -50850,7 +50873,7 @@
         ],
         "responses": {
           "200": {
-            "description": "The proposals whose assessment has been decided, in the departments the caller reads, the newest decision first: completed (the request went on to the spend decision) or refused at the gate. Each says what the software is, who asked, who decided and when, how it ended and, for a refusal, its kind and the reason. The assessment itself is read by the route of the request.",
+            "description": "The proposals whose assessment has been decided, in the departments the caller reads, the newest decision first: completed (the request went on to the spend decision, or, for internal software with no fee registered by the IT Admin, straight to the IT Admin to grant it) or refused at the gate. Each says what the software is, who asked, who decided and when, how it ended and, for a refusal, its kind and the reason. The assessment itself is read by the route of the request.",
             "content": {
               "application/json": {
                 "schema": {
@@ -103868,7 +103891,14 @@
                         "maximum": 9007199254740991,
                         "minimum": 0
                       },
-                      "existingApplicationId": { "type": "string", "format": "uuid", "nullable": true }
+                      "existingApplicationId": { "type": "string", "format": "uuid", "nullable": true },
+                      "existingApplication": {
+                        "type": "object",
+                        "properties": { "id": { "type": "string", "format": "uuid" }, "name": { "type": "string" } },
+                        "required": ["id", "name"],
+                        "additionalProperties": false,
+                        "nullable": true
+                      }
                     },
                     "required": [
                       "softwareName",
@@ -103876,7 +103906,8 @@
                       "purpose",
                       "dataDescription",
                       "expectedUsers",
-                      "existingApplicationId"
+                      "existingApplicationId",
+                      "existingApplication"
                     ],
                     "additionalProperties": false
                   },
@@ -107059,7 +107090,7 @@
                     "scope": { "type": "string", "enum": ["FULL", "PLAN_ONLY"] },
                     "readiness": {
                       "type": "string",
-                      "enum": ["COMPLETABLE", "INCOMPLETE", "INTERNAL_BY_REGISTRATION", "UNCONTROLLABLE"]
+                      "enum": ["COMPLETABLE", "INCOMPLETE", "INTERNAL_BY_REGISTRATION", "UNCONTROLLABLE", "FREE_PLAN"]
                     },
                     "missingCount": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
                     "quote": { "type": "string", "enum": ["MISSING", "RECORDED"] },

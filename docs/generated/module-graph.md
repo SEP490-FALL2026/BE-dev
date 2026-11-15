@@ -123,10 +123,10 @@ flowchart BT
   personnel -->|8| requests
   requests -->|58| audit
   requests -->|25| budgets
-  requests -->|33| catalog
+  requests -->|36| catalog
   requests -->|7| finance
   requests -->|33| identity_access
-  requests -->|58| licensing
+  requests -->|59| licensing
   requests -->|10| notifications
   requests -->|11| operating_parameters
   requests -->|92| organization
