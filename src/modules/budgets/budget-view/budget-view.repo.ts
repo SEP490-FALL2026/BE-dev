@@ -13,7 +13,10 @@ export interface BudgetViewFigures {
   totalMinor: bigint | null;
 }
 
-/** Reference budgets and commitment-only years share a row; drafts never masquerade as a budget. */
+/**
+ * Reference budgets, commitment-only years and years that only have an expense with no commitment (an invoice booked to the Cost Center that bears it, a
+ * case outside the process) share a row, so that what a Cost Center spent is never missing from the table for want of a budget; drafts never masquerade as a budget.
+ */
 const figuresQuery = (year?: number) => Prisma.sql`
   WITH reference AS (
     SELECT DISTINCT ON (cost_center_id, year) cost_center_id, year, currency, id, number, base_minor, reserve_minor, total_minor
@@ -25,6 +28,10 @@ const figuresQuery = (year?: number) => Prisma.sql`
     UNION
     SELECT c.cost_center_id, c.year, c.currency FROM budget_commitments c
      WHERE NOT EXISTS (SELECT 1 FROM reference v WHERE v.cost_center_id = c.cost_center_id AND v.year = c.year)
+    UNION
+    SELECT i.cost_center_id, EXTRACT(YEAR FROM i.service_month)::int, i.currency FROM invoices i
+     WHERE i.commitment_id IS NULL AND i.cost_center_id IS NOT NULL AND i.service_month IS NOT NULL
+       AND NOT EXISTS (SELECT 1 FROM reference v WHERE v.cost_center_id = i.cost_center_id AND v.year = EXTRACT(YEAR FROM i.service_month)::int)
   )
   SELECT p.cost_center_id AS "costCenterId", p.year, p.currency,
          v.id AS "versionId", v.number, v.base_minor AS "baseMinor",

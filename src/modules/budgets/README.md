@@ -156,8 +156,10 @@ Update/Delete/Open`, `budgetCycleBaseline`, `budgetCyclePackage`. Bảng `budget
   dòng commitment của Request (`lockOfRequest`), khóa năm chỉ cho thực chi không cam kết và **không bao giờ bị chặn vì vượt ngân sách** (`C-08`). Chống trùng `(organization,
 vendor, number)`; bảng `invoices` chỉ ghi thêm (trigger + quyền runtime `INSERT, SELECT`).
 - Giải phóng (hủy/rút/thất bại) khóa các dòng commitment của Request theo thứ tự năm (`CommitmentRepo.lockOfRequest`, cùng thứ tự với `lockById`) rồi mới đọc, nên xếp hàng sau hóa đơn đang ghi thay vì đọc cũ. Phần chia cho từng người của Request nhóm vượt `held` chỉ giải phóng `held` (phần đã chi không quay về); dòng đã `EXPENSED` bị bỏ qua, dòng `RELEASED` vẫn `NOT_HELD`. Gắn commitment chờ ngân sách vào phiên bản chỉ gắn dòng còn `HELD`.
-- `spent` của một Cost Center và năm = Σ chi phí thực của hóa đơn thuộc commitment của chính Cost Center và năm đó, kể cả commitment chưa gắn
-  phiên bản; `held` chỉ tính commitment `HELD` đã gắn phiên bản (`CommitmentRepo.totals`, dùng chung cho bảng, ô tổng và kiểm tra ngân sách).
+- `spent` của một Cost Center và năm = Σ chi phí thực của hóa đơn thuộc commitment của chính Cost Center và năm đó (kể cả commitment chưa gắn
+  phiên bản) + hóa đơn không commitment ghi thẳng vào Cost Center đó theo năm của tháng dịch vụ (PI-1 `COST_CENTER`, ca ngoài quy trình RC-2); hóa đơn
+  gắn thuê bao kho và ca `UNALLOCATED` không vào `spent` của phòng nào (MG-03). Một Cost Center chỉ có chi không commitment ở một năm vẫn có dòng ở bảng
+  và tổng (`BudgetViewRepo` `pairs`, trạng thái `NO_BUDGET`). `held` chỉ tính commitment `HELD` đã gắn phiên bản (`CommitmentRepo.totals`, dùng chung cho bảng, ô tổng và kiểm tra ngân sách).
 - Proposal đã gửi không sửa tại chỗ; quyết định version là bản ghi không đổi và không quyết định sau khi năm tài
   chính đã hết (`BUDGET.YEAR_ENDED`, `version-decision.service.ts`).
 - Chỉ Finance dựng version; chỉ spending approver quyết định, không ai thay (QĐ-93c, US-06-11 AC-12): chưa ai giữ vai thì

@@ -93,6 +93,20 @@ describe('BR-MF4-05 budgetTable commitment-only years over PostgreSQL', () => {
     expect((await rows(year + 1)).some((entry) => entry.costCenter.id === u.department.unitId)).toBe(false);
   });
 
+  it('shows the expense of a Cost Center that has no budget of the year and no commitment, in the table and in the summary (MG2-02)', async () => {
+    const u = await unit();
+    const year = h.year + 9;
+    const before = h.dataOf<BudgetSummaryWire>(await h.summary(h.finance, { year }).expect(200));
+    expect(before.totals[h.reporting]?.costCenterCount ?? 0).toBe(0);
+    await h.expenseWithoutCommitment(u, `${year}-06-01`, 750);
+
+    const row = (await rows(year)).find((entry) => entry.costCenter.id === u.department.unitId);
+
+    expect(row).toMatchObject({ status: 'NO_BUDGET', versionId: null, total: null, spent: { amount: '750' } });
+    const summary = h.dataOf<BudgetSummaryWire>(await h.summary(h.finance, { year }).expect(200));
+    expect(summary.totals[h.reporting]).toMatchObject({ spent: { amount: '750' }, costCenterCount: 1 });
+  });
+
   it('BR-MF4-01 summary exposes annual ceiling and shared reserve for an existing cycle', async () => {
     const summary = h.dataOf<BudgetSummaryWire>(await h.summary(h.finance, { year: h.next }).expect(200));
     expect(summary.annualCeiling).toEqual({ amount: '100000000000000', currency: h.reporting });
