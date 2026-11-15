@@ -131,11 +131,12 @@ flowchart BT
   requests -->|11| operating_parameters
   requests -->|92| organization
   usage -->|7| audit
-  usage -->|8| catalog
-  usage -->|15| devices
-  usage -->|7| licensing
+  usage -->|11| catalog
+  usage -->|16| devices
+  usage -->|2| identity_access
+  usage -->|8| licensing
   usage -->|2| notifications
-  usage -->|10| organization
+  usage -->|14| organization
 ```
 
-96 module edges.
+97 module edges.
