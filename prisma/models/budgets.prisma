@@ -392,7 +392,8 @@ enum InvoiceMatchResult {
 model Invoice {
   id                    String             @id @default(uuid(7)) @db.Uuid
   organizationId        String             @map("organization_id") @db.Uuid
-  commitmentId          String             @map("commitment_id") @db.Uuid
+  // Null for an invoice booked to a subscription, to a Cost Center or to a case of SBF-07a (the CHECK `invoices_place_check` keeps one of the four).
+  commitmentId          String?            @map("commitment_id") @db.Uuid
   vendorId              String             @map("vendor_id") @db.Uuid
   number                String
   issuedOn              DateTime           @map("issued_on") @db.Date
@@ -408,15 +409,25 @@ model Invoice {
   note                  String?
   recordedByEmployeeId  String             @map("recorded_by_employee_id") @db.Uuid
   recordedAt            DateTime           @map("recorded_at") @db.Timestamptz(3)
+  // The first day of the month the invoice pays for (PI-1, QĐ-111w); null for the invoices of before, whose year is the one of their commitment.
+  serviceMonth          DateTime?          @map("service_month") @db.Date
+  // The purchase invoice the IT Admin submitted and Finance signed (a value of the requests context); null for an invoice recorded by hand.
+  purchaseInvoiceId     String?            @unique @map("purchase_invoice_id") @db.Uuid
+  subscriptionId        String?            @map("subscription_id") @db.Uuid
+  // Where an invoice with no commitment is booked (R-51: the department that held the right in the service month).
+  costCenterId          String?            @map("cost_center_id") @db.Uuid
+  outOfProcessCaseId    String?            @map("out_of_process_case_id") @db.Uuid
 
   organization   Organization     @relation(fields: [organizationId], references: [id])
-  commitment     BudgetCommitment @relation(fields: [commitmentId], references: [id], onDelete: Restrict)
+  commitment     BudgetCommitment? @relation(fields: [commitmentId], references: [id], onDelete: Restrict)
   vendor         Vendor           @relation(fields: [vendorId], references: [id], onDelete: Restrict)
   currencyRecord Currency         @relation("InvoiceCurrency", fields: [currency], references: [code], onDelete: Restrict)
   recordedBy     Employee         @relation("InvoiceRecorder", fields: [recordedByEmployeeId], references: [id], onDelete: Restrict)
 
   @@unique([organizationId, vendorId, number])
   @@index([commitmentId, recordedAt])
+  @@index([costCenterId, serviceMonth])
+  @@index([subscriptionId, serviceMonth])
   @@map("invoices")
 }
 

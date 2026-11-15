@@ -25,7 +25,8 @@ export interface NewInvoice {
 
 export interface InvoiceRecord {
   id: string;
-  commitmentId: string;
+  /** Null for an invoice booked to a subscription or a Cost Center, with no commitment behind it (PI-1). */
+  commitmentId: string | null;
   number: string;
   issuedOn: BusinessDate;
   currency: string;
@@ -143,6 +144,7 @@ export class InvoiceRepo {
     ]);
     const flaggedIds = new Set(flagged.map((group) => group.commitmentId));
     for (const group of sums) {
+      if (group.commitmentId === null) continue;
       figures.set(group.commitmentId, {
         costMinor: group._sum.actualCostMinor ?? 0n,
         count: group._count._all,
