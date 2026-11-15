@@ -664,7 +664,9 @@ model BudgetReviewLine {
   costCenterId       String  @map("cost_center_id") @db.Uuid
   baseMinor          BigInt  @map("base_minor")
   reserveMinor       BigInt  @map("reserve_minor")
+  // Through the end of the month closed, by the month each invoice or seat-month pays for (FIX-RV1 RV1-03); what was already recorded for later months is `spentAfterMonthMinor`.
   spentMinor         BigInt  @map("spent_minor")
+  spentAfterMonthMinor BigInt @default(0) @map("spent_after_month_minor")
   committedMinor     BigInt  @map("committed_minor")
   pendingSpendMinor  BigInt  @map("pending_spend_minor")
   remainingMinor     BigInt  @map("remaining_minor")

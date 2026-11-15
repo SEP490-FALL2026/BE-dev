@@ -28,21 +28,27 @@ export function variancePpm(input: { invoiceBasisMinor: bigint; invoiceActualMin
 }
 
 /**
- * The forecast of the end of the year (`R-37`): what was spent, plus what is held and what waits for the spend decision, multiplied by one plus k,
+ * The forecast of the end of the year (`R-37`): what was spent (through the month and what was already recorded after it), plus what is held and what waits for the spend decision, multiplied by one plus k,
  * plus the price increase already known. What was spent is a real cost with its tax and fees already in it, so it is never multiplied again. The
  * multiplication is exact (the cost of the invoices over their price), rounded once, half away from zero.
  */
 export function forecastOfYear(
   input: Pick<
     ReviewInput,
-    'spentMinor' | 'committedMinor' | 'pendingMinor' | 'invoiceBasisMinor' | 'invoiceActualMinor' | 'priceIncreaseMinor'
+    | 'spentMinor'
+    | 'spentAfterMonthMinor'
+    | 'committedMinor'
+    | 'pendingMinor'
+    | 'invoiceBasisMinor'
+    | 'invoiceActualMinor'
+    | 'priceIncreaseMinor'
   >,
 ): bigint {
   const open = input.committedMinor + input.pendingMinor;
   const grownOpen =
     input.invoiceBasisMinor > 0n ? roundHalfAway(open * input.invoiceActualMinor, input.invoiceBasisMinor) : open;
 
-  return input.spentMinor + grownOpen + input.priceIncreaseMinor;
+  return input.spentMinor + input.spentAfterMonthMinor + grownOpen + input.priceIncreaseMinor;
 }
 
 /**
@@ -101,7 +107,13 @@ export function reviewFiguresOf(input: ReviewInput): ReviewFigures {
   const paceBasisPoints = paceOf(input);
 
   return {
-    remainingMinor: input.baseMinor + input.reserveMinor - input.spentMinor - input.committedMinor - input.pendingMinor,
+    remainingMinor:
+      input.baseMinor +
+      input.reserveMinor -
+      input.spentMinor -
+      input.spentAfterMonthMinor -
+      input.committedMinor -
+      input.pendingMinor,
     variancePpm: variancePpm(input),
     forecastMinor,
     paceBasisPoints,

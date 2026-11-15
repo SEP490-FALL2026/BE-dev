@@ -142,6 +142,7 @@ export class BudgetReviewQueryService {
       base: money(row.baseMinor),
       reserve: money(row.reserveMinor),
       spent: money(row.spentMinor),
+      spentAfterMonth: money(row.spentAfterMonthMinor),
       committed: money(row.committedMinor),
       pendingSpend: money(row.pendingSpendMinor),
       remaining: money(row.remainingMinor),

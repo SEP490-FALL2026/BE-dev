@@ -45,6 +45,7 @@ describe('the tables of the review periods keep a picture that is never changed 
     baseMinor: 300_000_000n,
     reserveMinor: 30_000_000n,
     spentMinor: 168_000_000n,
+    spentAfterMonthMinor: 0n,
     committedMinor: 135_000_000n,
     pendingSpendMinor: 0n,
     remainingMinor: -3_000_000n,
@@ -113,6 +114,7 @@ describe('the tables of the review periods keep a picture that is never changed 
     const created = await write(period({ year: nextYear() }), [line()]);
     const columns = [
       ['spent_minor', '1'],
+      ['spent_after_month_minor', '1'],
       ['committed_minor', '1'],
       ['pending_spend_minor', '1'],
       ['base_minor', '1'],
@@ -121,6 +123,7 @@ describe('the tables of the review periods keep a picture that is never changed 
       ['forecast_minor', '1'],
       ['variance_ppm', '1'],
       ['invoice_net_minor', '1'],
+      ['invoice_actual_minor', '1'],
       ['price_increase_minor', '1'],
       ['pace_basis_points', 'NULL'],
       ['light', `'GREEN'`],

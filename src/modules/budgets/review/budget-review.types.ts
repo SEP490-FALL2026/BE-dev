@@ -17,7 +17,10 @@ export interface ReviewInput {
   month: number;
   baseMinor: bigint;
   reserveMinor: bigint;
+  /** What was spent through the end of `month`, by the month each invoice or seat-month pays for (`US-12-21`: the spent figure of the pace), never by the day Finance closes. */
   spentMinor: bigint;
+  /** What was already recorded for the months after `month` when the month was closed: spent, and it took the commitments down, so the forecast counts it; the pace does not. */
+  spentAfterMonthMinor: bigint;
   committedMinor: bigint;
   pendingMinor: bigint;
   /** The price in the commitments of what the invoices of a commitment took down, and what those invoices cost (price with the exchange rate and the card fee, and the tax that cannot be deducted). */

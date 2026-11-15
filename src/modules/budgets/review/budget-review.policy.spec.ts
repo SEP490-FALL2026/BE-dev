@@ -19,6 +19,7 @@ const base: ReviewInput = {
   baseMinor: 300n * TR,
   reserveMinor: 30n * TR,
   spentMinor: 168n * TR,
+  spentAfterMonthMinor: 0n,
   committedMinor: 135n * TR,
   pendingMinor: 0n,
   invoiceBasisMinor: 160n * TR,
@@ -68,6 +69,7 @@ describe('the review of the budget of a Cost Center at the close of a month (RV-
         baseMinor: 120n * TR,
         reserveMinor: 12n * TR,
         spentMinor: 67n * TR,
+        spentAfterMonthMinor: 0n,
         committedMinor: 54n * TR,
         pendingMinor: 5n * TR,
         invoiceBasisMinor: 64n * TR,
@@ -93,6 +95,23 @@ describe('the review of the budget of a Cost Center at the close of a month (RV-
 
       expect(figures.variancePpm).toBe(0n);
       expect(figures.forecastMinor).toBe(35n * TR);
+    });
+
+    it('RV1-03: the pace counts what was spent through the end of the month only, the forecast and the left count what was recorded for later months too', () => {
+      // June is closed on 07/07 and an invoice of July (25 tr) is already there: it took the commitment down, so it is in the forecast and out of the pace.
+      const figures = reviewFiguresOf({
+        ...base,
+        spentMinor: 150n * TR,
+        spentAfterMonthMinor: 25n * TR,
+        committedMinor: 100n * TR,
+        invoiceBasisMinor: 150n * TR,
+        invoiceActualMinor: 150n * TR,
+      });
+
+      expect(figures.paceBasisPoints).toBe(10_000n);
+      expect(figures.forecastMinor).toBe(275n * TR);
+      expect(figures.remainingMinor).toBe(330n * TR - 150n * TR - 25n * TR - 100n * TR);
+      expect(figures.light).toBe('GREEN');
     });
 
     it('adds the price increase already known to the forecast', () => {

@@ -24,7 +24,9 @@ export interface NewReviewLine {
   costCenterId: string;
   baseMinor: bigint;
   reserveMinor: bigint;
+  /** What was spent through the end of the month closed, and what was already recorded for the months after it. */
   spentMinor: bigint;
+  spentAfterMonthMinor: bigint;
   committedMinor: bigint;
   pendingSpendMinor: bigint;
   remainingMinor: bigint;
@@ -79,6 +81,7 @@ interface LineRow {
   base_minor: bigint;
   reserve_minor: bigint;
   spent_minor: bigint;
+  spent_after_month_minor: bigint;
   committed_minor: bigint;
   pending_spend_minor: bigint;
   remaining_minor: bigint;
@@ -98,6 +101,7 @@ const toLine = (row: LineRow): ReviewLineRecord => ({
   baseMinor: row.base_minor,
   reserveMinor: row.reserve_minor,
   spentMinor: row.spent_minor,
+  spentAfterMonthMinor: row.spent_after_month_minor,
   committedMinor: row.committed_minor,
   pendingSpendMinor: row.pending_spend_minor,
   remainingMinor: row.remaining_minor,

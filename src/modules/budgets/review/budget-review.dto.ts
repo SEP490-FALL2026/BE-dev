@@ -94,12 +94,18 @@ const lineSchema = z.strictObject({
   base: moneyView.meta({ description: 'The effective base of the year at the close.' }),
   reserve: moneyView,
   spent: moneyView.meta({
-    description: 'What the Cost Center spent in the year, the seat-months of the shared pool in it.',
+    description:
+      'What the Cost Center spent through the end of the month closed, by the month each invoice or seat-month pays for, the seat-months of the shared pool in it.',
+  }),
+  spentAfterMonth: moneyView.meta({
+    description:
+      'What was already recorded for the months after the one closed when it was closed: spent, and it took commitments down, so the forecast and what is left count it and the pace does not.',
   }),
   committed: moneyView.meta({ description: 'What its commitments still hold.' }),
   pendingSpend: moneyView.meta({ description: 'What its requests that wait for the spend decision would cost.' }),
   remaining: moneyView.meta({
-    description: 'The budget (base and reserve) less spent, held and waiting; negative when it is over.',
+    description:
+      'The budget (base and reserve) less spent, spent after the month, held and waiting; negative when it is over.',
   }),
   variancePpm: z.number().int().meta({
     description:
@@ -111,11 +117,11 @@ const lineSchema = z.strictObject({
   }),
   forecast: moneyView.meta({
     description:
-      'The forecast of the end of the year: spent + (held + waiting) x (1 + k) + price increase already known.',
+      'The forecast of the end of the year: spent + spent after the month + (held + waiting) x (1 + k) + price increase already known.',
   }),
   paceBasisPoints: z.number().int().nullable().meta({
     description:
-      'The spent over the base of the months gone, in hundredths of a percent (11.200 is 112 %), rounded up; null when the Cost Center has no base.',
+      'The spent through the end of the month over the base of the months gone, in hundredths of a percent (11.200 is 112 %), rounded up; null when the Cost Center has no base.',
   }),
   light,
 });

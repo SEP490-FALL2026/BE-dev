@@ -9,6 +9,7 @@ const M = 1_000_000;
 interface LineWire {
   costCenter: { id: string } | null;
   spent: { amount: string };
+  spentAfterMonth: { amount: string };
   committed: { amount: string };
   remaining: { amount: string };
   variancePpm: number;
@@ -130,7 +131,7 @@ describe('The figures of the close of a month are worked out as the documents de
   }
 
   /** One department for each case: a month is closed once and the figures of a Cost Center are read by its own line. */
-  const units: Record<'outside' | 'basis', Unit> = {} as Record<'outside' | 'basis', Unit>;
+  const units: Record<'outside' | 'basis' | 'pace', Unit> = {} as Record<'outside' | 'basis' | 'pace', Unit>;
   const versions: Record<string, string> = {};
 
   beforeAll(async () => {
@@ -139,6 +140,7 @@ describe('The figures of the close of a month are worked out as the documents de
     for (const [key, code] of [
       ['outside', 'P-K2'],
       ['basis', 'P-K1'],
+      ['pace', 'P-K3'],
     ] as const) {
       units[key] = await h.departmentWithHead(code);
       versions[key] = (await h.budgetFor(units[key], { total: 300 * M, reserve: 30 * M })).id;
@@ -190,6 +192,26 @@ describe('The figures of the close of a month are worked out as the documents de
       forecast: { amount: '311111111' },
       paceBasisPoints: 8_889,
       light: 'YELLOW',
+    });
+  });
+
+  it('RV1-03: the pace is the spent through the end of the month by the month the invoices pay for, not by the day of the close: June closed on 07/07 with an invoice of July of 25 tr is 100 % and Xanh', async () => {
+    const unit = units.pace;
+    await expense(unit, versions.pace, { committed: 150 * M, net: 150 * M, tax: 0, serviceMonth: `${h.year}-03-01` });
+    // An invoice of July, recorded before June is closed: it took the commitment down, so it is spent for the forecast and not yet for the pace.
+    await expense(unit, versions.pace, { committed: 25 * M, net: 25 * M, tax: 0, serviceMonth: `${h.year}-07-01` });
+    await h.commit(unit, versions.pace, h.year, 100 * M, 'HELD');
+
+    const line = lineOf(await detail((await close(6)).id), unit);
+
+    expect(line).toMatchObject({
+      spent: { amount: String(150 * M) },
+      spentAfterMonth: { amount: String(25 * M) },
+      committed: { amount: String(100 * M) },
+      remaining: { amount: String(55 * M) },
+      forecast: { amount: String(275 * M) },
+      paceBasisPoints: 10_000,
+      light: 'GREEN',
     });
   });
 });
