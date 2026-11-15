@@ -28471,6 +28471,13 @@
             "schema": { "type": "string", "enum": ["PERSONAL", "SERVICE"] }
           },
           {
+            "name": "activeOnly",
+            "required": false,
+            "in": "query",
+            "description": "true lists only the rights in force today: not ended, not failed and not cancelled, one that begins later included. False or absent lists every assignment, the ended ones too.",
+            "schema": { "type": "string", "enum": ["true", "false"] }
+          },
+          {
             "name": "page",
             "required": false,
             "in": "query",
@@ -28491,7 +28498,7 @@
         ],
         "responses": {
           "200": {
-            "description": "A page of assignments by start date, each with the person, the plan and the Cost Center it names. source tells a baseline assignment from one that came from a request, a renewal or the conversion of a former service account (MACHINE_ACCOUNT_CONVERSION); isMachineAccount is on for the seat of an IT Admin used for a machine account, with its reason in machineAccountNote; a start that is only the day of recording has no grantedOn and carries a label.",
+            "description": "A page of assignments by start date, each with the person, the plan with the logo of its application, the Cost Center it names and the revocation task that is open for it (revocation, null when nobody is taking it back, claimableNow false while it is still in its grace). subscriptionId lists the holders of a subscription (a person for each seat, and for each key of a license-key subscription); activeOnly=true keeps the rights in force today. source tells a baseline assignment from one that came from a request, a renewal or the conversion of a former service account (MACHINE_ACCOUNT_CONVERSION); isMachineAccount is on for the seat of an IT Admin used for a machine account, with its reason in machineAccountNote; a start that is only the day of recording has no grantedOn and carries a label.",
             "content": {
               "application/json": {
                 "schema": {
@@ -40215,6 +40222,191 @@
         "security": [{ "bearer": [] }],
         "summary": "List the milestones that passed with no renewal decision",
         "tags": ["subscription-renewals"]
+      }
+    },
+    "/api/v1/stock-summary": {
+      "get": {
+        "operationId": "stockSummaryList",
+        "parameters": [
+          {
+            "name": "mine",
+            "required": false,
+            "in": "query",
+            "description": "true counts only the subscriptions the caller answers for as their IT Admin, and lists the plans that have one; false or absent counts every subscription of every plan.",
+            "schema": { "type": "string", "enum": ["true", "false"] }
+          },
+          {
+            "name": "planId",
+            "required": false,
+            "in": "query",
+            "description": "Only this plan: the stock a grant or a revocation of the plan draws on.",
+            "schema": { "format": "uuid", "type": "string" }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maximum": 9007199254740991,
+              "exclusiveMinimum": true,
+              "default": 1,
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": { "maximum": 100, "exclusiveMinimum": true, "default": 20, "type": "integer", "minimum": 0 }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A page of plans by application and plan, each with what it holds counted by what it gives out and never by the records of its subscriptions: the seats of a shared plan (stock.kind SEATS: bought, assigned, free, revoking), the keys of a license-key plan (KEYS: in the store, assigned, withdrawn) and the people who hold a personal account (HOLDERS). It counts over the subscriptions a seat can be taken from today; the seats of a plan are the sum of the seats of those subscriptions in the list of subscriptions. mine=true keeps the plans the caller answers for as their IT Admin and counts only those subscriptions, planId a single plan.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/StockSummaryResponseDto" },
+                    { "properties": { "message": { "example": "STOCK_SUMMARY.LISTED" } } }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHENTICATION_REQUIRED": {
+                    "summary": "A Bearer access token is required.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHENTICATION_REQUIRED",
+                        "message": "A Bearer access token is required.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "INVALID_ACCESS_TOKEN": {
+                    "summary": "The access token is invalid.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "INVALID_ACCESS_TOKEN",
+                        "message": "The access token is invalid.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only an IT Admin reads the stock.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHORIZATION.FORBIDDEN": {
+                    "summary": "You do not have permission to perform this action.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHORIZATION.FORBIDDEN",
+                        "message": "You do not have permission to perform this action.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The query is invalid (VALIDATION_ERROR).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "VALIDATION_ERROR": {
+                    "summary": "Request validation failed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "VALIDATION_ERROR",
+                        "message": "Request validation failed.",
+                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_TOO_MANY_REQUESTS": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_TOO_MANY_REQUESTS",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "TOKEN_VERIFICATION_UNAVAILABLE": {
+                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
+                        "message": "Authentication is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SERVICE_UNAVAILABLE": {
+                    "summary": "The service is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SERVICE_UNAVAILABLE",
+                        "message": "The service is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "bearer": [] }],
+        "summary": "List what each plan holds, by what it gives out",
+        "tags": ["stock-summary"]
       }
     },
     "/api/v1/access-requests/drafts": {
@@ -95952,9 +96144,14 @@
                       "properties": {
                         "planId": { "type": "string", "format": "uuid" },
                         "planName": { "type": "string" },
-                        "applicationName": { "type": "string" }
+                        "applicationName": { "type": "string" },
+                        "logoUrl": {
+                          "description": "The https link to the logo image of the application that the IT Admin pasted, or null. The server never checks it: it may be broken, so show the first letter of the name when the image does not load.",
+                          "type": "string",
+                          "nullable": true
+                        }
                       },
-                      "required": ["planId", "planName", "applicationName"],
+                      "required": ["planId", "planName", "applicationName", "logoUrl"],
                       "additionalProperties": false
                     },
                     "costCenter": {
@@ -95966,6 +96163,32 @@
                       },
                       "required": ["id", "code", "name"],
                       "additionalProperties": false,
+                      "nullable": true
+                    },
+                    "revocation": {
+                      "type": "object",
+                      "properties": {
+                        "taskId": { "type": "string", "format": "uuid" },
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "QUEUED",
+                            "RETRY_SCHEDULED",
+                            "IN_PROGRESS",
+                            "COMPLETED",
+                            "FAILED",
+                            "CLOSED_FAILED",
+                            "CANCELLED"
+                          ]
+                        },
+                        "claimableNow": {
+                          "type": "boolean",
+                          "description": "False while a reason asks for a day not before that has not come: the task cannot be taken or completed yet."
+                        }
+                      },
+                      "required": ["taskId", "status", "claimableNow"],
+                      "additionalProperties": false,
+                      "description": "The revocation task that is open for this seat (the task of the provisioning routes), or null when nobody is taking it back: only then is there something to press \"Revoke\" on. A key (K4) is revoked through its holder: the row of the person who holds it.",
                       "nullable": true
                     }
                   },
@@ -95994,7 +96217,8 @@
                     "createdAt",
                     "employee",
                     "plan",
-                    "costCenter"
+                    "costCenter",
+                    "revocation"
                   ],
                   "additionalProperties": false
                 }
@@ -99490,6 +99714,151 @@
                     "recordedOn",
                     "recordedAt"
                   ],
+                  "additionalProperties": false
+                }
+              },
+              "pagination": {
+                "type": "object",
+                "properties": {
+                  "page": { "type": "integer", "exclusiveMinimum": true, "maximum": 9007199254740991, "minimum": 0 },
+                  "pageSize": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "maximum": 9007199254740991,
+                    "minimum": 0
+                  },
+                  "totalItems": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                  "totalPages": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+                },
+                "required": ["page", "pageSize", "totalItems", "totalPages"],
+                "additionalProperties": false
+              }
+            },
+            "required": ["items", "pagination"],
+            "additionalProperties": false,
+            "nullable": true
+          }
+        },
+        "required": ["success", "message", "data"],
+        "additionalProperties": false
+      },
+      "StockSummaryResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "enum": [true] },
+          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "items": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "plan": {
+                      "type": "object",
+                      "properties": {
+                        "planId": { "type": "string", "format": "uuid" },
+                        "planName": { "type": "string" },
+                        "provisioningType": { "type": "string", "enum": ["K1", "K2", "K4"] },
+                        "applicationId": { "type": "string", "format": "uuid" },
+                        "applicationName": { "type": "string" },
+                        "logoUrl": {
+                          "description": "The https link to the logo image of the application that the IT Admin pasted, or null. The server never checks it: it may be broken, so show the first letter of the name when the image does not load.",
+                          "type": "string",
+                          "nullable": true
+                        }
+                      },
+                      "required": [
+                        "planId",
+                        "planName",
+                        "provisioningType",
+                        "applicationId",
+                        "applicationName",
+                        "logoUrl"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "stock": {
+                      "oneOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "kind": { "type": "string", "enum": ["SEATS"] },
+                            "purchased": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 9007199254740991,
+                              "description": "The seats bought; null while a subscription of the plan has no quantity (a flat rate), when the seats are not known.",
+                              "nullable": true
+                            },
+                            "assigned": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 9007199254740991,
+                              "description": "The seats held from today on: the most held on any day, so a seat promised from a later day is not free today. Seats being taken back are counted here too."
+                            },
+                            "free": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 9007199254740991,
+                              "description": "The seats a grant can take without buying, the seats of each subscription less what it holds; null when the seats bought are not known.",
+                              "nullable": true
+                            },
+                            "revoking": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 9007199254740991,
+                              "description": "Of the assigned seats, those held by a right whose revocation is still open: not free until the revocation is completed."
+                            }
+                          },
+                          "required": ["kind", "purchased", "assigned", "free", "revoking"],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "kind": { "type": "string", "enum": ["KEYS"] },
+                            "inStore": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 9007199254740991,
+                              "description": "The keys in the store that were not withdrawn: free to give."
+                            },
+                            "assigned": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 9007199254740991,
+                              "description": "The keys given to a seat."
+                            },
+                            "withdrawn": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 9007199254740991,
+                              "description": "The keys taken out of the store and never given out again."
+                            }
+                          },
+                          "required": ["kind", "inStore", "assigned", "withdrawn"],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "kind": { "type": "string", "enum": ["HOLDERS"] },
+                            "holders": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 9007199254740991,
+                              "description": "The personal accounts held today (a right each), a plan that has no free seat to count."
+                            }
+                          },
+                          "required": ["kind", "holders"],
+                          "additionalProperties": false
+                        }
+                      ]
+                    }
+                  },
+                  "required": ["plan", "stock"],
                   "additionalProperties": false
                 }
               },
