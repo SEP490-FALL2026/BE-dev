@@ -34,14 +34,21 @@ const monthly = (amountMinor: bigint, billingCycle = 'MONTHLY'): Price => ({
   billingCycle,
 });
 
-function build(rows: HeldWithSeatPrice[], views: CommitmentRequestView[], prices: Record<string, Price>) {
+/** The price of a plan: the same on every day, or a function of the first day of the month that is asked. */
+type PriceOn = Price | ((on: string) => Price);
+
+function build(rows: HeldWithSeatPrice[], views: CommitmentRequestView[], prices: Record<string, PriceOn>) {
   const hook = new CommitmentRequestFactsHook();
   hook.bind({
     factsOf: jest.fn((ids: readonly string[]) =>
       Promise.resolve(new Map(views.filter((one) => ids.includes(one.id)).map((one) => [one.id, one]))),
     ),
   });
-  const getPlanPrice = jest.fn((planId: string) => Promise.resolve(prices[planId] ?? null));
+  const getPlanPrice = jest.fn((planId: string, _tx: unknown, on: string) => {
+    const price = prices[planId];
+
+    return Promise.resolve(typeof price === 'function' ? price(on) : (price ?? null));
+  });
   const service = new BudgetReviewPriceService(
     { heldWithSeatPrice: jest.fn().mockResolvedValue(rows) } as unknown as CommitmentRepo,
     hook,
@@ -51,33 +58,93 @@ function build(rows: HeldWithSeatPrice[], views: CommitmentRequestView[], prices
   return { service, getPlanPrice };
 }
 
-describe('the price increase already known of the commitments of a Cost Center (RV-1.3; R-52, US-12-21 AC-7)', () => {
+/** The old price until the last day of September, the new one from the first day of October. */
+const risesFromOctober = (before: bigint, after: bigint) => (on: string) =>
+  monthly(on >= '2027-10-01' ? after : before);
+
+describe('the price increase already known of the commitments of a Cost Center (RV-1.3, FIX-RV1; R-52, US-12-21 AC-7)', () => {
   it('AC-7: 4 seats of Adobe committed at 1.500.000 đ, 24 tr still held, the price 1.650.000 đ from 01/09 and the month of August closed ⟹ 4 seats, 4 months, 2.400.000 đ', async () => {
     const { service, getPlanPrice } = build([held()], [view()], { 'plan-1': monthly(1_650_000n) });
 
-    const items = await service.itemsOf(tx, [CC], YEAR, 8, '2027-09-01');
+    const items = await service.itemsOf(tx, [CC], YEAR, 8);
 
     expect(items.get(CC)).toEqual([
-      { currentMonthlyMinor: 1_650_000n, committedMonthlyMinor: 1_500_000n, seats: 4, monthsLeft: 4 },
+      {
+        committedMonthlyMinor: 1_500_000n,
+        seats: 4,
+        heldMinor: 24_000_000n,
+        monthlyMinor: [1_650_000n, 1_650_000n, 1_650_000n, 1_650_000n],
+      },
     ]);
     expect(knownPriceIncrease(items.get(CC) ?? [])).toBe(2_400_000n);
-    expect(getPlanPrice).toHaveBeenCalledWith('plan-1', tx, '2027-09-01');
+    expect(getPlanPrice.mock.calls.map((call) => call[2])).toEqual([
+      '2027-09-01',
+      '2027-10-01',
+      '2027-11-01',
+      '2027-12-01',
+    ]);
   });
 
-  it('counts only the months the commitment still holds: a K1 of 9 months held for 2 more months is 2 months, not the 4 of the year', async () => {
+  it('RV1-04: a price that takes effect on 01/10, already in the catalog when August is closed, is known: 150.000 x 4 seats x 3 months = 1.800.000 đ', async () => {
+    const { service } = build([held()], [view()], { 'plan-1': risesFromOctober(1_500_000n, 1_650_000n) });
+
+    const items = await service.itemsOf(tx, [CC], YEAR, 8);
+
+    expect(items.get(CC)?.[0].monthlyMinor).toEqual([1_500_000n, 1_650_000n, 1_650_000n, 1_650_000n]);
+    expect(knownPriceIncrease(items.get(CC) ?? [])).toBe(1_800_000n);
+  });
+
+  it('RV1-11: asks the prices of the months after the one closed and no other: October closed asks November and December, November closed asks December', async () => {
+    const { service, getPlanPrice } = build([held()], [view()], { 'plan-1': monthly(1_650_000n) });
+
+    const october = await service.itemsOf(tx, [CC], YEAR, 10);
+    const november = await service.itemsOf(tx, [CC], YEAR, 11);
+
+    expect(october.get(CC)?.[0].monthlyMinor).toHaveLength(2);
+    expect(november.get(CC)?.[0].monthlyMinor).toEqual([1_650_000n]);
+    expect(getPlanPrice.mock.calls.map((call) => call[2])).toEqual(['2027-11-01', '2027-12-01', '2027-12-01']);
+  });
+
+  it('RV1-11: a commitment that holds more than the months left is worth only the months left: 36 tr of four seats and August closed is 4 x 4 x 150.000 = 2.400.000 đ', async () => {
+    const { service } = build([held({ heldMinor: 36_000_000n })], [view()], { 'plan-1': monthly(1_650_000n) });
+
+    const items = await service.itemsOf(tx, [CC], YEAR, 8);
+
+    expect(knownPriceIncrease(items.get(CC) ?? [])).toBe(2_400_000n);
+  });
+
+  it('counts only the months the commitment still holds: a K1 of 9 months held for 2 more months is 2 months of four seats, not the 4 of the year', async () => {
     const { service } = build([held({ heldMinor: 12_000_000n })], [view()], { 'plan-1': monthly(1_650_000n) });
 
-    const items = await service.itemsOf(tx, [CC], YEAR, 8, '2027-09-01');
+    const items = await service.itemsOf(tx, [CC], YEAR, 8);
 
-    expect(items.get(CC)?.[0].monthsLeft).toBe(2);
+    expect(knownPriceIncrease(items.get(CC) ?? [])).toBe(1_200_000n);
+  });
+
+  it('RV1-05: the months held are not rounded up to a whole month: 20 tr of four seats at 1.500.000 a seat-month is 13,33 seat-months, 2.000.000 đ and not 2.400.000 đ', async () => {
+    const { service } = build([held({ heldMinor: 20_000_000n })], [view()], { 'plan-1': monthly(1_650_000n) });
+
+    const items = await service.itemsOf(tx, [CC], YEAR, 8);
+
+    expect(knownPriceIncrease(items.get(CC) ?? [])).toBe(2_000_000n);
   });
 
   it('turns the price of a quarter or a year into the price of a month, rounded up, as the commitment did', async () => {
     const { service } = build([held()], [view()], { 'plan-1': monthly(18_000_001n, 'ANNUAL') });
 
-    const items = await service.itemsOf(tx, [CC], YEAR, 8, '2027-09-01');
+    const items = await service.itemsOf(tx, [CC], YEAR, 8);
 
-    expect(items.get(CC)?.[0].currentMonthlyMinor).toBe(1_500_001n);
+    expect(items.get(CC)?.[0].monthlyMinor[0]).toBe(1_500_001n);
+  });
+
+  it('keeps the price of the month before for a month the catalog has no comparable price for: it is not known to have changed', async () => {
+    const { service } = build([held()], [view()], {
+      'plan-1': (on) => (on === '2027-11-01' ? null : monthly(on >= '2027-12-01' ? 1_800_000n : 1_500_000n)),
+    });
+
+    const items = await service.itemsOf(tx, [CC], YEAR, 8);
+
+    expect(items.get(CC)?.[0].monthlyMinor).toEqual([1_500_000n, 1_500_000n, 1_500_000n, 1_800_000n]);
   });
 
   it('leaves out what cannot be compared: a request with no plan or no seat, a price that is not by a billing cycle or not recurring, and a plan with no price', async () => {
@@ -94,13 +161,13 @@ describe('the price increase already known of the commitments of a Cost Center (
       once: { kind: 'ONE_TIME', unitPrice: { amountMinor: 9_000_000n }, billingCycle: 'MONTHLY' },
     });
 
-    expect((await service.itemsOf(tx, [CC], YEAR, 8, '2027-09-01')).size).toBe(0);
+    expect((await service.itemsOf(tx, [CC], YEAR, 8)).size).toBe(0);
   });
 
   it('reads nothing in December: no month is left', async () => {
     const { service, getPlanPrice } = build([held()], [view()], { 'plan-1': monthly(1_650_000n) });
 
-    expect((await service.itemsOf(tx, [CC], YEAR, 12, '2028-01-01')).size).toBe(0);
+    expect((await service.itemsOf(tx, [CC], YEAR, 12)).size).toBe(0);
     expect(getPlanPrice).not.toHaveBeenCalled();
   });
 });

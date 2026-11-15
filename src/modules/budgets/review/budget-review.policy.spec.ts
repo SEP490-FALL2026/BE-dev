@@ -10,7 +10,7 @@ import {
   reviewedMonthHasEnded,
   variancePpm,
 } from './budget-review.policy';
-import type { ReviewInput } from './budget-review.types';
+import type { PriceIncreaseItem, ReviewInput } from './budget-review.types';
 
 const TR = 1_000_000n;
 
@@ -135,37 +135,82 @@ describe('the review of the budget of a Cost Center at the close of a month (RV-
   });
 
   describe('the price increase already known (R-52, US-12-21 AC-7)', () => {
+    const item = (over: Partial<PriceIncreaseItem> = {}): PriceIncreaseItem => ({
+      committedMonthlyMinor: 1_500_000n,
+      seats: 4,
+      heldMinor: 24_000_000n,
+      monthlyMinor: [1_650_000n, 1_650_000n, 1_650_000n, 1_650_000n],
+      ...over,
+    });
+
     it('T-RV1: (1.650.000 - 1.500.000) x 4 seats x 4 months (September to December) = 2.400.000 đ', () => {
+      expect(knownPriceIncrease([item()])).toBe(2_400_000n);
+    });
+
+    it('RV1-04: every price that takes effect after the month counts, not only the one of the first day after it: a rise from 01/10 known in August is 150.000 x 4 seats x 3 months = 1.800.000 đ', () => {
+      expect(knownPriceIncrease([item({ monthlyMinor: [1_500_000n, 1_650_000n, 1_650_000n, 1_650_000n] })])).toBe(
+        1_800_000n,
+      );
+    });
+
+    it('counts each month at its own price: a rise and then a fall back leaves only the months that are above the commitment', () => {
+      expect(knownPriceIncrease([item({ monthlyMinor: [1_650_000n, 1_800_000n, 1_400_000n, 1_500_000n] })])).toBe(
+        (150_000n + 300_000n) * 4n,
+      );
+    });
+
+    it('RV1-05: the months the commitment still holds are not rounded up: 20 tr held at 1.500.000 a seat-month is 13,33 seat-months, so 2.000.000 đ and not 4 x 4 x 150.000', () => {
+      expect(knownPriceIncrease([item({ heldMinor: 20_000_000n })])).toBe(2_000_000n);
+    });
+
+    it('does not count more than the commitment holds: 12 tr held covers two months of four seats, the last two months of the year are not in it', () => {
+      expect(knownPriceIncrease([item({ heldMinor: 12_000_000n })])).toBe(1_200_000n);
+    });
+
+    it('rounds once for a commitment, half away from zero: 1 seat-month and a third at a rise of 1 đ is 1 đ', () => {
       expect(
         knownPriceIncrease([
-          { currentMonthlyMinor: 1_650_000n, committedMonthlyMinor: 1_500_000n, seats: 4, monthsLeft: 4 },
+          item({
+            committedMonthlyMinor: 3n,
+            seats: 1,
+            heldMinor: 4n,
+            monthlyMinor: [4n, 4n],
+          }),
         ]),
-      ).toBe(2_400_000n);
+      ).toBe(1n);
     });
 
     it('T-RV1: a price that went down adds nothing, it is never taken off (R-52)', () => {
-      expect(
-        knownPriceIncrease([
-          { currentMonthlyMinor: 1_400_000n, committedMonthlyMinor: 1_500_000n, seats: 4, monthsLeft: 4 },
-        ]),
-      ).toBe(0n);
+      expect(knownPriceIncrease([item({ monthlyMinor: [1_400_000n, 1_400_000n, 1_400_000n, 1_400_000n] })])).toBe(0n);
     });
 
     it('adds the commitments that rose and skips the ones that fell, one by one', () => {
       expect(
         knownPriceIncrease([
-          { currentMonthlyMinor: 1_650_000n, committedMonthlyMinor: 1_500_000n, seats: 4, monthsLeft: 4 },
-          { currentMonthlyMinor: 100_000n, committedMonthlyMinor: 300_000n, seats: 10, monthsLeft: 6 },
-          { currentMonthlyMinor: 320_000n, committedMonthlyMinor: 300_000n, seats: 10, monthsLeft: 6 },
+          item(),
+          item({
+            committedMonthlyMinor: 300_000n,
+            seats: 10,
+            heldMinor: 18_000_000n,
+            monthlyMinor: Array(6).fill(100_000n) as bigint[],
+          }),
+          item({
+            committedMonthlyMinor: 300_000n,
+            seats: 10,
+            heldMinor: 18_000_000n,
+            monthlyMinor: Array(6).fill(320_000n) as bigint[],
+          }),
         ]),
       ).toBe(2_400_000n + 1_200_000n);
     });
 
-    it('is nothing when no month is left or no seat', () => {
+    it('is nothing when nothing is held, no seat, no price of a month or no price of a seat to compare with', () => {
       expect(
         knownPriceIncrease([
-          { currentMonthlyMinor: 2n, committedMonthlyMinor: 1n, seats: 3, monthsLeft: 0 },
-          { currentMonthlyMinor: 2n, committedMonthlyMinor: 1n, seats: 0, monthsLeft: 3 },
+          item({ heldMinor: 0n }),
+          item({ seats: 0 }),
+          item({ monthlyMinor: [] }),
+          item({ committedMonthlyMinor: 0n }),
         ]),
       ).toBe(0n);
     });

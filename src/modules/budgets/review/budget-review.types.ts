@@ -41,10 +41,14 @@ export interface ReviewFigures {
   light: ReviewLight;
 }
 
-/** One commitment's price increase: what a seat costs a month now against what it was committed at, for the seats and the months of the year left. */
+/**
+ * What the price increase already known of one commitment is worked out from (`R-52`): the price of a seat a month when it was committed, its seats, what it still
+ * holds and the price of a seat of its plan in each month after the one closed (`monthlyMinor[0]` is the month after, the last is December), so a rise that takes effect
+ * in October is known in August. The months it covers are the first ones its held amount pays for, in whole seat-months and a part of one.
+ */
 export interface PriceIncreaseItem {
-  currentMonthlyMinor: bigint;
   committedMonthlyMinor: bigint;
   seats: number;
-  monthsLeft: number;
+  heldMinor: bigint;
+  monthlyMinor: readonly bigint[];
 }

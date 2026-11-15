@@ -48,7 +48,7 @@ export class BudgetReviewFiguresService {
     const spentThrough = await this.invoices.spentOf(pairs, tx, from);
     const pending = await this.pending.totals(pairs, tx);
     const basis = await this.invoices.priceBasisOf(pairs, tx, from);
-    const increases = await this.prices.itemsOf(tx, costCenterIds, year, month, from);
+    const increases = await this.prices.itemsOf(tx, costCenterIds, year, month);
 
     const facts: YearFacts = { totals, spentThrough, pending, basis, increases };
 

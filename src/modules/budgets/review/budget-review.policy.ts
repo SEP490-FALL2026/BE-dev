@@ -52,15 +52,25 @@ export function forecastOfYear(
 }
 
 /**
- * The price increase already known (`R-52`, `US-12-21` AC-7): for each commitment, what a seat costs a month now over what it was committed at, for its
- * seats and the months of the year left. Only the part that rose: a price that fell adds nothing and is never taken off.
+ * The price increase already known (`R-52`, `US-12-21` AC-7): for each commitment, what a seat costs in each month after the one closed over what it was committed
+ * at, for the seat-months the commitment still holds, which are its first months in order (a month takes at most its seats). Only what rose: a month at a lower price
+ * adds nothing and is never taken off. The seat-months are not rounded up to a whole month: 20 tr held at 1,5 tr a seat-month are 13,33 of them. Rounded once for a
+ * commitment, half away from zero.
  */
 export function knownPriceIncrease(items: readonly PriceIncreaseItem[]): bigint {
   let total = 0n;
   for (const item of items) {
-    if (item.seats <= 0 || item.monthsLeft <= 0) continue;
-    const rise = item.currentMonthlyMinor - item.committedMonthlyMinor;
-    if (rise > 0n) total += rise * BigInt(item.seats) * BigInt(item.monthsLeft);
+    if (item.seats <= 0 || item.committedMonthlyMinor <= 0n || item.heldMinor <= 0n) continue;
+    const monthMinor = BigInt(item.seats) * item.committedMonthlyMinor;
+    let left = item.heldMinor;
+    let weighted = 0n;
+    for (const current of item.monthlyMinor) {
+      const covered = left < monthMinor ? left : monthMinor;
+      if (covered <= 0n) break;
+      if (current > item.committedMonthlyMinor) weighted += (current - item.committedMonthlyMinor) * covered;
+      left -= covered;
+    }
+    total += roundHalfAway(weighted, item.committedMonthlyMinor);
   }
 
   return total;
