@@ -53358,7 +53358,7 @@
         ],
         "responses": {
           "200": {
-            "description": "Each period of a right paid by the month (a request for months of use of a plan bought by the month, while a seat of it is held) or by the cycle of a subscription whose invoice has not been submitted five working days after its payment day. The oldest due day first. An invoice that was returned does not count. Finance reads every period; the IT Admin the ones of the departments they work and of the shared pool, which every IT Admin works.",
+            "description": "Each period of a right paid by the month (a request for months of use of a plan bought by the month, while a seat of it is held) or by the cycle of a subscription whose invoice has not been submitted by the fifth working day, the payment day being the first when it is a working day. The oldest due day first. An invoice that was returned does not count. Finance reads every period; the IT Admin the ones of the departments they work and of the shared pool, which every IT Admin works.",
             "content": {
               "application/json": {
                 "schema": {
@@ -82885,7 +82885,7 @@
             }
           },
           "422": {
-            "description": "The decision or the note is missing or not valid (VALIDATION_ERROR).",
+            "description": "The decision or the note is missing or not valid (VALIDATION_ERROR), or the difference is an invoice Finance closed as a suspicion, which is closed as a false alarm and never as a case outside the process (VENDOR_ACCOUNT_DISCREPANCY.DECISION_NOT_ALLOWED).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -82898,6 +82898,17 @@
                         "code": "VALIDATION_ERROR",
                         "message": "Request validation failed.",
                         "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "VENDOR_ACCOUNT_DISCREPANCY.DECISION_NOT_ALLOWED": {
+                    "summary": "The review of the accounts at the vendor refused: DECISION_NOT_ALLOWED.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "VENDOR_ACCOUNT_DISCREPANCY.DECISION_NOT_ALLOWED",
+                        "message": "The review of the accounts at the vendor refused: DECISION_NOT_ALLOWED.",
                         "requestId": "req_example"
                       }
                     }
@@ -82979,7 +82990,7 @@
             "name": "outcome",
             "required": false,
             "in": "query",
-            "schema": { "type": "string", "enum": ["FALSE_ALARM", "RECORD_SPENT", "REPORT_ONLY"] }
+            "schema": { "type": "string", "enum": ["FALSE_ALARM", "RECORD_SPENT", "REPORT_ONLY", "REVOKED"] }
           },
           {
             "name": "page",
@@ -83160,7 +83171,7 @@
         },
         "responses": {
           "201": {
-            "description": "The case is closed once with a note. RECORD_SPENT records the money already spent as one expense in dong with no commitment, in the same step: it needs at least one proof of payment of the company, an amount and a Cost Center or UNALLOCATED. With no proof the case can only be a false alarm or a report.",
+            "description": "The case is closed once with a note. RECORD_SPENT, which only Finance closes with, records the money already spent as one expense in dong with no commitment, in the same step: it needs at least one proof of payment of the company, an amount and a Cost Center or UNALLOCATED. With no proof the case can only be a false alarm or a report.",
             "content": {
               "application/json": {
                 "schema": {
@@ -83226,7 +83237,7 @@
             }
           },
           "403": {
-            "description": "Only Finance and the IT Admin read and close the cases outside the process.",
+            "description": "Only Finance and the IT Admin close the cases outside the process, and only Finance records the money already spent (OUT_OF_PROCESS_CASE.FINANCE_ONLY) and only the IT Admin closes a case as revoked (OUT_OF_PROCESS_CASE.IT_ADMIN_ONLY).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -83238,6 +83249,28 @@
                       "error": {
                         "code": "AUTHORIZATION.FORBIDDEN",
                         "message": "You do not have permission to perform this action.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "OUT_OF_PROCESS_CASE.FINANCE_ONLY": {
+                    "summary": "The review of the accounts at the vendor refused: FINANCE_ONLY.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "OUT_OF_PROCESS_CASE.FINANCE_ONLY",
+                        "message": "The review of the accounts at the vendor refused: FINANCE_ONLY.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "OUT_OF_PROCESS_CASE.IT_ADMIN_ONLY": {
+                    "summary": "The review of the accounts at the vendor refused: IT_ADMIN_ONLY.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "OUT_OF_PROCESS_CASE.IT_ADMIN_ONLY",
+                        "message": "The review of the accounts at the vendor refused: IT_ADMIN_ONLY.",
                         "requestId": "req_example"
                       }
                     }
@@ -83342,7 +83375,7 @@
             }
           },
           "422": {
-            "description": "The note is missing (VALIDATION_ERROR); money is recorded with no proof of payment (OUT_OF_PROCESS_CASE.DOCUMENT_REQUIRED), with a file that is not a finished proof of payment of the person who closes it (OUT_OF_PROCESS_CASE.DOCUMENT_INVALID), without an amount or a Cost Center (OUT_OF_PROCESS_CASE.RECORD_FIELDS_MISSING) or with them on an outcome that records none (OUT_OF_PROCESS_CASE.RECORD_FIELDS_NOT_ALLOWED); the amount has digits after the point, is too large or is not above nothing (MONEY_SCALE_EXCEEDED, MONEY_OUT_OF_RANGE); the software has no vendor (OUT_OF_PROCESS_CASE.NO_VENDOR); or the Cost Center does not exist (OUT_OF_PROCESS_CASE.COST_CENTER_NOT_FOUND).",
+            "description": "The note is missing (VALIDATION_ERROR); money is recorded with no proof of payment (OUT_OF_PROCESS_CASE.DOCUMENT_REQUIRED), with a file that is not a finished proof of payment of the person who closes it (OUT_OF_PROCESS_CASE.DOCUMENT_INVALID), without an amount or a Cost Center (OUT_OF_PROCESS_CASE.RECORD_FIELDS_MISSING) or with them on an outcome that records none (OUT_OF_PROCESS_CASE.RECORD_FIELDS_NOT_ALLOWED); the amount has digits after the point, is too large or is not above nothing (MONEY_SCALE_EXCEEDED, MONEY_OUT_OF_RANGE); the software has no vendor (OUT_OF_PROCESS_CASE.NO_VENDOR); the Cost Center does not exist (OUT_OF_PROCESS_CASE.COST_CENTER_NOT_FOUND); or a revocation is of a case that is not on a company asset (OUT_OF_PROCESS_CASE.REVOKE_NOT_ALLOWED) or lacks the cancelled renewal and its proof (OUT_OF_PROCESS_CASE.REVOKE_EVIDENCE_MISSING).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -83445,6 +83478,28 @@
                       "error": {
                         "code": "OUT_OF_PROCESS_CASE.COST_CENTER_NOT_FOUND",
                         "message": "The review of the accounts at the vendor refused: COST_CENTER_NOT_FOUND.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "OUT_OF_PROCESS_CASE.REVOKE_NOT_ALLOWED": {
+                    "summary": "The review of the accounts at the vendor refused: REVOKE_NOT_ALLOWED.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "OUT_OF_PROCESS_CASE.REVOKE_NOT_ALLOWED",
+                        "message": "The review of the accounts at the vendor refused: REVOKE_NOT_ALLOWED.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "OUT_OF_PROCESS_CASE.REVOKE_EVIDENCE_MISSING": {
+                    "summary": "The review of the accounts at the vendor refused: REVOKE_EVIDENCE_MISSING.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "OUT_OF_PROCESS_CASE.REVOKE_EVIDENCE_MISSING",
+                        "message": "The review of the accounts at the vendor refused: REVOKE_EVIDENCE_MISSING.",
                         "requestId": "req_example"
                       }
                     }
@@ -124839,7 +124894,13 @@
                     "outOfProcessCaseId": {
                       "type": "string",
                       "format": "uuid",
-                      "description": "The case an OUT_OF_PROCESS decision opened.",
+                      "description": "The case an OUT_OF_PROCESS decision opened, or the one already open for the same account that it joined.",
+                      "nullable": true
+                    },
+                    "reopenedFromId": {
+                      "type": "string",
+                      "format": "uuid",
+                      "description": "The decided difference of the same thing this one follows, when it was seen again with newer evidence after it was decided; null for a first sighting.",
                       "nullable": true
                     }
                   },
@@ -124860,7 +124921,8 @@
                     "decisionNote",
                     "decidedBy",
                     "decidedAt",
-                    "outOfProcessCaseId"
+                    "outOfProcessCaseId",
+                    "reopenedFromId"
                   ],
                   "additionalProperties": false
                 }
@@ -124895,8 +124957,12 @@
         "properties": {
           "decision": {
             "type": "string",
-            "enum": ["LEGALIZE_VIA_REQUEST", "REVOKE", "FALSE_ALARM", "OUT_OF_PROCESS"],
-            "description": "LEGALIZE_VIA_REQUEST when the account goes through a Request; REVOKE when the access is revoked; FALSE_ALARM when there is nothing wrong; OUT_OF_PROCESS when money or access was outside the process, which opens a case Finance or the IT Admin closes."
+            "enum": ["FALSE_ALARM", "OUT_OF_PROCESS"],
+            "description": "FALSE_ALARM when there is nothing wrong; OUT_OF_PROCESS when money or access was outside the process, which opens the case that Finance and the IT Admin close, or joins the one already open for the same account. Nobody makes a Request to legalize it: whoever wants to use the software sends a new Request like anyone."
+          },
+          "companyAsset": {
+            "description": "Required with OUT_OF_PROCESS: true when the account is on a company asset (registered with the company email or in the company workspace), false for a personal one outside them. Only a case on a company asset can be closed as REVOKED.",
+            "type": "boolean"
           },
           "note": {
             "type": "string",
@@ -124964,7 +125030,13 @@
               "outOfProcessCaseId": {
                 "type": "string",
                 "format": "uuid",
-                "description": "The case an OUT_OF_PROCESS decision opened.",
+                "description": "The case an OUT_OF_PROCESS decision opened, or the one already open for the same account that it joined.",
+                "nullable": true
+              },
+              "reopenedFromId": {
+                "type": "string",
+                "format": "uuid",
+                "description": "The decided difference of the same thing this one follows, when it was seen again with newer evidence after it was decided; null for a first sighting.",
                 "nullable": true
               }
             },
@@ -124985,7 +125057,8 @@
               "decisionNote",
               "decidedBy",
               "decidedAt",
-              "outOfProcessCaseId"
+              "outOfProcessCaseId",
+              "reopenedFromId"
             ],
             "additionalProperties": false,
             "nullable": true
@@ -125021,7 +125094,7 @@
                     "openedAt": { "type": "string", "format": "date-time" },
                     "outcome": {
                       "type": "string",
-                      "enum": ["FALSE_ALARM", "RECORD_SPENT", "REPORT_ONLY", null],
+                      "enum": ["FALSE_ALARM", "RECORD_SPENT", "REPORT_ONLY", "REVOKED", null],
                       "nullable": true
                     },
                     "note": { "type": "string", "nullable": true },
@@ -125047,7 +125120,22 @@
                       "description": "The Cost Center that bears it; null with an amount means not allocated yet.",
                       "nullable": true
                     },
-                    "documentIds": { "maxItems": 20, "type": "array", "items": { "type": "string", "format": "uuid" } }
+                    "documentIds": { "maxItems": 20, "type": "array", "items": { "type": "string", "format": "uuid" } },
+                    "companyAsset": {
+                      "description": "Concluded on a company asset (registered with the company email or in the company workspace); null for a case opened before it was asked.",
+                      "type": "boolean",
+                      "nullable": true
+                    },
+                    "concludedOn": {
+                      "type": "string",
+                      "format": "date",
+                      "description": "The day the difference was concluded to be outside the process; null for a case opened before it was kept.",
+                      "nullable": true
+                    },
+                    "renewalCancelled": {
+                      "type": "boolean",
+                      "description": "The renewal or payment was cancelled; true only for REVOKED."
+                    }
                   },
                   "required": [
                     "id",
@@ -125062,7 +125150,10 @@
                     "closedAt",
                     "amount",
                     "costCenterId",
-                    "documentIds"
+                    "documentIds",
+                    "companyAsset",
+                    "concludedOn",
+                    "renewalCancelled"
                   ],
                   "additionalProperties": false
                 }
@@ -125097,8 +125188,8 @@
         "properties": {
           "outcome": {
             "type": "string",
-            "enum": ["FALSE_ALARM", "RECORD_SPENT", "REPORT_ONLY"],
-            "description": "FALSE_ALARM when nothing was spent; REPORT_ONLY to report it with the reason when there is no proof of payment; RECORD_SPENT to record the money already spent, which needs a proof of payment, an amount and a Cost Center or UNALLOCATED."
+            "enum": ["FALSE_ALARM", "RECORD_SPENT", "REPORT_ONLY", "REVOKED"],
+            "description": "FALSE_ALARM when nothing was spent; REPORT_ONLY to report it with the reason when there is no proof of payment; RECORD_SPENT (Finance) to record the money already spent, which needs a proof of payment, an amount and a Cost Center or UNALLOCATED; REVOKED (IT Admin) for an account on a company asset that was revoked, which needs renewalCancelled true and a proof of the cancellation."
           },
           "note": {
             "type": "string",
@@ -125106,8 +125197,12 @@
             "maxLength": 1000,
             "description": "Why the case is closed this way. Required; it stays with the case."
           },
+          "renewalCancelled": {
+            "description": "Only for REVOKED, and then true: the renewal or payment with the vendor was cancelled; a proof of it is needed among documentIds.",
+            "type": "boolean"
+          },
           "documentIds": {
-            "description": "The proofs of payment of the company, finished uploads of purpose PURCHASE_DOCUMENT of the person who closes. Only for RECORD_SPENT, and then at least one.",
+            "description": "The proofs of payment of the company (RECORD_SPENT) or of the cancellation of the renewal or payment (REVOKED): finished uploads of purpose PURCHASE_DOCUMENT of the person who closes. Only for those two, and then at least one.",
             "minItems": 1,
             "maxItems": 20,
             "type": "array",
@@ -125153,7 +125248,7 @@
               "openedAt": { "type": "string", "format": "date-time" },
               "outcome": {
                 "type": "string",
-                "enum": ["FALSE_ALARM", "RECORD_SPENT", "REPORT_ONLY", null],
+                "enum": ["FALSE_ALARM", "RECORD_SPENT", "REPORT_ONLY", "REVOKED", null],
                 "nullable": true
               },
               "note": { "type": "string", "nullable": true },
@@ -125179,7 +125274,22 @@
                 "description": "The Cost Center that bears it; null with an amount means not allocated yet.",
                 "nullable": true
               },
-              "documentIds": { "maxItems": 20, "type": "array", "items": { "type": "string", "format": "uuid" } }
+              "documentIds": { "maxItems": 20, "type": "array", "items": { "type": "string", "format": "uuid" } },
+              "companyAsset": {
+                "description": "Concluded on a company asset (registered with the company email or in the company workspace); null for a case opened before it was asked.",
+                "type": "boolean",
+                "nullable": true
+              },
+              "concludedOn": {
+                "type": "string",
+                "format": "date",
+                "description": "The day the difference was concluded to be outside the process; null for a case opened before it was kept.",
+                "nullable": true
+              },
+              "renewalCancelled": {
+                "type": "boolean",
+                "description": "The renewal or payment was cancelled; true only for REVOKED."
+              }
             },
             "required": [
               "id",
@@ -125194,7 +125304,10 @@
               "closedAt",
               "amount",
               "costCenterId",
-              "documentIds"
+              "documentIds",
+              "companyAsset",
+              "concludedOn",
+              "renewalCancelled"
             ],
             "additionalProperties": false,
             "nullable": true
@@ -128653,6 +128766,7 @@
                         "SEAT_ENDED",
                         "MACHINE_ACCOUNT",
                         "TRANSFER_GRACE",
+                        "LEAVE_OR_HANDOVER",
                         "NO_DEPARTMENT",
                         null
                       ],
