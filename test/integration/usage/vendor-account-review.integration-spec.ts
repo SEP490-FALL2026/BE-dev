@@ -462,6 +462,15 @@ describe('the review of the accounts at the vendors over PostgreSQL (integration
       expect(code(await send({ costCenterId: randomUUID() }).then((r) => r))).toBe(
         'OUT_OF_PROCESS_CASE.COST_CENTER_NOT_FOUND',
       );
+      // A Cost Center Finance has stopped takes no new expense (QĐ-90f, US-13-05 AC-19: the Cost Center in force).
+      serial += 1;
+      const stopped = await h.departmentWithHead(`P-RC2X${serial}`);
+      await h.ctx.sql.query(`UPDATE cost_centers SET status = 'INACTIVE', deactivated_at = now() WHERE id = $1`, [
+        stopped.department.unitId,
+      ]);
+      expect(code(await send({ costCenterId: stopped.department.unitId }))).toBe(
+        'OUT_OF_PROCESS_CASE.COST_CENTER_NOT_FOUND',
+      );
       expect(code(await send({ amount: { amount: 'abc' } }))).toBe('VALIDATION_ERROR');
       expect(code(await send({ amount: { amount: '100.5' } }))).toBe('MONEY_SCALE_EXCEEDED');
       expect(code(await send({ amount: { amount: '-1' } }))).toBe('MONEY_OUT_OF_RANGE');

@@ -141,8 +141,9 @@ export class OutOfProcessCaseClosureService {
   ): Promise<void> {
     const costCenterId = input.costCenterId ?? null;
     if (costCenterId !== null) {
-      const found = await this.organizationReads.costCentersByIds([costCenterId], tx);
-      if (found.length === 0) throw new VendorAccountReviewRefusedError('COST_CENTER_NOT_FOUND');
+      // The Cost Center in force, held `FOR SHARE` so that it cannot be stopped before the expense is committed (`QĐ-90f`, `US-13-05` AC-19).
+      const [found] = await this.organizationReads.lockCostCentersShared(tx, [costCenterId]);
+      if (!found || found.status !== 'ACTIVE') throw new VendorAccountReviewRefusedError('COST_CENTER_NOT_FOUND');
     }
     try {
       await this.catalog.attachOutOfProcessCaseDocuments(tx, actor, {
