@@ -43,6 +43,12 @@
 - **Chọn A:** đúng "Không nạp nháp, vì checklist cần bản hiện hành" (điểm Owner 6) và không đụng demo seed. `PoliciesBootstrapApi.seedInitialPolicies(tx, orgId, changeNote?)` chạy lại an toàn. Cài đặt gọi qua `InstallationInitialDataService` (nhóm chức năng + chính sách) vì constructor `InstallationApi` đã 8 tham số.
 - **File:** `policies/initial/*`, `policies/public/policies-bootstrap.api.ts`, `installation/installation-initial-data.service.ts`. **Đổi lại:** bỏ lời gọi ở service; hoặc đổi `INITIAL_CHANGE_NOTE`.
 
+### D-B6 — chưa bỏ mục đích tệp `COST_STATEMENT` ("sao kê") khỏi enum nhận mới
+
+- **Câu hỏi:** PLAN PL-3.1 bảo bỏ mục đích tệp sao kê khỏi enum nhận mới (US-01-12 AC-10, US-04-04 AC-11). Mục đích đó là `COST_STATEMENT` trong `catalog/contract/contract.dto.ts` + `contract.policy.ts`.
+- **Phương án:** (A) bỏ ngay ở lane B; (B) để lại tới lượt hợp nhất vì cùng file lane A (CO-1 sửa hợp đồng/tệp, PI-1 thêm mục đích tệp cho hóa đơn); (C) giữ vĩnh viễn.
+- **Chọn B** (tránh xung đột file chung, không mất gì: không có route nào của PL-3 nhận file sao kê, và **không có mẫu sao kê**). **Việc cho chat điều phối:** sau khi lane A xong PI-1, bỏ `COST_STATEMENT` khỏi danh sách nhận mới (`contract.dto.ts:95`, `contract.policy.ts:20,35`, `contract.policy.spec.ts`), giữ giá trị trong DB để đọc tệp cũ.
+
 ## Optional và việc để lại
 
 - Báo cáo xác nhận chưa có tổng `done`/`pending` toàn tập (cần join chéo module); thêm khi FE đòi.
@@ -59,4 +65,4 @@
 
 ## Dừng ở đâu
 
-- Xong cả PL-1 (PL-1.1–PL-1.5, commit cuối `e20b09e6`). Việc tiếp: PL-3 → PF-1 → BG-1 → BG-2.
+- Xong PL-1 (commit cuối `e20b09e6`) và PL-3 (commit cuối `df3a8933`). Việc tiếp: PF-1 → BG-1 → BG-2.
