@@ -52310,7 +52310,7 @@
             }
           },
           "422": {
-            "description": "The form is invalid (VALIDATION_ERROR), or the software has no vendor (PURCHASE_INVOICE.NO_VENDOR).",
+            "description": "The form is invalid (VALIDATION_ERROR), an amount is not a plain number (VALIDATION_ERROR), has more decimals than its currency (MONEY_SCALE_EXCEEDED), is too large, below nothing, or nothing where it must be more (MONEY_OUT_OF_RANGE), or a currency is not one the system prices in (CURRENCY_NOT_SUPPORTED), or the software has no vendor (PURCHASE_INVOICE.NO_VENDOR).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -52323,6 +52323,41 @@
                         "code": "VALIDATION_ERROR",
                         "message": "Request validation failed.",
                         "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "MONEY_SCALE_EXCEEDED": {
+                    "summary": "This currency allows at most 0 decimal digit(s).",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "MONEY_SCALE_EXCEEDED",
+                        "message": "This currency allows at most 0 decimal digit(s).",
+                        "details": { "allowedDecimals": 0 },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "MONEY_OUT_OF_RANGE": {
+                    "summary": "The amount is outside the range a money value may hold.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "MONEY_OUT_OF_RANGE",
+                        "message": "The amount is outside the range a money value may hold.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "CURRENCY_NOT_SUPPORTED": {
+                    "summary": "The currency ZZZ is not supported.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "CURRENCY_NOT_SUPPORTED",
+                        "message": "The currency ZZZ is not supported.",
+                        "details": { "currency": "ZZZ" },
                         "requestId": "req_example"
                       }
                     }
@@ -52596,7 +52631,7 @@
             }
           },
           "422": {
-            "description": "The form is invalid (VALIDATION_ERROR: at least one file, at most twenty), the software has no vendor (PURCHASE_INVOICE.NO_VENDOR), or a file is not a finished purchase document of the person who submits it (PURCHASE_INVOICE.DOCUMENT_INVALID, with the reason in details).",
+            "description": "The form is invalid (VALIDATION_ERROR: at least one file, at most twenty), an amount is not a plain number (VALIDATION_ERROR), has more decimals than its currency (MONEY_SCALE_EXCEEDED), is too large, below nothing, or nothing where it must be more (MONEY_OUT_OF_RANGE), or a currency is not one the system prices in (CURRENCY_NOT_SUPPORTED), the software has no vendor (PURCHASE_INVOICE.NO_VENDOR), or a file is not a finished purchase document of the person who submits it (PURCHASE_INVOICE.DOCUMENT_INVALID, with the reason in details).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -52609,6 +52644,41 @@
                         "code": "VALIDATION_ERROR",
                         "message": "Request validation failed.",
                         "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "MONEY_SCALE_EXCEEDED": {
+                    "summary": "This currency allows at most 0 decimal digit(s).",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "MONEY_SCALE_EXCEEDED",
+                        "message": "This currency allows at most 0 decimal digit(s).",
+                        "details": { "allowedDecimals": 0 },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "MONEY_OUT_OF_RANGE": {
+                    "summary": "The amount is outside the range a money value may hold.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "MONEY_OUT_OF_RANGE",
+                        "message": "The amount is outside the range a money value may hold.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "CURRENCY_NOT_SUPPORTED": {
+                    "summary": "The currency ZZZ is not supported.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "CURRENCY_NOT_SUPPORTED",
+                        "message": "The currency ZZZ is not supported.",
+                        "details": { "currency": "ZZZ" },
                         "requestId": "req_example"
                       }
                     }
@@ -53125,7 +53195,7 @@
             }
           },
           "422": {
-            "description": "The form is invalid (VALIDATION_ERROR: at least one file, at most twenty), the software has no vendor (PURCHASE_INVOICE.NO_VENDOR), or a file is not a finished purchase document of the person who submits it (PURCHASE_INVOICE.DOCUMENT_INVALID, with the reason in details).",
+            "description": "The form is invalid (VALIDATION_ERROR: at least one file, at most twenty), an amount is not a plain number (VALIDATION_ERROR), has more decimals than its currency (MONEY_SCALE_EXCEEDED), is too large, below nothing, or nothing where it must be more (MONEY_OUT_OF_RANGE), or a currency is not one the system prices in (CURRENCY_NOT_SUPPORTED), the software has no vendor (PURCHASE_INVOICE.NO_VENDOR), or a file is not a finished purchase document of the person who submits it (PURCHASE_INVOICE.DOCUMENT_INVALID, with the reason in details).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -53138,6 +53208,41 @@
                         "code": "VALIDATION_ERROR",
                         "message": "Request validation failed.",
                         "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "MONEY_SCALE_EXCEEDED": {
+                    "summary": "This currency allows at most 0 decimal digit(s).",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "MONEY_SCALE_EXCEEDED",
+                        "message": "This currency allows at most 0 decimal digit(s).",
+                        "details": { "allowedDecimals": 0 },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "MONEY_OUT_OF_RANGE": {
+                    "summary": "The amount is outside the range a money value may hold.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "MONEY_OUT_OF_RANGE",
+                        "message": "The amount is outside the range a money value may hold.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "CURRENCY_NOT_SUPPORTED": {
+                    "summary": "The currency ZZZ is not supported.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "CURRENCY_NOT_SUPPORTED",
+                        "message": "The currency ZZZ is not supported.",
+                        "details": { "currency": "ZZZ" },
                         "requestId": "req_example"
                       }
                     }
@@ -84021,6 +84126,1010 @@
         "security": [{ "bearer": [] }],
         "summary": "Show what each source says of a person in one software",
         "tags": ["usage-overview"]
+      }
+    },
+    "/api/v1/vendor-account-discrepancies": {
+      "get": {
+        "operationId": "vendorAccountDiscrepancyList",
+        "parameters": [
+          {
+            "name": "state",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string", "enum": ["OPEN", "DECIDED"] }
+          },
+          {
+            "name": "source",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "type": "string",
+              "enum": ["NO_ASSIGNMENT", "UNMATCHED_IDENTITY", "INVOICE_DIFFERENCE", "COLLECTOR_UNLISTED"]
+            }
+          },
+          {
+            "name": "applicationId",
+            "required": false,
+            "in": "query",
+            "schema": { "format": "uuid", "type": "string" }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maximum": 9007199254740991,
+              "exclusiveMinimum": true,
+              "default": 1,
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": { "maximum": 100, "exclusiveMinimum": true, "default": 20, "type": "integer", "minimum": 0 }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The newest seen first, each with what the company has on record and what the vendor shows, where it came from and the decision taken on it. Filter by state, source or application.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/VendorAccountListResponseDto" },
+                    { "properties": { "message": { "example": "VENDOR_ACCOUNT_DISCREPANCY.LISTED" } } }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHENTICATION_REQUIRED": {
+                    "summary": "A Bearer access token is required.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHENTICATION_REQUIRED",
+                        "message": "A Bearer access token is required.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "INVALID_ACCESS_TOKEN": {
+                    "summary": "The access token is invalid.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "INVALID_ACCESS_TOKEN",
+                        "message": "The access token is invalid.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only the IT Admin reviews the accounts at the vendors.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHORIZATION.FORBIDDEN": {
+                    "summary": "You do not have permission to perform this action.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHORIZATION.FORBIDDEN",
+                        "message": "You do not have permission to perform this action.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The query is invalid (VALIDATION_ERROR).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "VALIDATION_ERROR": {
+                    "summary": "Request validation failed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "VALIDATION_ERROR",
+                        "message": "Request validation failed.",
+                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_TOO_MANY_REQUESTS": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_TOO_MANY_REQUESTS",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "TOKEN_VERIFICATION_UNAVAILABLE": {
+                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
+                        "message": "Authentication is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SERVICE_UNAVAILABLE": {
+                    "summary": "The service is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SERVICE_UNAVAILABLE",
+                        "message": "The service is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "bearer": [] }],
+        "summary": "List the differences of the accounts at the vendors",
+        "tags": ["vendor-account-discrepancies"]
+      }
+    },
+    "/api/v1/vendor-account-discrepancies/{id}/decision": {
+      "post": {
+        "operationId": "vendorAccountDiscrepancyDecide",
+        "parameters": [
+          { "name": "id", "required": true, "in": "path", "schema": { "format": "uuid", "type": "string" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/VendorAccountDecisionBodyDto" } }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The IT Admin decides once, with a note. OUT_OF_PROCESS opens, in the same step, the case Finance or the IT Admin closes; the other decisions only record the choice, the Request and the revocation being done where they are done today.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/VendorAccountResponseDto" },
+                    { "properties": { "message": { "example": "VENDOR_ACCOUNT_DISCREPANCY.DECIDED" } } }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_BAD_REQUEST": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_BAD_REQUEST",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHENTICATION_REQUIRED": {
+                    "summary": "A Bearer access token is required.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHENTICATION_REQUIRED",
+                        "message": "A Bearer access token is required.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "INVALID_ACCESS_TOKEN": {
+                    "summary": "The access token is invalid.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "INVALID_ACCESS_TOKEN",
+                        "message": "The access token is invalid.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only the IT Admin reviews the accounts at the vendors.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHORIZATION.FORBIDDEN": {
+                    "summary": "You do not have permission to perform this action.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHORIZATION.FORBIDDEN",
+                        "message": "You do not have permission to perform this action.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The difference does not exist (VENDOR_ACCOUNT_DISCREPANCY.NOT_FOUND).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "VENDOR_ACCOUNT_DISCREPANCY.NOT_FOUND": {
+                    "summary": "The review of the accounts at the vendor refused: NOT_FOUND.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "VENDOR_ACCOUNT_DISCREPANCY.NOT_FOUND",
+                        "message": "The review of the accounts at the vendor refused: NOT_FOUND.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The difference was decided already (VENDOR_ACCOUNT_DISCREPANCY.ALREADY_DECIDED).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "VENDOR_ACCOUNT_DISCREPANCY.ALREADY_DECIDED": {
+                    "summary": "The review of the accounts at the vendor refused: ALREADY_DECIDED.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "VENDOR_ACCOUNT_DISCREPANCY.ALREADY_DECIDED",
+                        "message": "The review of the accounts at the vendor refused: ALREADY_DECIDED.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_PAYLOAD_TOO_LARGE": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_PAYLOAD_TOO_LARGE",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_UNSUPPORTED_MEDIA_TYPE": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_UNSUPPORTED_MEDIA_TYPE",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The decision or the note is missing or not valid (VALIDATION_ERROR).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "VALIDATION_ERROR": {
+                    "summary": "Request validation failed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "VALIDATION_ERROR",
+                        "message": "Request validation failed.",
+                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_TOO_MANY_REQUESTS": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_TOO_MANY_REQUESTS",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "TOKEN_VERIFICATION_UNAVAILABLE": {
+                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
+                        "message": "Authentication is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SERVICE_UNAVAILABLE": {
+                    "summary": "The service is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SERVICE_UNAVAILABLE",
+                        "message": "The service is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "bearer": [] }],
+        "summary": "Decide a difference of an account at the vendor",
+        "tags": ["vendor-account-discrepancies"]
+      }
+    },
+    "/api/v1/out-of-process-cases": {
+      "get": {
+        "operationId": "outOfProcessCaseList",
+        "parameters": [
+          {
+            "name": "state",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string", "enum": ["OPEN", "CLOSED"] }
+          },
+          {
+            "name": "outcome",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string", "enum": ["FALSE_ALARM", "RECORD_SPENT", "REPORT_ONLY"] }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maximum": 9007199254740991,
+              "exclusiveMinimum": true,
+              "default": 1,
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": { "maximum": 100, "exclusiveMinimum": true, "default": 20, "type": "integer", "minimum": 0 }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The newest opened first. Filter by state or outcome.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/OutOfProcessListResponseDto" },
+                    { "properties": { "message": { "example": "OUT_OF_PROCESS_CASE.LISTED" } } }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHENTICATION_REQUIRED": {
+                    "summary": "A Bearer access token is required.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHENTICATION_REQUIRED",
+                        "message": "A Bearer access token is required.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "INVALID_ACCESS_TOKEN": {
+                    "summary": "The access token is invalid.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "INVALID_ACCESS_TOKEN",
+                        "message": "The access token is invalid.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only Finance and the IT Admin read and close the cases outside the process.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHORIZATION.FORBIDDEN": {
+                    "summary": "You do not have permission to perform this action.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHORIZATION.FORBIDDEN",
+                        "message": "You do not have permission to perform this action.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The query is invalid (VALIDATION_ERROR).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "VALIDATION_ERROR": {
+                    "summary": "Request validation failed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "VALIDATION_ERROR",
+                        "message": "Request validation failed.",
+                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_TOO_MANY_REQUESTS": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_TOO_MANY_REQUESTS",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "TOKEN_VERIFICATION_UNAVAILABLE": {
+                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
+                        "message": "Authentication is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SERVICE_UNAVAILABLE": {
+                    "summary": "The service is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SERVICE_UNAVAILABLE",
+                        "message": "The service is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "bearer": [] }],
+        "summary": "List the cases outside the process",
+        "tags": ["out-of-process-cases"]
+      }
+    },
+    "/api/v1/out-of-process-cases/{id}/closure": {
+      "post": {
+        "operationId": "outOfProcessCaseClose",
+        "parameters": [
+          { "name": "id", "required": true, "in": "path", "schema": { "format": "uuid", "type": "string" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/OutOfProcessClosureBodyDto" } } }
+        },
+        "responses": {
+          "201": {
+            "description": "The case is closed once with a note. RECORD_SPENT records the money already spent as one expense in dong with no commitment, in the same step: it needs at least one proof of payment of the company, an amount and a Cost Center or UNALLOCATED. With no proof the case can only be a false alarm or a report.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/OutOfProcessResponseDto" },
+                    { "properties": { "message": { "example": "OUT_OF_PROCESS_CASE.CLOSED" } } }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_BAD_REQUEST": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_BAD_REQUEST",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHENTICATION_REQUIRED": {
+                    "summary": "A Bearer access token is required.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHENTICATION_REQUIRED",
+                        "message": "A Bearer access token is required.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "INVALID_ACCESS_TOKEN": {
+                    "summary": "The access token is invalid.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "INVALID_ACCESS_TOKEN",
+                        "message": "The access token is invalid.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only Finance and the IT Admin read and close the cases outside the process.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHORIZATION.FORBIDDEN": {
+                    "summary": "You do not have permission to perform this action.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHORIZATION.FORBIDDEN",
+                        "message": "You do not have permission to perform this action.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The case does not exist (OUT_OF_PROCESS_CASE.NOT_FOUND).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "OUT_OF_PROCESS_CASE.NOT_FOUND": {
+                    "summary": "The review of the accounts at the vendor refused: CASE_NOT_FOUND.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "OUT_OF_PROCESS_CASE.NOT_FOUND",
+                        "message": "The review of the accounts at the vendor refused: CASE_NOT_FOUND.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The case was closed already (OUT_OF_PROCESS_CASE.ALREADY_CLOSED), or the vendor has an invoice with its number (OUT_OF_PROCESS_CASE.NUMBER_TAKEN).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "OUT_OF_PROCESS_CASE.ALREADY_CLOSED": {
+                    "summary": "The review of the accounts at the vendor refused: CASE_ALREADY_CLOSED.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "OUT_OF_PROCESS_CASE.ALREADY_CLOSED",
+                        "message": "The review of the accounts at the vendor refused: CASE_ALREADY_CLOSED.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "OUT_OF_PROCESS_CASE.NUMBER_TAKEN": {
+                    "summary": "The review of the accounts at the vendor refused: NUMBER_TAKEN.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "OUT_OF_PROCESS_CASE.NUMBER_TAKEN",
+                        "message": "The review of the accounts at the vendor refused: NUMBER_TAKEN.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_PAYLOAD_TOO_LARGE": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_PAYLOAD_TOO_LARGE",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_UNSUPPORTED_MEDIA_TYPE": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_UNSUPPORTED_MEDIA_TYPE",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The note is missing (VALIDATION_ERROR); money is recorded with no proof of payment (OUT_OF_PROCESS_CASE.DOCUMENT_REQUIRED), with a file that is not a finished proof of payment of the person who closes it (OUT_OF_PROCESS_CASE.DOCUMENT_INVALID), without an amount or a Cost Center (OUT_OF_PROCESS_CASE.RECORD_FIELDS_MISSING) or with them on an outcome that records none (OUT_OF_PROCESS_CASE.RECORD_FIELDS_NOT_ALLOWED); the amount has digits after the point, is too large or is not above nothing (MONEY_SCALE_EXCEEDED, MONEY_OUT_OF_RANGE); the software has no vendor (OUT_OF_PROCESS_CASE.NO_VENDOR); or the Cost Center does not exist (OUT_OF_PROCESS_CASE.COST_CENTER_NOT_FOUND).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "VALIDATION_ERROR": {
+                    "summary": "Request validation failed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "VALIDATION_ERROR",
+                        "message": "Request validation failed.",
+                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "OUT_OF_PROCESS_CASE.DOCUMENT_REQUIRED": {
+                    "summary": "The review of the accounts at the vendor refused: DOCUMENT_REQUIRED.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "OUT_OF_PROCESS_CASE.DOCUMENT_REQUIRED",
+                        "message": "The review of the accounts at the vendor refused: DOCUMENT_REQUIRED.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "OUT_OF_PROCESS_CASE.DOCUMENT_INVALID": {
+                    "summary": "The review of the accounts at the vendor refused: DOCUMENT_INVALID (NOT_FOUND).",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "OUT_OF_PROCESS_CASE.DOCUMENT_INVALID",
+                        "message": "The review of the accounts at the vendor refused: DOCUMENT_INVALID (NOT_FOUND).",
+                        "details": { "reason": "NOT_FOUND" },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "OUT_OF_PROCESS_CASE.RECORD_FIELDS_MISSING": {
+                    "summary": "The review of the accounts at the vendor refused: RECORD_FIELDS_MISSING.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "OUT_OF_PROCESS_CASE.RECORD_FIELDS_MISSING",
+                        "message": "The review of the accounts at the vendor refused: RECORD_FIELDS_MISSING.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "OUT_OF_PROCESS_CASE.RECORD_FIELDS_NOT_ALLOWED": {
+                    "summary": "The review of the accounts at the vendor refused: RECORD_FIELDS_NOT_ALLOWED.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "OUT_OF_PROCESS_CASE.RECORD_FIELDS_NOT_ALLOWED",
+                        "message": "The review of the accounts at the vendor refused: RECORD_FIELDS_NOT_ALLOWED.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "MONEY_SCALE_EXCEEDED": {
+                    "summary": "This currency allows at most 0 decimal digit(s).",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "MONEY_SCALE_EXCEEDED",
+                        "message": "This currency allows at most 0 decimal digit(s).",
+                        "details": { "allowedDecimals": 0 },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "MONEY_OUT_OF_RANGE": {
+                    "summary": "The amount is outside the range a money value may hold.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "MONEY_OUT_OF_RANGE",
+                        "message": "The amount is outside the range a money value may hold.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "OUT_OF_PROCESS_CASE.NO_VENDOR": {
+                    "summary": "The review of the accounts at the vendor refused: NO_VENDOR.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "OUT_OF_PROCESS_CASE.NO_VENDOR",
+                        "message": "The review of the accounts at the vendor refused: NO_VENDOR.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "OUT_OF_PROCESS_CASE.COST_CENTER_NOT_FOUND": {
+                    "summary": "The review of the accounts at the vendor refused: COST_CENTER_NOT_FOUND.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "OUT_OF_PROCESS_CASE.COST_CENTER_NOT_FOUND",
+                        "message": "The review of the accounts at the vendor refused: COST_CENTER_NOT_FOUND.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_TOO_MANY_REQUESTS": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_TOO_MANY_REQUESTS",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "TOKEN_VERIFICATION_UNAVAILABLE": {
+                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
+                        "message": "Authentication is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SERVICE_UNAVAILABLE": {
+                    "summary": "The service is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SERVICE_UNAVAILABLE",
+                        "message": "The service is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "bearer": [] }],
+        "summary": "Close a case outside the process",
+        "tags": ["out-of-process-cases"]
       }
     },
     "/api/v1/notifications": {
@@ -122775,6 +123884,435 @@
               "vendorSources",
               "sourcesTruncated",
               "collector"
+            ],
+            "additionalProperties": false,
+            "nullable": true
+          }
+        },
+        "required": ["success", "message", "data"],
+        "additionalProperties": false
+      },
+      "VendorAccountListResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "enum": [true] },
+          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "items": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": { "type": "string", "format": "uuid" },
+                    "source": {
+                      "type": "string",
+                      "enum": ["NO_ASSIGNMENT", "UNMATCHED_IDENTITY", "INVOICE_DIFFERENCE", "COLLECTOR_UNLISTED"]
+                    },
+                    "state": { "type": "string", "enum": ["OPEN", "DECIDED"] },
+                    "application": {
+                      "type": "object",
+                      "properties": { "id": { "type": "string", "format": "uuid" }, "name": { "type": "string" } },
+                      "required": ["id", "name"],
+                      "additionalProperties": false,
+                      "description": "The application the difference is about; null for an invoice or a tool.",
+                      "nullable": true
+                    },
+                    "vendorId": { "type": "string", "format": "uuid", "nullable": true },
+                    "employeeId": {
+                      "type": "string",
+                      "format": "uuid",
+                      "description": "The person with activity and no seat, by id only; never a name.",
+                      "nullable": true
+                    },
+                    "identity": {
+                      "description": "The account as the vendor wrote it, or the key of the tool.",
+                      "type": "string",
+                      "nullable": true
+                    },
+                    "internalValue": { "type": "string", "description": "What the company has on record." },
+                    "vendorValue": { "type": "string", "description": "What the vendor shows." },
+                    "evidenceOn": {
+                      "type": "string",
+                      "format": "date",
+                      "description": "A calendar date as YYYY-MM-DD."
+                    },
+                    "firstSeenAt": { "type": "string", "format": "date-time" },
+                    "lastSeenAt": { "type": "string", "format": "date-time" },
+                    "decision": {
+                      "type": "string",
+                      "enum": ["LEGALIZE_VIA_REQUEST", "REVOKE", "FALSE_ALARM", "OUT_OF_PROCESS", null],
+                      "nullable": true
+                    },
+                    "decisionNote": { "type": "string", "nullable": true },
+                    "decidedBy": {
+                      "type": "object",
+                      "properties": { "employeeId": { "type": "string", "format": "uuid" } },
+                      "required": ["employeeId"],
+                      "additionalProperties": false,
+                      "nullable": true
+                    },
+                    "decidedAt": { "type": "string", "format": "date-time", "nullable": true },
+                    "outOfProcessCaseId": {
+                      "type": "string",
+                      "format": "uuid",
+                      "description": "The case an OUT_OF_PROCESS decision opened.",
+                      "nullable": true
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "source",
+                    "state",
+                    "application",
+                    "vendorId",
+                    "employeeId",
+                    "identity",
+                    "internalValue",
+                    "vendorValue",
+                    "evidenceOn",
+                    "firstSeenAt",
+                    "lastSeenAt",
+                    "decision",
+                    "decisionNote",
+                    "decidedBy",
+                    "decidedAt",
+                    "outOfProcessCaseId"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "pagination": {
+                "type": "object",
+                "properties": {
+                  "page": { "type": "integer", "exclusiveMinimum": true, "maximum": 9007199254740991, "minimum": 0 },
+                  "pageSize": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "maximum": 9007199254740991,
+                    "minimum": 0
+                  },
+                  "totalItems": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                  "totalPages": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+                },
+                "required": ["page", "pageSize", "totalItems", "totalPages"],
+                "additionalProperties": false
+              }
+            },
+            "required": ["items", "pagination"],
+            "additionalProperties": false,
+            "nullable": true
+          }
+        },
+        "required": ["success", "message", "data"],
+        "additionalProperties": false
+      },
+      "VendorAccountDecisionBodyDto": {
+        "type": "object",
+        "properties": {
+          "decision": {
+            "type": "string",
+            "enum": ["LEGALIZE_VIA_REQUEST", "REVOKE", "FALSE_ALARM", "OUT_OF_PROCESS"],
+            "description": "LEGALIZE_VIA_REQUEST when the account goes through a Request; REVOKE when the access is revoked; FALSE_ALARM when there is nothing wrong; OUT_OF_PROCESS when money or access was outside the process, which opens a case Finance or the IT Admin closes."
+          },
+          "note": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000,
+            "description": "Why. Required; it stays with the difference."
+          }
+        },
+        "required": ["decision", "note"],
+        "additionalProperties": false
+      },
+      "VendorAccountResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "enum": [true] },
+          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string", "format": "uuid" },
+              "source": {
+                "type": "string",
+                "enum": ["NO_ASSIGNMENT", "UNMATCHED_IDENTITY", "INVOICE_DIFFERENCE", "COLLECTOR_UNLISTED"]
+              },
+              "state": { "type": "string", "enum": ["OPEN", "DECIDED"] },
+              "application": {
+                "type": "object",
+                "properties": { "id": { "type": "string", "format": "uuid" }, "name": { "type": "string" } },
+                "required": ["id", "name"],
+                "additionalProperties": false,
+                "description": "The application the difference is about; null for an invoice or a tool.",
+                "nullable": true
+              },
+              "vendorId": { "type": "string", "format": "uuid", "nullable": true },
+              "employeeId": {
+                "type": "string",
+                "format": "uuid",
+                "description": "The person with activity and no seat, by id only; never a name.",
+                "nullable": true
+              },
+              "identity": {
+                "description": "The account as the vendor wrote it, or the key of the tool.",
+                "type": "string",
+                "nullable": true
+              },
+              "internalValue": { "type": "string", "description": "What the company has on record." },
+              "vendorValue": { "type": "string", "description": "What the vendor shows." },
+              "evidenceOn": { "type": "string", "format": "date", "description": "A calendar date as YYYY-MM-DD." },
+              "firstSeenAt": { "type": "string", "format": "date-time" },
+              "lastSeenAt": { "type": "string", "format": "date-time" },
+              "decision": {
+                "type": "string",
+                "enum": ["LEGALIZE_VIA_REQUEST", "REVOKE", "FALSE_ALARM", "OUT_OF_PROCESS", null],
+                "nullable": true
+              },
+              "decisionNote": { "type": "string", "nullable": true },
+              "decidedBy": {
+                "type": "object",
+                "properties": { "employeeId": { "type": "string", "format": "uuid" } },
+                "required": ["employeeId"],
+                "additionalProperties": false,
+                "nullable": true
+              },
+              "decidedAt": { "type": "string", "format": "date-time", "nullable": true },
+              "outOfProcessCaseId": {
+                "type": "string",
+                "format": "uuid",
+                "description": "The case an OUT_OF_PROCESS decision opened.",
+                "nullable": true
+              }
+            },
+            "required": [
+              "id",
+              "source",
+              "state",
+              "application",
+              "vendorId",
+              "employeeId",
+              "identity",
+              "internalValue",
+              "vendorValue",
+              "evidenceOn",
+              "firstSeenAt",
+              "lastSeenAt",
+              "decision",
+              "decisionNote",
+              "decidedBy",
+              "decidedAt",
+              "outOfProcessCaseId"
+            ],
+            "additionalProperties": false,
+            "nullable": true
+          }
+        },
+        "required": ["success", "message", "data"],
+        "additionalProperties": false
+      },
+      "OutOfProcessListResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "enum": [true] },
+          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "items": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": { "type": "string", "format": "uuid" },
+                    "state": { "type": "string", "enum": ["OPEN", "CLOSED"] },
+                    "discrepancyId": { "type": "string", "format": "uuid" },
+                    "application": {
+                      "type": "object",
+                      "properties": { "id": { "type": "string", "format": "uuid" }, "name": { "type": "string" } },
+                      "required": ["id", "name"],
+                      "additionalProperties": false,
+                      "nullable": true
+                    },
+                    "vendorId": { "type": "string", "format": "uuid", "nullable": true },
+                    "openedAt": { "type": "string", "format": "date-time" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["FALSE_ALARM", "RECORD_SPENT", "REPORT_ONLY", null],
+                      "nullable": true
+                    },
+                    "note": { "type": "string", "nullable": true },
+                    "closedBy": {
+                      "type": "object",
+                      "properties": { "employeeId": { "type": "string", "format": "uuid" } },
+                      "required": ["employeeId"],
+                      "additionalProperties": false,
+                      "nullable": true
+                    },
+                    "closedAt": { "type": "string", "format": "date-time", "nullable": true },
+                    "amount": {
+                      "type": "object",
+                      "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                      "required": ["amount", "currency"],
+                      "additionalProperties": false,
+                      "description": "What was recorded as spent, in dong; only for RECORD_SPENT.",
+                      "nullable": true
+                    },
+                    "costCenterId": {
+                      "type": "string",
+                      "format": "uuid",
+                      "description": "The Cost Center that bears it; null with an amount means not allocated yet.",
+                      "nullable": true
+                    },
+                    "documentIds": { "maxItems": 20, "type": "array", "items": { "type": "string", "format": "uuid" } }
+                  },
+                  "required": [
+                    "id",
+                    "state",
+                    "discrepancyId",
+                    "application",
+                    "vendorId",
+                    "openedAt",
+                    "outcome",
+                    "note",
+                    "closedBy",
+                    "closedAt",
+                    "amount",
+                    "costCenterId",
+                    "documentIds"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "pagination": {
+                "type": "object",
+                "properties": {
+                  "page": { "type": "integer", "exclusiveMinimum": true, "maximum": 9007199254740991, "minimum": 0 },
+                  "pageSize": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "maximum": 9007199254740991,
+                    "minimum": 0
+                  },
+                  "totalItems": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                  "totalPages": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+                },
+                "required": ["page", "pageSize", "totalItems", "totalPages"],
+                "additionalProperties": false
+              }
+            },
+            "required": ["items", "pagination"],
+            "additionalProperties": false,
+            "nullable": true
+          }
+        },
+        "required": ["success", "message", "data"],
+        "additionalProperties": false
+      },
+      "OutOfProcessClosureBodyDto": {
+        "type": "object",
+        "properties": {
+          "outcome": {
+            "type": "string",
+            "enum": ["FALSE_ALARM", "RECORD_SPENT", "REPORT_ONLY"],
+            "description": "FALSE_ALARM when nothing was spent; REPORT_ONLY to report it with the reason when there is no proof of payment; RECORD_SPENT to record the money already spent, which needs a proof of payment, an amount and a Cost Center or UNALLOCATED."
+          },
+          "note": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000,
+            "description": "Why the case is closed this way. Required; it stays with the case."
+          },
+          "documentIds": {
+            "description": "The proofs of payment of the company, finished uploads of purpose PURCHASE_DOCUMENT of the person who closes. Only for RECORD_SPENT, and then at least one.",
+            "minItems": 1,
+            "maxItems": 20,
+            "type": "array",
+            "items": { "type": "string", "format": "uuid" }
+          },
+          "amount": {
+            "description": "What was spent, in dong. Only for RECORD_SPENT, and then above nothing.",
+            "type": "object",
+            "properties": { "amount": { "type": "string", "maxLength": 40 } },
+            "required": ["amount"],
+            "additionalProperties": false
+          },
+          "costCenterId": {
+            "description": "The Cost Center that bears the money, or UNALLOCATED when no department can be told yet. Only for RECORD_SPENT, and then required; for a shared tool Finance chooses one department.",
+            "anyOf": [
+              { "type": "string", "format": "uuid" },
+              { "type": "string", "enum": ["UNALLOCATED"] }
+            ]
+          }
+        },
+        "required": ["outcome", "note"],
+        "additionalProperties": false
+      },
+      "OutOfProcessResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "enum": [true] },
+          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string", "format": "uuid" },
+              "state": { "type": "string", "enum": ["OPEN", "CLOSED"] },
+              "discrepancyId": { "type": "string", "format": "uuid" },
+              "application": {
+                "type": "object",
+                "properties": { "id": { "type": "string", "format": "uuid" }, "name": { "type": "string" } },
+                "required": ["id", "name"],
+                "additionalProperties": false,
+                "nullable": true
+              },
+              "vendorId": { "type": "string", "format": "uuid", "nullable": true },
+              "openedAt": { "type": "string", "format": "date-time" },
+              "outcome": {
+                "type": "string",
+                "enum": ["FALSE_ALARM", "RECORD_SPENT", "REPORT_ONLY", null],
+                "nullable": true
+              },
+              "note": { "type": "string", "nullable": true },
+              "closedBy": {
+                "type": "object",
+                "properties": { "employeeId": { "type": "string", "format": "uuid" } },
+                "required": ["employeeId"],
+                "additionalProperties": false,
+                "nullable": true
+              },
+              "closedAt": { "type": "string", "format": "date-time", "nullable": true },
+              "amount": {
+                "type": "object",
+                "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                "required": ["amount", "currency"],
+                "additionalProperties": false,
+                "description": "What was recorded as spent, in dong; only for RECORD_SPENT.",
+                "nullable": true
+              },
+              "costCenterId": {
+                "type": "string",
+                "format": "uuid",
+                "description": "The Cost Center that bears it; null with an amount means not allocated yet.",
+                "nullable": true
+              },
+              "documentIds": { "maxItems": 20, "type": "array", "items": { "type": "string", "format": "uuid" } }
+            },
+            "required": [
+              "id",
+              "state",
+              "discrepancyId",
+              "application",
+              "vendorId",
+              "openedAt",
+              "outcome",
+              "note",
+              "closedBy",
+              "closedAt",
+              "amount",
+              "costCenterId",
+              "documentIds"
             ],
             "additionalProperties": false,
             "nullable": true

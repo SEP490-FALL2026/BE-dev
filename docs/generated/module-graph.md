@@ -44,7 +44,7 @@ flowchart BT
   ai_assist -->|2| operating_parameters
   ai_assist -->|4| organization
   ai_assist -->|4| requests
-  budgets -->|19| audit
+  budgets -->|20| audit
   budgets -->|5| catalog
   budgets -->|3| finance
   budgets -->|5| identity_access
@@ -130,13 +130,16 @@ flowchart BT
   requests -->|12| notifications
   requests -->|12| operating_parameters
   requests -->|96| organization
-  usage -->|7| audit
-  usage -->|11| catalog
+  usage -->|10| audit
+  usage -->|3| budgets
+  usage -->|15| catalog
   usage -->|16| devices
+  usage -->|3| finance
   usage -->|2| identity_access
   usage -->|8| licensing
   usage -->|2| notifications
-  usage -->|14| organization
+  usage -->|17| organization
+  usage -->|3| requests
 ```
 
-97 module edges.
+100 module edges.
