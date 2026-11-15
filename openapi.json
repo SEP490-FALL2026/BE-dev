@@ -26146,6 +26146,204 @@
       }
     },
     "/api/v1/contracts": {
+      "get": {
+        "operationId": "contractList",
+        "parameters": [
+          {
+            "name": "search",
+            "required": false,
+            "in": "query",
+            "description": "Part of the name or of the number; case does not matter.",
+            "schema": { "maxLength": 100, "type": "string" }
+          },
+          { "name": "vendorId", "required": false, "in": "query", "schema": { "format": "uuid", "type": "string" } },
+          {
+            "name": "status",
+            "required": false,
+            "in": "query",
+            "description": "The status as of today.",
+            "schema": { "type": "string", "enum": ["INCOMPLETE", "NOT_YET_EFFECTIVE", "ACTIVE", "EXPIRED"] }
+          },
+          {
+            "name": "effectiveOn",
+            "required": false,
+            "in": "query",
+            "description": "Only the contracts in effect on this day. A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused).",
+            "schema": { "format": "date", "type": "string" }
+          },
+          {
+            "name": "order",
+            "required": false,
+            "in": "query",
+            "description": "The order of the day the contract begins; those with none come last.",
+            "schema": { "default": "desc", "type": "string", "enum": ["asc", "desc"] }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maximum": 9007199254740991,
+              "exclusiveMinimum": true,
+              "default": 1,
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": { "maximum": 100, "exclusiveMinimum": true, "default": 20, "type": "integer", "minimum": 0 }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A page of contracts, by the day they begin (the latest first unless order says otherwise; those with no beginning last). Each says its vendor, its days, its status as of today and how many subscriptions rest on it. search matches the name and the number, vendorId and status narrow the list, effectiveOn keeps the contracts in effect on a day. The company has one list: it is not cut by department.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/ContractPageResponseDto" },
+                    { "properties": { "message": { "example": "CONTRACT.LISTED" } } }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHENTICATION_REQUIRED": {
+                    "summary": "A Bearer access token is required.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHENTICATION_REQUIRED",
+                        "message": "A Bearer access token is required.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "INVALID_ACCESS_TOKEN": {
+                    "summary": "The access token is invalid.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "INVALID_ACCESS_TOKEN",
+                        "message": "The access token is invalid.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only the IT Admin and Finance read a contract.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHORIZATION.FORBIDDEN": {
+                    "summary": "You do not have permission to perform this action.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHORIZATION.FORBIDDEN",
+                        "message": "You do not have permission to perform this action.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The request is invalid (VALIDATION_ERROR).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "VALIDATION_ERROR": {
+                    "summary": "Request validation failed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "VALIDATION_ERROR",
+                        "message": "Request validation failed.",
+                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_TOO_MANY_REQUESTS": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_TOO_MANY_REQUESTS",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "TOKEN_VERIFICATION_UNAVAILABLE": {
+                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
+                        "message": "Authentication is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SERVICE_UNAVAILABLE": {
+                    "summary": "The service is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SERVICE_UNAVAILABLE",
+                        "message": "The service is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "bearer": [] }],
+        "summary": "List the contracts",
+        "tags": ["contracts"]
+      },
       "post": {
         "operationId": "contractCreate",
         "parameters": [],
@@ -26155,7 +26353,7 @@
         },
         "responses": {
           "201": {
-            "description": "The contract, with the name given and who made it, as the signed-in IT Admin.",
+            "description": "The contract, with the vendor, the number, the days it is in effect (an empty end day: it never ends) and the note given, who made it, and no subscription yet.",
             "content": {
               "application/json": {
                 "schema": {
@@ -26221,7 +26419,7 @@
             }
           },
           "403": {
-            "description": "Only an IT Admin makes a contract.",
+            "description": "Only an IT Admin makes or changes a contract; Finance only reads.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -26233,6 +26431,27 @@
                       "error": {
                         "code": "AUTHORIZATION.FORBIDDEN",
                         "message": "You do not have permission to perform this action.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Another contract has this number, compared ignoring case, accents and extra spaces (CONTRACT.NUMBER_TAKEN).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "CONTRACT.NUMBER_TAKEN": {
+                    "summary": "Another contract has this number.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "CONTRACT.NUMBER_TAKEN",
+                        "message": "Another contract has this number.",
                         "requestId": "req_example"
                       }
                     }
@@ -26284,7 +26503,7 @@
             }
           },
           "422": {
-            "description": "The request is invalid (VALIDATION_ERROR) or the name is blank (CONTRACT.NAME_REQUIRED).",
+            "description": "The request is invalid (VALIDATION_ERROR), or the name is blank (CONTRACT.NAME_REQUIRED), the vendor or the day it begins is missing (CONTRACT.VENDOR_REQUIRED, CONTRACT.EFFECTIVE_FROM_REQUIRED), the vendor is not in the catalog (CONTRACT.VENDOR_NOT_FOUND), or the end is before the beginning (CONTRACT.EFFECTIVE_RANGE_INVALID).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -26308,6 +26527,51 @@
                       "error": {
                         "code": "CONTRACT.NAME_REQUIRED",
                         "message": "A contract needs a name.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "CONTRACT.VENDOR_REQUIRED": {
+                    "summary": "A contract needs a vendor.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "CONTRACT.VENDOR_REQUIRED",
+                        "message": "A contract needs a vendor.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "CONTRACT.EFFECTIVE_FROM_REQUIRED": {
+                    "summary": "A contract needs the day from which it is in effect.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "CONTRACT.EFFECTIVE_FROM_REQUIRED",
+                        "message": "A contract needs the day from which it is in effect.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "CONTRACT.VENDOR_NOT_FOUND": {
+                    "summary": "The vendor does not exist.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "CONTRACT.VENDOR_NOT_FOUND",
+                        "message": "The vendor does not exist.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "CONTRACT.EFFECTIVE_RANGE_INVALID": {
+                    "summary": "The day a contract ends is before the day it begins.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "CONTRACT.EFFECTIVE_RANGE_INVALID",
+                        "message": "The day a contract ends is before the day it begins.",
+                        "details": { "problem": "TO_BEFORE_FROM" },
                         "requestId": "req_example"
                       }
                     }
@@ -26383,7 +26647,7 @@
         ],
         "responses": {
           "200": {
-            "description": "The contract.",
+            "description": "The contract with its note, its status as of today, and a slice of its subscriptions, its ready files and the applications of its subscriptions (each array lists up to 100; truncated says when there are more). The usage sources of an application are read from the usage sources of that application, not from here.",
             "content": {
               "application/json": {
                 "schema": {
@@ -26470,7 +26734,7 @@
             }
           },
           "422": {
-            "description": "The id is invalid (VALIDATION_ERROR).",
+            "description": "The request is invalid (VALIDATION_ERROR).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -26547,6 +26811,830 @@
         },
         "security": [{ "bearer": [] }],
         "summary": "Get a contract",
+        "tags": ["contracts"]
+      },
+      "patch": {
+        "operationId": "contractUpdate",
+        "parameters": [
+          { "name": "id", "required": true, "in": "path", "schema": { "format": "uuid", "type": "string" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/UpdateContractBodyDto" } } }
+        },
+        "responses": {
+          "200": {
+            "description": "Changes the fields named and keeps the others, for the reason given; the Audit Trail keeps the reason with the values before and after. The vendor does not change while a subscription is linked. A change that leaves every field as it is writes nothing.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/ContractResponseDto" },
+                    { "properties": { "message": { "example": "CONTRACT.UPDATED" } } }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_BAD_REQUEST": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_BAD_REQUEST",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHENTICATION_REQUIRED": {
+                    "summary": "A Bearer access token is required.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHENTICATION_REQUIRED",
+                        "message": "A Bearer access token is required.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "INVALID_ACCESS_TOKEN": {
+                    "summary": "The access token is invalid.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "INVALID_ACCESS_TOKEN",
+                        "message": "The access token is invalid.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only an IT Admin makes or changes a contract; Finance only reads.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHORIZATION.FORBIDDEN": {
+                    "summary": "You do not have permission to perform this action.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHORIZATION.FORBIDDEN",
+                        "message": "You do not have permission to perform this action.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The contract does not exist (CONTRACT.NOT_FOUND).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "CONTRACT.NOT_FOUND": {
+                    "summary": "The contract does not exist.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "CONTRACT.NOT_FOUND",
+                        "message": "The contract does not exist.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "Another contract has this number (CONTRACT.NUMBER_TAKEN), or a subscription is linked and the vendor cannot change (CONTRACT.VENDOR_LOCKED).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "CONTRACT.NUMBER_TAKEN": {
+                    "summary": "Another contract has this number.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "CONTRACT.NUMBER_TAKEN",
+                        "message": "Another contract has this number.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "CONTRACT.VENDOR_LOCKED": {
+                    "summary": "The vendor of a contract with subscriptions linked does not change.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "CONTRACT.VENDOR_LOCKED",
+                        "message": "The vendor of a contract with subscriptions linked does not change.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_PAYLOAD_TOO_LARGE": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_PAYLOAD_TOO_LARGE",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_UNSUPPORTED_MEDIA_TYPE": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_UNSUPPORTED_MEDIA_TYPE",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The request is invalid (VALIDATION_ERROR), or there is no reason (CONTRACT.REASON_REQUIRED), no field to change (CONTRACT.UPDATE_EMPTY), a blank name (CONTRACT.NAME_REQUIRED), a vendor that is not in the catalog (CONTRACT.VENDOR_NOT_FOUND), or days that make no period (CONTRACT.EFFECTIVE_RANGE_INVALID).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "VALIDATION_ERROR": {
+                    "summary": "Request validation failed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "VALIDATION_ERROR",
+                        "message": "Request validation failed.",
+                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "CONTRACT.REASON_REQUIRED": {
+                    "summary": "A change of a contract needs a reason.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "CONTRACT.REASON_REQUIRED",
+                        "message": "A change of a contract needs a reason.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "CONTRACT.UPDATE_EMPTY": {
+                    "summary": "The change names no field of the contract.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "CONTRACT.UPDATE_EMPTY",
+                        "message": "The change names no field of the contract.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "CONTRACT.NAME_REQUIRED": {
+                    "summary": "A contract needs a name.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "CONTRACT.NAME_REQUIRED",
+                        "message": "A contract needs a name.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "CONTRACT.VENDOR_NOT_FOUND": {
+                    "summary": "The vendor does not exist.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "CONTRACT.VENDOR_NOT_FOUND",
+                        "message": "The vendor does not exist.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "CONTRACT.EFFECTIVE_RANGE_INVALID": {
+                    "summary": "The day a contract ends is before the day it begins.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "CONTRACT.EFFECTIVE_RANGE_INVALID",
+                        "message": "The day a contract ends is before the day it begins.",
+                        "details": { "problem": "TO_BEFORE_FROM" },
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_TOO_MANY_REQUESTS": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_TOO_MANY_REQUESTS",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "TOKEN_VERIFICATION_UNAVAILABLE": {
+                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
+                        "message": "Authentication is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SERVICE_UNAVAILABLE": {
+                    "summary": "The service is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SERVICE_UNAVAILABLE",
+                        "message": "The service is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "bearer": [] }],
+        "summary": "Change a contract",
+        "tags": ["contracts"]
+      }
+    },
+    "/api/v1/contracts/{id}/subscriptions": {
+      "post": {
+        "operationId": "contractSubscriptionLink",
+        "parameters": [
+          { "name": "id", "required": true, "in": "path", "schema": { "format": "uuid", "type": "string" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/LinkSubscriptionBodyDto" } } }
+        },
+        "responses": {
+          "201": {
+            "description": "Links the subscription to the contract and answers with it as the contract lists it. Only a subscription of a shared stock (K2 or K4) whose application has the vendor of the contract is linked, and one that rests on no contract yet.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/ContractSubscriptionResponseDto" },
+                    { "properties": { "message": { "example": "CONTRACT.SUBSCRIPTION_LINKED" } } }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_BAD_REQUEST": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_BAD_REQUEST",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHENTICATION_REQUIRED": {
+                    "summary": "A Bearer access token is required.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHENTICATION_REQUIRED",
+                        "message": "A Bearer access token is required.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "INVALID_ACCESS_TOKEN": {
+                    "summary": "The access token is invalid.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "INVALID_ACCESS_TOKEN",
+                        "message": "The access token is invalid.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only an IT Admin links a subscription to a contract; Finance only reads.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHORIZATION.FORBIDDEN": {
+                    "summary": "You do not have permission to perform this action.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHORIZATION.FORBIDDEN",
+                        "message": "You do not have permission to perform this action.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The contract or the subscription does not exist (CONTRACT.NOT_FOUND, CONTRACT.SUBSCRIPTION_NOT_FOUND).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "CONTRACT.NOT_FOUND": {
+                    "summary": "The contract does not exist.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "CONTRACT.NOT_FOUND",
+                        "message": "The contract does not exist.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "CONTRACT.SUBSCRIPTION_NOT_FOUND": {
+                    "summary": "The subscription does not exist.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "CONTRACT.SUBSCRIPTION_NOT_FOUND",
+                        "message": "The subscription does not exist.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The subscription rests on a contract already, this one or another (CONTRACT.SUBSCRIPTION_ALREADY_LINKED).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "CONTRACT.SUBSCRIPTION_ALREADY_LINKED": {
+                    "summary": "The subscription rests on a contract already.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "CONTRACT.SUBSCRIPTION_ALREADY_LINKED",
+                        "message": "The subscription rests on a contract already.",
+                        "details": { "contractId": "<contract-id>" },
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_PAYLOAD_TOO_LARGE": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_PAYLOAD_TOO_LARGE",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_UNSUPPORTED_MEDIA_TYPE": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_UNSUPPORTED_MEDIA_TYPE",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The request is invalid (VALIDATION_ERROR), the subscription is not of a shared stock, K2 or K4 (CONTRACT.SUBSCRIPTION_KIND_NOT_ALLOWED), the contract has no vendor yet (CONTRACT.INCOMPLETE) or the vendor of the subscription is not the vendor of the contract (CONTRACT.SUBSCRIPTION_VENDOR_MISMATCH).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "VALIDATION_ERROR": {
+                    "summary": "Request validation failed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "VALIDATION_ERROR",
+                        "message": "Request validation failed.",
+                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "CONTRACT.SUBSCRIPTION_KIND_NOT_ALLOWED": {
+                    "summary": "Only a subscription of a shared stock (K2 or K4) rests on a contract.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "CONTRACT.SUBSCRIPTION_KIND_NOT_ALLOWED",
+                        "message": "Only a subscription of a shared stock (K2 or K4) rests on a contract.",
+                        "details": { "provisioningType": "K1" },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "CONTRACT.INCOMPLETE": {
+                    "summary": "The contract has no vendor yet: fill it in before linking a subscription.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "CONTRACT.INCOMPLETE",
+                        "message": "The contract has no vendor yet: fill it in before linking a subscription.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "CONTRACT.SUBSCRIPTION_VENDOR_MISMATCH": {
+                    "summary": "The vendor of the subscription is not the vendor of the contract.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "CONTRACT.SUBSCRIPTION_VENDOR_MISMATCH",
+                        "message": "The vendor of the subscription is not the vendor of the contract.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_TOO_MANY_REQUESTS": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_TOO_MANY_REQUESTS",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "TOKEN_VERIFICATION_UNAVAILABLE": {
+                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
+                        "message": "Authentication is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SERVICE_UNAVAILABLE": {
+                    "summary": "The service is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SERVICE_UNAVAILABLE",
+                        "message": "The service is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "bearer": [] }],
+        "summary": "Link a subscription to a contract",
+        "tags": ["contracts"]
+      }
+    },
+    "/api/v1/contracts/{id}/subscriptions/{subscriptionId}": {
+      "delete": {
+        "operationId": "contractSubscriptionUnlink",
+        "parameters": [
+          { "name": "id", "required": true, "in": "path", "schema": { "format": "uuid", "type": "string" } },
+          { "name": "subscriptionId", "required": true, "in": "path", "schema": { "format": "uuid", "type": "string" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "The subscription no longer rests on the contract, and answers with what was unlinked. Neither the subscription nor the contract is deleted.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/ContractSubscriptionResponseDto" },
+                    { "properties": { "message": { "example": "CONTRACT.SUBSCRIPTION_UNLINKED" } } }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHENTICATION_REQUIRED": {
+                    "summary": "A Bearer access token is required.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHENTICATION_REQUIRED",
+                        "message": "A Bearer access token is required.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "INVALID_ACCESS_TOKEN": {
+                    "summary": "The access token is invalid.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "INVALID_ACCESS_TOKEN",
+                        "message": "The access token is invalid.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only an IT Admin links a subscription to a contract; Finance only reads.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHORIZATION.FORBIDDEN": {
+                    "summary": "You do not have permission to perform this action.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHORIZATION.FORBIDDEN",
+                        "message": "You do not have permission to perform this action.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The contract does not exist, or the subscription is not linked to it (CONTRACT.NOT_FOUND, CONTRACT.SUBSCRIPTION_NOT_LINKED).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "CONTRACT.NOT_FOUND": {
+                    "summary": "The contract does not exist.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "CONTRACT.NOT_FOUND",
+                        "message": "The contract does not exist.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "CONTRACT.SUBSCRIPTION_NOT_LINKED": {
+                    "summary": "The subscription is not linked to this contract.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "CONTRACT.SUBSCRIPTION_NOT_LINKED",
+                        "message": "The subscription is not linked to this contract.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The request is invalid (VALIDATION_ERROR).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "VALIDATION_ERROR": {
+                    "summary": "Request validation failed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "VALIDATION_ERROR",
+                        "message": "Request validation failed.",
+                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_TOO_MANY_REQUESTS": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_TOO_MANY_REQUESTS",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "TOKEN_VERIFICATION_UNAVAILABLE": {
+                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
+                        "message": "Authentication is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SERVICE_UNAVAILABLE": {
+                    "summary": "The service is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SERVICE_UNAVAILABLE",
+                        "message": "The service is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "bearer": [] }],
+        "summary": "Unlink a subscription from a contract",
         "tags": ["contracts"]
       }
     },
@@ -95594,9 +96682,118 @@
         "required": ["success", "message", "data"],
         "additionalProperties": false
       },
+      "ContractPageResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "enum": [true] },
+          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "items": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": { "type": "string", "format": "uuid" },
+                    "name": { "type": "string" },
+                    "number": { "type": "string", "nullable": true },
+                    "vendor": {
+                      "type": "object",
+                      "properties": { "id": { "type": "string", "format": "uuid" }, "name": { "type": "string" } },
+                      "required": ["id", "name"],
+                      "additionalProperties": false,
+                      "nullable": true
+                    },
+                    "effectiveFrom": {
+                      "type": "string",
+                      "format": "date",
+                      "description": "A calendar date as YYYY-MM-DD.",
+                      "nullable": true
+                    },
+                    "effectiveTo": {
+                      "type": "string",
+                      "format": "date",
+                      "description": "Null: the contract never ends.",
+                      "nullable": true
+                    },
+                    "status": {
+                      "type": "string",
+                      "enum": ["INCOMPLETE", "NOT_YET_EFFECTIVE", "ACTIVE", "EXPIRED"],
+                      "description": "Read from the vendor and the days as of today: INCOMPLETE (no vendor or no beginning: an old contract that is only a name), NOT_YET_EFFECTIVE, ACTIVE (a contract with no end that has begun stays ACTIVE) and EXPIRED."
+                    },
+                    "subscriptionCount": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                    "createdAt": { "type": "string", "format": "date-time" },
+                    "updatedAt": { "type": "string", "format": "date-time" }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "number",
+                    "vendor",
+                    "effectiveFrom",
+                    "effectiveTo",
+                    "status",
+                    "subscriptionCount",
+                    "createdAt",
+                    "updatedAt"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "pagination": {
+                "type": "object",
+                "properties": {
+                  "page": { "type": "integer", "exclusiveMinimum": true, "maximum": 9007199254740991, "minimum": 0 },
+                  "pageSize": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "maximum": 9007199254740991,
+                    "minimum": 0
+                  },
+                  "totalItems": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                  "totalPages": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+                },
+                "required": ["page", "pageSize", "totalItems", "totalPages"],
+                "additionalProperties": false
+              }
+            },
+            "required": ["items", "pagination"],
+            "additionalProperties": false,
+            "nullable": true
+          }
+        },
+        "required": ["success", "message", "data"],
+        "additionalProperties": false
+      },
       "CreateContractBodyDto": {
         "type": "object",
-        "properties": { "name": { "default": "", "type": "string", "maxLength": 200 } },
+        "properties": {
+          "name": { "default": "", "type": "string", "maxLength": 200 },
+          "vendorId": {
+            "description": "The vendor of the contract, from the catalog. Needed to make one.",
+            "type": "string",
+            "format": "uuid"
+          },
+          "number": {
+            "type": "string",
+            "maxLength": 100,
+            "description": "The number of the contract, if it has one: unique in the company, compared ignoring case, accents and extra spaces.",
+            "nullable": true
+          },
+          "effectiveFrom": {
+            "type": "string",
+            "format": "date",
+            "description": "The day the contract begins. Needed to make one. A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."
+          },
+          "effectiveTo": {
+            "type": "string",
+            "format": "date",
+            "description": "The day the contract ends; empty when it never ends (a purchase for good). A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused).",
+            "nullable": true
+          },
+          "note": { "type": "string", "maxLength": 2000, "nullable": true }
+        },
         "additionalProperties": false
       },
       "ContractResponseDto": {
@@ -95612,14 +96809,265 @@
                 "properties": {
                   "id": { "type": "string", "format": "uuid" },
                   "name": { "type": "string" },
+                  "number": { "type": "string", "nullable": true },
+                  "vendor": {
+                    "type": "object",
+                    "properties": { "id": { "type": "string", "format": "uuid" }, "name": { "type": "string" } },
+                    "required": ["id", "name"],
+                    "additionalProperties": false,
+                    "nullable": true
+                  },
+                  "effectiveFrom": {
+                    "type": "string",
+                    "format": "date",
+                    "description": "A calendar date as YYYY-MM-DD.",
+                    "nullable": true
+                  },
+                  "effectiveTo": {
+                    "type": "string",
+                    "format": "date",
+                    "description": "Null: the contract never ends.",
+                    "nullable": true
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": ["INCOMPLETE", "NOT_YET_EFFECTIVE", "ACTIVE", "EXPIRED"],
+                    "description": "Read from the vendor and the days as of today: INCOMPLETE (no vendor or no beginning: an old contract that is only a name), NOT_YET_EFFECTIVE, ACTIVE (a contract with no end that has begun stays ACTIVE) and EXPIRED."
+                  },
+                  "subscriptionCount": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                  "createdAt": { "type": "string", "format": "date-time" },
+                  "updatedAt": { "type": "string", "format": "date-time" },
+                  "note": { "type": "string", "nullable": true },
                   "createdBy": { "type": "string", "format": "uuid" },
-                  "createdAt": { "type": "string", "format": "date-time" }
+                  "subscriptions": {
+                    "maxItems": 100,
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "subscriptionId": { "type": "string", "format": "uuid" },
+                        "status": { "type": "string", "enum": ["DRAFT", "ACTIVE"] },
+                        "kind": { "type": "string", "enum": ["TERM", "PERPETUAL"] },
+                        "startDate": {
+                          "type": "string",
+                          "format": "date",
+                          "description": "A calendar date as YYYY-MM-DD.",
+                          "nullable": true
+                        },
+                        "endDate": {
+                          "type": "string",
+                          "format": "date",
+                          "description": "A calendar date as YYYY-MM-DD.",
+                          "nullable": true
+                        },
+                        "planId": { "type": "string", "format": "uuid" },
+                        "planName": { "type": "string" },
+                        "provisioningType": { "type": "string", "enum": ["K1", "K2", "K3", "K4", "K5"] },
+                        "applicationId": { "type": "string", "format": "uuid" },
+                        "applicationName": { "type": "string" },
+                        "logoUrl": {
+                          "description": "The https link to the logo image of the application that the IT Admin pasted, or null. The server never checks it: show the first letter of the name when the image does not load.",
+                          "type": "string",
+                          "nullable": true
+                        },
+                        "linkedAt": { "type": "string", "format": "date-time" }
+                      },
+                      "required": [
+                        "subscriptionId",
+                        "status",
+                        "kind",
+                        "startDate",
+                        "endDate",
+                        "planId",
+                        "planName",
+                        "provisioningType",
+                        "applicationId",
+                        "applicationName",
+                        "logoUrl",
+                        "linkedAt"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "description": "The subscriptions linked to the contract, the last linked first. Only subscriptions of a shared stock (K2 or K4) are linked."
+                  },
+                  "documents": {
+                    "maxItems": 100,
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "id": { "type": "string", "format": "uuid" },
+                        "purpose": {
+                          "type": "string",
+                          "enum": [
+                            "CONTRACT_ATTACHMENT",
+                            "PURCHASE_DOCUMENT",
+                            "TAX_PAYMENT_PROOF",
+                            "SIGNATURE_RECORD",
+                            "IMPORT_SOURCE",
+                            "COST_STATEMENT"
+                          ]
+                        },
+                        "fileName": { "type": "string" },
+                        "contentType": { "type": "string" },
+                        "sizeBytes": {
+                          "type": "integer",
+                          "exclusiveMinimum": true,
+                          "maximum": 9007199254740991,
+                          "minimum": 0
+                        },
+                        "attachedAt": { "type": "string", "format": "date-time" }
+                      },
+                      "required": ["id", "purpose", "fileName", "contentType", "sizeBytes", "attachedAt"],
+                      "additionalProperties": false
+                    },
+                    "description": "The files attached to the contract that are ready, the last attached first. Open one with its link."
+                  },
+                  "applicationIds": {
+                    "maxItems": 100,
+                    "type": "array",
+                    "items": { "type": "string", "format": "uuid" },
+                    "description": "The applications of the linked subscriptions, each once. Read their usage sources from the usage sources of the application: a contract is not linked to a usage source."
+                  },
+                  "truncated": {
+                    "type": "object",
+                    "properties": {
+                      "subscriptions": { "type": "boolean" },
+                      "documents": { "type": "boolean" },
+                      "applicationIds": { "type": "boolean" }
+                    },
+                    "required": ["subscriptions", "documents", "applicationIds"],
+                    "additionalProperties": false,
+                    "description": "True for an array above that holds only the first of more than it lists."
+                  }
                 },
-                "required": ["id", "name", "createdBy", "createdAt"],
+                "required": [
+                  "id",
+                  "name",
+                  "number",
+                  "vendor",
+                  "effectiveFrom",
+                  "effectiveTo",
+                  "status",
+                  "subscriptionCount",
+                  "createdAt",
+                  "updatedAt",
+                  "note",
+                  "createdBy",
+                  "subscriptions",
+                  "documents",
+                  "applicationIds",
+                  "truncated"
+                ],
                 "additionalProperties": false
               }
             },
             "required": ["contract"],
+            "additionalProperties": false,
+            "nullable": true
+          }
+        },
+        "required": ["success", "message", "data"],
+        "additionalProperties": false
+      },
+      "UpdateContractBodyDto": {
+        "type": "object",
+        "properties": {
+          "name": { "type": "string", "maxLength": 200 },
+          "vendorId": {
+            "description": "Refused while a subscription is linked to the contract.",
+            "type": "string",
+            "format": "uuid"
+          },
+          "number": {
+            "type": "string",
+            "maxLength": 100,
+            "description": "null takes the number away.",
+            "nullable": true
+          },
+          "effectiveFrom": {
+            "type": "string",
+            "format": "date",
+            "description": "The day the contract begins. A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."
+          },
+          "effectiveTo": {
+            "type": "string",
+            "format": "date",
+            "description": "The day the contract ends; null says the contract never ends. A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused).",
+            "nullable": true
+          },
+          "note": { "type": "string", "maxLength": 2000, "description": "null takes the note away.", "nullable": true },
+          "reason": {
+            "default": "",
+            "description": "Why the contract is changed. Kept in the Audit Trail.",
+            "type": "string",
+            "maxLength": 1000
+          }
+        },
+        "additionalProperties": false
+      },
+      "LinkSubscriptionBodyDto": {
+        "type": "object",
+        "properties": { "subscriptionId": { "type": "string", "format": "uuid" } },
+        "required": ["subscriptionId"],
+        "additionalProperties": false
+      },
+      "ContractSubscriptionResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "enum": [true] },
+          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "subscription": {
+                "type": "object",
+                "properties": {
+                  "subscriptionId": { "type": "string", "format": "uuid" },
+                  "status": { "type": "string", "enum": ["DRAFT", "ACTIVE"] },
+                  "kind": { "type": "string", "enum": ["TERM", "PERPETUAL"] },
+                  "startDate": {
+                    "type": "string",
+                    "format": "date",
+                    "description": "A calendar date as YYYY-MM-DD.",
+                    "nullable": true
+                  },
+                  "endDate": {
+                    "type": "string",
+                    "format": "date",
+                    "description": "A calendar date as YYYY-MM-DD.",
+                    "nullable": true
+                  },
+                  "planId": { "type": "string", "format": "uuid" },
+                  "planName": { "type": "string" },
+                  "provisioningType": { "type": "string", "enum": ["K1", "K2", "K3", "K4", "K5"] },
+                  "applicationId": { "type": "string", "format": "uuid" },
+                  "applicationName": { "type": "string" },
+                  "logoUrl": {
+                    "description": "The https link to the logo image of the application that the IT Admin pasted, or null. The server never checks it: show the first letter of the name when the image does not load.",
+                    "type": "string",
+                    "nullable": true
+                  },
+                  "linkedAt": { "type": "string", "format": "date-time" }
+                },
+                "required": [
+                  "subscriptionId",
+                  "status",
+                  "kind",
+                  "startDate",
+                  "endDate",
+                  "planId",
+                  "planName",
+                  "provisioningType",
+                  "applicationId",
+                  "applicationName",
+                  "logoUrl",
+                  "linkedAt"
+                ],
+                "additionalProperties": false
+              }
+            },
+            "required": ["subscription"],
             "additionalProperties": false,
             "nullable": true
           }

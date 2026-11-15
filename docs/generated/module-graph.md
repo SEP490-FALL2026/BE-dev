@@ -52,12 +52,12 @@ flowchart BT
   budgets -->|6| notifications
   budgets -->|4| operating_parameters
   budgets -->|19| organization
-  catalog -->|21| audit
+  catalog -->|23| audit
   catalog -->|10| finance
   catalog -->|8| identity_access
   catalog -->|2| notifications
   catalog -->|4| operating_parameters
-  catalog -->|31| organization
+  catalog -->|33| organization
   dashboards -->|2| catalog
   dashboards -->|2| devices
   dashboards -->|4| identity_access
