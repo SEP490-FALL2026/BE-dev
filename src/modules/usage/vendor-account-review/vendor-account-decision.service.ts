@@ -36,6 +36,10 @@ export class VendorAccountDecisionService {
       const locked = await this.repo.lockDiscrepancy(tx, id);
       if (!locked || locked.organizationId !== organization.id) throw new VendorAccountReviewRefusedError('NOT_FOUND');
       if (locked.state === 'DECIDED') throw new VendorAccountReviewRefusedError('ALREADY_DECIDED');
+      // The money of an invoice Finance suspects is already in what was spent: a case outside the process from it would record that money twice (`US-13-03` AC-8, AC-11, `D-79`(4)).
+      if (locked.source === 'INVOICE_DIFFERENCE' && input.decision === 'OUT_OF_PROCESS') {
+        throw new VendorAccountReviewRefusedError('DECISION_NOT_ALLOWED');
+      }
       const opened =
         input.decision === 'OUT_OF_PROCESS'
           ? await this.repo.insertCase(tx, {

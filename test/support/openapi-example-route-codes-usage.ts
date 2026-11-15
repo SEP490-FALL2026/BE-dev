@@ -18,6 +18,7 @@ export const ROUTE_ERROR_CODES_USAGE: Readonly<Record<string, Partial<Record<Rou
   vendorAccountDiscrepancyDecide: {
     '404': ['VENDOR_ACCOUNT_DISCREPANCY.NOT_FOUND'],
     '409': ['VENDOR_ACCOUNT_DISCREPANCY.ALREADY_DECIDED'],
+    '422': ['VENDOR_ACCOUNT_DISCREPANCY.DECISION_NOT_ALLOWED'],
   },
   outOfProcessCaseClose: {
     '403': ['OUT_OF_PROCESS_CASE.FINANCE_ONLY'],

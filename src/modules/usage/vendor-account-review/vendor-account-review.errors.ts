@@ -17,6 +17,8 @@ export type VendorAccountReviewRefusal =
   | 'NO_VENDOR'
   | 'COST_CENTER_NOT_FOUND'
   | 'NUMBER_TAKEN'
+  /** An invoice that is a difference (`SBF-11a`) is not a case outside the process: its money is already spent when Finance signed it (`US-13-03` AC-8, AC-11). */
+  | 'DECISION_NOT_ALLOWED'
   /** Only Finance records the money already spent and chooses the Cost Center (`SBF-07a`, `US-13-05` AC-19). */
   | 'FINANCE_ONLY';
 

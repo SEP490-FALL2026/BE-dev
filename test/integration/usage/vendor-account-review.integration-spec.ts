@@ -299,6 +299,24 @@ describe('the review of the accounts at the vendors over PostgreSQL (integration
         employeeId: null,
         state: 'OPEN',
       });
+
+      // The money of that invoice is already spent when Finance signed it: it is not a case outside the process, and writing it again would count it twice (B3C-03).
+      const casesBefore = (await h.ctx.sql.query(`SELECT 1 FROM out_of_process_cases`)).rowCount;
+      expect(
+        code(
+          await differences('post', `/${suspectedDifferenceId}/decision`)
+            .send({ decision: 'OUT_OF_PROCESS', note: 'Chuyển sang ca ngoài quy trình' })
+            .expect(422),
+        ),
+      ).toBe('VENDOR_ACCOUNT_DISCREPANCY.DECISION_NOT_ALLOWED');
+      expect((await h.ctx.sql.query(`SELECT 1 FROM out_of_process_cases`)).rowCount).toBe(casesBefore);
+      expect(
+        h.dataOf<Difference>(
+          await differences('post', `/${suspectedDifferenceId}/decision`)
+            .send({ decision: 'FALSE_ALARM', note: 'Đã đối soát danh sách tài khoản của nhà cung cấp' })
+            .expect(201),
+        ),
+      ).toMatchObject({ state: 'DECIDED', decision: 'FALSE_ALARM', outOfProcessCaseId: null });
     });
 
     it('lists the newest first in the same number of statements whatever the number of differences, and only to the IT Admin', async () => {

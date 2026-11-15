@@ -92,8 +92,9 @@ export class VendorAccountDiscrepanciesController {
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
-      description: 'The decision or the note is missing or not valid (VALIDATION_ERROR).',
-      examples: [VALIDATION_EXAMPLE],
+      description:
+        'The decision or the note is missing or not valid (VALIDATION_ERROR), or the difference is an invoice Finance closed as a suspicion, which is closed as a false alarm and never as a case outside the process (VENDOR_ACCOUNT_DISCREPANCY.DECISION_NOT_ALLOWED).',
+      examples: [VALIDATION_EXAMPLE, EXAMPLES.DECISION_NOT_ALLOWED],
     },
   )
   async decide(
