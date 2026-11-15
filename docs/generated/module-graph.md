@@ -121,15 +121,15 @@ flowchart BT
   personnel -->|8| operating_parameters
   personnel -->|97| organization
   personnel -->|8| requests
-  requests -->|60| audit
+  requests -->|62| audit
   requests -->|29| budgets
   requests -->|42| catalog
-  requests -->|9| finance
-  requests -->|37| identity_access
+  requests -->|11| finance
+  requests -->|38| identity_access
   requests -->|61| licensing
   requests -->|12| notifications
   requests -->|12| operating_parameters
-  requests -->|95| organization
+  requests -->|96| organization
   usage -->|7| audit
   usage -->|11| catalog
   usage -->|16| devices

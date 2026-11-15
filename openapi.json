@@ -54068,6 +54068,663 @@
         "tags": ["purchase-invoices"]
       }
     },
+    "/api/v1/invoice-discrepancies": {
+      "get": {
+        "operationId": "invoiceDiscrepancyList",
+        "parameters": [
+          {
+            "name": "state",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string", "enum": ["OPEN", "CLOSED"] }
+          },
+          {
+            "name": "outcome",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string", "enum": ["EXPLAINED", "OUT_OF_PROCESS_SUSPECTED"] }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maximum": 9007199254740991,
+              "exclusiveMinimum": true,
+              "default": 1,
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": { "maximum": 100, "exclusiveMinimum": true, "default": 20, "type": "integer", "minimum": 0 }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The newest opened first, each with both sides of what differs: the seats and the price of one the invoice states against the ones approved or bought. Finance reads every case; the IT Admin the ones of the invoices they submitted and of the requests of the departments they work. Filter by state or outcome.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/InvoiceDiscrepancyListResponseDto" },
+                    { "properties": { "message": { "example": "INVOICE_DISCREPANCY.LISTED" } } }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHENTICATION_REQUIRED": {
+                    "summary": "A Bearer access token is required.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHENTICATION_REQUIRED",
+                        "message": "A Bearer access token is required.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "INVALID_ACCESS_TOKEN": {
+                    "summary": "The access token is invalid.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "INVALID_ACCESS_TOKEN",
+                        "message": "The access token is invalid.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only Finance and the IT Admin read the cases.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHORIZATION.FORBIDDEN": {
+                    "summary": "You do not have permission to perform this action.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHORIZATION.FORBIDDEN",
+                        "message": "You do not have permission to perform this action.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The query is invalid (VALIDATION_ERROR).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "VALIDATION_ERROR": {
+                    "summary": "Request validation failed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "VALIDATION_ERROR",
+                        "message": "Request validation failed.",
+                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_TOO_MANY_REQUESTS": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_TOO_MANY_REQUESTS",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "TOKEN_VERIFICATION_UNAVAILABLE": {
+                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
+                        "message": "Authentication is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SERVICE_UNAVAILABLE": {
+                    "summary": "The service is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SERVICE_UNAVAILABLE",
+                        "message": "The service is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "bearer": [] }],
+        "summary": "List the cases of invoices that differ",
+        "tags": ["invoice-discrepancies"]
+      }
+    },
+    "/api/v1/invoice-discrepancies/{id}": {
+      "get": {
+        "operationId": "invoiceDiscrepancyGet",
+        "parameters": [
+          { "name": "id", "required": true, "in": "path", "schema": { "format": "uuid", "type": "string" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "The case with both sides of what differs and, once closed, how and why it was closed.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/InvoiceDiscrepancyResponseDto" },
+                    { "properties": { "message": { "example": "INVOICE_DISCREPANCY.READ" } } }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHENTICATION_REQUIRED": {
+                    "summary": "A Bearer access token is required.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHENTICATION_REQUIRED",
+                        "message": "A Bearer access token is required.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "INVALID_ACCESS_TOKEN": {
+                    "summary": "The access token is invalid.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "INVALID_ACCESS_TOKEN",
+                        "message": "The access token is invalid.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only Finance and the IT Admin read the cases.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHORIZATION.FORBIDDEN": {
+                    "summary": "You do not have permission to perform this action.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHORIZATION.FORBIDDEN",
+                        "message": "You do not have permission to perform this action.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The case does not exist or is not one the caller may read (INVOICE_DISCREPANCY.NOT_FOUND).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "INVOICE_DISCREPANCY.NOT_FOUND": {
+                    "summary": "The case of an invoice that differs was refused: NOT_FOUND.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "INVOICE_DISCREPANCY.NOT_FOUND",
+                        "message": "The case of an invoice that differs was refused: NOT_FOUND.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The id is not an id (VALIDATION_ERROR).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "VALIDATION_ERROR": {
+                    "summary": "Request validation failed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "VALIDATION_ERROR",
+                        "message": "Request validation failed.",
+                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_TOO_MANY_REQUESTS": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_TOO_MANY_REQUESTS",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "TOKEN_VERIFICATION_UNAVAILABLE": {
+                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
+                        "message": "Authentication is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SERVICE_UNAVAILABLE": {
+                    "summary": "The service is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SERVICE_UNAVAILABLE",
+                        "message": "The service is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "bearer": [] }],
+        "summary": "Read one case of an invoice that differs",
+        "tags": ["invoice-discrepancies"]
+      }
+    },
+    "/api/v1/invoice-discrepancies/{id}/closure": {
+      "post": {
+        "operationId": "invoiceDiscrepancyClose",
+        "parameters": [
+          { "name": "id", "required": true, "in": "path", "schema": { "format": "uuid", "type": "string" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/InvoiceDiscrepancyClosureBodyDto" } }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Finance closes the case with an outcome, a reason and the difference it works out in dong. A suspicion that the software was paid for outside the process is sent, in the same step, to the review of the accounts at the vendor. A case is closed once.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/InvoiceDiscrepancyResponseDto" },
+                    { "properties": { "message": { "example": "INVOICE_DISCREPANCY.CLOSED" } } }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_BAD_REQUEST": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_BAD_REQUEST",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHENTICATION_REQUIRED": {
+                    "summary": "A Bearer access token is required.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHENTICATION_REQUIRED",
+                        "message": "A Bearer access token is required.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "INVALID_ACCESS_TOKEN": {
+                    "summary": "The access token is invalid.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "INVALID_ACCESS_TOKEN",
+                        "message": "The access token is invalid.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only Finance closes a case.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHORIZATION.FORBIDDEN": {
+                    "summary": "You do not have permission to perform this action.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHORIZATION.FORBIDDEN",
+                        "message": "You do not have permission to perform this action.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The case does not exist or is not one the caller may read (INVOICE_DISCREPANCY.NOT_FOUND).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "INVOICE_DISCREPANCY.NOT_FOUND": {
+                    "summary": "The case of an invoice that differs was refused: NOT_FOUND.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "INVOICE_DISCREPANCY.NOT_FOUND",
+                        "message": "The case of an invoice that differs was refused: NOT_FOUND.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The case was closed already (INVOICE_DISCREPANCY.ALREADY_CLOSED).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "INVOICE_DISCREPANCY.ALREADY_CLOSED": {
+                    "summary": "The case of an invoice that differs was refused: ALREADY_CLOSED.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "INVOICE_DISCREPANCY.ALREADY_CLOSED",
+                        "message": "The case of an invoice that differs was refused: ALREADY_CLOSED.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_PAYLOAD_TOO_LARGE": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_PAYLOAD_TOO_LARGE",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_UNSUPPORTED_MEDIA_TYPE": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_UNSUPPORTED_MEDIA_TYPE",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The reason is missing or blank, the outcome or the amount is not valid (VALIDATION_ERROR), the amount has digits after the point or is too large (MONEY_SCALE_EXCEEDED, MONEY_OUT_OF_RANGE), or the difference is below nothing or, for a suspicion, nothing (INVOICE_DISCREPANCY.DIFFERENCE_INVALID).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "VALIDATION_ERROR": {
+                    "summary": "Request validation failed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "VALIDATION_ERROR",
+                        "message": "Request validation failed.",
+                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "MONEY_SCALE_EXCEEDED": {
+                    "summary": "This currency allows at most 0 decimal digit(s).",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "MONEY_SCALE_EXCEEDED",
+                        "message": "This currency allows at most 0 decimal digit(s).",
+                        "details": { "allowedDecimals": 0 },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "MONEY_OUT_OF_RANGE": {
+                    "summary": "The amount is outside the range a money value may hold.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "MONEY_OUT_OF_RANGE",
+                        "message": "The amount is outside the range a money value may hold.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "INVOICE_DISCREPANCY.DIFFERENCE_INVALID": {
+                    "summary": "The case of an invoice that differs was refused: DIFFERENCE_INVALID.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "INVOICE_DISCREPANCY.DIFFERENCE_INVALID",
+                        "message": "The case of an invoice that differs was refused: DIFFERENCE_INVALID.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_TOO_MANY_REQUESTS": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_TOO_MANY_REQUESTS",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "TOKEN_VERIFICATION_UNAVAILABLE": {
+                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
+                        "message": "Authentication is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SERVICE_UNAVAILABLE": {
+                    "summary": "The service is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SERVICE_UNAVAILABLE",
+                        "message": "The service is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "bearer": [] }],
+        "summary": "Close a case of an invoice that differs",
+        "tags": ["invoice-discrepancies"]
+      }
+    },
     "/api/v1/controlled-waits": {
       "get": {
         "operationId": "controlledWaitList",
@@ -111935,6 +112592,300 @@
           }
         },
         "required": ["reason"],
+        "additionalProperties": false
+      },
+      "InvoiceDiscrepancyListResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "enum": [true] },
+          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "items": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": { "type": "string", "format": "uuid" },
+                    "state": { "type": "string", "enum": ["OPEN", "CLOSED"] },
+                    "mismatches": {
+                      "maxItems": 2,
+                      "type": "array",
+                      "items": { "type": "string", "enum": ["QUANTITY", "UNIT_PRICE"] }
+                    },
+                    "openedAt": { "type": "string", "format": "date-time" },
+                    "outcome": {
+                      "type": "string",
+                      "enum": ["EXPLAINED", "OUT_OF_PROCESS_SUSPECTED", null],
+                      "nullable": true
+                    },
+                    "purchaseInvoice": {
+                      "type": "object",
+                      "properties": {
+                        "id": { "type": "string", "format": "uuid" },
+                        "vendorId": { "type": "string", "format": "uuid" },
+                        "vendorInvoiceNumber": { "type": "string" },
+                        "servicePeriodMonth": {
+                          "type": "string",
+                          "description": "The month the invoice pays for, as YYYY-MM."
+                        },
+                        "linkKind": { "type": "string", "enum": ["REQUEST", "SUBSCRIPTION"] },
+                        "requestId": { "type": "string", "format": "uuid", "nullable": true },
+                        "subscriptionId": { "type": "string", "format": "uuid", "nullable": true },
+                        "netAmount": {
+                          "type": "object",
+                          "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                          "required": ["amount", "currency"],
+                          "additionalProperties": false,
+                          "description": "What was taken out of the company in dong, before tax."
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "vendorId",
+                        "vendorInvoiceNumber",
+                        "servicePeriodMonth",
+                        "linkKind",
+                        "requestId",
+                        "subscriptionId",
+                        "netAmount"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "quantity": {
+                      "type": "object",
+                      "properties": {
+                        "invoice": { "type": "integer", "minimum": -9007199254740991, "maximum": 9007199254740991 },
+                        "expected": {
+                          "type": "integer",
+                          "minimum": -9007199254740991,
+                          "maximum": 9007199254740991,
+                          "description": "The seats approved or bought; null when nobody knew.",
+                          "nullable": true
+                        }
+                      },
+                      "required": ["invoice", "expected"],
+                      "additionalProperties": false
+                    },
+                    "unitPrice": {
+                      "type": "object",
+                      "properties": {
+                        "invoice": {
+                          "type": "object",
+                          "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                          "required": ["amount", "currency"],
+                          "additionalProperties": false,
+                          "description": "The price of one the invoice states, in the currency it states."
+                        },
+                        "expected": {
+                          "type": "object",
+                          "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                          "required": ["amount", "currency"],
+                          "additionalProperties": false,
+                          "description": "The price of one of the plan or subscription, in its original currency; null when nobody knew.",
+                          "nullable": true
+                        }
+                      },
+                      "required": ["invoice", "expected"],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "state",
+                    "mismatches",
+                    "openedAt",
+                    "outcome",
+                    "purchaseInvoice",
+                    "quantity",
+                    "unitPrice"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "pagination": {
+                "type": "object",
+                "properties": {
+                  "page": { "type": "integer", "exclusiveMinimum": true, "maximum": 9007199254740991, "minimum": 0 },
+                  "pageSize": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "maximum": 9007199254740991,
+                    "minimum": 0
+                  },
+                  "totalItems": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                  "totalPages": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+                },
+                "required": ["page", "pageSize", "totalItems", "totalPages"],
+                "additionalProperties": false
+              }
+            },
+            "required": ["items", "pagination"],
+            "additionalProperties": false,
+            "nullable": true
+          }
+        },
+        "required": ["success", "message", "data"],
+        "additionalProperties": false
+      },
+      "InvoiceDiscrepancyResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "enum": [true] },
+          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string", "format": "uuid" },
+              "state": { "type": "string", "enum": ["OPEN", "CLOSED"] },
+              "mismatches": {
+                "maxItems": 2,
+                "type": "array",
+                "items": { "type": "string", "enum": ["QUANTITY", "UNIT_PRICE"] }
+              },
+              "openedAt": { "type": "string", "format": "date-time" },
+              "outcome": {
+                "type": "string",
+                "enum": ["EXPLAINED", "OUT_OF_PROCESS_SUSPECTED", null],
+                "nullable": true
+              },
+              "purchaseInvoice": {
+                "type": "object",
+                "properties": {
+                  "id": { "type": "string", "format": "uuid" },
+                  "vendorId": { "type": "string", "format": "uuid" },
+                  "vendorInvoiceNumber": { "type": "string" },
+                  "servicePeriodMonth": {
+                    "type": "string",
+                    "description": "The month the invoice pays for, as YYYY-MM."
+                  },
+                  "linkKind": { "type": "string", "enum": ["REQUEST", "SUBSCRIPTION"] },
+                  "requestId": { "type": "string", "format": "uuid", "nullable": true },
+                  "subscriptionId": { "type": "string", "format": "uuid", "nullable": true },
+                  "netAmount": {
+                    "type": "object",
+                    "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                    "required": ["amount", "currency"],
+                    "additionalProperties": false,
+                    "description": "What was taken out of the company in dong, before tax."
+                  }
+                },
+                "required": [
+                  "id",
+                  "vendorId",
+                  "vendorInvoiceNumber",
+                  "servicePeriodMonth",
+                  "linkKind",
+                  "requestId",
+                  "subscriptionId",
+                  "netAmount"
+                ],
+                "additionalProperties": false
+              },
+              "quantity": {
+                "type": "object",
+                "properties": {
+                  "invoice": { "type": "integer", "minimum": -9007199254740991, "maximum": 9007199254740991 },
+                  "expected": {
+                    "type": "integer",
+                    "minimum": -9007199254740991,
+                    "maximum": 9007199254740991,
+                    "description": "The seats approved or bought; null when nobody knew.",
+                    "nullable": true
+                  }
+                },
+                "required": ["invoice", "expected"],
+                "additionalProperties": false
+              },
+              "unitPrice": {
+                "type": "object",
+                "properties": {
+                  "invoice": {
+                    "type": "object",
+                    "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                    "required": ["amount", "currency"],
+                    "additionalProperties": false,
+                    "description": "The price of one the invoice states, in the currency it states."
+                  },
+                  "expected": {
+                    "type": "object",
+                    "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                    "required": ["amount", "currency"],
+                    "additionalProperties": false,
+                    "description": "The price of one of the plan or subscription, in its original currency; null when nobody knew.",
+                    "nullable": true
+                  }
+                },
+                "required": ["invoice", "expected"],
+                "additionalProperties": false
+              },
+              "closure": {
+                "type": "object",
+                "properties": {
+                  "outcome": { "type": "string", "enum": ["EXPLAINED", "OUT_OF_PROCESS_SUSPECTED"] },
+                  "reason": { "type": "string" },
+                  "differenceAmount": {
+                    "type": "object",
+                    "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                    "required": ["amount", "currency"],
+                    "additionalProperties": false
+                  },
+                  "closedBy": {
+                    "type": "object",
+                    "properties": { "employeeId": { "type": "string", "format": "uuid" } },
+                    "required": ["employeeId"],
+                    "additionalProperties": false
+                  },
+                  "closedAt": { "type": "string", "format": "date-time" }
+                },
+                "required": ["outcome", "reason", "differenceAmount", "closedBy", "closedAt"],
+                "additionalProperties": false,
+                "description": "How the case was closed; null while it is open.",
+                "nullable": true
+              }
+            },
+            "required": [
+              "id",
+              "state",
+              "mismatches",
+              "openedAt",
+              "outcome",
+              "purchaseInvoice",
+              "quantity",
+              "unitPrice",
+              "closure"
+            ],
+            "additionalProperties": false,
+            "nullable": true
+          }
+        },
+        "required": ["success", "message", "data"],
+        "additionalProperties": false
+      },
+      "InvoiceDiscrepancyClosureBodyDto": {
+        "type": "object",
+        "properties": {
+          "outcome": {
+            "type": "string",
+            "enum": ["EXPLAINED", "OUT_OF_PROCESS_SUSPECTED"],
+            "description": "EXPLAINED when the difference has a reason; OUT_OF_PROCESS_SUSPECTED when someone may have paid for the software outside the process (it needs a difference above nothing, and is sent on to the review of the accounts at the vendor)."
+          },
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000,
+            "description": "Why the case is closed this way. Required; it stays with the case."
+          },
+          "differenceAmount": {
+            "type": "object",
+            "properties": { "amount": { "type": "string", "maxLength": 40 } },
+            "required": ["amount"],
+            "additionalProperties": false,
+            "description": "What the invoice cost beyond what was approved or bought, in dong (nothing is allowed for an explanation, never below nothing). The money is already in the expense of the invoice; this only records it."
+          }
+        },
+        "required": ["outcome", "reason", "differenceAmount"],
         "additionalProperties": false
       },
       "ControlledWaitListResponseDto": {
