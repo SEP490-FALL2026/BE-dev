@@ -1,12 +1,15 @@
 import { Module } from '@nestjs/common';
 import { DatabaseModule } from '../../infrastructure/database/database.module';
 import { AuditModule } from '../audit/audit.module';
+import { BudgetsModule } from '../budgets/budgets.module';
 import { CatalogModule } from '../catalog/catalog.module';
 import { DevicesModule } from '../devices/devices.module';
+import { FinanceModule } from '../finance/finance.module';
 import { IdentityAccessFacadeModule } from '../identity-access/identity-access-facade.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { LicensingModule } from '../licensing/licensing.module';
 import { OrganizationModule } from '../organization/organization.module';
+import { RequestsModule } from '../requests/requests.module';
 import { AiUsageController } from './ai-usage/ai-usage.controller';
 import { AiUsageBatchService } from './ai-usage/ai-usage-batch.service';
 import { AiUsageQueryService } from './ai-usage/ai-usage-query.service';
@@ -56,6 +59,16 @@ import { ToolStatusController } from './tool-status/tool-status.controller';
 import { ToolStatusQueryService } from './tool-status/tool-status-query.service';
 import { ToolStatusRepo } from './tool-status/tool-status.repo';
 import { ToolStatusSnapshotService } from './tool-status/tool-status-snapshot.service';
+import { OutOfProcessCaseClosureService } from './vendor-account-review/out-of-process-case-closure.service';
+import { VendorAccountDecisionService } from './vendor-account-review/vendor-account-decision.service';
+import { VendorAccountEvidenceSweeper } from './vendor-account-review/vendor-account-evidence-retention.job';
+import { VendorAccountEvidenceRetentionService } from './vendor-account-review/vendor-account-evidence-retention.service';
+import { VendorAccountIntakeService } from './vendor-account-review/vendor-account-intake.service';
+import { VendorAccountReviewListener } from './vendor-account-review/vendor-account-review-import.listener';
+import { VendorAccountReviewRepo } from './vendor-account-review/vendor-account-review.repo';
+import { OutOfProcessCasesController } from './vendor-account-review-queue/out-of-process-cases.controller';
+import { VendorAccountDiscrepanciesController } from './vendor-account-review-queue/vendor-account-discrepancies.controller';
+import { VendorAccountReviewQueryService } from './vendor-account-review-queue/vendor-account-review-query.service';
 
 /**
  * What the collectors on company machines send and what is read of it (`G7`): the allowlist of tools, the days an AI tool was used,
@@ -66,7 +79,10 @@ import { ToolStatusSnapshotService } from './tool-status/tool-status-snapshot.se
   imports: [
     DatabaseModule,
     AuditModule,
+    BudgetsModule,
+    FinanceModule,
     OrganizationModule,
+    RequestsModule,
     CatalogModule,
     DevicesModule,
     IdentityAccessFacadeModule,
@@ -84,8 +100,18 @@ import { ToolStatusSnapshotService } from './tool-status/tool-status-snapshot.se
     IdentityController,
     UsageOverviewController,
     UsageEmployeeController,
+    VendorAccountDiscrepanciesController,
+    OutOfProcessCasesController,
   ],
   providers: [
+    VendorAccountReviewRepo,
+    VendorAccountIntakeService,
+    VendorAccountDecisionService,
+    OutOfProcessCaseClosureService,
+    VendorAccountReviewQueryService,
+    VendorAccountEvidenceRetentionService,
+    VendorAccountEvidenceSweeper,
+    VendorAccountReviewListener,
     AllowlistRepo,
     AllowlistFactsService,
     AllowlistPublishService,

@@ -32,7 +32,9 @@ Tầng: T6 (`scripts/arch/tiers.cjs`). Phụ thuộc: devices, catalog, licensin
   năng lực), `usage_imports` (cửa sổ bao phủ bắt buộc ≤ 366 ngày — `INV-10`; xem trước → xác nhận; `notice_at`), `usage_import_rows` (dòng xem
   trước), `usage_activity_days` (ngày hoạt động theo **định danh**, không có `employee_id`; trigger chỉ cho đặt `superseded_by_import_id` một
   lần), `usage_identity_mappings` (một định danh ↔ một nhân viên còn hiệu lực — partial UNIQUE), `usage_unmatched_identities` (hàng đợi),
-  `usage_no_assignment_findings` (`FR-4.8`) — `prisma/models/usage.prisma`. `device_id`, `registration_id`, `credential_id`, `application_id`, người
+  `usage_no_assignment_findings` (`FR-4.8`) — `prisma/models/usage.prisma`. Rà soát tài khoản (`SBF-08`, RC-2): `vendor_account_discrepancies`
+  (một khác biệt giữa số nội bộ và số nhà cung cấp, giữ **cả hai giá trị**, ngày bằng chứng, quyết định một lần của IT Admin; xóa sau 24 tháng) và
+  `out_of_process_cases` (`SBF-07a`: ca ngoài quy trình, đóng một lần). `device_id`, `registration_id`, `credential_id`, `application_id`, người
   là giá trị, không FK: usage có vòng đời và thời hạn lưu riêng.
 - Cột JSON có codec riêng: `usage_sources.template`, `usage_imports.summary|result`, `usage_import_rows.cells|errors`.
 
@@ -58,6 +60,18 @@ Tầng: T6 (`scripts/arch/tiers.cjs`). Phụ thuộc: devices, catalog, licensin
   Theo một nhân viên (`GET /employees/{id}/usage-software`, `…/{applicationId}`): phần mềm có quyền hoặc có usage trong kỳ (`hasSeat`, nối qua
   `LicensingUsageApi.listAssignmentIntervals`) và chi tiết hai nguồn tách riêng (từng nguồn nhà cung cấp, collector); nhân viên chỉ hiện bằng `employeeCode`;
   **token và số câu trả lời chỉ ở chi tiết** (`collector.days`); nhân viên ngoài phạm vi hoặc không có ⟹ 404 như nhau.
+- `vendor-account-review/` — L0, không controller (RC-2, `QĐ-111y`, R-18, R-45, C-4): `vendor-account-review.repo.ts` là writer duy nhất của hai
+  bảng trên; `vendor-account-intake.service.ts` tạo khác biệt từ cái đã thấy (tài khoản có hoạt động không có ghế và định danh chưa khớp khi
+  xác nhận báo cáo — `vendor-account-review-import.listener.ts` bind `UsageImportListeners`; hồ sơ hóa đơn nghi ngờ của `requests` qua
+  `InvoiceDiscrepancyReferralListeners`; công cụ ngoài allowlist mà collector thấy — `ai-usage-batch.service.ts` gọi khi từ chối `NOT_IN_ALLOWLIST`), mỗi
+  thứ một dòng (`source`, `source_ref`), thấy lại chỉ dời ngày bằng chứng; không bao giờ giữ tên người (`OQ-03`).
+  `vendor-account-decision.service.ts` (quyết định một lần: `LEGALIZE_VIA_REQUEST|REVOKE|FALSE_ALARM|OUT_OF_PROCESS`, `OUT_OF_PROCESS` mở ca cùng
+  transaction), `out-of-process-case-closure.service.ts` (`FALSE_ALARM|RECORD_SPENT|REPORT_ONLY`; ghi tiền chỉ khi có chứng từ + số VND + Cost Center hoặc
+  chưa phân bổ: đính tệp qua `CatalogApi.attachOutOfProcessCaseDocuments`, rồi `BudgetsApi.recordOutOfProcessSpend` ghi MỘT khoản thực chi không cam kết),
+  `vendor-account-evidence-retention.service.ts` + `.job.ts` (`VendorAccountEvidenceSweeper` xóa bằng chứng quá 24 tháng, `US-14-04` AC-2). Policy thuần:
+  `vendor-account-discrepancy.policy.ts` (hai giá trị, mốc 24 tháng), `out-of-process-case.policy.ts` (đóng ca).
+- `vendor-account-review-queue/` — L3: `GET /vendor-account-discrepancies` + `POST …/{id}/decision` (IT Admin), `GET /out-of-process-cases` +
+  `POST …/{id}/closure` (Finance, IT Admin); tên ứng dụng của một trang đọc một lần (`CatalogApi.getCollectorApplications`).
 - `usage-evidence/` — L0: repo đọc (nối ánh xạ còn hiệu lực **lúc đọc**), policy (độ mới 7/14 ngày theo loại nguồn, năng lực), service.
 
 ## Luồng và khóa
@@ -91,5 +105,5 @@ qua ánh xạ còn hiệu lực lúc đọc, nên sửa ánh xạ sai là đủ 
 ## Chưa làm
 
 Collector: lưu lý do `SCHEMA_VIOLATION`, tự phát hành allowlist khi catalog đổi, xóa theo thời hạn lưu, lô trình duyệt (`WEB_DOMAIN`). Nhà cung
-cấp: bật thu thập ứng dụng liên lạc (`US-01-08`), hồ sơ sai lệch `SBF-08`, thông báo ngay lúc cấp quyền (cần hook ở `provisioning`), thời hạn giữ
+cấp: bật thu thập ứng dụng liên lạc (`US-01-08`), thông báo ngay lúc cấp quyền (cần hook ở `provisioning`), thời hạn giữ
 dòng thô, kết nối API nhà cung cấp.

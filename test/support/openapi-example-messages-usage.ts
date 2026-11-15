@@ -1,5 +1,7 @@
 /** Part of SUCCESS_MESSAGES (usage): the success `message` each operation of the vendor usage import answers with (`qd103-vendor-usage-import`). */
 export const SUCCESS_MESSAGES_USAGE: Readonly<Record<string, string>> = {
+  outOfProcessCaseClose: 'OUT_OF_PROCESS_CASE.CLOSED',
+  outOfProcessCaseList: 'OUT_OF_PROCESS_CASE.LISTED',
   usageIdentityMappingEnd: 'USAGE_IDENTITY.MAPPING_ENDED',
   usageIdentityMappingList: 'USAGE_IDENTITY.MAPPINGS_LISTED',
   usageImportCancel: 'USAGE_IMPORT.CANCELLED',
@@ -20,4 +22,6 @@ export const SUCCESS_MESSAGES_USAGE: Readonly<Record<string, string>> = {
   usageUnmatchedIdentityDismiss: 'USAGE_IDENTITY.DISMISSED',
   usageUnmatchedIdentityList: 'USAGE_IDENTITY.UNMATCHED_LISTED',
   usageUnmatchedIdentityResolve: 'USAGE_IDENTITY.RESOLVED',
+  vendorAccountDiscrepancyDecide: 'VENDOR_ACCOUNT_DISCREPANCY.DECIDED',
+  vendorAccountDiscrepancyList: 'VENDOR_ACCOUNT_DISCREPANCY.LISTED',
 };

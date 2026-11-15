@@ -1,4 +1,5 @@
 import { API_COVERAGE_PURCHASE } from './api-coverage-manifest-purchase';
+import { API_COVERAGE_REVIEW } from './api-coverage-manifest-review';
 
 /** Inventory of exported HTTP operations. Add entries and HTTP tests together. */
 export const API_COVERAGE_MANIFEST: readonly string[] = [
@@ -112,6 +113,7 @@ export const API_COVERAGE_MANIFEST: readonly string[] = [
   'POST /api/v1/spend-batches/{id}/decisions',
   'GET /api/v1/grant-queue',
   ...API_COVERAGE_PURCHASE,
+  ...API_COVERAGE_REVIEW,
   'GET /api/v1/stock-summary',
   'GET /api/v1/budget-cycles',
   'POST /api/v1/budget-cycles',

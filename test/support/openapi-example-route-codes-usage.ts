@@ -15,6 +15,24 @@ const SOURCE_SAVE_422 = [
  * `vendor-source.http-errors.ts` and `vendor-import.http-errors.ts`.
  */
 export const ROUTE_ERROR_CODES_USAGE: Readonly<Record<string, Partial<Record<RouteErrorStatus, readonly string[]>>>> = {
+  vendorAccountDiscrepancyDecide: {
+    '404': ['VENDOR_ACCOUNT_DISCREPANCY.NOT_FOUND'],
+    '409': ['VENDOR_ACCOUNT_DISCREPANCY.ALREADY_DECIDED'],
+  },
+  outOfProcessCaseClose: {
+    '404': ['OUT_OF_PROCESS_CASE.NOT_FOUND'],
+    '409': ['OUT_OF_PROCESS_CASE.ALREADY_CLOSED', 'OUT_OF_PROCESS_CASE.NUMBER_TAKEN'],
+    '422': [
+      'MONEY_OUT_OF_RANGE',
+      'MONEY_SCALE_EXCEEDED',
+      'OUT_OF_PROCESS_CASE.COST_CENTER_NOT_FOUND',
+      'OUT_OF_PROCESS_CASE.DOCUMENT_INVALID',
+      'OUT_OF_PROCESS_CASE.DOCUMENT_REQUIRED',
+      'OUT_OF_PROCESS_CASE.NO_VENDOR',
+      'OUT_OF_PROCESS_CASE.RECORD_FIELDS_MISSING',
+      'OUT_OF_PROCESS_CASE.RECORD_FIELDS_NOT_ALLOWED',
+    ],
+  },
   usageSourceCreate: { '409': ['USAGE_SOURCE.NAME_TAKEN'], '422': SOURCE_SAVE_422 },
   usageSourceGet: { '404': ['USAGE_SOURCE.NOT_FOUND'] },
   usageSourceListOfContract: { '404': ['USAGE_SOURCE.CONTRACT_NOT_FOUND'] },
