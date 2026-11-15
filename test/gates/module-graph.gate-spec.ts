@@ -71,6 +71,8 @@ const PUBLIC_CONTRACT_EXPORTS: ReadonlySet<string> = new Set([
   'PoliciesTemplateFacadeModule: ImportTemplateContributions',
   // The extension points the requests context binds (public/budgets.extension-points.ts): what waits to be decided as spend, the release guard and the facts of a commitment request.
   'BudgetsModule: PendingSpendContributions',
+  // QĐ-111ac: what a Cost Center carries into the year, added by the requests context from a dry run of the pass of 01/01.
+  'BudgetsModule: CarriedOverContributions',
   'BudgetsModule: CommitmentReleaseGuardHook',
   'BudgetsModule: CommitmentRequestFactsHook',
   // PI-1.7: the purchase invoice behind an invoice of a commitment (its label and how it was paid), bound by the requests context.

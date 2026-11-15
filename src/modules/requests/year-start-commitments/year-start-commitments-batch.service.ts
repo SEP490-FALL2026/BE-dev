@@ -50,6 +50,13 @@ interface IgnoredSaved {
 }
 type LeftOut = { requestId: string; reason: YearStartSkipReason };
 
+/** What the paid requests of a batch hold on 01/01, judged: the commitments to make, the requests left out and why, and the numbers the approval kept in another currency. */
+export interface YearStartJudgedBatch {
+  items: HoldItem[];
+  leftOut: LeftOut[];
+  ignored: IgnoredSaved[];
+}
+
 /**
  * The price of a seat each request counted with at its approval, in dong (`unit_price_minor` and `billing_cycle` of the request): a seat that
  * closes before its term is counted at it, not at the price of 01/01 (`QĐ-111ak`). Null for a request that carries none, or carries it in
@@ -108,10 +115,10 @@ export class YearStartCommitmentsBatchService {
   async commitBatch(tx: DbTx, pass: YearStartPassContext, afterId: string | null): Promise<YearStartBatchResult> {
     const locked = await this.repo.lockBatch(tx, pass.organizationId, afterId, YEAR_START_BATCH_SIZE);
     const lastId = locked.length === 0 ? null : locked[locked.length - 1].id;
-    const candidates = await this.withoutCommitment(tx, await this.ofPaidKinds(tx, locked), pass.year);
-    if (candidates.length === 0) return { lastId, created: 0, skipped: 0 };
+    const judged = await this.judgeBatch(tx, pass, locked);
+    if (judged === null) return { lastId, created: 0, skipped: 0 };
 
-    const { items, leftOut, ignored } = await this.judgeAll(tx, pass, candidates);
+    const { items, leftOut, ignored } = judged;
     const held = await this.budgets.holdYearStart(tx, {
       organizationId: pass.organizationId,
       year: pass.year,
@@ -130,12 +137,27 @@ export class YearStartCommitmentsBatchService {
     return { lastId, created: held.created.length, skipped: leftOut.length };
   }
 
+  /**
+   * What the requests of a batch hold on 01/01 by the one rule of the pass, and writes nothing: the paid ones that hold no commitment for the
+   * year yet, each judged on the seats and the price of 01/01. Null when none is left to judge. The pass judges the rows it locked; the
+   * budgets ask the same of rows nobody locked, to tell what a Cost Center carries into the year (`QĐ-111ac`), so the two never disagree.
+   */
+  async judgeBatch(
+    tx: DbTx,
+    pass: YearStartPassContext,
+    rows: readonly YearStartCandidate[],
+  ): Promise<YearStartJudgedBatch | null> {
+    const candidates = await this.withoutCommitment(tx, await this.ofPaidKinds(tx, rows), pass.year);
+
+    return candidates.length === 0 ? null : this.judgeAll(tx, pass, candidates);
+  }
+
   /** What each candidate holds, in dong and the Cost Center of the department that bears it, or why it is left out. */
   private async judgeAll(
     tx: DbTx,
     pass: YearStartPassContext,
     candidates: readonly YearStartCandidate[],
-  ): Promise<{ items: HoldItem[]; leftOut: LeftOut[]; ignored: IgnoredSaved[] }> {
+  ): Promise<YearStartJudgedBatch> {
     const yearStart: BusinessDate = `${pass.year}-01-01`;
     const { seats, ignored } = await this.seatsOf(tx, candidates, pass.year);
     const bearing = new Map(

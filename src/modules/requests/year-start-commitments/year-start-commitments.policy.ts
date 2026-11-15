@@ -216,3 +216,22 @@ export function judgeYearStart(input: {
     costCenterId: input.costCenterId,
   };
 }
+
+/**
+ * What each of the Cost Centers asked about carries into the year (`QĐ-111ac`): the amounts of the commitments the pass of 01/01 would make,
+ * added by Cost Center. A Cost Center nothing would be committed in is left out of the answer. The amounts are in dong, like every
+ * commitment of the pass (`QĐ-111an`).
+ */
+export function carriedOverByCostCenter(
+  commitments: readonly { costCenterId: string; amountMinor: bigint }[],
+  costCenterIds: readonly string[],
+): Map<string, bigint> {
+  const wanted = new Set(costCenterIds);
+  const totals = new Map<string, bigint>();
+  for (const commitment of commitments) {
+    if (!wanted.has(commitment.costCenterId)) continue;
+    totals.set(commitment.costCenterId, (totals.get(commitment.costCenterId) ?? 0n) + commitment.amountMinor);
+  }
+
+  return totals;
+}

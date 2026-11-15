@@ -71,7 +71,7 @@ attachmentIds[1..10] }`, không có dòng (`requestedAmount` lưu ở `total_min
 - `version/` — phiên bản: tạo, sửa số, gửi duyệt, quyết định, lịch sử (US-06-09, US-06-11); `budget-versions.controller.ts`;
   `VersionService`, `VersionDecisionService` (`VersionDecisionJudge` + `VersionDecisionWriter`), `VersionCreationService`,
   `VersionBaselineCreationService`, `VersionFigures`, `VersionTrail`, `VersionAccessService`. Một số cho cả năm, không dòng (`QĐ-111ac`,
-  B-6): `base` bỏ trống ⟹ điền số chạy sang của Cost Center (`CarriedOverContributions`, `requests` bind; chưa bind ⟹ 0), dự phòng là
+  B-6): `base` bỏ trống ⟹ điền số chạy sang của Cost Center (`CarriedOverContributions`, `requests` bind bằng một lần chạy thử khoản 01/01; không ai bind ⟹ 0), dự phòng là
   `reservePercent` (mặc định `BUDGET_RESERVE_DEFAULT_PERCENT`) hoặc `reserve` (số tiền); dự phòng khác mặc định của tổ chức (đọc lúc gửi), dù
   chọn bằng tỷ lệ hay số tiền, cần `reserveReason` khi gửi (422 `BUDGET.RESERVE_REASON_REQUIRED`); lưu nháp không chặn; gửi cần ≥ 1 tệp (422 `BUDGET_VERSION.ATTACHMENT_REQUIRED`) và tổng mọi Cost Center ≤ Trần năm − Dự phòng kho (409
   `BUDGET_VERSION.OVER_CEILING`, `details.overBy`). Đọc phiên bản có `carriedOverNextYear`, `belowCarriedOver` (cờ đỏ: cơ sở + dự phòng < số chạy sang, `C-09`) và `carriedOverShortfall` (phần thiếu, 0 khi đủ),

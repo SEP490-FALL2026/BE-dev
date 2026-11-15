@@ -167,11 +167,25 @@ export class YearStartCommitmentsRepo {
    * refused, withdrawn, failed nor cancelled — with their rows locked. Which of them are paid, of which kind of provisioning and with what seats
    * is for the caller to judge.
    */
-  async lockBatch(
+  lockBatch(tx: DbTx, organizationId: string, afterId: string | null, limit: number): Promise<YearStartCandidate[]> {
+    return this.batchAfter(tx, organizationId, afterId, limit, Prisma.sql`FOR UPDATE OF r`);
+  }
+
+  /**
+   * The same requests as `lockBatch`, read as they stand and locked by nobody: for the caller that only works out what the pass would commit
+   * (`QĐ-111ac`, what a Cost Center carries into the year) and writes nothing, so it neither waits for a request that is being decided nor
+   * keeps one from being decided.
+   */
+  readBatch(tx: DbTx, organizationId: string, afterId: string | null, limit: number): Promise<YearStartCandidate[]> {
+    return this.batchAfter(tx, organizationId, afterId, limit, Prisma.empty);
+  }
+
+  private async batchAfter(
     tx: DbTx,
     organizationId: string,
     afterId: string | null,
     limit: number,
+    lock: Prisma.Sql,
   ): Promise<YearStartCandidate[]> {
     const after = afterId === null ? Prisma.empty : Prisma.sql`AND r."id" > ${afterId}::uuid`;
     const rows = await tx.$queryRaw<CandidateRow[]>`
@@ -186,7 +200,7 @@ export class YearStartCommitmentsRepo {
          AND r."plan_id" IS NOT NULL ${after}
        ORDER BY r."id"
        LIMIT ${limit}
-         FOR UPDATE OF r`;
+       ${lock}`;
 
     return rows.map((row) => ({
       id: row.id,

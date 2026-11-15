@@ -8,7 +8,11 @@ import { waitForLockWaiters } from '../../support/lock-wait';
 import type { Department } from '../../support/request-harness';
 
 const h = new BudgetHarness();
-/** What a context that adds its part says each Cost Center carries into the year: the requests context is not bound to it yet (BG-2.1). */
+/**
+ * What each Cost Center carries into the year, as these tests say it (the budgets read it through `CarriedOverContributions.totals`; the
+ * requests context's real source, and its figures, are proved in `requests/year-start-carried-over`): a spy on the answer, never a second
+ * source added next to the real one, which would be added up with it (FIX-LB4 MG-05).
+ */
 const carriedOver = new Map<string, bigint>();
 
 interface VersionBody {
@@ -74,9 +78,9 @@ describe('a version built from the baseline (integration, real PostgreSQL)', () 
 
   beforeAll(async () => {
     await h.start();
-    h.ctx.app.get(CarriedOverContributions, { strict: false }).add('test', {
-      carriedOverOf: (ids) => Promise.resolve(new Map([...carriedOver].filter(([id]) => ids.includes(id)))),
-    });
+    jest
+      .spyOn(h.ctx.app.get(CarriedOverContributions, { strict: false }), 'totals')
+      .mockImplementation((ids) => Promise.resolve(new Map([...carriedOver].filter(([id]) => ids.includes(id)))));
     // The deadline of the year has passed: yesterday.
     await setDeadline(h.year, addDays(h.today(), -1));
   }, 240000);
