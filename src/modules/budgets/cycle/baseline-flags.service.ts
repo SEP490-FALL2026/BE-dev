@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { belowCarriedOver } from '../budget/budget.policy';
+import { belowCarriedOver, carriedOverShortfall } from '../budget/budget.policy';
 import { ProposalRepo } from '../budget/proposal.repo';
 import { VersionRepo } from '../budget/version.repo';
 import { CarriedOverContributions } from '../public/budgets.extension-points';
@@ -9,11 +9,13 @@ export interface BaselineCarried {
   carriedOver: bigint;
   noProposalSubmitted: boolean;
   belowCarriedOver: boolean;
+  /** What the base and the reserve of the newest version lack of what is carried over; zero when they cover it, and when there is no version. */
+  carriedOverShortfall: bigint;
 }
 
 /**
  * What each department of the baseline says of the year it is made for: what its Cost Center carries into the year, whether the deadline
- * passed with no proposal of it, and whether the newest version of it has a base below what is carried over (the red flag). Three
+ * passed with no proposal of it, and whether the base and the reserve of the newest version of it are below what is carried over (the red flag), and by how much. Three
  * statements for the whole baseline, whatever the number of departments.
  */
 @Injectable()
@@ -40,7 +42,8 @@ export class BaselineFlags {
       return {
         carriedOver: amount,
         noProposalSubmitted: locked && !proposed.has(costCenterId),
-        belowCarriedOver: version !== undefined && belowCarriedOver(version.baseMinor, amount),
+        belowCarriedOver: version !== undefined && belowCarriedOver(version, amount),
+        carriedOverShortfall: version === undefined ? 0n : carriedOverShortfall(version, amount),
       };
     };
   }

@@ -10,7 +10,7 @@ import {
   BudgetCycleNotFoundError,
   BudgetNotYourCostCenterError,
 } from '../budget/budget.errors';
-import { BaselineFlags } from './baseline-flags.service';
+import { BaselineFlags, type BaselineCarried } from './baseline-flags.service';
 import { BudgetFactsService } from '../budget/budget-facts.service';
 import { CommitmentRepo, heldKey } from '../budget/commitment.repo';
 import { ProposalRepo } from '../budget/proposal.repo';
@@ -51,10 +51,11 @@ export function departmentOf(
   costCenterId: string | null,
   subscriptions: readonly BaselineSubscription[],
   reading: Reading,
-  carried: { carriedOver: bigint; noProposalSubmitted: boolean; belowCarriedOver: boolean } = {
+  carried: BaselineCarried = {
     carriedOver: 0n,
     noProposalSubmitted: false,
     belowCarriedOver: false,
+    carriedOverShortfall: 0n,
   },
 ): BaselineWire['departments'][number] {
   const { year, today, seats, ending, kpi3ByPlan, spent, format } = reading;
@@ -97,6 +98,7 @@ export function departmentOf(
     carriedOverNextYear: format(carried.carriedOver),
     noProposalSubmitted: carried.noProposalSubmitted,
     belowCarriedOver: carried.belowCarriedOver,
+    carriedOverShortfall: format(carried.carriedOverShortfall),
     spentThisYear: format(spent),
     estimatedAnnualCost: format(total),
     hasUnknownCost: unknown,

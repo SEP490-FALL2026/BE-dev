@@ -108,7 +108,11 @@ const baselineDepartmentView = z.strictObject({
   }),
   belowCarriedOver: z.boolean().meta({
     description:
-      'The red flag: the newest version of the Cost Center for the year has a base below carriedOverNextYear. False when it has none; it never stops anything.',
+      'The red flag: the newest version of the Cost Center for the year has a base and a reserve (its total) below carriedOverNextYear. False when it has none; it never stops anything.',
+  }),
+  carriedOverShortfall: moneyView.meta({
+    description:
+      'What the base and the reserve of that version lack of carriedOverNextYear: zero when they cover it or when there is no version.',
   }),
   noProposalSubmitted: z.boolean().meta({
     description:

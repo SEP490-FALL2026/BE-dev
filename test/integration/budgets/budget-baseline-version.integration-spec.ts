@@ -20,6 +20,7 @@ interface VersionBody {
     reserve: { amount: string };
     carriedOverNextYear: { amount: string };
     belowCarriedOver: boolean;
+    carriedOverShortfall: { amount: string };
     noProposalSubmitted: boolean;
   };
 }
@@ -98,6 +99,7 @@ describe('a version built from the baseline (integration, real PostgreSQL)', () 
       reserve: { amount: '12300000' },
       carriedOverNextYear: { amount: '123000000' },
       belowCarriedOver: false,
+      carriedOverShortfall: { amount: '0' },
       noProposalSubmitted: true,
     });
     expect(await h.budgetRows(`budget_version_lines WHERE version_id = '${made.id}'`)).toBe(0);
@@ -116,10 +118,57 @@ describe('a version built from the baseline (integration, real PostgreSQL)', () 
       reserve: { amount: '2000000' },
       carriedOverNextYear: { amount: '50000000' },
       belowCarriedOver: true,
+      carriedOverShortfall: { amount: '8000000' },
     });
     const read = h.dataOf<VersionBody>(await h.versionOf(made.id).expect(200)).version;
     expect(read).toMatchObject({ belowCarriedOver: true, noProposalSubmitted: true });
     await h.sendVersion(made.id).expect(200);
+  });
+
+  describe('the red flag compares the base and the reserve together with what is carried over (QĐ-111ac, C-09, QT 4.6; FIX-LB3 LBG-01)', () => {
+    const flagsOf = async (department: Department, versionId: string) => {
+      const read = h.dataOf<VersionBody>(await h.versionOf(versionId).expect(200)).version;
+      const baseline = h.dataOf<{
+        departments: { departmentId: string; belowCarriedOver: boolean; carriedOverShortfall: { amount: string } }[];
+      }>(await request(h.server()).get(`/api/v1/budget-cycles/${h.year}/baseline`).set(h.as(h.finance)).expect(200));
+      const row = baseline.departments.find((one) => one.departmentId === department.id);
+
+      return {
+        version: { below: read.belowCarriedOver, shortfall: read.carriedOverShortfall.amount },
+        baseline: { below: row?.belowCarriedOver, shortfall: row?.carriedOverShortfall.amount },
+      };
+    };
+
+    it('is down when the base is below what is carried over (850 against 900 million) and the reserve of 85 makes up for it: 935 covers 900', async () => {
+      const department = await headless();
+      carriedOver.set(department.unitId, 900_000_000n);
+
+      const made = h.dataOf<VersionBody>(
+        await create({ ...baselineBody(department), base: h.money(850_000_000), reservePercent: 10 }).expect(201),
+      ).version;
+
+      expect(made.reserve.amount).toBe('85000000');
+      expect(await flagsOf(department, made.id)).toEqual({
+        version: { below: false, shortfall: '0' },
+        baseline: { below: false, shortfall: '0' },
+      });
+    });
+
+    it('is up with the amount that is missing when the base and the reserve fall short: 800 + 80 against 900 million is 20 million short, still saved and sent', async () => {
+      const department = await headless();
+      carriedOver.set(department.unitId, 900_000_000n);
+
+      const made = h.dataOf<VersionBody>(
+        await create({ ...baselineBody(department), base: h.money(800_000_000), reservePercent: 10 }).expect(201),
+      ).version;
+
+      expect(made).toMatchObject({ belowCarriedOver: true, carriedOverShortfall: { amount: '20000000' } });
+      expect(await flagsOf(department, made.id)).toEqual({
+        version: { below: true, shortfall: '20000000' },
+        baseline: { below: true, shortfall: '20000000' },
+      });
+      await h.sendVersion(made.id).expect(200);
+    });
   });
 
   describe('refuses with 409 BUDGET.BASELINE_VERSION_NOT_ALLOWED naming the reason', () => {

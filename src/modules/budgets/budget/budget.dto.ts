@@ -239,7 +239,12 @@ const versionSchema = z.strictObject({
       'What the Cost Center carries into the year of the version: the amount the requests approved so far already saved for it (zero until the requests context tells it).',
   }),
   belowCarriedOver: z.boolean().meta({
-    description: 'The red flag: the base is below carriedOverNextYear. It never stops a sending or a decision.',
+    description:
+      'The red flag: the budget of the department, the base and the reserve together (total), is below carriedOverNextYear. It never stops a sending or a decision.',
+  }),
+  carriedOverShortfall: moneyView.meta({
+    description:
+      'What the base and the reserve lack of carriedOverNextYear: zero when they cover it, the amount to tell with the red flag when they do not.',
   }),
   noProposalSubmitted: z.boolean().meta({
     description: 'Finance built the version from the baseline because the department had no proposal at the deadline.',

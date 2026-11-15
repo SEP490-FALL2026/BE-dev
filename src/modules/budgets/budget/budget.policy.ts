@@ -210,8 +210,21 @@ export function versionFiguresOf(input: {
   return { baseMinor, reserveMinor: defaultReserveOf(baseMinor, reservePercent), reservePercent };
 }
 
-/** The red flag of a version (`QĐ-111ac`): its base is below what the Cost Center carries into the year. It never stops anything. */
-export const belowCarriedOver = (baseMinor: bigint, carriedOverMinor: bigint): boolean => baseMinor < carriedOverMinor;
+/**
+ * The red flag of a version (`QĐ-111ac`): the budget of the department, its base and its reserve together, is below what the Cost Center
+ * carries into the year (`C-09`: the budget of a department is the base plus the reserve). It never stops anything.
+ */
+export const belowCarriedOver = (
+  version: { baseMinor: bigint; reserveMinor: bigint },
+  carriedOverMinor: bigint,
+): boolean => version.baseMinor + version.reserveMinor < carriedOverMinor;
+
+/** What the base and the reserve of a version lack of what the Cost Center carries into the year: the amount told with the red flag, zero when they cover it. */
+export const carriedOverShortfall = (
+  version: { baseMinor: bigint; reserveMinor: bigint },
+  carriedOverMinor: bigint,
+): bigint =>
+  belowCarriedOver(version, carriedOverMinor) ? carriedOverMinor - version.baseMinor - version.reserveMinor : 0n;
 
 /** A version is sent with one file at least that explains it (`QĐ-111ac`); saving a draft asks for none. */
 export const versionAttachmentMissing = (attachedCount: number): boolean => attachedCount < 1;

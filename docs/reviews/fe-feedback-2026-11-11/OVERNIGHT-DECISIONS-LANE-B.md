@@ -88,13 +88,20 @@ Không làm ở FIX-LB1 (rẻ nhưng đổi hợp đồng hoặc chạm file lan
 
 ### D-B14 — số liệu phiên bản (BG-2.5/2.6): dự phòng theo tỷ lệ hay số tiền, cờ đỏ so cơ sở, gửi cần tệp
 
-- **Chọn:** (1) `reservePercent` (0–100, số nguyên) **hoặc** `reserve` (loại trừ nhau ⟹ 422); tỷ lệ Finance chọn được lưu vào `reserve_percent` nên không cần lý do; số tiền giữ so với tỷ lệ mặc định ⟹ khác tỷ lệ thì vẫn cần `reserveReason` khi gửi (luật US-06-09 AC-30 có sẵn, SPEC ghi `reserveReason?` nên không bỏ luật); (2) `base` bỏ trống ⟹ điền `carriedOverNextYear` (cả nguồn `PROPOSAL` lẫn `BASELINE`; nguồn chạy sang chưa bind ⟹ 0); `PUT` không tự đổi cơ sở theo số chạy sang; (3) `belowCarriedOver` = **cơ sở** < số chạy sang (cam kết chạy sang tiêu vào cơ sở, dự phòng là phần dự trữ); ở số liệu nền cờ lấy theo phiên bản mới nhất (không tách rời) của Cost Center trong năm, không có phiên bản ⟹ `false`; (4) đếm tệp đính kèm khi gửi đọc `budget_attachments` qua `VersionRepo.countAttachedFiles` (capability `attachment` đã phụ thuộc `version`, import ngược tạo vòng — gate capability graph); (5) BG-2.5 và BG-2.6 vào một commit vì cùng DTO và cùng `VersionFigures`.
-- **Đổi lại:** đổi so sánh ở `belowCarriedOver` (một dòng, có test) nếu Owner muốn so tổng (cơ sở + dự phòng).
+- **Chọn:** (1) `reservePercent` (0–100, số nguyên) **hoặc** `reserve` (loại trừ nhau ⟹ 422); tỷ lệ Finance chọn được lưu vào `reserve_percent` nên không cần lý do; số tiền giữ so với tỷ lệ mặc định ⟹ khác tỷ lệ thì vẫn cần `reserveReason` khi gửi (luật US-06-09 AC-30 có sẵn, SPEC ghi `reserveReason?` nên không bỏ luật); (2) `base` bỏ trống ⟹ điền `carriedOverNextYear` (cả nguồn `PROPOSAL` lẫn `BASELINE`; nguồn chạy sang chưa bind ⟹ 0); `PUT` không tự đổi cơ sở theo số chạy sang; (3) `belowCarriedOver` = (**cơ sở + dự phòng**) < số chạy sang, kèm `carriedOverShortfall` (SỬA theo FIX-LB3 LBG-01 ⟹ D-B16; bản đầu so riêng cơ sở, trái QĐ-111ac, `C-09` và QT §4.6); ở số liệu nền cờ lấy theo phiên bản mới nhất (không tách rời) của Cost Center trong năm, không có phiên bản ⟹ `false`; (4) đếm tệp đính kèm khi gửi đọc `budget_attachments` qua `VersionRepo.countAttachedFiles` (capability `attachment` đã phụ thuộc `version`, import ngược tạo vòng — gate capability graph); (5) BG-2.5 và BG-2.6 vào một commit vì cùng DTO và cùng `VersionFigures`.
+- **Đổi lại:** (3) đã sửa sang so tổng (cơ sở + dự phòng) ở D-B16; so riêng cơ sở lại ⟹ đổi `belowCarriedOver` ở `budget.policy.ts`.
 
 ### D-B15 — quyết định phiên bản chỉ `APPROVE` | `RETURN` (BG-2.7)
 
 - **Chọn:** `RETURN` (lý do bắt buộc) ghi quyết định `CHANGES_REQUESTED` và trạng thái `CHANGES_REQUESTED` có sẵn (Finance sửa và gửi lại); `REJECT`, `REQUEST_CHANGES` ⟹ 422 `VALIDATION_ERROR`. Giá trị enum `REJECTED` (trạng thái và quyết định) **giữ** để đọc bản cũ; luồng "bản bị từ chối ⟹ đề nghị kế tiếp / làm lại từ đề nghị" giữ nguyên cho dữ liệu cũ (không còn đường tạo mới). Mã thông báo `BUDGET_VERSION_DECIDED` mang `decision: CHANGES_REQUESTED` khi trả về.
 - **Đổi lại:** thêm lại giá trị vào `decisionBodySchema` và `decisionOutcomeOf`.
+
+### D-B16 — cờ đỏ `belowCarriedOver` so ngân sách phòng (cơ sở + dự phòng) và nói phần thiếu (FIX-LB3 LBG-01, sửa D-B14(3))
+
+- **Câu hỏi:** cờ đỏ so với số nào, và có nói phần thiếu không.
+- **Phương án:** (A) giữ so riêng cơ sở (D-B14(3) cũ); (B) so ngân sách phòng = cơ sở + dự phòng, thêm `carriedOverShortfall`; (C) so ngân sách phòng nhưng FE tự tính phần thiếu.
+- **Chọn B** theo chữ tài liệu: QĐ-111ac ("ngân sách phòng thấp hơn số chạy sang ⟹ cờ đỏ"), `C-09` ("ngân sách phòng = số cơ sở + dự phòng"), QT §4.6 dòng 780 ("kèm phần thiếu", ví dụ 800 + 80 = 880 so với 900 ⟹ thiếu 20 tr). `carriedOverShortfall` = `max(0, số chạy sang − (cơ sở + dự phòng))` là số tiền (`{ amount, currency }`) trên `GET /budget-versions/{id}` và trên từng phòng của `GET /budget-cycles/{year}/baseline` (0 khi đủ hoặc khi phòng chưa có phiên bản). Cờ vẫn không chặn gì.
+- **File/commit:** `budget/budget.policy.ts` (`belowCarriedOver`, `carriedOverShortfall` nhận `{ baseMinor, reserveMinor }` để hai nơi gọi không lệch), `budget/version-view.service.ts`, `cycle/baseline-flags.service.ts`, `cycle/baseline.service.ts`, DTO `budget.dto.ts` + `cycle.dto.ts`. **Đổi lại:** đổi hai hàm ở `budget.policy.ts` về so `baseMinor`.
 
 ## Optional và việc để lại
 

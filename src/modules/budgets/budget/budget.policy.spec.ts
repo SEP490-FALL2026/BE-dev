@@ -1,6 +1,7 @@
 import type { BusinessDate } from '../../../core/business-date';
 import {
   belowCarriedOver,
+  carriedOverShortfall,
   versionAttachmentMissing,
   versionFiguresOf,
   defaultReserveOf,
@@ -285,10 +286,31 @@ describe('the figures of a version as Finance gives them (QĐ-111ac, BG-2.5)', (
     );
   });
 
-  it('raises the red flag when the base is below what the Cost Center carries into the year, and never otherwise', () => {
-    expect(belowCarriedOver(122_999_999n, 123_000_000n)).toBe(true);
-    expect(belowCarriedOver(123_000_000n, 123_000_000n)).toBe(false);
-    expect(belowCarriedOver(0n, 0n)).toBe(false);
+  describe('the red flag: the budget of the department, its base and its reserve, is below what is carried into the year (QĐ-111ac, C-09, QT §4.6)', () => {
+    const M = 1_000_000n;
+
+    it('is down when the base alone is below what is carried over but the base and the reserve cover it: 850 + 85 against 900 (FIX-LB3 LBG-01)', () => {
+      const version = { baseMinor: 850n * M, reserveMinor: 85n * M };
+
+      expect(belowCarriedOver(version, 900n * M)).toBe(false);
+      expect(carriedOverShortfall(version, 900n * M)).toBe(0n);
+    });
+
+    it('is up, with the amount that is missing, when the base and the reserve do not cover it: the example of the process, 800 + 80 against 900 is 20 short', () => {
+      const version = { baseMinor: 800n * M, reserveMinor: 80n * M };
+
+      expect(belowCarriedOver(version, 900n * M)).toBe(true);
+      expect(carriedOverShortfall(version, 900n * M)).toBe(20n * M);
+    });
+
+    it('does not count a budget that equals what is carried over, nor one when nothing is carried over', () => {
+      expect(belowCarriedOver({ baseMinor: 900n * M, reserveMinor: 0n }, 900n * M)).toBe(false);
+      expect(belowCarriedOver({ baseMinor: 899n * M, reserveMinor: 1n * M }, 900n * M)).toBe(false);
+      expect(belowCarriedOver({ baseMinor: 0n, reserveMinor: 0n }, 0n)).toBe(false);
+      expect(carriedOverShortfall({ baseMinor: 0n, reserveMinor: 0n }, 0n)).toBe(0n);
+      expect(belowCarriedOver({ baseMinor: 899n * M, reserveMinor: 0n }, 900n * M)).toBe(true);
+      expect(carriedOverShortfall({ baseMinor: 899n * M, reserveMinor: 0n }, 900n * M)).toBe(1n * M);
+    });
   });
 
   it('sends a version only with one file at least that explains it', () => {

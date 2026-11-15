@@ -199,7 +199,7 @@ export class BudgetVersionsController {
   @ApiSuccessResponse(VersionResponseDto, {
     message: 'BUDGET_VERSION.FETCHED',
     description:
-      'One figure for the year: the base, the reserve and their total, what the Cost Center carries into the year (carriedOverNextYear) with the red flag when the base is below it (belowCarriedOver, never a refusal), and whether Finance built it from the baseline because the department had no proposal (noProposalSubmitted).',
+      'One figure for the year: the base, the reserve and their total, what the Cost Center carries into the year (carriedOverNextYear) with the red flag when the base and the reserve together are below it (belowCarriedOver, never a refusal) and the amount that is missing (carriedOverShortfall), and whether Finance built it from the baseline because the department had no proposal (noProposalSubmitted).',
   })
   @ApiErrorResponses(...AUTH_ERRORS, READERS_ONLY, NOT_FOUND, INVALID)
   async get(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Param() params: IdParamDto) {

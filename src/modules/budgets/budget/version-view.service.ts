@@ -3,7 +3,13 @@ import { Page, pageOf } from '../../../core/application/pagination';
 
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { BudgetCostCenterNotFoundError, BudgetVersionNotFoundError } from './budget.errors';
-import { belowCarriedOver, defaultReserveOf, versionWaitingReason, type VersionStateName } from './budget.policy';
+import {
+  belowCarriedOver,
+  carriedOverShortfall,
+  defaultReserveOf,
+  versionWaitingReason,
+  type VersionStateName,
+} from './budget.policy';
 import { BudgetFactsService } from './budget-facts.service';
 import { DecisionRepo, type DecisionRecord } from './decision.repo';
 import { CarriedOverContributions } from '../public/budgets.extension-points';
@@ -87,7 +93,8 @@ export class VersionViewService {
           defaultReserve:
             version.reservePercent === null ? null : money(defaultReserveOf(version.baseMinor, version.reservePercent)),
           carriedOverNextYear: money(carriedOver(version)),
-          belowCarriedOver: belowCarriedOver(version.baseMinor, carriedOver(version)),
+          belowCarriedOver: belowCarriedOver(version, carriedOver(version)),
+          carriedOverShortfall: money(carriedOverShortfall(version, carriedOver(version))),
           noProposalSubmitted: version.origin === 'BASELINE_NO_PROPOSAL',
           reserveReason: version.reserveReason,
           baseReason: version.baseReason,

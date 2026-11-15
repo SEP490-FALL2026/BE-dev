@@ -74,7 +74,7 @@ attachmentIds[1..10] }`, không có dòng (`requestedAmount` lưu ở `total_min
   B-6): `base` bỏ trống ⟹ điền số chạy sang của Cost Center (`CarriedOverContributions`, `requests` bind; chưa bind ⟹ 0), dự phòng là
   `reservePercent` (mặc định `BUDGET_RESERVE_DEFAULT_PERCENT`) hoặc `reserve` (số tiền khác tỷ lệ cần `reserveReason` khi gửi); lưu nháp
   không chặn; gửi cần ≥ 1 tệp (422 `BUDGET_VERSION.ATTACHMENT_REQUIRED`) và tổng mọi Cost Center ≤ Trần năm − Dự phòng kho (409
-  `BUDGET_VERSION.OVER_CEILING`, `details.overBy`). Đọc phiên bản có `carriedOverNextYear`, `belowCarriedOver` (cờ đỏ: cơ sở < số chạy sang),
+  `BUDGET_VERSION.OVER_CEILING`, `details.overBy`). Đọc phiên bản có `carriedOverNextYear`, `belowCarriedOver` (cờ đỏ: cơ sở + dự phòng < số chạy sang, `C-09`) và `carriedOverShortfall` (phần thiếu, 0 khi đủ),
   `noProposalSubmitted` (origin `BASELINE_NO_PROPOSAL`: phòng không nộp tới hạn hoặc tạo sau hạn, `QĐ-111bb`). Quyết định chỉ `APPROVE` |
   `RETURN` (lý do bắt buộc ⟹ `CHANGES_REQUESTED`, `QĐ-111ad`); `REJECTED` chỉ còn ở dữ liệu cũ. Không còn `REVISION`, `SUPERSEDED`, dời
   khoảng mua (`QĐ-97b`); bảng `budget_version_lines` và các mục lịch sử dòng cũ chỉ còn để đọc. Quyết định và nhả cam kết là hàm thuần trong
