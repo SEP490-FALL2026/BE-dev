@@ -487,7 +487,6 @@ export class VersionRepo {
     return new Map(rows.map((row) => [row.id, row.totalMinor]));
   }
 
-  /** The newest version of the Cost Center and year that is read as its budget or is not closed: what the head is told of. */
   /** How many files are attached to the version now (a removed one is not): what its sending needs one of (`QĐ-111ac`). */
   countAttachedFiles(tx: DbTx, versionId: string): Promise<number> {
     return tx.budgetAttachment.count({ where: { versionId, status: 'ATTACHED' } });
@@ -511,6 +510,7 @@ export class VersionRepo {
     return latest;
   }
 
+  /** The newest version of the Cost Center and year that is read as its budget or is not closed: what the head is told of. */
   async latestOf(costCenterId: string, year: number): Promise<VersionRecord | null> {
     const row = await this.prisma.budgetVersion.findFirst({
       where: { costCenterId, year, neverCurrent: false },
