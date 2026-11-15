@@ -85,6 +85,7 @@ describe('the routes of purchase invoices (e2e, no database)', () => {
     ['submission', 'post', URL],
     ['resubmission', 'post', `${URL}/${ID}/resubmission`],
     ['list', 'get', URL],
+    ['periods without an invoice', 'get', `${URL}/missing-periods`],
     ['detail', 'get', `${URL}/${ID}`],
   ] as const)('needs a token for the %s', async (_name, method, url) => {
     const response = await request(app.getHttpServer())[method](url).expect(401);
@@ -115,8 +116,8 @@ describe('the routes of purchase invoices (e2e, no database)', () => {
   it.each([
     ['an employee', ['EMPLOYEE']],
     ['the Super Admin', ['SUPER_ADMIN']],
-  ])('refuses the list and the detail to %s with 403', async (_name, roles) => {
-    for (const url of [URL, `${URL}/${ID}`]) {
+  ])('refuses the list, the periods without an invoice and the detail to %s with 403', async (_name, roles) => {
+    for (const url of [URL, `${URL}/missing-periods`, `${URL}/${ID}`]) {
       await request(app.getHttpServer()).get(url).set('Authorization', as(roles)).expect(403);
     }
   });
@@ -185,6 +186,26 @@ describe('the routes of purchase invoices (e2e, no database)', () => {
         .expect(422);
 
       expect(bodyOf(response).error.code).toBe('VALIDATION_ERROR');
+    }
+  });
+
+  // PI-2: `missing-periods` is a route of its own and never an id: its query is judged, and the id of the detail is not asked for.
+  it.each([
+    ['a page of 0', { page: 0 }],
+    ['a page size of 101', { pageSize: 101 }],
+    ['a page that is not a number', { page: 'one' }],
+    ['a filter the list of periods does not have', { state: 'SUBMITTED' }],
+  ])('refuses the periods without an invoice with %s with 422, as a query and not as an id', async (_name, query) => {
+    for (const roles of [['IT_ADMIN'], ['FINANCE']]) {
+      const response = await request(app.getHttpServer())
+        .get(`${URL}/missing-periods`)
+        .query(query)
+        .set('Authorization', as(roles))
+        .expect(422);
+
+      const issues = (bodyOf(response).error?.details as { issues: Array<{ path: string }> }).issues;
+      expect(bodyOf(response).error.code).toBe('VALIDATION_ERROR');
+      expect(issues.map((issue) => issue.path)).not.toContain('id');
     }
   });
 

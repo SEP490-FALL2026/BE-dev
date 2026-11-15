@@ -113,6 +113,7 @@ export const API_COVERAGE_MANIFEST: readonly string[] = [
   'POST /api/v1/purchase-invoices',
   'POST /api/v1/purchase-invoices/{id}/resubmission',
   'GET /api/v1/purchase-invoices',
+  'GET /api/v1/purchase-invoices/missing-periods',
   'GET /api/v1/purchase-invoices/{id}',
   'POST /api/v1/purchase-invoices/{id}/confirmation',
   'POST /api/v1/purchase-invoices/{id}/return',

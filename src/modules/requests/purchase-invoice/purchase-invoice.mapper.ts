@@ -3,11 +3,12 @@ import { DONG, formatAmount } from '../../../core/money/money';
 import type { PurchaseInvoiceFlag } from './labels/purchase-invoice-labels.policy';
 import type {
   PurchaseInvoiceDetailWire,
+  PurchaseInvoiceMissingPeriodWire,
   PurchaseInvoicePreviewWire,
   PurchaseInvoiceSummaryWire,
 } from './purchase-invoice.dto';
 import type { PurchaseInvoiceRow } from './purchase-invoice.repo';
-import type { PurchaseInvoicePlan } from './purchase-invoice.types';
+import type { MissingInvoicePeriod, PurchaseInvoicePlan } from './purchase-invoice.types';
 
 /** An amount in dong: the currency has no minor digits (`QĐ-111an`). */
 export const dongView = (minor: bigint) => ({ amount: formatAmount(minor, 0), currency: DONG });
@@ -78,5 +79,28 @@ export function toPreview(plan: PurchaseInvoicePlan): PurchaseInvoicePreviewWire
     commitment: plan.commitment
       ? { id: plan.commitment.id, remaining: dongView(plan.commitment.remainingMinor) }
       : null,
+  };
+}
+
+/** A period without an invoice with the names of its plan and department, as the list of them shows it. */
+export function toMissingPeriod(
+  row: MissingInvoicePeriod,
+  names: {
+    plan: { planId: string; planName: string; applicationName: string; logoUrl: string | null };
+    department: { id: string; name: string };
+  },
+): PurchaseInvoiceMissingPeriodWire {
+  return {
+    linkKind: row.link.kind,
+    requestId: row.link.kind === 'REQUEST' ? row.link.requestId : null,
+    subscriptionId: row.link.kind === 'SUBSCRIPTION' ? row.link.subscriptionId : null,
+    label: row.label,
+    servicePeriodMonth: monthOf(row.serviceMonth),
+    periodIndex: row.periodIndex,
+    periodCount: row.periodCount,
+    paymentDate: row.paymentDate,
+    dueDate: row.dueDate,
+    plan: names.plan,
+    department: names.department,
   };
 }

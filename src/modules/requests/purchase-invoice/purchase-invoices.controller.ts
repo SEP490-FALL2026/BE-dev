@@ -15,6 +15,8 @@ import {
   PurchaseInvoiceIdParamDto,
   PurchaseInvoiceListQueryDto,
   PurchaseInvoiceListResponseDto,
+  PurchaseInvoiceMissingPeriodListResponseDto,
+  PurchaseInvoiceMissingPeriodQueryDto,
   PurchaseInvoicePreviewBodyDto,
   PurchaseInvoicePreviewResponseDto,
   PurchaseInvoiceResponseDto,
@@ -26,6 +28,7 @@ import {
   toPurchaseInvoiceApiException,
 } from './purchase-invoice.http-errors';
 import { toPreview } from './purchase-invoice.mapper';
+import { PurchaseInvoiceMissingPeriodsQueryService } from './purchase-invoice-missing-periods-query.service';
 import { PurchaseInvoiceQueryService } from './purchase-invoice-query.service';
 import { PurchaseInvoiceSubmissionService } from './purchase-invoice-submission.service';
 
@@ -110,6 +113,7 @@ export class PurchaseInvoicesController {
   constructor(
     private readonly submissions: PurchaseInvoiceSubmissionService,
     private readonly queries: PurchaseInvoiceQueryService,
+    private readonly missingPeriods: PurchaseInvoiceMissingPeriodsQueryService,
   ) {}
 
   @Post('preview')
@@ -191,6 +195,30 @@ export class PurchaseInvoicesController {
   })
   async list(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Query() query: PurchaseInvoiceListQueryDto) {
     return this.queries.page(actor, query);
+  }
+
+  /** Declared before `:id`, so that `missing-periods` is a route and not an id. */
+  @Get('missing-periods')
+  @RequireRoles('IT_ADMIN', 'FINANCE')
+  @ApiOperation({
+    operationId: 'purchaseInvoiceMissingPeriodList',
+    summary: 'List the periods that have no invoice',
+  })
+  @ApiSuccessResponse(PurchaseInvoiceMissingPeriodListResponseDto, {
+    message: 'PURCHASE_INVOICE.MISSING_PERIODS_LISTED',
+    description:
+      'Each period of a right paid by the month (a request for months of use of a plan bought by the month, while a seat of it is held) or by the cycle of a subscription whose invoice has not been submitted five working days after its payment day. The oldest due day first. An invoice that was returned does not count. Finance reads every period; the IT Admin the ones of the departments they work.',
+  })
+  @ApiErrorResponses(...AUTH_ERRORS, FORBIDDEN, {
+    status: HttpStatus.UNPROCESSABLE_ENTITY,
+    description: 'The query is invalid (VALIDATION_ERROR).',
+    examples: [VALIDATION_EXAMPLE],
+  })
+  async missing(
+    @CurrentPrincipal() actor: AuthenticatedPrincipal,
+    @Query() query: PurchaseInvoiceMissingPeriodQueryDto,
+  ) {
+    return this.missingPeriods.pageFor(actor, query);
   }
 
   @Get(':id')

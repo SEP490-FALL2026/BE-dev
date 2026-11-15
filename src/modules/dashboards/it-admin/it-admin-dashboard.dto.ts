@@ -38,6 +38,9 @@ const itAdminDashboardSchema = z.strictObject({
     saasIssues: section(
       'The SaaS error reports given to the caller that are not resolved, closed or marked duplicate.',
     ),
+    missingInvoicePeriods: section(
+      'The periods of a right paid by the month or the year whose invoice has not been submitted five working days after the payment day, in the departments of the caller: the total of the list of them (`purchaseInvoiceMissingPeriodList`).',
+    ),
     ghostSeats: section(
       'The recommendations of wasted seats not closed: the seats of people who left (G2) and the free seats of subscriptions (G1 open).',
     ),

@@ -1,5 +1,9 @@
 import type { BusinessDate } from '../../../core/business-date';
-import type { PurchaseInvoiceFlag, PurchaseInvoiceLabelResult } from './labels/purchase-invoice-labels.policy';
+import type {
+  PurchaseInvoiceFlag,
+  PurchaseInvoiceLabel,
+  PurchaseInvoiceLabelResult,
+} from './labels/purchase-invoice-labels.policy';
 import type { OriginalPrice, PurchaseInvoiceMatch } from './purchase-invoice-match.policy';
 
 /** The request or subscription an invoice is for, as the IT Admin works it. */
@@ -28,4 +32,22 @@ export interface PurchaseInvoicePlan {
   /** The commitment of the year of the service month this invoice goes into, and what is left of it; null when it goes nowhere into a commitment. */
   commitment: { id: string; remainingMinor: bigint } | null;
   flags: PurchaseInvoiceFlag[];
+}
+
+/** Whose periods without an invoice are read: Finance reads every one, an IT Admin the periods of the departments they work (`D8`). */
+export type MissingInvoiceScope = { kind: 'ALL' } | { kind: 'DEPARTMENTS'; departmentIds: readonly string[] };
+
+/** A period of a right paid by the month or the year whose invoice has not come past its due day (`PI-2`, `QĐ-111x`). */
+export interface MissingInvoicePeriod {
+  link: { kind: 'REQUEST'; requestId: string } | { kind: 'SUBSCRIPTION'; subscriptionId: string };
+  planId: string;
+  departmentId: string;
+  label: PurchaseInvoiceLabel;
+  periodIndex: number | null;
+  periodCount: number | null;
+  /** The first day of the month the period begins to pay for. */
+  serviceMonth: BusinessDate;
+  paymentDate: BusinessDate;
+  /** The last day the invoice was on time; the period carries the mark from the day after. */
+  dueDate: BusinessDate;
 }

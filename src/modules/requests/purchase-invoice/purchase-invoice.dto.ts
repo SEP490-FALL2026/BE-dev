@@ -97,6 +97,11 @@ export const purchaseInvoiceListQuerySchema = z.strictObject({
   pageSize: z.coerce.number().int().positive().max(100).default(20),
 });
 
+export const purchaseInvoiceMissingPeriodQuerySchema = z.strictObject({
+  page: z.coerce.number().int().positive().default(1),
+  pageSize: z.coerce.number().int().positive().max(100).default(20),
+});
+
 const planView = z.strictObject({
   label,
   servicePeriodMonth: serviceMonth,
@@ -148,6 +153,31 @@ const detailSchema = summarySchema.extend({
     .max(PURCHASE_INVOICE_DOCUMENTS_MAX),
 });
 
+/** A period of a right paid by the month or the year whose invoice has not come past its due day. */
+const missingPeriodSchema = z.strictObject({
+  linkKind: z.enum(['REQUEST', 'SUBSCRIPTION']),
+  requestId: z.uuid().nullable(),
+  subscriptionId: z.uuid().nullable(),
+  label,
+  servicePeriodMonth: serviceMonth,
+  periodIndex: z.number().int().positive().nullable(),
+  periodCount: z.number().int().positive().nullable(),
+  paymentDate: responseBusinessDate,
+  dueDate: responseBusinessDate,
+  plan: z.strictObject({
+    planId: z.uuid(),
+    planName: z.string(),
+    applicationName: z.string(),
+    logoUrl: z.string().nullable().meta({
+      description:
+        'The https link to the logo image of the application that the IT Admin pasted, or null. The server never checks it: it may be broken, so show the first letter of the name when the image does not load.',
+    }),
+  }),
+  department: z.strictObject({ id: z.uuid(), name: z.string() }).meta({
+    description: 'The department of the request, or the one that owns the subscription.',
+  }),
+});
+
 const previewSchema = planView.extend({
   chargedCostCenter: z.strictObject({ id: z.uuid() }).nullable(),
   commitment: z.strictObject({ id: z.uuid(), remaining: moneyView }).nullable(),
@@ -165,13 +195,19 @@ export class PurchaseInvoicePreviewBodyDto extends createZodDto(purchaseInvoiceP
 export class PurchaseInvoiceSubmitBodyDto extends createZodDto(purchaseInvoiceSubmitSchema) {}
 export class PurchaseInvoiceResubmitBodyDto extends createZodDto(purchaseInvoiceResubmitSchema) {}
 export class PurchaseInvoiceListQueryDto extends createZodDto(purchaseInvoiceListQuerySchema) {}
+export class PurchaseInvoiceMissingPeriodQueryDto extends createZodDto(purchaseInvoiceMissingPeriodQuerySchema) {}
 export class PurchaseInvoicePreviewResponseDto extends createZodDto(successEnvelopeSchema(previewSchema)) {}
 export class PurchaseInvoiceResponseDto extends createZodDto(successEnvelopeSchema(detailSchema)) {}
 export class PurchaseInvoiceListResponseDto extends createZodDto(
   successEnvelopeSchema(z.strictObject({ items: z.array(summarySchema), pagination })),
 ) {}
 
+export class PurchaseInvoiceMissingPeriodListResponseDto extends createZodDto(
+  successEnvelopeSchema(z.strictObject({ items: z.array(missingPeriodSchema), pagination })),
+) {}
+
 export type PurchaseInvoiceSummaryWire = z.infer<typeof summarySchema>;
+export type PurchaseInvoiceMissingPeriodWire = z.infer<typeof missingPeriodSchema>;
 export type PurchaseInvoiceDetailWire = z.infer<typeof detailSchema>;
 export type PurchaseInvoicePreviewWire = z.infer<typeof previewSchema>;
 export type PurchaseInvoiceFormInput = z.infer<typeof purchaseInvoicePreviewSchema>;

@@ -23,6 +23,21 @@ export interface RequestPurchaseFacts {
   renewedAssignmentId: string | null;
 }
 
+/** What a completed grant for months of use says of the payment days of its right (`PI-2`). */
+export interface TermGrantFacts {
+  id: string;
+  planId: string;
+  departmentId: string;
+  grantCompletedAt: Date;
+  termMonths: number;
+}
+
+/** The months that each request or subscription has a purchase invoice for that was not returned, as `YYYY-MM`, by the id of the request or subscription. */
+export interface OpenServiceMonths {
+  byRequest: Map<string, Set<string>>;
+  bySubscription: Map<string, Set<string>>;
+}
+
 export interface NewPurchaseInvoice {
   organizationId: string;
   linkKind: 'REQUEST' | 'SUBSCRIPTION';
@@ -170,6 +185,72 @@ export class PurchaseInvoiceRepo {
         resubmissionOfId: input.resubmissionOfId,
       },
     });
+  }
+
+  /**
+   * The requests whose grant was completed since `since` for months of use up to `maxTermMonths`, oldest first: the rights that may still be
+   * paying by the month (`PI-2`). `departmentIds` narrows to the ones named, null reads every department, an empty list reads none. One statement.
+   */
+  async completedTermGrants(
+    input: { departmentIds: readonly string[] | null; maxTermMonths: number; since: Date },
+    tx?: DbTx,
+  ): Promise<TermGrantFacts[]> {
+    if (input.departmentIds !== null && input.departmentIds.length === 0) return [];
+    const rows = await (tx ?? this.prisma).accessRequest.findMany({
+      where: {
+        type: { in: ['GRANT', 'GROUP_GRANT'] },
+        state: 'COMPLETED',
+        planId: { not: null },
+        termMonths: { gte: 1, lte: input.maxTermMonths },
+        grantCompletedAt: { gte: input.since },
+        ...(input.departmentIds === null ? {} : { departmentId: { in: [...input.departmentIds] } }),
+      },
+      select: { id: true, planId: true, departmentId: true, grantCompletedAt: true, termMonths: true },
+      orderBy: [{ grantCompletedAt: 'asc' }, { id: 'asc' }],
+    });
+
+    return rows.flatMap((row) =>
+      row.planId !== null && row.grantCompletedAt !== null && row.termMonths !== null
+        ? [
+            {
+              id: row.id,
+              planId: row.planId,
+              departmentId: row.departmentId,
+              grantCompletedAt: row.grantCompletedAt,
+              termMonths: row.termMonths,
+            },
+          ]
+        : [],
+    );
+  }
+
+  /** The months each of these requests and renewals has a purchase invoice for that was not returned, in one statement whatever the number of links. */
+  async openServiceMonths(
+    links: { requestIds: readonly string[]; subscriptionIds: readonly string[] },
+    tx?: DbTx,
+  ): Promise<OpenServiceMonths> {
+    const months: OpenServiceMonths = { byRequest: new Map(), bySubscription: new Map() };
+    if (links.requestIds.length === 0 && links.subscriptionIds.length === 0) return months;
+    const rows = await (tx ?? this.prisma).purchaseInvoice.findMany({
+      where: {
+        state: { not: 'RETURNED' },
+        OR: [
+          ...(links.requestIds.length > 0 ? [{ requestId: { in: [...links.requestIds] } }] : []),
+          ...(links.subscriptionIds.length > 0 ? [{ subscriptionId: { in: [...links.subscriptionIds] } }] : []),
+        ],
+      },
+      select: { requestId: true, subscriptionId: true, serviceMonth: true },
+    });
+    for (const row of rows) {
+      const [bucket, id] =
+        row.requestId !== null ? [months.byRequest, row.requestId] : [months.bySubscription, row.subscriptionId];
+      if (id === null) continue;
+      const set = bucket.get(id) ?? new Set<string>();
+      set.add(fromDateColumn(row.serviceMonth).slice(0, 7));
+      bucket.set(id, set);
+    }
+
+    return months;
   }
 
   /** The files of the invoice, in the order the IT Admin gave them. */
