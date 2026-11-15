@@ -142,9 +142,8 @@ describe('budget attachment access rules (integration)', () => {
         if (state === 'APPROVED') {
           await h.decideVersion(version.id, { decision: 'APPROVE' }, spendingApprover.account).expect(200);
         } else if (state === 'REJECTED') {
-          await h
-            .decideVersion(version.id, { decision: 'REJECT', reason: 'Too high' }, spendingApprover.account)
-            .expect(200);
+          // A refusal is no decision any more (only APPROVE and RETURN are left); a version refused before stays readable (`QĐ-111ad`).
+          await h.refusedBefore(version.id, spendingApprover.account, 'Too high');
         }
 
         expect((await listIds(version.id, head.account)).map((item) => item.id)).toEqual([docId]);
@@ -175,7 +174,7 @@ describe('budget attachment access rules (integration)', () => {
       await h.removeVersionAttachment(version.id, b).expect(200);
       await h.sendVersion(version.id).expect(200);
       await h
-        .decideVersion(version.id, { decision: 'REQUEST_CHANGES', reason: 'Please revise' }, spendingApprover.account)
+        .decideVersion(version.id, { decision: 'RETURN', reason: 'Please revise' }, spendingApprover.account)
         .expect(200);
 
       // Back with Finance: C is added, A is removed.
