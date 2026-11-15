@@ -11,13 +11,17 @@ import {
   DocumentUploadMismatchError,
 } from './contract.errors';
 
-export type DocumentPurpose =
-  | 'CONTRACT_ATTACHMENT'
-  | 'PURCHASE_DOCUMENT'
-  | 'TAX_PAYMENT_PROOF'
-  | 'SIGNATURE_RECORD'
-  | 'IMPORT_SOURCE'
-  | 'COST_STATEMENT';
+/** The purposes a new file may be declared with (`US-04-04` AC-11): a bank statement is not one, nobody uploads it any more. */
+export const NEW_DOCUMENT_PURPOSES = [
+  'CONTRACT_ATTACHMENT',
+  'PURCHASE_DOCUMENT',
+  'TAX_PAYMENT_PROOF',
+  'SIGNATURE_RECORD',
+  'IMPORT_SOURCE',
+] as const;
+export type NewDocumentPurpose = (typeof NEW_DOCUMENT_PURPOSES)[number];
+/** The purposes a stored file has: `COST_STATEMENT` stays only so that a file kept before is still read; the database keeps the value. */
+export type DocumentPurpose = NewDocumentPurpose | 'COST_STATEMENT';
 export type DocumentStatus = 'AWAITING_UPLOAD' | 'PENDING_ATTACH' | 'READY' | 'QUARANTINED' | 'EXPIRED';
 
 /** How long a link that opens a file lives (`US-04-04` AC-1, AC-2); it is never stored and a new request makes a new one. */
@@ -32,6 +36,7 @@ const PURPOSE_ROLES: Record<DocumentPurpose, readonly string[]> = {
   TAX_PAYMENT_PROOF: ['FINANCE'],
   SIGNATURE_RECORD: ['IT_ADMIN'],
   IMPORT_SOURCE: ['IT_ADMIN'],
+  // Only a file kept before has it (no new one is declared with it): the same role that chose it then still judges it.
   COST_STATEMENT: ['FINANCE'],
 };
 

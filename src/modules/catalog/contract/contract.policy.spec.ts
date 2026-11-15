@@ -12,6 +12,7 @@ import {
 } from './contract.errors';
 import {
   LINK_TTL_SECONDS,
+  NEW_DOCUMENT_PURPOSES,
   assertAttachable,
   assertFileAllowed,
   assertMayChoosePurpose,
@@ -60,6 +61,19 @@ describe('who chooses which purpose of a file (US-04-04 AC-6, AC-9)', () => {
     expect(() => {
       assertMayChoosePurpose('IMPORT_SOURCE', ['FINANCE', 'IT_ADMIN']);
     }).not.toThrow();
+  });
+});
+
+describe('the purposes a new file may be declared with', () => {
+  it('US-04-04 AC-11: has no bank statement: a file kept before still reads as one, no new one is taken', () => {
+    expect(NEW_DOCUMENT_PURPOSES).toEqual([
+      'CONTRACT_ATTACHMENT',
+      'PURCHASE_DOCUMENT',
+      'TAX_PAYMENT_PROOF',
+      'SIGNATURE_RECORD',
+      'IMPORT_SOURCE',
+    ]);
+    expect(NEW_DOCUMENT_PURPOSES).not.toContain('COST_STATEMENT');
   });
 });
 
