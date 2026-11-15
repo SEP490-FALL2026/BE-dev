@@ -38,6 +38,8 @@ export interface ImportTemplateColumn {
   example: string;
   /** What the parser refuses: a length, a list of values, a rule. */
   constraint: string;
+  /** The codes the parser gives a row it refuses for this column, so the instruction sheet and the parser say the same. */
+  refusedWith?: string[];
 }
 
 /**

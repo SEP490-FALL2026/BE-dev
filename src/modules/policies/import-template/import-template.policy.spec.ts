@@ -64,8 +64,9 @@ describe('guideRowsOf', () => {
   it('has a header and one row per column, with whether it is required', () => {
     const rows = guideRowsOf(definition);
 
-    expect(rows[0]).toEqual(['Cột', 'Bắt buộc', 'Mô tả', 'Định dạng', 'Ví dụ', 'Ràng buộc']);
-    expect(rows[1]).toEqual(['employee_code', 'Có', 'Mã nhân viên', 'chữ và số', 'NV001', 'duy nhất']);
+    expect(rows[0]).toEqual(['Cột', 'Bắt buộc', 'Mô tả', 'Định dạng', 'Ví dụ', 'Ràng buộc', 'Mã lỗi khi từ chối']);
+    expect(rows[1]).toEqual(['employee_code', 'Có', 'Mã nhân viên', 'chữ và số', 'NV001', 'duy nhất', '']);
+    expect(guideRowsOf({ ...definition, columns: [{ ...code, refusedWith: ['A', 'B'] }] })[1]?.[6]).toBe('A, B');
     expect(rows).toHaveLength(3);
   });
 

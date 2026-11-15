@@ -2,7 +2,8 @@ import type { ImportTemplateDefinition } from '../../policies/public/policies.ty
 
 /**
  * What the template of the people file says (`QĐ-111as`, `US-02-01`): the columns `employee-import-row.types.ts` lists, with the rules
- * `row-validation/` judges them by. The example people are fictitious; the file reads back without a single error when the departments exist.
+ * `row-validation/` judges them by and the codes it answers with, so the instruction sheet says what the parser does and nothing else. The example
+ * people are fictitious; the file reads back without a single error when the departments exist.
  */
 export const EMPLOYEE_IMPORT_TEMPLATE: ImportTemplateDefinition = {
   kind: 'employees',
@@ -13,9 +14,12 @@ export const EMPLOYEE_IMPORT_TEMPLATE: ImportTemplateDefinition = {
       key: 'employee_code',
       description: 'Mã nhân viên do công ty cấp; khóa nhận diện, không đổi sau khi đã tạo.',
       required: true,
-      format: 'Chữ và số, không dấu cách; hoa thường như nhau',
+      format:
+        '3 đến 20 ký tự: chữ in hoa và số, các nhóm nối bằng đúng một dấu "-" (ví dụ NV-0101); chữ thường được đổi thành chữ hoa',
       example: 'NV0101',
-      constraint: 'Duy nhất trong file và trong hệ thống; một mã đã có thì dòng được so với hồ sơ hiện tại.',
+      constraint:
+        'Không dùng dấu cách, "_", "." hay "/"; duy nhất trong file và trong hệ thống: một mã đã có thì dòng được so với hồ sơ hiện tại.',
+      refusedWith: ['EMPLOYEE_CODE_REQUIRED', 'EMPLOYEE_CODE_INVALID', 'EMPLOYEE_CODE_DUPLICATE_IN_FILE', 'OWN_RECORD'],
     },
     {
       key: 'full_name',
@@ -23,23 +27,27 @@ export const EMPLOYEE_IMPORT_TEMPLATE: ImportTemplateDefinition = {
       required: true,
       format: 'Văn bản, có dấu',
       example: 'Nguyễn Minh Anh',
-      constraint: 'Không để trống.',
+      constraint: 'Không để trống với một người mới.',
+      refusedWith: ['FULL_NAME_REQUIRED'],
     },
     {
       key: 'work_email',
-      description: 'Email công việc thuộc tên miền công ty; là tài khoản duy nhất được cấp quyền trả phí.',
+      description:
+        'Email công việc; là tài khoản duy nhất được cấp quyền trả phí. Tên miền công ty được kiểm khi cấp quyền hoặc nhập hiện trạng seat, không kiểm ở file này.',
       required: false,
       format: 'Địa chỉ email',
       example: 'minh.anh@congty.example',
-      constraint: 'Mỗi email chỉ một người; tên miền phải là tên miền công ty.',
+      constraint: 'Mỗi email chỉ một người, trong file và trong hệ thống.',
+      refusedWith: ['WORK_EMAIL_INVALID', 'WORK_EMAIL_DUPLICATE_IN_FILE', 'WORK_EMAIL_TAKEN'],
     },
     {
       key: 'employment_type',
       description: 'Loại nhân sự.',
       required: true,
-      format: 'Một trong: STAFF, CONTRACTOR, FREELANCER, INTERN',
+      format: 'Một trong: STAFF, CONTRACTOR, FREELANCER, INTERN (chữ thường được đổi thành chữ hoa)',
       example: 'STAFF',
       constraint: 'Nhà thầu, freelancer và thực tập có ngày hết hợp đồng nhập riêng sau khi tạo hồ sơ.',
+      refusedWith: ['EMPLOYMENT_TYPE_INVALID'],
     },
     {
       key: 'hire_date',
@@ -47,15 +55,17 @@ export const EMPLOYEE_IMPORT_TEMPLATE: ImportTemplateDefinition = {
       required: true,
       format: 'YYYY-MM-DD',
       example: '2025-03-01',
-      constraint: 'Ngày có thật; không sau ngày nhập.',
+      constraint: 'Ngày có thật theo đúng định dạng.',
+      refusedWith: ['HIRE_DATE_INVALID'],
     },
     {
       key: 'department_code',
       description: 'Mã phòng ban đang hoạt động. Để trống thì nhân viên được tạo ở trạng thái chưa xếp phòng.',
       required: false,
-      format: 'Mã phòng ban đã có trong hệ thống',
+      format: 'Mã phòng ban đã có trong hệ thống (chữ thường được đổi thành chữ hoa)',
       example: 'P-ENG',
       constraint: 'Phải là phòng ban có thật và đang hoạt động.',
+      refusedWith: ['DEPARTMENT_CODE_INVALID'],
     },
     {
       key: 'job_title',
@@ -63,7 +73,7 @@ export const EMPLOYEE_IMPORT_TEMPLATE: ImportTemplateDefinition = {
       required: false,
       format: 'Văn bản',
       example: 'Kỹ sư phần mềm',
-      constraint: 'Có thể để trống.',
+      constraint: 'Tối đa 255 ký tự; có thể để trống.',
     },
   ],
   sampleRows: [

@@ -25,7 +25,7 @@ export function templateCsvOf(definition: ImportTemplateDefinition): string {
 /** The table of the instruction sheet: one row per column, the first row names the fields. */
 export function guideRowsOf(definition: ImportTemplateDefinition): string[][] {
   return [
-    ['Cột', 'Bắt buộc', 'Mô tả', 'Định dạng', 'Ví dụ', 'Ràng buộc'],
+    ['Cột', 'Bắt buộc', 'Mô tả', 'Định dạng', 'Ví dụ', 'Ràng buộc', 'Mã lỗi khi từ chối'],
     ...definition.columns.map((column) => [
       column.key,
       column.required ? 'Có' : 'Không',
@@ -33,6 +33,7 @@ export function guideRowsOf(definition: ImportTemplateDefinition): string[][] {
       column.format,
       column.example,
       column.constraint,
+      (column.refusedWith ?? []).join(', '),
     ]),
   ];
 }

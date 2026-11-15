@@ -75,7 +75,7 @@ export class ImportTemplateService {
     const guide = workbook.addWorksheet('Hướng dẫn');
     for (const row of guideRowsOf(definition)) guide.addRow(row);
     guide.getRow(1).font = { bold: true };
-    guide.columns = [28, 12, 40, 28, 28, 50].map((width) => ({ width }));
+    guide.columns = [28, 12, 40, 28, 28, 50, 36].map((width) => ({ width }));
     guide.addRow([]);
     for (const note of definition.notes) guide.addRow([note]);
 

@@ -3,7 +3,7 @@ import { ImportTemplateContributions } from '../../policies/public/policies.exte
 import { readSeatFile } from './seat-baseline-file.policy';
 import { judgeSeatRows, type SeatFacts } from './seat-baseline-rows.policy';
 import { SEAT_BASELINE_TEMPLATE } from './seat-baseline-template.policy';
-import { SEAT_COLUMNS } from './seat-baseline-import.types';
+import { SEAT_COLUMNS, SEAT_ROW_ERROR_CODES } from './seat-baseline-import.types';
 
 const unit = { departmentId: 'department-1', costCenter: { id: 'cc-1', code: 'CC-ENG', status: 'ACTIVE' } };
 const person = (id: string, hireDate: string) => ({
@@ -60,5 +60,12 @@ describe('the template of the seat baseline file', () => {
       'employee_code',
       'account_identifier',
     ]);
+  });
+
+  it('says on the instruction sheet every code the parser can answer a row with (LB3-04)', () => {
+    const said = new Set(SEAT_BASELINE_TEMPLATE.columns.flatMap((column) => column.refusedWith ?? []));
+
+    expect([...SEAT_ROW_ERROR_CODES].filter((code) => !said.has(code))).toEqual([]);
+    expect([...said].filter((code) => !(SEAT_ROW_ERROR_CODES as readonly string[]).includes(code))).toEqual([]);
   });
 });
