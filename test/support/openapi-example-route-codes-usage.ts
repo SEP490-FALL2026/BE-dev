@@ -18,6 +18,7 @@ export const ROUTE_ERROR_CODES_USAGE: Readonly<Record<string, Partial<Record<Rou
   usageSourceCreate: { '409': ['USAGE_SOURCE.NAME_TAKEN'], '422': SOURCE_SAVE_422 },
   usageSourceGet: { '404': ['USAGE_SOURCE.NOT_FOUND'] },
   usageSourceListOfContract: { '404': ['USAGE_SOURCE.CONTRACT_NOT_FOUND'] },
+  usageOverviewList: { '422': ['USAGE_OVERVIEW.RANGE_INVALID'] },
   usageSourceUpdate: {
     '404': ['USAGE_SOURCE.NOT_FOUND'],
     '409': ['USAGE_SOURCE.IN_USE', 'USAGE_SOURCE.NAME_TAKEN'],

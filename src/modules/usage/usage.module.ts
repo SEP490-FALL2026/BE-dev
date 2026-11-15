@@ -3,6 +3,7 @@ import { DatabaseModule } from '../../infrastructure/database/database.module';
 import { AuditModule } from '../audit/audit.module';
 import { CatalogModule } from '../catalog/catalog.module';
 import { DevicesModule } from '../devices/devices.module';
+import { IdentityAccessFacadeModule } from '../identity-access/identity-access-facade.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { LicensingModule } from '../licensing/licensing.module';
 import { OrganizationModule } from '../organization/organization.module';
@@ -43,6 +44,10 @@ import { VendorSourceController } from './vendor-source/vendor-source.controller
 import { VendorSourceQueryService } from './vendor-source/vendor-source-query.service';
 import { VendorSourceRepo } from './vendor-source/vendor-source.repo';
 import { VendorSourceService } from './vendor-source/vendor-source.service';
+import { UsageOverviewController } from './usage-overview/usage-overview.controller';
+import { UsageOverviewQueryService } from './usage-overview/usage-overview-query.service';
+import { UsageOverviewRepo } from './usage-overview/usage-overview.repo';
+import { UsageOverviewScopeService } from './usage-overview/usage-overview-scope.service';
 import { ToolStatusController } from './tool-status/tool-status.controller';
 import { ToolStatusQueryService } from './tool-status/tool-status-query.service';
 import { ToolStatusRepo } from './tool-status/tool-status.repo';
@@ -60,6 +65,7 @@ import { ToolStatusSnapshotService } from './tool-status/tool-status-snapshot.se
     OrganizationModule,
     CatalogModule,
     DevicesModule,
+    IdentityAccessFacadeModule,
     LicensingModule,
     NotificationsModule,
   ],
@@ -72,6 +78,7 @@ import { ToolStatusSnapshotService } from './tool-status/tool-status-snapshot.se
     VendorSourceContractController,
     VendorImportController,
     IdentityController,
+    UsageOverviewController,
   ],
   providers: [
     AllowlistRepo,
@@ -107,6 +114,9 @@ import { ToolStatusSnapshotService } from './tool-status/tool-status-snapshot.se
     UsageEvidenceRepo,
     UsageEvidenceService,
     UsageEvidenceApi,
+    UsageOverviewRepo,
+    UsageOverviewScopeService,
+    UsageOverviewQueryService,
   ],
   // The door to the usage for the rules of wasted seats, and the point they bind to hear a confirmed report.
   exports: [UsageEvidenceApi, UsageImportListeners],

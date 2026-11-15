@@ -8,6 +8,7 @@ export const SUCCESS_MESSAGES_USAGE: Readonly<Record<string, string>> = {
   usageImportRowList: 'USAGE_IMPORT.ROWS_LISTED',
   usageImportUpload: 'USAGE_IMPORT.UPLOADED',
   usageNoAssignmentFindingList: 'USAGE_IDENTITY.FINDINGS_LISTED',
+  usageOverviewList: 'USAGE_OVERVIEW.LISTED',
   usageSourceCreate: 'USAGE_SOURCE.CREATED',
   usageSourceGet: 'USAGE_SOURCE.FETCHED',
   usageSourceList: 'USAGE_SOURCE.LISTED',

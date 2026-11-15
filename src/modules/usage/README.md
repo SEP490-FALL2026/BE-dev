@@ -5,7 +5,7 @@ chụp đăng nhập và hạn mức, lý do một lần gửi bị từ chối)
 (xem trước → xác nhận), khớp danh tính, hàng đợi chưa khớp, phát hiện sai lệch, và **một cửa bằng chứng** cho rule `G3`/`G4`. Story
 chính: US-09-02 (AC-7), US-09-05, US-09-07 và vế cổng nhận của US-09-01/03/04/09 ([spec](../../../docs/workspace/items/g7-ai-usage-intake/spec.md));
 `US-08-01`→`US-08-07`, `US-10-02`…`US-10-04` ([spec](../../../docs/workspace/items/qd103-vendor-usage-import/spec.md)).
-Tầng: T6 (`scripts/arch/tiers.cjs`). Phụ thuộc: devices, catalog, licensing, organization, notifications, audit. Được dùng bởi: gốc
+Tầng: T6 (`scripts/arch/tiers.cjs`). Phụ thuộc: devices, catalog, licensing, organization, identity-access, notifications, audit. Được dùng bởi: gốc
 `src/app/app.module.ts`, `dashboards` (số phát hiện sai lệch) và lệnh `ops:record-super-admin-event` (để graph có đủ người đăng ký của
 `CollectorAllowlistHook`).
 
@@ -50,6 +50,11 @@ Tầng: T6 (`scripts/arch/tiers.cjs`). Phụ thuộc: devices, catalog, licensin
   `match/` (khớp danh tính lúc đọc: ánh xạ → email/tài khoản chính xác → quy tắc bí danh; mơ hồ không đoán), `preview/` (xem trước, không ghi
   ngày), `confirmation/` (khóa nguồn → khóa import, tính lại preview, **báo người giữ trước khi ghi**, ghi theo chunk ≤ 5 000, chồng lấn,
   ánh xạ, hàng đợi, sai lệch, phát `UsageImportListeners`).
+- `usage-overview/` — màn usage tổng hợp của IT Admin (`GET /usage-overview`, `QĐ-111aw`, `QĐ-111ax`): chuỗi theo kỳ (ngày, tuần ISO, tháng) × phòng,
+  ứng dụng hoặc nguồn; đơn vị duy nhất là **ngày** — `activeDays` (ngày có người hoạt động) và `coveredDays` (ngày có nguồn nào nói được), mỗi ngày đếm một
+  lần dù mấy nguồn kể, hợp ngày chứ không cộng — kèm `status` (`HAS_DATA`, `PARTIAL`, `NO_DATA`) và `updatedAt`. Chỉ đọc người thuộc phòng trong
+  phạm vi `getItAdminScope` (`UsageOverviewScopeService`): lọc ngoài phạm vi ⟹ trang rỗng, không bao giờ tin `departmentId` của FE. Không họ tên, ảnh, token
+  hay xếp hạng; một câu SQL cho cả trang (`usage-overview.repo.ts`), luật chia kỳ và trạng thái ở `usage-overview.policy.ts`.
 - `usage-evidence/` — L0: repo đọc (nối ánh xạ còn hiệu lực **lúc đọc**), policy (độ mới 7/14 ngày theo loại nguồn, năng lực), service.
 
 ## Luồng và khóa
