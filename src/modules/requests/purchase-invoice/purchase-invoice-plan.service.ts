@@ -16,7 +16,7 @@ import {
   labelOfPurchaseInvoice,
   expenseYearOf,
 } from './labels/purchase-invoice-labels.policy';
-import { chargedCostCenterOf, holderDayOf } from './purchase-invoice-charge.policy';
+import { bearsByHolder, chargedCostCenterOf, holderDayOf } from './purchase-invoice-charge.policy';
 import { PurchaseInvoiceRefusedError } from './purchase-invoice.errors';
 import { matchPurchaseInvoice, type OriginalPrice } from './purchase-invoice-match.policy';
 import { PurchaseInvoiceRepo, type RequestPurchaseFacts } from './purchase-invoice.repo';
@@ -51,7 +51,7 @@ interface LinkFacts {
   expectedUnitPrice: OriginalPrice | null;
   requestCostCenterId: string | null;
   requestId: string | null;
-  /** The right is a person's own (`K1`, `K4`): the department that bears it is the holder's. */
+  /** The right is a person's own (`K1`): the department that bears it is the holder's. A `K4` key is the request's (`QĐ-103k`). */
   holderBound: boolean;
   /**
    * The subscription of the shared pool the invoice is a line of, for a request of a `K2` plan (`QĐ-104c`(3), `QĐ-103k`): every invoice of a `K2`
@@ -127,8 +127,7 @@ export class PurchaseInvoicePlanService {
       expectedUnitPrice: await this.catalog.getPlanOriginalPrice(request.planId, tx, serviceMonth),
       requestCostCenterId: request.costCenterId,
       requestId,
-      holderBound:
-        !FAILED_AFTER_PURCHASE_STATES.has(request.state) && ['K1', 'K4'].includes(target?.provisioningType ?? ''),
+      holderBound: !FAILED_AFTER_PURCHASE_STATES.has(request.state) && bearsByHolder(target?.provisioningType),
       poolSubscriptionId,
       renewedAssignmentId: request.renewedAssignmentId,
     };

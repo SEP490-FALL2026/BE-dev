@@ -1,4 +1,4 @@
-import { chargedCostCenterOf, holderDayOf } from './purchase-invoice-charge.policy';
+import { bearsByHolder, chargedCostCenterOf, holderDayOf } from './purchase-invoice-charge.policy';
 
 describe('which department bears a purchase invoice (R-51, QĐ-55b)', () => {
   describe('the day whose holder is asked', () => {
@@ -13,6 +13,22 @@ describe('which department bears a purchase invoice (R-51, QĐ-55b)', () => {
 
     it('is today for a month not yet begun: the invoice is paid ahead of the period', () => {
       expect(holderDayOf('2027-01-01', '2026-11-17')).toBe('2026-11-17');
+    });
+  });
+
+  describe('the kind of right whose cost follows the person who holds it (QĐ-55b, QĐ-103k)', () => {
+    it('is the monthly right of one person: the department that holds it in the month bears the month', () => {
+      expect(bearsByHolder('K1')).toBe(true);
+    });
+
+    it('is not the key bought once (K4): the cost is one, in the department of the request that bought it, whoever holds the key later', () => {
+      expect(bearsByHolder('K4')).toBe(false);
+    });
+
+    it('is not a seat of the shared pool, an internal software, or a plan not known', () => {
+      expect(bearsByHolder('K2')).toBe(false);
+      expect(bearsByHolder('K5')).toBe(false);
+      expect(bearsByHolder(undefined)).toBe(false);
     });
   });
 

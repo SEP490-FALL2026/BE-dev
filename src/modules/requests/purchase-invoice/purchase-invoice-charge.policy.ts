@@ -6,6 +6,15 @@ import { addDays, monthBoundsOf, type BusinessDate } from '../../../core/busines
  * not yet begun is asked about today.
  */
 
+/**
+ * Whether the cost of a kind of right follows the person who holds it (`R-51`): only `K1`, the right of one person paid by the month. A `K4` key
+ * bought once is a cost of the department of the request that bought it, whoever holds the key later (`QĐ-103k`); the seats of a pool (`K2`) are
+ * borne by seat-months, and `K5` costs nothing.
+ */
+export function bearsByHolder(provisioningType: string | undefined): boolean {
+  return provisioningType === 'K1';
+}
+
 /** The day whose holder of the right is asked for: the last day of the service month, or today when the month has not ended. */
 export function holderDayOf(serviceMonth: BusinessDate, today: BusinessDate): BusinessDate {
   const lastDay = addDays(monthBoundsOf(serviceMonth).nextStart, -1);
