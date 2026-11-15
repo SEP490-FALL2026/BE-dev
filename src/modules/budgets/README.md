@@ -33,7 +33,7 @@ audit, notifications. Được dùng bởi: requests; gốc `src/app/app.module.
 
 - `budget_proposals`, `budget_proposal_lines`, `budget_versions`, `budget_version_lines`,
   `budget_version_line_changes` (còn trong DB, không còn code ghi), `budget_version_decisions`, `budget_version_history`, `budget_commitments`,
-  `budget_commitment_releases` (`budget_commitments.origin` = `APPROVAL` hoặc `YEAR_START`; `seat_monthly_minor` giá tháng một seat, quy tiền báo cáo, làm tròn lên, ghi lúc duyệt chi và lúc ghi khoản 01/01; null = khoản cũ, không giải phóng theo ngày), `invoices`, `budget_attachments` (`prisma/models/budgets.prisma`). Kiểm ngân sách của request
+  `budget_commitment_releases` (`budget_commitments.origin` = `APPROVAL` hoặc `YEAR_START`; `seat_monthly_minor` giá tháng một seat, quy tiền báo cáo, làm tròn lên, ghi lúc duyệt chi và lúc ghi khoản 01/01; null = khoản cũ, không giải phóng theo ngày), `invoices`, `budget_attachments`, `budget_adjustments` (AD-1: bản ghi điều chỉnh ngân sách trong năm, một bảng bốn loại; trigger không cho sửa điều gì đã đề nghị, chỉ quyết một lần, không xóa) (`prisma/models/budgets.prisma`). Kiểm ngân sách của request
   (`request_budget_checks`…) thuộc `requests`.
 
 ## Extension point
@@ -65,6 +65,7 @@ import lõi (`pnpm arch:capabilities --module budgets`).
   (phòng chịu và phần cam kết bị tiêu), `SeatMonthService` (tính một tháng), `SeatMonthSubscriptionService` (một thuê bao, một transaction; khóa tháng, hàng cam kết, rồi khóa năm),
   `SeatMonthSweeper` mỗi giờ cho thuê bao chưa có dấu `seat_month_runs` của tháng đã kết thúc (một thuê bao lỗi không mất các thuê bao sau; tháng tính lại theo yêu cầu thì tính mọi thuê bao, phần đã tiêu cam kết mà dòng không còn tiêu thì trả lại qua bảng bù trừ append-only `budget_commitment_seat_month_reversals`, `SM1-06`); `GET /seat-month-charges` (`SeatMonthChargesController`, Finance và trưởng phòng của Cost Center mình) kèm dòng kho. Cam kết chỉ
   bị tiêu thêm, không bao giờ hoàn lại (trigger `budget_commitments_guard`), nên tính lại một tháng giữ phần đã tiêu.
+- `adjustment/` — điều chỉnh ngân sách trong năm (AD-1, `QĐ-111ag`, `QĐ-111bh`, C-1): `budget-adjustment.policy.ts` (hàm thuần: hình dạng bốn loại `SUPPLEMENT`/`TRANSFER`/`RETURN`/`CEILING_REDUCTION`, phần chưa phân bổ = Trần năm − Dự phòng kho − Σ ngân sách hiệu lực, sàn của _Trả lại_ và phòng nguồn của _Chuyển_ = dự kiến cuối năm của RV-1, `COST_CENTER_CHANGE` miễn sàn) và `BudgetAdjustmentRepo` (mọi SQL của bảng). Route, duyệt và ngân sách hiệu lực do các task AD-1.2, AD-1.3 thêm.
 - `proposal/` — đề xuất của trưởng phòng: gửi, rút, Finance trả về, gửi lại (US-06-10); `budget-proposals.controller.ts`;
   `ProposalService`, `ProposalViewService`, `ProposalSender`. **`BM-10`** (`QĐ-111ab`) = `{ costCenterId?, year, requestedAmount, note?,
 attachmentIds[1..10] }`, không có dòng (`requestedAmount` lưu ở `total_minor`, `note` 1–1000 ký tự, CHECK `budget_proposals_note_check`);

@@ -199,6 +199,7 @@ model BudgetVersion {
   decisions           BudgetVersionDecision[]
   attachedCommitments BudgetCommitment[]          @relation("BudgetCommitmentAttached")
   attachments         BudgetAttachment[]
+  adjustmentsMade     BudgetAdjustment[]          @relation("BudgetAdjustmentVersion")
 
   @@unique([costCenterId, year, number])
   @@index([costCenterId, year, state])
@@ -704,4 +705,36 @@ model BudgetCommitmentSeatMonthReversal {
   @@index([commitmentId], map: "bcsmr_commitment_idx")
   @@index([subscriptionId, month], map: "bcsmr_subscription_month_idx")
   @@map("budget_commitment_seat_month_reversals")
+}
+
+/// AD-1 (QĐ-111ag, QĐ-111bh, C-1): an adjustment of the budget in the year, one record and four kinds. Finance makes it, the spending approver decides it. It is added to or taken
+/// from the BASE of a Cost Center (the reserve stays); CEILING_REDUCTION lowers the annual ceiling of the cycle. A Cost Center with no version of the year that is given money gets
+/// one when the adjustment is approved (R-48), named in `createdVersionId`, so that the amount is counted once. What it asks for never changes and it is never removed (a trigger).
+/// The ids of the Cost Centers are values of another context, not foreign keys. `kind`: SUPPLEMENT, TRANSFER, RETURN, CEILING_REDUCTION. `state`: PENDING, APPROVED, REJECTED.
+model BudgetAdjustment {
+  id                  String    @id @default(uuid(7)) @db.Uuid
+  organizationId      String    @map("organization_id") @db.Uuid
+  year                Int
+  kind                String
+  fromCostCenterId    String?   @map("from_cost_center_id") @db.Uuid
+  toCostCenterId      String?   @map("to_cost_center_id") @db.Uuid
+  amountMinor         BigInt    @map("amount_minor")
+  currency            String    @db.Char(3)
+  reason              String
+  // COST_CENTER_CHANGE: a department moved to another Cost Center in the year; the transfer is not held to the forecast of the end of the year (R-40).
+  transferReason      String?   @map("transfer_reason")
+  state               String    @default("PENDING")
+  createdByEmployeeId String    @map("created_by_employee_id") @db.Uuid
+  createdAt           DateTime  @map("created_at") @db.Timestamptz(3)
+  decidedByEmployeeId String?   @map("decided_by_employee_id") @db.Uuid
+  decidedAt           DateTime? @map("decided_at") @db.Timestamptz(3)
+  decisionReason      String?   @map("decision_reason")
+  createdVersionId    String?   @map("created_version_id") @db.Uuid
+
+  createdVersion BudgetVersion? @relation("BudgetAdjustmentVersion", fields: [createdVersionId], references: [id], onDelete: Restrict)
+
+  @@index([organizationId, year, state])
+  @@index([toCostCenterId, year])
+  @@index([fromCostCenterId, year])
+  @@map("budget_adjustments")
 }
