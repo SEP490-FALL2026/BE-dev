@@ -203,8 +203,8 @@ export class InvoiceRepo {
 
   /**
    * What the invoices of each Cost Center and year cost against their price before tax, keyed `costCenterId:year`: the basis of the difference k of the review
-   * (`RV-1`, `QĐ-111ai`). The same invoices as `spentOf` takes (the Cost Center and the year of the commitment or of the month the invoice pays for), the seat-months
-   * of the pool left out: they carry no tax. A Cost Center and year with no invoice is absent.
+   * (`RV-1`, `QĐ-111ai`). The invoices of a commitment only, in the Cost Center and the year `spentOf` gives them (an invoice outside the process has no commitment price
+   * to differ from, `FIX-RV1` RV1-02), the seat-months of the pool left out: they carry no tax. A Cost Center and year with no such invoice is absent.
    */
   async priceBasisOf(
     pairs: readonly { costCenterId: string; year: number }[],
@@ -221,7 +221,8 @@ export class InvoiceRepo {
              SUM(i.net_minor)::text AS net, SUM(i.actual_cost_minor)::text AS actual
         FROM invoices i
         LEFT JOIN budget_commitments c ON c.id = i.commitment_id
-       WHERE (COALESCE(i.cost_center_id, c.cost_center_id), COALESCE(EXTRACT(YEAR FROM i.service_month)::int, c.year)) IN (${wanted})
+       WHERE i.commitment_id IS NOT NULL
+         AND (COALESCE(i.cost_center_id, c.cost_center_id), COALESCE(EXTRACT(YEAR FROM i.service_month)::int, c.year)) IN (${wanted})
        GROUP BY 1, 2`;
     for (const row of rows) {
       basis.set(`${row.cost_center_id}:${row.year}`, { netMinor: BigInt(row.net), actualMinor: BigInt(row.actual) });
