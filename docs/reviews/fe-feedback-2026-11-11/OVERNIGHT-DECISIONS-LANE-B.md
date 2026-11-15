@@ -69,4 +69,4 @@ Không làm ở FIX-LB1 (rẻ nhưng đổi hợp đồng hoặc chạm file lan
 
 ## Dừng ở đâu
 
-- Xong PL-1, PL-3, PF-1 (code), FIX-LB1 (12 mục, commit cuối `077c179d`). Nợ: integration DB thật cho PF-1 (upload ⟹ LEFT ⟹ sweeper). Việc tiếp: BG-1 → BG-2.
+- Xong PL-1, PL-3, PF-1 (code), FIX-LB1 (12 mục, commit cuối `077c179d`). Việc tiếp: BG-1 → BG-2.
