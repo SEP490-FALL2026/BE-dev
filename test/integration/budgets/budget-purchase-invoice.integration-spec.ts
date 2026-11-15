@@ -1,6 +1,4 @@
 import { randomUUID } from 'node:crypto';
-import { TransactionRunner } from '../../../src/infrastructure/database/transaction-runner';
-import type { AuthenticatedPrincipal } from '../../../src/infrastructure/security/tokens/access-token-verifier.port';
 import { BudgetsApi } from '../../../src/modules/budgets/public/budgets.api';
 import { PurchaseInvoiceRecordRefusedError } from '../../../src/modules/budgets/public/budgets.errors';
 import type {
@@ -17,7 +15,6 @@ describe('the invoice Finance signs for a purchase is booked to the month it pay
   let plan: string;
   let vendorId: string;
   let counter = 0;
-  let invoiceNumber = 0;
 
   beforeAll(async () => {
     await h.start();
@@ -28,15 +25,6 @@ describe('the invoice Finance signs for a purchase is booked to the month it pay
 
   afterAll(async () => {
     await h.stop();
-  });
-
-  const actor = (): AuthenticatedPrincipal => ({
-    subject: h.finance.appUserId,
-    appUserId: h.finance.appUserId,
-    sessionId: randomUUID(),
-    employeeId: h.finance.employeeId,
-    directRoles: ['FINANCE'],
-    roles: ['FINANCE'],
   });
 
   /** A department with a budget of 100 million. */
@@ -55,29 +43,8 @@ describe('the invoice Finance signs for a purchase is booked to the month it pay
 
     return { unit, requestId };
   };
-  const record = (over: Partial<PurchaseInvoiceRecordInput>): Promise<PurchaseInvoiceRecorded> => {
-    invoiceNumber += 1;
-
-    return h.ctx.app.get(TransactionRunner, { strict: false }).run((tx) =>
-      h.ctx.app.get(BudgetsApi, { strict: false }).recordPurchaseInvoice(tx, actor(), {
-        organizationId: h.seed.organizationId,
-        purchaseInvoiceId: randomUUID(),
-        requestId: null,
-        subscriptionId: null,
-        vendorId,
-        number: `PI-${invoiceNumber}`,
-        issuedOn: `${h.year}-11-03`,
-        serviceMonth: `${h.year}-11-01`,
-        netMinor: BigInt(6 * M),
-        deductibleTaxMinor: 0n,
-        nonDeductibleTaxMinor: 0n,
-        matchResult: 'MATCHED',
-        chargedCostCenterId: null,
-        now: new Date(),
-        ...over,
-      }),
-    );
-  };
+  const record = (over: Partial<PurchaseInvoiceRecordInput>): Promise<PurchaseInvoiceRecorded> =>
+    h.recordPurchase(vendorId, over);
   const facts = async (unit: Unit, year = h.year) =>
     (await h.ctx.app.get(BudgetsApi, { strict: false }).yearFacts(unit.department.unitId, [year])).get(year);
   const row = async (invoiceId: string) =>

@@ -1,6 +1,6 @@
 import { BudgetsApi } from '../../../src/modules/budgets/public/budgets.api';
+import { PurchaseInvoiceRecordRefusedError } from '../../../src/modules/budgets/public/budgets.errors';
 import { TransactionRunner } from '../../../src/infrastructure/database/transaction-runner';
-import { bodyOf } from '../../support/api-body';
 import { InvoiceHarness } from '../../support/invoice-harness';
 import type { Unit } from '../../support/spend-harness';
 
@@ -42,19 +42,29 @@ interface TableRow {
   spent: Money;
   remaining: Money;
 }
+/** What a test says of the invoice of a purchase, in whole units of the currency; the rest is the default of `book-purchase-invoice.ts`. */
+interface Figures {
+  net?: number;
+  deductibleTax?: number;
+  nonDeductibleTax?: number;
+  number?: string;
+}
 
-describe('invoices recorded against commitments over PostgreSQL (US-12-02, US-06-06)', () => {
+/**
+ * What an invoice does to the commitment and to what is spent, now that the only way an invoice enters the books is the signature of Finance on a
+ * purchase invoice (`PI-1`, `B6`): the tests book it through the facade of the budgets as the signature does, and read what Finance reads through the
+ * routes of the commitments and of their invoices (`US-12-02`, `US-06-06`).
+ */
+describe('invoices booked against commitments over PostgreSQL (US-12-02, US-06-06; PI-1.7)', () => {
   let plan: string;
   let vendorId: string;
   let counter = 0;
-  let invoiceNumber = 0;
 
   beforeAll(async () => {
     await h.start();
     await h.withApprover();
     plan = await h.planOf(await h.subscription(10));
     vendorId = (await h.vendorOf(plan)).id;
-    await h.declareTaxProfile(vendorId, [{ taxType: 'GTGT', ratePercent: '10', deductible: true }]).expect(200);
   }, 240000);
 
   afterAll(async () => {
@@ -74,15 +84,33 @@ describe('invoices recorded against commitments over PostgreSQL (US-12-02, US-06
 
     return { unit, requestId, commitment };
   };
-  const invoice = (over: Record<string, unknown> = {}) => {
-    invoiceNumber += 1;
+  type Committed = Awaited<ReturnType<typeof committed>>;
+  const figuresOf = (over: Figures) => ({
+    netMinor: BigInt(over.net ?? 12 * M),
+    deductibleTaxMinor: BigInt(over.deductibleTax ?? 0),
+    nonDeductibleTaxMinor: BigInt(over.nonDeductibleTax ?? 0),
+    ...(over.number ? { number: over.number } : {}),
+  });
+  const commitmentOf = async (requestId: string) =>
+    h.dataOf<{ items: CommitmentWire[] }>(await h.commitmentList(h.finance, { requestId }).expect(200)).items[0];
+  /** Books an invoice for the request, as the Cost Center of the commitment bears it, and reads back the invoice and the commitment as Finance sees them. */
+  const record = async (target: Committed, over: Figures = {}) => {
+    const recorded = await h.recordPurchase(vendorId, {
+      requestId: target.requestId,
+      chargedCostCenterId: target.unit.department.unitId,
+      ...figuresOf(over),
+    });
+    const listed = h.dataOf<{ items: InvoiceWire[] }>(
+      await h.invoicesOf(target.commitment.id, h.finance, { pageSize: 100 }).expect(200),
+    ).items;
+    const invoice = listed.find((item) => item.id === recorded.invoiceId) as InvoiceWire;
 
-    return { number: `INV-${invoiceNumber}`, issuedOn: '2026-11-03', netAmount: { amount: String(12 * M) }, ...over };
+    return { recorded, invoice, commitment: await commitmentOf(target.requestId) };
   };
-  const amount = (value: number) => ({ amount: String(value) });
-  const record = async (commitmentId: string, over: Record<string, unknown> = {}) =>
-    h.dataOf<{ invoice: InvoiceWire; commitment: CommitmentWire }>(
-      await h.recordInvoice(commitmentId, invoice(over)).expect(201),
+  const refusalOf = (work: Promise<unknown>) =>
+    work.then(
+      () => null,
+      (error: unknown) => (error instanceof PurchaseInvoiceRecordRefusedError ? error.reason : error),
     );
   const commitmentRow = async (id: string) =>
     (
@@ -100,17 +128,24 @@ describe('invoices recorded against commitments over PostgreSQL (US-12-02, US-06
 
     return facts.get(h.year);
   };
+  /** A commitment of the year after, made for a request and attached to no budget yet. */
+  const waitingForBudget = async (unit: Unit, next: number) => {
+    const requestId = await h.fixtureRequestId();
+    const { rows } = await h.ctx.sql.query<{ id: string }>(
+      `INSERT INTO budget_commitments (id, organization_id, request_id, cost_center_id, year, amount_minor, currency, state, unattached_reason)
+       VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6, 'HELD', 'NO_BUDGET') RETURNING id`,
+      [h.seed.organizationId, requestId, unit.department.unitId, next, 20 * M, h.reporting],
+    );
+
+    return { requestId, commitmentId: rows[0].id };
+  };
 
   describe('what an invoice does to the commitment and to what is spent (US-06-06 AC-1, AC-5)', () => {
     it('takes the commitment down by the price, costs the price and the tax that cannot be deducted, and shows the rest apart', async () => {
-      const { unit, requestId, commitment } = await committed();
-      expect(commitment.amount.amount).toBe(String(20 * M));
+      const target = await committed();
+      expect(target.commitment.amount.amount).toBe(String(20 * M));
 
-      const recorded = await record(commitment.id, {
-        deductibleTax: amount(1_200_000),
-        nonDeductibleTax: amount(600_000),
-        note: 'First half',
-      });
+      const recorded = await record(target, { deductibleTax: 1_200_000, nonDeductibleTax: 600_000 });
 
       expect(recorded.invoice).toMatchObject({
         netAmount: { amount: String(12 * M), currency: h.reporting },
@@ -118,35 +153,35 @@ describe('invoices recorded against commitments over PostgreSQL (US-12-02, US-06
         nonDeductibleTax: { amount: '600000' },
         actualCost: { amount: '12600000' },
         matchResult: 'TAX_ONLY',
-        note: 'First half',
-        issuedOn: '2026-11-03',
+        note: null,
+        issuedOn: `${h.year}-11-03`,
         recordedBy: { employeeId: h.finance.employeeId },
       });
       expect(recorded.commitment).toMatchObject({
-        id: commitment.id,
+        id: target.commitment.id,
         state: 'HELD',
         held: { amount: String(8 * M) },
         invoiced: { amount: '12600000' },
         invoiceCount: 1,
         hasDiscrepancy: false,
       });
-      expect(await commitmentRow(commitment.id)).toMatchObject({ state: 'HELD', applied_minor: String(12 * M) });
-      expect(await tableRow(unit)).toMatchObject({
+      expect(await commitmentRow(target.commitment.id)).toMatchObject({ state: 'HELD', applied_minor: String(12 * M) });
+      expect(await tableRow(target.unit)).toMatchObject({
         committed: { amount: String(8 * M) },
         spent: { amount: '12600000' },
         remaining: { amount: String(100 * M - 8 * M - 12_600_000) },
       });
       const events = await h.ctx.sql.query(
-        `SELECT 1 FROM audit_events WHERE action = 'INVOICE.RECORDED' AND after->>'requestId' = $1`,
-        [requestId],
+        `SELECT 1 FROM audit_events WHERE action = 'INVOICE.RECORDED' AND after->>'commitmentId' = $1`,
+        [target.commitment.id],
       );
       expect(events.rowCount).toBe(1);
     });
 
-    it('records the vendor of the request, the currency of the commitment and nobody else as the one who recorded it', async () => {
-      const { commitment } = await committed();
+    it('records the vendor it is given, in dong, and the one who signed as the one who recorded it', async () => {
+      const target = await committed();
 
-      const { invoice: recorded } = await record(commitment.id);
+      const { invoice: recorded } = await record(target);
 
       const stored = await h.ctx.sql.query<{ vendor_id: string; currency: string; recorded_by_employee_id: string }>(
         `SELECT vendor_id, currency, recorded_by_employee_id FROM invoices WHERE id = $1`,
@@ -160,11 +195,11 @@ describe('invoices recorded against commitments over PostgreSQL (US-12-02, US-06
     });
 
     it('makes the commitment an expense when nothing is left to hold, and a later invoice is still an expense without taking it down', async () => {
-      const { unit, commitment } = await committed();
+      const target = await committed();
 
-      const first = await record(commitment.id, { netAmount: amount(12 * M) });
-      const second = await record(commitment.id, { netAmount: amount(8 * M), nonDeductibleTax: amount(400_000) });
-      const third = await record(commitment.id, { netAmount: amount(500_000) });
+      const first = await record(target, { net: 12 * M });
+      const second = await record(target, { net: 8 * M, nonDeductibleTax: 400_000 });
+      const third = await record(target, { net: 500_000 });
 
       expect(first.commitment).toMatchObject({ state: 'HELD', held: { amount: String(8 * M) } });
       expect(second.commitment).toMatchObject({ state: 'EXPENSED', held: { amount: '0' } });
@@ -174,20 +209,23 @@ describe('invoices recorded against commitments over PostgreSQL (US-12-02, US-06
         invoiceCount: 3,
         invoiced: { amount: String(12 * M + 8 * M + 400_000 + 500_000) },
       });
-      expect(await commitmentRow(commitment.id)).toMatchObject({ state: 'EXPENSED', applied_minor: String(20 * M) });
+      expect(await commitmentRow(target.commitment.id)).toMatchObject({
+        state: 'EXPENSED',
+        applied_minor: String(20 * M),
+      });
       // Nothing is held any more; everything invoiced is spent, over the commitment included (QĐ-34b).
-      expect(await tableRow(unit)).toMatchObject({
+      expect(await tableRow(target.unit)).toMatchObject({
         committed: { amount: '0' },
         spent: { amount: String(12 * M + 8 * M + 400_000 + 500_000) },
       });
     });
 
     it('does not let an expense be counted twice: held plus spent never exceeds the commitment while the invoices fit it', async () => {
-      const { unit, commitment } = await committed();
+      const target = await committed();
 
-      await record(commitment.id, { netAmount: amount(5 * M) });
+      await record(target, { net: 5 * M });
 
-      const row = await tableRow(unit);
+      const row = await tableRow(target.unit);
       expect(Number(row?.committed.amount) + Number(row?.spent.amount)).toBe(20 * M);
     });
   });
@@ -197,8 +235,8 @@ describe('invoices recorded against commitments over PostgreSQL (US-12-02, US-06
       const exact = await committed();
       const over = await committed();
 
-      const matched = await record(exact.commitment.id, { netAmount: amount(20 * M) });
-      const flagged = await record(over.commitment.id, { netAmount: amount(20 * M + 1) });
+      const matched = await record(exact, { net: 20 * M });
+      const flagged = await record(over, { net: 20 * M + 1 });
 
       expect(matched.invoice.matchResult).toBe('MATCHED');
       expect(matched.commitment).toMatchObject({ state: 'EXPENSED', hasDiscrepancy: false });
@@ -209,10 +247,10 @@ describe('invoices recorded against commitments over PostgreSQL (US-12-02, US-06
     });
 
     it('judges the invoices together: the second one that takes the total over the allowance is the one flagged', async () => {
-      const { commitment } = await committed();
+      const target = await committed();
 
-      const first = await record(commitment.id, { netAmount: amount(12 * M) });
-      const second = await record(commitment.id, { netAmount: amount(8 * M + 1) });
+      const first = await record(target, { net: 12 * M });
+      const second = await record(target, { net: 8 * M + 1 });
 
       expect(first.invoice.matchResult).toBe('MATCHED');
       expect(second.invoice.matchResult).toBe('PRICE_QUANTITY_EXCEPTION');
@@ -220,9 +258,9 @@ describe('invoices recorded against commitments over PostgreSQL (US-12-02, US-06
     });
 
     it('is recorded with a difference in tax alone as TAX_ONLY and does not open a discrepancy', async () => {
-      const { commitment } = await committed();
+      const target = await committed();
 
-      const recorded = await record(commitment.id, { netAmount: amount(20 * M), deductibleTax: amount(2 * M) });
+      const recorded = await record(target, { net: 20 * M, deductibleTax: 2 * M });
 
       expect(recorded.invoice.matchResult).toBe('TAX_ONLY');
       expect(recorded.commitment.hasDiscrepancy).toBe(false);
@@ -231,13 +269,13 @@ describe('invoices recorded against commitments over PostgreSQL (US-12-02, US-06
 
   describe('what it does to the check of the next request (A8)', () => {
     it('lowers what is left by the tax that cannot be deducted, and not by the tax that can', async () => {
-      const { unit, commitment } = await committed();
-      const before = await yearFacts(unit);
+      const target = await committed();
+      const before = await yearFacts(target.unit);
 
-      await record(commitment.id, { netAmount: amount(5 * M), deductibleTax: amount(500_000) });
-      const afterDeductible = await yearFacts(unit);
-      await record(commitment.id, { netAmount: amount(5 * M), nonDeductibleTax: amount(250_000) });
-      const afterNonDeductible = await yearFacts(unit);
+      await record(target, { net: 5 * M, deductibleTax: 500_000 });
+      const afterDeductible = await yearFacts(target.unit);
+      await record(target, { net: 5 * M, nonDeductibleTax: 250_000 });
+      const afterNonDeductible = await yearFacts(target.unit);
 
       expect(before?.spentMinor).toBe(0n);
       expect(afterDeductible?.spentMinor).toBe(BigInt(5 * M));
@@ -252,21 +290,15 @@ describe('invoices recorded against commitments over PostgreSQL (US-12-02, US-06
       counter += 1;
       const unit: Unit = await h.departmentWithHead(`P-V${counter}`);
       const next = h.year + 1;
-      // A commitment for the year after, that waits for a budget: made by the request, attached to nothing yet.
-      const requestId = await h.fixtureRequestId();
-      const { rows } = await h.ctx.sql.query<{ id: string }>(
-        `INSERT INTO budget_commitments (id, organization_id, request_id, cost_center_id, year, amount_minor, currency, state, unattached_reason)
-         VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6, 'HELD', 'NO_BUDGET') RETURNING id`,
-        [h.seed.organizationId, requestId, unit.department.unitId, next, 20 * M, h.reporting],
-      );
-      const commitmentId = rows[0].id;
-      // The vendor of a commitment is told by its request: give the fixture the plan the others have.
-      await h.ctx.sql.query(`UPDATE access_requests SET plan_id = (SELECT id FROM plans WHERE id = $2) WHERE id = $1`, [
-        requestId,
-        plan,
-      ]);
+      const { requestId, commitmentId } = await waitingForBudget(unit, next);
 
-      await record(commitmentId, { netAmount: amount(20 * M) });
+      await h.recordPurchase(vendorId, {
+        requestId,
+        chargedCostCenterId: unit.department.unitId,
+        netMinor: BigInt(20 * M),
+        serviceMonth: `${next}-02-01`,
+        issuedOn: `${next}-02-03`,
+      });
 
       expect(await commitmentRow(commitmentId)).toMatchObject({ state: 'EXPENSED', applied_minor: String(20 * M) });
       const unattached = await h.ctx.app
@@ -302,28 +334,25 @@ describe('invoices recorded against commitments over PostgreSQL (US-12-02, US-06
         );
 
     it('gives back only the part that did not become an expense, and the commitment stays an expense', async () => {
-      const { unit, requestId, commitment } = await committed();
-      await record(commitment.id, { netAmount: amount(12 * M) });
+      const target = await committed();
+      await record(target, { net: 12 * M });
 
-      const released = await endRequest(requestId);
+      const released = await endRequest(target.requestId);
 
       expect(released).toHaveLength(1);
       expect(released[0]).toMatchObject({ releasedMinor: BigInt(8 * M), heldMinor: 0n, released: true });
-      expect(await commitmentRow(commitment.id)).toMatchObject({
+      expect(await commitmentRow(target.commitment.id)).toMatchObject({
         state: 'EXPENSED',
         released_minor: String(8 * M),
         applied_minor: String(12 * M),
         released_at: null,
       });
-      expect(await tableRow(unit)).toMatchObject({
+      expect(await tableRow(target.unit)).toMatchObject({
         committed: { amount: '0' },
         spent: { amount: String(12 * M) },
         remaining: { amount: String(88 * M) },
       });
-      const listed = h.dataOf<{ items: CommitmentWire[] }>(
-        await h.commitmentList(h.finance, { requestId }).expect(200),
-      );
-      expect(listed.items[0]).toMatchObject({
+      expect(await commitmentOf(target.requestId)).toMatchObject({
         state: 'EXPENSED',
         held: { amount: '0' },
         released: { amount: String(8 * M) },
@@ -331,22 +360,24 @@ describe('invoices recorded against commitments over PostgreSQL (US-12-02, US-06
     });
 
     it('does not take the money of an invoice back: ending the request twice gives back nothing more', async () => {
-      const { requestId, commitment } = await committed();
-      await record(commitment.id, { netAmount: amount(12 * M) });
-      await endRequest(requestId);
+      const target = await committed();
+      await record(target, { net: 12 * M });
+      await endRequest(target.requestId);
 
-      const again = await endRequest(requestId);
+      const again = await endRequest(target.requestId);
 
       expect(again).toEqual([]);
-      expect((await commitmentRow(commitment.id)).released_minor).toBe(String(8 * M));
+      expect((await commitmentRow(target.commitment.id)).released_minor).toBe(String(8 * M));
     });
 
     it('lets Finance give back the rest once the request has ended, and only the rest', async () => {
-      const { unit, requestId, commitment } = await committed();
-      await record(commitment.id, { netAmount: amount(12 * M) });
-      await h.ctx.sql.query(`UPDATE access_requests SET state = 'COMPLETED' WHERE id = $1`, [requestId]);
+      const target = await committed();
+      await record(target, { net: 12 * M });
+      await h.ctx.sql.query(`UPDATE access_requests SET state = 'COMPLETED' WHERE id = $1`, [target.requestId]);
 
-      const response = await h.releaseCommitment(commitment.id, { reason: 'No more invoices' }, h.finance).expect(200);
+      const response = await h
+        .releaseCommitment(target.commitment.id, { reason: 'No more invoices' }, h.finance)
+        .expect(200);
 
       expect(h.dataOf<{ commitment: CommitmentWire }>(response).commitment).toMatchObject({
         state: 'EXPENSED',
@@ -354,18 +385,21 @@ describe('invoices recorded against commitments over PostgreSQL (US-12-02, US-06
         held: { amount: '0' },
         invoiced: { amount: String(12 * M) },
       });
-      expect(await tableRow(unit)).toMatchObject({ committed: { amount: '0' }, spent: { amount: String(12 * M) } });
+      expect(await tableRow(target.unit)).toMatchObject({
+        committed: { amount: '0' },
+        spent: { amount: String(12 * M) },
+      });
     });
 
-    it('never makes an expense held again: Finance cannot give back the rest of one, and an ended request cannot be invoiced as released', async () => {
-      const { requestId, commitment } = await committed();
-      await record(commitment.id, { netAmount: amount(20 * M) });
-      await h.ctx.sql.query(`UPDATE access_requests SET state = 'COMPLETED' WHERE id = $1`, [requestId]);
+    it('never makes an expense held again: Finance cannot give back the rest of one, and a later invoice leaves it an expense', async () => {
+      const target = await committed();
+      await record(target, { net: 20 * M });
+      await h.ctx.sql.query(`UPDATE access_requests SET state = 'COMPLETED' WHERE id = $1`, [target.requestId]);
 
-      await h.releaseCommitment(commitment.id, { reason: 'Nothing is left' }, h.finance).expect(409);
-      await record(commitment.id, { netAmount: amount(1) });
+      await h.releaseCommitment(target.commitment.id, { reason: 'Nothing is left' }, h.finance).expect(409);
+      await record(target, { net: 1 });
 
-      expect((await commitmentRow(commitment.id)).state).toBe('EXPENSED');
+      expect((await commitmentRow(target.commitment.id)).state).toBe('EXPENSED');
     });
 
     it('queues behind an invoice that is being recorded and gives back what it leaves held, instead of failing on a stale read', async () => {
@@ -387,14 +421,26 @@ describe('invoices recorded against commitments over PostgreSQL (US-12-02, US-06
       });
     });
 
-    it('refuses an invoice against a commitment that was released whole', async () => {
-      const { requestId, commitment } = await committed();
-      await endRequest(requestId);
+    it('books an invoice for a commitment that was released whole as an expense of its Cost Center, and the commitment stays released (QĐ-55b, R-51)', async () => {
+      const target = await committed();
+      await endRequest(target.requestId);
+      const before = await yearFacts(target.unit);
 
-      const response = await h.recordInvoice(commitment.id, invoice()).expect(409);
+      const recorded = await h.recordPurchase(vendorId, {
+        requestId: target.requestId,
+        chargedCostCenterId: target.unit.department.unitId,
+        netMinor: BigInt(6 * M),
+      });
 
-      expect(bodyOf(response).error.code).toBe('INVOICE.COMMITMENT_RELEASED');
-      expect((await commitmentRow(commitment.id)).state).toBe('RELEASED');
+      expect(recorded).toMatchObject({
+        booking: 'COST_CENTER',
+        commitmentId: null,
+        costCenterId: target.unit.department.unitId,
+        appliedMinor: 0n,
+      });
+      expect((await commitmentRow(target.commitment.id)).state).toBe('RELEASED');
+      expect(before?.spentMinor).toBe(0n);
+      expect((await yearFacts(target.unit))?.spentMinor).toBe(BigInt(6 * M));
     });
   });
 
@@ -403,13 +449,7 @@ describe('invoices recorded against commitments over PostgreSQL (US-12-02, US-06
       counter += 1;
       const unit: Unit = await h.departmentWithHead(`P-V${counter}`);
       const next = h.year + 1;
-      const requestId = await h.fixtureRequestId();
-      const { rows } = await h.ctx.sql.query<{ id: string }>(
-        `INSERT INTO budget_commitments (id, organization_id, request_id, cost_center_id, year, amount_minor, currency, state, unattached_reason)
-         VALUES (gen_random_uuid(), $1, $2, $3, $4, $5, $6, 'HELD', 'NO_BUDGET') RETURNING id`,
-        [h.seed.organizationId, requestId, unit.department.unitId, next, 20 * M, h.reporting],
-      );
-      const commitmentId = rows[0].id;
+      const { commitmentId } = await waitingForBudget(unit, next);
 
       await h.lockedWhile(
         commitmentId,
@@ -437,78 +477,66 @@ describe('invoices recorded against commitments over PostgreSQL (US-12-02, US-06
     it('refuses a number the vendor has used already, and the first invoice stays as it was', async () => {
       const first = await committed();
       const second = await committed();
-      await record(first.commitment.id, { number: 'DUP-1', netAmount: amount(5 * M) });
+      await record(first, { number: 'DUP-1', net: 5 * M });
 
-      const response = await h.recordInvoice(second.commitment.id, invoice({ number: 'DUP-1' })).expect(409);
+      const refused = await refusalOf(
+        h.recordPurchase(vendorId, {
+          requestId: second.requestId,
+          chargedCostCenterId: second.unit.department.unitId,
+          number: 'DUP-1',
+        }),
+      );
 
-      expect(bodyOf(response).error.code).toBe('INVOICE.DUPLICATE');
+      expect(refused).toBe('DUPLICATE_NUMBER');
       expect(await commitmentRow(second.commitment.id)).toMatchObject({ state: 'HELD', applied_minor: '0' });
       const stored = await h.ctx.sql.query(`SELECT 1 FROM invoices WHERE number = 'DUP-1'`);
       expect(stored.rowCount).toBe(1);
     });
 
-    it('refuses a commitment whose request is for software of the company, which has no vendor, without guessing one', async () => {
-      const { commitment } = await committed();
-      const internal = await h.plan('K5');
-      await h.ctx.sql.query(
-        `UPDATE access_requests SET plan_id = $2 WHERE id = (SELECT request_id FROM budget_commitments WHERE id = $1)`,
-        [commitment.id, internal],
-      );
-
-      const response = await h.recordInvoice(commitment.id, invoice()).expect(409);
-
-      expect(bodyOf(response).error.code).toBe('INVOICE.VENDOR_UNKNOWN');
-      expect((await commitmentRow(commitment.id)).applied_minor).toBe('0');
-    });
-
-    it('answers 404 for a commitment that does not exist, for both routes', async () => {
-      const missing = '0a1b2c3d-0000-4000-8000-000000000099';
-
-      await h.recordInvoice(missing, invoice()).expect(404);
-      await h.invoicesOf(missing).expect(404);
+    it('answers 404 for a commitment that does not exist when its invoices are read', async () => {
+      await h.invoicesOf('0a1b2c3d-0000-4000-8000-000000000099').expect(404);
     });
 
     it.each([
-      ['a currency in an amount', () => invoice({ netAmount: { amount: '100', currency: 'USD' } })],
-      ['a currency beside the amounts', () => invoice({ currency: 'VND' })],
-      ['a price of nothing', () => invoice({ netAmount: amount(0) })],
-      ['a negative price', () => invoice({ netAmount: amount(-5) })],
-      ['a negative tax', () => invoice({ nonDeductibleTax: amount(-1) })],
-      ['an amount that is not a number', () => invoice({ netAmount: { amount: 'twelve' } })],
-    ])('turns away %s with 422 and records nothing', async (_name, makeBody) => {
-      const { commitment } = await committed();
+      ['a price of nothing', { net: 0 }],
+      ['a negative price', { net: -5 }],
+      ['a negative tax that can be deducted', { deductibleTax: -1 }],
+      ['a negative tax that cannot be deducted', { nonDeductibleTax: -1 }],
+    ])('turns away %s and records nothing', async (_name, over) => {
+      const target = await committed();
 
-      await h.recordInvoice(commitment.id, makeBody()).expect(422);
+      const refused = await refusalOf(
+        h.recordPurchase(vendorId, {
+          requestId: target.requestId,
+          chargedCostCenterId: target.unit.department.unitId,
+          ...figuresOf(over),
+        }),
+      );
 
-      expect(await commitmentRow(commitment.id)).toMatchObject({ state: 'HELD', applied_minor: '0' });
-      expect(h.dataOf<{ items: unknown[] }>(await h.invoicesOf(commitment.id).expect(200)).items).toEqual([]);
+      expect(refused).toBe('AMOUNT_NOT_POSITIVE');
+      expect(await commitmentRow(target.commitment.id)).toMatchObject({ state: 'HELD', applied_minor: '0' });
+      expect(h.dataOf<{ items: unknown[] }>(await h.invoicesOf(target.commitment.id).expect(200)).items).toEqual([]);
     });
 
-    it('turns away every role but Finance, the IT Admin included, from recording and from reading', async () => {
+    it('turns away every role but Finance, the IT Admin included, from reading the invoices', async () => {
       const { unit, commitment } = await committed();
 
       for (const account of [h.it1, h.boss.account, unit.head.account, unit.member.account]) {
-        await h.recordInvoice(commitment.id, invoice(), account).expect(403);
         await h.invoicesOf(commitment.id, account).expect(403);
       }
-      expect(await commitmentRow(commitment.id)).toMatchObject({ applied_minor: '0' });
     });
   });
 
   describe('the list of the invoices of a commitment', () => {
     it('gives them newest first with both kinds of tax, and pages them', async () => {
-      const { commitment } = await committed();
-      const first = await record(commitment.id, { netAmount: amount(1 * M), number: 'A-1' });
-      const second = await record(commitment.id, {
-        netAmount: amount(2 * M),
-        number: 'A-2',
-        deductibleTax: amount(200_000),
-      });
+      const target = await committed();
+      const first = await record(target, { net: 1 * M, number: 'A-1' });
+      const second = await record(target, { net: 2 * M, number: 'A-2', deductibleTax: 200_000 });
 
       const page = h.dataOf<{ items: InvoiceWire[]; pagination: { totalItems: number } }>(
-        await h.invoicesOf(commitment.id, h.finance, { pageSize: 1 }).expect(200),
+        await h.invoicesOf(target.commitment.id, h.finance, { pageSize: 1 }).expect(200),
       );
-      const all = h.dataOf<{ items: InvoiceWire[] }>(await h.invoicesOf(commitment.id).expect(200)).items;
+      const all = h.dataOf<{ items: InvoiceWire[] }>(await h.invoicesOf(target.commitment.id).expect(200)).items;
 
       expect(all.map((item) => item.id)).toEqual([second.invoice.id, first.invoice.id]);
       expect(all[0]).toMatchObject({ deductibleTax: { amount: '200000' }, matchResult: 'TAX_ONLY' });
@@ -518,21 +546,37 @@ describe('invoices recorded against commitments over PostgreSQL (US-12-02, US-06
   });
 
   describe('two invoices at the same time (A7)', () => {
+    const queued = (target: Committed, numbers: [string, string], net: number) =>
+      h.queuedOnCommitment(
+        target.commitment.id,
+        numbers.map(
+          (number) => () =>
+            h
+              .recordPurchase(vendorId, {
+                requestId: target.requestId,
+                chargedCostCenterId: target.unit.department.unitId,
+                netMinor: BigInt(net),
+                number,
+              })
+              .then(
+                () => 'recorded',
+                (error: unknown) => (error instanceof PurchaseInvoiceRecordRefusedError ? error.reason : error),
+              ),
+        ),
+      );
+
     it('queue on the row of the commitment: neither takes it down by more than it held, and the second sees the first', async () => {
-      const { commitment } = await committed();
+      const target = await committed();
 
-      const [first, second] = await h.queuedOnCommitment(commitment.id, [
-        () => h.recordInvoice(commitment.id, invoice({ number: 'RACE-1', netAmount: amount(15 * M) })),
-        () => h.recordInvoice(commitment.id, invoice({ number: 'RACE-2', netAmount: amount(15 * M) })),
-      ]);
+      const answers = await queued(target, ['RACE-1', 'RACE-2'], 15 * M);
 
-      expect([first.status, second.status]).toEqual([201, 201]);
-      const row = await commitmentRow(commitment.id);
+      expect(answers).toEqual(['recorded', 'recorded']);
+      const row = await commitmentRow(target.commitment.id);
       // 20 million held: the first takes 15, the second only the 5 that is left; both prices are spent.
       expect(row).toMatchObject({ state: 'EXPENSED', applied_minor: String(20 * M) });
       const applied = await h.ctx.sql.query<{ number: string; applied_minor: string; match_result: string }>(
         `SELECT number, applied_minor::text, match_result::text FROM invoices WHERE commitment_id = $1 ORDER BY recorded_at, number`,
-        [commitment.id],
+        [target.commitment.id],
       );
       expect(applied.rows).toEqual([
         { number: 'RACE-1', applied_minor: String(15 * M), match_result: 'MATCHED' },
@@ -540,23 +584,20 @@ describe('invoices recorded against commitments over PostgreSQL (US-12-02, US-06
       ]);
     });
 
-    it('answers 409 to the one that comes second with a number the first used', async () => {
-      const { commitment } = await committed();
+    it('refuses the one that comes second with a number the first used', async () => {
+      const target = await committed();
 
-      const [first, second] = await h.queuedOnCommitment(commitment.id, [
-        () => h.recordInvoice(commitment.id, invoice({ number: 'SAME', netAmount: amount(1 * M) })),
-        () => h.recordInvoice(commitment.id, invoice({ number: 'SAME', netAmount: amount(1 * M) })),
-      ]);
+      const answers = await queued(target, ['SAME', 'SAME'], 1 * M);
 
-      expect([first.status, second.status]).toEqual([201, 409]);
-      expect((await commitmentRow(commitment.id)).applied_minor).toBe(String(1 * M));
+      expect(answers).toEqual(['recorded', 'DUPLICATE_NUMBER']);
+      expect((await commitmentRow(target.commitment.id)).applied_minor).toBe(String(1 * M));
     });
   });
 
   describe('the database keeps it too', () => {
     it('refuses to change or delete an invoice, even to the owner of the schema', async () => {
-      const { commitment } = await committed();
-      const { invoice: recorded } = await record(commitment.id);
+      const target = await committed();
+      const { invoice: recorded } = await record(target);
 
       const update = h.ctx.sql.query(`UPDATE invoices SET note = 'x' WHERE id = $1`, [recorded.id]);
       const remove = h.ctx.sql.query(`DELETE FROM invoices WHERE id = $1`, [recorded.id]);
