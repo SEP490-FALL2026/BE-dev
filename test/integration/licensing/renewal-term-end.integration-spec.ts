@@ -163,7 +163,12 @@ describe('the end of the time of use and the renewal of the right (T-RQ3, integr
     expect(await h.seatRow(assignmentId)).toMatchObject({ valid_until: null, expected_end_date: '2026-11-04' });
 
     const task = await extensionTaskOf(request.id);
-    await h.claim(task.id).expect(200);
+    const claimed = await h.claim(task.id).expect(200);
+    // The extension of a K1 seat has no checklist: the one of K1 belongs to the grant and the revocation of a seat (QĐ-111az, K1-GR).
+    expect(h.dataOf<{ task: { kind: string; k1Checklist: unknown } }>(claimed).task).toMatchObject({
+      kind: 'EXTEND',
+      k1Checklist: null,
+    });
     await h.complete(task.id, { evidence: 'Extended with the vendor until 04/02/2027' }).expect(200);
 
     expect(await h.state(request.id)).toBe('COMPLETED');
