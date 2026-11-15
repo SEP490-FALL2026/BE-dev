@@ -106,7 +106,7 @@ export class AssessmentQueueController {
   @ApiSuccessResponse(AssessmentDecisionsResponseDto, {
     message: 'ASSESSMENT_DECISIONS.LISTED',
     description:
-      'The proposals whose assessment has been decided, in the departments the caller reads, the newest decision first: completed (the request went on to the spend decision) or refused at the gate. Each says what the software is, who asked, who decided and when, how it ended and, for a refusal, its kind and the reason. The assessment itself is read by the route of the request.',
+      'The proposals whose assessment has been decided, in the departments the caller reads, the newest decision first: completed (the request went on to the spend decision, or, for internal software with no fee registered by the IT Admin, straight to the IT Admin to grant it) or refused at the gate. Each says what the software is, who asked, who decided and when, how it ended and, for a refusal, its kind and the reason. The assessment itself is read by the route of the request.',
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,
