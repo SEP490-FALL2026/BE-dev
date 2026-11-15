@@ -89,7 +89,8 @@ export class OutOfProcessCasesController {
   @ApiOperation({ operationId: 'outOfProcessCaseList', summary: 'List the cases outside the process' })
   @ApiSuccessResponse(OutOfProcessListResponseDto, {
     message: 'OUT_OF_PROCESS_CASE.LISTED',
-    description: 'The newest opened first. Filter by state or outcome.',
+    description:
+      'The newest opened first. Filter by state or outcome. Each case says in `revocation` what it asks of the IT Admin: an open case on a company asset waits at most ten working days (the day of the conclusion counting as the first) for the Request of the person to reach the step of the spending approver, and is `due` when there is none to wait for or the ceiling has passed.',
   })
   @ApiErrorResponses(...AUTH_ERRORS, FORBIDDEN, {
     status: HttpStatus.UNPROCESSABLE_ENTITY,

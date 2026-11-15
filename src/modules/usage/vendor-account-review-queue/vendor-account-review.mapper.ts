@@ -1,4 +1,5 @@
 import { DONG, formatAmount } from '../../../core/money/money';
+import type { Revocation } from '../vendor-account-review/out-of-process-revocation.policy';
 import type { DiscrepancyRecord, OutOfProcessCaseRecord } from '../vendor-account-review/vendor-account-review.types';
 import type { OutOfProcessCaseWire, VendorAccountWire } from './vendor-account-review.dto';
 
@@ -31,7 +32,11 @@ export function toDiscrepancyWire(row: DiscrepancyRecord, names: ApplicationName
   };
 }
 
-export function toCaseWire(row: OutOfProcessCaseRecord, names: ApplicationNames): OutOfProcessCaseWire {
+export function toCaseWire(
+  row: OutOfProcessCaseRecord,
+  names: ApplicationNames,
+  revocation: Revocation,
+): OutOfProcessCaseWire {
   return {
     id: row.id,
     state: row.state,
@@ -49,5 +54,6 @@ export function toCaseWire(row: OutOfProcessCaseRecord, names: ApplicationNames)
     companyAsset: row.companyAsset,
     concludedOn: row.concludedOn,
     renewalCancelled: row.renewalCancelled,
+    revocation,
   };
 }

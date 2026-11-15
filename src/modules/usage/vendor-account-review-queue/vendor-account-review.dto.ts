@@ -112,6 +112,25 @@ const discrepancySchema = z.strictObject({
   }),
 });
 
+const revocationSchema = z.strictObject({
+  required: z.boolean().meta({
+    description:
+      'The IT Admin has an account to revoke for this case: it is open and on a company asset, and the person has no Request that was approved. False for a personal account, a closed case, or a person whose Request was approved (the grant then goes by the task of that Request).',
+  }),
+  waitingRequestId: z.uuid().nullable().meta({
+    description:
+      'The Request of the person for the same software that is still on its way, which the case waits for or which goes on after the ceiling; null when there is none.',
+  }),
+  waitUntil: responseBusinessDate.nullable().meta({
+    description:
+      'The last day of the wait for that Request while it counts: the tenth working day from the day the case was concluded, which counts as the first. Null with no such Request, and once the Request is at the step of the spending approver in time (it is then waited for with no ceiling).',
+  }),
+  due: z.boolean().meta({
+    description:
+      'The IT Admin has the revocation to do now: nothing to wait for, the ceiling has passed with the Request not yet at the step of the spending approver, or the Request came to that step after the ceiling. Worked out when the case is read, never stored.',
+  }),
+});
+
 const caseSchema = z.strictObject({
   id: z.uuid(),
   state: caseState,
@@ -138,6 +157,10 @@ const caseSchema = z.strictObject({
       'The day the difference was concluded to be outside the process; null for a case opened before it was kept.',
   }),
   renewalCancelled: z.boolean().meta({ description: 'The renewal or payment was cancelled; true only for REVOKED.' }),
+  revocation: revocationSchema.meta({
+    description:
+      'What the case asks of the IT Admin by way of revocation, worked out when it is read from the Request the person sent for the same software (an account on a company asset waits at most ten working days for it to reach the step of the spending approver).',
+  }),
 });
 
 const pagination = z.strictObject({

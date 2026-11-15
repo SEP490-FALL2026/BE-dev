@@ -69,9 +69,10 @@ Tầng: T6 (`scripts/arch/tiers.cjs`). Phụ thuộc: devices, catalog, licensin
   transaction hoặc gắn vào ca đang mở của cùng tài khoản, `QĐ-98h`), `out-of-process-case-closure.service.ts` (`FALSE_ALARM|RECORD_SPENT|REPORT_ONLY|REVOKED`; `RECORD_SPENT` chỉ FINANCE, `REVOKED` chỉ IT_ADMIN, chỉ ca trên tài sản công ty, kèm `renewalCancelled` + chứng từ hủy gia hạn; ghi tiền chỉ khi có chứng từ + số VND + Cost Center đang hiệu lực hoặc
   chưa phân bổ: đính tệp qua `CatalogApi.attachOutOfProcessCaseDocuments`, rồi `BudgetsApi.recordOutOfProcessSpend` ghi MỘT khoản thực chi không cam kết),
   `vendor-account-evidence-retention.service.ts` + `.job.ts` (`VendorAccountEvidenceSweeper` xóa bằng chứng quá 24 tháng, `US-14-04` AC-2). Policy thuần:
-  `vendor-account-discrepancy.policy.ts` (hai giá trị, mốc 24 tháng), `out-of-process-case.policy.ts` (đóng ca).
+  `out-of-process-revocation.service.ts` + `.policy.ts` (việc thu hồi một ca trên tài sản công ty đòi ở IT Admin, tính LÚC ĐỌC: `RequestsApi.openGrantRequestsOf` một lần cho cả trang, lịch ngày nghỉ một lần; `required`/`waitingRequestId`/`waitUntil` = ngày làm việc thứ 10 kể từ ngày kết luận/`due`, `US-13-05` AC-20, AC-23, AC-24; không lưu gì, không tác vụ `SBF-18`).
+  Policy thuần: `vendor-account-discrepancy.policy.ts` (hai giá trị, mốc 24 tháng), `out-of-process-case.policy.ts` (đóng ca), `out-of-process-revocation.policy.ts` (thu hồi).
 - `vendor-account-review-queue/` — L3: `GET /vendor-account-discrepancies` + `POST …/{id}/decision` (IT Admin), `GET /out-of-process-cases` +
-  `POST …/{id}/closure` (Finance, IT Admin); tên ứng dụng của một trang đọc một lần (`CatalogApi.getCollectorApplications`).
+  `POST …/{id}/closure` (Finance, IT Admin), mỗi ca kèm `revocation { required, waitingRequestId, waitUntil, due }`; tên ứng dụng của một trang đọc một lần (`CatalogApi.getCollectorApplications`).
 - `usage-evidence/` — L0: repo đọc (nối ánh xạ còn hiệu lực **lúc đọc**), policy (độ mới 7/14 ngày theo loại nguồn, năng lực), service.
 
 ## Luồng và khóa

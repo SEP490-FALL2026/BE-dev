@@ -1,6 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { pageOf, type Page } from '../../../core/application/pagination';
 import { CatalogApi } from '../../catalog/public/catalog.api';
+import type { Revocation } from '../vendor-account-review/out-of-process-revocation.policy';
+import { OutOfProcessRevocationService } from '../vendor-account-review/out-of-process-revocation.service';
 import { VendorAccountReviewRepo } from '../vendor-account-review/vendor-account-review.repo';
 import type {
   DiscrepancyRecord,
@@ -23,6 +25,7 @@ export class VendorAccountReviewQueryService {
   constructor(
     private readonly reviews: VendorAccountReviewRepo,
     private readonly catalog: CatalogApi,
+    private readonly revocations: OutOfProcessRevocationService,
   ) {}
 
   async pageDiscrepancies(query: {
@@ -63,9 +66,10 @@ export class VendorAccountReviewQueryService {
       query.pageSize,
     );
     const names = await this.namesOf(rows);
+    const revocations = await this.revocations.of(rows);
 
     return pageOf(
-      rows.map((row) => toCaseWire(row, names)),
+      rows.map((row) => toCaseWire(row, names, revocationOf(revocations, row))),
       total,
       query.page,
       query.pageSize,
@@ -73,7 +77,9 @@ export class VendorAccountReviewQueryService {
   }
 
   async caseOf(row: OutOfProcessCaseRecord): Promise<OutOfProcessCaseWire> {
-    return toCaseWire(row, await this.namesOf([row]));
+    const revocations = await this.revocations.of([row]);
+
+    return toCaseWire(row, await this.namesOf([row]), revocationOf(revocations, row));
   }
 
   private async namesOf(rows: readonly { applicationId: string | null }[]): Promise<ApplicationNames> {
@@ -84,4 +90,11 @@ export class VendorAccountReviewQueryService {
       (await this.catalog.getCollectorApplications(ids)).map((application) => [application.id, application.name]),
     );
   }
+}
+
+function revocationOf(revocations: ReadonlyMap<string, Revocation>, row: OutOfProcessCaseRecord): Revocation {
+  const found = revocations.get(row.id);
+  if (!found) throw new Error(`The revocation of the case ${row.id} was not worked out.`);
+
+  return found;
 }

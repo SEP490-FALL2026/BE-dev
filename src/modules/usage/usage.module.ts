@@ -8,6 +8,7 @@ import { FinanceModule } from '../finance/finance.module';
 import { IdentityAccessFacadeModule } from '../identity-access/identity-access-facade.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { LicensingModule } from '../licensing/licensing.module';
+import { OperatingParametersModule } from '../operating-parameters/operating-parameters.module';
 import { OrganizationModule } from '../organization/organization.module';
 import { RequestsModule } from '../requests/requests.module';
 import { AiUsageController } from './ai-usage/ai-usage.controller';
@@ -60,6 +61,7 @@ import { ToolStatusQueryService } from './tool-status/tool-status-query.service'
 import { ToolStatusRepo } from './tool-status/tool-status.repo';
 import { ToolStatusSnapshotService } from './tool-status/tool-status-snapshot.service';
 import { OutOfProcessCaseClosureService } from './vendor-account-review/out-of-process-case-closure.service';
+import { OutOfProcessRevocationService } from './vendor-account-review/out-of-process-revocation.service';
 import { VendorAccountDecisionService } from './vendor-account-review/vendor-account-decision.service';
 import { VendorAccountEvidenceSweeper } from './vendor-account-review/vendor-account-evidence-retention.job';
 import { VendorAccountEvidenceRetentionService } from './vendor-account-review/vendor-account-evidence-retention.service';
@@ -84,6 +86,7 @@ import { VendorImportTemplateListener } from './vendor-import/vendor-import-temp
     AuditModule,
     BudgetsModule,
     FinanceModule,
+    OperatingParametersModule,
     OrganizationModule,
     RequestsModule,
     CatalogModule,
@@ -111,6 +114,7 @@ import { VendorImportTemplateListener } from './vendor-import/vendor-import-temp
     VendorAccountIntakeService,
     VendorAccountDecisionService,
     OutOfProcessCaseClosureService,
+    OutOfProcessRevocationService,
     VendorAccountReviewQueryService,
     VendorAccountEvidenceRetentionService,
     VendorAccountEvidenceSweeper,

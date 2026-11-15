@@ -235,6 +235,27 @@ export class VendorAccountReviewRepo {
     return toCase(row);
   }
 
+  /** The person each of the cases is about, from the difference it came from; null where the difference names none (an identifier nobody owns). One statement. */
+  async employeeIdsOfCases(caseIds: readonly string[]): Promise<Map<string, string | null>> {
+    if (caseIds.length === 0) return new Map();
+    const rows = await this.prisma.$queryRaw<{ case_id: string; employee_id: string | null }[]>`
+      SELECT c.id AS case_id, d.employee_id
+        FROM out_of_process_cases c JOIN vendor_account_discrepancies d ON d.id = c.discrepancy_id
+       WHERE c.id = ANY(${[...caseIds]}::uuid[])`;
+
+    return new Map(rows.map((row) => [row.case_id, row.employee_id]));
+  }
+
+  /** Every case still open on a company asset that was concluded: the ones that may ask the IT Admin to revoke (a short list, the cases of an account at a time). */
+  async openCompanyAssetCases(): Promise<OutOfProcessCaseRecord[]> {
+    const rows = await this.prisma.outOfProcessCase.findMany({
+      where: { state: 'OPEN', companyAsset: true, concludedOn: { not: null } },
+      orderBy: [{ openedAt: 'asc' }, { id: 'asc' }],
+    });
+
+    return rows.map(toCase);
+  }
+
   async pageCases(
     filter: OutOfProcessCaseFilter,
     skip: number,
