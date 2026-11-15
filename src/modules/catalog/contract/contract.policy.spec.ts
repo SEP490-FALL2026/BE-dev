@@ -96,6 +96,17 @@ describe('what a file is attached to', () => {
       assertPurposeAttachesTo('CONTRACT_ATTACHMENT', 'SIGNER');
     }).toThrow(DocumentPurposeMismatchError);
   });
+
+  it('attaches only a purchase document to the purchase invoice it came with (PI-1)', () => {
+    expect(() => {
+      assertPurposeAttachesTo('PURCHASE_DOCUMENT', 'PURCHASE_INVOICE');
+    }).not.toThrow();
+    for (const purpose of ['CONTRACT_ATTACHMENT', 'SIGNATURE_RECORD', 'COST_STATEMENT', 'TAX_PAYMENT_PROOF'] as const) {
+      expect(() => {
+        assertPurposeAttachesTo(purpose, 'PURCHASE_INVOICE');
+      }).toThrow(DocumentPurposeMismatchError);
+    }
+  });
 });
 
 describe('the file that may be stored (US-04-04 AC-10)', () => {

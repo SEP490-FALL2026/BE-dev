@@ -301,6 +301,7 @@ export class SubscriptionRepo {
     tx?: DbTx,
     on?: BusinessDate,
   ): Promise<{
+    subscriptionId: string;
     subscriptionKind: 'TERM' | 'PERPETUAL';
     unitPriceMinor: bigint;
     currency: string;
@@ -323,6 +324,7 @@ export class SubscriptionRepo {
     if (!row || row.unitPriceMinor === null || row.unitPriceCurrency === null) return null;
 
     return {
+      subscriptionId: row.id,
       subscriptionKind: row.plan.provisioningType === 'K4' ? 'PERPETUAL' : row.kind,
       unitPriceMinor: row.unitPriceMinor,
       currency: row.unitPriceCurrency,

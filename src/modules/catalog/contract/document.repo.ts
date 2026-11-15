@@ -118,6 +118,14 @@ export class DocumentRepo {
     });
   }
 
+  /** A purchase document belongs to the purchase invoice it came with, in the transaction of the caller. */
+  async markAttachedToPurchaseInvoice(tx: DbTx, id: string, purchaseInvoiceId: string, now: Date): Promise<void> {
+    await tx.documentAttachment.update({
+      where: { id },
+      data: { status: 'READY', purchaseInvoiceId, attachedAt: now },
+    });
+  }
+
   /** A signed record belongs to the person who signed it, in the transaction of the caller. */
   async markAttachedToSigner(tx: DbTx, id: string, signerEmployeeId: string, now: Date): Promise<void> {
     await tx.documentAttachment.update({

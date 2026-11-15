@@ -41,6 +41,9 @@ const ATTACHES_TO_CONTRACT: ReadonlySet<DocumentPurpose> = new Set(['CONTRACT_AT
 /** A signed record belongs to the person who signed it, not to a contract (`BM-06`). */
 const ATTACHES_TO_SIGNER: ReadonlySet<DocumentPurpose> = new Set(['SIGNATURE_RECORD']);
 
+/** A purchase document may also belong to the purchase invoice it came with (`PI-1`). */
+const ATTACHES_TO_PURCHASE_INVOICE: ReadonlySet<DocumentPurpose> = new Set(['PURCHASE_DOCUMENT']);
+
 /** What is kept: each type with the extensions that go with it. A name that says otherwise is refused. */
 const ALLOWED_TYPES: Record<string, readonly string[]> = {
   'application/pdf': ['pdf'],
@@ -61,8 +64,16 @@ export function assertPurposeAvailable(purpose: DocumentPurpose): void {
 }
 
 /** A file is attached to what its purpose names and to nothing else. Throws DocumentPurposeMismatchError. */
-export function assertPurposeAttachesTo(purpose: DocumentPurpose, target: 'CONTRACT' | 'SIGNER'): void {
-  const fits = target === 'CONTRACT' ? ATTACHES_TO_CONTRACT.has(purpose) : ATTACHES_TO_SIGNER.has(purpose);
+export function assertPurposeAttachesTo(
+  purpose: DocumentPurpose,
+  target: 'CONTRACT' | 'SIGNER' | 'PURCHASE_INVOICE',
+): void {
+  const targets = {
+    CONTRACT: ATTACHES_TO_CONTRACT,
+    SIGNER: ATTACHES_TO_SIGNER,
+    PURCHASE_INVOICE: ATTACHES_TO_PURCHASE_INVOICE,
+  } as const;
+  const fits = targets[target].has(purpose);
   if (!fits) throw new DocumentPurposeMismatchError();
 }
 
