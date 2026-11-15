@@ -1,21 +1,19 @@
 /**
- * The literal expectations of the OpenAPI examples (OPENAPI-EXAMPLE.1), written out so the test never asks the code that
- * builds the examples what they should be. Traced on BE `ea73c2f` (25/10/2026), and for the G5/G6 routes on their
- * merge `0da8f56` (Prompt 02, 26/10/2026), from each handler through its service, policies and repository to the HTTP
- * mapper — never from a response description; see docs/workspace/items/openapi-response-examples/spec.md.
+ * The literal expectations of the OpenAPI examples (OPENAPI-EXAMPLE.1), written out so the test never asks the code that builds the
+ * examples what they should be. Traced on BE `ea73c2f` and, for the G5/G6 routes, on `0da8f56`, from each handler through its service,
+ * policies and repository to the HTTP mapper — never from a response description; see docs/workspace/items/openapi-response-examples/spec.md.
  *
  * - SUCCESS_MESSAGES: the success `message` each operation answers with (its `@ApiSuccessResponse` metadata).
  * - BODYLESS_RESPONSES: success responses that have no JSON body, with the reason.
  * - ROUTE_ERROR_CODES: the codes an operation can answer with at a status beyond the ones every operation of its kind
  *   answers with (guards, validation pipe, throttler, request parsers — written out in api-inventory.e2e-spec.ts).
- *   Adding a code here needs the traced code path; a code that cannot be reached is never listed. A reachable code of
- *   another capability that the route only passes through is not shown until its owner can give the example within the
- *   module boundaries (Prompt 02 decision: personnelNoticeRecord, the revocation hooks; see the item spec).
- * - NO_EXAMPLE_RESPONSES: declared error responses the running system cannot answer yet, so they show no example
- *   (their declaration says why in `noExampleBecause`). The list only shrinks: the slice that makes one reachable adds
- *   its examples and removes the entry.
+ *   Adding a code here needs the traced code path; a code that cannot be reached is never listed. A reachable code of another
+ *   capability that the route only passes through is not shown until its owner can give the example within the module boundaries.
+ * - NO_EXAMPLE_RESPONSES: declared error responses the running system cannot answer yet, so they show no example (their declaration
+ *   says why in `noExampleBecause`). The list only shrinks: the slice that makes one reachable adds its examples and removes the entry.
  */
 
+import { SUCCESS_MESSAGES_POLICIES } from './openapi-example-messages-policies';
 import { ROUTE_ERROR_CODES_AI_ASSIST } from './openapi-example-route-codes-ai-assist';
 import { ROUTE_ERROR_CODES_BUDGETS } from './openapi-example-route-codes-budgets';
 import { ROUTE_ERROR_CODES_CATALOG } from './openapi-example-route-codes-catalog';
@@ -35,11 +33,12 @@ import { ROUTE_ERROR_CODES_REQUESTS } from './openapi-example-route-codes-reques
 import { ROUTE_ERROR_CODES_REQUESTS_SPEND } from './openapi-example-route-codes-requests-spend';
 import { ROUTE_ERROR_CODES_USAGE } from './openapi-example-route-codes-usage';
 
-export type RouteErrorStatus = '400' | '401' | '403' | '404' | '409' | '413' | '422' | '429' | '500' | '503';
+export type RouteErrorStatus = '400' | '401' | '403' | '404' | '409' | '413' | '415' | '422' | '429' | '500' | '503';
 
 export const SUCCESS_MESSAGES: Readonly<Record<string, string>> = {
   ...SUCCESS_MESSAGES_DEVICES,
   ...SUCCESS_MESSAGES_OPTIMIZATION,
+  ...SUCCESS_MESSAGES_POLICIES,
   ...SUCCESS_MESSAGES_USAGE,
   accessRequestAssessmentComplete: 'ACCESS_REQUEST.ASSESSMENT_COMPLETED',
   accessRequestAssessmentGet: 'ACCESS_REQUEST.ASSESSMENT_FETCHED',
@@ -370,6 +369,7 @@ export const SUCCESS_MESSAGES: Readonly<Record<string, string>> = {
 
 export const BODYLESS_RESPONSES: Readonly<Record<string, string>> = {
   'authLogout 204': 'Signed out: 204 No Content has no body (@RawResponse).',
+  'importTemplateGet 200': 'A file (xlsx or csv) sent as raw bytes with its own content type (@RawResponse).',
 };
 
 export const NO_EXAMPLE_RESPONSES: Readonly<Record<string, string>> = {};

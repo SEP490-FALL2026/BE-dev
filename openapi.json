@@ -82903,6 +82903,28 @@
               }
             }
           },
+          "422": {
+            "description": "The code, the step or the query is invalid (VALIDATION_ERROR).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "VALIDATION_ERROR": {
+                    "summary": "Request validation failed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "VALIDATION_ERROR",
+                        "message": "Request validation failed.",
+                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
           "429": {
             "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
             "content": {
@@ -83068,6 +83090,28 @@
               }
             }
           },
+          "422": {
+            "description": "The code, the step or the query is invalid (VALIDATION_ERROR).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "VALIDATION_ERROR": {
+                    "summary": "Request validation failed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "VALIDATION_ERROR",
+                        "message": "Request validation failed.",
+                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
           "429": {
             "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
             "content": {
@@ -83209,6 +83253,28 @@
                       "error": {
                         "code": "POLICY.NOT_FOUND",
                         "message": "No policy has this code.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The code, the step or the query is invalid (VALIDATION_ERROR).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "VALIDATION_ERROR": {
+                    "summary": "Request validation failed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "VALIDATION_ERROR",
+                        "message": "Request validation failed.",
+                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
                         "requestId": "req_example"
                       }
                     }
@@ -83392,6 +83458,28 @@
               }
             }
           },
+          "422": {
+            "description": "The code, the step or the query is invalid (VALIDATION_ERROR).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "VALIDATION_ERROR": {
+                    "summary": "Request validation failed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "VALIDATION_ERROR",
+                        "message": "Request validation failed.",
+                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
           "429": {
             "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
             "content": {
@@ -83553,6 +83641,28 @@
                       "error": {
                         "code": "POLICY.DRAFT_NOT_FOUND",
                         "message": "The policy has no draft.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The code, the step or the query is invalid (VALIDATION_ERROR).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "VALIDATION_ERROR": {
+                    "summary": "Request validation failed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "VALIDATION_ERROR",
+                        "message": "Request validation failed.",
+                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
                         "requestId": "req_example"
                       }
                     }
@@ -83806,7 +83916,7 @@
             }
           },
           "422": {
-            "description": "The request is invalid (VALIDATION_ERROR): a step or an item code that repeats, an empty checklist.",
+            "description": "The request is invalid (VALIDATION_ERROR): a step or an item code that repeats, an empty checklist; or the draft changes what the company may not change: the set of steps (POLICY.STEP_SET_FIXED, details.added and details.removed) or the code of an item the system checks by itself (POLICY.SYSTEM_ITEM_UNKNOWN, details.codes).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -83819,6 +83929,30 @@
                         "code": "VALIDATION_ERROR",
                         "message": "Request validation failed.",
                         "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "POLICY.STEP_SET_FIXED": {
+                    "summary": "The decision steps of a policy are fixed: a version may change their words, not add or take away a step.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "POLICY.STEP_SET_FIXED",
+                        "message": "The decision steps of a policy are fixed: a version may change their words, not add or take away a step.",
+                        "details": { "added": ["1.9"], "removed": [] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "POLICY.SYSTEM_ITEM_UNKNOWN": {
+                    "summary": "A question the system answers must be one the version in force already had as such; any other question asks the person.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "POLICY.SYSTEM_ITEM_UNKNOWN",
+                        "message": "A question the system answers must be one the version in force already had as such; any other question asks the person.",
+                        "details": { "items": ["1.2-04"] },
                         "requestId": "req_example"
                       }
                     }
@@ -83986,6 +84120,28 @@
                       "error": {
                         "code": "POLICY.DRAFT_NOT_FOUND",
                         "message": "The policy has no draft.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The code, the step or the query is invalid (VALIDATION_ERROR).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "VALIDATION_ERROR": {
+                    "summary": "Request validation failed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "VALIDATION_ERROR",
+                        "message": "Request validation failed.",
+                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
                         "requestId": "req_example"
                       }
                     }
@@ -84231,7 +84387,7 @@
             }
           },
           "422": {
-            "description": "The request is invalid (VALIDATION_ERROR): no ground of the issue, no role, a role named twice.",
+            "description": "The request is invalid (VALIDATION_ERROR): no ground of the issue, no role, a role named twice; or the draft changes the set of steps (POLICY.STEP_SET_FIXED) or the code of an item the system checks by itself (POLICY.SYSTEM_ITEM_UNKNOWN) — a draft written before the rule is refused here too.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -84244,6 +84400,30 @@
                         "code": "VALIDATION_ERROR",
                         "message": "Request validation failed.",
                         "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "POLICY.STEP_SET_FIXED": {
+                    "summary": "The decision steps of a policy are fixed: a version may change their words, not add or take away a step.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "POLICY.STEP_SET_FIXED",
+                        "message": "The decision steps of a policy are fixed: a version may change their words, not add or take away a step.",
+                        "details": { "added": ["1.9"], "removed": [] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "POLICY.SYSTEM_ITEM_UNKNOWN": {
+                    "summary": "A question the system answers must be one the version in force already had as such; any other question asks the person.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "POLICY.SYSTEM_ITEM_UNKNOWN",
+                        "message": "A question the system answers must be one the version in force already had as such; any other question asks the person.",
+                        "details": { "items": ["1.2-04"] },
                         "requestId": "req_example"
                       }
                     }
@@ -84329,7 +84509,7 @@
               "application/json": {
                 "schema": {
                   "allOf": [
-                    { "$ref": "#/components/schemas/AcknowledgementResponseDto" },
+                    { "$ref": "#/components/schemas/PolicyAcknowledgementResponseDto" },
                     { "properties": { "message": { "example": "POLICY_ACKNOWLEDGEMENT.RECORDED" } } }
                   ]
                 }
@@ -84413,6 +84593,28 @@
                       "error": {
                         "code": "POLICY.ACKNOWLEDGEMENT_NOT_REQUIRED",
                         "message": "The policy in force does not apply to any role of this account.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The code, the step or the query is invalid (VALIDATION_ERROR).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "VALIDATION_ERROR": {
+                    "summary": "Request validation failed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "VALIDATION_ERROR",
+                        "message": "Request validation failed.",
+                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
                         "requestId": "req_example"
                       }
                     }
@@ -84602,6 +84804,28 @@
                       "error": {
                         "code": "POLICY.NOT_PUBLISHED",
                         "message": "The policy has no published version.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The code, the step or the query is invalid (VALIDATION_ERROR).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "VALIDATION_ERROR": {
+                    "summary": "Request validation failed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "VALIDATION_ERROR",
+                        "message": "Request validation failed.",
+                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
                         "requestId": "req_example"
                       }
                     }
@@ -86307,7 +86531,7 @@
             }
           },
           "413": {
-            "description": "The picture is larger than 1 MB (PROFILE.AVATAR_TOO_LARGE).",
+            "description": "The picture is larger than 1 MiB: PROFILE.AVATAR_TOO_LARGE for one a little over it, HTTP_PAYLOAD_TOO_LARGE for any larger one, which the parser stops at once (1 MiB).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -86319,6 +86543,17 @@
                       "error": {
                         "code": "PROFILE.AVATAR_TOO_LARGE",
                         "message": "The picture is larger than 1 MB.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "HTTP_PAYLOAD_TOO_LARGE": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_PAYLOAD_TOO_LARGE",
+                        "message": "The request could not be processed.",
                         "requestId": "req_example"
                       }
                     }
@@ -118303,22 +118538,17 @@
           "data": {
             "type": "object",
             "properties": {
-              "policyCode": { "type": "string" },
-              "versionNumber": {
+              "id": { "type": "string", "format": "uuid" },
+              "registrationId": { "type": "string", "format": "uuid" },
+              "noticeVersionNumber": {
                 "type": "integer",
                 "exclusiveMinimum": true,
                 "maximum": 9007199254740991,
                 "minimum": 0
               },
-              "acknowledgedAt": {
-                "type": "string",
-                "format": "date-time",
-                "description": "When it was written now; null when the account had acknowledged the policy already and nothing was written.",
-                "nullable": true
-              },
-              "alreadyAcknowledged": { "type": "boolean" }
+              "acknowledgedAt": { "type": "string", "format": "date-time" }
             },
-            "required": ["policyCode", "versionNumber", "acknowledgedAt", "alreadyAcknowledged"],
+            "required": ["id", "registrationId", "noticeVersionNumber", "acknowledgedAt"],
             "additionalProperties": false,
             "nullable": true
           }
@@ -122777,6 +123007,37 @@
               "applicableRoles",
               "notified"
             ],
+            "additionalProperties": false,
+            "nullable": true
+          }
+        },
+        "required": ["success", "message", "data"],
+        "additionalProperties": false
+      },
+      "PolicyAcknowledgementResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "enum": [true] },
+          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "policyCode": { "type": "string" },
+              "versionNumber": {
+                "type": "integer",
+                "exclusiveMinimum": true,
+                "maximum": 9007199254740991,
+                "minimum": 0
+              },
+              "acknowledgedAt": {
+                "type": "string",
+                "format": "date-time",
+                "description": "When it was written now; null when the account had acknowledged the policy already and nothing was written.",
+                "nullable": true
+              },
+              "alreadyAcknowledged": { "type": "boolean" }
+            },
+            "required": ["policyCode", "versionNumber", "acknowledgedAt", "alreadyAcknowledged"],
             "additionalProperties": false,
             "nullable": true
           }

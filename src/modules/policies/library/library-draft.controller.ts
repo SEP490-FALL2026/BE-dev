@@ -29,6 +29,11 @@ const AUTH_ERRORS = [
   GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
   { status: HttpStatus.FORBIDDEN, description: 'Only the Super Admin.', examples: [FORBIDDEN_EXAMPLE] },
 ] as const;
+const VALIDATION_422 = {
+  status: HttpStatus.UNPROCESSABLE_ENTITY,
+  description: 'The code, the step or the query is invalid (VALIDATION_ERROR).',
+  examples: [VALIDATION_EXAMPLE],
+} as const;
 
 /** The Super Admin writes the draft of a policy and publishes it; the policies themselves are fixed, none is made or deleted here. */
 @ApiTags('policies')
@@ -46,7 +51,7 @@ export class LibraryDraftController {
     message: 'POLICY_DRAFT.FETCHED',
     description: 'The draft being written: the title, the sections and steps, and the roles it would apply to.',
   })
-  @ApiErrorResponses(...AUTH_ERRORS, {
+  @ApiErrorResponses(...AUTH_ERRORS, VALIDATION_422, {
     status: HttpStatus.NOT_FOUND,
     description: 'No such policy (POLICY.NOT_FOUND) or it has no draft (POLICY.DRAFT_NOT_FOUND).',
     examples: [EXAMPLES.NOT_FOUND, EXAMPLES.DRAFT_NOT_FOUND],
@@ -82,8 +87,8 @@ export class LibraryDraftController {
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
-        'The request is invalid (VALIDATION_ERROR): a step or an item code that repeats, an empty checklist.',
-      examples: [VALIDATION_EXAMPLE],
+        'The request is invalid (VALIDATION_ERROR): a step or an item code that repeats, an empty checklist; or the draft changes what the company may not change: the set of steps (POLICY.STEP_SET_FIXED, details.added and details.removed) or the code of an item the system checks by itself (POLICY.SYSTEM_ITEM_UNKNOWN, details.codes).',
+      examples: [VALIDATION_EXAMPLE, EXAMPLES.STEP_SET_FIXED, EXAMPLES.SYSTEM_ITEM_UNKNOWN],
     },
   )
   async write(
@@ -110,7 +115,7 @@ export class LibraryDraftController {
     message: 'POLICY_DRAFT.DISCARDED',
     description: 'The draft was deleted; the version in force is untouched.',
   })
-  @ApiErrorResponses(...AUTH_ERRORS, {
+  @ApiErrorResponses(...AUTH_ERRORS, VALIDATION_422, {
     status: HttpStatus.NOT_FOUND,
     description: 'No such policy (POLICY.NOT_FOUND) or it has no draft (POLICY.DRAFT_NOT_FOUND).',
     examples: [EXAMPLES.NOT_FOUND, EXAMPLES.DRAFT_NOT_FOUND],
@@ -143,8 +148,9 @@ export class LibraryDraftController {
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
-      description: 'The request is invalid (VALIDATION_ERROR): no ground of the issue, no role, a role named twice.',
-      examples: [VALIDATION_EXAMPLE],
+      description:
+        'The request is invalid (VALIDATION_ERROR): no ground of the issue, no role, a role named twice; or the draft changes the set of steps (POLICY.STEP_SET_FIXED) or the code of an item the system checks by itself (POLICY.SYSTEM_ITEM_UNKNOWN) — a draft written before the rule is refused here too.',
+      examples: [VALIDATION_EXAMPLE, EXAMPLES.STEP_SET_FIXED, EXAMPLES.SYSTEM_ITEM_UNKNOWN],
     },
   )
   async publish(

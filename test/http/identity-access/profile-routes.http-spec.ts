@@ -2,6 +2,7 @@ import { INestApplication } from '@nestjs/common';
 import request from 'supertest';
 import { App } from 'supertest/types';
 import { AccountNotFoundError } from '../../../src/modules/identity-access/accounts/account.errors';
+import { MeController } from '../../../src/modules/identity-access/access/me.controller';
 import {
   AvatarFileRequiredError,
   AvatarInvalidError,
@@ -10,6 +11,7 @@ import {
   AvatarTypeUnsupportedError,
   WorkPhoneInvalidError,
 } from '../../../src/modules/identity-access/profile/profile.errors';
+import { AVATAR_MAX_BYTES } from '../../../src/modules/identity-access/profile/profile.policy';
 import { ProfileAvatarService } from '../../../src/modules/identity-access/profile/profile-avatar.service';
 import { ProfilePhoneService } from '../../../src/modules/identity-access/profile/profile-phone.service';
 import { ProfileQueryService } from '../../../src/modules/identity-access/profile/profile-query.service';
@@ -106,6 +108,31 @@ describe('profile routes (http contract, no database)', () => {
       expect(bodyOf(response).error.code).toBe(code);
     });
 
+    it('answers 413 HTTP_PAYLOAD_TOO_LARGE for a file the parser stops at once, a byte over the limit and more, and never reaches the service (PF1-03)', async () => {
+      const huge = Buffer.alloc(AVATAR_MAX_BYTES + 2, 1);
+
+      const response = await as(
+        ['EMPLOYEE'],
+        request(app.getHttpServer())
+          .put('/api/v1/me/avatar')
+          .attach('file', huge, { filename: 'me.png', contentType: 'image/png' }),
+      ).expect(413);
+
+      expect(bodyOf(response).error.code).toBe('HTTP_PAYLOAD_TOO_LARGE');
+      expect(avatars.upload).not.toHaveBeenCalled();
+    });
+
+    it('is never cached: the answer carries a signed link (PF1-02)', async () => {
+      const response = await as(
+        ['EMPLOYEE'],
+        request(app.getHttpServer())
+          .put('/api/v1/me/avatar')
+          .attach('file', PNG, { filename: 'me.png', contentType: 'image/png' }),
+      ).expect(200);
+
+      expect(response.headers['cache-control']).toBe('no-store');
+    });
+
     it('refuses a form with a text field or a second file before the service is reached (400)', async () => {
       await as(
         ['EMPLOYEE'],
@@ -183,6 +210,12 @@ describe('profile routes (http contract, no database)', () => {
       expect(queries.lookup).not.toHaveBeenCalled();
     });
 
+    it('is never cached: the entries carry signed links (PF1-02)', async () => {
+      const response = await lookup({ employeeIds: [ID] }).expect(200);
+
+      expect(response.headers['cache-control']).toBe('no-store');
+    });
+
     it('accepts exactly 100 ids', async () => {
       await lookup({ employeeIds: Array.from({ length: 100 }, () => ID) }).expect(200);
     });
@@ -231,5 +264,12 @@ describe('profile routes (http contract, no database)', () => {
         'PROFILE.AVATAR_NOT_SET',
       );
     });
+  });
+
+  it('says GET /me is never cached either, for it carries the link to the picture (PF1-02)', () => {
+    const handler: unknown = Object.getOwnPropertyDescriptor(MeController.prototype, 'get')?.value;
+    const headers = Reflect.getMetadata('__headers__', handler as object) as { name: string; value: string }[];
+
+    expect(headers).toContainEqual({ name: 'Cache-Control', value: 'no-store' });
   });
 });

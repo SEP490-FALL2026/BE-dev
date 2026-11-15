@@ -32,7 +32,7 @@ export const acknowledgementReportRowSchema = z.strictObject({
 });
 
 export class AcknowledgementReportQueryDto extends createZodDto(acknowledgementReportQuerySchema) {}
-export class AcknowledgementResponseDto extends createZodDto(successEnvelopeSchema(acknowledgementSchema)) {}
+export class PolicyAcknowledgementResponseDto extends createZodDto(successEnvelopeSchema(acknowledgementSchema)) {}
 export class AcknowledgementReportResponseDto extends createZodDto(
   successEnvelopeSchema(
     z.strictObject({

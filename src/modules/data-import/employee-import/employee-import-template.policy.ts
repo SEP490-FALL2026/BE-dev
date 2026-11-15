@@ -1,3 +1,4 @@
+import { PLACEMENT_CODES_BY_COLUMN } from './row-validation/employee-import-row-validation.policy';
 import type { ImportTemplateDefinition } from '../../policies/public/policies.types';
 
 /**
@@ -38,7 +39,7 @@ export const EMPLOYEE_IMPORT_TEMPLATE: ImportTemplateDefinition = {
       format: 'Địa chỉ email',
       example: 'minh.anh@congty.example',
       constraint: 'Mỗi email chỉ một người, trong file và trong hệ thống.',
-      refusedWith: ['WORK_EMAIL_INVALID', 'WORK_EMAIL_DUPLICATE_IN_FILE', 'WORK_EMAIL_TAKEN'],
+      refusedWith: ['WORK_EMAIL_INVALID', 'WORK_EMAIL_DUPLICATE_IN_FILE', 'WORK_EMAIL_TAKEN', 'OWN_RECORD'],
     },
     {
       key: 'employment_type',
@@ -65,7 +66,7 @@ export const EMPLOYEE_IMPORT_TEMPLATE: ImportTemplateDefinition = {
       format: 'Mã phòng ban đã có trong hệ thống (chữ thường được đổi thành chữ hoa)',
       example: 'P-ENG',
       constraint: 'Phải là phòng ban có thật và đang hoạt động.',
-      refusedWith: ['DEPARTMENT_CODE_INVALID'],
+      refusedWith: ['DEPARTMENT_CODE_INVALID', ...PLACEMENT_CODES_BY_COLUMN.department_code],
     },
     {
       key: 'job_title',
@@ -74,6 +75,7 @@ export const EMPLOYEE_IMPORT_TEMPLATE: ImportTemplateDefinition = {
       format: 'Văn bản',
       example: 'Kỹ sư phần mềm',
       constraint: 'Tối đa 255 ký tự; có thể để trống.',
+      refusedWith: PLACEMENT_CODES_BY_COLUMN.job_title,
     },
   ],
   sampleRows: [

@@ -2,6 +2,7 @@ import { isBusinessDate } from '../../../../core/business-date';
 import { normalizeDisplayName } from '../../../../core/display-name';
 import { InvalidEmailError, normalizeEmail } from '../../../../core/email';
 import {
+  PLACEMENT_REASON_CODES,
   PlacementSubject,
   isJobTitleTooLong,
   placementReasons,
@@ -172,6 +173,12 @@ function typeAndDateIssues(row: RowText): RowIssue[] {
 
   return issues;
 }
+
+/** The codes of the placement reasons by the column of the file they are attached to: what the guide of the file says each column is refused with. */
+export const PLACEMENT_CODES_BY_COLUMN = {
+  department_code: PLACEMENT_REASON_CODES.filter((code) => code.startsWith('DEPARTMENT_')),
+  job_title: PLACEMENT_REASON_CODES.filter((code) => code.startsWith('JOB_TITLE_')),
+} as const;
 
 /** Only a person to create is placed; the placement reasons come after this file's own. */
 function placementIssues(row: RowText, department: { id: string; active: boolean } | undefined): RowIssue[] {

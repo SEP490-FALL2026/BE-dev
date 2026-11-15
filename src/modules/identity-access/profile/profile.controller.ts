@@ -2,6 +2,7 @@ import {
   Body,
   Controller,
   Delete,
+  Header,
   HttpStatus,
   Param,
   Patch,
@@ -39,7 +40,10 @@ import { ProfileAvatarService } from './profile-avatar.service';
 import { ProfilePhoneService } from './profile-phone.service';
 import { ProfileQueryService } from './profile-query.service';
 
-/** One file and nothing else, a little over the limit so the policy, not the parser, says it is too large (413 with its own code). */
+/**
+ * One file and nothing else. The limit is a byte over the policy's, so a file that is only a little too large is told by the policy
+ * (PROFILE.AVATAR_TOO_LARGE); the parser stops anything larger at once and answers 413 HTTP_PAYLOAD_TOO_LARGE, which the route declares too.
+ */
 const UPLOAD_LIMITS = { fileSize: AVATAR_MAX_BYTES + 1, files: 1, fields: 0, parts: 1 };
 
 interface UploadedBinary {
@@ -60,6 +64,7 @@ export class ProfileController {
   ) {}
 
   @Put('me/avatar')
+  @Header('Cache-Control', 'no-store')
   @AuthenticatedOnly()
   @UseInterceptors(FileInterceptor('file', { limits: UPLOAD_LIMITS }))
   @ApiOperation({ operationId: 'meAvatarPut', summary: 'Set my picture' })
@@ -81,8 +86,9 @@ export class ProfileController {
     },
     {
       status: HttpStatus.PAYLOAD_TOO_LARGE,
-      description: 'The picture is larger than 1 MB (PROFILE.AVATAR_TOO_LARGE).',
-      examples: [EXAMPLES.TOO_LARGE],
+      description:
+        'The picture is larger than 1 MiB: PROFILE.AVATAR_TOO_LARGE for one a little over it, HTTP_PAYLOAD_TOO_LARGE for any larger one, which the parser stops at once (1 MiB).',
+      examples: [EXAMPLES.TOO_LARGE, fallbackExample(HttpStatus.PAYLOAD_TOO_LARGE)],
     },
     {
       status: HttpStatus.UNSUPPORTED_MEDIA_TYPE,
@@ -145,6 +151,7 @@ export class ProfileController {
   }
 
   @Post('employee-profiles/lookup')
+  @Header('Cache-Control', 'no-store')
   @AuthenticatedOnly()
   @ApiOperation({ operationId: 'employeeProfileLookup', summary: 'Read the picture and work phone of employees' })
   @ApiSuccessResponse(EmployeeProfileLookupResponseDto, {

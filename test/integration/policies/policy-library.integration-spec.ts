@@ -180,6 +180,42 @@ describe('policy library (integration, real PostgreSQL)', () => {
       await h.admin.delete('/api/v1/policies/POL-MF4/draft').expect(200);
     });
 
+    it('refuses to publish a draft that changes the set of steps or marks a question as answered by the system, even one that skipped the check of the draft (LBF-06)', async () => {
+      await h.admin.put('/api/v1/policies/POL-MF4/draft', {}).expect(200);
+      const id = await policyId('POL-MF4');
+      const draft = dataOf<{ content: { steps: { checklist: { check: string }[] }[] } }>(
+        await h.admin.get('/api/v1/policies/POL-MF4/draft').expect(200),
+      );
+      const writeDraft = (content: object) =>
+        h.ctx.sql.query(
+          'UPDATE policy_versions SET content = $2::jsonb WHERE policy_id = $1 AND version_number IS NULL',
+          [id, JSON.stringify(content)],
+        );
+      const publish = () =>
+        h.admin.post('/api/v1/policies/POL-MF4/draft/publish', {
+          changeNote: 'Quyết định số 08',
+          applicableRoles: ['MANAGER'],
+        });
+      const published = () =>
+        count('SELECT count(*) AS n FROM policy_versions WHERE policy_id = $1 AND version_number IS NOT NULL', [id]);
+      const before = await published();
+
+      // The checks of the save are walked round: the text is written straight into the draft.
+      await writeDraft({ ...draft.content, steps: [] });
+      expect(bodyOf(await publish().expect(422)).error.code).toBe('POLICY.STEP_SET_FIXED');
+      await writeDraft({
+        ...draft.content,
+        steps: draft.content.steps.map((step) => ({
+          ...step,
+          checklist: step.checklist.map((item) => ({ ...item, check: 'SYSTEM' })),
+        })),
+      });
+      expect(bodyOf(await publish().expect(422)).error.code).toBe('POLICY.SYSTEM_ITEM_UNKNOWN');
+
+      expect(await published()).toBe(before);
+      await h.admin.delete('/api/v1/policies/POL-MF4/draft').expect(200);
+    });
+
     it('numbers versions one after the other, publishes a draft once, and names who published each (LB1-04)', async () => {
       await h.admin.put('/api/v1/policies/POL-MF5/draft', {}).expect(200);
       const body = {

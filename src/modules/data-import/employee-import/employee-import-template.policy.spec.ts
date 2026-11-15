@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { PLACEMENT_REASON_CODES } from '../../organization/public/employee-placement.policy';
 import { ImportTemplateService } from '../../policies/import-template/import-template.service';
 import { ImportTemplateContributions } from '../../policies/public/policies.extension-points';
 import { readUploadedEmployeeFile } from './preview/employee-import-xlsx.service';
@@ -59,5 +62,29 @@ describe('the template of the people file', () => {
       'employment_type',
       'hire_date',
     ]);
+  });
+
+  it('says on the instruction sheet every code the judge of the rows can answer with, and no other (LBF-03)', () => {
+    // The codes are read from the sources that make them, so a new refusal of a row that the sheet does not say turns this red.
+    const rowCodes = (file: string) =>
+      [...readFileSync(file, 'utf8').matchAll(/code: '([A-Z_]+)'/g)].map((match) => match[1]);
+    const validation = join(__dirname, 'row-validation', 'employee-import-row-validation.policy.ts');
+    const answered = new Set([...rowCodes(validation), ...PLACEMENT_REASON_CODES]);
+    const said = new Set(EMPLOYEE_IMPORT_TEMPLATE.columns.flatMap((column) => column.refusedWith ?? []));
+
+    expect(answered.size).toBe(14);
+    expect([...answered].filter((code) => !said.has(code)).sort()).toEqual([]);
+    expect([...said].filter((code) => !answered.has(code)).sort()).toEqual([]);
+  });
+
+  it('says each code under the column the judge attaches it to', () => {
+    const under = (key: string) =>
+      EMPLOYEE_IMPORT_TEMPLATE.columns.find((column) => column.key === key)?.refusedWith ?? [];
+
+    expect(under('work_email')).toContain('OWN_RECORD');
+    expect(under('department_code')).toEqual(
+      expect.arrayContaining(['DEPARTMENT_CODE_INVALID', 'DEPARTMENT_NOT_FOUND', 'DEPARTMENT_INACTIVE']),
+    );
+    expect(under('job_title')).toEqual(['JOB_TITLE_TOO_LONG']);
   });
 });

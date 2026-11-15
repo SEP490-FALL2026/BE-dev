@@ -5,6 +5,7 @@ import {
   FORBIDDEN_EXAMPLE,
   GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
   UNAUTHENTICATED_RESPONSE,
+  VALIDATION_EXAMPLE,
 } from '../../../infrastructure/http/decorators/api-error-responses.decorator';
 import { ApiSuccessResponse } from '../../../infrastructure/http/decorators/api-success-response.decorator';
 import { AuthenticatedOnly, RequireRoles } from '../../../infrastructure/security/decorators/access.decorators';
@@ -15,7 +16,7 @@ import { AcknowledgementReportService } from './acknowledgement-report.service';
 import {
   AcknowledgementReportQueryDto,
   AcknowledgementReportResponseDto,
-  AcknowledgementResponseDto,
+  PolicyAcknowledgementResponseDto,
 } from './acknowledgement.dto';
 import {
   ACKNOWLEDGEMENT_ERROR_EXAMPLES as EXAMPLES,
@@ -24,6 +25,11 @@ import {
 import { AcknowledgementService } from './acknowledgement.service';
 
 const AUTH_ERRORS = [UNAUTHENTICATED_RESPONSE, GUARDED_SERVICE_UNAVAILABLE_RESPONSE] as const;
+const VALIDATION_422 = {
+  status: HttpStatus.UNPROCESSABLE_ENTITY,
+  description: 'The code, the step or the query is invalid (VALIDATION_ERROR).',
+  examples: [VALIDATION_EXAMPLE],
+} as const;
 
 /** The reader says they have read the policy in force; the Super Admin sees who has and who has not. */
 @ApiTags('policies')
@@ -37,7 +43,7 @@ export class AcknowledgementController {
   @Post()
   @AuthenticatedOnly()
   @ApiOperation({ operationId: 'policyAcknowledgementCreate', summary: 'Acknowledge the policy in force' })
-  @ApiSuccessResponse(AcknowledgementResponseDto, {
+  @ApiSuccessResponse(PolicyAcknowledgementResponseDto, {
     status: HttpStatus.CREATED,
     message: 'POLICY_ACKNOWLEDGEMENT.RECORDED',
     description:
@@ -45,6 +51,7 @@ export class AcknowledgementController {
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,
+    VALIDATION_422,
     {
       status: HttpStatus.NOT_FOUND,
       description: 'No such policy (POLICY.NOT_FOUND).',
@@ -77,6 +84,7 @@ export class AcknowledgementController {
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,
+    VALIDATION_422,
     { status: HttpStatus.FORBIDDEN, description: 'Only the Super Admin.', examples: [FORBIDDEN_EXAMPLE] },
     {
       status: HttpStatus.NOT_FOUND,

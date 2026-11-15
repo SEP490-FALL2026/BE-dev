@@ -1,3 +1,5 @@
+import { POLICY_AND_PROFILE_OPERATIONS } from './api-coverage-manifest-policies';
+
 /** Inventory of exported HTTP operations. Add entries and HTTP tests together. */
 export const API_COVERAGE_MANIFEST: readonly string[] = [
   'GET /api/v1/cost-centers',
@@ -322,6 +324,7 @@ export const API_COVERAGE_MANIFEST: readonly string[] = [
   'GET /api/v1/health/live',
   'GET /api/v1/health/ready',
   'GET /api/v1/me',
+  ...POLICY_AND_PROFILE_OPERATIONS,
   'GET /api/v1/me/departure-notice',
   'GET /api/v1/me/department-transfer',
   'GET /api/v1/me/software-rights',

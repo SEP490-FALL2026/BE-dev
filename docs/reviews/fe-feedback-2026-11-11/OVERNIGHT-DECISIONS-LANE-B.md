@@ -60,10 +60,16 @@ Không làm ở FIX-LB1 (rẻ nhưng đổi hợp đồng hoặc chạm file lan
 - **Mã mới:** `BUDGET_CYCLE.LOCKED`, `.NOT_DRAFT`, `.ALREADY_OPEN` (409), `.DEADLINE_PASSED` (422), `.NOT_OPEN` (409, thay `BUDGET.CYCLE_NOT_PUBLISHED`); các mã cũ `BUDGET.CYCLE_*` còn lại giữ nguyên. Danh sách kỳ trả bản tóm tắt không có `priorities` (cổng collection-contract không cho phần tử danh sách trùng hình dạng chi tiết).
 - **Đổi lại:** nếu Owner muốn "đúng ngày hạn là khóa" hoặc nháp cũng cho tạo phòng thì đổi `cycleStateOf` / `windowOf` (một dòng mỗi nơi, có test).
 
+### D-B9 — phiên bản ngân sách: một số cho cả năm, tên trường giữ nguyên, mã 409 đổi theo SPEC (BG-2)
+
+- **Chọn:** giữ tên trường đang có trên dây (`base`, `reserve`, `reserveReason`) cho `baseAmount`/`reserveAmount` của SPEC, để FE hiện tại không phải đổi tên; chỉ bỏ `quarters`. Mã vượt Trần: `BUDGET_VERSION.OVER_CEILING`, `details.overBy` và `details.availableMinor` là số nhỏ nhất dạng chữ (cùng kiểu mọi `details` tiền khác). Cột `q1..q4_minor` và dòng `BM-10` cũ **không ghi nữa nhưng không xóa** (expand–contract).
+- **Việc BG-2 còn lại, chưa làm ở lượt này:** BG-2.1 `CarriedOverContributions` (budgets mở điểm mở rộng, `requests` gắn bằng hàm 01/01 của XY-1 — lane A đang sửa chính hàm đó nên chờ), BG-2.2 `BM-10` = tệp + `requestedAmount` + `note` + khóa sau hạn, BG-2.3 xóa route dòng/import, BG-2.5 phần còn lại (`reservePercent`, ≥ 1 tệp khi gửi, mặc định cơ sở = số chạy sang), BG-2.6 số liệu nền (`carriedOverNextYear`, `noProposalSubmitted`, `BASELINE_NO_PROPOSAL`, bỏ chặn `HAS_HEAD`), BG-2.7 quyết định chỉ `APPROVE`|`RETURN`.
+
 ## Optional và việc để lại
 
 - Báo cáo xác nhận chưa có tổng `done`/`pending` toàn tập (cần join chéo module); thêm khi FE đòi.
 - `GET /policies/{code}` cho phiên bản cũ trả `myAcknowledgement = null` (chỉ bản hiện hành có trạng thái).
+- FIX-LB2 Optional: LBF-04 (CHECK của migration `…100200` làm deploy hỏng nếu một DB đã có bản xuất bản vi phạm — chưa DB nào ngoài máy dev chạy PL-1, FYI, không cần Owner); LBF-05 (ca gọi `insertOnce` hai lần trong một transaction; CHECK bản 1 luôn đòi xác nhận lại; quyền runtime của `policy_acknowledgements`); LBF-06 phần còn lại (so mã `SYSTEM` theo cặp bước + mục, khóa chữ mục `SYSTEM` — cần Owner chốt nếu khóa chữ); LBF-07 (`publishedBy` có tên); LBF-08/09/10 (ghi chú thứ tự, lệch OVERNIGHT/HANDOFF, backfill so snapshot 1.0); PF1-04 (request bay lúc ghi `LEFT` đặt lại ảnh/SĐT), PF1-05 (sweeper gọi storage trong một transaction), PF1-06 (README module + `security-jobs.md` + chú thích client vẽ lại ảnh), PF1-07 (giới hạn điểm ảnh), PF1-08…12. Chi tiết ở `AUDIT-LB-FIX1-PF1.md`.
 - Mã thông báo cũ `BUDGET_DEPARTMENT_CEILING_PUBLISHED` giữ (đọc được hàng cũ) — BG-1.3 chỉ ngừng phát.
 
 ## Seed cần cho Z2
@@ -76,4 +82,4 @@ Không làm ở FIX-LB1 (rẻ nhưng đổi hợp đồng hoặc chạm file lan
 
 ## Dừng ở đâu
 
-- Xong PL-1, PL-3, PF-1, FIX-LB1, BG-1 (commit `1282e391`). Việc tiếp: BG-2 (và FIX-LB2 của chat 121 khi gửi tới).
+- Xong PL-1, PL-3, PF-1, FIX-LB1, BG-1 (`1282e391`), FIX-LB2, BG-2.0 (`4d58016a`), BG-2.4 + một phần BG-2.5 (`09fb1d0e`). Việc tiếp: phần còn lại của BG-2 (xem D-B9), rồi dừng "LANE B CHỜ MERGE".

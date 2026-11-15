@@ -183,7 +183,6 @@ export const ROUTE_ERROR_CODES_BUDGETS: Readonly<Record<string, Partial<Record<R
       ],
       '422': [
         'BUDGET.CURRENCY_NOT_REPORTING',
-        'BUDGET.QUARTERS_MISMATCH',
         'BUDGET.YEAR_ENDED',
         'CURRENCY_NOT_SUPPORTED',
         'MONEY_OUT_OF_RANGE',
@@ -258,7 +257,6 @@ export const ROUTE_ERROR_CODES_BUDGETS: Readonly<Record<string, Partial<Record<R
       '422': [
         'BUDGET.BASE_REASON_REQUIRED',
         'BUDGET.CURRENCY_NOT_REPORTING',
-        'BUDGET.QUARTERS_MISMATCH',
         'BUDGET.YEAR_ENDED',
         'CURRENCY_NOT_SUPPORTED',
         'MONEY_OUT_OF_RANGE',
