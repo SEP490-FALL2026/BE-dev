@@ -16,6 +16,7 @@ flowchart BT
   subgraph T3["T3"]
     finance["finance"]
     operating_parameters["operating-parameters"]
+    policies["policies"]
   end
   subgraph T4["T4"]
     catalog["catalog"]
@@ -121,6 +122,10 @@ flowchart BT
   personnel -->|8| operating_parameters
   personnel -->|97| organization
   personnel -->|8| requests
+  policies -->|5| audit
+  policies -->|4| identity_access
+  policies -->|2| notifications
+  policies -->|7| organization
   requests -->|58| audit
   requests -->|25| budgets
   requests -->|36| catalog
@@ -139,4 +144,4 @@ flowchart BT
   usage -->|14| organization
 ```
 
-97 module edges.
+101 module edges.
