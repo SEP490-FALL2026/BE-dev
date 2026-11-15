@@ -17,6 +17,7 @@ const BUDGET = {
   base: money('100'),
   reserve: money('20'),
   total: money('120'),
+  effectiveBudget: { base: money('100'), reserve: money('20'), total: money('120'), adjustment: money('0') },
   committed: money('20'),
   spent: money('10'),
   pendingSpend: money('30'),

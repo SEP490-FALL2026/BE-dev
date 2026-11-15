@@ -15,6 +15,12 @@ const SUMMARY = {
       base: { amount: '900', currency: 'VND' },
       reserve: { amount: '100', currency: 'VND' },
       total: { amount: '1000', currency: 'VND' },
+      effectiveBudget: {
+        base: { amount: '900', currency: 'VND' },
+        reserve: { amount: '100', currency: 'VND' },
+        total: { amount: '1000', currency: 'VND' },
+        adjustment: { amount: '0', currency: 'VND' },
+      },
       committed: { amount: '300', currency: 'VND' },
       spent: { amount: '200', currency: 'VND' },
       remaining: { amount: '500', currency: 'VND' },

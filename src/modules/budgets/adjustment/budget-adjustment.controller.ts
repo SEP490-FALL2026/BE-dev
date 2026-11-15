@@ -61,15 +61,13 @@ export class BudgetAdjustmentController {
     },
     {
       status: HttpStatus.CONFLICT,
-      description:
-        'The budget cycle of the year is not open yet (BUDGET_CYCLE.NOT_OPEN), or the year has ended (BUDGET.YEAR_ENDED).',
-      noExampleBecause:
-        'Both codes are of the budget cycle and of the year, which the routes of the versions document.',
+      description: 'The budget cycle of the year is not open yet (BUDGET_CYCLE.NOT_OPEN).',
+      examples: [EXAMPLES.CYCLE_NOT_OPEN],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
-        'The body is invalid (VALIDATION_ERROR), the adjustment is not made as its kind is meant (BUDGET_ADJUSTMENT.INVALID_SHAPE), it is more than what is not allocated (BUDGET_ADJUSTMENT.OVER_UNALLOCATED), it would leave a Cost Center below its forecast (BUDGET_ADJUSTMENT.BELOW_FORECAST_FLOOR) or give more than its base (BUDGET_ADJUSTMENT.OVER_BASE), or the Cost Center has no budget to give from (BUDGET_ADJUSTMENT.NO_BUDGET).',
+        'The body is invalid (VALIDATION_ERROR), the year has ended (BUDGET.YEAR_ENDED), the adjustment is not made as its kind is meant (BUDGET_ADJUSTMENT.INVALID_SHAPE), it is more than what is not allocated (BUDGET_ADJUSTMENT.OVER_UNALLOCATED), it would leave a Cost Center below its forecast (BUDGET_ADJUSTMENT.BELOW_FORECAST_FLOOR) or give more than its base (BUDGET_ADJUSTMENT.OVER_BASE), or the Cost Center has no budget to give from (BUDGET_ADJUSTMENT.NO_BUDGET).',
       examples: [
         VALIDATION_EXAMPLE,
         EXAMPLES.INVALID_SHAPE,

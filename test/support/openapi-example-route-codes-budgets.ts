@@ -57,6 +57,7 @@ export const ROUTE_ERROR_CODES_BUDGETS: Readonly<Record<string, Partial<Record<R
       '422': ['BUDGET_REVIEW.MONTH_NOT_ENDED', 'BUDGET_REVIEW.NO_BUDGET_FOR_YEAR'],
     },
     budgetAdjustmentCreate: {
+      '409': ['BUDGET_CYCLE.NOT_OPEN'],
       '422': [
         'BUDGET_ADJUSTMENT.INVALID_SHAPE',
         'BUDGET_ADJUSTMENT.OVER_UNALLOCATED',

@@ -69007,8 +69007,26 @@
             }
           },
           "409": {
-            "description": "The budget cycle of the year is not open yet (BUDGET_CYCLE.NOT_OPEN), or the year has ended (BUDGET.YEAR_ENDED).",
-            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+            "description": "The budget cycle of the year is not open yet (BUDGET_CYCLE.NOT_OPEN).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "BUDGET_CYCLE.NOT_OPEN": {
+                    "summary": "The budget cycle of 2026 is not open yet.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "BUDGET_CYCLE.NOT_OPEN",
+                        "message": "The budget cycle of 2026 is not open yet.",
+                        "details": { "year": 2026 },
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
           },
           "413": {
             "description": "The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).",
@@ -69053,7 +69071,7 @@
             }
           },
           "422": {
-            "description": "The body is invalid (VALIDATION_ERROR), the adjustment is not made as its kind is meant (BUDGET_ADJUSTMENT.INVALID_SHAPE), it is more than what is not allocated (BUDGET_ADJUSTMENT.OVER_UNALLOCATED), it would leave a Cost Center below its forecast (BUDGET_ADJUSTMENT.BELOW_FORECAST_FLOOR) or give more than its base (BUDGET_ADJUSTMENT.OVER_BASE), or the Cost Center has no budget to give from (BUDGET_ADJUSTMENT.NO_BUDGET).",
+            "description": "The body is invalid (VALIDATION_ERROR), the year has ended (BUDGET.YEAR_ENDED), the adjustment is not made as its kind is meant (BUDGET_ADJUSTMENT.INVALID_SHAPE), it is more than what is not allocated (BUDGET_ADJUSTMENT.OVER_UNALLOCATED), it would leave a Cost Center below its forecast (BUDGET_ADJUSTMENT.BELOW_FORECAST_FLOOR) or give more than its base (BUDGET_ADJUSTMENT.OVER_BASE), or the Cost Center has no budget to give from (BUDGET_ADJUSTMENT.NO_BUDGET).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -69102,7 +69120,7 @@
                         "code": "BUDGET_ADJUSTMENT.BELOW_FORECAST_FLOOR",
                         "message": "The Cost Center would be left with less than it is forecast to spend by the end of the year.",
                         "details": {
-                          "costCenterId": "3f0c7d54-9e1b-4f6a-8d2c-5b7a1e9c0d11",
+                          "costCenterId": "cost-center-1",
                           "floorMinor": "110000000",
                           "afterMinor": "108000000"
                         },
@@ -69117,7 +69135,7 @@
                       "error": {
                         "code": "BUDGET_ADJUSTMENT.OVER_BASE",
                         "message": "The amount is more than the base of the Cost Center.",
-                        "details": { "costCenterId": "3f0c7d54-9e1b-4f6a-8d2c-5b7a1e9c0d11", "baseMinor": "180000000" },
+                        "details": { "costCenterId": "cost-center-1", "baseMinor": "180000000" },
                         "requestId": "req_example"
                       }
                     }
@@ -69129,7 +69147,7 @@
                       "error": {
                         "code": "BUDGET_ADJUSTMENT.NO_BUDGET",
                         "message": "The Cost Center has no budget of the year to give from.",
-                        "details": { "costCenterId": "3f0c7d54-9e1b-4f6a-8d2c-5b7a1e9c0d11" },
+                        "details": { "costCenterId": "cost-center-1" },
                         "requestId": "req_example"
                       }
                     }
@@ -69528,7 +69546,7 @@
                       "error": {
                         "code": "BUDGET_ADJUSTMENT.VERSION_IN_FLIGHT",
                         "message": "The Cost Center has a version of the year that is still being decided.",
-                        "details": { "costCenterId": "3f0c7d54-9e1b-4f6a-8d2c-5b7a1e9c0d11" },
+                        "details": { "costCenterId": "cost-center-1" },
                         "requestId": "req_example"
                       }
                     }
@@ -69617,7 +69635,7 @@
                         "code": "BUDGET_ADJUSTMENT.BELOW_FORECAST_FLOOR",
                         "message": "The Cost Center would be left with less than it is forecast to spend by the end of the year.",
                         "details": {
-                          "costCenterId": "3f0c7d54-9e1b-4f6a-8d2c-5b7a1e9c0d11",
+                          "costCenterId": "cost-center-1",
                           "floorMinor": "110000000",
                           "afterMinor": "108000000"
                         },
@@ -69632,7 +69650,7 @@
                       "error": {
                         "code": "BUDGET_ADJUSTMENT.OVER_BASE",
                         "message": "The amount is more than the base of the Cost Center.",
-                        "details": { "costCenterId": "3f0c7d54-9e1b-4f6a-8d2c-5b7a1e9c0d11", "baseMinor": "180000000" },
+                        "details": { "costCenterId": "cost-center-1", "baseMinor": "180000000" },
                         "requestId": "req_example"
                       }
                     }
@@ -69644,7 +69662,7 @@
                       "error": {
                         "code": "BUDGET_ADJUSTMENT.NO_BUDGET",
                         "message": "The Cost Center has no budget of the year to give from.",
-                        "details": { "costCenterId": "3f0c7d54-9e1b-4f6a-8d2c-5b7a1e9c0d11" },
+                        "details": { "costCenterId": "cost-center-1" },
                         "requestId": "req_example"
                       }
                     }

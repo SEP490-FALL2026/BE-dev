@@ -1,6 +1,7 @@
 import { HttpStatus } from '@nestjs/common';
 import { ApiException } from '../../../infrastructure/http/errors/api.exception';
 import { errorExampleOf } from '../../../infrastructure/http/openapi-error-examples';
+import { BudgetCycleNotOpenError } from '../budget/budget.errors';
 import { toBudgetApiException } from '../budget/budget.http-errors';
 import {
   BudgetAdjustmentBelowForecastError,
@@ -67,10 +68,11 @@ export function toBudgetAdjustmentApiException(error: unknown): unknown {
 }
 
 const example = (error: Error) => errorExampleOf(toBudgetAdjustmentApiException(error));
-const COST_CENTER = '3f0c7d54-9e1b-4f6a-8d2c-5b7a1e9c0d11';
+const COST_CENTER = 'cost-center-1';
 
 /** The answers above as OpenAPI examples, each produced by the mapper that gives it at runtime (OPENAPI-EXAMPLE.1). */
 export const BUDGET_ADJUSTMENT_ERROR_EXAMPLES = {
+  CYCLE_NOT_OPEN: example(new BudgetCycleNotOpenError(2026)),
   NOT_FOUND: example(new BudgetAdjustmentNotFoundError()),
   INVALID_SHAPE: example(new BudgetAdjustmentShapeError('TO_REQUIRED')),
   OVER_UNALLOCATED: example(new BudgetAdjustmentOverUnallocatedError(29_000_000n, 30_000_000n)),
