@@ -131,14 +131,14 @@ flowchart BT
   policies -->|2| notifications
   policies -->|7| organization
   requests -->|60| audit
-  requests -->|29| budgets
+  requests -->|30| budgets
   requests -->|42| catalog
   requests -->|9| finance
   requests -->|37| identity_access
   requests -->|61| licensing
   requests -->|12| notifications
   requests -->|12| operating_parameters
-  requests -->|95| organization
+  requests -->|96| organization
   usage -->|7| audit
   usage -->|11| catalog
   usage -->|16| devices

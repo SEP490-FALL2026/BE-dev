@@ -101860,8 +101860,7 @@
               "PURCHASE_DOCUMENT",
               "TAX_PAYMENT_PROOF",
               "SIGNATURE_RECORD",
-              "IMPORT_SOURCE",
-              "COST_STATEMENT"
+              "IMPORT_SOURCE"
             ]
           }
         },
