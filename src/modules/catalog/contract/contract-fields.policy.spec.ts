@@ -144,6 +144,15 @@ describe('the number of a contract is read the way a name is (US-04-13 AC-4)', (
   it('tells different numbers apart', () => {
     expect(numberKeyOf('HD-001')).not.toBe(numberKeyOf('HD-0012'));
   });
+
+  it('reads a number of nothing but combining marks as no number, as a blank box is no number (B2D-05)', () => {
+    const input = { name: 'Hợp đồng', vendorId: VENDOR, effectiveFrom: '2026-01-01' };
+
+    expect(newContractFields({ ...input, number: '́' }).number).toBeNull();
+    expect(newContractFields({ ...input, number: ' ̣́ ' }).number).toBeNull();
+    expect(newContractFields({ ...input, number: 'HD-́' }).number).toBe('HD-́');
+    expect(changedContractFields(complete, { number: '́' }).number).toBeNull();
+  });
 });
 
 describe('what a change of a contract does (US-04-13 AC-5, AC-8)', () => {

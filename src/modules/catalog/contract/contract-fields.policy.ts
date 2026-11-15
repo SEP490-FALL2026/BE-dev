@@ -84,6 +84,16 @@ function trimmedOrNull(raw: string | null | undefined): string | null {
   return text.length === 0 ? null : text;
 }
 
+/**
+ * The number as it is kept, or null when there is none: a blank box, or text that is only combining marks (it has no key, which the database
+ * refuses), is no number.
+ */
+function numberOrNull(raw: string | null | undefined): string | null {
+  const text = trimmedOrNull(raw);
+
+  return text === null || numberKeyOf(text) === '' ? null : text;
+}
+
 /** The days make a period: the end is not before the beginning, and an end needs a beginning. Throws ContractEffectiveRangeError. */
 function assertRange(from: BusinessDate | null, to: BusinessDate | null): void {
   if (to === null) return;
@@ -106,7 +116,7 @@ export function newContractFields(input: NewContract): ContractFields {
   return {
     name,
     vendorId: input.vendorId,
-    number: trimmedOrNull(input.number),
+    number: numberOrNull(input.number),
     effectiveFrom: input.effectiveFrom,
     effectiveTo,
     note: trimmedOrNull(input.note),
@@ -124,7 +134,7 @@ export function changedContractFields(current: ContractFields, change: ContractC
   const next: ContractFields = {
     name: change.name === undefined ? current.name : cleanContractName(change.name),
     vendorId: change.vendorId ?? current.vendorId,
-    number: change.number === undefined ? current.number : trimmedOrNull(change.number),
+    number: change.number === undefined ? current.number : numberOrNull(change.number),
     effectiveFrom: change.effectiveFrom ?? current.effectiveFrom,
     effectiveTo: change.effectiveTo === undefined ? current.effectiveTo : change.effectiveTo,
     note: change.note === undefined ? current.note : trimmedOrNull(change.note),

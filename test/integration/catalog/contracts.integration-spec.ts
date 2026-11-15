@@ -119,6 +119,15 @@ describe('the contracts, over HTTP (integration, real PostgreSQL)', () => {
       await h.contractWith({ name: 'Không số 2', number: '   ' });
     });
 
+    it('reads a number of nothing but combining marks as no number instead of failing on the key of the database (B2D-05)', async () => {
+      const id = await h.contractWith({ name: 'Số chỉ có dấu', number: '́' });
+
+      expect((await h.contractOf(id)).number).toBeNull();
+      const other = await h.contractWith({ name: 'Số chỉ có dấu khác', number: '̣́' });
+      expect((await h.contractOf(other)).number).toBeNull();
+      await h.updateContract(other, { number: '́', reason: 'Dán nhầm ký tự dấu' }).expect(200);
+    });
+
     it('refuses a contract without a vendor or the day it begins, a vendor that is not in the catalog, days that make no period, and a kind', async () => {
       const make = (body: object) => h.createContract({ name: 'Hợp đồng', ...body });
       const answer = async (body: object, status: number) => {
