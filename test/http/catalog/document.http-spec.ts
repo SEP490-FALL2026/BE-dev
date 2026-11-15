@@ -117,7 +117,7 @@ describe('contract and document routes (e2e, no database)', () => {
     ['an attachment to a contract that is not a UUID', 'post', `${DOCUMENTS}/${ID}/attach`, { contractId: 'x' }],
     ['an attachment with an unknown field', 'post', `${DOCUMENTS}/${ID}/attach`, { contractId: ID, force: true }],
     ['a contract name over two hundred characters', 'post', CONTRACTS, { name: 'x'.repeat(201) }],
-    ['a contract with an unknown field', 'post', CONTRACTS, { name: 'x', vendorId: ID }],
+    ['a contract with a kind, which a contract no longer has', 'post', CONTRACTS, { name: 'x', kind: 'TERM' }],
   ] as const)('turns away %s with 422', async (_name, method, path, body) => {
     const req = request(app.getHttpServer())
       [method](path)

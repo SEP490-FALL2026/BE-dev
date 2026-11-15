@@ -28,6 +28,10 @@ import { ApplicationPlans } from './catalog-entry/application-plans.types';
 import { ApplicationViewService } from './catalog-entry/application-view.service';
 import { ApplicationVendorLinkService } from './catalog-entry/application-vendor-link.service';
 import { ApplicationsController } from './catalog-entry/applications.controller';
+import { ContractQueryService } from './contract/contract-query.service';
+import { ContractSubscriptionRepo } from './contract/contract-subscription.repo';
+import { ContractSubscriptionService } from './contract/contract-subscription.service';
+import { ContractSubscriptionsController } from './contract/contract-subscriptions.controller';
 import { ContractRepo } from './contract/contract.repo';
 import { ContractService } from './contract/contract.service';
 import { ContractsController } from './contract/contracts.controller';
@@ -116,6 +120,7 @@ import { VendorRepo } from './vendor/vendor.repo';
     ApplicationRetirementController,
     ApplicationResponsibilityController,
     ContractsController,
+    ContractSubscriptionsController,
     DocumentsController,
     RequestableSoftwareController,
   ],
@@ -175,6 +180,9 @@ import { VendorRepo } from './vendor/vendor.repo';
     SeatBaselinePhaseHook,
     ContractRepo,
     ContractService,
+    ContractQueryService,
+    ContractSubscriptionRepo,
+    ContractSubscriptionService,
     DocumentRepo,
     DocumentService,
     DocumentExpirySweeper,

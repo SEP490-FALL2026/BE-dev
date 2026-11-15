@@ -54,7 +54,7 @@ unitPrice, reportingUnitPrice, billingCycle }`, thuê bao `PERPETUAL` có giá �
 - Vendor: `vendors`, `vendor_groups`, `vendor_service_lines`, `vendor_dictionary_proposals`.
 - Ứng dụng: `applications`, `application_business_owners`, `application_retirement_confirmations`, `functional_groups`.
 - Plan: `plans`, `plan_workspace_profiles`, `plan_workspace_admins`, `plan_terms`, `plan_term_opinions`.
-- Subscription: `subscriptions`, `subscription_owner_assignments`. Hợp đồng: `contracts`, `document_attachments`.
+- Subscription: `subscriptions`, `subscription_owner_assignments`. Hợp đồng: `contracts`, `contract_subscriptions`, `document_attachments`.
 - Nguồn: `prisma/models/catalog.prisma`; hồ sơ thuế vendor (`VendorTaxProfile*`) thuộc `finance`.
 
 ## Extension point
@@ -110,8 +110,15 @@ file thuần xuống tầng thấp, hoặc đưa dịch vụ điều phối lên
   `SeatTargetService`, `seat-guard.policy.ts` (số lượng không dưới ghế đang chiếm); `nextStateOf`, `subscriptionStatusOf`,
   `sameUnitPrice` là hàm thuần trong `subscription.policy.ts`.
   `SubscriptionPoolRulesService` giữ các luật kho dùng chung mà policy thuần không biết (ai được phụ trách thuê bao).
-- `contract/` — hợp đồng và file riêng tư trong object storage (US-04-04); `contracts.controller.ts`,
-  `documents.controller.ts`; `ContractService`, `DocumentService`; `document-expiry.job.ts` chạy mỗi giờ (DB-13).
+- `contract/` — hợp đồng (nhà cung cấp, số, hiệu lực từ/đến — để trống là vô thời hạn —, ghi chú; không có loại hợp đồng,
+  US-04-13, `QĐ-111t`) và file riêng tư trong object storage (US-04-04). `contracts.controller.ts` (danh sách, tạo, sửa kèm
+  lý do, chi tiết), `contract-subscriptions.controller.ts` (liên kết và bỏ liên kết thuê bao), `documents.controller.ts`;
+  `ContractService` (ghi), `ContractQueryService` (danh sách phân trang và chi tiết, mỗi mảng ≤ 100 kèm cờ `truncated`),
+  `ContractSubscriptionService`, `DocumentService`; `document-expiry.job.ts` chạy mỗi giờ (DB-13). Trạng thái suy ra từ ngày
+  hôm nay (`contractStatusOf`, `INCOMPLETE` cho hợp đồng cũ chỉ có tên), không lưu. `contract-fields.policy.ts` giữ trường,
+  trạng thái và luật liên kết: chỉ thuê bao `K2`/`K4` cùng nhà cung cấp, mỗi thuê bao tối đa một hợp đồng (unique index và
+  trigger `contract_subscriptions_check` giữ lần chót); nhà cung cấp không đổi khi còn thuê bao liên kết. Nguồn usage của ứng
+  dụng không đọc ở đây (catalog T4 không đọc usage T6): chi tiết trả `applicationIds`.
 - `subscription-owner-assignment/` — repo và Nest module riêng của lệnh CLI (`subscription-owner-assignment-cli.module.ts`); service nằm ở `public/`.
 - Gốc module: `catalog-audit-event.mapper.ts` (sự kiện Audit Trail, mọi capability dùng).
 

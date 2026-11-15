@@ -21,6 +21,11 @@ const SHARED_STOCK_KINDS: ReadonlySet<string> = new Set(['K2', 'K4']);
 export const MAX_CONTRACT_NUMBER_LENGTH = 100;
 export const MAX_CONTRACT_NOTE_LENGTH = 2000;
 export const MAX_CONTRACT_REASON_LENGTH = 1000;
+/**
+ * The most subscriptions, files and applications the detail of a contract lists; it says when there are more. The detail carries a
+ * bounded slice of each, never the whole of an association that grows.
+ */
+export const CONTRACT_DETAIL_ARRAY_MAX = 100;
 
 /** What a contract says of itself. There is no kind of contract: a purchase for good is a contract that never ends. */
 export interface ContractFields {
@@ -129,12 +134,12 @@ export function changedContractFields(current: ContractFields, change: ContractC
   return next;
 }
 
-/** Whether two sets of fields say the same, the number being compared the way numbers are. */
+/** Whether two sets of fields are the same, to the letter: a number written in another case is a change (its key is the same, its text is not). */
 export function sameContractFields(a: ContractFields, b: ContractFields): boolean {
   return (
     a.name === b.name &&
     a.vendorId === b.vendorId &&
-    (a.number === null ? b.number === null : b.number !== null && numberKeyOf(a.number) === numberKeyOf(b.number)) &&
+    a.number === b.number &&
     a.effectiveFrom === b.effectiveFrom &&
     a.effectiveTo === b.effectiveTo &&
     a.note === b.note

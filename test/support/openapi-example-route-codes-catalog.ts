@@ -54,10 +54,36 @@ export const ROUTE_ERROR_CODES_CATALOG: Readonly<Record<string, Partial<Record<R
       ],
     },
     contractCreate: {
-      '422': ['CONTRACT.NAME_REQUIRED'],
+      '409': ['CONTRACT.NUMBER_TAKEN'],
+      '422': [
+        'CONTRACT.EFFECTIVE_FROM_REQUIRED',
+        'CONTRACT.EFFECTIVE_RANGE_INVALID',
+        'CONTRACT.NAME_REQUIRED',
+        'CONTRACT.VENDOR_NOT_FOUND',
+        'CONTRACT.VENDOR_REQUIRED',
+      ],
     },
     contractGet: {
       '404': ['CONTRACT.NOT_FOUND'],
+    },
+    contractSubscriptionLink: {
+      '404': ['CONTRACT.NOT_FOUND', 'CONTRACT.SUBSCRIPTION_NOT_FOUND'],
+      '409': ['CONTRACT.SUBSCRIPTION_ALREADY_LINKED'],
+      '422': ['CONTRACT.INCOMPLETE', 'CONTRACT.SUBSCRIPTION_KIND_NOT_ALLOWED', 'CONTRACT.SUBSCRIPTION_VENDOR_MISMATCH'],
+    },
+    contractSubscriptionUnlink: {
+      '404': ['CONTRACT.NOT_FOUND', 'CONTRACT.SUBSCRIPTION_NOT_LINKED'],
+    },
+    contractUpdate: {
+      '404': ['CONTRACT.NOT_FOUND'],
+      '409': ['CONTRACT.NUMBER_TAKEN', 'CONTRACT.VENDOR_LOCKED'],
+      '422': [
+        'CONTRACT.EFFECTIVE_RANGE_INVALID',
+        'CONTRACT.NAME_REQUIRED',
+        'CONTRACT.REASON_REQUIRED',
+        'CONTRACT.UPDATE_EMPTY',
+        'CONTRACT.VENDOR_NOT_FOUND',
+      ],
     },
     documentAttach: {
       '404': ['CONTRACT.NOT_FOUND', 'DOCUMENT.NOT_FOUND'],

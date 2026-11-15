@@ -378,7 +378,7 @@ describe('the contracts and the files kept for them over HTTP (integration, real
     expect(JSON.stringify(events)).not.toContain(await h.keyOf(document.id));
   });
 
-  it('keeps contracts as a name: the IT Admin makes one, the IT Admin and Finance read it, the head does not, nothing changes it', async () => {
+  it('keeps contracts to the IT Admin and Finance: the IT Admin makes one, both read it, the head does not, and no route deletes one', async () => {
     const id = await h.contract('  Hợp đồng Figma  ');
 
     expect(h.codeOf(await h.createContract({ name: '   ' }).expect(422))).toBe('CONTRACT.NAME_REQUIRED');
@@ -391,7 +391,6 @@ describe('the contracts and the files kept for them over HTTP (integration, real
     expect(h.codeOf(await h.getContract(id, head).expect(403))).toBe('AUTHORIZATION.FORBIDDEN');
     expect(h.codeOf(await h.getContract(randomUUID()).expect(404))).toBe('CONTRACT.NOT_FOUND');
     await request(h.server()).delete(`/api/v1/contracts/${id}`).set(h.as(h.it1)).expect(404);
-    await request(h.server()).patch(`/api/v1/contracts/${id}`).set(h.as(h.it1)).send({ name: 'x' }).expect(404);
   });
   describe('the integrity of a file that was looked at (SEC-01, SEC-07, DB-13)', () => {
     it('keeps the bytes that were looked at under a key of their own, and the old upload link is of no use to replace them', async () => {
