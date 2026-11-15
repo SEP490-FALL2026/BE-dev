@@ -50,6 +50,10 @@ export class OutOfProcessCaseClosureService {
     input: OutOfProcessClosureInput,
     now: Date = new Date(),
   ): Promise<OutOfProcessCaseRecord> {
+    // The money already spent, and the Cost Center that bears it, are Finance's to record; the IT Admin closes a false alarm or a report (`SBF-07a`, `US-13-05` AC-19).
+    if (input.outcome === 'RECORD_SPENT' && !actor.roles.includes('FINANCE')) {
+      throw new VendorAccountReviewRefusedError('FINANCE_ONLY');
+    }
     const organization = await this.organizationReads.getOrganization();
     if (!organization) throw new Error('A case outside the process was closed before installation');
 

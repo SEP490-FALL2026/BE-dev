@@ -484,6 +484,35 @@ describe('the review of the accounts at the vendors over PostgreSQL (integration
       expect(invoice).toMatchObject({ net_minor: '100000', cost_center_id: null, commitment_id: null });
     });
 
+    it('lets only Finance record the money already spent and choose the Cost Center: the IT Admin is refused with 403 and nothing is written, and still closes a false alarm or a report (B3C-06, SBF-07a, US-13-05 AC-19)', async () => {
+      const { caseId } = await opened();
+      const money = async (account: ApiAccount) => ({
+        outcome: 'RECORD_SPENT',
+        note: 'Đã trả',
+        documentIds: [await proof(account)],
+        amount: { amount: '250000' },
+        costCenterId: 'UNALLOCATED',
+      });
+
+      const refused = await cases('post', `/${caseId}/closure`, itAdmin)
+        .send(await money(itAdmin))
+        .expect(403);
+
+      expect(code(refused)).toBe('OUT_OF_PROCESS_CASE.FINANCE_ONLY');
+      expect(await rowsOfCase(caseId)).toEqual([]);
+      expect(
+        (await h.ctx.sql.query(`SELECT state::text FROM out_of_process_cases WHERE id = $1`, [caseId])).rows[0],
+      ).toEqual({ state: 'OPEN' });
+      await cases('post', `/${caseId}/closure`, h.finance)
+        .send(await money(h.finance))
+        .expect(201);
+      expect(await rowsOfCase(caseId)).toHaveLength(1);
+      const other = await opened();
+      await cases('post', `/${other.caseId}/closure`, itAdmin)
+        .send({ outcome: 'FALSE_ALARM', note: 'Báo nhầm' })
+        .expect(201);
+    });
+
     it('refuses money for a difference that has no vendor to book it to, while a report closes it, by the IT Admin as well', async () => {
       const intake = h.ctx.app.get(VendorAccountIntakeService);
       await h.ctx.app.get(TransactionRunner).run((tx) =>
@@ -503,11 +532,11 @@ describe('the review of the accounts at the vendors over PostgreSQL (integration
 
       expect(
         code(
-          await cases('post', `/${caseId}/closure`, itAdmin)
+          await cases('post', `/${caseId}/closure`, h.finance)
             .send({
               outcome: 'RECORD_SPENT',
               note: 'Đã trả',
-              documentIds: [await proof(itAdmin)],
+              documentIds: [await proof(h.finance)],
               amount: { amount: '5000' },
               costCenterId: 'UNALLOCATED',
             })

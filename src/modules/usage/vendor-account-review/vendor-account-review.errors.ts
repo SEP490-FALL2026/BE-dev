@@ -16,7 +16,9 @@ export type VendorAccountReviewRefusal =
   | 'AMOUNT_INVALID'
   | 'NO_VENDOR'
   | 'COST_CENTER_NOT_FOUND'
-  | 'NUMBER_TAKEN';
+  | 'NUMBER_TAKEN'
+  /** Only Finance records the money already spent and chooses the Cost Center (`SBF-07a`, `US-13-05` AC-19). */
+  | 'FINANCE_ONLY';
 
 export class VendorAccountReviewRefusedError extends Error {
   constructor(

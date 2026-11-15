@@ -32,6 +32,43 @@ const FORBIDDEN = {
   examples: [FORBIDDEN_EXAMPLE],
 } as const;
 
+/** What closing a case outside the process answers besides the shared authentication answers. */
+const CLOSE_ERROR_RESPONSES = [
+  {
+    status: HttpStatus.FORBIDDEN,
+    description:
+      'Only Finance and the IT Admin close the cases outside the process, and only Finance records the money already spent (OUT_OF_PROCESS_CASE.FINANCE_ONLY).',
+    examples: [FORBIDDEN_EXAMPLE, EXAMPLES.FINANCE_ONLY],
+  },
+  {
+    status: HttpStatus.NOT_FOUND,
+    description: 'The case does not exist (OUT_OF_PROCESS_CASE.NOT_FOUND).',
+    examples: [EXAMPLES.CASE_NOT_FOUND],
+  },
+  {
+    status: HttpStatus.CONFLICT,
+    description:
+      'The case was closed already (OUT_OF_PROCESS_CASE.ALREADY_CLOSED), or the vendor has an invoice with its number (OUT_OF_PROCESS_CASE.NUMBER_TAKEN).',
+    examples: [EXAMPLES.CASE_ALREADY_CLOSED, EXAMPLES.NUMBER_TAKEN],
+  },
+  {
+    status: HttpStatus.UNPROCESSABLE_ENTITY,
+    description:
+      'The note is missing (VALIDATION_ERROR); money is recorded with no proof of payment (OUT_OF_PROCESS_CASE.DOCUMENT_REQUIRED), with a file that is not a finished proof of payment of the person who closes it (OUT_OF_PROCESS_CASE.DOCUMENT_INVALID), without an amount or a Cost Center (OUT_OF_PROCESS_CASE.RECORD_FIELDS_MISSING) or with them on an outcome that records none (OUT_OF_PROCESS_CASE.RECORD_FIELDS_NOT_ALLOWED); the amount has digits after the point, is too large or is not above nothing (MONEY_SCALE_EXCEEDED, MONEY_OUT_OF_RANGE); the software has no vendor (OUT_OF_PROCESS_CASE.NO_VENDOR); or the Cost Center does not exist (OUT_OF_PROCESS_CASE.COST_CENTER_NOT_FOUND).',
+    examples: [
+      VALIDATION_EXAMPLE,
+      EXAMPLES.DOCUMENT_REQUIRED,
+      EXAMPLES.DOCUMENT_INVALID,
+      EXAMPLES.RECORD_FIELDS_MISSING,
+      EXAMPLES.RECORD_FIELDS_NOT_ALLOWED,
+      EXAMPLES.MONEY_SCALE_EXCEEDED,
+      EXAMPLES.MONEY_OUT_OF_RANGE,
+      EXAMPLES.NO_VENDOR,
+      EXAMPLES.COST_CENTER_NOT_FOUND,
+    ],
+  },
+] as const;
+
 /**
  * What happened outside the process (`SBF-07a`, RC-2, `QĐ-111y`, R-45, C-4): a case is opened by the decision OUT_OF_PROCESS on a difference of an
  * account at the vendor and closed once as a false alarm, as money already spent that has a proof of payment of the company, or as a report only.
@@ -67,39 +104,9 @@ export class OutOfProcessCasesController {
     status: HttpStatus.CREATED,
     message: 'OUT_OF_PROCESS_CASE.CLOSED',
     description:
-      'The case is closed once with a note. RECORD_SPENT records the money already spent as one expense in dong with no commitment, in the same step: it needs at least one proof of payment of the company, an amount and a Cost Center or UNALLOCATED. With no proof the case can only be a false alarm or a report.',
+      'The case is closed once with a note. RECORD_SPENT, which only Finance closes with, records the money already spent as one expense in dong with no commitment, in the same step: it needs at least one proof of payment of the company, an amount and a Cost Center or UNALLOCATED. With no proof the case can only be a false alarm or a report.',
   })
-  @ApiErrorResponses(
-    ...AUTH_ERRORS,
-    FORBIDDEN,
-    {
-      status: HttpStatus.NOT_FOUND,
-      description: 'The case does not exist (OUT_OF_PROCESS_CASE.NOT_FOUND).',
-      examples: [EXAMPLES.CASE_NOT_FOUND],
-    },
-    {
-      status: HttpStatus.CONFLICT,
-      description:
-        'The case was closed already (OUT_OF_PROCESS_CASE.ALREADY_CLOSED), or the vendor has an invoice with its number (OUT_OF_PROCESS_CASE.NUMBER_TAKEN).',
-      examples: [EXAMPLES.CASE_ALREADY_CLOSED, EXAMPLES.NUMBER_TAKEN],
-    },
-    {
-      status: HttpStatus.UNPROCESSABLE_ENTITY,
-      description:
-        'The note is missing (VALIDATION_ERROR); money is recorded with no proof of payment (OUT_OF_PROCESS_CASE.DOCUMENT_REQUIRED), with a file that is not a finished proof of payment of the person who closes it (OUT_OF_PROCESS_CASE.DOCUMENT_INVALID), without an amount or a Cost Center (OUT_OF_PROCESS_CASE.RECORD_FIELDS_MISSING) or with them on an outcome that records none (OUT_OF_PROCESS_CASE.RECORD_FIELDS_NOT_ALLOWED); the amount has digits after the point, is too large or is not above nothing (MONEY_SCALE_EXCEEDED, MONEY_OUT_OF_RANGE); the software has no vendor (OUT_OF_PROCESS_CASE.NO_VENDOR); or the Cost Center does not exist (OUT_OF_PROCESS_CASE.COST_CENTER_NOT_FOUND).',
-      examples: [
-        VALIDATION_EXAMPLE,
-        EXAMPLES.DOCUMENT_REQUIRED,
-        EXAMPLES.DOCUMENT_INVALID,
-        EXAMPLES.RECORD_FIELDS_MISSING,
-        EXAMPLES.RECORD_FIELDS_NOT_ALLOWED,
-        EXAMPLES.MONEY_SCALE_EXCEEDED,
-        EXAMPLES.MONEY_OUT_OF_RANGE,
-        EXAMPLES.NO_VENDOR,
-        EXAMPLES.COST_CENTER_NOT_FOUND,
-      ],
-    },
-  )
+  @ApiErrorResponses(...AUTH_ERRORS, ...CLOSE_ERROR_RESPONSES)
   async close(
     @CurrentPrincipal() actor: AuthenticatedPrincipal,
     @Param() params: VendorAccountIdParamDto,

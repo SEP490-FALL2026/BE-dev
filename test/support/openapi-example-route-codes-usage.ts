@@ -20,6 +20,7 @@ export const ROUTE_ERROR_CODES_USAGE: Readonly<Record<string, Partial<Record<Rou
     '409': ['VENDOR_ACCOUNT_DISCREPANCY.ALREADY_DECIDED'],
   },
   outOfProcessCaseClose: {
+    '403': ['OUT_OF_PROCESS_CASE.FINANCE_ONLY'],
     '404': ['OUT_OF_PROCESS_CASE.NOT_FOUND'],
     '409': ['OUT_OF_PROCESS_CASE.ALREADY_CLOSED', 'OUT_OF_PROCESS_CASE.NUMBER_TAKEN'],
     '422': [
