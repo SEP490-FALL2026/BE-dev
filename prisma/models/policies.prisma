@@ -52,5 +52,6 @@ model PolicyAcknowledgement {
 
   @@unique([policyVersionId, appUserId])
   @@index([organizationId, employeeId])
+  @@index([appUserId, policyVersionId])
   @@map("policy_acknowledgements")
 }

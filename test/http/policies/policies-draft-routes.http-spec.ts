@@ -137,6 +137,10 @@ describe('policy draft routes (http contract, no database)', () => {
     ['no role', { changeNote: 'Quyết định số 05', applicableRoles: [] }],
     ['a role named twice', { changeNote: 'Quyết định số 05', applicableRoles: ['MANAGER', 'MANAGER'] }],
     ['a role that does not exist', { changeNote: 'Quyết định số 05', applicableRoles: ['CEO'] }],
+    [
+      'the Super Admin among the roles (they publish, they are not asked to acknowledge)',
+      { changeNote: 'Quyết định số 05', applicableRoles: ['SUPER_ADMIN', 'EMPLOYEE'] },
+    ],
   ])('refuses a publication with %s (422)', async (_name, body) => {
     const response = await asSuperAdmin(request(app.getHttpServer()).post(`${DRAFT}/publish`).send(body)).expect(422);
 

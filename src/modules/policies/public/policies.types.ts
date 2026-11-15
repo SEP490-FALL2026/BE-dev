@@ -3,6 +3,9 @@ export const POLICY_ROLES = ['SUPER_ADMIN', 'IT_ADMIN', 'FINANCE', 'EMPLOYEE', '
 
 export type PolicyRole = (typeof POLICY_ROLES)[number];
 
+/** The roles a policy may ask to acknowledge it: the Super Admin publishes the policies and never acknowledges one (`US-01-14` AC-5, Bộ chính sách khởi tạo, mục Đã chốt 7). */
+export const POLICY_ACKNOWLEDGING_ROLES = ['IT_ADMIN', 'FINANCE', 'EMPLOYEE', 'MANAGER', 'SPENDING_APPROVER'] as const;
+
 /** The files an IT Admin, a head, Finance or the Super Admin may ask a template of (`QĐ-111as`). There is no template of a bank statement. */
 export const IMPORT_TEMPLATE_KINDS = [
   'employees',
