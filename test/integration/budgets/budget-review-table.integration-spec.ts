@@ -155,6 +155,25 @@ describe('the tables of the review periods keep a picture that is never changed 
     expect(kept.forecastMinor).toBe(309_750_000n);
   });
 
+  it('RV1-07: a line is never added to a period made before, signed or not: the lines of a picture are written with the period, in its own transaction', async () => {
+    const open = await write(period({ year: nextYear() }), [line()]);
+    const signed = await write(period({ year: nextYear(), month: 4, kind: 'MONTH' }), [line()]);
+    await runner.run((tx) =>
+      repo.sign(tx, signed.id, { employeeId: randomUUID(), at: new Date('2040-05-08T03:00:00.000Z'), note: null }),
+    );
+    const add = (periodId: string) =>
+      h.ctx.sql.query(
+        `INSERT INTO budget_review_lines (id, period_id, cost_center_id, base_minor, reserve_minor, spent_minor, committed_minor, pending_spend_minor,
+            remaining_minor, invoice_net_minor, invoice_actual_minor, variance_ppm, price_increase_minor, forecast_minor, pace_basis_points, light)
+         VALUES (gen_random_uuid(), $1, gen_random_uuid(), 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 999999999, NULL, 'RED')`,
+        [periodId],
+      );
+
+    await expect(add(open.id)).rejects.toThrow(/keeps its picture/);
+    await expect(add(signed.id)).rejects.toThrow(/keeps its picture/);
+    expect((await repo.linesPage({ periodId: signed.id, skip: 0, take: 10 })).total).toBe(1);
+  });
+
   it('signs once: the state moves from the picture to signed with who and when, a second signature finds nothing to sign, and a signed period does not change again', async () => {
     const created = await write(period({ year: nextYear(), month: 4, kind: 'MONTH' }), [line()]);
     const by = { employeeId: randomUUID(), at: new Date('2040-05-08T03:00:00.000Z'), note: 'Reviewed' };
