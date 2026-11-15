@@ -3,6 +3,7 @@ import { DevicesApi } from '../../devices/public/devices.api';
 import { OptimizationApi } from '../../optimization/public/optimization.api';
 import { RequestsDashboardApi } from '../../requests/public/requests-dashboard.api';
 import { UsageEvidenceApi } from '../../usage/public/usage-evidence.api';
+import { UsageOutOfProcessApi } from '../../usage/public/usage-out-of-process.api';
 
 /** The counts of the overview of an IT Admin that each come from the facade of one other module and need no rule of the overview. */
 export interface ItAdminDashboardFacts {
@@ -14,6 +15,8 @@ export interface ItAdminDashboardFacts {
   unconfirmedDevices: number;
   /** The periods of a right paid by the month or the year whose invoice is five working days late, in the departments in scope (`PI-2`). */
   missingInvoicePeriods: number;
+  /** The open cases outside the process on a company asset whose revocation is due now: nobody to wait for, or the ten working days passed (`US-13-05` AC-23). */
+  outOfProcessRevocationsDue: number;
 }
 
 /**
@@ -29,6 +32,7 @@ export class ItAdminDashboardFactsService {
     private readonly usage: UsageEvidenceApi,
     private readonly devices: DevicesApi,
     private readonly requests: RequestsDashboardApi,
+    private readonly outOfProcess: UsageOutOfProcessApi,
   ) {}
 
   /** `organizationId` is null before the installation. */
@@ -44,6 +48,14 @@ export class ItAdminDashboardFactsService {
       : 0;
     const missingInvoicePeriods = await this.requests.missingInvoicePeriods(input.departmentIds);
 
-    return { wastedSeats: wastedSeats.counted, withoutSeat, unconfirmedDevices, missingInvoicePeriods };
+    const outOfProcessRevocationsDue = await this.outOfProcess.revocationsDue();
+
+    return {
+      wastedSeats: wastedSeats.counted,
+      withoutSeat,
+      unconfirmedDevices,
+      missingInvoicePeriods,
+      outOfProcessRevocationsDue,
+    };
   }
 }

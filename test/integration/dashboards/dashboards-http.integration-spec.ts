@@ -26,6 +26,7 @@ const SECTION_KEYS = {
     'licenseKeys',
     'missingInvoicePeriods',
     'offboardingHandovers',
+    'outOfProcessRevocationsDue',
     'plansBelowVendorAdminMinimum',
     'revocationTasks',
     'saasIssues',

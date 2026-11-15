@@ -32,6 +32,7 @@ import { IdentityService } from './identity/identity.service';
 import { IdentityRepo } from './identity/identity.repo';
 import { NoAssignmentFindingRepo } from './identity/no-assignment-finding.repo';
 import { UsageEvidenceApi } from './public/usage-evidence.api';
+import { UsageOutOfProcessApi } from './public/usage-out-of-process.api';
 import { UsageImportListeners } from './public/usage.extension-points';
 import { VendorImportConfirmationService } from './vendor-import/confirmation/vendor-import-confirmation.service';
 import { VendorImportWriteService } from './vendor-import/confirmation/vendor-import-write.service';
@@ -153,6 +154,7 @@ import { VendorImportTemplateListener } from './vendor-import/vendor-import-temp
     UsageEvidenceRepo,
     UsageEvidenceService,
     UsageEvidenceApi,
+    UsageOutOfProcessApi,
     UsageOverviewRepo,
     UsageOverviewScopeService,
     UsageOverviewPeopleService,
@@ -161,6 +163,6 @@ import { VendorImportTemplateListener } from './vendor-import/vendor-import-temp
     UsageEmployeeViewService,
   ],
   // The door to the usage for the rules of wasted seats, and the point they bind to hear a confirmed report.
-  exports: [UsageEvidenceApi, UsageImportListeners],
+  exports: [UsageEvidenceApi, UsageOutOfProcessApi, UsageImportListeners],
 })
 export class UsageModule {}

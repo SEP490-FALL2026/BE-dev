@@ -26,6 +26,7 @@ export interface ItAdminDashboard {
     saasIssues: DashboardSection;
     ghostSeats: DashboardSection;
     missingInvoicePeriods: DashboardSection;
+    outOfProcessRevocationsDue: DashboardSection;
   };
 }
 
@@ -39,6 +40,8 @@ export interface ItAdminDashboard {
  * (people active in a vendor with no seat to cover the day, `FR-4.8`) are the open findings of the vendor usage import; the company machines whose holder has not
  * acknowledged the notice are counted from the register of the organization (`unconfirmedDevices`, the total `deviceList` answers for that state). The recommendations of wasted seats are counted as the `G2` not closed plus the `G1` open of the whole organization (`ghostSeats`).
  * The periods of a right paid by the month or the year whose invoice is five working days late are counted in the departments in scope (`missingInvoicePeriods`, `PI-2`).
+ * The cases outside the process on a company asset whose revocation is due now (nobody to wait for, or the ten working days of the wait passed) are counted for the whole
+ * organization (`outOfProcessRevocationsDue`, `US-13-05` AC-23); the cases are not of a department.
  * The progress of the departures and the transfers of those departments (`departures`, `transfers`), the seats of the shared pools got back in the tasks
  * the IT Admin is in charge of (`seatsReturned`) and the plans short of admins at the vendor (`plansBelowVendorAdminMinimum`) come from `DashboardProgressService`
  * (SPEC P21); `offboardingHandovers` stays one release beside them (the cases still handing over, as before) and is dropped after.
@@ -89,6 +92,8 @@ export class ItAdminDashboardService {
         saasIssues: counted(work.openSaasIssues, 'saasIssueList'),
         ghostSeats: counted(counts.wastedSeats, 'ghostSeatRecommendationList'),
         missingInvoicePeriods: counted(counts.missingInvoicePeriods, 'purchaseInvoiceMissingPeriodList'),
+        // No list answers this number alone: the cases are listed by `outOfProcessCaseList`, each saying in `revocation` whether it is due.
+        outOfProcessRevocationsDue: counted(counts.outOfProcessRevocationsDue, null),
       },
     };
   }

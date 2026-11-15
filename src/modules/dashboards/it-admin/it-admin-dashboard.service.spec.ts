@@ -7,6 +7,7 @@ import type { OptimizationApi } from '../../optimization/public/optimization.api
 import { PersonnelDashboardApi } from '../../personnel/public/personnel-dashboard.api';
 import type { RequestsDashboardApi } from '../../requests/public/requests-dashboard.api';
 import type { UsageEvidenceApi } from '../../usage/public/usage-evidence.api';
+import type { UsageOutOfProcessApi } from '../../usage/public/usage-out-of-process.api';
 import { progressOf } from '../progress/dashboard-progress.policy';
 import type { DashboardProgressService } from '../progress/dashboard-progress.service';
 import { DashboardRefusedError } from '../section/dashboard-section.errors';
@@ -55,6 +56,7 @@ function serviceWith(scope: string[]) {
   const countByCollectionState = jest.fn().mockResolvedValue(4);
   const read = jest.fn().mockResolvedValue(PROGRESS);
   const missingInvoicePeriods = jest.fn().mockResolvedValue(7);
+  const revocationsDue = jest.fn().mockResolvedValue(4);
   const service = new ItAdminDashboardService(
     {
       businessToday: () => Promise.resolve('2026-10-23'),
@@ -70,6 +72,7 @@ function serviceWith(scope: string[]) {
       { openFindingCount } as unknown as UsageEvidenceApi,
       { countByCollectionState } as unknown as DevicesApi,
       { missingInvoicePeriods } as unknown as RequestsDashboardApi,
+      { revocationsDue } as unknown as UsageOutOfProcessApi,
     ),
   );
 
@@ -83,6 +86,7 @@ function serviceWith(scope: string[]) {
     countByCollectionState,
     read,
     missingInvoicePeriods,
+    revocationsDue,
   };
 }
 
@@ -122,6 +126,8 @@ describe('ItAdminDashboardService', () => {
       unconfirmedDevices: { state: 'COUNTED', count: 4, sourceOperationId: 'deviceList' },
       // PI-2: the periods whose invoice is five working days late, in the departments in scope, as the list of them totals.
       missingInvoicePeriods: { state: 'COUNTED', count: 7, sourceOperationId: 'purchaseInvoiceMissingPeriodList' },
+      // OOP-1a: the open cases on a company asset whose revocation is due; no list answers this number alone, so it names none.
+      outOfProcessRevocationsDue: { state: 'COUNTED', count: 4, sourceOperationId: null },
     });
     expect(missingInvoicePeriods).toHaveBeenCalledWith(['d-des', 'd-ops']);
     expect(countByCollectionState).toHaveBeenCalledWith('org-1', 'AWAITING_ACKNOWLEDGEMENT');

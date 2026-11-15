@@ -240,6 +240,32 @@ describe('the revocation a case on a company asset asks of the IT Admin (integra
     expect((await revocationOf(id, h.finance))?.due).toBe(true);
   });
 
+  it('is counted on the overview of the IT Admin as the cases whose revocation is due, the ones that wait and the ones that ask nothing left out', async () => {
+    const waiting = await person();
+    await sentBy(waiting);
+    const approved = await person();
+    await stateOf(await sentBy(approved), 'AWAITING_EXECUTION');
+    const dueOnes = [await caseOf(await person()), await caseOf(null)];
+    await caseOf(waiting);
+    await caseOf(approved);
+    await caseOf(await person(), { companyAsset: false });
+    pretendBusinessToday(h.ctx.app, '2026-08-10');
+
+    const cases = await read();
+    const dashboard = h.dataOf<{ sections: { outOfProcessRevocationsDue: Record<string, unknown> } }>(
+      await request(h.server()).get('/api/v1/dashboards/it-admin').set(h.as(h.it1)).expect(200),
+    );
+
+    const due = [...cases.values()].filter((item) => item.revocation.due).map((item) => item.id);
+    expect(dueOnes.every((id) => due.includes(id))).toBe(true);
+    expect(dashboard.sections.outOfProcessRevocationsDue).toEqual({
+      state: 'COUNTED',
+      count: due.length,
+      sourceOperationId: null,
+      reason: null,
+    });
+  });
+
   it('costs the same number of statements for a page of one case as for a page of several people with Requests of their own', async () => {
     const asker = await person();
     await sentBy(asker);

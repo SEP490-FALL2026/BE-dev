@@ -41,6 +41,9 @@ const itAdminDashboardSchema = z.strictObject({
     missingInvoicePeriods: section(
       'The periods of a right paid by the month or the year whose invoice has not been submitted five working days after the payment day, in the departments of the caller: the total of the list of them (`purchaseInvoiceMissingPeriodList`).',
     ),
+    outOfProcessRevocationsDue: section(
+      'The open cases outside the process on a company asset whose revocation is due now: no Request of the person to wait for, or the ten working days of the wait have passed with the Request not yet at the step of the spending approver. The cases are listed by `outOfProcessCaseList`, each with its `revocation`; no list answers this number alone.',
+    ),
     ghostSeats: section(
       'The recommendations of wasted seats not closed: the seats of people who left (G2) and the free seats of subscriptions (G1 open).',
     ),

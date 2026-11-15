@@ -100,6 +100,7 @@ const ROUTES: Route[] = [
         saasIssues: COUNTED,
         ghostSeats: COUNTED,
         missingInvoicePeriods: COUNTED,
+        outOfProcessRevocationsDue: COUNTED,
       },
     },
   },
