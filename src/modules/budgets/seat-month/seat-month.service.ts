@@ -6,11 +6,9 @@ import type { SeatOfMonth } from '../../licensing/public/licensing-seat-month.ty
 import { SeatMonthSubscriptionService } from './seat-month-subscription.service';
 import { endedMonthsOf } from './seat-month.policy';
 import { SeatMonthRepo } from './seat-month.repo';
-import { SeatMonthSignedGuard } from './seat-month.types';
 
-/** What charging a month did: the subscriptions it charged, the rows they have now, how many failed, and whether a signed month made it stop. */
+/** What charging a month did: the subscriptions it charged, the rows they have now, and how many failed. */
 export interface SeatMonthResult {
-  skipped: boolean;
   subscriptions: number;
   rows: number;
   /** The subscriptions whose charge failed; a month charged on request throws instead, the sweeper tries them again at its next pass. */
@@ -32,13 +30,12 @@ export class SeatMonthService {
     private readonly runner: TransactionRunner,
     private readonly repo: SeatMonthRepo,
     private readonly licensing: LicensingSeatMonthApi,
-    private readonly signed: SeatMonthSignedGuard,
     private readonly subscriptions: SeatMonthSubscriptionService,
   ) {}
 
   /** Charges the subscriptions of every month that has ended that have no mark for it, the earliest month first: what the sweeper does each hour. */
   async chargeEndedMonths(today: BusinessDate, now: Date = new Date()): Promise<SeatMonthResult> {
-    const total: SeatMonthResult = { skipped: false, subscriptions: 0, rows: 0, failed: 0 };
+    const total: SeatMonthResult = { subscriptions: 0, rows: 0, failed: 0 };
     for (const month of endedMonthsOf(today)) {
       const done = await this.charge(month, now, true);
       total.subscriptions += done.subscriptions;
@@ -65,7 +62,6 @@ export class SeatMonthService {
     now: Date,
     onlyMissing: boolean,
   ): Promise<SeatMonthResult & { firstFailure?: Error }> {
-    if (await this.signed.isSigned(month)) return { skipped: true, subscriptions: 0, rows: 0, failed: 0 };
     const seatsBySubscription = new Map<string, SeatOfMonth[]>();
     for (const seat of await this.licensing.getSeatsOfMonth(month)) {
       seatsBySubscription.set(seat.subscriptionId, [...(seatsBySubscription.get(seat.subscriptionId) ?? []), seat]);
@@ -77,7 +73,6 @@ export class SeatMonthService {
       .filter((subscriptionId) => !marked.has(subscriptionId))
       .sort(byId);
     const result: SeatMonthResult & { firstFailure?: Error } = {
-      skipped: false,
       subscriptions: 0,
       rows: 0,
       failed: 0,

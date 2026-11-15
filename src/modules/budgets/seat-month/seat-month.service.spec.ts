@@ -24,7 +24,7 @@ const seatOn = (subscriptionId: string): SeatOfMonth => ({
 describe('SeatMonthService.chargeEndedMonths (SM1-03)', () => {
   const subscriptions = ['A', 'B', 'C'];
 
-  function build(options: { failing?: string[]; signed?: boolean } = {}) {
+  function build(options: { failing?: string[] } = {}) {
     const done = new Set<string>();
     const failing = new Set(options.failing ?? []);
     const charged: string[] = [];
@@ -43,7 +43,6 @@ describe('SeatMonthService.chargeEndedMonths (SM1-03)', () => {
           Promise.resolve(new Set(subscriptions.filter((id) => done.has(`${id}|${month}`)))),
       } as unknown as SeatMonthRepo,
       { getSeatsOfMonth: () => Promise.resolve(subscriptions.map(seatOn)) } as unknown as LicensingSeatMonthApi,
-      { isSigned: () => Promise.resolve(options.signed === true) },
       { charge } as unknown as SeatMonthSubscriptionService,
     );
 
@@ -77,10 +76,12 @@ describe('SeatMonthService.chargeEndedMonths (SM1-03)', () => {
     expect(charge).toHaveBeenCalledTimes(3 + 3 + 3);
   });
 
-  it('leaves a signed month as it is', async () => {
-    const { service, charge } = build({ signed: true });
+  it('charges a month again whatever was charged before: closing the numbers of a month is a picture, not a lock (QĐ-111ae)', async () => {
+    const { service, charge } = build();
 
-    expect(await service.chargeMonth('2026-01-01')).toEqual({ skipped: true, subscriptions: 0, rows: 0, failed: 0 });
-    expect(charge).not.toHaveBeenCalled();
+    await service.chargeMonth('2026-01-01');
+    await service.chargeMonth('2026-01-01');
+
+    expect(charge).toHaveBeenCalledTimes(6);
   });
 });

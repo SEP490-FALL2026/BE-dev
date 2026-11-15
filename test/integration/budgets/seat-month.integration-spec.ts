@@ -404,6 +404,138 @@ describe('a month of the seats of a K2 pool is charged to the departments of the
     expect(await poolService().linesOfMonth(`${h.year}-07-01`, owned, 10)).toEqual([]);
   });
 
+  const reversalsOf = async (requestId: string) =>
+    (
+      await h.ctx.sql.query<{ amount_minor: string; reason: string; month: string }>(
+        `SELECT r.amount_minor::text, r.reason, to_char(r.month, 'YYYY-MM-DD') AS month
+           FROM budget_commitment_seat_month_reversals r JOIN budget_commitments c ON c.id = r.commitment_id
+          WHERE c.request_id = $1 ORDER BY r.created_at, r.amount_minor`,
+        [requestId],
+      )
+    ).rows;
+  const approvedRequest = async (unit: Unit, planId: string, amount: number): Promise<string> => {
+    const requestId = await h.waitingForApprover(unit, planId, { amount });
+    await h.decideSpend(requestId, { decision: 'APPROVE' }, h.boss.account).expect(200);
+
+    return requestId;
+  };
+
+  it('SM1-06: a month charged again after the person moved earlier gives back what the old department applied, never applies the commitment of another Cost Center, and charging a third time changes nothing', async () => {
+    const pool = await newPool();
+    const planId = await h.planOf(pool);
+    const [from, to] = [await department(), await department()];
+    const requestId = await approvedRequest(from, planId, 400_000);
+    const person = await holder('E-SM-REV', from, to, `${h.year}-10-26`);
+    await seat(pool, planId, person, { requestId });
+    await service().chargeMonth(month());
+    expect(await commitmentOf(requestId)).toMatchObject({ applied_minor: '322581', state: 'HELD' });
+
+    // The history is corrected: the person was in the new department from 01/10, so the old department bore none of the month.
+    await h.ctx.sql.query(
+      `BEGIN;
+       UPDATE employee_placements SET valid_to = '${h.year}-10-01' WHERE employee_id = '${person}' AND department_id = '${from.department.id}';
+       UPDATE employee_placements SET valid_from = '${h.year}-10-01' WHERE employee_id = '${person}' AND department_id = '${to.department.id}';
+       COMMIT;`,
+    );
+    await service().chargeMonth(month());
+
+    const rows = await rowsOf(pool);
+    expect(rows).toMatchObject([
+      { department_id: to.department.id, days: 31, amount_minor: '400000', applied_minor: '0', commitment_id: null },
+    ]);
+    expect(await commitmentOf(requestId)).toMatchObject({ applied_minor: '0', state: 'HELD' });
+    expect(await reversalsOf(requestId)).toEqual([
+      { amount_minor: '322581', reason: 'SEAT_NOT_ASKED', month: month() },
+    ]);
+
+    await service().chargeMonth(month());
+    expect(await rowsOf(pool)).toEqual(rows);
+    expect(await reversalsOf(requestId)).toHaveLength(1);
+    expect(await commitmentOf(requestId)).toMatchObject({ applied_minor: '0', state: 'HELD' });
+  });
+
+  it('SM1-06: a commitment that became an expense is held again for what a seat-month no longer applies, and what the rows of the seat apply never exceeds the days it was held', async () => {
+    const pool = await newPool();
+    const planId = await h.planOf(pool);
+    const unit = await department();
+    const requestId = await approvedRequest(unit, planId, 400_000);
+    const seatId = await seat(pool, planId, await holder('E-SM-EXP', unit), {
+      requestId,
+      validFrom: `${h.year}-01-01`,
+    });
+    await service().chargeMonth(month());
+    expect(await commitmentOf(requestId)).toMatchObject({ applied_minor: '400000', state: 'EXPENSED' });
+
+    await h.ctx.sql.query(`UPDATE license_assignments SET valid_until = $2 WHERE id = $1`, [seatId, `${h.year}-10-16`]);
+    await service().chargeMonth(month());
+
+    expect(await rowsOf(pool)).toMatchObject([{ days: 15, amount_minor: '193548', applied_minor: '193548' }]);
+    expect(await commitmentOf(requestId)).toMatchObject({ applied_minor: '193548', state: 'HELD' });
+    expect(await reversalsOf(requestId)).toEqual([{ amount_minor: '206452', reason: 'RECALCULATED', month: month() }]);
+  });
+
+  it('SM1-06: the database lets the applied amount of a commitment go down only by what the reversals add up to, and never changes or removes a reversal', async () => {
+    const unit = await department();
+    const pool = await newPool();
+    const planId = await h.planOf(pool);
+    const requestId = await approvedRequest(unit, planId, 400_000);
+    await seat(pool, planId, await holder('E-SM-GRD', unit), { requestId, validFrom: `${h.year}-01-01` });
+    await service().chargeMonth(month());
+    const [commitment] = (
+      await h.ctx.sql.query<{ id: string; organization_id: string }>(
+        `SELECT id, organization_id FROM budget_commitments WHERE request_id = $1`,
+        [requestId],
+      )
+    ).rows;
+    const code = async (statement: string, values: unknown[] = []) => {
+      try {
+        await h.ctx.sql.query(statement, values);
+
+        return null;
+      } catch (error) {
+        return (error as { code?: string }).code ?? 'unknown';
+      }
+    };
+    const reverse = (amount: number) =>
+      h.ctx.sql.query(
+        `INSERT INTO budget_commitment_seat_month_reversals (id, organization_id, commitment_id, subscription_id, assignment_id, department_id, month, amount_minor, reason, created_at)
+         VALUES (gen_random_uuid(), $1, $2, gen_random_uuid(), gen_random_uuid(), gen_random_uuid(), $3, $4, 'RECALCULATED', now())`,
+        [commitment.organization_id, commitment.id, month(), amount],
+      );
+
+    // No way down without a reversal, or with one that does not match.
+    expect(
+      await code(`UPDATE budget_commitments SET applied_minor = applied_minor - 1 WHERE id = $1`, [commitment.id]),
+    ).toBe('23001');
+    await reverse(1000);
+    expect(
+      await code(
+        `UPDATE budget_commitments SET applied_minor = applied_minor - 999, seat_month_reversed_minor = 999, state = 'HELD' WHERE id = $1`,
+        [commitment.id],
+      ),
+    ).toBe('23001');
+    expect(
+      await code(
+        `UPDATE budget_commitments SET applied_minor = applied_minor - 1000, seat_month_reversed_minor = 1000, state = 'HELD' WHERE id = $1`,
+        [commitment.id],
+      ),
+    ).toBeNull();
+    expect(await commitmentOf(requestId)).toMatchObject({ applied_minor: '399000', state: 'HELD' });
+    // A reversal is the proof: it is never changed or removed.
+    expect(
+      await code(`UPDATE budget_commitment_seat_month_reversals SET amount_minor = 1 WHERE commitment_id = $1`, [
+        commitment.id,
+      ]),
+    ).toBe('23001');
+    expect(
+      await code(`DELETE FROM budget_commitment_seat_month_reversals WHERE commitment_id = $1`, [commitment.id]),
+    ).toBe('23001');
+    // What was given back is never taken back.
+    expect(
+      await code(`UPDATE budget_commitments SET seat_month_reversed_minor = 0 WHERE id = $1`, [commitment.id]),
+    ).toBe('23001');
+  });
+
   const facts = async (unit: Unit) =>
     (await h.ctx.app.get(BudgetsApi, { strict: false }).yearFacts(unit.department.unitId, [h.year])).get(h.year);
 

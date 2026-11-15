@@ -68,7 +68,28 @@ export class SeatMonthRepo {
     return rows.map(toRecord);
   }
 
-  /** Removes these rows; the ones that took a commitment down are not among them (an expense does not come back, see `SeatMonthService`). */
+  /** What a seat-month gave back to a commitment, one row for each, written before the commitment is held again (the guard of the commitments checks the sum). */
+  async insertReversals(
+    tx: DbTx,
+    rows: readonly {
+      organizationId: string;
+      commitmentId: string;
+      subscriptionId: string;
+      assignmentId: string;
+      departmentId: string;
+      month: BusinessDate;
+      amountMinor: bigint;
+      reason: 'RECALCULATED' | 'SEAT_NOT_ASKED';
+      createdAt: Date;
+    }[],
+  ): Promise<void> {
+    if (rows.length === 0) return;
+    await tx.budgetCommitmentSeatMonthReversal.createMany({
+      data: rows.map((row) => ({ ...row, month: toDateColumn(row.month) })),
+    });
+  }
+
+  /** Removes these rows of a month charged again; what they applied to a commitment was given back first, by a reversal. */
   async deleteRows(tx: DbTx, ids: readonly string[]): Promise<void> {
     if (ids.length === 0) return;
     await tx.seatMonthCharge.deleteMany({ where: { id: { in: [...ids] } } });

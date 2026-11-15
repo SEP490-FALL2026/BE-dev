@@ -22,11 +22,3 @@ export interface HeldRange {
   from: BusinessDate;
   until: BusinessDate | null;
 }
-
-/**
- * Whether the month was already signed off by a review period (`RV-1`): a signed month is never charged again. The review capability binds the
- * real answer; until it does, nothing is signed.
- */
-export abstract class SeatMonthSignedGuard {
-  abstract isSigned(month: BusinessDate): Promise<boolean>;
-}

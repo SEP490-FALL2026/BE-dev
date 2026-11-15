@@ -8,7 +8,7 @@ import { OrganizationHistoryApi } from '../../organization/public/organization-h
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { BudgetYearLockRepo } from '../budget/budget-year-lock.repo';
 import { CommitmentRepo, type LockedCommitmentOfRequest } from '../budget/commitment.repo';
-import { planSeatMonth, type SeatToCharge } from './seat-month-plan.policy';
+import { planSeatMonth, type ReturnedApplication, type SeatToCharge } from './seat-month-plan.policy';
 import { SeatMonthRepo, type NewSeatMonthCharge, type SeatMonthChargeRecord } from './seat-month.repo';
 import type { PlacementPeriod } from './seat-month.types';
 
@@ -16,11 +16,22 @@ const byId = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0);
 const daysBetween = (from: BusinessDate, to: BusinessDate): number =>
   Math.round((Date.parse(`${to}T00:00:00.000Z`) - Date.parse(`${from}T00:00:00.000Z`)) / 86_400_000);
 
+/** What of a commitment the plan reads and the writes after it need, whichever way the commitment was found. */
+interface HeldCommitment {
+  id: string;
+  state: string;
+  amountMinor: bigint;
+  releasedMinor: bigint;
+  appliedMinor: bigint;
+}
+
 /**
  * Charges one subscription for one month in the transaction of the caller (`SM-1`, see `SeatMonthService`): reads where the holders were placed, the
- * price and the commitments, lets the plan say what each department bears and what each commitment gives up, and replaces the rows of the month.
- * Locks, in the order of the module: the month of the subscription, the commitments of the requests (by id), the budget years of the Cost Centers
- * (by id). A row that took a commitment down and is no longer asked for stays, because what became an expense never comes back to a commitment.
+ * price and the commitments, lets the plan say what each department bears, what each commitment gives up and what it gets back, and replaces the rows of
+ * the month. A month charged again gives the same rows and moves nothing; when a row applies less than before, or is gone, what it applied is written as a
+ * reversal and the commitment holds it again, so no seat-month is applied twice and the commitment of another Cost Center is never touched (`SM1-06`).
+ * Locks, in the order of the module: the month of the subscription, the commitments of the requests (by id), the ones a row of before applied to, the budget
+ * years of the Cost Centers (by id).
  */
 @Injectable()
 export class SeatMonthSubscriptionService {
@@ -48,6 +59,7 @@ export class SeatMonthSubscriptionService {
     if (!organization) throw new Error('The installation has no organization.');
     const year = Number(month.slice(0, 4));
     const commitmentOf = await this.lockCommitments(tx, seats, year);
+    const held = await this.lockPriorCommitments(tx, before, commitmentOf);
     const toCharge = await this.seatsToCharge(tx, month, seats, commitmentOf);
     const departmentIds = [...new Set([...toCharge.flatMap((seat) => this.departmentsOf(seat))])];
     const costCenterOfDepartment = await this.organizationReads.getUnitCostCenterIds(departmentIds, tx);
@@ -58,7 +70,7 @@ export class SeatMonthSubscriptionService {
       seats: toCharge,
       costCenterOfDepartment,
       heldByCommitment: new Map(
-        [...commitmentOf.values()].map((row) => [
+        [...held.values()].map((row) => [
           row.id,
           row.state === 'HELD' ? row.amountMinor - row.releasedMinor - row.appliedMinor : 0n,
         ]),
@@ -75,13 +87,20 @@ export class SeatMonthSubscriptionService {
       computedAt: now,
     }));
     await this.replace(tx, year, before, written);
-    await this.takeDown(tx, commitmentOf, plan.takenByCommitment);
-    if (before.length > 0 || written.length > 0) await this.record(tx, organization.id, subscriptionId, month, written);
-    const rows = written.length + before.length - this.removable(before, written).length;
+    await this.giveBack(tx, { organizationId: organization.id, subscriptionId, month, now }, plan.returned);
+    await this.takeDown(tx, plan.takenByCommitment);
+    if (before.length > 0 || written.length > 0)
+      await this.record(tx, organization.id, subscriptionId, month, written, plan.returned);
     // The mark is written in the transaction of the rows: it exists if and only if this subscription was charged for the month (`SM1-03`).
-    await this.repo.markCharged(tx, { organizationId: organization.id, subscriptionId, month, rows, now });
+    await this.repo.markCharged(tx, {
+      organizationId: organization.id,
+      subscriptionId,
+      month,
+      rows: written.length,
+      now,
+    });
 
-    return rows;
+    return written.length;
   }
 
   private departmentsOf(seat: SeatToCharge): string[] {
@@ -145,14 +164,29 @@ export class SeatMonthSubscriptionService {
     return found;
   }
 
-  /** The rows of before that are replaced: all but the ones that took a commitment down and are no longer asked for. */
-  private removable(
+  /**
+   * Every commitment the plan may read or change: the ones of the seats of the month, and the ones a row of before applied to that no seat of the month points
+   * at any more (a seat taken back, a request that no longer is behind it), locked by id after the others.
+   */
+  private async lockPriorCommitments(
+    tx: DbTx,
     before: readonly SeatMonthChargeRecord[],
-    written: readonly NewSeatMonthCharge[],
-  ): SeatMonthChargeRecord[] {
-    const asked = new Set(written.map((row) => `${row.assignmentId}|${row.departmentId}`));
+    commitmentOf: ReadonlyMap<string, LockedCommitmentOfRequest>,
+  ): Promise<Map<string, HeldCommitment>> {
+    const held = new Map<string, HeldCommitment>([...commitmentOf.values()].map((row) => [row.id, row]));
+    const extra = [
+      ...new Set(
+        before.flatMap((row) => (row.commitmentId !== null && row.appliedMinor > 0n ? [row.commitmentId] : [])),
+      ),
+    ]
+      .filter((id) => !held.has(id))
+      .sort(byId);
+    for (const id of extra) {
+      const row = await this.commitments.lockById(tx, id);
+      if (row) held.set(id, row);
+    }
 
-    return before.filter((row) => row.appliedMinor === 0n || asked.has(`${row.assignmentId}|${row.departmentId}`));
+    return held;
   }
 
   private async replace(
@@ -168,21 +202,49 @@ export class SeatMonthSubscriptionService {
       await this.yearLock.lock(tx, costCenterId, [year]);
     await this.repo.deleteRows(
       tx,
-      this.removable(before, written).map((row) => row.id),
+      before.map((row) => row.id),
     );
     await this.repo.insertMany(tx, written);
   }
 
-  private async takeDown(
+  /** What the rows applied before and apply no more goes back to its commitments: the reversals first, then each commitment holds it again. */
+  private async giveBack(
     tx: DbTx,
-    commitmentOf: ReadonlyMap<string, LockedCommitmentOfRequest>,
-    taken: ReadonlyMap<string, bigint>,
+    month: { organizationId: string; subscriptionId: string; month: BusinessDate; now: Date },
+    returned: readonly ReturnedApplication[],
   ): Promise<void> {
-    for (const commitment of [...commitmentOf.values()].sort((a, b) => byId(a.id, b.id))) {
-      const takeMinor = taken.get(commitment.id) ?? 0n;
+    if (returned.length === 0) return;
+    await this.repo.insertReversals(
+      tx,
+      returned.map((row) => ({
+        organizationId: month.organizationId,
+        commitmentId: row.commitmentId,
+        subscriptionId: month.subscriptionId,
+        assignmentId: row.assignmentId,
+        departmentId: row.departmentId,
+        month: month.month,
+        amountMinor: row.amountMinor,
+        reason: row.reason,
+        createdAt: month.now,
+      })),
+    );
+    const total = new Map<string, bigint>();
+    for (const row of returned) total.set(row.commitmentId, (total.get(row.commitmentId) ?? 0n) + row.amountMinor);
+    for (const [commitmentId, returnMinor] of [...total].sort(([a], [b]) => byId(a, b))) {
+      const row = await this.commitments.lockById(tx, commitmentId);
+      if (!row) throw new Error(`The commitment ${commitmentId} a seat-month gave back to is gone.`);
+      await this.commitments.giveBackApplied(tx, row, returnMinor);
+    }
+  }
+
+  /** What the rows apply more than before takes each commitment down, read again after what went back to it. */
+  private async takeDown(tx: DbTx, taken: ReadonlyMap<string, bigint>): Promise<void> {
+    for (const [commitmentId, takeMinor] of [...taken].sort(([a], [b]) => byId(a, b))) {
       if (takeMinor === 0n) continue;
-      const left = commitment.amountMinor - commitment.releasedMinor - commitment.appliedMinor - takeMinor;
-      await this.commitments.applyInvoice(tx, commitment, { takeMinor, stateAfter: left === 0n ? 'EXPENSED' : 'HELD' });
+      const row = await this.commitments.lockById(tx, commitmentId);
+      if (!row) throw new Error(`The commitment ${commitmentId} a seat-month applies to is gone.`);
+      const left = row.amountMinor - row.releasedMinor - row.appliedMinor - takeMinor;
+      await this.commitments.applyInvoice(tx, row, { takeMinor, stateAfter: left === 0n ? 'EXPENSED' : 'HELD' });
     }
   }
 
@@ -192,6 +254,7 @@ export class SeatMonthSubscriptionService {
     subscriptionId: string,
     month: BusinessDate,
     written: readonly NewSeatMonthCharge[],
+    returned: readonly ReturnedApplication[],
   ): Promise<void> {
     await this.audit.record(tx, {
       organizationId,
@@ -204,6 +267,8 @@ export class SeatMonthSubscriptionService {
         rows: written.length,
         amountMinor: written.reduce((sum, row) => sum + row.amountMinor, 0n).toString(),
         appliedMinor: written.reduce((sum, row) => sum + row.appliedMinor, 0n).toString(),
+        returnedMinor: returned.reduce((sum, row) => sum + row.amountMinor, 0n).toString(),
+        reversals: returned.length,
       },
       correlationId: `seat-month:${subscriptionId}:${month}`,
     });

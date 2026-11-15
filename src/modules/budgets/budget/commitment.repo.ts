@@ -359,6 +359,24 @@ export class CommitmentRepo {
     if (changed.count !== 1) throw new Error(`The commitment ${row.id} changed while an invoice was applied to it.`);
   }
 
+  /**
+   * Gives back to a commitment what seat-months applied and apply no more (`SM1-06`): the reversals are written first (`SeatMonthRepo.insertReversals`), then
+   * `applied_minor` goes down by exactly their sum and the running total `seat_month_reversed_minor` goes up by it, and the commitment is held again; the guard of
+   * the table refuses any other decrease. The caller holds the lock of the row.
+   */
+  async giveBackApplied(tx: DbTx, row: CommitmentRow, returnMinor: bigint): Promise<void> {
+    if (returnMinor === 0n) return;
+    const changed = await tx.budgetCommitment.updateMany({
+      where: { id: row.id, releasedMinor: row.releasedMinor, appliedMinor: row.appliedMinor },
+      data: {
+        appliedMinor: row.appliedMinor - returnMinor,
+        seatMonthReversedMinor: { increment: returnMinor },
+        state: 'HELD',
+      },
+    });
+    if (changed.count !== 1) throw new Error(`The commitment ${row.id} changed while a seat-month gave back to it.`);
+  }
+
   /** The commitments of the request, the oldest year first, with what is left of each to be invoiced against; locks nothing. */
   async ofRequest(requestId: string, tx?: DbTx): Promise<RequestCommitment[]> {
     const rows = await (tx ?? this.prisma).budgetCommitment.findMany({

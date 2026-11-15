@@ -349,6 +349,8 @@ model BudgetCommitment {
   origin            CommitmentOrigin @default(APPROVAL)
   // What one seat costs a month, rounded up, when the commitment was made: what the release by day takes from. Null before it was kept.
   seatMonthlyMinor  BigInt?         @map("seat_monthly_minor")
+  // What the seat-months gave back so far (SM1-06): the sum of the reversals of the commitment, moving with `appliedMinor`; the guard of the table accepts a lower `appliedMinor` only by exactly this.
+  seatMonthReversedMinor BigInt     @default(0) @map("seat_month_reversed_minor")
   createdAt         DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt         DateTime        @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
 
@@ -361,6 +363,7 @@ model BudgetCommitment {
   releases        BudgetCommitmentRelease[]
   invoices        Invoice[]
   seatMonths      SeatMonthCharge[]
+  seatMonthReversals BudgetCommitmentSeatMonthReversal[]
 
   @@unique([requestId, year])
   @@index([costCenterId, year, state])
@@ -621,4 +624,28 @@ model SeatMonthRun {
   @@unique([subscriptionId, month])
   @@index([month])
   @@map("seat_month_runs")
+}
+
+/// FIX-SM1 SM1-06: what a seat-month gave back to a commitment when the month was charged again (the seat was taken back, its days moved, the department changed
+/// Cost Center). Append-only: the database refuses to change or remove a row, and refuses to lower `applied_minor` of a commitment by anything but what these rows
+/// add up to (`seat_month_reversed_minor`). The ids of other contexts are values, not foreign keys.
+model BudgetCommitmentSeatMonthReversal {
+  id             String   @id @default(uuid(7)) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  commitmentId   String   @map("commitment_id") @db.Uuid
+  subscriptionId String   @map("subscription_id") @db.Uuid
+  assignmentId   String   @map("assignment_id") @db.Uuid
+  departmentId   String   @map("department_id") @db.Uuid
+  // The first day of the month.
+  month          DateTime @db.Date
+  amountMinor    BigInt   @map("amount_minor")
+  // `RECALCULATED` or `SEAT_NOT_ASKED`.
+  reason         String
+  createdAt      DateTime @map("created_at") @db.Timestamptz(3)
+
+  commitment BudgetCommitment @relation(fields: [commitmentId], references: [id], onDelete: Restrict, map: "bcsmr_commitment_id_fkey")
+
+  @@index([commitmentId], map: "bcsmr_commitment_idx")
+  @@index([subscriptionId, month], map: "bcsmr_subscription_month_idx")
+  @@map("budget_commitment_seat_month_reversals")
 }

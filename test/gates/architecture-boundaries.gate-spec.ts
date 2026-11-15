@@ -141,6 +141,7 @@ const PRISMA_MODEL_OWNER: Readonly<Record<string, string>> = {
   Invoice: 'budgets',
   SeatMonthCharge: 'budgets',
   SeatMonthRun: 'budgets',
+  BudgetCommitmentSeatMonthReversal: 'budgets',
   BudgetAttachment: 'budgets',
   RequestBudgetCheck: 'requests',
   RequestBudgetCheckYear: 'requests',

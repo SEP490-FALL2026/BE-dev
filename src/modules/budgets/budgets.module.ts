@@ -88,7 +88,6 @@ import { SeatMonthQueryService } from './seat-month/seat-month-query.service';
 import { SeatMonthService } from './seat-month/seat-month.service';
 import { SeatMonthSubscriptionService } from './seat-month/seat-month-subscription.service';
 import { SeatMonthSweeper } from './seat-month/seat-month.job';
-import { SeatMonthSignedGuard } from './seat-month/seat-month.types';
 import { PoliciesTemplateFacadeModule } from '../policies/policies-template-facade.module';
 import { BudgetProposalTemplateListener } from './proposal/budget-proposal-template.listener';
 
@@ -185,7 +184,6 @@ import { BudgetProposalTemplateListener } from './proposal/budget-proposal-templ
     SeatMonthQueryService,
     SeatMonthSweeper,
     // Until a review period can sign a month (RV-1), no month is signed.
-    { provide: SeatMonthSignedGuard, useValue: { isSigned: () => Promise.resolve(false) } },
     CommitmentReleaseGuardHook,
     CommitmentRequestFactsHook,
     PurchaseInvoiceFactsHook,

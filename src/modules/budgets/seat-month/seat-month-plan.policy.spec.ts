@@ -118,22 +118,79 @@ describe('the plan of a month of a subscription (SM-1.4; T-SM1)', () => {
     expect(again.takenByCommitment).toEqual(new Map());
   });
 
-  it('never applies less than a row applied before, even when its department no longer bears the commitment (an expense does not come back)', () => {
+  it('SM1-06: when the department no longer bears the commitment the row applies nothing, never the commitment of another Cost Center, and what it applied before is returned', () => {
     const commitment = { id: 'c-1', costCenterId: 'cc-b' };
     const prior: PriorRow[] = [
       { assignmentId: 'seat-1', departmentId: A, appliedMinor: 322_581n, commitmentId: 'c-1' },
     ];
-    const { rows, takenByCommitment } = plan({
+    const { rows, takenByCommitment, returned } = plan({
       seats: [seat({ commitment })],
       heldByCommitment: new Map([['c-1', 1_000_000n]]),
       prior,
     });
 
     expect(rows.map((row) => [row.departmentId, row.appliedMinor])).toEqual([
-      [A, 322_581n],
+      [A, 0n],
       [B, 77_419n],
     ]);
     expect(takenByCommitment).toEqual(new Map([['c-1', 77_419n]]));
+    expect(returned).toEqual([
+      { commitmentId: 'c-1', assignmentId: 'seat-1', departmentId: A, amountMinor: 322_581n, reason: 'RECALCULATED' },
+    ]);
+  });
+
+  it('SM1-06: a row that is no longer asked (the seat was taken back, or its days moved) returns what it applied, and the same month again returns nothing', () => {
+    const commitment = { id: 'c-1', costCenterId: 'cc-a' };
+    const prior: PriorRow[] = [
+      { assignmentId: 'seat-1', departmentId: A, appliedMinor: 322_581n, commitmentId: 'c-1' },
+      { assignmentId: 'seat-gone', departmentId: A, appliedMinor: 100_000n, commitmentId: 'c-1' },
+    ];
+    const first = plan({
+      seats: [seat({ commitment })],
+      heldByCommitment: new Map([['c-1', 500_000n]]),
+      prior,
+    });
+
+    expect(first.rows.map((row) => [row.assignmentId, row.departmentId, row.appliedMinor])).toEqual([
+      ['seat-1', A, 322_581n],
+      ['seat-1', B, 0n],
+    ]);
+    expect(first.returned).toEqual([
+      {
+        commitmentId: 'c-1',
+        assignmentId: 'seat-gone',
+        departmentId: A,
+        amountMinor: 100_000n,
+        reason: 'SEAT_NOT_ASKED',
+      },
+    ]);
+    expect(first.takenByCommitment).toEqual(new Map());
+  });
+
+  it('SM1-06: what one row returns is held for the rows after it in the same month, so a recalculation never counts a seat-month twice', () => {
+    const commitment = { id: 'c-1', costCenterId: 'cc-a' };
+    const prior: PriorRow[] = [
+      { assignmentId: 'seat-a', departmentId: A, appliedMinor: 400_000n, commitmentId: 'c-1' },
+    ];
+    const onlyA = [{ departmentId: A, from: '2026-01-01', to: null }];
+    const { rows, returned, takenByCommitment } = plan({
+      seats: [
+        seat({ assignmentId: 'seat-a', commitment: null, placements: onlyA }),
+        seat({ assignmentId: 'seat-b', commitment, placements: onlyA }),
+      ],
+      // The commitment holds nothing now: the 400.000 seat-a applied is the only money it can give seat-b.
+      heldByCommitment: new Map([['c-1', 0n]]),
+      prior,
+    });
+
+    expect(rows.map((row) => [row.assignmentId, row.appliedMinor])).toEqual([
+      ['seat-a', 0n],
+      ['seat-b', 400_000n],
+    ]);
+    expect(returned).toEqual([
+      { commitmentId: 'c-1', assignmentId: 'seat-a', departmentId: A, amountMinor: 400_000n, reason: 'RECALCULATED' },
+    ]);
+    expect(takenByCommitment).toEqual(new Map([['c-1', 400_000n]]));
   });
 
   it('applies what is more than before when the commitment holds more now: 100.000 before and 50.000 held make 150.000, 50.000 more', () => {

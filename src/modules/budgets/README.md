@@ -63,7 +63,7 @@ import lõi (`pnpm arch:capabilities --module budgets`).
 
 - `seat-month/` — seat-tháng `K2` (SM-1, `QĐ-103k`, `QĐ-111bg`): `seat-month.policy.ts` (chia theo ngày, làm tròn nửa ra xa 0, phần dư dồn đoạn cuối) và `seat-month-plan.policy.ts`
   (phòng chịu và phần cam kết bị tiêu), `SeatMonthService` (tính một tháng), `SeatMonthSubscriptionService` (một thuê bao, một transaction; khóa tháng, hàng cam kết, rồi khóa năm),
-  `SeatMonthSweeper` mỗi giờ cho tháng đã kết thúc chưa có dòng; `GET /seat-month-charges` (`SeatMonthChargesController`, Finance và trưởng phòng của Cost Center mình) kèm dòng kho. Cam kết chỉ
+  `SeatMonthSweeper` mỗi giờ cho thuê bao chưa có dấu `seat_month_runs` của tháng đã kết thúc (một thuê bao lỗi không mất các thuê bao sau; tháng tính lại theo yêu cầu thì tính mọi thuê bao, phần đã tiêu cam kết mà dòng không còn tiêu thì trả lại qua bảng bù trừ append-only `budget_commitment_seat_month_reversals`, `SM1-06`); `GET /seat-month-charges` (`SeatMonthChargesController`, Finance và trưởng phòng của Cost Center mình) kèm dòng kho. Cam kết chỉ
   bị tiêu thêm, không bao giờ hoàn lại (trigger `budget_commitments_guard`), nên tính lại một tháng giữ phần đã tiêu.
 - `proposal/` — đề xuất của trưởng phòng: gửi, rút, Finance trả về, gửi lại (US-06-10); `budget-proposals.controller.ts`;
   `ProposalService`, `ProposalViewService`, `ProposalSender`. **`BM-10`** (`QĐ-111ab`) = `{ costCenterId?, year, requestedAmount, note?,
