@@ -55,6 +55,9 @@ Tầng: T6 (`scripts/arch/tiers.cjs`). Phụ thuộc: devices, catalog, licensin
   lần dù mấy nguồn kể, hợp ngày chứ không cộng — kèm `status` (`HAS_DATA`, `PARTIAL`, `NO_DATA`) và `updatedAt`. Chỉ đọc người thuộc phòng trong
   phạm vi `getItAdminScope` (`UsageOverviewScopeService`): lọc ngoài phạm vi ⟹ trang rỗng, không bao giờ tin `departmentId` của FE. Không họ tên, ảnh, token
   hay xếp hạng; một câu SQL cho cả trang (`usage-overview.repo.ts`), luật chia kỳ và trạng thái ở `usage-overview.policy.ts`.
+  Theo một nhân viên (`GET /employees/{id}/usage-software`, `…/{applicationId}`): phần mềm có quyền hoặc có usage trong kỳ (`hasSeat`, nối qua
+  `LicensingUsageApi.listAssignmentIntervals`) và chi tiết hai nguồn tách riêng (từng nguồn nhà cung cấp, collector); nhân viên chỉ hiện bằng `employeeCode`;
+  **token và số câu trả lời chỉ ở chi tiết** (`collector.days`); nhân viên ngoài phạm vi hoặc không có ⟹ 404 như nhau.
 - `usage-evidence/` — L0: repo đọc (nối ánh xạ còn hiệu lực **lúc đọc**), policy (độ mới 7/14 ngày theo loại nguồn, năng lực), service.
 
 ## Luồng và khóa

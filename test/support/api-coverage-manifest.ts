@@ -369,6 +369,8 @@ export const API_COVERAGE_MANIFEST: readonly string[] = [
   'PATCH /api/v1/usage-sources/{id}',
   'GET /api/v1/contracts/{id}/usage-sources',
   'GET /api/v1/usage-overview',
+  'GET /api/v1/employees/{id}/usage-software',
+  'GET /api/v1/employees/{id}/usage-software/{applicationId}',
   'POST /api/v1/usage-imports',
   'GET /api/v1/usage-imports/{id}',
   'GET /api/v1/usage-imports/{id}/rows',

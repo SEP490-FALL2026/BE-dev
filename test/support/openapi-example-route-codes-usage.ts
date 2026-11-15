@@ -19,6 +19,11 @@ export const ROUTE_ERROR_CODES_USAGE: Readonly<Record<string, Partial<Record<Rou
   usageSourceGet: { '404': ['USAGE_SOURCE.NOT_FOUND'] },
   usageSourceListOfContract: { '404': ['USAGE_SOURCE.CONTRACT_NOT_FOUND'] },
   usageOverviewList: { '422': ['USAGE_OVERVIEW.RANGE_INVALID'] },
+  usageEmployeeSoftwareList: { '404': ['USAGE_OVERVIEW.EMPLOYEE_NOT_FOUND'], '422': ['USAGE_OVERVIEW.RANGE_INVALID'] },
+  usageEmployeeSoftwareGet: {
+    '404': ['USAGE_OVERVIEW.EMPLOYEE_NOT_FOUND', 'USAGE_OVERVIEW.APPLICATION_NOT_FOUND'],
+    '422': ['USAGE_OVERVIEW.RANGE_INVALID'],
+  },
   usageSourceUpdate: {
     '404': ['USAGE_SOURCE.NOT_FOUND'],
     '409': ['USAGE_SOURCE.IN_USE', 'USAGE_SOURCE.NAME_TAKEN'],

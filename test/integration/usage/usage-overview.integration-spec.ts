@@ -1,13 +1,11 @@
 import request from 'supertest';
 import type { ApiAccount } from '../../support/api-accounts';
 import { PgRelay } from '../../support/pg-relay';
-import { pretendBusinessToday } from '../../support/pretend-today';
 import { QueryCounter, dataStatements, tablesOf } from '../../support/query-count';
 import { personalLeaksIn } from '../../support/usage-privacy';
-import { UsageOverviewHarness } from '../../support/usage-overview-harness';
+import { UsageOverviewHarness, type UsageWorld } from '../../support/usage-overview-harness';
 
 const h = new UsageOverviewHarness();
-const TODAY = '2026-11-15';
 const NOVEMBER = { from: '2026-11-01', to: '2026-11-15' };
 
 interface PointWire {
@@ -34,8 +32,8 @@ interface PageWire {
 describe('the series of the usage over HTTP (integration, real PostgreSQL)', () => {
   let relay: PgRelay;
   let counter: QueryCounter;
-  let x: { applicationId: string; subscriptionId: string | null };
-  let y: { applicationId: string; subscriptionId: string | null };
+  let x: UsageWorld['x'];
+  let y: UsageWorld['y'];
   let vendorSourceId: string;
   let vendorSourceName: string;
   let employeeA: string;
@@ -54,40 +52,8 @@ describe('the series of the usage over HTTP (integration, real PostgreSQL)', () 
       },
     });
     counter = QueryCounter.on(relay);
-    pretendBusinessToday(h.ctx.app, TODAY);
-
-    x = await h.usageApp();
-    y = await h.usageApp();
-    employeeA = await h.person('E-A');
-    employeeB = await h.person('E-B');
-    employeeC = await h.personOfOtherDepartment('E-C');
-    await h.seatsOn(x.subscriptionId as string, [
-      { code: 'E-A', grantedOn: '2026-01-05' },
-      { code: 'E-B', grantedOn: '2026-01-05' },
-    ]);
-    await h.seatsOn(y.subscriptionId as string, [{ code: 'E-A', grantedOn: '2026-01-05' }]);
-
-    const source = await h.source(x.applicationId);
-    vendorSourceId = source.id;
-    vendorSourceName = source.name;
-    await h.confirmed(
-      source.id,
-      h.report(
-        ['email', 'last_active'],
-        [
-          ['e-a@acme.vn', '2026-11-05'],
-          ['e-c@acme.vn', '2026-11-08'],
-        ],
-      ),
-      { coverageFrom: '2026-11-01', coverageTo: '2026-11-10' },
-    );
-    const machine = await h.registrationOf(employeeA, TODAY);
-    await h.collectorUsage(machine, x.applicationId, [
-      { date: '2026-11-05', responses: 3 },
-      { date: '2026-11-06', responses: 2 },
-      { date: '2026-11-12', responses: 1 },
-      { date: '2026-11-13', responses: 0, coverage: 'COVERED' },
-    ]);
+    const world = await h.world();
+    ({ x, y, vendorSourceId, vendorSourceName, employeeA, employeeB, employeeC } = world);
   }, 300000);
 
   afterAll(async () => {

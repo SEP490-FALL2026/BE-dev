@@ -60,6 +60,13 @@ export function periodsOf(range: UsageRange, granularity: Granularity): UsagePer
   return periods;
 }
 
+/** The whole range as one period (what a view of one person over the range counts): null when every day of it is still to come. */
+export function wholeRangeOf(range: UsageRange): UsagePeriod | null {
+  if (range.from > range.effectiveTo) return null;
+
+  return { start: range.from, end: range.effectiveTo, days: daysBetween(range.from, range.effectiveTo) + 1 };
+}
+
 /**
  * What the days covered say of a period: `NO_DATA` when no source covered any day of it (a person's silence is then no activity, only an
  * absence of data), `HAS_DATA` when every day was covered, `PARTIAL` otherwise (`FR-4.10`, `FR-4.14a`). The days where something was active

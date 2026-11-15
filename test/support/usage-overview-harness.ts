@@ -1,7 +1,22 @@
 import { buildActivatedAccount } from './builders/account.builder';
 import { createDepartment, enterEmployee } from './builders/organization.builder';
 import type { ApiAccount } from './api-accounts';
+import { pretendBusinessToday } from './pretend-today';
 import { UsageHarness } from './vendor-usage-harness';
+
+/** The day the organization is on in the world of the usage suites. */
+export const USAGE_TODAY = '2026-11-15';
+
+/** What the world of the usage suites holds: two software, the vendor source of the first, and three people. */
+export interface UsageWorld {
+  x: { applicationId: string; subscriptionId: string | null };
+  y: { applicationId: string; subscriptionId: string | null };
+  vendorSourceId: string;
+  vendorSourceName: string;
+  employeeA: string;
+  employeeB: string;
+  employeeC: string;
+}
 
 /**
  * The usage harness with two IT Admins each in charge of a department of their own (`QĐ-111ax`): `it1` of the seeded department and `it2`
@@ -44,5 +59,45 @@ export class UsageOverviewHarness extends UsageHarness {
         jobTitle: 'Tester',
       })
     ).id;
+  }
+
+  /**
+   * The world of the usage suites, on 15/11/2026: a software `X` with a vendor source (a report of 01–10/11 saying `E-A` was last active on 05/11 and
+   * `E-C` on 08/11) and a collector on the machine of `E-A` (active 05, 06 and 12/11, observed without activity on 13/11); `E-A` and `E-B` are of the
+   * department of `it1`, `E-C` of the one of `it2`; a software `Y` has seats of `E-A` and no data.
+   */
+  async world(): Promise<UsageWorld> {
+    pretendBusinessToday(this.ctx.app, USAGE_TODAY);
+    const x = await this.usageApp();
+    const y = await this.usageApp();
+    const employeeA = await this.person('E-A');
+    const employeeB = await this.person('E-B');
+    const employeeC = await this.personOfOtherDepartment('E-C');
+    await this.seatsOn(x.subscriptionId as string, [
+      { code: 'E-A', grantedOn: '2026-01-05' },
+      { code: 'E-B', grantedOn: '2026-01-05' },
+    ]);
+    await this.seatsOn(y.subscriptionId as string, [{ code: 'E-A', grantedOn: '2026-01-05' }]);
+    const source = await this.source(x.applicationId);
+    await this.confirmed(
+      source.id,
+      this.report(
+        ['email', 'last_active'],
+        [
+          ['e-a@acme.vn', '2026-11-05'],
+          ['e-c@acme.vn', '2026-11-08'],
+        ],
+      ),
+      { coverageFrom: '2026-11-01', coverageTo: '2026-11-10' },
+    );
+    const machine = await this.registrationOf(employeeA, USAGE_TODAY);
+    await this.collectorUsage(machine, x.applicationId, [
+      { date: '2026-11-05', responses: 3 },
+      { date: '2026-11-06', responses: 2 },
+      { date: '2026-11-12', responses: 1 },
+      { date: '2026-11-13', responses: 0, coverage: 'COVERED' },
+    ]);
+
+    return { x, y, vendorSourceId: source.id, vendorSourceName: source.name, employeeA, employeeB, employeeC };
   }
 }

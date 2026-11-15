@@ -7,6 +7,7 @@ import { bodyOf } from '../../support/api-body';
 import { bearer, createHttpContractApp, principal } from '../../support/http-contract-app';
 import { OPENAPI_DOCUMENT_BUDGET_MS } from '../../support/openapi-document-budget';
 
+const ID = '3f0c7d54-9e1b-4f6a-8d2c-5b7a1e9c0d11';
 const FORBIDDEN_PROPERTY = /^(fullName|avatar|avatarUrl|photo|photoUrl|picture|workPhone)$/i;
 
 type Schema = { $ref?: string; properties?: Record<string, Schema>; items?: Schema; [key: string]: unknown };
@@ -140,6 +141,59 @@ describe('the usage reads of the IT Admin (http contract, no database)', () => {
           'to',
         ].sort(),
       );
+    });
+  });
+
+  describe('the usage of one person (usageEmployeeSoftwareList, usageEmployeeSoftwareGet)', () => {
+    const LIST = `/api/v1/employees/${ID}/usage-software`;
+    const DETAIL = `${LIST}/${ID}`;
+
+    it('exports both operations, each with the range and no way to sort or rank', () => {
+      const list = document.paths['/api/v1/employees/{id}/usage-software']?.get as unknown as {
+        operationId: string;
+        parameters: Array<{ name: string; schema?: { maximum?: number } }>;
+      };
+      const detail = document.paths['/api/v1/employees/{id}/usage-software/{applicationId}']?.get as unknown as {
+        operationId: string;
+        parameters: Array<{ name: string }>;
+      };
+
+      expect(list.operationId).toBe('usageEmployeeSoftwareList');
+      expect(detail.operationId).toBe('usageEmployeeSoftwareGet');
+      expect(list.parameters.map((parameter) => parameter.name).sort()).toEqual(
+        ['from', 'id', 'page', 'pageSize', 'to'].sort(),
+      );
+      expect(list.parameters.find((parameter) => parameter.name === 'pageSize')?.schema?.maximum).toBe(100);
+      expect(detail.parameters.map((parameter) => parameter.name).sort()).toEqual([
+        'applicationId',
+        'from',
+        'id',
+        'to',
+      ]);
+    });
+
+    it('answers 401 without a token and 403 to everyone but the IT Admin', async () => {
+      const server = app.getHttpServer();
+
+      for (const path of [LIST, DETAIL]) {
+        expect(bodyOf(await request(server).get(path).expect(401)).error.code).toBe('AUTHENTICATION_REQUIRED');
+        for (const roles of [['MANAGER'], ['FINANCE'], ['EMPLOYEE'], ['SUPER_ADMIN']]) {
+          await request(server)
+            .get(path)
+            .set('Authorization', bearer(principal(roles)))
+            .expect(403);
+        }
+      }
+    });
+
+    it('refuses what is not valid with 422: an identifier that is not a UUID, a date that does not exist, a page too large', async () => {
+      const server = app.getHttpServer();
+
+      await asAdmin(request(server).get('/api/v1/employees/not-a-uuid/usage-software')).expect(422);
+      await asAdmin(request(server).get(`${LIST}/not-a-uuid`)).expect(422);
+      await asAdmin(request(server).get(LIST).query({ from: '2026-02-30' })).expect(422);
+      await asAdmin(request(server).get(LIST).query({ pageSize: 101 })).expect(422);
+      await asAdmin(request(server).get(DETAIL).query({ granularity: 'DAY' })).expect(422);
     });
   });
 });

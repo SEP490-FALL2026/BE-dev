@@ -216,11 +216,12 @@ export class UsageOverviewRepo {
     };
   }
 
-  /** The registrations a collector sent a day for in the range (one for each machine and holder): who held them is asked of the devices. */
-  async collectorRegistrations(range: UsageRange): Promise<string[]> {
+  /** The registrations a collector sent a day for in the range (of one application when given): who held them is asked of the devices. */
+  async collectorRegistrations(range: UsageRange, applicationId?: string): Promise<string[]> {
     const rows = await this.prisma.$queryRaw<Array<{ registration_id: string }>>`
       SELECT DISTINCT registration_id::text AS registration_id FROM ai_usage_days
-       WHERE usage_date BETWEEN ${range.from}::date AND ${range.effectiveTo}::date`;
+       WHERE usage_date BETWEEN ${range.from}::date AND ${range.effectiveTo}::date
+         ${applicationId ? Prisma.sql`AND application_id = ${applicationId}::uuid` : Prisma.empty}`;
 
     return rows.map((row) => row.registration_id);
   }

@@ -2,7 +2,6 @@ import { Controller, Get, HttpStatus, Query } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   ApiErrorResponses,
-  FORBIDDEN_EXAMPLE,
   GUARDED_SERVICE_UNAVAILABLE_RESPONSE,
   UNAUTHENTICATED_RESPONSE,
   VALIDATION_EXAMPLE,
@@ -12,16 +11,13 @@ import { RequireRoles } from '../../../infrastructure/security/decorators/access
 import { CurrentPrincipal } from '../../../infrastructure/security/models/current-principal';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { UsageOverviewPageResponseDto, UsageOverviewQueryDto } from './usage-overview.dto';
-import { toUsageOverviewApiException, USAGE_OVERVIEW_ERROR_EXAMPLES as EXAMPLES } from './usage-overview.http-errors';
+import {
+  FORBIDDEN_USAGE_READ,
+  toUsageOverviewApiException,
+  USAGE_OVERVIEW_ERROR_EXAMPLES as EXAMPLES,
+} from './usage-overview.http-errors';
 import { UsageOverviewQueryService } from './usage-overview-query.service';
 import type { UsagePoint } from './usage-overview.types';
-
-export const FORBIDDEN_USAGE_READ = {
-  status: HttpStatus.FORBIDDEN,
-  description:
-    'Only an IT Admin reads the usage of the people of the departments they work: a head of department never does.',
-  examples: [FORBIDDEN_EXAMPLE],
-} as const;
 
 const toWire = (point: UsagePoint) => ({
   period: point.period,

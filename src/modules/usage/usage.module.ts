@@ -44,7 +44,11 @@ import { VendorSourceController } from './vendor-source/vendor-source.controller
 import { VendorSourceQueryService } from './vendor-source/vendor-source-query.service';
 import { VendorSourceRepo } from './vendor-source/vendor-source.repo';
 import { VendorSourceService } from './vendor-source/vendor-source.service';
+import { UsageEmployeeController } from './usage-overview/usage-employee.controller';
+import { UsageEmployeeRepo } from './usage-overview/usage-employee.repo';
+import { UsageEmployeeViewService } from './usage-overview/usage-employee-view.service';
 import { UsageOverviewController } from './usage-overview/usage-overview.controller';
+import { UsageOverviewPeopleService } from './usage-overview/usage-overview-people.service';
 import { UsageOverviewQueryService } from './usage-overview/usage-overview-query.service';
 import { UsageOverviewRepo } from './usage-overview/usage-overview.repo';
 import { UsageOverviewScopeService } from './usage-overview/usage-overview-scope.service';
@@ -79,6 +83,7 @@ import { ToolStatusSnapshotService } from './tool-status/tool-status-snapshot.se
     VendorImportController,
     IdentityController,
     UsageOverviewController,
+    UsageEmployeeController,
   ],
   providers: [
     AllowlistRepo,
@@ -116,7 +121,10 @@ import { ToolStatusSnapshotService } from './tool-status/tool-status-snapshot.se
     UsageEvidenceApi,
     UsageOverviewRepo,
     UsageOverviewScopeService,
+    UsageOverviewPeopleService,
     UsageOverviewQueryService,
+    UsageEmployeeRepo,
+    UsageEmployeeViewService,
   ],
   // The door to the usage for the rules of wasted seats, and the point they bind to hear a confirmed report.
   exports: [UsageEvidenceApi, UsageImportListeners],

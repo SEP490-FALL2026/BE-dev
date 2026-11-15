@@ -1,4 +1,4 @@
-import { dataStatusOf, periodsOf, resolveRange } from './usage-overview.policy';
+import { dataStatusOf, periodsOf, resolveRange, wholeRangeOf } from './usage-overview.policy';
 
 describe('resolveRange', () => {
   const today = '2026-11-15';
@@ -99,5 +99,19 @@ describe('dataStatusOf', () => {
 
   it('says HAS_DATA only when every day of the period is covered', () => {
     expect(dataStatusOf(7, 7)).toBe('HAS_DATA');
+  });
+});
+
+describe('wholeRangeOf', () => {
+  it('is one period from the first day to the last day that can have data, with the days it counts', () => {
+    expect(wholeRangeOf({ from: '2026-11-01', to: '2026-11-30', effectiveTo: '2026-11-15' })).toEqual({
+      start: '2026-11-01',
+      end: '2026-11-15',
+      days: 15,
+    });
+  });
+
+  it('is nothing when every day of the range is still to come', () => {
+    expect(wholeRangeOf({ from: '2026-11-20', to: '2026-11-30', effectiveTo: '2026-11-15' })).toBeNull();
   });
 });
