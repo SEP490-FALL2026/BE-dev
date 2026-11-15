@@ -296,6 +296,83 @@ describe('requests: case B against the catalog (integration, real PostgreSQL)', 
       ).toEqual({ classification: 'PAID_LICENSED' });
     });
 
+    describe('a plan of internal software (B2A-R3, QĐ-111d, QĐ-103p)', () => {
+      let portal: string; // an internal application of the catalog: its plans are free
+      let portalViewer: string; // its plan K5
+
+      beforeAll(async () => {
+        portal = await declareApplication(h.ctx, h.it1.accessToken, {
+          name: 'Report Portal',
+          kind: 'INTERNAL',
+          dataSensitivity: 'LOW',
+        });
+        portalViewer = await declarePlan(h.ctx, h.it1.accessToken, {
+          applicationId: portal,
+          name: 'Viewer',
+          provisioningType: 'K5',
+        });
+      });
+
+      const forPortal = () =>
+        shortAwaiting({
+          softwareName: 'Report Portal Admin',
+          homepageUrl: 'https://reports.internal.example',
+          existingApplicationId: portal,
+          plannedPlanName: 'Admin',
+        });
+
+      it('is not completed whatever the IT Admin fills: 409 ASSESSMENT.SHORT_PROPOSAL_FREE_PLAN, the assessment stays a draft with the IT Admin, and the queue says so', async () => {
+        const proposed = await forPortal();
+        await h.saveAssessment(proposed.id, planFields(), itInCharge.account).expect(200);
+
+        const refused = await h.completeAssessment(proposed.id, itInCharge.account).expect(409);
+
+        expect(h.codeOf(refused)).toBe('ASSESSMENT.SHORT_PROPOSAL_FREE_PLAN');
+        expect(await stateOf(proposed.id)).toBe('AWAITING_IT_ASSESSMENT');
+        expect(
+          (await h.ctx.sql.query(`SELECT status FROM access_request_assessments WHERE request_id = $1`, [proposed.id]))
+            .rows[0],
+        ).toEqual({ status: 'DRAFT' });
+        const wire = await h.assessmentWire(proposed.id, itInCharge.account);
+        expect(wire.complete).toBe(false);
+        expect(wire.proposal.existingApplication).toEqual({ id: portal, name: 'Report Portal' });
+        const queue = h.dataOf<{ items: Array<{ requestId: string; readiness: string }> }>(
+          await request(h.server()).get('/api/v1/assessment-queue').set(h.as(itInCharge.account)).expect(200),
+        );
+        expect(queue.items.find((item) => item.requestId === proposed.id)).toMatchObject({ readiness: 'FREE_PLAN' });
+        expect(await h.auditEvents('ACCESS_REQUEST', proposed.id)).not.toContainEqual(
+          expect.objectContaining({ action: 'ACCESS_REQUEST.ASSESSMENT_COMPLETED' }),
+        );
+      });
+
+      it('is rejected as not eligible with the plan of the catalog named, which is the way out the refusal points to', async () => {
+        const proposed = await forPortal();
+
+        await h
+          .rejectAssessment(
+            proposed.id,
+            {
+              kind: 'NOT_ELIGIBLE',
+              reason: 'The plan is free: ask for it from the catalog',
+              alternativePlanId: portalViewer,
+            },
+            itInCharge.account,
+          )
+          .expect(200);
+
+        expect(await stateOf(proposed.id)).not.toBe('AWAITING_IT_ASSESSMENT');
+      });
+
+      it('leaves a short proposal for a plan of software that is not internal completable as before', async () => {
+        const proposed = await shortAwaiting();
+        await h.saveAssessment(proposed.id, planFields(), itInCharge.account).expect(200);
+
+        await h.completeAssessment(proposed.id, itInCharge.account).expect(200);
+
+        expect(await stateOf(proposed.id)).toBe('AWAITING_SPEND_SUBMISSION');
+      });
+    });
+
     it('names what the plan still lacks, and nothing of the application, while it is incomplete', async () => {
       const proposed = await shortAwaiting();
 

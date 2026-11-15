@@ -26,6 +26,20 @@ export class AssessmentInternalByRegistrationError extends Error {
   }
 }
 
+/**
+ * A short proposal names internal software, whose plans are free (`QĐ-111d`, `QĐ-103p`): the assessment is not completed, since it would end paid and go to
+ * the spending approver. The IT Admin adds the plan to the catalog and rejects the proposal as not eligible, naming that plan, for the person to ask
+ * for it from the catalog.
+ */
+export class AssessmentFreePlanError extends Error {
+  constructor() {
+    super(
+      'A plan of internal software is free: add it to the catalog and reject the proposal for the person to ask for it from there.',
+    );
+    this.name = 'AssessmentFreePlanError';
+  }
+}
+
 /** A tool that cannot be controlled is refused at the gate with a reason, not sent on to the spending approver (`US-05-18` AC-1). */
 export class AssessmentUncontrollableError extends Error {
   constructor() {

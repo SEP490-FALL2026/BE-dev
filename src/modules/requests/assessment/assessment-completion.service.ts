@@ -8,6 +8,7 @@ import type { AccessRequestRecord, PricingRecord } from '../access-request/acces
 import type { AssessmentRecord, Quote } from '../access-request/assessment-record.types';
 import { SpendRoutingService } from '../spend/spend-routing.service';
 import {
+  AssessmentFreePlanError,
   AssessmentIncompleteError,
   AssessmentInternalByRegistrationError,
   AssessmentUncontrollableError,
@@ -37,8 +38,8 @@ export class AssessmentCompletionService {
   ) {}
 
   /**
-   * Throws AssessmentRefusedError, AssessmentIncompleteError, AssessmentInternalByRegistrationError,
-   * AssessmentUncontrollableError, AssessmentTermNotFitError, AssessmentQuoteRefusedError and AccessRequestNotFoundError.
+   * Throws AssessmentRefusedError, AssessmentIncompleteError, AssessmentInternalByRegistrationError, AssessmentFreePlanError (a short proposal
+   * for a plan of internal software), AssessmentUncontrollableError, AssessmentTermNotFitError, AssessmentQuoteRefusedError and AccessRequestNotFoundError.
    */
   async complete(actor: AuthenticatedPrincipal, requestId: string): Promise<AccessRequestRecord> {
     return this.runner.run(async (tx) => {
@@ -46,7 +47,7 @@ export class AssessmentCompletionService {
       this.gate.requireAssessor(actor, request);
       const { assessment, proposal } = await this.gate.requireProposalFacts(tx, requestId);
       const scope = assessmentScopeOf(proposal);
-      const quote = this.completableQuote(assessment, scope);
+      const quote = this.completableQuote(assessment, scope, await this.gate.namesInternalApplication(tx, proposal));
       // A plan alone is never classified by the IT Admin (the application is in the catalog) and is always paid or licensed: a completed assessment says so.
       const concluded: AssessmentRecord =
         scope === 'PLAN_ONLY' ? { ...assessment, classification: 'PAID_LICENSED' } : assessment;
@@ -90,8 +91,9 @@ export class AssessmentCompletionService {
   }
 
   /** The quote that prices the request, when the assessment may be completed here; the errors say what stops it. */
-  private completableQuote(assessment: AssessmentRecord, scope: AssessmentScope): Quote {
-    const verdict = judgeCompletion(assessment, scope);
+  private completableQuote(assessment: AssessmentRecord, scope: AssessmentScope, internalApplication: boolean): Quote {
+    const verdict = judgeCompletion(assessment, scope, internalApplication);
+    if (verdict.kind === 'FREE_PLAN') throw new AssessmentFreePlanError();
     if (verdict.kind === 'INCOMPLETE') throw new AssessmentIncompleteError(verdict.missing);
     if (verdict.kind === 'INTERNAL_BY_REGISTRATION') throw new AssessmentInternalByRegistrationError();
     if (verdict.kind === 'UNCONTROLLABLE') throw new AssessmentUncontrollableError();

@@ -294,6 +294,23 @@ describe('completing the assessment of a plan the catalog lacks of software it h
     });
   });
 
+  it('is not completed for a plan of internal software, whatever the IT Admin filled: its plans are free, so it would end paid and go to the spending approver (QĐ-111d, QĐ-103p, B2A-R3)', () => {
+    expect(judgeCompletion(planOnly(), 'PLAN_ONLY', true)).toEqual({ kind: 'FREE_PLAN' });
+    // Judged before what is missing and before the control level: nothing the IT Admin fills makes it completable.
+    expect(judgeCompletion(bare(), 'PLAN_ONLY', true)).toEqual({ kind: 'FREE_PLAN' });
+    expect(judgeCompletion(planOnly({ controlLevel: 'UNCONTROLLABLE' }), 'PLAN_ONLY', true)).toEqual({
+      kind: 'FREE_PLAN',
+    });
+    expect(judgeCompletion(planOnly(), 'PLAN_ONLY', false)).toEqual({ kind: 'OK' });
+  });
+
+  it('leaves the whole assessment as it was: internal software there is the classification, completed by registering it', () => {
+    expect(judgeCompletion(complete({ classification: 'INTERNAL' }), 'FULL', true)).toEqual({
+      kind: 'INTERNAL_BY_REGISTRATION',
+    });
+    expect(judgeCompletion(complete(), 'FULL', true)).toEqual({ kind: 'OK' });
+  });
+
   it('takes the short shape as the default of nothing: FULL stays what it was', () => {
     expect(judgeCompletion(complete())).toEqual(judgeCompletion(complete(), 'FULL'));
     expect(missingFields(empty)).toEqual(missingFields(empty, 'FULL'));

@@ -21,6 +21,8 @@ export interface AssessmentQueueRow {
   expectedUsers: number;
   /** The proposal names an application of the catalog: only the plan is assessed (`QĐ-111a`). */
   planOnly: boolean;
+  /** That application; null for software that is new. */
+  existingApplicationId: string | null;
   /** The IT Admin has saved the assessment at least once. */
   started: boolean;
   fields: AssessmentFields;
@@ -137,6 +139,7 @@ function rowOf(step: StepColumns, readerEmployeeId: string): AssessmentQueueRow 
     softwareName: proposal.softwareName,
     expectedUsers: proposal.expectedUsers,
     planOnly: proposal.existingApplicationId !== null,
+    existingApplicationId: proposal.existingApplicationId,
     started: assessment.savedByEmployeeId !== null,
     fields: fieldsOf(assessment),
   };

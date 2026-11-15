@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { Page, pageOf } from '../../../core/application/pagination';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
+import { CatalogApi } from '../../catalog/public/catalog.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import type { AssessmentQueueDepartmentWire, AssessmentQueueItemWire } from './assessment-queue.dto';
 import { queueItemOf, type QueueLookups } from './assessment-queue.mapper';
@@ -17,6 +18,7 @@ export class AssessmentQueueService {
   constructor(
     private readonly queue: AssessmentQueueRepo,
     private readonly organizationReads: OrganizationReadApi,
+    private readonly catalog: CatalogApi,
     private readonly reach: AssessmentQueueReachService,
   ) {}
 
@@ -73,8 +75,20 @@ export class AssessmentQueueService {
     );
   }
 
+  /** Which applications the short proposals of the page name are internal software: one read for the page, none when no proposal names an application. */
+  private async internalApplicationsOf(rows: readonly AssessmentQueueRow[]): Promise<Set<string>> {
+    const named = [...new Set(rows.flatMap((row) => (row.existingApplicationId ? [row.existingApplicationId] : [])))];
+    if (named.length === 0) return new Set();
+
+    return new Set(
+      (await this.catalog.getCollectorApplications(named))
+        .filter((application) => application.kind === 'INTERNAL')
+        .map((application) => application.id),
+    );
+  }
+
   private async lookupsFor(rows: readonly AssessmentQueueRow[]): Promise<QueueLookups> {
-    if (rows.length === 0) return { people: new Map(), departments: new Map() };
+    if (rows.length === 0) return { people: new Map(), departments: new Map(), internalApplicationIds: new Set() };
     const personIds = [
       ...new Set(
         rows.flatMap((row) =>
@@ -91,6 +105,7 @@ export class AssessmentQueueService {
     return {
       people: new Map(people.map((person) => [person.id, person])),
       departments: new Map(departments.map((department) => [department.id, department])),
+      internalApplicationIds: await this.internalApplicationsOf(rows),
     };
   }
 }

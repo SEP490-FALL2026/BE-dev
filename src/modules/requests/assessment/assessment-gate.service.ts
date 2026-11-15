@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
+import { CatalogApi } from '../../catalog/public/catalog.api';
 import { AccessRequestNotFoundError } from '../access-request/access-request.errors';
 import { AccessRequestRepo } from '../access-request/access-request.repo';
 import type { AccessRequestRecord } from '../access-request/access-request.types';
@@ -21,6 +22,7 @@ export class AssessmentGate {
     private readonly requests: AccessRequestRepo,
     private readonly assessmentReads: AssessmentReadRepo,
     private readonly steps: AssessmentStepRepo,
+    private readonly catalog: CatalogApi,
   ) {}
 
   /** The request, locked; AccessRequestNotFoundError when it is not a proposal: a request has an assessment from the proposal on. */
@@ -60,6 +62,17 @@ export class AssessmentGate {
     if (!assessment || !proposal) throw new AccessRequestNotFoundError();
 
     return { assessment, proposal };
+  }
+
+  /**
+   * Whether a short proposal names internal software, whose plans are all free (`K5`; `QĐ-111d`): the assessment of such a plan is rejected, not
+   * completed. False for a proposal that names no application (software that is new).
+   */
+  async namesInternalApplication(tx: DbTx, proposal: Pick<ProposalRecord, 'existingApplicationId'>): Promise<boolean> {
+    if (proposal.existingApplicationId === null) return false;
+    const [application] = await this.catalog.getCollectorApplications([proposal.existingApplicationId], tx);
+
+    return application?.kind === 'INTERNAL';
   }
 
   /** Whether the actor works the step in the place of the person it was given to (the audit says so). */

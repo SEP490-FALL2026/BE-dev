@@ -41,9 +41,10 @@ export const assessmentQueueItemSchema = z.strictObject({
   scope: z.enum(['FULL', 'PLAN_ONLY']),
   /**
    * What completing it would do now: it can be completed, it still lacks fields (`missingCount`), internal software is completed by
-   * registering it, or a tool that cannot be controlled is refused at the gate instead.
+   * registering it, a tool that cannot be controlled is refused at the gate instead, or (FREE_PLAN) a short proposal names internal software, whose
+   * plans are free: it cannot be completed, and the IT Admin adds the plan to the catalog and rejects the proposal for the person to ask from the catalog.
    */
-  readiness: z.enum(['COMPLETABLE', 'INCOMPLETE', 'INTERNAL_BY_REGISTRATION', 'UNCONTROLLABLE']),
+  readiness: z.enum(['COMPLETABLE', 'INCOMPLETE', 'INTERNAL_BY_REGISTRATION', 'UNCONTROLLABLE', 'FREE_PLAN']),
   /** How many fields the assessment still lacks; 0 unless `readiness` is `INCOMPLETE`. */
   missingCount: z.number().int().nonnegative(),
   /** Whether the IT Admin has recorded a quote. The price of the request stays missing until the assessment is completed. */

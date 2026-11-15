@@ -23,6 +23,7 @@ import {
 import { RequestPartyIneligibleError } from '../../identity-access/public/request-party.errors';
 import { toAccessRequestApiException } from '../access-request/access-request.http-errors';
 import {
+  AssessmentFreePlanError,
   AssessmentIncompleteError,
   AssessmentInternalByRegistrationError,
   AssessmentQuoteRefusedError,
@@ -58,6 +59,9 @@ export function toAssessmentApiException(error: unknown): unknown {
   }
   if (error instanceof AssessmentUncontrollableError) {
     return refuse(HttpStatus.CONFLICT, 'ASSESSMENT.CONTROL_LEVEL_UNCONTROLLABLE', error.message);
+  }
+  if (error instanceof AssessmentFreePlanError) {
+    return refuse(HttpStatus.CONFLICT, 'ASSESSMENT.SHORT_PROPOSAL_FREE_PLAN', error.message);
   }
   if (error instanceof AssessmentQuoteRefusedError) {
     return refuse(HttpStatus.UNPROCESSABLE_ENTITY, `ASSESSMENT.${error.reason}`, error.message);
@@ -146,6 +150,7 @@ export const ASSESSMENT_ERROR_EXAMPLES = {
   INCOMPLETE_DATA_SENSITIVITY: example(new AssessmentIncompleteError(['dataSensitivity'])),
   INTERNAL_COMPLETES_BY_REGISTRATION: example(new AssessmentInternalByRegistrationError()),
   CONTROL_LEVEL_UNCONTROLLABLE: example(new AssessmentUncontrollableError()),
+  SHORT_PROPOSAL_FREE_PLAN: example(new AssessmentFreePlanError()),
   QUOTE_NOT_IN_FORCE: quote('QUOTE_NOT_IN_FORCE'),
   QUOTE_PERIOD_INVALID: quote('QUOTE_PERIOD_INVALID'),
   QUOTE_PRICE_NOT_VND: quote('QUOTE_PRICE_NOT_VND'),

@@ -12,6 +12,8 @@ export interface QueuePerson {
 export interface QueueLookups {
   people: ReadonlyMap<string, QueuePerson>;
   departments: ReadonlyMap<string, { id: string; name: string }>;
+  /** The applications of the page that are internal software: a short proposal for a plan of one is rejected, not completed (`QĐ-111d`). */
+  internalApplicationIds?: ReadonlySet<string>;
 }
 
 export const personOf = (lookups: QueueLookups, id: string) => {
@@ -25,11 +27,12 @@ export const personOf = (lookups: QueueLookups, id: string) => {
 export function readinessOf(
   fields: AssessmentQueueRow['fields'],
   scope: AssessmentScope = 'FULL',
+  internalApplication = false,
 ): {
   readiness: AssessmentQueueItemWire['readiness'];
   missingCount: number;
 } {
-  const verdict = judgeCompletion(fields, scope);
+  const verdict = judgeCompletion(fields, scope, internalApplication);
   switch (verdict.kind) {
     case 'OK':
       return { readiness: 'COMPLETABLE', missingCount: 0 };
@@ -39,6 +42,8 @@ export function readinessOf(
       return { readiness: 'INTERNAL_BY_REGISTRATION', missingCount: 0 };
     case 'UNCONTROLLABLE':
       return { readiness: 'UNCONTROLLABLE', missingCount: 0 };
+    case 'FREE_PLAN':
+      return { readiness: 'FREE_PLAN', missingCount: 0 };
   }
 }
 
@@ -72,7 +77,11 @@ export function queueItemOf(
     started: row.started,
     classification: row.fields.classification,
     scope: row.planOnly ? 'PLAN_ONLY' : 'FULL',
-    ...readinessOf(row.fields, row.planOnly ? 'PLAN_ONLY' : 'FULL'),
+    ...readinessOf(
+      row.fields,
+      row.planOnly ? 'PLAN_ONLY' : 'FULL',
+      row.existingApplicationId !== null && (lookups.internalApplicationIds?.has(row.existingApplicationId) ?? false),
+    ),
     quote: row.fields.quote === null ? 'MISSING' : 'RECORDED',
     slaWorkingDays: row.slaWorkingDays,
     waitingSince: row.reachedItAt.toISOString(),

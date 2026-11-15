@@ -197,11 +197,12 @@ export class ProposalsController {
     {
       status: HttpStatus.CONFLICT,
       description:
-        'The request is not waiting for its assessment (ACCESS_REQUEST.NOT_AWAITING_ASSESSMENT), internal software is completed by registering it (ASSESSMENT.INTERNAL_COMPLETES_BY_REGISTRATION), or a tool that cannot be controlled is refused at the gate (ASSESSMENT.CONTROL_LEVEL_UNCONTROLLABLE).',
+        'The request is not waiting for its assessment (ACCESS_REQUEST.NOT_AWAITING_ASSESSMENT), internal software is completed by registering it (ASSESSMENT.INTERNAL_COMPLETES_BY_REGISTRATION), a tool that cannot be controlled is refused at the gate (ASSESSMENT.CONTROL_LEVEL_UNCONTROLLABLE), or a short proposal names internal software, whose plans are free (ASSESSMENT.SHORT_PROPOSAL_FREE_PLAN): add the plan to the catalog and reject the proposal as not eligible, naming that plan, for the person to ask for it from the catalog.',
       examples: [
         EXAMPLES.NOT_AWAITING_ASSESSMENT,
         EXAMPLES.INTERNAL_COMPLETES_BY_REGISTRATION,
         EXAMPLES.CONTROL_LEVEL_UNCONTROLLABLE,
+        EXAMPLES.SHORT_PROPOSAL_FREE_PLAN,
       ],
     },
     {

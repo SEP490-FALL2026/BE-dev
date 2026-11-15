@@ -68,6 +68,7 @@ const row = (over: Partial<AssessmentQueueRow> = {}): AssessmentQueueRow => ({
   softwareName: 'Miro',
   expectedUsers: 5,
   planOnly: false,
+  existingApplicationId: null,
   started: false,
   fields: empty,
   ...over,
@@ -163,6 +164,26 @@ describe('the assessment of a plan alone in the queue (case B, short)', () => {
   it('is judged by the plan alone: no classification, no flags, no control level', () => {
     expect(readinessOf(planFields, 'PLAN_ONLY')).toEqual({ readiness: 'COMPLETABLE', missingCount: 0 });
     expect(readinessOf(planFields)).toEqual({ readiness: 'INCOMPLETE', missingCount: 1 });
+  });
+
+  it('says a short proposal for a plan of internal software cannot be completed: the plan is free, so the proposal is rejected for the person to ask from the catalog (B2A-R3)', () => {
+    expect(readinessOf(planFields, 'PLAN_ONLY', true)).toEqual({ readiness: 'FREE_PLAN', missingCount: 0 });
+    // Nothing is filled and it is still told so first.
+    expect(readinessOf(empty, 'PLAN_ONLY', true)).toEqual({ readiness: 'FREE_PLAN', missingCount: 0 });
+    expect(readinessOf(planFields, 'PLAN_ONLY', false)).toEqual({ readiness: 'COMPLETABLE', missingCount: 0 });
+  });
+
+  it('reads the application a short proposal names against the internal ones of the page, and only for that proposal', () => {
+    const APPLICATION = '00000000-0000-4000-8000-0000000000b1';
+    const internal: QueueLookups = { ...lookups, internalApplicationIds: new Set([APPLICATION]) };
+
+    expect(
+      queueItemOf(row({ planOnly: true, existingApplicationId: APPLICATION, fields: planFields }), READER, internal),
+    ).toMatchObject({ scope: 'PLAN_ONLY', readiness: 'FREE_PLAN' });
+    expect(
+      queueItemOf(row({ planOnly: true, existingApplicationId: APPLICATION, fields: planFields }), READER, lookups),
+    ).toMatchObject({ readiness: 'COMPLETABLE' });
+    expect(queueItemOf(row({ fields: planFields }), READER, internal)).toMatchObject({ scope: 'FULL' });
   });
 
   it('says its scope on the item', () => {

@@ -165,7 +165,10 @@ cùng cần; phần ghi nằm ở `assessment/assessment.repo.ts`.
     theo kiểu cấp (QĐ-111i; K4 xóa tháng, K1 ngoài 1–9 ⟹ 422 `ASSESSMENT.TERM_NOT_FIT_KIND`): hoàn tất đánh giá dùng kiểu IT kết luận, `catalog-link/`
     dùng kiểu của gói được gắn khi khác kiểu đã kết luận; `ProposalService`,
     `need-spend.service.ts`, `internal-registration.service.ts` (đăng ký nội bộ; `internalRegistrationBasis`, `registeredShapeOf`,
-    `actsForAssignee` ở `assessment.policy.ts`); `proposal-review/` — `proposals.controller.ts`.
+    `actsForAssignee` ở `assessment.policy.ts`); `proposal-review/` — `proposals.controller.ts`. Đề xuất rút gọn (case B) cho gói của ứng dụng nội bộ (`INTERNAL`: mọi gói
+    là `K5`, miễn phí) không hoàn tất được vì kết thúc sẽ là trả phí và đi Người duyệt chi, trái QĐ-111d/QĐ-103p: `judgeCompletion(…, 'PLAN_ONLY', internalApplication)` ra `FREE_PLAN` trước mọi
+    ô thiếu ⟹ 409 `ASSESSMENT.SHORT_PROPOSAL_FREE_PLAN`, hàng đợi `readiness: FREE_PLAN`, `complete: false`; lối ra là IT thêm gói vào danh mục rồi từ chối `NOT_ELIGIBLE` kèm `alternativePlanId`
+    (người xin đi case A, Request nội bộ không phí đi thẳng IT).
   - `catalog-link/` — nối Request đề xuất đã qua Người duyệt chi vào gói của danh mục (US-05-06 AC-4, AC-8; R-25): `CatalogLinkService` (khóa Request, gói phải có và ứng dụng chưa ngừng,
     xét lại số tháng theo kiểu của gói qua `AssessmentTermFitService`, một dòng audit `ACCESS_REQUEST.CATALOG_LINKED`); đề xuất rút gọn (case B, QĐ-111a) chỉ nối được vào gói của chính ứng dụng nó
     nêu, gói của ứng dụng khác ⟹ 422 `ACCESS_REQUEST.CATALOG_LINK_APPLICATION_MISMATCH` (QĐ-53c: phần mềm mới phải qua cổng mức kiểm soát), đề xuất phần mềm mới nối được vào mọi gói;

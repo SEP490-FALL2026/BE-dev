@@ -15,7 +15,9 @@ export type CompletionVerdict =
   /** Internal software is completed by registering it in the catalog (`US-05-20`), not here. */
   | { kind: 'INTERNAL_BY_REGISTRATION' }
   /** A tool that cannot be controlled is refused at the gate with a reason (`US-05-18` AC-1), not sent on. */
-  | { kind: 'UNCONTROLLABLE' };
+  | { kind: 'UNCONTROLLABLE' }
+  /** A plan of internal software costs nothing: it has no quote and no spending approver (`QĐ-111d`, `QĐ-103p`), so a short proposal for it is rejected, not completed. */
+  | { kind: 'FREE_PLAN' };
 
 const REQUIRED_FLAGS = ['adminConsole', 'memberExport', 'sso'] as const;
 
@@ -78,8 +80,18 @@ function missingFullFields(fields: AssessmentFields): string[] {
   return missing;
 }
 
-export function judgeCompletion(fields: AssessmentFields, scope: AssessmentScope = 'FULL'): CompletionVerdict {
+/**
+ * What completing the assessment would do. `internalApplication` is whether the application a short proposal names is internal software: all its
+ * plans are `K5` and free (the catalog keeps one for the other), and a short proposal always ends paid (`D-38`), so nothing the IT Admin fills
+ * lets it be completed and it is told so first (`QĐ-111d`, `QĐ-103p`, `QĐ-50a`). It says nothing of a whole assessment, where internal software is `classification`.
+ */
+export function judgeCompletion(
+  fields: AssessmentFields,
+  scope: AssessmentScope = 'FULL',
+  internalApplication = false,
+): CompletionVerdict {
   if (scope === 'PLAN_ONLY') {
+    if (internalApplication) return { kind: 'FREE_PLAN' };
     if (fields.controlLevel === 'UNCONTROLLABLE') return { kind: 'UNCONTROLLABLE' };
     const missing = missingPlanFields(fields);
 
