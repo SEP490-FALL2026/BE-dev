@@ -1,5 +1,6 @@
 import request from 'supertest';
 import { pretendBusinessToday } from '../../support/pretend-today';
+import { SeatMonthService } from '../../../src/modules/budgets/seat-month/seat-month.service';
 import { InvoiceHarness } from '../../support/invoice-harness';
 import type { Unit } from '../../support/spend-harness';
 
@@ -132,8 +133,8 @@ describe('The figures of the close of a month are worked out as the documents de
   }
 
   /** One department for each case: a month is closed once and the figures of a Cost Center are read by its own line. */
-  const units: Record<'outside' | 'basis' | 'pace' | 'late', Unit> = {} as Record<
-    'outside' | 'basis' | 'pace' | 'late',
+  const units: Record<'outside' | 'basis' | 'pace' | 'late' | 'jan' | 'dec', Unit> = {} as Record<
+    'outside' | 'basis' | 'pace' | 'late' | 'jan' | 'dec',
     Unit
   >;
   const versions: Record<string, string> = {};
@@ -146,6 +147,8 @@ describe('The figures of the close of a month are worked out as the documents de
       ['basis', 'P-K1'],
       ['pace', 'P-K3'],
       ['late', 'P-K4'],
+      ['jan', 'P-K5'],
+      ['dec', 'P-K6'],
     ] as const) {
       units[key] = await h.departmentWithHead(code);
       versions[key] = (await h.budgetFor(units[key], { total: 300 * M, reserve: 30 * M })).id;
@@ -255,5 +258,56 @@ describe('The figures of the close of a month are worked out as the documents de
 
     expect((refused.body as { error: { code: string } }).error.code).toBe('BUDGET_REVIEW.NO_BUDGET_FOR_YEAR');
     expect(list.items).toEqual([]);
+  });
+
+  it('RV1-11: January is the first month of the schedule: 30 tr spent over a twelfth of 300 tr is 120 %, Vàng, and the forecast is what was spent', async () => {
+    const unit = units.jan;
+    await expense(unit, versions.jan, { committed: 30 * M, net: 30 * M, tax: 0, serviceMonth: `${h.year}-01-01` });
+
+    const line = lineOf(await detail((await close(1)).id), unit);
+
+    expect(line).toMatchObject({
+      spent: { amount: String(30 * M) },
+      forecast: { amount: String(30 * M) },
+      paceBasisPoints: 12_000,
+      light: 'YELLOW',
+    });
+  });
+
+  it('RV1-11: December has no month left: no price increase, the pace is over the whole base, and 60 tr of 300 tr is 20 % and Dưới mức', async () => {
+    const unit = units.dec;
+    await expense(unit, versions.dec, { committed: 60 * M, net: 60 * M, tax: 0, serviceMonth: `${h.year}-12-01` });
+
+    const line = lineOf(await detail((await close(12)).id), unit);
+
+    expect(line).toMatchObject({
+      spent: { amount: String(60 * M) },
+      spentAfterMonth: { amount: '0' },
+      priceIncrease: { amount: '0' },
+      forecast: { amount: String(60 * M) },
+      paceBasisPoints: 2_000,
+      light: 'UNDER',
+    });
+  });
+
+  it('RV1-11: when the seat-months of the month cannot all be worked out nothing is closed: 409 and no period, and the month can be closed once they can', async () => {
+    const seatMonths = h.ctx.app.get(SeatMonthService, { strict: false });
+    const failing = jest
+      .spyOn(seatMonths, 'chargeMonth')
+      .mockRejectedValueOnce(new Error('a subscription has no price'));
+
+    const refused = await closing({ year: h.year, month: 2 }).expect(409);
+    const listed = h.dataOf<{ items: PeriodWire[] }>(
+      await request(h.server())
+        .get('/api/v1/budget-review-periods')
+        .query({ year: h.year })
+        .set(h.as(h.finance))
+        .expect(200),
+    );
+    failing.mockRestore();
+
+    expect((refused.body as { error: { code: string } }).error.code).toBe('BUDGET_REVIEW.SEAT_MONTHS_NOT_READY');
+    expect(listed.items.map((one) => one.month)).not.toContain(2);
+    await closing({ year: h.year, month: 2 }).expect(201);
   });
 });
