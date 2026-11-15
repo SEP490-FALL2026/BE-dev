@@ -188,6 +188,8 @@ export const PARAM_KEYS_BY_CODE: Readonly<Record<InAppNotificationCode, readonly
   IT_ADMIN_HANDOVER_RECEIVED: ['sourceKind', 'sourceId', 'fromEmployeeId', 'subscriptions', 'applications'],
   // A departure cancelled after the last working day: how many revocation tasks in progress the IT Admin closes by hand (`QĐ-110c`).
   DEPARTURE_REVOCATION_IT_CLOSE: ['caseId', 'employeeId', 'taskCount'],
+  // A new version of a policy: which policy, which version, and whether the reader is asked to acknowledge it (`QĐ-111bi`).
+  POLICY_PUBLISHED: ['policyCode', 'versionNumber', 'requiresReacknowledgement'],
 };
 
 /** Whether the code is one of the closed table. */

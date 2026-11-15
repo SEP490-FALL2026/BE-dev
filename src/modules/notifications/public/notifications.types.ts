@@ -182,6 +182,8 @@ export const IN_APP_NOTIFICATION_CODES = [
   // A handover cancelled after its last working day left revocation tasks in progress with no reason of the departure: the IT Admin closes
   // them by what happened at the provider (`QĐ-110c`, MF2-C).
   'DEPARTURE_REVOCATION_IT_CLOSE',
+  // A new version of a policy is in force (`QĐ-111bi`): told once to each account of a role it applies to, with the code, the number and whether it asks to be acknowledged again.
+  'POLICY_PUBLISHED',
 ] as const;
 
 export type InAppNotificationCode = (typeof IN_APP_NOTIFICATION_CODES)[number];

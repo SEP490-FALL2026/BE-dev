@@ -1,0 +1,41 @@
+# OVERNIGHT-DECISIONS-LANE-B — chạy đêm lane B (15/11/2026)
+
+> Nhánh `feat/fe-feedback-lane-b`. Owner không trả lời lúc chạy; mọi điểm dưới đây là **tạm chốt**, audit hỏi lại từng `D-Bn`. Mỗi mục: câu
+> hỏi · phương án · đã chọn + căn cứ · file/commit · cách đổi lại. Thứ tự căn cứ: QĐ → BRD → OWNER-REVIEW → SPEC/PLAN → code → thông lệ.
+
+## Chờ Owner quyết
+
+| Mã | Câu hỏi | A | B | Khuyến nghị |
+| -- | ------- | - | - | ----------- |
+| (chưa có) | | | | |
+
+## Quyết định tự chốt (D-Bn)
+
+### D-B1 — thêm `GET /policies/{code}/draft` cho Super Admin
+
+- **Câu hỏi:** SPEC PL-1 có `PUT`/`DELETE` nháp nhưng không có route đọc nháp; Super Admin cần đọc nháp đang soạn.
+- **Phương án:** (A) thêm `GET /policies/{code}/draft` (SUPER_ADMIN); (B) chỉ trả nháp trong `PUT`; (C) thêm trường `draft` vào `GET /policies/{code}`.
+- **Chọn A:** thêm một route chỉ đọc, không đổi route nào của SPEC; `GET /policies/{code}` không lộ nháp cho người đọc thường.
+- **File/commit:** `policies/library/` (task PL-1.3). **Đổi lại:** xóa route, FE dùng kết quả `PUT`.
+
+### D-B2 — "người có vai áp dụng" tính theo vai được cấp (`directRoles`), không theo vai đang hiệu lực
+
+- **Câu hỏi:** MANAGER chưa là trưởng phòng của phòng nào có vai (cấp) nhưng không hiệu lực; có phải xác nhận chính sách không?
+- **Phương án:** (A) vai được cấp và còn hiệu lực (`directRoles`, giống `roles` của `GET /me`); (B) vai hiệu lực (`roles` của principal).
+- **Chọn A:** khớp `GET /me` (FE chặn theo danh sách này) và khớp người nhận thông báo xuất bản (tài khoản giữ grant). **Đổi lại:** đổi nguồn vai ở `acknowledgement.service.ts`.
+
+## Optional và việc để lại
+
+- (chưa có)
+
+## Seed cần cho Z2
+
+- (chưa có)
+
+## Bị chặn
+
+- (chưa có)
+
+## Dừng ở đâu
+
+- Đang làm PL-1.3.

@@ -11,6 +11,7 @@ import {
   AccountRecord,
   AccountSnapshot,
   ActivationState,
+  AppRole,
   AppUserStatus,
   CreateAppUserInput,
 } from '../public/identity-access.types';
@@ -224,6 +225,22 @@ export class AppUserRepo {
         activationState: 'ACTIVATED',
         employee: { status: 'ACTIVE' },
         roleGrants: { some: { role: 'IT_ADMIN', revokedAt: null } },
+      },
+      orderBy: { employee: { employeeCode: 'asc' } },
+      select: { employeeId: true },
+    });
+
+    return rows.map((row) => row.employeeId);
+  }
+
+  /** Every employee who holds an effective grant of any of these roles on an account that can act, by employee code. */
+  async findUsableEmployeeIdsHoldingRoles(roles: readonly AppRole[], tx?: DbTx): Promise<string[]> {
+    const rows = await (tx ?? this.prisma).appUser.findMany({
+      where: {
+        status: 'ACTIVE',
+        activationState: 'ACTIVATED',
+        employee: { status: 'ACTIVE' },
+        roleGrants: { some: { role: { in: [...roles] }, revokedAt: null } },
       },
       orderBy: { employee: { employeeCode: 'asc' } },
       select: { employeeId: true },

@@ -11,6 +11,7 @@ import { RoleGrantService } from '../accounts/role-grant.service';
 import {
   AccessBlockCause,
   AccessBlockRecord,
+  AppRole,
   BootstrapSuperAdminInput,
   EmployeeAccountInspection,
   LeaverGrantRole,
@@ -143,6 +144,11 @@ export class IdentityAccessApi {
   /** Every IT Admin whose account can act, by employee code: who is told what any IT Admin may handle. */
   findAllUsableItAdminEmployeeIds(tx?: DbTx): Promise<string[]> {
     return this.accounts.findAllUsableItAdminEmployeeIds(tx);
+  }
+
+  /** Every employee who holds an effective grant of any of these roles on an account that can act, by employee code: who a notice to a role goes to. */
+  findUsableEmployeeIdsHoldingRoles(roles: readonly AppRole[], tx?: DbTx): Promise<string[]> {
+    return this.accounts.findUsableEmployeeIdsHoldingRoles(roles, tx);
   }
 
   /** The usable IT Admin with the smallest employee code, or null: who a report is given to when nobody is in charge. */
