@@ -96123,20 +96123,20 @@
                     "expiry": {
                       "type": "string",
                       "enum": ["SOON", "EXPIRED", null],
-                      "description": "SOON from the point of adjustment to the last day of the period (a plan by the year stays SOON past its deadline to cancel); EXPIRED after the renewal day (else the end day) while seats are still held; null before the point, for a purchase made once and when no date is known to count from.",
+                      "description": "SOON from the point of adjustment to the last day of the period (a plan by the year stays SOON past its deadline to cancel); EXPIRED the day after the last day of the period (the renewal day, else the end day; for a plan by the month that does not renew itself, its end day) while seats are still held; null before the point, for a purchase made once and when no date is known to count from.",
                       "nullable": true
                     },
                     "daysLeft": {
                       "type": "integer",
                       "minimum": -9007199254740991,
                       "maximum": 9007199254740991,
-                      "description": "The days from today to the deadline the point counts to; negative once it is past while the period still runs (a plan by the year after its deadline to cancel); once EXPIRED it counts from the renewal day (else the end day) instead, and deadlineKind says which; null when there is no point.",
+                      "description": "The days from today to the deadline the point counts to; negative once it is past while the period still runs (a plan by the year after its deadline to cancel); once EXPIRED it counts from the last day of the period instead, and deadlineKind says which; null when there is no point.",
                       "nullable": true
                     },
                     "deadlineKind": {
                       "type": "string",
                       "enum": ["PAYMENT_DATE", "NOTICE_DEADLINE", "RENEWAL_DATE", "END_DATE", null],
-                      "description": "What daysLeft counts to: the next payment day of a plan by the month; by the year, the deadline to cancel, else the renewal day, else the end day; once EXPIRED, the renewal day or the end day it counts from.",
+                      "description": "What daysLeft counts to: the next payment day of a plan by the month; by the year, the deadline to cancel, else the renewal day, else the end day; once EXPIRED, the last day of the period it counts from (the renewal day or the end day; the payment day of a plan by the month that ends; the deadline itself when no later day is known).",
                       "nullable": true
                     },
                     "seats": {
@@ -96498,20 +96498,20 @@
               "expiry": {
                 "type": "string",
                 "enum": ["SOON", "EXPIRED", null],
-                "description": "SOON from the point of adjustment to the last day of the period (a plan by the year stays SOON past its deadline to cancel); EXPIRED after the renewal day (else the end day) while seats are still held; null before the point, for a purchase made once and when no date is known to count from.",
+                "description": "SOON from the point of adjustment to the last day of the period (a plan by the year stays SOON past its deadline to cancel); EXPIRED the day after the last day of the period (the renewal day, else the end day; for a plan by the month that does not renew itself, its end day) while seats are still held; null before the point, for a purchase made once and when no date is known to count from.",
                 "nullable": true
               },
               "daysLeft": {
                 "type": "integer",
                 "minimum": -9007199254740991,
                 "maximum": 9007199254740991,
-                "description": "The days from today to the deadline the point counts to; negative once it is past while the period still runs (a plan by the year after its deadline to cancel); once EXPIRED it counts from the renewal day (else the end day) instead, and deadlineKind says which; null when there is no point.",
+                "description": "The days from today to the deadline the point counts to; negative once it is past while the period still runs (a plan by the year after its deadline to cancel); once EXPIRED it counts from the last day of the period instead, and deadlineKind says which; null when there is no point.",
                 "nullable": true
               },
               "deadlineKind": {
                 "type": "string",
                 "enum": ["PAYMENT_DATE", "NOTICE_DEADLINE", "RENEWAL_DATE", "END_DATE", null],
-                "description": "What daysLeft counts to: the next payment day of a plan by the month; by the year, the deadline to cancel, else the renewal day, else the end day; once EXPIRED, the renewal day or the end day it counts from.",
+                "description": "What daysLeft counts to: the next payment day of a plan by the month; by the year, the deadline to cancel, else the renewal day, else the end day; once EXPIRED, the last day of the period it counts from (the renewal day or the end day; the payment day of a plan by the month that ends; the deadline itself when no later day is known).",
                 "nullable": true
               },
               "seats": {
