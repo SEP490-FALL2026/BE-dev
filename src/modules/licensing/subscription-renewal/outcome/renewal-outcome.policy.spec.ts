@@ -1,5 +1,4 @@
-import type { HeldSeat } from '../subscription-renewal.types';
-import { checkOutcome, realisedSavingsOf, seatsToCarry } from './renewal-outcome.policy';
+import { checkOutcome, realisedSavingsOf } from './renewal-outcome.policy';
 
 describe('an outcome against the decision (US-11-03 AC-15, AC-18, US-11-05 AC-11, AC-12)', () => {
   const base = { decidedQuantity: null, purchasedQuantity: 100 };
@@ -43,36 +42,6 @@ describe('an outcome against the decision (US-11-03 AC-15, AC-18, US-11-05 AC-11
     expect(
       checkOutcome({ ...base, outcome: 'DIFFERENT', decidedChoice: 'REDUCE', decidedQuantity: 88, nextQuantity: 100 }),
     ).toBeNull();
-  });
-});
-
-describe('the seats carried to the new period (QĐ-35c, US-11-03 AC-2)', () => {
-  const seat = (id: string, extra: Partial<HeldSeat>): HeldSeat => ({
-    assignmentId: id,
-    employeeId: id,
-    kind: 'PERSONAL',
-    validFrom: '2026-01-05',
-    validUntil: null,
-    expectedEndDate: null,
-    liveRevocationSources: [],
-    hasOpenTask: false,
-    ...extra,
-  });
-
-  it('are those held on its first day', () => {
-    const carried = seatsToCarry(
-      [
-        seat('open', {}),
-        seat('ends-before', { validUntil: '2026-12-15' }),
-        seat('ends-later', { validUntil: '2027-02-01' }),
-        seat('expected-before', { expectedEndDate: '2026-12-31' }),
-        seat('expected-on', { expectedEndDate: '2027-01-01' }),
-        seat('starts-on', { validFrom: '2027-01-01' }),
-      ],
-      '2027-01-01',
-    );
-
-    expect(carried.map((s) => s.assignmentId)).toEqual(['open', 'ends-later', 'expected-on']);
   });
 });
 

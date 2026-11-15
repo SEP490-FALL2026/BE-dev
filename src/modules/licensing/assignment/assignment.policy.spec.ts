@@ -1,5 +1,13 @@
 import type { AssignmentRecord } from '../public/licensing.types';
-import { effectiveFromLabel, replacedByGrant, revocationOf, toAssignmentView, usableDayOf } from './assignment.policy';
+import {
+  effectiveFromLabel,
+  nextPeriodStart,
+  replacedByGrant,
+  revocationOf,
+  seatsToCarry,
+  toAssignmentView,
+  usableDayOf,
+} from './assignment.policy';
 
 const bot: AssignmentRecord = {
   id: 'a1',
@@ -139,5 +147,45 @@ describe('revocationOf (QĐ-111p: the revocation a seat has, from the task that 
   it('carries the state of a task that is being worked or has failed', () => {
     expect(revocationOf({ ...task, status: 'IN_PROGRESS' }, '2026-11-15').status).toBe('IN_PROGRESS');
     expect(revocationOf({ ...task, status: 'FAILED' }, '2026-11-15').status).toBe('FAILED');
+  });
+});
+
+describe('the seats carried to the new period (QĐ-35c, US-11-03 AC-2)', () => {
+  const seat = (id: string, extra: object) => ({
+    assignmentId: id,
+    validFrom: '2026-01-05',
+    validUntil: null as string | null,
+    expectedEndDate: null as string | null,
+    ...extra,
+  });
+
+  it('are those held on its first day', () => {
+    const carried = seatsToCarry(
+      [
+        seat('open', {}),
+        seat('ends-before', { validUntil: '2026-12-15' }),
+        seat('ends-later', { validUntil: '2027-02-01' }),
+        seat('expected-before', { expectedEndDate: '2026-12-31' }),
+        seat('expected-on', { expectedEndDate: '2027-01-01' }),
+        seat('starts-on', { validFrom: '2027-01-01' }),
+      ],
+      '2027-01-01',
+    );
+
+    expect(carried.map((s) => s.assignmentId)).toEqual(['open', 'ends-later', 'expected-on']);
+  });
+});
+
+describe('the next period a seat granted today goes on into (FX2-R1, QĐ-35c)', () => {
+  it('is an active period recorded ahead of its start', () => {
+    expect(nextPeriodStart({ status: 'ACTIVE', startDate: '2027-01-01' }, '2026-11-15')).toBe('2027-01-01');
+  });
+
+  it('is none when it has begun, begins today, is a draft, has no start, or there is no next period', () => {
+    expect(nextPeriodStart({ status: 'ACTIVE', startDate: '2026-11-15' }, '2026-11-15')).toBeNull();
+    expect(nextPeriodStart({ status: 'ACTIVE', startDate: '2026-11-01' }, '2026-11-15')).toBeNull();
+    expect(nextPeriodStart({ status: 'DRAFT', startDate: '2027-01-01' }, '2026-11-15')).toBeNull();
+    expect(nextPeriodStart({ status: 'ACTIVE', startDate: null }, '2026-11-15')).toBeNull();
+    expect(nextPeriodStart(undefined, '2026-11-15')).toBeNull();
   });
 });

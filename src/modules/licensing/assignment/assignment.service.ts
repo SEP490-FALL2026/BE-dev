@@ -7,8 +7,15 @@ import type { AuthenticatedPrincipal } from '../../../infrastructure/security/to
 import { AuditApi } from '../../audit/public/audit.api';
 import type { SeatTarget, SeatTargetRef } from '../../catalog/public/catalog.types';
 import { CatalogApi } from '../../catalog/public/catalog.api';
+import { SubscriptionPeriodApi } from '../../catalog/public/subscription-period.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
-import { AssignmentNotFoundError, AssignmentNotOpenError, SeatTargetNotFoundError } from '../public/licensing.errors';
+import {
+  AssignmentConflictError,
+  AssignmentNotFoundError,
+  AssignmentNotOpenError,
+  ProvisioningSubscriptionError,
+  SeatTargetNotFoundError,
+} from '../public/licensing.errors';
 import type {
   AssignmentHolder,
   AssignmentRecord,
@@ -21,9 +28,10 @@ import type {
 import { licensingAuditEvent } from '../licensing-audit-event.mapper';
 import { toAssignmentFailure } from './assignment-conflicts.repo';
 import { AssignmentDepartmentRepo } from './assignment-department.repo';
-import { assignmentCreatedSnapshot, replacedByGrant } from './assignment.policy';
+import { assignmentCreatedSnapshot, nextPeriodStart, replacedByGrant, seatsToCarry } from './assignment.policy';
 import { assertBaselineTarget, assertSeatTargetUsable, toSeatTargetRef } from './baseline-target.policy';
 import { AssignmentRepo } from './assignment.repo';
+import { AssignmentCarryRepo } from './assignment-carry.repo';
 
 /** What ending an open assignment without a seat needs: the assignment, the request that led to it and the day. */
 interface EndWithoutSeatInput {
@@ -76,6 +84,8 @@ export class AssignmentService {
     private readonly catalog: CatalogApi,
     private readonly audit: AuditApi,
     private readonly runner: TransactionRunner,
+    private readonly periods: SubscriptionPeriodApi,
+    private readonly carrying: AssignmentCarryRepo,
   ) {}
 
   /** The target a baseline is for: exactly one subscription or one internal plan. Throws SeatTargetInvalidError. */
@@ -197,8 +207,10 @@ export class AssignmentService {
    * audit event: a personal seat, or a service account with its reason, owning department and Cost Center (`US-05-21`). The seats
    * of a subscription are one pool for every department (`QĐ-103d`): the seat is held by the department of the request
    * (`departmentId`), the department of the person it is for; `replacesAssignmentId` is the right this grant ended the same day (`endReplacedByGrant`, R-49).
+   * When a next period, recorded ahead of its start, continues the subscription, the seat goes on into it in the same transaction (`carryToNextPeriod`).
    * Throws AssignmentConflictError when the database refuses the seat:
-   * an overlap, the seats all taken, the identifier in use, no expected end date for time-limited staff, or a rule of the baseline.
+   * an overlap, the seats all taken, the identifier in use, no expected end date for time-limited staff, or a rule of the baseline;
+   * ProvisioningSubscriptionError (`NEXT_PERIOD_SEATS`) when the next period buys no seat for it.
    */
   async createFromRequest(tx: DbTx, actor: AuthenticatedPrincipal, input: GrantedSeat): Promise<AssignmentRecord> {
     const { holder } = input;
@@ -249,6 +261,7 @@ export class AssignmentService {
         },
       ),
     );
+    await this.carryToNextPeriod(tx, actor, { seat: record, today: input.effectiveFrom });
 
     return record;
   }
@@ -341,12 +354,7 @@ export class AssignmentService {
     const probe = await this.repo.find(input.assignmentId, tx);
     if (!probe) throw new AssignmentNotFoundError();
     if (probe.subscriptionId) await this.catalog.lockSeatTarget(tx, { subscriptionId: probe.subscriptionId });
-    const current = await this.repo.lock(tx, input.assignmentId);
-    if (!current) throw new AssignmentNotFoundError();
-    if (current.validUntil !== null || current.failedAt !== null || current.cancelledAt !== null) {
-      throw new AssignmentNotOpenError();
-    }
-
+    const current = await this.openToVoid(tx, input.assignmentId, how, input.now);
     const failed = how === 'FAILED';
     await (failed
       ? this.repo.markFailed(tx, current.id, input.now)
@@ -364,6 +372,80 @@ export class AssignmentService {
       ),
     );
     await this.giveBackReplaced(tx, actor, current.id, input, failed ? 'GRANT_FAILED' : 'GRANT_CANCELLED');
+  }
+
+  /** Carries these seats of a subscription to its next period from the first day of it, and ends them that day (the renewal recorded); returns how many. */
+  carry(
+    tx: DbTx,
+    input: {
+      assignmentIds: readonly string[];
+      nextSubscriptionId: string;
+      startDate: BusinessDate;
+      actorAppUserId: string;
+    },
+  ): Promise<number> {
+    return this.carrying.carry(tx, input);
+  }
+
+  /**
+   * A seat granted on a subscription that a next period, recorded ahead of its start, continues goes on into that period at once, in the
+   * transaction of the grant (`QĐ-35c`): otherwise the seats the next period buys, sized to the rights held and the requests waiting to be
+   * granted (`QĐ-103e`), would show it free on its first day with the person holding it (a second grant of it). The same carrying and the
+   * same rule as when the renewal was recorded; a seat that ends before the next period begins stays where it is. Throws
+   * ProvisioningSubscriptionError (`NEXT_PERIOD_SEATS`) when the next period buys no seat for it, nothing written.
+   */
+  private async carryToNextPeriod(
+    tx: DbTx,
+    actor: AuthenticatedPrincipal,
+    input: { seat: AssignmentRecord; today: BusinessDate },
+  ): Promise<void> {
+    const { seat } = input;
+    if (seat.subscriptionId === null) return;
+    const [period] = await this.periods.getPeriods([seat.subscriptionId], tx);
+    if (!period?.renewedById) return;
+    const [next] = await this.periods.getPeriods([period.renewedById], tx);
+    const startDate = nextPeriodStart(next, input.today);
+    const carried = seatsToCarry(
+      [{ validFrom: seat.effectiveFrom, validUntil: seat.validUntil, expectedEndDate: seat.expectedEndDate }],
+      startDate ?? seat.effectiveFrom,
+    );
+    if (startDate === null || next === undefined || carried.length === 0) return;
+
+    try {
+      await this.carrying.carry(tx, {
+        assignmentIds: [seat.id],
+        nextSubscriptionId: next.subscriptionId,
+        startDate,
+        actorAppUserId: actor.appUserId,
+      });
+    } catch (error) {
+      const failure = toAssignmentFailure(error, 0);
+      if (failure instanceof AssignmentConflictError && failure.conflict === 'SEAT_CAPACITY') {
+        throw new ProvisioningSubscriptionError('NEXT_PERIOD_SEATS');
+      }
+      throw failure ?? error;
+    }
+  }
+
+  /**
+   * The assignment locked and open, ready to be voided. A grant carried into a next period at its grant (`carryToNextPeriod`) ended there: the right it made on
+   * that period goes first and this one is open again. Throws AssignmentNotFoundError and AssignmentNotOpenError.
+   */
+  private async openToVoid(
+    tx: DbTx,
+    assignmentId: string,
+    how: 'FAILED' | 'CANCELLED',
+    now: Date,
+  ): Promise<AssignmentRecord> {
+    const locked = await this.repo.lock(tx, assignmentId);
+    if (!locked) throw new AssignmentNotFoundError();
+    const carriedBack = await this.carrying.takeBack(tx, locked.id, how, now);
+    const current = carriedBack ? ((await this.repo.find(locked.id, tx)) ?? locked) : locked;
+    if (current.validUntil !== null || current.failedAt !== null || current.cancelledAt !== null) {
+      throw new AssignmentNotOpenError();
+    }
+
+    return current;
   }
 
   /**
