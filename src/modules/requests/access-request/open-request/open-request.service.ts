@@ -1,9 +1,27 @@
 import { Injectable } from '@nestjs/common';
+import { businessDateAt } from '../../../../core/business-date';
 import type { DbTx } from '../../../../infrastructure/database/transaction-runner';
 import { CatalogApi } from '../../../catalog/public/catalog.api';
 import { OrganizationReadApi } from '../../../organization/public/organization-read.api';
-import type { OpenRequestOfBeneficiary } from '../../public/requests.types';
-import { OpenRequestRepo } from './open-request.repo';
+import type { GrantRequestOnItsWay, GrantRequestQuestion, OpenRequestOfBeneficiary } from '../../public/requests.types';
+import type { AccessRequestState } from '../access-request.types';
+import { OpenRequestRepo, type GrantRequestRow } from './open-request.repo';
+
+type Stage = GrantRequestOnItsWay['stage'];
+
+/** How far each state of a Request to grant has come; a Request that is carried out or done is approved, one in the queue of spend or sent back from it is at that step. */
+const STAGE_OF: Partial<Record<AccessRequestState, Stage>> = {
+  PENDING: 'BEFORE_SPEND',
+  WAITING_CONTROLLED: 'BEFORE_SPEND',
+  AWAITING_IT_ASSESSMENT: 'BEFORE_SPEND',
+  AWAITING_SPEND_SUBMISSION: 'AT_SPEND',
+  AWAITING_SPEND_DECISION: 'AT_SPEND',
+  AWAITING_REQUESTER_REVISION: 'AT_SPEND',
+  AWAITING_EXECUTION: 'APPROVED',
+  EXECUTING: 'APPROVED',
+  COMPLETED: 'APPROVED',
+};
+const FURTHEST: readonly Stage[] = ['BEFORE_SPEND', 'AT_SPEND', 'APPROVED'];
 
 /**
  * The requests of a person that are still open, with the plan and who sent each (`US-03-04` AC-24). Nothing here changes a request:
@@ -66,5 +84,49 @@ export class OpenRequestService {
       }),
       total,
     };
+  }
+
+  /**
+   * For each question, the Request of that person for that application that has come furthest on its way to a grant (`US-13-05` AC-23), or null when
+   * there is none. Two statements however many questions: the Requests of the people, then the plans they name.
+   */
+  async grantsOnItsWay(
+    questions: readonly GrantRequestQuestion[],
+    tx?: DbTx,
+  ): Promise<(GrantRequestOnItsWay | null)[]> {
+    if (questions.length === 0) return [];
+    const earliest = questions.reduce((day, question) => (question.since < day ? question.since : day), '9999-12-31');
+    const rows = await this.repo.grantsOf([...new Set(questions.map((question) => question.employeeId))], earliest, tx);
+    const planIds = [...new Set(rows.flatMap((row) => (row.planId === null ? [] : [row.planId])))];
+    const plans = planIds.length === 0 ? [] : await this.catalog.getPlanSummaries(planIds, tx);
+    const applicationOf = new Map(plans.map((plan) => [plan.planId, plan.applicationId]));
+    const organization = await this.organizationReads.getOrganization(tx);
+    const timeZone = organization?.timeZone ?? 'UTC';
+
+    return questions.map((question) => {
+      const answers = rows
+        .filter((row) => row.planId !== null && applicationOf.get(row.planId) === question.applicationId)
+        .filter((row) => row.beneficiaryEmployeeIds.includes(question.employeeId))
+        .flatMap((row) => this.wayOf(row, question, timeZone));
+      const furthest = Math.max(...answers.map((answer) => FURTHEST.indexOf(answer.stage)));
+
+      return answers.find((answer) => FURTHEST.indexOf(answer.stage) === furthest) ?? null;
+    });
+  }
+
+  private wayOf(row: GrantRequestRow, question: GrantRequestQuestion, timeZone: string): GrantRequestOnItsWay[] {
+    const stage = STAGE_OF[row.state];
+    if (stage === undefined) return [];
+    // A Request that is done counts only for the right it granted after the case was concluded.
+    if (row.state === 'COMPLETED' && (row.grantedOn === null || row.grantedOn < question.since)) return [];
+
+    return [
+      {
+        requestId: row.id,
+        stage,
+        reachedSpendOn:
+          stage === 'AT_SPEND' && row.spendQueuedAt !== null ? businessDateAt(row.spendQueuedAt, timeZone) : null,
+      },
+    ];
   }
 }
