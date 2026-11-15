@@ -33,6 +33,7 @@ export function toPolicyDetail(
     isCurrent,
     publishedAt: version.publishedAt.toISOString(),
     changeNote: version.changeNote,
+    publishedByAppUserId: version.publishedByAppUserId,
     requiresReacknowledgement: version.requiresReacknowledgement,
     applicableRoles: version.applicableRoles,
     content: version.content,
@@ -45,6 +46,7 @@ export function toVersionSummary(version: PublishedVersionRecord) {
     versionNumber: version.versionNumber,
     publishedAt: version.publishedAt.toISOString(),
     changeNote: version.changeNote,
+    publishedByAppUserId: version.publishedByAppUserId,
     requiresReacknowledgement: version.requiresReacknowledgement,
     applicableRoles: version.applicableRoles,
   };

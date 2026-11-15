@@ -61,6 +61,10 @@ export const policyDetailSchema = z.strictObject({
   isCurrent: z.boolean(),
   publishedAt: instant,
   changeNote: z.string(),
+  publishedByAppUserId: z
+    .uuid()
+    .nullable()
+    .meta({ description: 'The account that published the version; null for a version the installation wrote.' }),
   requiresReacknowledgement: z.boolean(),
   applicableRoles: roles,
   content: policyContentSchema,
@@ -71,6 +75,10 @@ export const policyVersionSummarySchema = z.strictObject({
   versionNumber: z.number().int().positive(),
   publishedAt: instant,
   changeNote: z.string(),
+  publishedByAppUserId: z
+    .uuid()
+    .nullable()
+    .meta({ description: 'The account that published the version; null for a version the installation wrote.' }),
   requiresReacknowledgement: z.boolean(),
   applicableRoles: roles,
 });
