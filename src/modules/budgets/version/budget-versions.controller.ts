@@ -263,7 +263,7 @@ export class BudgetVersionsController {
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
-        'The version has no file that explains it (BUDGET_VERSION.ATTACHMENT_REQUIRED), a reserve that is not its share of the base has no reason (BUDGET.RESERVE_REASON_REQUIRED) or the year has ended (BUDGET.YEAR_ENDED).',
+        'The version has no file that explains it (BUDGET_VERSION.ATTACHMENT_REQUIRED), a reserve that is not the default share of the organization has no reason (BUDGET.RESERVE_REASON_REQUIRED) or the year has ended (BUDGET.YEAR_ENDED).',
       examples: [
         VALIDATION_EXAMPLE,
         EXAMPLES.ATTACHMENT_REQUIRED,

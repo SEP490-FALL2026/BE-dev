@@ -178,21 +178,30 @@ export function commitmentAttachedAfter(
 export const defaultReserveOf = (baseMinor: bigint, percent: number): bigint =>
   (baseMinor * BigInt(percent) + 50n) / 100n;
 
-/** A version whose reserve is not the default share of its base, and says not why (`US-06-09` AC-30); one made before the share was kept asks nothing. */
-export const reserveReasonMissing = (version: {
-  baseMinor: bigint;
-  reserveMinor: bigint;
-  reservePercent: number | null;
-  reserveReason: string | null;
-}): boolean =>
+/**
+ * A version whose reserve is not the default share of its base, and says not why (`US-06-09` AC-30, `QĐ-100h`, `QĐ-100k`, `FR-5.15`(2)).
+ * The default is the one of the organization (`BUDGET_RESERVE_DEFAULT_PERCENT`, read when the version is sent), never the share the version
+ * itself holds: a share Finance chose is a share that differs from the default and asks its reason. One made before the share was kept
+ * (`reservePercent` null) asks nothing.
+ */
+export const reserveReasonMissing = (
+  version: {
+    baseMinor: bigint;
+    reserveMinor: bigint;
+    reservePercent: number | null;
+    reserveReason: string | null;
+  },
+  defaultPercent: number,
+): boolean =>
   version.reservePercent !== null &&
-  version.reserveMinor !== defaultReserveOf(version.baseMinor, version.reservePercent) &&
+  version.reserveMinor !== defaultReserveOf(version.baseMinor, defaultPercent) &&
   !version.reserveReason;
 
 /**
  * The figures of a version as Finance gives them (`QĐ-111ac`): the base, filled in with what the Cost Center carries into the year when
- * Finance gives none; the reserve as a share Finance chooses (the share is kept, so it asks no reason) or as an amount (kept against the
- * default share, so an amount that is not that share asks a reason when the version is sent), the default share when neither is given.
+ * Finance gives none; the reserve as a share Finance chooses (kept as it was given) or as an amount (the default share is kept), the default
+ * share when neither is given. Whichever way, a reserve that is not the default share of the organization asks its reason when the version
+ * is sent (`reserveReasonMissing`).
  */
 export function versionFiguresOf(input: {
   baseMinor?: bigint;

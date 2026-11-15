@@ -70,11 +70,11 @@ const versionFigures = {
   }),
   reserve: money.meta({
     description:
-      'The reserve as an amount; not with reservePercent. An amount that is not the default share asks a reason.',
+      'The reserve as an amount; not with reservePercent. An amount that is not the default share of the base asks a reason when the version is sent.',
   }),
   reservePercent: z.number().int().min(0).max(100).meta({
     description:
-      'The reserve as a share of the base, in whole percent; not with reserve. The default share when neither is given.',
+      'The reserve as a share of the base, in whole percent; not with reserve. The default share when neither is given. A share that is not the default asks reserveReason when the version is sent.',
   }),
   /** Why the reserve is not the default share of the base; asked when the version is sent (`US-06-09` AC-30). */
   reserveReason: text(REASON_MAX),
@@ -227,9 +227,9 @@ const versionSchema = z.strictObject({
   /** Where the version came from: the head's proposal, or the baseline Finance built when nobody headed the department (`QĐ-100h`). */
   origin: z.enum(['PROPOSAL', 'BASELINE_NO_HEAD', 'BASELINE_NO_PROPOSAL', 'ADJUSTMENT']),
   reserve: moneyView,
-  /** The share of the base the reserve defaults to when the version was made; null for a version made before `QĐ-98`. */
+  /** The share of the base the reserve was made with: the default of the organization, or the share Finance chose; null for a version made before `QĐ-98`. */
   reservePercent: z.number().int().nullable(),
-  /** The reserve the share gives for the base now; Finance sees it and may differ, with a reason. */
+  /** The reserve the default share of the organization gives for the base now; Finance sees it and may differ, with a reason (asked when the version is sent). */
   defaultReserve: moneyView.nullable(),
   reserveReason: z.string().nullable(),
   total: moneyView,

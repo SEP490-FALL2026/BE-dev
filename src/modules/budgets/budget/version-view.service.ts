@@ -72,6 +72,8 @@ export class VersionViewService {
       ...[...latest.values()].map((decision) => decision.decidedByEmployeeId),
     ]);
     const carriedOver = await this.carriedOverOf(versions);
+    // The reserve the default share of the organization gives, which a reserve that differs from asks its reason when sent.
+    const defaultPercent = await this.facts.reserveDefaultPercent();
 
     return Promise.all(
       versions.map(async (version) => {
@@ -91,7 +93,7 @@ export class VersionViewService {
           reserve: money(version.reserveMinor),
           reservePercent: version.reservePercent,
           defaultReserve:
-            version.reservePercent === null ? null : money(defaultReserveOf(version.baseMinor, version.reservePercent)),
+            version.reservePercent === null ? null : money(defaultReserveOf(version.baseMinor, defaultPercent)),
           carriedOverNextYear: money(carriedOver(version)),
           belowCarriedOver: belowCarriedOver(version, carriedOver(version)),
           carriedOverShortfall: money(carriedOverShortfall(version, carriedOver(version))),

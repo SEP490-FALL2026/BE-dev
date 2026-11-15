@@ -72,8 +72,8 @@ attachmentIds[1..10] }`, không có dòng (`requestedAmount` lưu ở `total_min
   `VersionService`, `VersionDecisionService` (`VersionDecisionJudge` + `VersionDecisionWriter`), `VersionCreationService`,
   `VersionBaselineCreationService`, `VersionFigures`, `VersionTrail`, `VersionAccessService`. Một số cho cả năm, không dòng (`QĐ-111ac`,
   B-6): `base` bỏ trống ⟹ điền số chạy sang của Cost Center (`CarriedOverContributions`, `requests` bind; chưa bind ⟹ 0), dự phòng là
-  `reservePercent` (mặc định `BUDGET_RESERVE_DEFAULT_PERCENT`) hoặc `reserve` (số tiền khác tỷ lệ cần `reserveReason` khi gửi); lưu nháp
-  không chặn; gửi cần ≥ 1 tệp (422 `BUDGET_VERSION.ATTACHMENT_REQUIRED`) và tổng mọi Cost Center ≤ Trần năm − Dự phòng kho (409
+  `reservePercent` (mặc định `BUDGET_RESERVE_DEFAULT_PERCENT`) hoặc `reserve` (số tiền); dự phòng khác mặc định của tổ chức (đọc lúc gửi), dù
+  chọn bằng tỷ lệ hay số tiền, cần `reserveReason` khi gửi (422 `BUDGET.RESERVE_REASON_REQUIRED`); lưu nháp không chặn; gửi cần ≥ 1 tệp (422 `BUDGET_VERSION.ATTACHMENT_REQUIRED`) và tổng mọi Cost Center ≤ Trần năm − Dự phòng kho (409
   `BUDGET_VERSION.OVER_CEILING`, `details.overBy`). Đọc phiên bản có `carriedOverNextYear`, `belowCarriedOver` (cờ đỏ: cơ sở + dự phòng < số chạy sang, `C-09`) và `carriedOverShortfall` (phần thiếu, 0 khi đủ),
   `noProposalSubmitted` (origin `BASELINE_NO_PROPOSAL`: phòng không nộp tới hạn hoặc tạo sau hạn, `QĐ-111bb`). Quyết định chỉ `APPROVE` |
   `RETURN` (lý do bắt buộc ⟹ `CHANGES_REQUESTED`, `QĐ-111ad`); `REJECTED` chỉ còn ở dữ liệu cũ. Không còn `REVISION`, `SUPERSEDED`, dời

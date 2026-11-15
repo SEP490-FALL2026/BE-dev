@@ -178,7 +178,52 @@ describe('budgets over HTTP: the versions Finance builds (integration, real Post
 
       expect(h.codeOf(both)).toBe('VALIDATION_ERROR');
       expect(filled).toMatchObject({ base: { amount: '0' }, carriedOverNextYear: { amount: '0' }, reservePercent: 15 });
-      expect(shared).toMatchObject({ reserve: { amount: '200000' }, reservePercent: 20, reserveReason: null });
+      // The share Finance chose is told back as it was given, and the default reserve is the one of the organization (10 %), not the chosen one.
+      expect(shared).toMatchObject({
+        reserve: { amount: '200000' },
+        reservePercent: 20,
+        defaultReserve: { amount: '100000' },
+        reserveReason: null,
+      });
+    });
+
+    it('asks a reason when the share of the reserve is not the default of the organization, however it was chosen: sending 20 % with none is 422 BUDGET.RESERVE_REASON_REQUIRED, and nothing is written (QĐ-100h, FR-5.15(2); FIX-LB3 LBG-02)', async () => {
+      const { proposal } = await waiting();
+      const version = h.dataOf<{ version: VersionWire }>(
+        await h.createVersion({ proposalId: proposal.id, base: h.money(1_000_000), reservePercent: 15 }).expect(201),
+      ).version;
+      await h.updateVersion(version.id, { reservePercent: 20 }).expect(200);
+
+      const refused = await h.sendVersion(version.id).expect(422);
+
+      expect(h.codeOf(refused)).toBe('BUDGET.RESERVE_REASON_REQUIRED');
+      expect(await stateOf(version.id)).toBe('DRAFT');
+      expect(await proposalState(proposal.id)).toBe('SUBMITTED');
+      await h.updateVersion(version.id, { reserveReason: 'The plan buys more in the autumn' }).expect(200);
+      expect(h.dataOf<{ version: VersionWire }>(await h.sendVersion(version.id).expect(200)).version).toMatchObject({
+        state: 'SENT',
+        reserve: { amount: '200000' },
+        reserveReason: 'The plan buys more in the autumn',
+      });
+    });
+
+    it('asks a reason at the creation too, and none when the share given is the default itself', async () => {
+      const unshared = await waiting();
+      const atDefault = await waiting();
+      const different = h.dataOf<{ version: VersionWire }>(
+        await h
+          .createVersion({ proposalId: unshared.proposal.id, base: h.money(2_000_000), reservePercent: 15 })
+          .expect(201),
+      ).version;
+      const same = h.dataOf<{ version: VersionWire }>(
+        await h
+          .createVersion({ proposalId: atDefault.proposal.id, base: h.money(2_000_000), reservePercent: 10 })
+          .expect(201),
+      ).version;
+
+      expect(h.codeOf(await h.sendVersion(different.id).expect(422))).toBe('BUDGET.RESERVE_REASON_REQUIRED');
+      expect(same).toMatchObject({ reserve: { amount: '200000' }, defaultReserve: { amount: '200000' } });
+      await h.sendVersion(same.id).expect(200);
     });
 
     it('saves a draft with no file, and sends it only with one: 422 BUDGET_VERSION.ATTACHMENT_REQUIRED, nothing is written', async () => {

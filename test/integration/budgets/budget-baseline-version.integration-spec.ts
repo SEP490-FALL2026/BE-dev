@@ -110,7 +110,12 @@ describe('a version built from the baseline (integration, real PostgreSQL)', () 
     carriedOver.set(department.unitId, 50_000_000n);
 
     const made = h.dataOf<VersionBody>(
-      await create({ ...baselineBody(department), base: h.money(40_000_000), reservePercent: 5 }).expect(201),
+      await create({
+        ...baselineBody(department),
+        base: h.money(40_000_000),
+        reservePercent: 5,
+        reserveReason: 'A lean year',
+      }).expect(201),
     ).version;
 
     expect(made).toMatchObject({

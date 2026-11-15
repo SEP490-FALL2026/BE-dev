@@ -20,6 +20,11 @@ export class VersionFigures {
     private readonly carried: CarriedOverContributions,
   ) {}
 
+  /** The default share of the organization for the reserve, as it is now: a reserve that is not that share asks its reason when it is sent. */
+  defaultPercent(): Promise<number> {
+    return this.facts.reserveDefaultPercent();
+  }
+
   /** What the Cost Center carries into the year, as the contexts that add it say; zero when none does. */
   async carriedOverOf(costCenterId: string, year: number, tx?: DbTx): Promise<bigint> {
     return (await this.carried.totals([costCenterId], year, tx)).get(costCenterId) ?? 0n;
@@ -85,7 +90,7 @@ export class VersionFigures {
   }
 }
 
-/** A share Finance chooses is the share the reserve keeps from now on (`QĐ-111ac`): the reserve is that share of the base. */
+/** A share Finance chooses sets the reserve to that share of the base and is kept as it was given; whether it asks a reason is told at the sending. */
 function shareOf(version: VersionRecord, patch: VersionPatchDto, next: VersionPatch): void {
   if (patch.reservePercent === undefined) return;
   next.reservePercent = patch.reservePercent;

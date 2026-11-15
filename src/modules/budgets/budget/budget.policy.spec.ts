@@ -249,13 +249,27 @@ describe('the default reserve of a version (US-06-09 AC-30, QĐ-98)', () => {
     expect(defaultReserveOf(500n, 0)).toBe(0n);
   });
 
-  it('asks a reason only of a version that kept its share and differs from it', () => {
+  it('asks a reason of a version whose reserve is not the default share of the organization, and of nothing else', () => {
     const version = { baseMinor: 1000n, reserveMinor: 100n, reservePercent: 10, reserveReason: null };
 
-    expect(reserveReasonMissing(version)).toBe(false);
-    expect(reserveReasonMissing({ ...version, reserveMinor: 150n })).toBe(true);
-    expect(reserveReasonMissing({ ...version, reserveMinor: 150n, reserveReason: 'Kế hoạch mua thêm' })).toBe(false);
-    expect(reserveReasonMissing({ ...version, reserveMinor: 150n, reservePercent: null })).toBe(false);
+    expect(reserveReasonMissing(version, 10)).toBe(false);
+    expect(reserveReasonMissing({ ...version, reserveMinor: 150n }, 10)).toBe(true);
+    expect(reserveReasonMissing({ ...version, reserveMinor: 150n, reserveReason: 'Kế hoạch mua thêm' }, 10)).toBe(
+      false,
+    );
+    expect(reserveReasonMissing({ ...version, reserveMinor: 150n, reservePercent: null }, 10)).toBe(false);
+  });
+
+  it('compares with the default share of the organization, never with the share the version itself holds: a chosen 15 % against a default of 10 % asks a reason (FIX-LB3 LBG-02)', () => {
+    const chosen = { baseMinor: 1000n, reserveMinor: 150n, reservePercent: 15, reserveReason: null };
+
+    expect(reserveReasonMissing(chosen, 10)).toBe(true);
+    expect(reserveReasonMissing({ ...chosen, reserveReason: 'Mua thêm vào mùa thu' }, 10)).toBe(false);
+    // The reserve that is the default share asks nothing, whatever share the version holds.
+    expect(reserveReasonMissing({ ...chosen, reserveMinor: 100n }, 10)).toBe(false);
+    // The default of the organization is the one that counts when it is read: a version made at 10 % is not the default once it is 12 %.
+    expect(reserveReasonMissing({ ...chosen, reserveMinor: 100n, reservePercent: 10 }, 12)).toBe(true);
+    expect(reserveReasonMissing({ ...chosen, reserveMinor: 120n, reservePercent: 12 }, 12)).toBe(false);
   });
 });
 
