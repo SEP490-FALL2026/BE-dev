@@ -12,6 +12,7 @@ import { UsageModule } from '../usage/usage.module';
 import { EmployeeDashboardController } from './employee/employee-dashboard.controller';
 import { EmployeeDashboardService } from './employee/employee-dashboard.service';
 import { ItAdminDashboardController } from './it-admin/it-admin-dashboard.controller';
+import { ItAdminDashboardFactsService } from './it-admin/it-admin-dashboard-facts.service';
 import { ItAdminDashboardService } from './it-admin/it-admin-dashboard.service';
 import { ManagerDashboardController } from './manager/manager-dashboard.controller';
 import { ManagerDashboardService } from './manager/manager-dashboard.service';
@@ -50,6 +51,7 @@ import { SuperAdminDashboardService } from './super-admin/super-admin-dashboard.
     DashboardProgressService,
     EmployeeDashboardService,
     ManagerDashboardService,
+    ItAdminDashboardFactsService,
     ItAdminDashboardService,
     SuperAdminDashboardService,
     RevocationSlaQueryService,

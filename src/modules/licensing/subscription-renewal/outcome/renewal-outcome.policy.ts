@@ -1,6 +1,6 @@
 import { addDays, type BusinessDate } from '../../../../core/business-date';
 import type { RenewalProblem } from '../subscription-renewal.errors';
-import type { HeldSeat, RenewalChoice, RenewalOutcomeKind } from '../subscription-renewal.types';
+import type { RenewalChoice, RenewalOutcomeKind } from '../subscription-renewal.types';
 
 /**
  * Whether the outcome fits the decision (`US-11-03` AC-15, AC-18, `US-11-05` AC-11, AC-12): an outcome as decided records the new
@@ -20,19 +20,6 @@ export function checkOutcome(input: {
   const expected = input.decidedChoice === 'REDUCE' ? input.decidedQuantity : input.purchasedQuantity;
 
   return expected === null || expected === input.nextQuantity ? null : 'OUTCOME_MISMATCH';
-}
-
-/**
- * The seats that go on into the new period (`QĐ-35c`): those held on its first day — begun before it, not ended by it, and not
- * expected to end before it. A seat that ends before the new period stays where it is and is never carried.
- */
-export function seatsToCarry(seats: readonly HeldSeat[], startDate: BusinessDate): HeldSeat[] {
-  return seats.filter(
-    (seat) =>
-      seat.validFrom < startDate &&
-      (seat.validUntil === null || seat.validUntil > startDate) &&
-      (seat.expectedEndDate === null || seat.expectedEndDate >= startDate),
-  );
 }
 
 interface PeriodCost {

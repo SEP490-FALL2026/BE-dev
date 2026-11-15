@@ -7,6 +7,8 @@ import { SubscriptionPeriodApi } from '../../../catalog/public/subscription-peri
 import { SubscriptionPeriodRefusedError } from '../../../catalog/public/subscription-period.errors';
 import type { NextPeriodInput, RenewalPeriodFacts } from '../../../catalog/public/subscription-period.types';
 import { OrganizationReadApi } from '../../../organization/public/organization-read.api';
+import { seatsToCarry } from '../../assignment/assignment.policy';
+import { AssignmentService } from '../../assignment/assignment.service';
 import { licensingAuditEvent } from '../../licensing-audit-event.mapper';
 import { RenewalError } from '../subscription-renewal.errors';
 import { SubscriptionRenewalSeatRepo } from '../subscription-renewal-seat.repo';
@@ -17,7 +19,7 @@ import type {
   RenewalOutcomeKind,
   RenewalRecord,
 } from '../subscription-renewal.types';
-import { checkOutcome, realisedSavingsOf, seatsToCarry } from './renewal-outcome.policy';
+import { checkOutcome, realisedSavingsOf } from './renewal-outcome.policy';
 
 export interface RecordOutcomeInput {
   outcome: RenewalOutcomeKind;
@@ -63,6 +65,7 @@ export class RenewalOutcomeService {
   constructor(
     private readonly repo: SubscriptionRenewalRepo,
     private readonly seats: SubscriptionRenewalSeatRepo,
+    private readonly assignments: AssignmentService,
     private readonly periods: SubscriptionPeriodApi,
     private readonly organizationReads: OrganizationReadApi,
     private readonly audit: AuditApi,
@@ -191,7 +194,7 @@ export class RenewalOutcomeService {
       throw error;
     }
     if (next.status !== 'ACTIVE' && carry.length > 0) throw new RenewalError('PERIOD_REFUSED', { reason: 'DRAFT' });
-    const carried = await this.seats.carry(tx, {
+    const carried = await this.assignments.carry(tx, {
       assignmentIds: carry.map((seat) => seat.assignmentId),
       nextSubscriptionId: next.subscriptionId,
       startDate: nextPeriod.startDate,

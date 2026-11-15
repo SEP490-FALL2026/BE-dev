@@ -5,6 +5,7 @@ import { OrganizationReadApi } from '../../organization/public/organization-read
 import { statesOf } from '../my-requests/my-requests.policy';
 import { MyRequestsFactsRepo } from '../my-requests/my-requests-facts.repo';
 import { MyRequestsRepo } from '../my-requests/my-requests.repo';
+import { PurchaseInvoiceMissingPeriodsQueryService } from '../purchase-invoice/purchase-invoice-missing-periods-query.service';
 import { NeedDecisionQueueRepo } from '../need-decision-queue/need-decision-queue.repo';
 import type { TransferGraceRequestFacts } from './requests-dashboard.types';
 
@@ -16,6 +17,7 @@ export class RequestsDashboardApi {
     private readonly needQueue: NeedDecisionQueueRepo,
     private readonly facts: MyRequestsFactsRepo,
     private readonly organizationReads: OrganizationReadApi,
+    private readonly missingInvoices: PurchaseInvoiceMissingPeriodsQueryService,
   ) {}
 
   /** The open requests this person sent, whatever their role, including requests sent before their current role. */
@@ -29,6 +31,14 @@ export class RequestsDashboardApi {
   /** The need steps that wait for the person now, as the need-decision queue counts them. */
   async needDecisionsHeldBy(employeeId: string): Promise<number> {
     return this.needQueue.countOpenOf(employeeId);
+  }
+
+  /**
+   * How many periods of a right paid by the month or the year have no invoice five working days after their payment day, in these departments
+   * (`PI-2`): the number `GET /purchase-invoices/missing-periods` answers as its total for an IT Admin who works them.
+   */
+  async missingInvoicePeriods(departmentIds: readonly string[]): Promise<number> {
+    return this.missingInvoices.countOf({ kind: 'DEPARTMENTS', departmentIds });
   }
 
   /**

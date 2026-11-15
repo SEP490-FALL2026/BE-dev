@@ -10,6 +10,7 @@ import { NotificationsModule } from '../notifications/notifications.module';
 import { OperatingParametersModule } from '../operating-parameters/operating-parameters.module';
 import { OrganizationModule } from '../organization/organization.module';
 import { AssignmentEndService } from './assignment/assignment-end.service';
+import { AssignmentCarryRepo } from './assignment/assignment-carry.repo';
 import { AssignmentFactsRepo } from './assignment/renewal/assignment-facts.repo';
 import { AssignmentRenewalService } from './assignment/renewal/assignment-renewal.service';
 import { AssignmentDepartmentRepo } from './assignment/assignment-department.repo';
@@ -199,6 +200,7 @@ import { LicenseKeyTemplateListener } from './license-key/license-key-template.l
     ProvisioningDepartmentUseRepo,
     AssignmentService,
     AssignmentEndService,
+    AssignmentCarryRepo,
     AssignmentFactsRepo,
     AssignmentRenewalService,
     RenewalHoldHook,

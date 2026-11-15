@@ -2,6 +2,7 @@
 export const SUCCESS_MESSAGES_OPTIMIZATION: Readonly<Record<string, string>> = {
   ghostSeatDecisionCreate: 'GHOST_SEAT_DECISION.CREATED',
   ghostSeatDecisionList: 'GHOST_SEAT_DECISIONS.LISTED',
+  ghostSeatEscalationCreate: 'GHOST_SEAT_ESCALATION.CREATED',
   ghostSeatExemptionList: 'GHOST_SEAT_EXEMPTIONS.LISTED',
   ghostSeatKpi5Get: 'GHOST_SEAT_KPI5.READ',
   ghostSeatOptimizationSummaryGet: 'GHOST_SEAT_OPTIMIZATION_SUMMARY.READ',

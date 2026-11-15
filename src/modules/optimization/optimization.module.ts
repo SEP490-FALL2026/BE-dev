@@ -25,6 +25,10 @@ import { DecisionFollowUpService } from './decision/decision-follow-up.service';
 import { DecisionFollowUpSweeper } from './decision/decision-follow-up.job';
 import { DecisionRoutingService } from './decision/decision-routing.service';
 import { DecisionTransferService } from './decision/decision-transfer.service';
+import { EscalationController } from './escalation/escalation.controller';
+import { EscalationFactsService } from './escalation/escalation-facts.service';
+import { EscalationRepo } from './escalation/escalation.repo';
+import { EscalationService } from './escalation/escalation.service';
 import { GhostSeatDecisionRepo } from './ghost-seat/ghost-seat-decision.repo';
 import { GhostSeatSeatStateRepo } from './ghost-seat/ghost-seat-seat-state.repo';
 import { GhostSeatRepo } from './ghost-seat/ghost-seat.repo';
@@ -68,7 +72,7 @@ import { UsageRulesService } from './usage-rules/usage-rules.service';
     PersonnelModule,
     UsageModule,
   ],
-  controllers: [BoardController, DecisionController, UsageRulesThresholdController],
+  controllers: [BoardController, DecisionController, EscalationController, UsageRulesThresholdController],
   providers: [
     BoardQueryService,
     BoardSummaryService,
@@ -96,6 +100,9 @@ import { UsageRulesService } from './usage-rules/usage-rules.service';
     DecisionReturnService,
     DecisionReminderService,
     GhostSeatDecisionRepo,
+    EscalationRepo,
+    EscalationFactsService,
+    EscalationService,
     UsageRulesRepo,
     GhostSeatSeatStateRepo,
     UsageNegationService,

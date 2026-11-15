@@ -138,11 +138,13 @@ export class ProvisioningTypeNotSupportedError extends Error {
   }
 }
 
-export type ProvisioningSubscriptionProblem = 'REQUIRED' | 'NOT_ALLOWED' | 'PLAN_MISMATCH' | 'NOT_GRANTABLE';
+export type ProvisioningSubscriptionProblem =
+  'REQUIRED' | 'NOT_ALLOWED' | 'PLAN_MISMATCH' | 'NOT_GRANTABLE' | 'NEXT_PERIOD_SEATS';
 
 /**
  * A grant names a subscription when it needs none (K5), none when it needs one (K1, K2), one of another plan, or one of the plan a seat
- * cannot be taken from today (its period ended, or a next period that runs took it over).
+ * cannot be taken from today (its period ended, or a next period that runs took it over); or a seat the next period recorded ahead of
+ * its start buys no seat for (`NEXT_PERIOD_SEATS`: the seat goes on into it, so it needs one).
  */
 export class ProvisioningSubscriptionError extends Error {
   constructor(readonly problem: ProvisioningSubscriptionProblem) {

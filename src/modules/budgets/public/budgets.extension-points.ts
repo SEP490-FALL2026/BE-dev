@@ -126,3 +126,26 @@ export class CommitmentRequestFactsHook extends Hook<CommitmentRequestFacts> {
     super('budgets.commitment-request-facts');
   }
 }
+
+/** What a purchase invoice Finance signed says that the invoice it wrote does not keep: the label it was given and how it was paid. */
+export interface PurchaseInvoiceFactsView {
+  label: 'NEW_PURCHASE' | 'PERIOD' | 'RENEWAL';
+  paymentSource: 'COMPANY_CARD' | 'IT_ADVANCE';
+}
+
+/** A context that keeps the purchase invoices, so that Finance reads the invoice of a commitment with the purchase it came from (`PI-1`). */
+export interface PurchaseInvoiceFacts {
+  /** The purchase invoices with these ids, in one read; an id that is not one is not in the map. */
+  factsOf(purchaseInvoiceIds: readonly string[]): Promise<Map<string, PurchaseInvoiceFactsView>>;
+}
+
+/**
+ * The purchase invoices behind a page of invoices, bound by the requests context, which keeps them. Every graph that loads the budgets loads the
+ * requests and binds it; unbound, reading invoices that came from a purchase fails instead of showing them with no label.
+ */
+@Injectable()
+export class PurchaseInvoiceFactsHook extends Hook<PurchaseInvoiceFacts> {
+  constructor() {
+    super('budgets.purchase-invoice-facts');
+  }
+}

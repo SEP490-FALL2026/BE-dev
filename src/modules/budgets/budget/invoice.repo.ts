@@ -7,7 +7,8 @@ import type { InvoiceMatch } from './invoice.policy';
 
 export interface NewInvoice {
   organizationId: string;
-  commitmentId: string;
+  /** Null for an invoice booked to a subscription or a Cost Center (PI-1): the CHECK of the table wants one of the places. */
+  commitmentId: string | null;
   vendorId: string;
   number: string;
   issuedOn: BusinessDate;
@@ -21,11 +22,17 @@ export interface NewInvoice {
   note: string | null;
   recordedByEmployeeId: string;
   now: Date;
+  /** The first day of the month the invoice pays for; absent for an invoice recorded by hand. */
+  serviceMonth?: BusinessDate | null;
+  purchaseInvoiceId?: string | null;
+  subscriptionId?: string | null;
+  costCenterId?: string | null;
 }
 
 export interface InvoiceRecord {
   id: string;
-  commitmentId: string;
+  /** Null for an invoice booked to a subscription or a Cost Center, with no commitment behind it (PI-1). */
+  commitmentId: string | null;
   number: string;
   issuedOn: BusinessDate;
   currency: string;
@@ -37,6 +44,8 @@ export interface InvoiceRecord {
   note: string | null;
   recordedByEmployeeId: string;
   recordedAt: Date;
+  serviceMonth: BusinessDate | null;
+  purchaseInvoiceId: string | null;
 }
 
 /** What the invoices of one commitment cost, how many there are, and whether one is flagged as more than the commitment allowed. */
@@ -60,6 +69,8 @@ const toRecord = (row: Prisma.InvoiceGetPayload<object>): InvoiceRecord => ({
   note: row.note,
   recordedByEmployeeId: row.recordedByEmployeeId,
   recordedAt: row.recordedAt,
+  serviceMonth: row.serviceMonth ? fromDateColumn(row.serviceMonth) : null,
+  purchaseInvoiceId: row.purchaseInvoiceId,
 });
 
 /**
@@ -88,6 +99,10 @@ export class InvoiceRepo {
         note: input.note,
         recordedByEmployeeId: input.recordedByEmployeeId,
         recordedAt: input.now,
+        serviceMonth: input.serviceMonth ? toDateColumn(input.serviceMonth) : null,
+        purchaseInvoiceId: input.purchaseInvoiceId ?? null,
+        subscriptionId: input.subscriptionId ?? null,
+        costCenterId: input.costCenterId ?? null,
       },
     });
 
@@ -143,6 +158,7 @@ export class InvoiceRepo {
     ]);
     const flaggedIds = new Set(flagged.map((group) => group.commitmentId));
     for (const group of sums) {
+      if (group.commitmentId === null) continue;
       figures.set(group.commitmentId, {
         costMinor: group._sum.actualCostMinor ?? 0n,
         count: group._count._all,
@@ -155,18 +171,22 @@ export class InvoiceRepo {
 
   /**
    * What the invoices cost for each Cost Center and year, keyed `costCenterId:year`: every invoice of every commitment of that Cost
-   * Center and year, because an expense belongs to its year even before the budget of that year is approved.
+   * Center and year, because an expense belongs to its year even before the budget of that year is approved, and every invoice booked
+   * to the Cost Center with no commitment (`PI-1`, `R-51`). The year is the one of the month the invoice pays for; an invoice of before
+   * has no such month and keeps the year of its commitment.
    */
   async spentOf(pairs: readonly { costCenterId: string; year: number }[], tx?: DbTx): Promise<Map<string, bigint>> {
     const spent = new Map<string, bigint>();
     if (pairs.length === 0) return spent;
     const wanted = Prisma.join(pairs.map((pair) => Prisma.sql`(${pair.costCenterId}::uuid, ${pair.year}::int)`));
     const rows = await (tx ?? this.prisma).$queryRaw<{ cost_center_id: string; year: number; spent: string }[]>`
-      SELECT c.cost_center_id, c.year, SUM(i.actual_cost_minor)::text AS spent
+      SELECT COALESCE(i.cost_center_id, c.cost_center_id) AS cost_center_id,
+             COALESCE(EXTRACT(YEAR FROM i.service_month)::int, c.year) AS year,
+             SUM(i.actual_cost_minor)::text AS spent
         FROM invoices i
-        JOIN budget_commitments c ON c.id = i.commitment_id
-       WHERE (c.cost_center_id, c.year) IN (${wanted})
-       GROUP BY c.cost_center_id, c.year`;
+        LEFT JOIN budget_commitments c ON c.id = i.commitment_id
+       WHERE (COALESCE(i.cost_center_id, c.cost_center_id), COALESCE(EXTRACT(YEAR FROM i.service_month)::int, c.year)) IN (${wanted})
+       GROUP BY 1, 2`;
     for (const row of rows) spent.set(`${row.cost_center_id}:${row.year}`, BigInt(row.spent));
 
     return spent;
@@ -177,8 +197,8 @@ export class InvoiceRepo {
     const rows = await this.prisma.$queryRaw<{ at: Date | null }[]>`
       SELECT max(i.recorded_at) AS at
         FROM invoices i
-        JOIN budget_commitments c ON c.id = i.commitment_id
-       WHERE c.year = ${year}::int`;
+        LEFT JOIN budget_commitments c ON c.id = i.commitment_id
+       WHERE COALESCE(EXTRACT(YEAR FROM i.service_month)::int, c.year) = ${year}::int`;
 
     return rows[0]?.at ?? null;
   }
@@ -191,11 +211,13 @@ export class InvoiceRepo {
     if (pairs.length === 0) return new Map();
     const wanted = Prisma.join(pairs.map((pair) => Prisma.sql`(${pair.costCenterId}::uuid, ${pair.year}::int)`));
     const rows = await this.prisma.$queryRaw<{ cost_center_id: string; year: number; amount: string }[]>`
-      SELECT c.cost_center_id, c.year, SUM(i.actual_cost_minor)::text AS amount
-        FROM invoices i JOIN budget_commitments c ON c.id = i.commitment_id
-       WHERE (c.cost_center_id, c.year) IN (${wanted})
-         AND i.recorded_at >= (make_date(c.year + 1, 1, 1)::timestamp AT TIME ZONE ${timeZone})
-       GROUP BY c.cost_center_id, c.year`;
+      SELECT COALESCE(i.cost_center_id, c.cost_center_id) AS cost_center_id,
+             COALESCE(EXTRACT(YEAR FROM i.service_month)::int, c.year) AS year,
+             SUM(i.actual_cost_minor)::text AS amount
+        FROM invoices i LEFT JOIN budget_commitments c ON c.id = i.commitment_id
+       WHERE (COALESCE(i.cost_center_id, c.cost_center_id), COALESCE(EXTRACT(YEAR FROM i.service_month)::int, c.year)) IN (${wanted})
+         AND i.recorded_at >= (make_date(COALESCE(EXTRACT(YEAR FROM i.service_month)::int, c.year) + 1, 1, 1)::timestamp AT TIME ZONE ${timeZone})
+       GROUP BY 1, 2`;
     return new Map(rows.map((row) => [`${row.cost_center_id}:${row.year}`, BigInt(row.amount)]));
   }
 }

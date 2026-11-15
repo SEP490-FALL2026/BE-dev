@@ -192,6 +192,36 @@ export class CatalogApi {
     return this.subscriptions.addSeat(tx, actor, subscriptionId, requestId);
   }
 
+  /**
+   * Attaches the purchase documents of a purchase invoice (`PI-1`) to it in the transaction of the caller: only `PURCHASE_DOCUMENT` files the actor uploaded
+   * that are uploaded and not attached yet. Throws DocumentAttachRefusedError.
+   */
+  async attachPurchaseDocuments(
+    tx: DbTx,
+    actor: AuthenticatedPrincipal,
+    input: { documentIds: readonly string[]; purchaseInvoiceId: string },
+  ): Promise<void> {
+    try {
+      await this.documents.attachPurchaseDocuments(tx, actor, input);
+    } catch (error) {
+      if (error instanceof DocumentNotFoundError) throw new DocumentAttachRefusedError('NOT_FOUND');
+      if (error instanceof DocumentAlreadyAttachedError) throw new DocumentAttachRefusedError('ALREADY_ATTACHED');
+      if (error instanceof DocumentNotReadyToAttachError) throw new DocumentAttachRefusedError('NOT_READY_TO_ATTACH');
+      if (error instanceof DocumentPurposeMismatchError) throw new DocumentAttachRefusedError('PURPOSE_MISMATCH');
+      throw error;
+    }
+  }
+
+  /** The price the vendor quoted for the main subscription of the plan, in the currency it was quoted in (`R-44`); null when none was kept. */
+  getPlanOriginalPrice(planId: string, tx?: DbTx, on?: BusinessDate) {
+    return this.subscriptions.originalPriceOfPlan(planId, tx, on);
+  }
+
+  /** The price the vendor quoted for one subscription, in the currency it was quoted in (`R-44`); null when none was kept. */
+  getSubscriptionOriginalPrice(subscriptionId: string, tx?: DbTx) {
+    return this.subscriptions.originalPriceOfSubscription(subscriptionId, tx);
+  }
+
   /** What one subscription is bought at (unit price and billing cycle); null when it has no price. */
   getSubscriptionPrice(subscriptionId: string, tx?: DbTx): Promise<SubscriptionPrice | null> {
     return this.subscriptions.priceOfSubscription(subscriptionId, tx);
@@ -279,7 +309,7 @@ export class CatalogApi {
     return this.plans.revocationInfos(planIds, tx);
   }
 
-  /** The plans of the other applications in the functional group of the plan's application (at most `limit`, by id). */
+  /** The plans of the other applications in the functional group of the plan's application (at most `limit`, by id); none for the group Khác, which is no one function. */
   getSimilarPlanIds(planId: string, limit: number, tx?: DbTx): Promise<string[]> {
     return this.plans.similarIds(planId, limit, tx);
   }

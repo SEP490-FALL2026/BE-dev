@@ -5,10 +5,12 @@ import { LicensingDashboardApi } from '../../licensing/public/licensing-dashboar
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import type { OptimizationApi } from '../../optimization/public/optimization.api';
 import { PersonnelDashboardApi } from '../../personnel/public/personnel-dashboard.api';
+import type { RequestsDashboardApi } from '../../requests/public/requests-dashboard.api';
 import type { UsageEvidenceApi } from '../../usage/public/usage-evidence.api';
 import { progressOf } from '../progress/dashboard-progress.policy';
 import type { DashboardProgressService } from '../progress/dashboard-progress.service';
 import { DashboardRefusedError } from '../section/dashboard-section.errors';
+import { ItAdminDashboardFactsService } from './it-admin-dashboard-facts.service';
 import { ItAdminDashboardService } from './it-admin-dashboard.service';
 
 const PROGRESS = progressOf({
@@ -52,6 +54,7 @@ function serviceWith(scope: string[]) {
   const openFindingCount = jest.fn().mockResolvedValue(2);
   const countByCollectionState = jest.fn().mockResolvedValue(4);
   const read = jest.fn().mockResolvedValue(PROGRESS);
+  const missingInvoicePeriods = jest.fn().mockResolvedValue(7);
   const service = new ItAdminDashboardService(
     {
       businessToday: () => Promise.resolve('2026-10-23'),
@@ -61,10 +64,13 @@ function serviceWith(scope: string[]) {
     { findUsableItAdminEmployeeIds } as unknown as IdentityAccessApi,
     { itAdminFacts } as unknown as LicensingDashboardApi,
     { handingOverCases } as unknown as PersonnelDashboardApi,
-    { getSummary } as unknown as OptimizationApi,
-    { openFindingCount } as unknown as UsageEvidenceApi,
-    { countByCollectionState } as unknown as DevicesApi,
     { read } as unknown as DashboardProgressService,
+    new ItAdminDashboardFactsService(
+      { getSummary } as unknown as OptimizationApi,
+      { openFindingCount } as unknown as UsageEvidenceApi,
+      { countByCollectionState } as unknown as DevicesApi,
+      { missingInvoicePeriods } as unknown as RequestsDashboardApi,
+    ),
   );
 
   return {
@@ -76,6 +82,7 @@ function serviceWith(scope: string[]) {
     getSummary,
     countByCollectionState,
     read,
+    missingInvoicePeriods,
   };
 }
 
@@ -89,6 +96,7 @@ describe('ItAdminDashboardService', () => {
       itAdminFacts,
       handingOverCases,
       countByCollectionState,
+      missingInvoicePeriods,
     } = serviceWith(['d-des', 'd-ops']);
 
     const overview = await service.overview(actor(['IT_ADMIN']));
@@ -112,7 +120,10 @@ describe('ItAdminDashboardService', () => {
       discrepancies: { state: 'COUNTED', count: 2, sourceOperationId: 'usageNoAssignmentFindingList' },
       // US-09-01 AC-2: the machines whose holder has not acknowledged the notice, counted as `GET /devices?state=AWAITING_ACKNOWLEDGEMENT` lists them.
       unconfirmedDevices: { state: 'COUNTED', count: 4, sourceOperationId: 'deviceList' },
+      // PI-2: the periods whose invoice is five working days late, in the departments in scope, as the list of them totals.
+      missingInvoicePeriods: { state: 'COUNTED', count: 7, sourceOperationId: 'purchaseInvoiceMissingPeriodList' },
     });
+    expect(missingInvoicePeriods).toHaveBeenCalledWith(['d-des', 'd-ops']);
     expect(countByCollectionState).toHaveBeenCalledWith('org-1', 'AWAITING_ACKNOWLEDGEMENT');
   });
 

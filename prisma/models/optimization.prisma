@@ -297,3 +297,19 @@ model GhostSeatSeatState {
   @@index([assessedRunId], map: "ghost_seat_seat_states_run")
   @@map("ghost_seat_seat_states")
 }
+
+// One batch of early pushes of the watch tier (QĐ-111ay) for one Idempotency-Key of a person: what it asked (a fingerprint, so the same key for
+// another list is refused), the note of the IT Admin, and what it answered, so the same key again answers the same result.
+model GhostSeatEscalation {
+  id                   String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  organizationId       String   @map("organization_id") @db.Uuid
+  requestedByAppUserId String   @map("requested_by_app_user_id") @db.Uuid
+  idempotencyKeyHash   String   @map("idempotency_key_hash")
+  requestHash          String   @map("request_hash")
+  note                 String?
+  results              Json     @default("[]")
+  createdAt            DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+
+  @@unique([organizationId, requestedByAppUserId, idempotencyKeyHash], map: "ghost_seat_escalations_key")
+  @@map("ghost_seat_escalations")
+}

@@ -20,6 +20,7 @@ import { ROUTE_ERROR_CODES_CATALOG } from './openapi-example-route-codes-catalog
 import { ROUTE_ERROR_CODES_DATA_IMPORT } from './openapi-example-route-codes-data-import';
 import { SUCCESS_MESSAGES_DEVICES } from './openapi-example-messages-devices';
 import { SUCCESS_MESSAGES_OPTIMIZATION } from './openapi-example-messages-optimization';
+import { SUCCESS_MESSAGES_PURCHASE_INVOICE } from './openapi-example-messages-purchase-invoice';
 import { SUCCESS_MESSAGES_USAGE } from './openapi-example-messages-usage';
 import { ROUTE_ERROR_CODES_DEVICES } from './openapi-example-route-codes-devices';
 import { ROUTE_ERROR_CODES_HEALTH } from './openapi-example-route-codes-health';
@@ -39,6 +40,7 @@ export const SUCCESS_MESSAGES: Readonly<Record<string, string>> = {
   ...SUCCESS_MESSAGES_DEVICES,
   ...SUCCESS_MESSAGES_OPTIMIZATION,
   ...SUCCESS_MESSAGES_POLICIES,
+  ...SUCCESS_MESSAGES_PURCHASE_INVOICE,
   ...SUCCESS_MESSAGES_USAGE,
   accessRequestAssessmentComplete: 'ACCESS_REQUEST.ASSESSMENT_COMPLETED',
   accessRequestAssessmentGet: 'ACCESS_REQUEST.ASSESSMENT_FETCHED',
@@ -114,7 +116,6 @@ export const SUCCESS_MESSAGES: Readonly<Record<string, string>> = {
   budgetCycleDelete: 'BUDGET_CYCLE.DELETED',
   budgetCycleOpen: 'BUDGET_CYCLE.OPENED',
   budgetCycleUpdate: 'BUDGET_CYCLE.UPDATED',
-  budgetCommitmentInvoiceRecord: 'BUDGET_COMMITMENT.INVOICE_RECORDED',
   budgetCommitmentRelease: 'BUDGET_COMMITMENT.RELEASED',
   budgetCommitmentReleases: 'BUDGET_COMMITMENT.RELEASES_LISTED',
   budgetMine: 'BUDGET.FETCHED',
@@ -360,12 +361,10 @@ export const SUCCESS_MESSAGES: Readonly<Record<string, string>> = {
   vendorTaxProfileHistory: 'VENDOR_TAX_PROFILE.HISTORY_LISTED',
   vendorTaxProfileSet: 'VENDOR_TAX_PROFILE.DECLARED',
 };
-
 export const BODYLESS_RESPONSES: Readonly<Record<string, string>> = {
   'authLogout 204': 'Signed out: 204 No Content has no body (@RawResponse).',
   'importTemplateGet 200': 'A file (xlsx or csv) sent as raw bytes with its own content type (@RawResponse).',
 };
-
 export const NO_EXAMPLE_RESPONSES: Readonly<Record<string, string>> = {};
 
 /**

@@ -62,6 +62,23 @@ export class SubscriptionFactsService {
     return this.pricing.priceOfPlan(planId, tx, on);
   }
 
+  /** The price the vendor quoted for the main subscription of the plan, in the currency it was quoted in; null when none was kept. */
+  originalPriceOfPlan(
+    planId: string,
+    tx?: DbTx,
+    on?: BusinessDate,
+  ): Promise<{ amountMinor: bigint; currency: string } | null> {
+    return this.pricing.originalPriceOfPlan(planId, tx, on);
+  }
+
+  /** The price the vendor quoted for this subscription, in the currency it was quoted in; null when none was kept or it does not exist. */
+  async originalPriceOfSubscription(
+    subscriptionId: string,
+    tx?: DbTx,
+  ): Promise<{ amountMinor: bigint; currency: string } | null> {
+    return (await this.subscriptions.find(subscriptionId, tx))?.originalPrice ?? null;
+  }
+
   /** The subscriptions of a plan a seat can be taken from today (the shared pool of the plan). */
   grantableOfPlan(planId: string, today: BusinessDate, tx?: DbTx) {
     return this.granting.findGrantableOfPlan(planId, today, tx);

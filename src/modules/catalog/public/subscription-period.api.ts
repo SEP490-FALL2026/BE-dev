@@ -4,7 +4,7 @@ import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { ApplicationFactsService } from '../catalog-entry/application-facts.service';
 import { SubscriptionPeriodService } from '../subscription/subscription-period.service';
-import type { NextPeriodInput, RenewalPeriodFacts } from './subscription-period.types';
+import type { NextPeriodInput, PaymentScheduleFacts, RenewalPeriodFacts } from './subscription-period.types';
 
 /**
  * The periods of the subscriptions as the renewal of a subscription (licensing, EP-11) reads and continues them: the milestone,
@@ -31,6 +31,14 @@ export class SubscriptionPeriodApi {
   /** The active terms not yet continued whose milestone falls between two days, and those that have no milestone at all. */
   listRenewalSubjects(window: { from: BusinessDate; to: BusinessDate }): Promise<RenewalPeriodFacts[]> {
     return this.periods.subjects(window);
+  }
+
+  /**
+   * The subscriptions a department owns that run a period, with the days their payments follow, for the periods that have no invoice (`PI-2`):
+   * those of `departmentIds`, or of every owner when null. A subscription no department owns, a purchase made once and a draft are not among them.
+   */
+  listPaymentSchedules(departmentIds: readonly string[] | null, tx?: DbTx): Promise<PaymentScheduleFacts[]> {
+    return this.periods.paymentSchedules(departmentIds, tx);
   }
 
   /**

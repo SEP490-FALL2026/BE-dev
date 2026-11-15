@@ -183,6 +183,9 @@ dịch vụ nào đọc cả ghế lẫn thu hồi thì đứng trên cả hai (
   Assignment chưa kết thúc có tác vụ thu hồi chưa đóng.
 - `provisioningTaskGrant`: `subscriptionId` tùy chọn (không có ⟹ `chooseSubscription`: thuê bao chính, ưu tiên cái còn chỗ Trống; K5 không được có);
   có mà không thuộc `getGrantableSubscriptions` của gói hôm nay (kỳ đã hết, hoặc kỳ kế tiếp đã chạy) ⟹ 422 `PROVISIONING.SUBSCRIPTION_NOT_GRANTABLE`.
+  Seat vừa cấp trên thuê bao có kỳ kế tiếp `ACTIVE` ghi trước ngày bắt đầu được mang sang kỳ đó ngay trong transaction của lệnh cấp (`RENEWAL_CARRY`, luật `seatsToCarry` và
+  SQL `AssignmentCarryRepo.carry` của `assignment/renewal/`, cùng đường với `outcome/` lúc ghi gia hạn; seat hết hạn trước ngày đó thì không mang); kỳ kế tiếp không đủ ghế ⟹ 422
+  `PROVISIONING.SUBSCRIPTION_NEXT_PERIOD_SEATS`, không ghi gì (sửa số ghế kỳ kế tiếp trước); lệnh cấp thất bại hoặc bị hủy thu lại cả bản ghi sang kỳ sau (`takeBackCarry`).
   `purchase?: { reason? }` chỉ K2/K4 (K khác ⟹ 422 `PURCHASE_NOT_APPLICABLE`): còn Trống ⟹ 409 `PURCHASE_NOT_ALLOWED` (audit
   `PROVISIONING_TASK.PURCHASE_REFUSED` ghi ở transaction riêng sau rollback); hết kho + còn seat đang thu hồi + thiếu lý do ⟹ 422
   `PURCHASE_REASON_REQUIRED`; ngược lại `CatalogApi.addPoolSeat` (+1 seat/lần) rồi ghi Assignment, task có `purchase_kind` (`POOL_TOP_UP`/`KEY_PURCHASE`).

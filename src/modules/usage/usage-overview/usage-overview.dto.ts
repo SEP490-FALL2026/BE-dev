@@ -1,17 +1,12 @@
 import { z } from 'zod';
-import { isBusinessDate } from '../../../core/business-date';
+import { businessDate, responseBusinessDate } from '../../../infrastructure/http/dto/business-date.dto';
 import { successEnvelopeSchema } from '../../../infrastructure/http/dto/success-envelope.dto';
 import { createZodDto } from '../../../infrastructure/http/dto/zod-dto';
 import { DATA_STATUSES, GRANULARITIES, GROUPINGS, SOURCE_KINDS } from './usage-overview.types';
 
-const date = z
-  .string()
-  .regex(/^\d{4}-\d{2}-\d{2}$/)
-  .refine(isBusinessDate, { message: 'Not a calendar date.' });
-
 export const usageOverviewQuerySchema = z.strictObject({
-  from: date.optional(),
-  to: date.optional(),
+  from: businessDate.optional(),
+  to: businessDate.optional(),
   granularity: z.enum(GRANULARITIES).default('DAY'),
   groupBy: z.enum(GROUPINGS).default('APPLICATION'),
   departmentId: z.uuid().optional(),
@@ -28,7 +23,7 @@ const days = z.number().int().nonnegative();
 
 /** A point of the series: one group in one period. Only the group the series is cut by is set; the others are null. */
 const usageOverviewPointSchema = z.strictObject({
-  period: z.strictObject({ start: date, end: date, days: z.number().int().positive() }),
+  period: z.strictObject({ start: responseBusinessDate, end: responseBusinessDate, days: z.number().int().positive() }),
   department: z.strictObject({ id: z.uuid(), code: z.string(), name: z.string() }).nullable(),
   application: applicationRefSchema.nullable(),
   source: z

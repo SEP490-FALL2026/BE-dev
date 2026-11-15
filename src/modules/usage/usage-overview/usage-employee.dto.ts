@@ -1,19 +1,15 @@
 import { z } from 'zod';
-import { isBusinessDate } from '../../../core/business-date';
+import { businessDate, responseBusinessDate } from '../../../infrastructure/http/dto/business-date.dto';
 import { successEnvelopeSchema } from '../../../infrastructure/http/dto/success-envelope.dto';
 import { createZodDto } from '../../../infrastructure/http/dto/zod-dto';
 import { MAX_DETAIL_SOURCES } from './usage-employee.types';
 import { DATA_STATUSES, MAX_RANGE_DAYS } from './usage-overview.types';
 
-const date = z
-  .string()
-  .regex(/^\d{4}-\d{2}-\d{2}$/)
-  .refine(isBusinessDate, { message: 'Not a calendar date.' });
 const days = z.number().int().nonnegative();
 const status = z.enum(DATA_STATUSES);
 const updatedAt = z.iso.datetime().nullable();
 
-const rangeQuery = { from: date.optional(), to: date.optional() };
+const rangeQuery = { from: businessDate.optional(), to: businessDate.optional() };
 
 export const usageSoftwareListQuerySchema = z.strictObject({
   ...rangeQuery,
@@ -27,7 +23,7 @@ export const usageSoftwareParamSchema = z.strictObject({ id: z.uuid(), applicati
 /** The person by the code the company gave them: never a name, never a photo. */
 const employeeSchema = z.strictObject({ id: z.uuid(), employeeCode: z.string() });
 const applicationSchema = z.strictObject({ id: z.uuid(), name: z.string(), logoUrl: z.string().nullable() });
-const rangeSchema = z.strictObject({ from: date, to: date, days: days });
+const rangeSchema = z.strictObject({ from: responseBusinessDate, to: responseBusinessDate, days: days });
 
 /** A software in the list of one person: whether they hold a seat and the days; no count of answers or tokens (those are in the detail). */
 const softwareLineSchema = z.strictObject({
@@ -45,7 +41,7 @@ const vendorSourceSchema = z.strictObject({
   status,
   activeDays: days,
   coveredDays: days,
-  activeDates: z.array(date).max(MAX_RANGE_DAYS),
+  activeDates: z.array(responseBusinessDate).max(MAX_RANGE_DAYS),
   updatedAt,
 });
 
@@ -59,7 +55,7 @@ const collectorSchema = z.strictObject({
   days: z
     .array(
       z.strictObject({
-        date,
+        date: responseBusinessDate,
         coverage: z.enum(['COVERED', 'PARTIAL']),
         active: z.boolean(),
         responses: days,

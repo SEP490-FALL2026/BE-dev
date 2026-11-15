@@ -79,3 +79,47 @@ function matchOf(cumulativeNetMinor: bigint, allowedMinor: bigint, figures: Invo
 
   return figures.deductibleTaxMinor > 0n || figures.nonDeductibleTaxMinor > 0n ? 'TAX_ONLY' : 'MATCHED';
 }
+
+/** A commitment of the request that an invoice of a purchase may be booked to. */
+export interface BookableCommitment {
+  id: string;
+  year: number;
+  costCenterId: string;
+  state: 'HELD' | 'RELEASED' | 'EXPENSED';
+}
+
+export type PurchaseBooking =
+  /** Into the commitment of the year: the Cost Center that bears the cost is the one the commitment is attached to. */
+  | { kind: 'COMMITMENT'; commitmentId: string }
+  /** An expense of the Cost Center with no commitment: the right moved to another department, or the commitment was let go (`QĐ-55b`, `R-51`). */
+  | { kind: 'COST_CENTER'; costCenterId: string }
+  /** A line of the subscription, to be shared among departments later (`QĐ-104c`). */
+  | { kind: 'SUBSCRIPTION'; subscriptionId: string }
+  | { kind: 'UNPLACED' };
+
+/**
+ * Where the invoice of a purchase is booked (`PI-1`, `R-51`, `MIN-15`), as one pure decision. The invoice belongs to the year of the month it pays
+ * for. An invoice of a subscription is a line of the subscription. Otherwise it goes into the commitment the request holds for that year when the Cost
+ * Center that bears it (the department that held the right in the service month) is the commitment's own; a commitment that was let go, or another
+ * department, takes it as an expense with no commitment. The price is never judged against the budget (`C-08`).
+ */
+export function bookPurchaseInvoice(input: {
+  commitments: readonly BookableCommitment[];
+  serviceYear: number;
+  chargedCostCenterId: string | null;
+  subscriptionId: string | null;
+}): PurchaseBooking {
+  if (input.subscriptionId !== null) return { kind: 'SUBSCRIPTION', subscriptionId: input.subscriptionId };
+  const ofYear = input.commitments.find((commitment) => commitment.year === input.serviceYear);
+  if (
+    ofYear &&
+    ofYear.state !== 'RELEASED' &&
+    (input.chargedCostCenterId === null || ofYear.costCenterId === input.chargedCostCenterId)
+  ) {
+    return { kind: 'COMMITMENT', commitmentId: ofYear.id };
+  }
+
+  return input.chargedCostCenterId === null
+    ? { kind: 'UNPLACED' }
+    : { kind: 'COST_CENTER', costCenterId: input.chargedCostCenterId };
+}

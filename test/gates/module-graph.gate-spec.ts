@@ -73,6 +73,8 @@ const PUBLIC_CONTRACT_EXPORTS: ReadonlySet<string> = new Set([
   'BudgetsModule: PendingSpendContributions',
   'BudgetsModule: CommitmentReleaseGuardHook',
   'BudgetsModule: CommitmentRequestFactsHook',
+  // PI-1.7: the purchase invoice behind an invoice of a commitment (its label and how it was paid), bound by the requests context.
+  'BudgetsModule: PurchaseInvoiceFactsHook',
   // G4 (ADR-0013): the catalog facade licensing reads the seat targets (subscription or internal plan) through.
   'CatalogModule: CatalogApi',
   // B2D-01 (`US-04-13` AC-15): the usage module reads which applications rest on a contract through this facade, to show their sources at the contract.

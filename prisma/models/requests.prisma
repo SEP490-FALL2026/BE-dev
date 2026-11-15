@@ -264,6 +264,7 @@ model AccessRequest {
   stepSlaReminders     StepSlaReminder[]
   serviceAccount       AccessRequestServiceAccount?
   renewal              AccessRequestRenewal?
+  purchaseInvoices     PurchaseInvoice[]
   returnsFromHere      ReturnRequest[]              @relation("ReturnRequestOrigin")
   replacesAssignment   LicenseAssignment?           @relation("RequestReplacesAssignment", fields: [replacesAssignmentId], references: [id], onDelete: Restrict)
 
@@ -1171,4 +1172,89 @@ model YearStartCommitmentRun {
 
   @@id([organizationId, year])
   @@map("year_start_commitment_runs")
+}
+
+enum PurchaseInvoiceLinkKind {
+  REQUEST
+  SUBSCRIPTION
+}
+
+// What the invoice is called when it is read (QĐ-111w, R-50): the first invoice of a request, a later period of it, or the renewal of a subscription.
+enum PurchaseInvoiceLabel {
+  NEW_PURCHASE
+  PERIOD
+  RENEWAL
+}
+
+enum PurchaseInvoiceState {
+  SUBMITTED
+  CONFIRMED
+  RETURNED
+}
+
+enum PurchaseInvoicePaymentSource {
+  COMPANY_CARD
+  IT_ADVANCE
+}
+
+// The invoice of a purchase the IT Admin submits (PI-1, QĐ-111u): the request or subscription it is for, the month it pays for, what it says
+// (count and price of one in the currency it states, R-44) and what was taken out in VND. It moves once, from SUBMITTED to CONFIRMED (Finance signs
+// the money out; one row of `invoices` is written, INV-05) or RETURNED (a reason; a new submission points back at it). A trigger keeps what it
+// says and refuses a change after the move. The ids of other modules are values, not foreign keys.
+model PurchaseInvoice {
+  id                        String                       @id @default(uuid(7)) @db.Uuid
+  organizationId            String                       @map("organization_id") @db.Uuid
+  linkKind                  PurchaseInvoiceLinkKind      @map("link_kind")
+  requestId                 String?                      @map("request_id") @db.Uuid
+  provisioningTaskId        String?                      @map("provisioning_task_id") @db.Uuid
+  subscriptionId            String?                      @map("subscription_id") @db.Uuid
+  vendorId                  String                       @map("vendor_id") @db.Uuid
+  number                    String
+  issuedOn                  DateTime                     @map("issued_on") @db.Date
+  // The first day of the month the invoice pays for.
+  serviceMonth              DateTime                     @map("service_month") @db.Date
+  label                     PurchaseInvoiceLabel
+  periodIndex               Int?                         @map("period_index")
+  periodCount               Int?                         @map("period_count")
+  quantity                  Int
+  unitPriceOriginalMinor    BigInt                       @map("unit_price_original_minor")
+  unitPriceOriginalCurrency String                       @map("unit_price_original_currency") @db.Char(3)
+  netMinor                  BigInt                       @map("net_minor")
+  deductibleTaxMinor        BigInt                       @default(0) @map("deductible_tax_minor")
+  nonDeductibleTaxMinor     BigInt                       @default(0) @map("non_deductible_tax_minor")
+  matchResult               InvoiceMatchResult           @map("match_result")
+  paymentSource             PurchaseInvoicePaymentSource @map("payment_source")
+  flags                     String[]                     @default([])
+  chargedCostCenterId       String?                      @map("charged_cost_center_id") @db.Uuid
+  state                     PurchaseInvoiceState         @default(SUBMITTED)
+  submittedByEmployeeId     String                       @map("submitted_by_employee_id") @db.Uuid
+  submittedAt               DateTime                     @map("submitted_at") @db.Timestamptz(3)
+  decidedByEmployeeId       String?                      @map("decided_by_employee_id") @db.Uuid
+  decidedAt                 DateTime?                    @map("decided_at") @db.Timestamptz(3)
+  returnReason              String?                      @map("return_reason")
+  resubmissionOfId          String?                      @unique @map("resubmission_of_id") @db.Uuid
+  invoiceId                 String?                      @map("invoice_id") @db.Uuid
+
+  request        AccessRequest?            @relation(fields: [requestId], references: [id], onDelete: Restrict)
+  resubmissionOf PurchaseInvoice?          @relation("PurchaseInvoiceResubmission", fields: [resubmissionOfId], references: [id], onDelete: Restrict)
+  resubmission   PurchaseInvoice?          @relation("PurchaseInvoiceResubmission")
+  documents      PurchaseInvoiceDocument[]
+
+  // The partial unique index of the open number, the checks and the trigger are SQL in the migration (ADR-0005).
+  @@index([requestId, serviceMonth])
+  @@index([subscriptionId, serviceMonth])
+  @@index([organizationId, state, submittedAt, id])
+  @@map("purchase_invoices")
+}
+
+// A file that came with a purchase invoice, in the order the IT Admin gave. Added and never changed; a file belongs to one invoice.
+model PurchaseInvoiceDocument {
+  purchaseInvoiceId String @map("purchase_invoice_id") @db.Uuid
+  documentId        String @unique @map("document_id") @db.Uuid
+  position          Int    @db.SmallInt
+
+  purchaseInvoice PurchaseInvoice @relation(fields: [purchaseInvoiceId], references: [id], onDelete: Restrict)
+
+  @@id([purchaseInvoiceId, documentId])
+  @@map("purchase_invoice_documents")
 }

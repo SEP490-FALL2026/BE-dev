@@ -585,6 +585,8 @@ model DocumentAttachment {
   contractId          String?         @map("contract_id") @db.Uuid
   // A `SIGNATURE_RECORD` belongs to the person who signed it, not to a contract (BM-06).
   signerEmployeeId    String?         @map("signer_employee_id") @db.Uuid
+  // A `PURCHASE_DOCUMENT` that came with a purchase invoice of the requests context belongs to it (PI-1): a value, not a foreign key.
+  purchaseInvoiceId   String?         @map("purchase_invoice_id") @db.Uuid
   attachedAt          DateTime?       @map("attached_at") @db.Timestamptz(3)
   createdAt           DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
 
@@ -592,6 +594,7 @@ model DocumentAttachment {
   contract     Contract?    @relation(fields: [contractId], references: [id], onDelete: Restrict)
 
   @@index([contractId])
+  @@index([purchaseInvoiceId])
   @@index([uploadedByAppUserId, status])
   @@map("document_attachments")
 }

@@ -8,6 +8,7 @@ import type {
   CommitmentHoldInput,
   CommitmentReleaseReason,
   HeldCommitment,
+  RequestCommitment,
   SeatCommitment,
 } from '../public/budgets.types';
 import { BudgetCommitmentNotHoldableError } from './budget.errors';
@@ -356,6 +357,23 @@ export class CommitmentRepo {
       },
     });
     if (changed.count !== 1) throw new Error(`The commitment ${row.id} changed while an invoice was applied to it.`);
+  }
+
+  /** The commitments of the request, the oldest year first, with what is left of each to be invoiced against; locks nothing. */
+  async ofRequest(requestId: string, tx?: DbTx): Promise<RequestCommitment[]> {
+    const rows = await (tx ?? this.prisma).budgetCommitment.findMany({
+      where: { requestId },
+      orderBy: { year: 'asc' },
+    });
+
+    return rows.map((row) => ({
+      id: row.id,
+      year: row.year,
+      costCenterId: row.costCenterId,
+      state: row.state,
+      amountMinor: row.amountMinor,
+      remainingMinor: row.state === 'HELD' ? row.amountMinor - row.releasedMinor - row.appliedMinor : 0n,
+    }));
   }
 
   /** What went back to the budget from one commitment, the oldest first. */

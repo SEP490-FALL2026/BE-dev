@@ -107,3 +107,37 @@ export function replacedByGrant(
     (old.subscriptionId ?? old.planId) === (grant.target.subscriptionId ?? grant.target.planId)
   );
 }
+
+/** What the rule of carrying a seat into a next period reads of it: the days it begins, ends and is expected to end. */
+export interface CarriableSeat {
+  validFrom: BusinessDate;
+  validUntil: BusinessDate | null;
+  expectedEndDate: BusinessDate | null;
+}
+
+/**
+ * The seats that go on into the new period (`QĐ-35c`): those held on its first day — begun before it, not ended by it, and not
+ * expected to end before it. A seat that ends before the new period stays where it is and is never carried. The one rule for the
+ * seats held when a renewal is recorded and for a seat granted after it was.
+ */
+export function seatsToCarry<T extends CarriableSeat>(seats: readonly T[], startDate: BusinessDate): T[] {
+  return seats.filter(
+    (seat) =>
+      seat.validFrom < startDate &&
+      (seat.validUntil === null || seat.validUntil > startDate) &&
+      (seat.expectedEndDate === null || seat.expectedEndDate >= startDate),
+  );
+}
+
+/**
+ * The first day of the next period a seat granted today goes on into: the period recorded ahead of its start that continues the
+ * one the seat is on, when it is active (a draft takes no seat). Null when there is none, it has begun, or it is not yet a pool.
+ */
+export function nextPeriodStart(
+  next: { status: 'DRAFT' | 'ACTIVE'; startDate: BusinessDate | null } | undefined,
+  today: BusinessDate,
+): BusinessDate | null {
+  if (!next || next.status !== 'ACTIVE' || next.startDate === null) return null;
+
+  return next.startDate > today ? next.startDate : null;
+}

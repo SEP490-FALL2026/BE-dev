@@ -37,4 +37,19 @@ export class SubscriptionPriceService {
       }
     );
   }
+
+  /**
+   * The price the vendor quoted for the main subscription of the plan, in the currency it was quoted in (`FX-1`, `R-44`): what the price of one on a
+   * purchase invoice is compared with. Null when the plan has no priced subscription or its subscription kept no original price.
+   */
+  async originalPriceOfPlan(
+    planId: string,
+    tx?: DbTx,
+    on?: BusinessDate,
+  ): Promise<{ amountMinor: bigint; currency: string } | null> {
+    const priced = await this.subscriptions.findPricedOfPlan(planId, tx, on);
+    const record = priced && (await this.subscriptions.find(priced.subscriptionId, tx));
+
+    return record?.originalPrice ?? null;
+  }
 }

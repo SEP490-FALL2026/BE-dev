@@ -30,6 +30,7 @@ import {
   CommitmentRequestFactsHook,
   CarriedOverContributions,
   PendingSpendContributions,
+  PurchaseInvoiceFactsHook,
 } from './public/budgets.extension-points';
 import { BudgetCommitmentsController } from './commitment/budget-commitments.controller';
 import { CommitmentService } from './commitment/commitment.service';
@@ -43,6 +44,7 @@ import { PackageService } from './cycle/package.service';
 import { CycleService } from './cycle/cycle.service';
 import { DepartmentCreationWindowListener } from './cycle/department-creation-window.listener';
 import { InvoiceService } from './invoice/invoice.service';
+import { PurchaseInvoiceRecorderService } from './invoice/purchase-invoice-recorder.service';
 import { DecisionRepo } from './budget/decision.repo';
 import { ProposalRepo } from './budget/proposal.repo';
 import { ProposalService } from './proposal/proposal.service';
@@ -168,12 +170,14 @@ import { BudgetProposalTemplateListener } from './proposal/budget-proposal-templ
     BaselineFlags,
     CommitmentReleaseGuardHook,
     CommitmentRequestFactsHook,
+    PurchaseInvoiceFactsHook,
     BudgetCostCenterUseReader,
     BudgetHeadChangeListener,
     BudgetSpendingApproverGrantCheck,
     SpendingApproverWaitListener,
     CommitmentService,
     InvoiceService,
+    PurchaseInvoiceRecorderService,
     BudgetsApi,
   ],
   exports: [
@@ -182,6 +186,7 @@ import { BudgetProposalTemplateListener } from './proposal/budget-proposal-templ
     CarriedOverContributions,
     CommitmentReleaseGuardHook,
     CommitmentRequestFactsHook,
+    PurchaseInvoiceFactsHook,
   ],
 })
 export class BudgetsModule {}

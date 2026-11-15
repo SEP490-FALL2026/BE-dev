@@ -177,6 +177,10 @@ export const PARAM_KEYS_BY_CODE: Readonly<Record<InAppNotificationCode, readonly
   REQUEST_CANCELLED_BENEFICIARY_GONE: ['requestId', 'beneficiaryEmployeeId', 'reasonKind'],
   // The same, for the request the system left to the IT Admin because its grant is being carried out (`QĐ-110d`).
   REQUEST_BENEFICIARY_GONE_IT_CHECK: ['requestId', 'beneficiaryEmployeeId', 'reasonKind'],
+  // The purchase invoices of PI-1: the invoice is the subject; the request or subscription it is for tells where to read it.
+  PURCHASE_INVOICE_SUBMITTED: ['purchaseInvoiceId', 'linkKind', 'servicePeriodMonth'],
+  PURCHASE_INVOICE_CONFIRMED: ['purchaseInvoiceId', 'linkKind', 'servicePeriodMonth'],
+  PURCHASE_INVOICE_RETURNED: ['purchaseInvoiceId', 'linkKind', 'servicePeriodMonth'],
   // The list of software of a department (`QĐ-110s`, `QĐ-110t`).
   DEPARTMENT_SOFTWARE_PROPOSED: ['proposalId', 'departmentId', 'applicationId', 'planId'],
   DEPARTMENT_SOFTWARE_PROPOSAL_DECIDED: ['proposalId', 'departmentId', 'applicationId', 'planId', 'decision', 'reason'],

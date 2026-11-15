@@ -11,7 +11,7 @@ controller) và `requests-work-facade.module.ts` (phần worker chạy, API dùn
 
 ## Public API (`public/`)
 
-- `RequestsDashboardApi` ([public/requests-dashboard.api.ts](public/requests-dashboard.api.ts)) — `openRequestsSentBy` (số Request đang mở người đó đã gửi, mọi vai; Super Admin thường 0), `needDecisionsHeldBy` (số bước nhu cầu đang chờ mình quyết); dashboards gọi (US-12-15 AC-2, AC-3).
+- `RequestsDashboardApi` ([public/requests-dashboard.api.ts](public/requests-dashboard.api.ts)) — `openRequestsSentBy` (số Request đang mở người đó đã gửi, mọi vai; Super Admin thường 0), `needDecisionsHeldBy` (số bước nhu cầu đang chờ mình quyết), `missingInvoicePeriods` (PI-2: số kỳ quá 5 ngày làm việc sau ngày thanh toán chưa có hóa đơn, theo các phòng IT Admin phụ trách); dashboards gọi (US-12-15 AC-2, AC-3, AC-4).
 - `RequestsApi` ([public/requests.api.ts](public/requests.api.ts)) — `listOpenOfBeneficiary`: request còn mở của một
   người, hiện cạnh hồ sơ nghỉ việc (US-03-04 AC-24); personnel gọi. Tham số `filter.departmentId` (tùy chọn) chỉ giữ request
   gửi từ phòng đó — trưởng phòng đọc một thành viên (`personnel/department-member`); không có `filter` thì như cũ.

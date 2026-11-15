@@ -1,4 +1,4 @@
-import request from 'supertest';
+import { bookPurchaseInvoice } from '../../support/book-purchase-invoice';
 import { GroupHarness } from '../../support/group-harness';
 import type { Unit } from '../../support/spend-harness';
 
@@ -11,12 +11,14 @@ const h = new GroupHarness();
  */
 describe('a person of a group leaves after an invoice was recorded over PostgreSQL (US-06-06 AC-9, US-05-17 AC-10)', () => {
   let paid: string;
+  let vendorId: string;
   let counter = 0;
 
   beforeAll(async () => {
     await h.start();
     await h.withApprover();
     paid = await h.planOf(await h.subscription(100));
+    vendorId = (await h.vendorOf(paid)).id;
   }, 240000);
 
   afterAll(async () => {
@@ -38,11 +40,14 @@ describe('a person of a group leaves after an invoice was recorded over PostgreS
 
     return { u, people, id, commitmentId: commitment.id, amount: BigInt(commitment.amount_minor) };
   };
-  const invoice = (commitmentId: string, netMinor: bigint) =>
-    request(h.server())
-      .post(`/api/v1/budget-commitments/${commitmentId}/invoices`)
-      .set(h.as(h.finance))
-      .send({ number: `GRP-${commitmentId}`, issuedOn: '2026-11-03', netAmount: { amount: netMinor.toString() } });
+  /** The invoice of a purchase for the request, booked into its commitment as the signature of Finance books it (`PI-1`). */
+  const invoice = (approvedRequest: { u: Unit; id: string; commitmentId: string }, netMinor: bigint) =>
+    bookPurchaseInvoice(h, vendorId, {
+      requestId: approvedRequest.id,
+      chargedCostCenterId: approvedRequest.u.department.unitId,
+      number: `GRP-${approvedRequest.commitmentId}`,
+      netMinor,
+    });
   const commitmentRow = async (id: string) =>
     (
       await h.ctx.sql.query<{ state: string; released_minor: string; applied_minor: string }>(
@@ -63,7 +68,7 @@ describe('a person of a group leaves after an invoice was recorded over PostgreS
   it('gives back only what is still held when the share is more, and the commitment becomes an expense', async () => {
     const { u, people, id, commitmentId, amount } = await approved();
     const net = (amount * 9n) / 10n;
-    await invoice(commitmentId, net).expect(201);
+    expect((await invoice({ u, id, commitmentId }, net)).booking).toBe('COMMITMENT');
 
     await h.withdrawLine(id, people[3].employeeId, {}, u.head.account).expect(200);
 
@@ -82,7 +87,7 @@ describe('a person of a group leaves after an invoice was recorded over PostgreS
 
   it('is not refused when the invoice already took the whole commitment: nothing goes back and the line still ends', async () => {
     const { u, people, id, commitmentId, amount } = await approved();
-    await invoice(commitmentId, amount).expect(201);
+    expect((await invoice({ u, id, commitmentId }, amount)).booking).toBe('COMMITMENT');
 
     await h.withdrawLine(id, people[0].employeeId, {}, u.head.account).expect(200);
 
@@ -95,7 +100,7 @@ describe('a person of a group leaves after an invoice was recorded over PostgreS
   it('gives back the share in full when the invoice took less than what is left over', async () => {
     const { u, people, id, commitmentId, amount } = await approved();
     const net = amount / 10n;
-    await invoice(commitmentId, net).expect(201);
+    expect((await invoice({ u, id, commitmentId }, net)).booking).toBe('COMMITMENT');
 
     await h.withdrawLine(id, people[1].employeeId, {}, u.head.account).expect(200);
 
@@ -109,7 +114,7 @@ describe('a person of a group leaves after an invoice was recorded over PostgreS
   it('gives back what is left of the commitment when the whole request is withdrawn after an invoice', async () => {
     const { u, id, commitmentId, amount } = await approved();
     const net = (amount * 6n) / 10n;
-    await invoice(commitmentId, net).expect(201);
+    expect((await invoice({ u, id, commitmentId }, net)).booking).toBe('COMMITMENT');
 
     await h.withdrawRequest(id, { reason: 'The project was cancelled' }, u.head.account).expect(200);
 

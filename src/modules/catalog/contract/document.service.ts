@@ -323,6 +323,39 @@ export class DocumentService {
     );
   }
 
+  /**
+   * Attaches the purchase documents that come with a purchase invoice (`PI-1`) to it, in the transaction of the caller: only files of the
+   * purpose `PURCHASE_DOCUMENT` that the person who submits it uploaded and that are uploaded and not yet attached; the rows are locked in order of id.
+   * Throws DocumentNotFoundError, DocumentPurposeMismatchError, DocumentAlreadyAttachedError and DocumentNotReadyToAttachError.
+   */
+  async attachPurchaseDocuments(
+    tx: DbTx,
+    actor: AuthenticatedPrincipal,
+    input: { documentIds: readonly string[]; purchaseInvoiceId: string },
+  ): Promise<void> {
+    const organization = await this.requireOrganization();
+    const now = new Date();
+    for (const documentId of [...input.documentIds].sort()) {
+      const locked = await this.documents.lock(tx, documentId);
+      if (!locked || locked.uploadedByAppUserId !== actor.appUserId) throw new DocumentNotFoundError();
+      assertPurposeAttachesTo(locked.purpose, 'PURCHASE_INVOICE');
+      assertAttachable(locked.status);
+      await this.documents.markAttachedToPurchaseInvoice(tx, locked.id, input.purchaseInvoiceId, now);
+      await this.audit.record(
+        tx,
+        catalogAuditEvent(
+          actor,
+          organization.id,
+          'DOCUMENT.ATTACHED',
+          'DocumentAttachment',
+          locked.id,
+          { status: locked.status },
+          { status: 'READY', purchaseInvoiceId: input.purchaseInvoiceId },
+        ),
+      );
+    }
+  }
+
   /** A file as the person may see it; one they may not see is as if it did not exist. Throws DocumentNotFoundError. */
   async get(actor: AuthenticatedPrincipal, id: string): Promise<DocumentRecord> {
     return this.visibleTo(actor, id);
