@@ -68910,6 +68910,808 @@
         "tags": ["budget-review-periods"]
       }
     },
+    "/api/v1/budget-adjustments": {
+      "post": {
+        "operationId": "budgetAdjustmentCreate",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CreateAdjustmentBodyDto" } } }
+        },
+        "responses": {
+          "201": {
+            "description": "Finance asks, with the reason, to give a Cost Center money from what is not allocated under the annual ceiling (SUPPLEMENT), to move money between two Cost Centers (TRANSFER, with COST_CENTER_CHANGE when a department changed its Cost Center), to give money back (RETURN), or to lower the annual ceiling (CEILING_REDUCTION). A supplement and a reduction of the ceiling cannot be more than what is not allocated; a return and the Cost Center that gives in a transfer are never left with less than the forecast of the end of their year (a transfer for COST_CENTER_CHANGE is not held to that) and never give more than their base. The spending approver is asked to decide; nothing in the budget changes until then.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/AdjustmentResponseDto" },
+                    { "properties": { "message": { "example": "BUDGET_ADJUSTMENT.CREATED" } } }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_BAD_REQUEST": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_BAD_REQUEST",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHENTICATION_REQUIRED": {
+                    "summary": "A Bearer access token is required.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHENTICATION_REQUIRED",
+                        "message": "A Bearer access token is required.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "INVALID_ACCESS_TOKEN": {
+                    "summary": "The access token is invalid.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "INVALID_ACCESS_TOKEN",
+                        "message": "The access token is invalid.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only Finance asks for an adjustment.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHORIZATION.FORBIDDEN": {
+                    "summary": "You do not have permission to perform this action.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHORIZATION.FORBIDDEN",
+                        "message": "You do not have permission to perform this action.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The budget cycle of the year is not open yet (BUDGET_CYCLE.NOT_OPEN), or the year has ended (BUDGET.YEAR_ENDED).",
+            "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" } } }
+          },
+          "413": {
+            "description": "The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_PAYLOAD_TOO_LARGE": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_PAYLOAD_TOO_LARGE",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_UNSUPPORTED_MEDIA_TYPE": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_UNSUPPORTED_MEDIA_TYPE",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The body is invalid (VALIDATION_ERROR), the adjustment is not made as its kind is meant (BUDGET_ADJUSTMENT.INVALID_SHAPE), it is more than what is not allocated (BUDGET_ADJUSTMENT.OVER_UNALLOCATED), it would leave a Cost Center below its forecast (BUDGET_ADJUSTMENT.BELOW_FORECAST_FLOOR) or give more than its base (BUDGET_ADJUSTMENT.OVER_BASE), or the Cost Center has no budget to give from (BUDGET_ADJUSTMENT.NO_BUDGET).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "VALIDATION_ERROR": {
+                    "summary": "Request validation failed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "VALIDATION_ERROR",
+                        "message": "Request validation failed.",
+                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "BUDGET_ADJUSTMENT.INVALID_SHAPE": {
+                    "summary": "The adjustment is not made as its kind is meant (TO_REQUIRED).",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "BUDGET_ADJUSTMENT.INVALID_SHAPE",
+                        "message": "The adjustment is not made as its kind is meant (TO_REQUIRED).",
+                        "details": { "refusal": "TO_REQUIRED" },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "BUDGET_ADJUSTMENT.OVER_UNALLOCATED": {
+                    "summary": "The amount is more than what is not allocated under the annual ceiling.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "BUDGET_ADJUSTMENT.OVER_UNALLOCATED",
+                        "message": "The amount is more than what is not allocated under the annual ceiling.",
+                        "details": { "availableMinor": "29000000", "requestedMinor": "30000000" },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "BUDGET_ADJUSTMENT.BELOW_FORECAST_FLOOR": {
+                    "summary": "The Cost Center would be left with less than it is forecast to spend by the end of the year.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "BUDGET_ADJUSTMENT.BELOW_FORECAST_FLOOR",
+                        "message": "The Cost Center would be left with less than it is forecast to spend by the end of the year.",
+                        "details": {
+                          "costCenterId": "3f0c7d54-9e1b-4f6a-8d2c-5b7a1e9c0d11",
+                          "floorMinor": "110000000",
+                          "afterMinor": "108000000"
+                        },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "BUDGET_ADJUSTMENT.OVER_BASE": {
+                    "summary": "The amount is more than the base of the Cost Center.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "BUDGET_ADJUSTMENT.OVER_BASE",
+                        "message": "The amount is more than the base of the Cost Center.",
+                        "details": { "costCenterId": "3f0c7d54-9e1b-4f6a-8d2c-5b7a1e9c0d11", "baseMinor": "180000000" },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "BUDGET_ADJUSTMENT.NO_BUDGET": {
+                    "summary": "The Cost Center has no budget of the year to give from.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "BUDGET_ADJUSTMENT.NO_BUDGET",
+                        "message": "The Cost Center has no budget of the year to give from.",
+                        "details": { "costCenterId": "3f0c7d54-9e1b-4f6a-8d2c-5b7a1e9c0d11" },
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_TOO_MANY_REQUESTS": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_TOO_MANY_REQUESTS",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "TOKEN_VERIFICATION_UNAVAILABLE": {
+                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
+                        "message": "Authentication is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SERVICE_UNAVAILABLE": {
+                    "summary": "The service is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SERVICE_UNAVAILABLE",
+                        "message": "The service is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "bearer": [] }],
+        "summary": "Ask for an adjustment of the budget of the year",
+        "tags": ["budget-adjustments"]
+      },
+      "get": {
+        "operationId": "budgetAdjustmentList",
+        "parameters": [
+          {
+            "name": "year",
+            "required": false,
+            "in": "query",
+            "schema": { "minimum": 2000, "maximum": 2999, "type": "integer" }
+          },
+          {
+            "name": "costCenterId",
+            "required": false,
+            "in": "query",
+            "description": "Only the adjustments that give to or take from this Cost Center.",
+            "schema": { "format": "uuid", "type": "string" }
+          },
+          {
+            "name": "state",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string", "enum": ["PENDING", "APPROVED", "REJECTED"] }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maximum": 9007199254740991,
+              "exclusiveMinimum": true,
+              "default": 1,
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": { "maximum": 100, "exclusiveMinimum": true, "default": 20, "type": "integer", "minimum": 0 }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A page of the adjustments, the latest first, with who asked, who decided and why. Finance and the spending approver read every adjustment; a manager reads the ones that give to or take from the Cost Center of their own department, and a department with no Cost Center reads none.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/AdjustmentListResponseDto" },
+                    { "properties": { "message": { "example": "BUDGET_ADJUSTMENT.LISTED" } } }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHENTICATION_REQUIRED": {
+                    "summary": "A Bearer access token is required.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHENTICATION_REQUIRED",
+                        "message": "A Bearer access token is required.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "INVALID_ACCESS_TOKEN": {
+                    "summary": "The access token is invalid.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "INVALID_ACCESS_TOKEN",
+                        "message": "The access token is invalid.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only Finance, the spending approver and the manager of a department read the adjustments.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHORIZATION.FORBIDDEN": {
+                    "summary": "You do not have permission to perform this action.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHORIZATION.FORBIDDEN",
+                        "message": "You do not have permission to perform this action.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The query is invalid (VALIDATION_ERROR).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "VALIDATION_ERROR": {
+                    "summary": "Request validation failed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "VALIDATION_ERROR",
+                        "message": "Request validation failed.",
+                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_TOO_MANY_REQUESTS": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_TOO_MANY_REQUESTS",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "TOKEN_VERIFICATION_UNAVAILABLE": {
+                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
+                        "message": "Authentication is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SERVICE_UNAVAILABLE": {
+                    "summary": "The service is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SERVICE_UNAVAILABLE",
+                        "message": "The service is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "bearer": [] }],
+        "summary": "List the adjustments of the budget",
+        "tags": ["budget-adjustments"]
+      }
+    },
+    "/api/v1/budget-adjustments/{id}/decision": {
+      "post": {
+        "operationId": "budgetAdjustmentDecide",
+        "parameters": [
+          { "name": "id", "required": true, "in": "path", "schema": { "format": "uuid", "type": "string" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/DecideAdjustmentBodyDto" } } }
+        },
+        "responses": {
+          "200": {
+            "description": "The spending approver approves or refuses an adjustment, once; the one who asked cannot decide it. Every condition is looked at again on the figures of today. An approval adds to or takes from the base of the Cost Centers it names, the reserve staying as it is, makes the approved version of a Cost Center that receives money and had no budget of the year (with the amount as its base and no reserve), and lowers the annual ceiling for a reduction of the ceiling. A refusal needs a reason and changes nothing.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/AdjustmentResponseDto" },
+                    { "properties": { "message": { "example": "BUDGET_ADJUSTMENT.DECIDED" } } }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_BAD_REQUEST": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_BAD_REQUEST",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHENTICATION_REQUIRED": {
+                    "summary": "A Bearer access token is required.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHENTICATION_REQUIRED",
+                        "message": "A Bearer access token is required.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "INVALID_ACCESS_TOKEN": {
+                    "summary": "The access token is invalid.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "INVALID_ACCESS_TOKEN",
+                        "message": "The access token is invalid.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only the spending approver decides, and never an adjustment they asked for (BUDGET.CONFLICT_OF_INTEREST).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHORIZATION.FORBIDDEN": {
+                    "summary": "You do not have permission to perform this action.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHORIZATION.FORBIDDEN",
+                        "message": "You do not have permission to perform this action.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The adjustment does not exist (BUDGET_ADJUSTMENT.NOT_FOUND).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "BUDGET_ADJUSTMENT.NOT_FOUND": {
+                    "summary": "The adjustment does not exist.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "BUDGET_ADJUSTMENT.NOT_FOUND",
+                        "message": "The adjustment does not exist.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The adjustment was decided already (BUDGET_ADJUSTMENT.ALREADY_DECIDED), the Cost Center that receives has a version of the year still being decided (BUDGET_ADJUSTMENT.VERSION_IN_FLIGHT), or the year has ended (BUDGET.YEAR_ENDED).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "BUDGET_ADJUSTMENT.ALREADY_DECIDED": {
+                    "summary": "The adjustment was decided already.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "BUDGET_ADJUSTMENT.ALREADY_DECIDED",
+                        "message": "The adjustment was decided already.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "BUDGET_ADJUSTMENT.VERSION_IN_FLIGHT": {
+                    "summary": "The Cost Center has a version of the year that is still being decided.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "BUDGET_ADJUSTMENT.VERSION_IN_FLIGHT",
+                        "message": "The Cost Center has a version of the year that is still being decided.",
+                        "details": { "costCenterId": "3f0c7d54-9e1b-4f6a-8d2c-5b7a1e9c0d11" },
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_PAYLOAD_TOO_LARGE": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_PAYLOAD_TOO_LARGE",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_UNSUPPORTED_MEDIA_TYPE": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_UNSUPPORTED_MEDIA_TYPE",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The body or the id is invalid (VALIDATION_ERROR), a refusal has no reason (BUDGET.ADJUSTMENT_REASON_REQUIRED), or a condition no longer holds on today's figures (BUDGET_ADJUSTMENT.OVER_UNALLOCATED, BELOW_FORECAST_FLOOR, OVER_BASE, NO_BUDGET).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "VALIDATION_ERROR": {
+                    "summary": "Request validation failed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "VALIDATION_ERROR",
+                        "message": "Request validation failed.",
+                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "BUDGET_ADJUSTMENT.OVER_UNALLOCATED": {
+                    "summary": "The amount is more than what is not allocated under the annual ceiling.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "BUDGET_ADJUSTMENT.OVER_UNALLOCATED",
+                        "message": "The amount is more than what is not allocated under the annual ceiling.",
+                        "details": { "availableMinor": "29000000", "requestedMinor": "30000000" },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "BUDGET_ADJUSTMENT.BELOW_FORECAST_FLOOR": {
+                    "summary": "The Cost Center would be left with less than it is forecast to spend by the end of the year.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "BUDGET_ADJUSTMENT.BELOW_FORECAST_FLOOR",
+                        "message": "The Cost Center would be left with less than it is forecast to spend by the end of the year.",
+                        "details": {
+                          "costCenterId": "3f0c7d54-9e1b-4f6a-8d2c-5b7a1e9c0d11",
+                          "floorMinor": "110000000",
+                          "afterMinor": "108000000"
+                        },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "BUDGET_ADJUSTMENT.OVER_BASE": {
+                    "summary": "The amount is more than the base of the Cost Center.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "BUDGET_ADJUSTMENT.OVER_BASE",
+                        "message": "The amount is more than the base of the Cost Center.",
+                        "details": { "costCenterId": "3f0c7d54-9e1b-4f6a-8d2c-5b7a1e9c0d11", "baseMinor": "180000000" },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "BUDGET_ADJUSTMENT.NO_BUDGET": {
+                    "summary": "The Cost Center has no budget of the year to give from.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "BUDGET_ADJUSTMENT.NO_BUDGET",
+                        "message": "The Cost Center has no budget of the year to give from.",
+                        "details": { "costCenterId": "3f0c7d54-9e1b-4f6a-8d2c-5b7a1e9c0d11" },
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_TOO_MANY_REQUESTS": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_TOO_MANY_REQUESTS",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "TOKEN_VERIFICATION_UNAVAILABLE": {
+                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
+                        "message": "Authentication is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SERVICE_UNAVAILABLE": {
+                    "summary": "The service is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SERVICE_UNAVAILABLE",
+                        "message": "The service is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "bearer": [] }],
+        "summary": "Approve or refuse an adjustment of the budget",
+        "tags": ["budget-adjustments"]
+      }
+    },
     "/api/v1/monitoring-notice-versions": {
       "post": {
         "operationId": "monitoringNoticeVersionCreate",
@@ -122735,6 +123537,295 @@
             "maxLength": 2000
           }
         },
+        "additionalProperties": false
+      },
+      "CreateAdjustmentBodyDto": {
+        "type": "object",
+        "properties": {
+          "year": {
+            "type": "integer",
+            "minimum": 2000,
+            "maximum": 2999,
+            "description": "The fiscal year whose budget is adjusted, as YYYY."
+          },
+          "kind": {
+            "type": "string",
+            "enum": ["SUPPLEMENT", "TRANSFER", "RETURN", "CEILING_REDUCTION"],
+            "description": "SUPPLEMENT: a Cost Center is given money from what is not allocated under the annual ceiling. TRANSFER: money moves from one Cost Center to another. RETURN: a Cost Center gives money back to what is not allocated. CEILING_REDUCTION: the annual ceiling goes down, from what is not allocated."
+          },
+          "fromCostCenterId": {
+            "description": "The Cost Center that gives: required for TRANSFER and RETURN, not allowed for the other two kinds.",
+            "type": "string",
+            "format": "uuid"
+          },
+          "toCostCenterId": {
+            "description": "The Cost Center that receives: required for SUPPLEMENT and TRANSFER, not allowed for the other two kinds.",
+            "type": "string",
+            "format": "uuid"
+          },
+          "amount": {
+            "type": "object",
+            "properties": { "amount": { "type": "string", "maxLength": 40 } },
+            "required": ["amount"],
+            "additionalProperties": false,
+            "description": "The amount, above nothing, in the reporting currency of the organization."
+          },
+          "reason": { "type": "string", "minLength": 1, "maxLength": 1000 },
+          "transferReason": {
+            "description": "Only for TRANSFER: the department changed its Cost Center in the year and what is left moves to the new one; such a transfer is not held to the forecast of the end of the year.",
+            "type": "string",
+            "enum": ["COST_CENTER_CHANGE"]
+          }
+        },
+        "required": ["year", "kind", "amount", "reason"],
+        "additionalProperties": false
+      },
+      "AdjustmentResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "enum": [true] },
+          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string", "format": "uuid" },
+              "year": { "type": "integer", "minimum": -9007199254740991, "maximum": 9007199254740991 },
+              "kind": {
+                "type": "string",
+                "enum": ["SUPPLEMENT", "TRANSFER", "RETURN", "CEILING_REDUCTION"],
+                "description": "SUPPLEMENT: a Cost Center is given money from what is not allocated under the annual ceiling. TRANSFER: money moves from one Cost Center to another. RETURN: a Cost Center gives money back to what is not allocated. CEILING_REDUCTION: the annual ceiling goes down, from what is not allocated."
+              },
+              "from": {
+                "type": "object",
+                "properties": {
+                  "id": { "type": "string", "format": "uuid" },
+                  "code": { "type": "string" },
+                  "name": { "type": "string" }
+                },
+                "required": ["id", "code", "name"],
+                "additionalProperties": false,
+                "description": "The Cost Center that gives; null for a supplement and for a reduction of the ceiling.",
+                "nullable": true
+              },
+              "to": {
+                "type": "object",
+                "properties": {
+                  "id": { "type": "string", "format": "uuid" },
+                  "code": { "type": "string" },
+                  "name": { "type": "string" }
+                },
+                "required": ["id", "code", "name"],
+                "additionalProperties": false,
+                "description": "The Cost Center that receives; null for a return and for a reduction of the ceiling.",
+                "nullable": true
+              },
+              "amount": {
+                "type": "object",
+                "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                "required": ["amount", "currency"],
+                "additionalProperties": false
+              },
+              "reason": { "type": "string" },
+              "transferReason": { "type": "string", "enum": ["COST_CENTER_CHANGE", null], "nullable": true },
+              "state": { "type": "string", "enum": ["PENDING", "APPROVED", "REJECTED"] },
+              "createdBy": {
+                "type": "object",
+                "properties": {
+                  "employeeId": { "type": "string", "format": "uuid" },
+                  "employeeCode": { "type": "string" },
+                  "fullName": { "type": "string" }
+                },
+                "required": ["employeeId", "employeeCode", "fullName"],
+                "additionalProperties": false,
+                "nullable": true
+              },
+              "createdAt": { "type": "string", "format": "date-time" },
+              "decidedBy": {
+                "type": "object",
+                "properties": {
+                  "employeeId": { "type": "string", "format": "uuid" },
+                  "employeeCode": { "type": "string" },
+                  "fullName": { "type": "string" }
+                },
+                "required": ["employeeId", "employeeCode", "fullName"],
+                "additionalProperties": false,
+                "nullable": true
+              },
+              "decidedAt": { "type": "string", "format": "date-time", "nullable": true },
+              "decisionReason": { "type": "string", "nullable": true },
+              "createdVersionId": {
+                "type": "string",
+                "format": "uuid",
+                "description": "The version of the budget made for the Cost Center that received money when it had none; null otherwise.",
+                "nullable": true
+              }
+            },
+            "required": [
+              "id",
+              "year",
+              "kind",
+              "from",
+              "to",
+              "amount",
+              "reason",
+              "transferReason",
+              "state",
+              "createdBy",
+              "createdAt",
+              "decidedBy",
+              "decidedAt",
+              "decisionReason",
+              "createdVersionId"
+            ],
+            "additionalProperties": false,
+            "nullable": true
+          }
+        },
+        "required": ["success", "message", "data"],
+        "additionalProperties": false
+      },
+      "AdjustmentListResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "enum": [true] },
+          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "items": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": { "type": "string", "format": "uuid" },
+                    "year": { "type": "integer", "minimum": -9007199254740991, "maximum": 9007199254740991 },
+                    "kind": {
+                      "type": "string",
+                      "enum": ["SUPPLEMENT", "TRANSFER", "RETURN", "CEILING_REDUCTION"],
+                      "description": "SUPPLEMENT: a Cost Center is given money from what is not allocated under the annual ceiling. TRANSFER: money moves from one Cost Center to another. RETURN: a Cost Center gives money back to what is not allocated. CEILING_REDUCTION: the annual ceiling goes down, from what is not allocated."
+                    },
+                    "from": {
+                      "type": "object",
+                      "properties": {
+                        "id": { "type": "string", "format": "uuid" },
+                        "code": { "type": "string" },
+                        "name": { "type": "string" }
+                      },
+                      "required": ["id", "code", "name"],
+                      "additionalProperties": false,
+                      "description": "The Cost Center that gives; null for a supplement and for a reduction of the ceiling.",
+                      "nullable": true
+                    },
+                    "to": {
+                      "type": "object",
+                      "properties": {
+                        "id": { "type": "string", "format": "uuid" },
+                        "code": { "type": "string" },
+                        "name": { "type": "string" }
+                      },
+                      "required": ["id", "code", "name"],
+                      "additionalProperties": false,
+                      "description": "The Cost Center that receives; null for a return and for a reduction of the ceiling.",
+                      "nullable": true
+                    },
+                    "amount": {
+                      "type": "object",
+                      "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                      "required": ["amount", "currency"],
+                      "additionalProperties": false
+                    },
+                    "reason": { "type": "string" },
+                    "transferReason": { "type": "string", "enum": ["COST_CENTER_CHANGE", null], "nullable": true },
+                    "state": { "type": "string", "enum": ["PENDING", "APPROVED", "REJECTED"] },
+                    "createdBy": {
+                      "type": "object",
+                      "properties": {
+                        "employeeId": { "type": "string", "format": "uuid" },
+                        "employeeCode": { "type": "string" },
+                        "fullName": { "type": "string" }
+                      },
+                      "required": ["employeeId", "employeeCode", "fullName"],
+                      "additionalProperties": false,
+                      "nullable": true
+                    },
+                    "createdAt": { "type": "string", "format": "date-time" },
+                    "decidedBy": {
+                      "type": "object",
+                      "properties": {
+                        "employeeId": { "type": "string", "format": "uuid" },
+                        "employeeCode": { "type": "string" },
+                        "fullName": { "type": "string" }
+                      },
+                      "required": ["employeeId", "employeeCode", "fullName"],
+                      "additionalProperties": false,
+                      "nullable": true
+                    },
+                    "decidedAt": { "type": "string", "format": "date-time", "nullable": true },
+                    "decisionReason": { "type": "string", "nullable": true },
+                    "createdVersionId": {
+                      "type": "string",
+                      "format": "uuid",
+                      "description": "The version of the budget made for the Cost Center that received money when it had none; null otherwise.",
+                      "nullable": true
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "year",
+                    "kind",
+                    "from",
+                    "to",
+                    "amount",
+                    "reason",
+                    "transferReason",
+                    "state",
+                    "createdBy",
+                    "createdAt",
+                    "decidedBy",
+                    "decidedAt",
+                    "decisionReason",
+                    "createdVersionId"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "pagination": {
+                "type": "object",
+                "properties": {
+                  "page": { "type": "integer", "exclusiveMinimum": true, "maximum": 9007199254740991, "minimum": 0 },
+                  "pageSize": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "maximum": 9007199254740991,
+                    "minimum": 0
+                  },
+                  "totalItems": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                  "totalPages": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+                },
+                "required": ["page", "pageSize", "totalItems", "totalPages"],
+                "additionalProperties": false
+              }
+            },
+            "required": ["items", "pagination"],
+            "additionalProperties": false,
+            "nullable": true
+          }
+        },
+        "required": ["success", "message", "data"],
+        "additionalProperties": false
+      },
+      "DecideAdjustmentBodyDto": {
+        "type": "object",
+        "properties": {
+          "decision": { "type": "string", "enum": ["APPROVE", "REJECT"] },
+          "reason": {
+            "description": "Required when the decision is REJECT.",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000
+          }
+        },
+        "required": ["decision"],
         "additionalProperties": false
       },
       "NoticeVersionBodyDto": {
