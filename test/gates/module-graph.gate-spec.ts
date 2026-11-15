@@ -129,6 +129,9 @@ const PUBLIC_CONTRACT_EXPORTS: ReadonlySet<string> = new Set([
   // QĐ-93d(3): where the grant of SPENDING_APPROVER asks the modules above it for the open work of a person; requests, budgets and
   // licensing add a check each from a `*.listener.ts`, so the one point the facade holds is injected by them.
   'IdentityAccessFacadeModule: SpendingApproverGrantChecks',
+  // QĐ-111ar: where `GET /me` asks the modules above it which policies the caller has not acknowledged; the library of policies adds the one
+  // source from a `*.listener.ts`, so the point the facade holds is injected by it.
+  'IdentityAccessFacadeModule: PendingPolicyAcknowledgements',
   'IdentityAccessFacadeModule: RoleGrantService',
   // H6.1: the read-only account contract of `ops:inspect`, declared only in the inspection graph.
   'IdentityAccessInspectionFacadeModule: IdentityAccessInspectionApi',

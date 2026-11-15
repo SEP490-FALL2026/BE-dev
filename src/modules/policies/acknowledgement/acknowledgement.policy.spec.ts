@@ -1,4 +1,4 @@
-import { acknowledgementStateOf, type PublishedVersionFacts } from './acknowledgement.policy';
+import { acknowledgementStateOf, policyRolesOf, type PublishedVersionFacts } from './acknowledgement.policy';
 
 const version = (versionNumber: number, requiresReacknowledgement: boolean): PublishedVersionFacts => ({
   versionNumber,
@@ -83,5 +83,15 @@ describe('acknowledgementStateOf (R-34, T-PL)', () => {
         acknowledgedVersionNumbers: [],
       }),
     ).toBe('NOT_REQUIRED');
+  });
+});
+
+describe('policyRolesOf', () => {
+  it('keeps the roles of the library and drops what is not one', () => {
+    expect(policyRolesOf(['MANAGER', 'ROOT', 'EMPLOYEE'])).toEqual(['EMPLOYEE', 'MANAGER']);
+  });
+
+  it('gives nothing for an account with no role', () => {
+    expect(policyRolesOf([])).toEqual([]);
   });
 });

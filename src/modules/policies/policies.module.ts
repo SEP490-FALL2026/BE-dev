@@ -4,10 +4,18 @@ import { AuditModule } from '../audit/audit.module';
 import { IdentityAccessFacadeModule } from '../identity-access/identity-access-facade.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { OrganizationModule } from '../organization/organization.module';
+import { AcknowledgementController } from './acknowledgement/acknowledgement.controller';
+import { AcknowledgementFactsService } from './acknowledgement/acknowledgement-facts.service';
+import { AcknowledgementReportService } from './acknowledgement/acknowledgement-report.service';
+import { AcknowledgementRepo } from './acknowledgement/acknowledgement.repo';
+import { AcknowledgementService } from './acknowledgement/acknowledgement.service';
+import { PendingPolicyAcknowledgementListener } from './acknowledgement/pending-acknowledgements.listener';
 import { LibraryDraftController } from './library/library-draft.controller';
 import { LibraryDraftService } from './library/library-draft.service';
 import { LibraryPublishService } from './library/library-publish.service';
 import { LibraryRepo } from './library/library.repo';
+import { PolicyReadingController } from './reading/policy-reading.controller';
+import { PolicyReadingQueryService } from './reading/policy-reading-query.service';
 
 /**
  * The policy library (`QĐ-111ao`): the fixed set of policies the Super Admin publishes new versions of, the acknowledgement of
@@ -16,7 +24,17 @@ import { LibraryRepo } from './library/library.repo';
  */
 @Module({
   imports: [DatabaseModule, AuditModule, OrganizationModule, IdentityAccessFacadeModule, NotificationsModule],
-  controllers: [LibraryDraftController],
-  providers: [LibraryRepo, LibraryDraftService, LibraryPublishService],
+  controllers: [PolicyReadingController, LibraryDraftController, AcknowledgementController],
+  providers: [
+    LibraryRepo,
+    LibraryDraftService,
+    LibraryPublishService,
+    AcknowledgementRepo,
+    AcknowledgementFactsService,
+    AcknowledgementService,
+    AcknowledgementReportService,
+    PendingPolicyAcknowledgementListener,
+    PolicyReadingQueryService,
+  ],
 })
 export class PoliciesModule {}

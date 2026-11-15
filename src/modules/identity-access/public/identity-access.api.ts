@@ -16,6 +16,7 @@ import {
   EmployeeAccountInspection,
   LeaverGrantRole,
   PendingBlockOutcome,
+  RoleHolderRecord,
   SuperAdminHolder,
 } from './identity-access.types';
 import { employeeHasNotLeft, isActionLinkRedeemable } from '../accounts/account.policy';
@@ -149,6 +150,15 @@ export class IdentityAccessApi {
   /** Every employee who holds an effective grant of any of these roles on an account that can act, by employee code: who a notice to a role goes to. */
   findUsableEmployeeIdsHoldingRoles(roles: readonly AppRole[], tx?: DbTx): Promise<string[]> {
     return this.accounts.findUsableEmployeeIdsHoldingRoles(roles, tx);
+  }
+
+  /** A page of the accounts that can act and hold any of these roles, by employee code, with who each person is (an unlocked read, for a report). */
+  pageUsableRoleHolders(
+    roles: readonly AppRole[],
+    skip: number,
+    take: number,
+  ): Promise<{ rows: RoleHolderRecord[]; total: number }> {
+    return this.accounts.pageUsableRoleHolders(roles, skip, take);
   }
 
   /** The usable IT Admin with the smallest employee code, or null: who a report is given to when nobody is in charge. */

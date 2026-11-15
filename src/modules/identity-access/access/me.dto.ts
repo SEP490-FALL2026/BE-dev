@@ -42,6 +42,14 @@ export const meSchema = z.strictObject({
       }),
     )
     .max(5),
+  /**
+   * The policies in force that the caller owes an acknowledgement of (`QĐ-111ar`, `QĐ-111bi`): a version of a policy that applies to one of the roles of
+   * the account and that it has not acknowledged since the last version that asked again. Web and mobile both read it and each blocks the dashboard
+   * until the caller acknowledges; no route of the API refuses a caller who has not.
+   */
+  pendingPolicyAcknowledgements: z
+    .array(z.strictObject({ code: z.string(), title: z.string(), versionNumber: z.number().int().positive() }))
+    .max(20),
 });
 
 export class MeResponseDto extends createZodDto(successEnvelopeSchema(meSchema)) {}

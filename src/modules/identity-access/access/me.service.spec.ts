@@ -1,6 +1,7 @@
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import type { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import type { AccountRecordService } from '../accounts/account-record.service';
+import { PendingPolicyAcknowledgements } from '../public/identity-access.extension-points';
 import { MeService } from './me.service';
 
 const PROFILE = {
@@ -33,7 +34,9 @@ function service(options: { headed?: { departmentId: string } | null } = {}) {
   } as unknown as OrganizationReadApi;
   const accounts = { findLoginEmail: () => Promise.resolve('an@acme.vn') } as unknown as AccountRecordService;
 
-  return { subject: new MeService(accounts, organization), headed, brief };
+  const policies = new PendingPolicyAcknowledgements();
+
+  return { subject: new MeService(accounts, organization, policies), headed, brief, policies };
 }
 
 describe('MeService (GET /api/v1/me — D-S19)', () => {
@@ -91,4 +94,41 @@ describe('MeService (GET /api/v1/me — D-S19)', () => {
       expect(me).not.toHaveProperty('selfServiceOnly');
     },
   );
+
+  it('lists the policies the caller owes an acknowledgement of, from every source that was added', async () => {
+    const { subject, policies } = service();
+    policies.add('one', {
+      pendingFor: () => Promise.resolve([{ code: 'POL-GEN', title: 'Quy định chung', versionNumber: 2 }]),
+    });
+    policies.add('two', {
+      pendingFor: () => Promise.resolve([{ code: 'POL-MF1', title: 'Cấp phát', versionNumber: 1 }]),
+    });
+
+    const me = await subject.get(principal(['MANAGER'], ['MANAGER']));
+
+    expect(me.pendingPolicyAcknowledgements).toEqual([
+      { code: 'POL-GEN', title: 'Quy định chung', versionNumber: 2 },
+      { code: 'POL-MF1', title: 'Cấp phát', versionNumber: 1 },
+    ]);
+  });
+
+  it('lists nothing when no module added a source', async () => {
+    const { subject } = service();
+
+    expect((await subject.get(principal(['EMPLOYEE'], ['EMPLOYEE']))).pendingPolicyAcknowledgements).toEqual([]);
+  });
+
+  it('asks the sources with the roles that were granted, not the roles in force', async () => {
+    const { subject, policies } = service();
+    const asked = jest.fn(() => Promise.resolve([]));
+    policies.add('spy', { pendingFor: asked });
+
+    await subject.get(principal(['MANAGER', 'EMPLOYEE'], ['EMPLOYEE']));
+
+    expect(asked).toHaveBeenCalledWith({
+      appUserId: 'user-1',
+      employeeId: 'employee-1',
+      roles: ['MANAGER', 'EMPLOYEE'],
+    });
+  });
 });

@@ -1,4 +1,4 @@
-import type { PolicyRole } from '../public/policies.types';
+import { POLICY_ROLES, type PolicyRole } from '../public/policies.types';
 
 /** What the reader must know of one published version to judge whether an acknowledgement is still owed. */
 export interface PublishedVersionFacts {
@@ -36,4 +36,9 @@ export function acknowledgementStateOf(facts: AcknowledgementFacts): MyAcknowled
   );
 
   return facts.acknowledgedVersionNumbers.some((number) => number >= latestThatAsks) ? 'DONE' : 'PENDING';
+}
+
+/** The roles a policy can name among the roles an account holds: whatever else a token carries is not a role of the library. */
+export function policyRolesOf(roles: readonly string[]): PolicyRole[] {
+  return POLICY_ROLES.filter((role) => roles.includes(role));
 }

@@ -17,7 +17,11 @@ import { SuperAdminHolderRepo } from './accounts/super-admin-holder.repo';
 import { IdentityAccessApi } from './public/identity-access.api';
 import { RequestPartyEligibilityApi } from './public/request-party-eligibility.api';
 import { RequestPartyEligibilityService } from './request-party/request-party-eligibility.service';
-import { ApprovalRoleChangeListeners, SpendingApproverGrantChecks } from './public/identity-access.extension-points';
+import {
+  ApprovalRoleChangeListeners,
+  PendingPolicyAcknowledgements,
+  SpendingApproverGrantChecks,
+} from './public/identity-access.extension-points';
 
 /**
  * IdentityAccessApi is the public facade installation and the worker use. The account persistence is declared
@@ -37,6 +41,7 @@ import { ApprovalRoleChangeListeners, SpendingApproverGrantChecks } from './publ
     ActionTokenRepo,
     ApprovalRoleChangeListeners,
     SpendingApproverGrantChecks,
+    PendingPolicyAcknowledgements,
     PasswordHasher,
     AccountRecordService,
     AccessBlockService,
@@ -58,6 +63,7 @@ import { ApprovalRoleChangeListeners, SpendingApproverGrantChecks } from './publ
     CredentialService,
     ApprovalRoleChangeListeners,
     SpendingApproverGrantChecks,
+    PendingPolicyAcknowledgements,
   ],
 })
 export class IdentityAccessFacadeModule {}

@@ -3,6 +3,10 @@ import { businessDateAt, toDateColumn, type BusinessDate } from '../../../core/b
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { AccountRecordService } from '../accounts/account-record.service';
+import {
+  PendingPolicyAcknowledgements,
+  type PendingPolicyAcknowledgement,
+} from '../public/identity-access.extension-points';
 import type { AppRole } from '../public/identity-access.types';
 
 export interface MeView {
@@ -28,6 +32,8 @@ export interface MeView {
     effectiveFrom: string;
     costCenterId: string | null;
   }[];
+  /** The policies in force the caller owes an acknowledgement of; the interface asks before the dashboard (`QĐ-111ar`). */
+  pendingPolicyAcknowledgements: PendingPolicyAcknowledgement[];
 }
 
 @Injectable()
@@ -35,6 +41,7 @@ export class MeService {
   constructor(
     private readonly accounts: AccountRecordService,
     private readonly organizationReads: OrganizationReadApi,
+    private readonly policies: PendingPolicyAcknowledgements,
   ) {}
 
   /** The caller's own identity, granted roles and Manager scope. Roles come from the principal resolved this request. */
@@ -59,7 +66,22 @@ export class MeService {
       roles,
       managerScope: await this.managerScopeOf(principal, day),
       upcomingUnits: await this.upcomingUnitsOf(principal, day),
+      pendingPolicyAcknowledgements: await this.pendingPoliciesOf(principal, roles),
     };
+  }
+
+  /**
+   * The policies the caller owes an acknowledgement of, from every module that knows some. The roles asked about are the ones granted
+   * (`roles` of this answer), the same list the interface shows. Nothing here stops any other route.
+   */
+  private async pendingPoliciesOf(
+    principal: AuthenticatedPrincipal,
+    roles: readonly AppRole[],
+  ): Promise<PendingPolicyAcknowledgement[]> {
+    const reader = { appUserId: principal.appUserId, employeeId: principal.employeeId, roles };
+    const lists = await Promise.all(this.policies.all().map((source) => source.pendingFor(reader)));
+
+    return lists.flat();
   }
 
   /**
