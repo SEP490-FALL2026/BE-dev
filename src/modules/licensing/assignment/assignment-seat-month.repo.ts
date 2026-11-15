@@ -4,15 +4,19 @@ import { seatHeldRange } from '../../../core/seat-month-cost';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { SeatOfMonth } from '../public/licensing-seat-month.types';
+import { AssignmentChainRepo } from './assignment-chain.repo';
 
 /**
  * What is read of the seats on subscriptions for the cost of a month (`SM-1`): a read that no write goes through (the writer of
- * `license_assignments` is `AssignmentRepo`). A seat counts for the days it is in force (`seatHeldRange`), and a seat whose grant failed or was
+ * `license_assignments` is `AssignmentRepo`; the request of a seat is read by the chain it was carried through, `AssignmentChainRepo`). A seat counts for the days it is in force (`seatHeldRange`), and a seat whose grant failed or was
  * cancelled never was.
  */
 @Injectable()
 export class AssignmentSeatMonthRepo {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly chains: AssignmentChainRepo,
+  ) {}
 
   /** The plans that have a seat on a subscription touching `[start, nextStart)`, in one statement. */
   async planIdsTouching(start: BusinessDate, nextStart: BusinessDate, tx?: DbTx): Promise<string[]> {
@@ -49,15 +53,11 @@ export class AssignmentSeatMonthRepo {
       },
       orderBy: [{ subscriptionId: 'asc' }, { id: 'asc' }],
     });
-    const tasks = await db.provisioningTask.findMany({
-      where: { assignmentId: { in: rows.map((row) => row.id) }, kind: 'GRANT', requestId: { not: null } },
-      select: { assignmentId: true, requestId: true },
-      orderBy: { createdAt: 'asc' },
-    });
-    const requestOf = new Map<string, string>();
-    for (const task of tasks) {
-      if (task.requestId && !requestOf.has(task.assignmentId)) requestOf.set(task.assignmentId, task.requestId);
-    }
+    // The request is the one of the last grant completed along the chain of the seat (a renewal, a handover), as a revocation finds it (`SM1-01`).
+    const requestOf = await this.chains.grantsOfChains(
+      db,
+      rows.map((row) => row.id),
+    );
 
     return rows.flatMap((row) => {
       const held = seatHeldRange({

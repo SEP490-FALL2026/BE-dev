@@ -75,46 +75,64 @@ describe('a month of the seats of a K2 pool is charged to the departments of the
 
     return employeeId;
   };
+  /**
+   * A seat on the subscription. By default the one a Request made and whose grant was completed the day it begins (`granted_on`); `grantedOn: null` is one still
+   * waiting for the IT Admin. A Request names the task of the grant, completed; a renewal carries the seat of `predecessorId` on.
+   */
   const seat = async (
     subscriptionId: string,
     planId: string,
     employeeId: string,
-    over: { validFrom?: string; validUntil?: string | null; requestId?: string } = {},
+    over: {
+      validFrom?: string;
+      validUntil?: string | null;
+      requestId?: string;
+      grantedOn?: string | null;
+      source?: 'REQUEST' | 'BASELINE' | 'RENEWAL_CARRY';
+      predecessorId?: string;
+      failedAt?: string;
+    } = {},
   ): Promise<string> => {
     const id = randomUUID();
+    const validFrom = over.validFrom ?? `${h.year}-03-01`;
     await h.ctx.sql.query(
       `INSERT INTO license_assignments (id, organization_id, kind, source, plan_id, subscription_id, employee_id,
-         account_identifier, normalized_account_identifier, valid_from, valid_until, valid_from_basis, created_by_app_user_id)
-       VALUES ($1, $2, 'PERSONAL', 'REQUEST', $3, $4, $5, $6, $6, $7, $8, 'ACTUAL', $9)`,
+         account_identifier, normalized_account_identifier, valid_from, valid_until, valid_from_basis, created_by_app_user_id,
+         granted_on, predecessor_id, failed_at)
+       VALUES ($1, $2, 'PERSONAL', $3::"AssignmentSource", $4, $5, $6, $7, $7, $8, $9, 'ACTUAL', $10, $11, $12, $13)`,
       [
         id,
         h.seed.organizationId,
+        over.source ?? 'REQUEST',
         planId,
         subscriptionId,
         employeeId,
         `${id.slice(0, 8)}@acme.vn`,
-        over.validFrom ?? `${h.year}-03-01`,
+        validFrom,
         over.validUntil ?? null,
         randomUUID(),
+        over.grantedOn === undefined ? validFrom : over.grantedOn,
+        over.predecessorId ?? null,
+        over.failedAt ?? null,
       ],
     );
     if (over.requestId) {
       await h.ctx.sql.query(
         `INSERT INTO provisioning_tasks (id, organization_id, assignment_id, kind, channel, status, request_id, max_attempts,
-           created_by_app_user_id, updated_at)
-         VALUES (gen_random_uuid(), $1, $2, 'GRANT', 'MANUAL', 'QUEUED', $3, 4, $4, now())`,
+           created_by_app_user_id, updated_at, claimed_by_app_user_id, claimed_at, completed_by_app_user_id, completed_at, evidence)
+         VALUES (gen_random_uuid(), $1, $2, 'GRANT', 'MANUAL', 'COMPLETED', $3, 4, $4, now(), $4, now(), $4, now(), 'done')`,
         [h.seed.organizationId, id, over.requestId, randomUUID()],
       );
     }
 
     return id;
   };
-  const rowsOf = async (subscriptionId: string): Promise<ChargeRow[]> =>
+  const rowsOf = async (subscriptionId: string, of = month()): Promise<ChargeRow[]> =>
     (
       await h.ctx.sql.query<ChargeRow>(
         `SELECT department_id, cost_center_id, days, amount_minor::text, applied_minor::text, commitment_id
            FROM seat_month_charges WHERE subscription_id = $1 AND month = $2 ORDER BY department_id`,
-        [subscriptionId, month()],
+        [subscriptionId, of],
       )
     ).rows;
   const commitmentOf = async (requestId: string) =>
@@ -182,6 +200,35 @@ describe('a month of the seats of a K2 pool is charged to the departments of the
     await service().chargeMonth(month());
 
     expect(await rowsOf(pool)).toMatchObject([{ department_id: unit.department.id, days: 15, amount_minor: '193548' }]);
+  });
+
+  it('SM1-01: a seat a renewal carried on still takes down the commitment of the Request that made the first seat, along a chain of three seats', async () => {
+    const pool = await newPool();
+    const planId = await h.planOf(pool);
+    const unit = await department();
+    const requestId = await h.waitingForApprover(unit, planId, { amount: 4_800_000 });
+    await h.decideSpend(requestId, { decision: 'APPROVE' }, h.boss.account).expect(200);
+    const person = await holder('E-SM-CARRY', unit);
+    const first = await seat(pool, planId, person, {
+      validFrom: `${h.year}-01-01`,
+      validUntil: `${h.year}-04-01`,
+      requestId,
+    });
+    const second = await seat(pool, planId, person, {
+      validFrom: `${h.year}-04-01`,
+      validUntil: `${h.year}-07-01`,
+      source: 'RENEWAL_CARRY',
+      predecessorId: first,
+    });
+    await seat(pool, planId, person, { validFrom: `${h.year}-07-01`, source: 'RENEWAL_CARRY', predecessorId: second });
+
+    await service().chargeMonth(`${h.year}-07-01`);
+
+    const [row] = await rowsOf(pool, `${h.year}-07-01`);
+    expect(row.commitment_id).not.toBeNull();
+    expect(row.applied_minor).toBe(row.amount_minor);
+    expect(Number(row.applied_minor)).toBeGreaterThan(0);
+    expect(await commitmentOf(requestId)).toMatchObject({ applied_minor: row.applied_minor });
   });
 
   const facts = async (unit: Unit) =>

@@ -43,6 +43,27 @@ export class AssignmentChainRepo {
   }
 
   /**
+   * `grantOfChain` for many assignments in one statement: the request of the most recently completed grant task along the chain of each, by the id of the
+   * assignment asked about; an assignment no request made (the baseline, a role) is not in the map. It is how the seats of a month find the request that
+   * holds the money for them, a seat a renewal carried on being the one the first seat's request asked for (`SM1-01`).
+   */
+  async grantsOfChains(db: Pick<DbTx, '$queryRaw'>, assignmentIds: readonly string[]): Promise<Map<string, string>> {
+    if (assignmentIds.length === 0) return new Map();
+    const rows = await db.$queryRaw<{ assignment_id: string; request_id: string }[]>`
+      WITH RECURSIVE chain AS (
+        SELECT "id" AS root, "id", "predecessor_id" FROM "license_assignments" WHERE "id" = ANY(${[...assignmentIds]}::uuid[])
+        UNION
+        SELECT c.root, a."id", a."predecessor_id" FROM "license_assignments" a JOIN chain c ON a."id" = c."predecessor_id"
+      )
+      SELECT DISTINCT ON (c.root) c.root::text AS assignment_id, t."request_id"::text AS request_id
+        FROM chain c JOIN "provisioning_tasks" t ON t."assignment_id" = c."id"
+       WHERE t."kind" = 'GRANT' AND t."status" = 'COMPLETED' AND t."request_id" IS NOT NULL
+       ORDER BY c.root, t."completed_at" DESC NULLS LAST, t."id" DESC`;
+
+    return new Map(rows.map((row) => [row.assignment_id, row.request_id]));
+  }
+
+  /**
    * The assignment and every one it continues (`predecessor_id`: a renewal, a handover), the given one first: the records a request to go
    * on using names (its renewal records), so the module of requests finds every request that holds money for the right.
    */
