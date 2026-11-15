@@ -158,13 +158,13 @@ describe('the periods that have no invoice over PostgreSQL (PI-2, T-PI)', () => 
       [id, h.finance.employeeId],
     );
 
-  it('marks a payment of 10/11/2026 from 18/11, the day after its fifth working day, and not on 17/11 (T-PI)', async () => {
+  it('marks a payment of 10/11/2026 from 17/11, the day after its fifth working day (the payment day is the first), and not on 16/11 (T-PI, QĐ-104k(2))', async () => {
     const requestId = await granted(await unit(), 3, '2026-11-10T10:00:00Z');
 
-    day('2026-11-17');
+    day('2026-11-16');
     expect(await ofRequest(h.it1, requestId)).toEqual([]);
 
-    day('2026-11-18');
+    day('2026-11-17');
     const [row, ...rest] = await ofRequest(h.it1, requestId);
     expect(rest).toEqual([]);
     expect(row).toMatchObject({
@@ -175,7 +175,7 @@ describe('the periods that have no invoice over PostgreSQL (PI-2, T-PI)', () => 
       periodIndex: 1,
       periodCount: 3,
       paymentDate: '2026-11-10',
-      dueDate: '2026-11-17',
+      dueDate: '2026-11-16',
       plan: { planId: k1 },
     });
     expect(row.plan.applicationName).toEqual(expect.any(String));
@@ -193,8 +193,8 @@ describe('the periods that have no invoice over PostgreSQL (PI-2, T-PI)', () => 
     expect(
       rows.map((row) => [row.servicePeriodMonth, row.paymentDate, row.dueDate, row.label, row.periodIndex]),
     ).toEqual([
-      ['2026-11', '2026-11-10', '2026-11-17', 'NEW_PURCHASE', 1],
-      ['2026-12', '2026-12-10', '2026-12-17', 'NEW_PURCHASE', 2],
+      ['2026-11', '2026-11-10', '2026-11-16', 'NEW_PURCHASE', 1],
+      ['2026-12', '2026-12-10', '2026-12-16', 'NEW_PURCHASE', 2],
     ]);
   });
 
@@ -245,8 +245,8 @@ describe('the periods that have no invoice over PostgreSQL (PI-2, T-PI)', () => 
         row.label,
       ]),
     ).toEqual([
-      ['2026-10', '2026-10-05', '2026-10-12', 'RENEWAL'],
-      ['2026-11', '2026-11-05', '2026-11-12', 'RENEWAL'],
+      ['2026-10', '2026-10-05', '2026-10-09', 'RENEWAL'],
+      ['2026-11', '2026-11-05', '2026-11-11', 'RENEWAL'],
       ['2026-12', '2026-12-05', '2026-12-11', 'RENEWAL'],
     ]);
 

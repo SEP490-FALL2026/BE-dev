@@ -210,7 +210,7 @@ export class PurchaseInvoicesController {
   @ApiSuccessResponse(PurchaseInvoiceMissingPeriodListResponseDto, {
     message: 'PURCHASE_INVOICE.MISSING_PERIODS_LISTED',
     description:
-      'Each period of a right paid by the month (a request for months of use of a plan bought by the month, while a seat of it is held) or by the cycle of a subscription whose invoice has not been submitted five working days after its payment day. The oldest due day first. An invoice that was returned does not count. Finance reads every period; the IT Admin the ones of the departments they work and of the shared pool, which every IT Admin works.',
+      'Each period of a right paid by the month (a request for months of use of a plan bought by the month, while a seat of it is held) or by the cycle of a subscription whose invoice has not been submitted by the fifth working day, the payment day being the first when it is a working day. The oldest due day first. An invoice that was returned does not count. Finance reads every period; the IT Admin the ones of the departments they work and of the shared pool, which every IT Admin works.',
   })
   @ApiErrorResponses(...AUTH_ERRORS, FORBIDDEN, {
     status: HttpStatus.UNPROCESSABLE_ENTITY,

@@ -1,11 +1,12 @@
 import { addDays, type BusinessDate } from '../../../core/business-date';
 import { addMonths } from '../../../core/fiscal-year';
-import { addWorkingDays, type NonWorkingDates } from '../../../core/working-days';
+import { nthWorkingDayFrom, type NonWorkingDates } from '../../../core/working-days';
 
 /**
  * When a period of a right that is paid by the month or the year has no invoice (`QĐ-111x`, `R-30`, `C-2`), as pure rules. A period is paid on a
  * day (the day of the grant each month for the right a request granted; the renewal day by the cycle for a subscription) and its invoice is due
- * five working days after it, the same time the IT Admin has to submit it (`SBF-19`). Past that day with no invoice that was not returned, the
+ * on the fifth working day, the payment day being the first when it is a working day (`QĐ-104k`(2)), the same time the IT Admin has to submit it
+ * (`SBF-19`). Past that day with no invoice that was not returned, the
  * period carries the mark _kỳ này chưa có hóa đơn_. The five days are a rule, not a setting (`C-2`).
  */
 
@@ -28,9 +29,9 @@ export interface PaymentPeriod {
   sequence: number | null;
 }
 
-/** The last day an invoice is on time: the fifth working day after the payment day, the payment day itself never counted. */
+/** The last day an invoice is on time: the fifth working day, the payment day being day 1 when it is a working day (`QĐ-104k`(2)). */
 export function invoiceDueDate(paymentDate: BusinessDate, nonWorkingDates: NonWorkingDates): BusinessDate {
-  return addWorkingDays(paymentDate, INVOICE_DUE_WORKING_DAYS, nonWorkingDates);
+  return nthWorkingDayFrom(paymentDate, INVOICE_DUE_WORKING_DAYS, nonWorkingDates);
 }
 
 /** Whether the due day of the payment has passed on `today`: the mark begins the day after the due day, a weekend included. */

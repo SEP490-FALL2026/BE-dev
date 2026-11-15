@@ -125,9 +125,9 @@ describe('PurchaseInvoiceMissingPeriodsQueryService (PI-2, QĐ-111x, R-30)', () 
   describe('the right a request granted', () => {
     const running: World = { grants: [grant()], seats: [seat('r-1')] };
 
-    it('is marked on 18/11/2026 for a payment on Tuesday 10/11/2026 and not on 17/11 (T-PI)', async () => {
-      expect(await monthsOf({ ...running, today: '2026-11-17' })).toEqual([]);
-      expect(await monthsOf({ ...running, today: '2026-11-18' })).toEqual(['2026-11']);
+    it('is marked on 17/11/2026 for a payment on Tuesday 10/11/2026 and not on 16/11: the payment day is the first of the five working days (T-PI, QĐ-104k(2))', async () => {
+      expect(await monthsOf({ ...running, today: '2026-11-16' })).toEqual([]);
+      expect(await monthsOf({ ...running, today: '2026-11-17' })).toEqual(['2026-11']);
     });
 
     it('gives the period what the IT Admin needs to find it: the request, the month, the days, the plan and the department', async () => {
@@ -145,16 +145,16 @@ describe('PurchaseInvoiceMissingPeriodsQueryService (PI-2, QĐ-111x, R-30)', () 
           periodIndex: 1,
           periodCount: 3,
           paymentDate: '2026-11-10',
-          dueDate: '2026-11-17',
+          dueDate: '2026-11-16',
           plan: { planId: 'plan-k1', planName: 'Plan plan-k1', applicationName: 'App plan-k1', logoUrl: null },
           department: { id: 'd-1', name: 'Department d-1' },
         },
       ]);
     });
 
-    it('counts the days nobody works: with 12/11 a holiday the same payment is on time on 18/11', async () => {
-      expect(await monthsOf({ ...running, nonWorking: ['2026-11-12'] })).toEqual([]);
-      expect(await monthsOf({ ...running, nonWorking: ['2026-11-12'], today: '2026-11-19' })).toEqual(['2026-11']);
+    it('counts the days nobody works: with 12/11 a holiday the same payment is on time on 17/11', async () => {
+      expect(await monthsOf({ ...running, nonWorking: ['2026-11-12'], today: '2026-11-17' })).toEqual([]);
+      expect(await monthsOf({ ...running, nonWorking: ['2026-11-12'], today: '2026-11-18' })).toEqual(['2026-11']);
     });
 
     it('reads the days nobody works from the earliest payment to today, once', async () => {
@@ -167,8 +167,8 @@ describe('PurchaseInvoiceMissingPeriodsQueryService (PI-2, QĐ-111x, R-30)', () 
     });
 
     it('is marked for each month that came and passed its due day, and not for the months to come', async () => {
-      expect(await monthsOf({ ...running, today: '2026-12-18' })).toEqual(['2026-11', '2026-12']);
-      expect(await monthsOf({ ...running, today: '2026-12-17' })).toEqual(['2026-11']);
+      expect(await monthsOf({ ...running, today: '2026-12-17' })).toEqual(['2026-11', '2026-12']);
+      expect(await monthsOf({ ...running, today: '2026-12-16' })).toEqual(['2026-11']);
     });
 
     it('is not marked for a month that has an invoice that was not returned, and is for one that has none', async () => {
@@ -233,8 +233,8 @@ describe('PurchaseInvoiceMissingPeriodsQueryService (PI-2, QĐ-111x, R-30)', () 
       const { items } = await service.pageFor(finance, all);
 
       expect(items.map((row) => [row.servicePeriodMonth, row.paymentDate, row.dueDate, row.label])).toEqual([
-        ['2026-10', '2026-10-05', '2026-10-12', 'RENEWAL'],
-        ['2026-11', '2026-11-05', '2026-11-12', 'RENEWAL'],
+        ['2026-10', '2026-10-05', '2026-10-09', 'RENEWAL'],
+        ['2026-11', '2026-11-05', '2026-11-11', 'RENEWAL'],
         ['2026-12', '2026-12-05', '2026-12-11', 'RENEWAL'],
       ]);
       expect(items[0]).toMatchObject({ linkKind: 'SUBSCRIPTION', requestId: null, subscriptionId: 's-1' });
@@ -336,18 +336,18 @@ describe('PurchaseInvoiceMissingPeriodsQueryService (PI-2, QĐ-111x, R-30)', () 
 
       expect(first.pagination).toEqual({ page: 1, pageSize: 2, totalItems: 4, totalPages: 2 });
       expect(first.items.map((row) => [row.requestId ?? row.subscriptionId, row.dueDate])).toEqual([
-        ['s-1', '2026-10-12'],
-        ['s-1', '2026-11-12'],
+        ['s-1', '2026-10-09'],
+        ['s-1', '2026-11-11'],
       ]);
       expect(second.items.map((row) => [row.requestId ?? row.subscriptionId, row.dueDate])).toEqual([
-        ['r-1', '2026-11-17'],
-        ['r-2', '2026-11-19'],
+        ['r-1', '2026-11-16'],
+        ['r-2', '2026-11-18'],
       ]);
     });
 
     it('answers nothing before the installation, and reads no names for an empty page', async () => {
       expect(await monthsOf({ organization: null, grants: [grant()], seats: [seat('r-1')] })).toEqual([]);
-      const empty = serviceIn({ today: '2026-11-17', grants: [grant()], seats: [seat('r-1')] });
+      const empty = serviceIn({ today: '2026-11-16', grants: [grant()], seats: [seat('r-1')] });
 
       expect((await empty.service.pageFor(finance, all)).pagination.totalItems).toBe(0);
     });

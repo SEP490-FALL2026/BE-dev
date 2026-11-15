@@ -10,27 +10,27 @@ import {
 const none: ReadonlySet<string> = new Set();
 
 describe('the period that has no invoice (QĐ-111x, R-30, C-2)', () => {
-  describe('the day an invoice is due: the fifth working day after the payment day', () => {
-    it('is Tuesday 17/11/2026 for a payment on Tuesday 10/11/2026', () => {
-      expect(invoiceDueDate('2026-11-10', none)).toBe('2026-11-17');
+  describe('the day an invoice is due: the fifth working day, the payment day being the first when it is one (QĐ-104k(2))', () => {
+    it('is Monday 16/11/2026 for a payment on Tuesday 10/11/2026: 10, 11, 12, 13 and 16', () => {
+      expect(invoiceDueDate('2026-11-10', none)).toBe('2026-11-16');
     });
 
-    it('does not count a day nobody works: a holiday on 12/11 moves it to 18/11', () => {
-      expect(invoiceDueDate('2026-11-10', new Set(['2026-11-12']))).toBe('2026-11-18');
+    it('does not count a day nobody works: a holiday on 12/11 moves it to 17/11', () => {
+      expect(invoiceDueDate('2026-11-10', new Set(['2026-11-12']))).toBe('2026-11-17');
     });
 
-    it('counts from the next working day when the payment falls on a Saturday', () => {
+    it('counts from the next working day when the payment falls on a Saturday: Monday 16/11 is the first, Friday 20/11 the fifth', () => {
       expect(invoiceDueDate('2026-11-14', none)).toBe('2026-11-20');
     });
   });
 
   describe('when the period carries the mark', () => {
-    it('is not marked on the due day itself: a payment on Tuesday 10/11/2026 is still on time on 17/11', () => {
-      expect(lacksInvoice('2026-11-10', '2026-11-17', none)).toBe(false);
+    it('is not marked on the due day itself: a payment on Tuesday 10/11/2026 is still on time on Monday 16/11', () => {
+      expect(lacksInvoice('2026-11-10', '2026-11-16', none)).toBe(false);
     });
 
-    it('is marked from the day after the due day: 18/11/2026 (T-PI)', () => {
-      expect(lacksInvoice('2026-11-10', '2026-11-18', none)).toBe(true);
+    it('is marked from the day after the due day: 17/11/2026 (QĐ-104k(2); the SPEC of PI-2 said 18/11)', () => {
+      expect(lacksInvoice('2026-11-10', '2026-11-17', none)).toBe(true);
     });
 
     it('is not marked before the payment day, nor on it', () => {
@@ -39,16 +39,16 @@ describe('the period that has no invoice (QĐ-111x, R-30, C-2)', () => {
     });
 
     it('stays marked once the due day has passed, a weekend included', () => {
-      // Payment Friday 13/11: due Friday 20/11; the deadline is over on Saturday 21/11.
-      expect(lacksInvoice('2026-11-13', '2026-11-20', none)).toBe(false);
-      expect(lacksInvoice('2026-11-13', '2026-11-21', none)).toBe(true);
+      // Payment Monday 16/11: due Friday 20/11; the deadline is over on Saturday 21/11.
+      expect(lacksInvoice('2026-11-16', '2026-11-20', none)).toBe(false);
+      expect(lacksInvoice('2026-11-16', '2026-11-21', none)).toBe(true);
     });
 
     it('waits for the working days of a holiday: the same payment is on time on 17/11 and marked on 18/11 only when 12/11 is a holiday', () => {
       const holiday = new Set(['2026-11-12']);
 
-      expect(lacksInvoice('2026-11-10', '2026-11-18', holiday)).toBe(false);
-      expect(lacksInvoice('2026-11-10', '2026-11-19', holiday)).toBe(true);
+      expect(lacksInvoice('2026-11-10', '2026-11-17', holiday)).toBe(false);
+      expect(lacksInvoice('2026-11-10', '2026-11-18', holiday)).toBe(true);
     });
   });
 
