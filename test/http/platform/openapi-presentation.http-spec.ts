@@ -326,6 +326,29 @@ describe('API inventory (e2e): openapi presentation and wire messages', () => {
       expect([recommendations, seatStates].filter((description) => INTERNAL_CODE.test(description))).toEqual([]);
     });
 
+    it('B2B-03: says that SOON runs to the last day of the period and EXPIRED starts after it, not after the deadline to cancel', () => {
+      const wording: string[] = [];
+      visit(document, '#', (node) => {
+        const description = (node as { description?: unknown }).description;
+        if (typeof description === 'string' && /\bSOON\b/.test(description)) wording.push(description);
+      });
+      // The expiry filter of the list, the field of a row and the description of the list itself.
+      expect(wording.length).toBeGreaterThanOrEqual(3);
+      expect(
+        wording.filter((description) => !description.includes('last day') || /past the deadline/.test(description)),
+      ).toEqual([]);
+
+      const daysLeft: string[] = [];
+      visit(document, '#', (node, at) => {
+        const description = (node as { description?: unknown }).description;
+        if (at.endsWith('/daysLeft') && typeof description === 'string') daysLeft.push(description);
+      });
+      expect(daysLeft.length).toBeGreaterThan(0);
+      expect(
+        daysLeft.filter((description) => !description.includes('once EXPIRED it counts from the renewal day')),
+      ).toEqual([]);
+    });
+
     it('keeps the guard and unavailable codes the client already handles (Q8)', () => {
       const guard503 = operations.find((operation) => operation.operationId === 'meGet')?.responses['503'];
       const login503 = operations.find((operation) => operation.operationId === 'authLogin')?.responses['503'];

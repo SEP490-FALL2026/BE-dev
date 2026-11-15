@@ -90,7 +90,7 @@ export const listSubscriptionsQuerySchema = z.strictObject({
   }),
   expiry: z.enum(['SOON', 'EXPIRED']).optional().meta({
     description:
-      'SOON lists the subscriptions from the point of adjustment to the day of its deadline, EXPIRED those past the deadline while seats are still held. A purchase made once is never listed.',
+      'SOON lists the subscriptions from the point of adjustment to the last day of their period (a plan by the year stays SOON after its deadline to cancel, up to its renewal day, else its end day); EXPIRED those past that last day while seats are still held. A plan by the month goes on from one payment day to the next, so only one that does not renew itself is EXPIRED, after its end day. A purchase made once is never listed.',
   }),
   page: z.coerce.number().int().positive().default(1),
   pageSize: z.coerce.number().int().positive().max(100).default(20),
@@ -143,15 +143,15 @@ const subscriptionSchema = z.strictObject({
   isPrimaryForPlan: z.boolean(),
   expiry: z.enum(['SOON', 'EXPIRED']).nullable().meta({
     description:
-      'SOON from the point of adjustment to the day of its deadline, EXPIRED past it while seats are still held; null before the point, for a purchase made once and when no date is known to count from.',
+      'SOON from the point of adjustment to the last day of the period (a plan by the year stays SOON past its deadline to cancel); EXPIRED after the renewal day (else the end day) while seats are still held; null before the point, for a purchase made once and when no date is known to count from.',
   }),
   daysLeft: z.number().int().nullable().meta({
     description:
-      'The days from today to the deadline the point counts to; negative once it is past; null when there is no point.',
+      'The days from today to the deadline the point counts to; negative once it is past while the period still runs (a plan by the year after its deadline to cancel); once EXPIRED it counts from the renewal day (else the end day) instead, and deadlineKind says which; null when there is no point.',
   }),
   deadlineKind: z.enum(['PAYMENT_DATE', 'NOTICE_DEADLINE', 'RENEWAL_DATE', 'END_DATE']).nullable().meta({
     description:
-      'What daysLeft counts to: the payment day of a plan by the month; by the year, the deadline to cancel, else the renewal day, else the end day.',
+      'What daysLeft counts to: the next payment day of a plan by the month; by the year, the deadline to cancel, else the renewal day, else the end day; once EXPIRED, the renewal day or the end day it counts from.',
   }),
   seats: z
     .strictObject({
