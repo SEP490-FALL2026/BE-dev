@@ -49,6 +49,10 @@ export class SeatMonthSweeper implements OnApplicationBootstrap, OnModuleDestroy
       const done = await this.seatMonths.chargeEndedMonths(await this.organizationReads.businessToday(new Date()));
       if (done.rows > 0)
         this.logger.log(`Charged ${done.rows} seat-month row(s) of ${done.subscriptions} subscription(s)`);
+      if (done.failed > 0)
+        this.logger.warn(
+          `${done.failed} subscription(s) could not be charged for a month; the next pass tries them again`,
+        );
     } catch (error) {
       this.logger.error(`Seat-month pass failed: ${describeForOperator(error)}`, traceForOperator(error));
     } finally {

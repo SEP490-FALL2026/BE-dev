@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import request from 'supertest';
 import { BudgetsApi } from '../../../src/modules/budgets/public/budgets.api';
+import { SeatMonthSubscriptionService } from '../../../src/modules/budgets/seat-month/seat-month-subscription.service';
 import { SeatMonthRepo } from '../../../src/modules/budgets/seat-month/seat-month.repo';
 import { SeatMonthService } from '../../../src/modules/budgets/seat-month/seat-month.service';
 import { takeOwnerOff } from '../../support/shared-pool-subscription';
@@ -259,6 +260,57 @@ describe('a month of the seats of a K2 pool is charged to the departments of the
     expect(await rowsOf(pool, april)).toMatchObject([
       { department_id: unit.department.id, days: 29, amount_minor: '386667' },
     ]);
+  });
+
+  it('SM1-03: a subscription that fails in the pass does not cost the ones after it their month, the next pass charges only what has no mark, and a month charged on request charges every subscription again', async () => {
+    const [first, second, third] = [await newPool(), await newPool(), await newPool()];
+    const unit = await department();
+    for (const pool of [first, second, third]) {
+      await seat(pool, await h.planOf(pool), await holder(`E-SM-RUN${pool.slice(0, 6)}`, unit), {
+        validFrom: `${h.year}-10-01`,
+      });
+    }
+    const subscriptions = h.ctx.app.get(SeatMonthSubscriptionService, { strict: false });
+    const charge = subscriptions.charge.bind(subscriptions);
+    // The second subscription (by id) is the one that fails, whichever pool that is.
+    const failing = [first, second, third].sort()[1];
+    const spy = jest
+      .spyOn(subscriptions, 'charge')
+      .mockImplementation((tx, id, ...rest) =>
+        id === failing ? Promise.reject(new Error('deadlock')) : charge(tx, id, ...rest),
+      );
+    const marks = async () =>
+      (
+        await h.ctx.sql.query<{ subscription_id: string; completed_at: Date }>(
+          `SELECT subscription_id, completed_at FROM seat_month_runs WHERE month = $1 AND subscription_id = ANY($2)`,
+          [month(), [first, second, third]],
+        )
+      ).rows;
+
+    const firstPass = await service().chargeEndedMonths(`${h.year}-11-20`);
+    expect(firstPass.failed).toBeGreaterThanOrEqual(1);
+    expect((await marks()).map((row) => row.subscription_id).sort()).toEqual(
+      [first, second, third].filter((id) => id !== failing).sort(),
+    );
+    expect(await rowsOf(failing)).toEqual([]);
+    for (const pool of [first, second, third].filter((id) => id !== failing))
+      expect(await rowsOf(pool)).toHaveLength(1);
+
+    spy.mockRestore();
+    const before = new Map((await marks()).map((row) => [row.subscription_id, row.completed_at.getTime()]));
+    const secondPass = await service().chargeEndedMonths(`${h.year}-11-20`);
+    const after = new Map((await marks()).map((row) => [row.subscription_id, row.completed_at.getTime()]));
+
+    expect(secondPass.failed).toBe(0);
+    expect(await rowsOf(failing)).toHaveLength(1);
+    expect(after.size).toBe(3);
+    for (const pool of [first, second, third].filter((id) => id !== failing))
+      expect(after.get(pool)).toBe(before.get(pool));
+
+    await service().chargeMonth(month());
+    for (const row of await marks())
+      expect(row.completed_at.getTime()).toBeGreaterThan(before.get(row.subscription_id) ?? 0);
+    for (const pool of [first, second, third]) expect(await rowsOf(pool)).toHaveLength(1);
   });
 
   const facts = async (unit: Unit) =>

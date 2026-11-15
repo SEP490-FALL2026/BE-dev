@@ -85,6 +85,35 @@ export class SeatMonthRepo {
     return rows.map((row) => row.subscriptionId);
   }
 
+  /** Each id of a subscription already charged for the month (its mark is written with its rows): what the sweeper leaves alone. */
+  async completedSubscriptionIds(month: BusinessDate, tx?: DbTx): Promise<Set<string>> {
+    const rows = await (tx ?? this.prisma).seatMonthRun.findMany({
+      where: { month: toDateColumn(month) },
+      select: { subscriptionId: true },
+    });
+
+    return new Set(rows.map((row) => row.subscriptionId));
+  }
+
+  /** Writes the mark that the subscription was charged for the month, or moves it when it is charged again; in the transaction of the charge. */
+  async markCharged(
+    tx: DbTx,
+    input: { organizationId: string; subscriptionId: string; month: BusinessDate; rows: number; now: Date },
+  ): Promise<void> {
+    const month = toDateColumn(input.month);
+    await tx.seatMonthRun.upsert({
+      where: { subscriptionId_month: { subscriptionId: input.subscriptionId, month } },
+      create: {
+        organizationId: input.organizationId,
+        subscriptionId: input.subscriptionId,
+        month,
+        rows: input.rows,
+        completedAt: input.now,
+      },
+      update: { rows: input.rows, completedAt: input.now },
+    });
+  }
+
   async insertMany(tx: DbTx, rows: readonly NewSeatMonthCharge[]): Promise<void> {
     if (rows.length === 0) return;
     await tx.seatMonthCharge.createMany({

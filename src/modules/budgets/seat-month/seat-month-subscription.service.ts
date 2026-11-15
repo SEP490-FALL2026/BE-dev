@@ -77,8 +77,11 @@ export class SeatMonthSubscriptionService {
     await this.replace(tx, year, before, written);
     await this.takeDown(tx, commitmentOf, plan.takenByCommitment);
     if (before.length > 0 || written.length > 0) await this.record(tx, organization.id, subscriptionId, month, written);
+    const rows = written.length + before.length - this.removable(before, written).length;
+    // The mark is written in the transaction of the rows: it exists if and only if this subscription was charged for the month (`SM1-03`).
+    await this.repo.markCharged(tx, { organizationId: organization.id, subscriptionId, month, rows, now });
 
-    return written.length + before.length - this.removable(before, written).length;
+    return rows;
   }
 
   private departmentsOf(seat: SeatToCharge): string[] {

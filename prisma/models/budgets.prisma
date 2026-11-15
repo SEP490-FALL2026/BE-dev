@@ -605,3 +605,20 @@ model SeatMonthCharge {
   @@index([commitmentId])
   @@map("seat_month_charges")
 }
+
+/// FIX-SM1 SM1-03: the mark that one subscription was charged for one month that has ended (written in the same transaction as its seat-month rows),
+/// so the sweeper charges the subscriptions of a month that have no mark and a failure in the middle of a pass never loses the ones after it. A month
+/// charged on request charges every subscription again. The ids of other contexts are values, not foreign keys.
+model SeatMonthRun {
+  id             String   @id @default(uuid(7)) @db.Uuid
+  organizationId String   @map("organization_id") @db.Uuid
+  subscriptionId String   @map("subscription_id") @db.Uuid
+  // The first day of the month.
+  month          DateTime @db.Date
+  rows           Int
+  completedAt    DateTime @map("completed_at") @db.Timestamptz(3)
+
+  @@unique([subscriptionId, month])
+  @@index([month])
+  @@map("seat_month_runs")
+}

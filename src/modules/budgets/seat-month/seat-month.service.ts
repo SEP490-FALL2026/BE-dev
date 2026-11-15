@@ -8,11 +8,13 @@ import { endedMonthsOf } from './seat-month.policy';
 import { SeatMonthRepo } from './seat-month.repo';
 import { SeatMonthSignedGuard } from './seat-month.types';
 
-/** What charging a month did: the subscriptions it looked at, the rows they have now, and whether a signed month made it stop. */
+/** What charging a month did: the subscriptions it charged, the rows they have now, how many failed, and whether a signed month made it stop. */
 export interface SeatMonthResult {
   skipped: boolean;
   subscriptions: number;
   rows: number;
+  /** The subscriptions whose charge failed; a month charged on request throws instead, the sweeper tries them again at its next pass. */
+  failed: number;
 }
 
 const byId = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0);
@@ -20,8 +22,9 @@ const byId = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0);
 /**
  * Charges the seats of the shared pool (`K2`) to the departments of the people who held them, one month at a time (`SM-1`, `QĐ-103k`,
  * `QĐ-111bg`). A month is charged when it has ended; charging it again gives the same rows (the rows of a subscription and a month are replaced
- * together) and applies nothing to a commitment twice, and a month a review period signed is never charged again. Each subscription is charged in
- * a transaction of its own (`SeatMonthSubscriptionService`).
+ * together) and applies nothing to a commitment twice. Each subscription is charged in a transaction of its own that also writes its mark for the month
+ * (`SeatMonthSubscriptionService`): the sweeper charges the subscriptions that have no mark, so one that fails never costs the others their month
+ * (`SM1-03`), while a month charged on request charges every subscription again, which is how a change to the seats after the month is taken in (`QĐ-111ae`).
  */
 @Injectable()
 export class SeatMonthService {
@@ -33,36 +36,64 @@ export class SeatMonthService {
     private readonly subscriptions: SeatMonthSubscriptionService,
   ) {}
 
-  /** Charges every month that has ended and has no row yet, the earliest first: what the sweeper does each hour. */
+  /** Charges the subscriptions of every month that has ended that have no mark for it, the earliest month first: what the sweeper does each hour. */
   async chargeEndedMonths(today: BusinessDate, now: Date = new Date()): Promise<SeatMonthResult> {
-    const total: SeatMonthResult = { skipped: false, subscriptions: 0, rows: 0 };
+    const total: SeatMonthResult = { skipped: false, subscriptions: 0, rows: 0, failed: 0 };
     for (const month of endedMonthsOf(today)) {
-      if ((await this.repo.countOfMonth(month)) > 0) continue;
-      const done = await this.chargeMonth(month, now);
+      const done = await this.charge(month, now, true);
       total.subscriptions += done.subscriptions;
       total.rows += done.rows;
+      total.failed += done.failed;
     }
 
     return total;
   }
 
-  /** Charges one month (the first day of it), each subscription in a transaction of its own. A month already signed is left as it is. */
+  /**
+   * Charges one month (the first day of it) for every subscription, each in a transaction of its own; a subscription that fails does not stop the others,
+   * and the first failure is thrown after they were all tried. A month already signed is left as it is.
+   */
   async chargeMonth(month: BusinessDate, now: Date = new Date()): Promise<SeatMonthResult> {
-    if (await this.signed.isSigned(month)) return { skipped: true, subscriptions: 0, rows: 0 };
+    const done = await this.charge(month, now, false);
+    if (done.firstFailure !== undefined) throw done.firstFailure;
+
+    return done;
+  }
+
+  private async charge(
+    month: BusinessDate,
+    now: Date,
+    onlyMissing: boolean,
+  ): Promise<SeatMonthResult & { firstFailure?: Error }> {
+    if (await this.signed.isSigned(month)) return { skipped: true, subscriptions: 0, rows: 0, failed: 0 };
     const seatsBySubscription = new Map<string, SeatOfMonth[]>();
     for (const seat of await this.licensing.getSeatsOfMonth(month)) {
       seatsBySubscription.set(seat.subscriptionId, [...(seatsBySubscription.get(seat.subscriptionId) ?? []), seat]);
     }
+    const marked = onlyMissing ? await this.repo.completedSubscriptionIds(month) : new Set<string>();
     const subscriptionIds = [
       ...new Set([...seatsBySubscription.keys(), ...(await this.repo.subscriptionIdsOfMonth(month))]),
-    ].sort(byId);
-    let rows = 0;
+    ]
+      .filter((subscriptionId) => !marked.has(subscriptionId))
+      .sort(byId);
+    const result: SeatMonthResult & { firstFailure?: Error } = {
+      skipped: false,
+      subscriptions: 0,
+      rows: 0,
+      failed: 0,
+    };
     for (const subscriptionId of subscriptionIds) {
-      rows += await this.runner.run((tx) =>
-        this.subscriptions.charge(tx, subscriptionId, month, seatsBySubscription.get(subscriptionId) ?? [], now),
-      );
+      try {
+        result.rows += await this.runner.run((tx) =>
+          this.subscriptions.charge(tx, subscriptionId, month, seatsBySubscription.get(subscriptionId) ?? [], now),
+        );
+        result.subscriptions += 1;
+      } catch (error) {
+        result.failed += 1;
+        result.firstFailure ??= error instanceof Error ? error : new Error(String(error));
+      }
     }
 
-    return { skipped: false, subscriptions: subscriptionIds.length, rows };
+    return result;
   }
 }
