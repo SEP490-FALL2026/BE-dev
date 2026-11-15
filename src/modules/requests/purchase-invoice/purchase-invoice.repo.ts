@@ -58,6 +58,10 @@ export interface NewPurchaseInvoice {
   deductibleTaxMinor: bigint;
   nonDeductibleTaxMinor: bigint;
   matchResult: 'MATCHED' | 'PRICE_QUANTITY_EXCEPTION';
+  /** What the invoice was read against (R-44); null for a side nobody knew. */
+  expectedQuantity: number | null;
+  expectedUnitPriceOriginalMinor: bigint | null;
+  expectedUnitPriceOriginalCurrency: string | null;
   paymentSource: 'COMPANY_CARD' | 'IT_ADVANCE';
   flags: string[];
   chargedCostCenterId: string | null;
@@ -177,6 +181,9 @@ export class PurchaseInvoiceRepo {
         deductibleTaxMinor: input.deductibleTaxMinor,
         nonDeductibleTaxMinor: input.nonDeductibleTaxMinor,
         matchResult: input.matchResult,
+        expectedQuantity: input.expectedQuantity,
+        expectedUnitPriceOriginalMinor: input.expectedUnitPriceOriginalMinor,
+        expectedUnitPriceOriginalCurrency: input.expectedUnitPriceOriginalCurrency,
         paymentSource: input.paymentSource,
         flags: input.flags,
         chargedCostCenterId: input.chargedCostCenterId,

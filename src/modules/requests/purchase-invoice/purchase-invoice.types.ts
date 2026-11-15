@@ -27,6 +27,8 @@ export interface PurchaseInvoicePlan {
   serviceMonth: BusinessDate;
   period: PurchaseInvoiceLabelResult;
   match: PurchaseInvoiceMatch;
+  /** What the invoice was read against: the seats or the count bought, and the price of one in its original currency; null for a side nobody knows. */
+  expected: { quantity: number | null; unitPrice: OriginalPrice | null };
   /** The Cost Center that bears the expense (`R-51`); null for an invoice of a subscription. */
   chargedCostCenterId: string | null;
   /** The commitment of the year of the service month this invoice goes into, and what is left of it; null when it goes nowhere into a commitment. */

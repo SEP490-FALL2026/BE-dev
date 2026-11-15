@@ -1,3 +1,5 @@
+import { API_COVERAGE_PURCHASE } from './api-coverage-manifest-purchase';
+
 /** Inventory of exported HTTP operations. Add entries and HTTP tests together. */
 export const API_COVERAGE_MANIFEST: readonly string[] = [
   'GET /api/v1/cost-centers',
@@ -109,14 +111,7 @@ export const API_COVERAGE_MANIFEST: readonly string[] = [
   'POST /api/v1/access-requests/{id}/spend-approval',
   'POST /api/v1/spend-batches/{id}/decisions',
   'GET /api/v1/grant-queue',
-  'POST /api/v1/purchase-invoices/preview',
-  'POST /api/v1/purchase-invoices',
-  'POST /api/v1/purchase-invoices/{id}/resubmission',
-  'GET /api/v1/purchase-invoices',
-  'GET /api/v1/purchase-invoices/missing-periods',
-  'GET /api/v1/purchase-invoices/{id}',
-  'POST /api/v1/purchase-invoices/{id}/confirmation',
-  'POST /api/v1/purchase-invoices/{id}/return',
+  ...API_COVERAGE_PURCHASE,
   'GET /api/v1/stock-summary',
   'GET /api/v1/budget-cycles',
   'POST /api/v1/budget-cycles',

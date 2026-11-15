@@ -204,6 +204,7 @@ export class PurchaseInvoicePlanService {
       serviceMonth,
       period,
       match,
+      expected: { quantity: facts.expectedQuantity, unitPrice: facts.expectedUnitPrice },
       chargedCostCenterId,
       commitment,
       flags: flagsOfPurchaseInvoice({

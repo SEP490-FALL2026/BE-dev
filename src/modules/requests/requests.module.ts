@@ -33,7 +33,11 @@ import { RequestCommitmentFacts } from './spend/commitment-request-facts.listene
 import { RequestDraftService } from './draft/request-draft.service';
 import { RequestDraftSubmitService } from './draft/request-draft-submit.service';
 import { RequestDraftsController } from './draft/request-drafts.controller';
-import { RequestOutcomeListeners, TransferGraceHoldContributions } from './public/requests.extension-points';
+import {
+  InvoiceDiscrepancyReferralListeners,
+  RequestOutcomeListeners,
+  TransferGraceHoldContributions,
+} from './public/requests.extension-points';
 import { RequestOutcomeService } from './outcome/request-outcome.service';
 import { AssessmentRepo } from './assessment/assessment.repo';
 import { AssessmentCompletionService } from './assessment/assessment-completion.service';
@@ -187,6 +191,11 @@ import { RequestReadRepo } from './request-view/request-read.repo';
 import { MyRequestsFactsRepo } from './my-requests/my-requests-facts.repo';
 import { MyRequestsRepo } from './my-requests/my-requests.repo';
 import { MyRequestsService } from './my-requests/my-requests.service';
+import { InvoiceDiscrepanciesController } from './invoice-discrepancy-queue/invoice-discrepancies.controller';
+import { InvoiceDiscrepancyQueryService } from './invoice-discrepancy-queue/invoice-discrepancy-query.service';
+import { InvoiceDiscrepancyClosureService } from './invoice-discrepancy/invoice-discrepancy-closure.service';
+import { InvoiceDiscrepancyOpeningService } from './invoice-discrepancy/invoice-discrepancy-opening.service';
+import { InvoiceDiscrepancyRepo } from './invoice-discrepancy/invoice-discrepancy.repo';
 import { PurchaseInvoicePlanService } from './purchase-invoice/purchase-invoice-plan.service';
 import { PurchaseInvoiceFacts } from './purchase-invoice/purchase-invoice-facts.listener';
 import { PurchaseInvoiceMissingPeriodsQueryService } from './purchase-invoice/purchase-invoice-missing-periods-query.service';
@@ -244,6 +253,7 @@ import { PurchaseInvoicesController } from './purchase-invoice/purchase-invoices
     RenewalRequestsController,
     PurchaseInvoicesController,
     PurchaseInvoiceDecisionsController,
+    InvoiceDiscrepanciesController,
     ControlledWaitController,
     RequestTimingsController,
     CongestionController,
@@ -372,6 +382,12 @@ import { PurchaseInvoicesController } from './purchase-invoice/purchase-invoices
     PurchaseInvoiceMissingPeriodsQueryService,
     PurchaseInvoiceFacts,
     PurchaseInvoiceConfirmationService,
+    // The case of an invoice that differs (`SBF-11a`): opened when Finance signs, read and closed here, and the extension point a suspicion is sent on through.
+    InvoiceDiscrepancyRepo,
+    InvoiceDiscrepancyOpeningService,
+    InvoiceDiscrepancyClosureService,
+    InvoiceDiscrepancyQueryService,
+    InvoiceDiscrepancyReferralListeners,
     RenewalApplyService,
     RenewalRequestTrail,
     RenewalHoldReader,
@@ -425,6 +441,7 @@ import { PurchaseInvoicesController } from './purchase-invoice/purchase-invoices
     RequestsApi,
     RequestOutcomeListeners,
     TransferGraceHoldContributions,
+    InvoiceDiscrepancyReferralListeners,
     RequestsDashboardApi,
     RequestsAiSourceApi,
   ],

@@ -71,3 +71,44 @@ export class TransferGraceHoldContributions extends Contributions<TransferGraceH
     super('requests.transfer-grace-hold');
   }
 }
+
+/**
+ * A case of an invoice that differs that Finance closed as a suspicion that the software was paid for outside the process (`RC-1`, `QĐ-111y`, `R-29`):
+ * what the invoice says and what was approved or bought, side by side, and the money Finance could not account for. The review of the accounts
+ * at the vendor (`SBF-08`) takes it up as a case of its own.
+ */
+export interface InvoiceDiscrepancyReferral {
+  organizationId: string;
+  caseId: string;
+  purchaseInvoiceId: string;
+  vendorId: string;
+  /** The request or the subscription the invoice was for: one of them. */
+  requestId: string | null;
+  subscriptionId: string | null;
+  /** What differs: the count of seats, the price of one, or both; in a fixed order. */
+  mismatches: Array<'QUANTITY' | 'UNIT_PRICE'>;
+  /** The count the invoice states and the count that was approved or bought; null for a side nobody knew. */
+  quantity: { invoice: number; expected: number | null };
+  /** The price of one the invoice states and the one of the plan or subscription, in the currency each is stated in, in minor units. */
+  unitPrice: {
+    invoice: { amountMinor: bigint; currency: string };
+    expected: { amountMinor: bigint; currency: string } | null;
+  };
+  /** What Finance could not account for, in dong. */
+  differenceMinor: bigint;
+  reason: string;
+  closedByEmployeeId: string;
+  closedAt: Date;
+}
+
+/**
+ * The contexts that take up a case closed as a suspicion (the usage context: the accounts at the vendor against the rights on record), told in the
+ * transaction in which Finance closes it, so a closed case is never left without the entry it was sent on as, and a listener that throws undoes the
+ * closing. They are added when their module starts, so requests never imports them.
+ */
+@Injectable()
+export class InvoiceDiscrepancyReferralListeners extends Listeners<InvoiceDiscrepancyReferral, DbTx> {
+  constructor() {
+    super('requests.invoice-discrepancy-referral');
+  }
+}

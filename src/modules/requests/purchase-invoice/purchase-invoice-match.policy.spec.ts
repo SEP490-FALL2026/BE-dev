@@ -1,4 +1,4 @@
-import { matchPurchaseInvoice } from './purchase-invoice-match.policy';
+import { matchPurchaseInvoice, mismatchesOfRow } from './purchase-invoice-match.policy';
 
 /** T-PI: Figma, 10 seats at 15 USD each; the commitment is 3.750.000 đ and the card took 3.840.000 đ in VND (R-44). */
 const FIGMA = {
@@ -85,5 +85,34 @@ describe('purchase invoice match with what was approved or bought (R-44; T-PI)',
         unitPriceOriginal: { amountMinor: 1500n, currency: 'USD' },
       }),
     ).toEqual({ result: 'MATCHED', reasons: [] });
+  });
+});
+
+describe('what differs on an invoice that was kept (RC-1: the case names the sides that do not match)', () => {
+  const kept = {
+    quantity: 12,
+    unitPriceOriginalMinor: 1500n,
+    unitPriceOriginalCurrency: 'USD',
+    expectedQuantity: 10 as number | null,
+    expectedUnitPriceOriginalMinor: 1500n as bigint | null,
+    expectedUnitPriceOriginalCurrency: 'USD' as string | null,
+  };
+
+  it('is the count, the price, or both, in that order, read from the columns of the invoice', () => {
+    expect(mismatchesOfRow(kept)).toEqual(['QUANTITY']);
+    expect(mismatchesOfRow({ ...kept, quantity: 10, unitPriceOriginalMinor: 1600n })).toEqual(['UNIT_PRICE']);
+    expect(mismatchesOfRow({ ...kept, unitPriceOriginalCurrency: 'EUR' })).toEqual(['QUANTITY', 'UNIT_PRICE']);
+  });
+
+  it('is nothing when the invoice matches, and nothing for a side that was not known', () => {
+    expect(mismatchesOfRow({ ...kept, quantity: 10 })).toEqual([]);
+    expect(
+      mismatchesOfRow({
+        ...kept,
+        expectedQuantity: null,
+        expectedUnitPriceOriginalMinor: null,
+        expectedUnitPriceOriginalCurrency: null,
+      }),
+    ).toEqual([]);
   });
 });

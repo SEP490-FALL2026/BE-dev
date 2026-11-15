@@ -43,3 +43,26 @@ export function matchPurchaseInvoice(input: PurchaseInvoiceMatchInput): Purchase
 
   return { result: reasons.length === 0 ? 'MATCHED' : 'PRICE_QUANTITY_EXCEPTION', reasons };
 }
+
+/** The columns of a purchase invoice that was kept which the match reads: what it says, and what it was read against (null for a side nobody knew). */
+export interface KeptPurchaseInvoiceFigures {
+  quantity: number;
+  unitPriceOriginalMinor: bigint;
+  unitPriceOriginalCurrency: string;
+  expectedQuantity: number | null;
+  expectedUnitPriceOriginalMinor: bigint | null;
+  expectedUnitPriceOriginalCurrency: string | null;
+}
+
+/** What differs on an invoice already kept, judged by the same rule as when it was submitted, so the case of an invoice that differs names it. */
+export function mismatchesOfRow(row: KeptPurchaseInvoiceFigures): PurchaseInvoiceMismatch[] {
+  return matchPurchaseInvoice({
+    quantity: row.quantity,
+    unitPriceOriginal: { amountMinor: row.unitPriceOriginalMinor, currency: row.unitPriceOriginalCurrency },
+    expectedQuantity: row.expectedQuantity,
+    expectedUnitPrice:
+      row.expectedUnitPriceOriginalMinor !== null && row.expectedUnitPriceOriginalCurrency !== null
+        ? { amountMinor: row.expectedUnitPriceOriginalMinor, currency: row.expectedUnitPriceOriginalCurrency }
+        : null,
+  }).reasons;
+}

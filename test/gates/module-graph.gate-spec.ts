@@ -209,6 +209,8 @@ const PUBLIC_CONTRACT_EXPORTS: ReadonlySet<string> = new Set([
   'RequestsModule: RequestOutcomeListeners',
   // MF3-C.3 (QĐ-110q, R-49): the extension point the personnel context adds its answer to — a person in the grace of a transfer who holds the software asked for (public/requests.extension-points.ts).
   'RequestsModule: TransferGraceHoldContributions',
+  // RC-1 (QĐ-111y, R-29): the extension point the review of the accounts at the vendor adds its listener to — a case of an invoice that differs closed as a suspicion (public/requests.extension-points.ts).
+  'RequestsModule: InvoiceDiscrepancyReferralListeners',
   // The two entry services of `pnpm ops:recover` (Q6; E7): the holder's own account, and the role transfer.
   'IdentityAccessRecoveryCliModule: HolderRecoveryApi',
   'IdentityAccessRecoveryCliModule: RoleTransferRecoveryApi',

@@ -420,11 +420,12 @@ describe('the layers of requests, as the command prints them and as the module c
   };
 
   // 39 until 09/11/2026; then request-limits (GH-1/2/3), renewal-apply and request-history (P1-09/P1-10) made 42; service-account-request left (QĐ-110m): 41;
-  // catalog-link left assessment (FIX-B2a, B2A-R1: the folder was at the 25 files of the cap): 42.
-  test('prints one line with a layer for each of the 42 capabilities, every one in exactly one layer', () => {
+  // catalog-link left assessment (FIX-B2a, B2A-R1: the folder was at the 25 files of the cap): 42; purchase-invoice (PI-1) made 43, and invoice-discrepancy with
+  // invoice-discrepancy-queue (RC-1: the case is opened by the signature of purchase-invoice, a capability with a controller, so it has none) made 45.
+  test('prints one line with a layer for each of the 45 capabilities, every one in exactly one layer', () => {
     assert.equal(printed.status, 0);
-    assert.equal(lines.length, 42);
-    assert.equal(new Set(lines.map(([, , name]) => name)).size, 42);
+    assert.equal(lines.length, 45);
+    assert.equal(new Set(lines.map(([, , name]) => name)).size, 45);
   });
 
   test('marks as isolated, and only as such, the capability that imports nothing and that nothing imports', () => {

@@ -6,6 +6,8 @@ import { AuditApi } from '../../../audit/public/audit.api';
 import { BudgetsApi } from '../../../budgets/public/budgets.api';
 import { PurchaseInvoiceRecordRefusedError } from '../../../budgets/public/budgets.errors';
 import { NotificationsApi } from '../../../notifications/public/notifications.api';
+import { InvoiceDiscrepancyOpeningService } from '../../invoice-discrepancy/invoice-discrepancy-opening.service';
+import { mismatchesOfRow } from '../purchase-invoice-match.policy';
 import { PurchaseInvoiceRefusedError } from '../purchase-invoice.errors';
 import { PurchaseInvoiceRepo, type PurchaseInvoiceRow } from '../purchase-invoice.repo';
 
@@ -15,8 +17,8 @@ import { PurchaseInvoiceRepo, type PurchaseInvoiceRow } from '../purchase-invoic
  * card) is not asked of anyone again. The person who submitted it never signs it. Returning needs a reason and writes nothing. The row is
  * locked first, so two decisions of one invoice queue and the second finds it decided.
  *
- * An invoice whose count or price of one differs from what was approved or bought (`PRICE_QUANTITY_EXCEPTION`) is signed all the same and its
- * mark goes onto the invoice it writes; the case of `SBF-11a` that Finance works from it is opened by `RC-1`, which hooks in here.
+ * An invoice whose count or price of one differs from what was approved or bought (`PRICE_QUANTITY_EXCEPTION`) is signed all the same: its
+ * mark goes onto the invoice it writes, and in the same transaction the case of `SBF-11a` that Finance works from it is opened (`RC-1`).
  */
 @Injectable()
 export class PurchaseInvoiceConfirmationService {
@@ -26,6 +28,7 @@ export class PurchaseInvoiceConfirmationService {
     private readonly budgets: BudgetsApi,
     private readonly notifications: NotificationsApi,
     private readonly audit: AuditApi,
+    private readonly discrepancies: InvoiceDiscrepancyOpeningService,
   ) {}
 
   /** Throws PurchaseInvoiceRefusedError (NOT_FOUND, NOT_SUBMITTED, SAME_PERSON, NUMBER_TAKEN, NO_PLACE). */
@@ -39,6 +42,7 @@ export class PurchaseInvoiceConfirmationService {
         throw new PurchaseInvoiceRefusedError('NOT_SUBMITTED');
       }
       await this.trail(tx, actor, row, 'CONFIRMED', { invoiceId: recorded.invoiceId, booking: recorded.booking });
+      if (row.matchResult === 'PRICE_QUANTITY_EXCEPTION') await this.openCase(tx, actor, row, now);
       await this.tell(tx, row, 'PURCHASE_INVOICE_CONFIRMED');
 
       return (await this.invoices.find(id, tx)) as PurchaseInvoiceRow;
@@ -56,6 +60,16 @@ export class PurchaseInvoiceConfirmationService {
       await this.tell(tx, row, 'PURCHASE_INVOICE_RETURNED');
 
       return (await this.invoices.find(id, tx)) as PurchaseInvoiceRow;
+    });
+  }
+
+  /** The case Finance works from an invoice whose count or price differs, opened in the transaction that signs it (`RC-1`). */
+  private async openCase(tx: DbTx, actor: AuthenticatedPrincipal, row: PurchaseInvoiceRow, now: Date): Promise<void> {
+    await this.discrepancies.open(tx, actor, {
+      organizationId: row.organizationId,
+      purchaseInvoiceId: row.id,
+      mismatches: mismatchesOfRow(row),
+      now,
     });
   }
 
