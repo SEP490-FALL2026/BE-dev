@@ -130,6 +130,16 @@ describe('a version built from the baseline (integration, real PostgreSQL)', () 
     await h.sendVersion(made.id).expect(200);
   });
 
+  it('flags a version of the older kind, made when nobody headed the department, as one with no proposal just like the new kind (QĐ-104f; FIX-LB3 LBG-06)', async () => {
+    const department = await headless();
+    const made = h.dataOf<VersionBody>(await create(baselineBody(department)).expect(201)).version;
+    await h.ctx.sql.query(`UPDATE budget_versions SET origin = 'BASELINE_NO_HEAD' WHERE id = $1`, [made.id]);
+
+    const read = h.dataOf<VersionBody>(await h.versionOf(made.id).expect(200)).version;
+
+    expect(read).toMatchObject({ origin: 'BASELINE_NO_HEAD', noProposalSubmitted: true });
+  });
+
   describe('the red flag compares the base and the reserve together with what is carried over (QĐ-111ac, C-09, QT 4.6; FIX-LB3 LBG-01)', () => {
     const flagsOf = async (department: Department, versionId: string) => {
       const read = h.dataOf<VersionBody>(await h.versionOf(versionId).expect(200)).version;

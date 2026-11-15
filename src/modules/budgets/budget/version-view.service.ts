@@ -97,7 +97,8 @@ export class VersionViewService {
           carriedOverNextYear: money(carriedOver(version)),
           belowCarriedOver: belowCarriedOver(version, carriedOver(version)),
           carriedOverShortfall: money(carriedOverShortfall(version, carriedOver(version))),
-          noProposalSubmitted: version.origin === 'BASELINE_NO_PROPOSAL',
+          // The version Finance built from the baseline: the department had no proposal, or no head to send one (the older kind, `QĐ-104f`).
+          noProposalSubmitted: version.origin === 'BASELINE_NO_PROPOSAL' || version.origin === 'BASELINE_NO_HEAD',
           reserveReason: version.reserveReason,
           baseReason: version.baseReason,
           origin: version.origin,
