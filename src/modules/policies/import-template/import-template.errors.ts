@@ -14,6 +14,14 @@ export class ImportTemplateForbiddenError extends Error {
   }
 }
 
+/** The kind has a template, but not in the format asked: the parser of that file does not read it. */
+export class ImportTemplateFormatNotSupportedError extends Error {
+  constructor(readonly formats: readonly string[]) {
+    super(`This file is read in ${formats.join(' or ')} only.`);
+    this.name = 'ImportTemplateFormatNotSupportedError';
+  }
+}
+
 /** A module gave a definition whose example rows do not fit its columns: a mistake in the code of that module, never an answer to a caller. */
 export class ImportTemplateDefinitionError extends Error {
   constructor(kind: string, problems: readonly string[]) {

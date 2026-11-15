@@ -27,6 +27,7 @@ const name = {
 const definition: ImportTemplateDefinition = {
   kind: 'employees',
   title: 'Danh sách nhân viên',
+  formats: ['xlsx', 'csv'],
   columns: [code, name],
   sampleRows: [
     ['NV001', 'Nguyễn, Văn A'],
@@ -89,6 +90,7 @@ describe('definitionProblems', () => {
       'column employee_code is written twice',
     ]);
     expect(definitionProblems({ ...definition, sampleRows: [] })).toEqual(['no example row']);
+    expect(definitionProblems({ ...definition, formats: [] })).toEqual(['no format']);
   });
 });
 

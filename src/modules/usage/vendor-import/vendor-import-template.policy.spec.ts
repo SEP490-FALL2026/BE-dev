@@ -16,7 +16,7 @@ describe('the template of the usage report', () => {
   it('reads back with one row per example line, each with its identifier and last day of activity', async () => {
     const sources = new ImportTemplateContributions();
     sources.add('test', { definitions: () => [USAGE_REPORT_TEMPLATE] });
-    const file = await new ImportTemplateService(sources).build('usage-csv', 'csv', ['IT_ADMIN']);
+    const file = await new ImportTemplateService(sources).build('usage-csv', undefined, ['IT_ADMIN']);
 
     const report = readCsvReport(file.bytes.toString('utf8'), source);
 

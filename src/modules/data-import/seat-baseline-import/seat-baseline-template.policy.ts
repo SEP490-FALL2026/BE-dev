@@ -6,6 +6,7 @@ import type { ImportTemplateDefinition } from '../../policies/public/policies.ty
  */
 export const SEAT_BASELINE_TEMPLATE: ImportTemplateDefinition = {
   kind: 'seat-baseline',
+  formats: ['csv'],
   title: 'Hiện trạng ai đang giữ seat của một gói',
   columns: [
     {

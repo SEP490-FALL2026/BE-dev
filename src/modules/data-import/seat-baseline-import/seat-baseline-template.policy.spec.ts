@@ -25,23 +25,33 @@ const facts: SeatFacts = {
   existing: [],
 };
 
-async function csvOf() {
+async function fileOf(format: 'xlsx' | 'csv' | undefined) {
   const sources = new ImportTemplateContributions();
   sources.add('test', { definitions: () => [SEAT_BASELINE_TEMPLATE] });
 
-  return new ImportTemplateService(sources).build('seat-baseline', 'csv', ['IT_ADMIN']);
+  return new ImportTemplateService(sources).build('seat-baseline', format, ['IT_ADMIN']);
 }
 
 /** The template of the seat baseline file is read back by the reader and the judge of the import (`QĐ-111as`). */
 describe('the template of the seat baseline file', () => {
-  it('reads back with no header ignored and every example row valid', async () => {
-    const read = readSeatFile((await csvOf()).bytes);
+  it.each(SEAT_BASELINE_TEMPLATE.formats)(
+    'reads back as %s, a format the reader reads, with every example row valid',
+    async (format) => {
+      const read = readSeatFile((await fileOf(format)).bytes);
 
-    expect(read.ignored).toEqual([]);
-    expect(read.rows).toHaveLength(SEAT_BASELINE_TEMPLATE.sampleRows.length);
-    const judged = judgeSeatRows(read.rows, facts);
-    expect(judged.map((row) => row.errors)).toEqual([[], []]);
-    expect(judged.map((row) => row.outcome)).toEqual(['VALID', 'VALID']);
+      expect(read.ignored).toEqual([]);
+      expect(read.rows).toHaveLength(SEAT_BASELINE_TEMPLATE.sampleRows.length);
+      const judged = judgeSeatRows(read.rows, facts);
+      expect(judged.map((row) => row.errors)).toEqual([[], []]);
+      expect(judged.map((row) => row.outcome)).toEqual(['VALID', 'VALID']);
+    },
+  );
+
+  it('is the file in the format the reader reads when the caller names none', async () => {
+    const file = await fileOf(undefined);
+
+    expect(file.fileName).toBe('mau-seat-baseline.csv');
+    expect(SEAT_BASELINE_TEMPLATE.formats).toEqual(['csv']);
   });
 
   it('has the columns the reader reads, in its order', () => {

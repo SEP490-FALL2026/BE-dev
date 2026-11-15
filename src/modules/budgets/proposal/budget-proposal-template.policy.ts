@@ -8,6 +8,7 @@ import type { ImportTemplateDefinition } from '../../policies/public/policies.ty
  */
 export const BUDGET_PROPOSAL_TEMPLATE: ImportTemplateDefinition = {
   kind: 'budget-proposal',
+  formats: ['xlsx'],
   title: 'Biểu mẫu BM-10: đề nghị ngân sách phần mềm năm của phòng',
   columns: [
     {

@@ -11,7 +11,7 @@ const lookup: EmployeeImportLookup = {
   own: null,
 };
 
-async function fileOf(format: 'xlsx' | 'csv') {
+async function fileOf(format: 'xlsx' | 'csv' | undefined) {
   const sources = new ImportTemplateContributions();
   sources.add('test', { definitions: () => [EMPLOYEE_IMPORT_TEMPLATE] });
 
@@ -20,7 +20,7 @@ async function fileOf(format: 'xlsx' | 'csv') {
 
 /** The template of the people file is read back by the parser and the judge of the import, so it cannot drift from them (`QĐ-111as`). */
 describe('the template of the people file', () => {
-  it.each(['xlsx', 'csv'] as const)(
+  it.each(EMPLOYEE_IMPORT_TEMPLATE.formats)(
     'reads back as %s with every example row valid and no header ignored',
     async (format) => {
       const file = await fileOf(format);

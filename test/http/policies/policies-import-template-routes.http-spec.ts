@@ -46,17 +46,49 @@ describe('import template route (http contract, no database)', () => {
     expect(bodyOf(response).error.code).toBe('AUTHENTICATION_REQUIRED');
   });
 
-  it.each(ALLOWED)('gives %s to %s as xlsx by default and as csv when asked', async (kind, role) => {
-    const xlsx = await get(kind, role).expect(200);
-    expect(xlsx.headers['content-type']).toContain(XLSX);
-    expect(xlsx.headers['content-disposition']).toContain(`mau-${kind}.xlsx`);
-    expect((xlsx.body as Buffer).subarray(0, 2).toString()).toBe('PK');
+  /** The formats the parser of each kind reads, the first being the one given when none is asked for (LB3-01). */
+  const FORMATS: Record<string, readonly ('xlsx' | 'csv')[]> = {
+    employees: ['xlsx', 'csv'],
+    'seat-baseline': ['csv'],
+    'license-keys': ['csv'],
+    'usage-csv': ['csv'],
+    'budget-proposal': ['xlsx'],
+  };
 
-    const csv = await get(kind, role, '?format=csv').expect(200);
-    expect(csv.headers['content-type']).toContain('text/csv');
-    expect(csv.headers['content-disposition']).toContain(`mau-${kind}.csv`);
-    expect((csv.body as Buffer).subarray(0, 3)).toEqual(Buffer.from([0xef, 0xbb, 0xbf]));
+  it.each(ALLOWED)('gives %s to %s in the format its parser reads, by default and when asked', async (kind, role) => {
+    const [first] = FORMATS[kind];
+    const byDefault = await get(kind, role).expect(200);
+    expect(byDefault.headers['content-disposition']).toContain(`mau-${kind}.${first}`);
+
+    for (const format of FORMATS[kind]) {
+      const asked = await get(kind, role, `?format=${format}`).expect(200);
+      const body = asked.body as Buffer;
+      expect(asked.headers['content-type']).toContain(format === 'xlsx' ? XLSX : 'text/csv');
+      expect(asked.headers['content-disposition']).toContain(`mau-${kind}.${format}`);
+      if (format === 'xlsx') expect(body.subarray(0, 2).toString()).toBe('PK');
+      else expect(body.subarray(0, 3)).toEqual(Buffer.from([0xef, 0xbb, 0xbf]));
+    }
   });
+
+  it.each([
+    ['seat-baseline', 'IT_ADMIN', 'xlsx'],
+    ['license-keys', 'IT_ADMIN', 'xlsx'],
+    ['usage-csv', 'IT_ADMIN', 'xlsx'],
+    ['budget-proposal', 'FINANCE', 'csv'],
+  ])(
+    'refuses %s to %s as %s, which its parser does not read (422 with the formats it reads)',
+    async (kind, role, format) => {
+      const response = await get(kind, role, `?format=${format}`);
+
+      expect(response.status).toBe(422);
+      const error = (
+        JSON.parse((response.body as Buffer).toString('utf8')) as {
+          error: { code: string; details: { formats: string[] } };
+        }
+      ).error;
+      expect([error.code, error.details.formats]).toEqual(['IMPORT_TEMPLATE.FORMAT_NOT_SUPPORTED', FORMATS[kind]]);
+    },
+  );
 
   it.each([
     ['employees', 'IT_ADMIN'],
@@ -78,10 +110,10 @@ describe('import template route (http contract, no database)', () => {
     }
   });
 
-  it('has the example rows of the budget form in the csv', async () => {
-    const csv = (await get('budget-proposal', 'FINANCE', '?format=csv').expect(200)).body as Buffer;
+  it('has the header the seat reader reads in the csv it gives by default', async () => {
+    const csv = (await get('seat-baseline', 'IT_ADMIN').expect(200)).body as Buffer;
 
-    expect(csv.toString('utf8')).toContain('software,plan,seats,monthly_price_vnd,months,amount_vnd,reason');
+    expect(csv.toString('utf8')).toContain('employee_code,account_identifier,kind,granted_on,expected_end_date');
   });
 
   it.each([['bank-statement'], ['employee'], ['EMPLOYEES']])(

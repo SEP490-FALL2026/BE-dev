@@ -9,7 +9,7 @@ describe('the template of the license key batch', () => {
   it('has keys the batch judge accepts, none repeated', async () => {
     const sources = new ImportTemplateContributions();
     sources.add('test', { definitions: () => [LICENSE_KEY_TEMPLATE] });
-    const file = await new ImportTemplateService(sources).build('license-keys', 'csv', ['IT_ADMIN']);
+    const file = await new ImportTemplateService(sources).build('license-keys', undefined, ['IT_ADMIN']);
 
     const [header, ...lines] = parseCsvRows(file.bytes.toString('utf8'), { maxRows: 100 });
     const judged = judgeBatch(lines.map((line) => line.cells[0] ?? ''));

@@ -6,6 +6,7 @@ import type { ImportTemplateDefinition } from '../../policies/public/policies.ty
  */
 export const EMPLOYEE_IMPORT_TEMPLATE: ImportTemplateDefinition = {
   kind: 'employees',
+  formats: ['xlsx', 'csv'],
   title: 'Danh sách nhân viên (hồ sơ nhân sự)',
   columns: [
     {

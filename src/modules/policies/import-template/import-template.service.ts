@@ -1,10 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import ExcelJS from 'exceljs';
-import type { ImportTemplateDefinition, ImportTemplateKind } from '../public/policies.types';
+import type { ImportTemplateDefinition, ImportTemplateFormat, ImportTemplateKind } from '../public/policies.types';
 import { ImportTemplateContributions } from '../public/policies.extension-points';
 import {
   ImportTemplateDefinitionError,
   ImportTemplateForbiddenError,
+  ImportTemplateFormatNotSupportedError,
   ImportTemplateNotAvailableError,
 } from './import-template.errors';
 import {
@@ -13,7 +14,6 @@ import {
   guideRowsOf,
   templateCsvOf,
   templateFileName,
-  type ImportTemplateFormat,
 } from './import-template.policy';
 
 export interface TemplateFile {
@@ -34,10 +34,13 @@ const CSV_TYPE = 'text/csv; charset=utf-8';
 export class ImportTemplateService {
   constructor(private readonly sources: ImportTemplateContributions) {}
 
-  /** Throws ImportTemplateNotAvailableError, ImportTemplateForbiddenError and ImportTemplateDefinitionError. */
+  /**
+   * Throws ImportTemplateNotAvailableError, ImportTemplateForbiddenError, ImportTemplateFormatNotSupportedError and
+   * ImportTemplateDefinitionError. Without a format it is the one the parser reads first.
+   */
   async build(
     kind: ImportTemplateKind,
-    format: ImportTemplateFormat,
+    askedFormat: ImportTemplateFormat | undefined,
     callerRoles: readonly string[],
   ): Promise<TemplateFile> {
     const definition = this.sources
@@ -48,6 +51,8 @@ export class ImportTemplateService {
     if (!canDownloadTemplate(kind, callerRoles)) throw new ImportTemplateForbiddenError();
     const problems = definitionProblems(definition);
     if (problems.length > 0) throw new ImportTemplateDefinitionError(kind, problems);
+    const format = askedFormat ?? definition.formats[0];
+    if (!definition.formats.includes(format)) throw new ImportTemplateFormatNotSupportedError(definition.formats);
 
     return {
       fileName: templateFileName(kind, format),

@@ -6,6 +6,7 @@ import type { ImportTemplateDefinition } from '../../policies/public/policies.ty
  */
 export const LICENSE_KEY_TEMPLATE: ImportTemplateDefinition = {
   kind: 'license-keys',
+  formats: ['csv'],
   title: 'Lô khóa bản quyền của một lần mua K4',
   columns: [
     {

@@ -13,6 +13,7 @@ export const USAGE_TEMPLATE_COLUMNS: SourceTemplate['columns'] = {
 
 export const USAGE_REPORT_TEMPLATE: ImportTemplateDefinition = {
   kind: 'usage-csv',
+  formats: ['csv'],
   title: 'Báo cáo sử dụng xuất từ trang quản trị của nhà cung cấp',
   columns: [
     {

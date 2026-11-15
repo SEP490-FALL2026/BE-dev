@@ -55,8 +55,9 @@ export class ImportTemplateController {
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
-      description: 'The kind or the format is not one of the lists (VALIDATION_ERROR).',
-      examples: [VALIDATION_EXAMPLE],
+      description:
+        'The kind or the format is not one of the lists (VALIDATION_ERROR), or the parser of that file does not read the format asked (IMPORT_TEMPLATE.FORMAT_NOT_SUPPORTED, details.formats).',
+      examples: [VALIDATION_EXAMPLE, EXAMPLES.FORMAT_NOT_SUPPORTED],
     },
   )
   async get(

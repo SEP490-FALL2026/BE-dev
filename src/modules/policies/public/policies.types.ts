@@ -16,6 +16,9 @@ export const IMPORT_TEMPLATE_KINDS = [
 ] as const;
 export type ImportTemplateKind = (typeof IMPORT_TEMPLATE_KINDS)[number];
 
+/** The formats a template can be made in; each definition says which of them its parser reads, the first being the default. */
+export type ImportTemplateFormat = 'xlsx' | 'csv';
+
 /** Who may download the template of each kind: the people who do that import (the head and Finance for the form `BM-10`). */
 export const IMPORT_TEMPLATE_ROLES: Readonly<Record<ImportTemplateKind, readonly PolicyRole[]>> = {
   employees: ['SUPER_ADMIN'],
@@ -44,6 +47,8 @@ export interface ImportTemplateColumn {
 export interface ImportTemplateDefinition {
   kind: ImportTemplateKind;
   title: string;
+  /** The formats the file is read in, the first the default: a template in a format the parser does not read would be refused whole. */
+  formats: ImportTemplateFormat[];
   columns: ImportTemplateColumn[];
   /** Each row has one cell per column, in the order of `columns`. */
   sampleRows: string[][];

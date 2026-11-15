@@ -1,11 +1,10 @@
 import {
   IMPORT_TEMPLATE_ROLES,
   type ImportTemplateDefinition,
+  type ImportTemplateFormat,
   type ImportTemplateKind,
   type PolicyRole,
 } from '../public/policies.types';
-
-export type ImportTemplateFormat = 'xlsx' | 'csv';
 
 /** Tells a spreadsheet the file is UTF-8, so Vietnamese letters open as they were written. */
 const BYTE_ORDER_MARK = '﻿';
@@ -46,6 +45,7 @@ export function definitionProblems(definition: ImportTemplateDefinition): string
     if (seen.has(column.key)) problems.push(`column ${column.key} is written twice`);
     seen.add(column.key);
   }
+  if (definition.formats.length === 0) problems.push('no format');
   if (definition.sampleRows.length === 0) problems.push('no example row');
   definition.sampleRows.forEach((row, index) => {
     if (row.length !== definition.columns.length) {
