@@ -231,7 +231,8 @@ describe('requests: case B against the catalog (integration, real PostgreSQL)', 
         vendor: { name: 'OpenAI' },
         classification: null,
         complete: false,
-        proposal: { existingApplicationId: chatgpt },
+        // The IT Admin sees the application the person named, to set it against the software the person typed (B2A-R1).
+        proposal: { existingApplicationId: chatgpt, existingApplication: { id: chatgpt, name: 'ChatGPT' } },
       });
       const submitted = (await h.auditEvents('ACCESS_REQUEST', proposed.id)).find(
         (event) => event.action === 'ACCESS_REQUEST.SUBMITTED',
@@ -245,7 +246,7 @@ describe('requests: case B against the catalog (integration, real PostgreSQL)', 
 
       expect(await h.assessmentWire(proposed.id, requester.account)).toMatchObject({
         scope: 'FULL',
-        proposal: { existingApplicationId: null },
+        proposal: { existingApplicationId: null, existingApplication: null },
       });
     });
 
@@ -410,14 +411,9 @@ describe('requests: case B against the catalog (integration, real PostgreSQL)', 
     });
 
     it('lists nothing when the tick is false', async () => {
-      const other = await declareApplication(h.ctx, h.it1.accessToken, {
-        name: 'Quiet Tool',
-        kind: 'SAAS',
-        vendorName: 'Quiet Co',
-        dataSensitivity: 'LOW',
-      });
+      // Another plan of the application the proposal names: a short proposal links only to plans of that application (B2A-R1).
       const quiet = await declarePlan(h.ctx, h.it1.accessToken, {
-        applicationId: other,
+        applicationId: chatgpt,
         name: 'Solo',
         provisioningType: 'K1',
         pricingModel: 'PER_SEAT',
@@ -454,6 +450,89 @@ describe('requests: case B against the catalog (integration, real PostgreSQL)', 
       expect(
         (await h.ctx.sql.query(`SELECT plan_id FROM access_requests WHERE id = $1`, [proposed.id])).rows[0],
       ).toEqual({ plan_id: plus });
+    });
+
+    describe('the plan a short proposal may be linked to (B2A-R1, QĐ-111a, QĐ-53c)', () => {
+      let midjourney: string; // another application of the catalog, which no one assessed for this request
+      let midjourneyPro: string;
+      let chatgptTeam: string; // another plan of the application the proposal names
+
+      beforeAll(async () => {
+        midjourney = await declareApplication(h.ctx, h.it1.accessToken, {
+          name: 'Midjourney',
+          kind: 'SAAS',
+          vendorName: 'Midjourney Inc.',
+          domains: ['midjourney.com'],
+          dataSensitivity: 'LOW',
+        });
+        midjourneyPro = await declarePlan(h.ctx, h.it1.accessToken, {
+          applicationId: midjourney,
+          name: 'Pro',
+          provisioningType: 'K1',
+          pricingModel: 'PER_SEAT',
+          controlLevel: 'FULL',
+        });
+        chatgptTeam = await declarePlan(h.ctx, h.it1.accessToken, {
+          applicationId: chatgpt,
+          name: 'Team',
+          provisioningType: 'K1',
+          pricingModel: 'PER_SEAT',
+          controlLevel: 'FULL',
+        });
+      });
+
+      /** The proposal of software that is new, the need approved and the spending approver's decision given: the IT Admin has no assessment of an application to rest on. */
+      const newSoftwareDecidedForSpend = async (): Promise<AccessRequestWire> => {
+        counter += 1;
+        const proposed = await h.proposed(await person(), {
+          softwareName: 'Fresh Tool ' + counter,
+          homepageUrl: `https://fresh-tool-${counter}.example`,
+        });
+        await h.decide(proposed.id, { decision: 'APPROVE' }, head.account).expect(200);
+        await h.ctx.sql.query(`UPDATE access_requests SET state = 'AWAITING_EXECUTION' WHERE id = $1`, [proposed.id]);
+
+        return proposed;
+      };
+      const planOf = async (id: string) =>
+        (await h.ctx.sql.query<{ plan_id: string | null }>(`SELECT plan_id FROM access_requests WHERE id = $1`, [id]))
+          .rows[0].plan_id;
+      const linkedEventsOf = async (id: string) =>
+        (await h.auditEvents('ACCESS_REQUEST', id)).filter((event) => event.action === 'ACCESS_REQUEST.CATALOG_LINKED');
+
+      it.each([[false], [true]])(
+        'refuses a plan of another application than the one the proposal names (tick %s): 422 with the application expected, and nothing is written',
+        async (tick) => {
+          const proposed = await decidedForSpend();
+          const entriesBefore = await entriesOf(design.id);
+
+          const refused = await link(proposed.id, { planId: midjourneyPro, addToDepartmentList: tick }).expect(422);
+
+          expect(h.codeOf(refused)).toBe('ACCESS_REQUEST.CATALOG_LINK_APPLICATION_MISMATCH');
+          expect(h.detailsOf(refused)).toEqual({ expectedApplicationId: chatgpt });
+          expect(await planOf(proposed.id)).toBeNull();
+          expect(await linkedEventsOf(proposed.id)).toEqual([]);
+          expect(await entriesOf(design.id)).toEqual(entriesBefore);
+        },
+      );
+
+      it('takes another plan of the application the proposal names, and lists that application with the tick', async () => {
+        const proposed = await decidedForSpend();
+
+        const linked = h.dataOf<{ request: AccessRequestWire; departmentList: { added: boolean } | null }>(
+          await link(proposed.id, { planId: chatgptTeam, addToDepartmentList: true }).expect(200),
+        );
+
+        expect(linked.request.plan?.planId).toBe(chatgptTeam);
+        expect(await entriesOf(design.id)).toContainEqual({ application_id: chatgpt, plan_id: chatgptTeam });
+      });
+
+      it('leaves software that is new free to link any plan of the catalog (R-25): only a short proposal names the application', async () => {
+        const proposed = await newSoftwareDecidedForSpend();
+
+        await link(proposed.id, { planId: midjourneyPro }).expect(200);
+
+        expect(await planOf(proposed.id)).toBe(midjourneyPro);
+      });
     });
 
     describe('the list of the department behind the tick (D-118, D-122)', () => {
@@ -538,8 +617,21 @@ describe('requests: case B against the catalog (integration, real PostgreSQL)', 
       let bought: string; // a plan bought once (K4)
 
       beforeAll(async () => {
-        seats = await h.plan('K2');
-        bought = await h.plan('K4');
+        // Plans of the application the short proposals name: a short proposal links only to a plan of that application (B2A-R1).
+        seats = await declarePlan(h.ctx, h.it1.accessToken, {
+          applicationId: chatgpt,
+          name: 'Seats',
+          provisioningType: 'K2',
+          pricingModel: 'PER_SEAT',
+          controlLevel: 'FULL',
+        });
+        bought = await declarePlan(h.ctx, h.it1.accessToken, {
+          applicationId: chatgpt,
+          name: 'Bought once',
+          provisioningType: 'K4',
+          pricingModel: 'PER_SEAT',
+          controlLevel: 'FULL',
+        });
       });
 
       /** A short proposal for `months` months whose assessment the IT Admin concluded as `kind`, completed, and put where the decision of the spending approver leaves it. */

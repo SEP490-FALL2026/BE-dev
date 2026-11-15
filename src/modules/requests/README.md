@@ -77,7 +77,7 @@ controller) và `requests-work-facade.module.ts` (phần worker chạy, API dùn
 ## Tầng trong module
 
 Đồ thị capability → capability của `requests` **không có vòng** (R6; `pnpm arch:capabilities --module requests`, gate
-`capability-graph`): 42 capability, 131 cạnh. Cạnh đi từ tầng cao xuống tầng thấp hoặc ngang tầng, không vòng. **Cột tầng do lệnh tính** từ
+`capability-graph`): 42 capability, 133 cạnh. Cạnh đi từ tầng cao xuống tầng thấp hoặc ngang tầng, không vòng. **Cột tầng do lệnh tính** từ
 cùng đồ thị gate dùng, không viết tay, và `scripts/verify/capability-graph.test.mjs` đọc bảng này so với lệnh (lệch thì test đỏ): có
 controller thì L3; còn lại, không import capability nào thì L0, chỉ import L0 thì L1, import ít nhất một L1 hoặc L2 thì L2.
 
@@ -89,7 +89,7 @@ import `spend`, nên theo luật tầng chúng là L2, và `status` (không cont
 | ---- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ----------------------------------------------------- |
 | L0   | `access-request` (lõi: bản ghi, repo, policy, types, errors, định tuyến, giá, `assessment-read.repo`, `withdrawal.policy`), `outcome`; `status` (cô lập: không import, không ai import, không controller; lệnh in `L0 (cô lập)`)                                                                                                                                                                       | không import capability nào của `requests` (gate)     |
 | L1   | lõi nhánh, không controller: `step-routing`, `request-draft`, `renewal-apply`, `repricing`, `request-limits`, `year-start-commitments`                                                                                                                                                                                                                                                                 | chỉ import L0                                         |
-| L2   | dịch vụ dùng chung, không controller: `spend`, `request-intake`, `request-view`, `assessment`, `reserve-confirmation`, `spend-effects`, `group-request`, `grant`, `request-end`, `spend-approval-view`, `my-requests`                                                                                                                                                                                  | import ít nhất một L1 hoặc L2, không vòng             |
+| L2   | dịch vụ dùng chung, không controller: `spend`, `request-intake`, `request-view`, `assessment`, `catalog-link`, `reserve-confirmation`, `spend-effects`, `group-request`, `grant`, `request-end`, `spend-approval-view`, `my-requests`                                                                                                                                                                  | import ít nhất một L1 hoặc L2, không vòng             |
 | L3   | use case lá, có controller: `proposal-review`, `budget-check`, `group-line-decisions`, `need-decision`, `need-decision-queue`, `request-history`, `assessment-queue`, `withdraw`, `spend-submission`, `spend-approval`, `request-submission`, `cancellation`, `reassignment`, `return-request`, `timing`, `grant-queue`, `renewal-request`, `group-request-submission`, `line-closure`, `draft`, `sla` | không ai import lên, trừ bốn ngoại lệ dưới đây (gate) |
 
 **Số đo (30/10/2026).** Từ 24 capability, 82 cạnh, một vòng 19 capability → 36 capability, 111 cạnh, không vòng (sau khi tích hợp code dev A ngày 31/10/2026: 39 capability, 118 cạnh, thêm `need-decision-queue`, `my-requests`, `assessment-queue`, cả ba là L3 chỉ đọc, không ai import lên). Cạnh không tính cạnh
@@ -162,10 +162,14 @@ cùng cần; phần ghi nằm ở `assessment/assessment.repo.ts`.
   - `assessment/` — thẩm định phần mềm ngoài catalog, đăng ký nội bộ, nối plan (US-05-06, US-05-18, US-05-20);
     `AssessmentQueryService` (đọc), `AssessmentService` (lưu), `AssessmentCompletionService`, `AssessmentRejectionService`, qua cổng chung
     `AssessmentGate` (khóa đề xuất, người thẩm định, bước của IT Admin); `AssessmentTermFitService` là chỗ duy nhất xét lại số tháng của đề xuất
-    theo kiểu cấp (QĐ-111i; K4 xóa tháng, K1 ngoài 1–9 ⟹ 422 `ASSESSMENT.TERM_NOT_FIT_KIND`): hoàn tất đánh giá dùng kiểu IT kết luận, `catalog-link`
+    theo kiểu cấp (QĐ-111i; K4 xóa tháng, K1 ngoài 1–9 ⟹ 422 `ASSESSMENT.TERM_NOT_FIT_KIND`): hoàn tất đánh giá dùng kiểu IT kết luận, `catalog-link/`
     dùng kiểu của gói được gắn khi khác kiểu đã kết luận; `ProposalService`,
     `need-spend.service.ts`, `internal-registration.service.ts` (đăng ký nội bộ; `internalRegistrationBasis`, `registeredShapeOf`,
     `actsForAssignee` ở `assessment.policy.ts`); `proposal-review/` — `proposals.controller.ts`.
+  - `catalog-link/` — nối Request đề xuất đã qua Người duyệt chi vào gói của danh mục (US-05-06 AC-4, AC-8; R-25): `CatalogLinkService` (khóa Request, gói phải có và ứng dụng chưa ngừng,
+    xét lại số tháng theo kiểu của gói qua `AssessmentTermFitService`, một dòng audit `ACCESS_REQUEST.CATALOG_LINKED`); đề xuất rút gọn (case B, QĐ-111a) chỉ nối được vào gói của chính ứng dụng nó
+    nêu, gói của ứng dụng khác ⟹ 422 `ACCESS_REQUEST.CATALOG_LINK_APPLICATION_MISMATCH` (QĐ-53c: phần mềm mới phải qua cổng mức kiểm soát), đề xuất phần mềm mới nối được vào mọi gói;
+    `CatalogLinkDepartmentListService` là ô tick `addToDepartmentList` (kiểm phạm vi IT Admin của phòng, rồi ghi danh sách phần mềm của phòng qua facade licensing, cùng transaction).
   - `grant-queue/` — hàng cấp theo người của IT Admin (US-03-02, QĐ-111m): chỉ phòng trong phạm vi `getItAdminScope`, lọc `planId`/`state` (`WAITING`/`EXECUTING`/`DONE`, suy từ trạng thái Request hoặc dòng của người, không đọc bảng licensing), mỗi người có phòng và `execution` (tác vụ cấp qua `LicensingOpenGrantsApi.listGrantExecutionsOfRequests`, hành động theo `grantExecutionActions`); `cancellation/` — IT Admin đóng request của người đã nghỉ (US-03-04) và hệ thống đóng request của người đã nghỉ/chuyển (`beneficiary-gone-*`, X0.7).
   - Lịch sử Request theo vai, chỉ đọc (L3 `request-history/`, qd103-request-history-by-role): `GET /me/access-requests` (người gửi; `involvement`
     SENT/FOR_ME/ALL, người thụ hưởng Request nhóm chỉ thấy `myLine` của mình), `GET /departments/{id}/access-requests` (trưởng phòng hôm nay của

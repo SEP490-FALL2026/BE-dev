@@ -30,6 +30,7 @@ import {
   AssessmentRefusedError,
   AssessmentTermNotFitError,
   AssessmentUncontrollableError,
+  CatalogLinkApplicationMismatchError,
   CatalogLinkRefusedError,
   InternalRegistrationRefusedError,
   ProposalSoftwareInCatalogError,
@@ -83,6 +84,11 @@ export function toAssessmentApiException(error: unknown): unknown {
         plans: error.existing.plans.map((plan) => ({ ...plan })),
         planTotal: error.existing.planTotal,
       },
+    });
+  }
+  if (error instanceof CatalogLinkApplicationMismatchError) {
+    return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'ACCESS_REQUEST.CATALOG_LINK_APPLICATION_MISMATCH', error.message, {
+      expectedApplicationId: error.expectedApplicationId,
     });
   }
   if (error instanceof CatalogLinkRefusedError) {
@@ -149,6 +155,7 @@ export const ASSESSMENT_ERROR_EXAMPLES = {
   // One message template whose field varies (details.field names it): the vendor stands for the fields of the save.
   REFERENCE_NOT_FOUND: example(new AssessmentReferenceNotFoundError('vendorId')),
   CATALOG_LINK_NOT_ALLOWED: example(new CatalogLinkRefusedError('NOT_LINKABLE')),
+  CATALOG_LINK_APPLICATION_MISMATCH: example(new CatalogLinkApplicationMismatchError('<application-id>')),
   DEPARTMENT_OUT_OF_SCOPE: example(new CatalogLinkRefusedError('DEPARTMENT_OUT_OF_SCOPE')),
   DEPARTMENT_NOT_FOUND: example(new ToolsDepartmentNotFoundError()),
   DEPARTMENT_SOFTWARE_NOT_IN_CATALOG: example(

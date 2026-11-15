@@ -3,10 +3,8 @@ import { TransactionRunner, type DbTx } from '../../../infrastructure/database/t
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../../audit/public/audit.api';
 import { CatalogApi } from '../../catalog/public/catalog.api';
-import { IdentityAccessApi } from '../../identity-access/public/identity-access.api';
-import { LicensingDepartmentToolsApi } from '../../licensing/public/licensing-department-tools.api';
+import type { SeatTarget } from '../../catalog/public/catalog.types';
 import type { DepartmentSoftwareEntryResult } from '../../licensing/public/licensing-department-tools.types';
-import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { accessRequestAuditEvent } from '../access-request/access-request-audit-event.mapper';
 import {
   AccessRequestApplicationRetiredError,
@@ -15,9 +13,11 @@ import {
 } from '../access-request/access-request.errors';
 import { AccessRequestRepo } from '../access-request/access-request.repo';
 import type { AccessRequestRecord } from '../access-request/access-request.types';
-import { CatalogLinkRefusedError } from './assessment.errors';
-import { canLinkCatalogPlan } from './assessment.policy';
-import { AssessmentTermFitService } from './assessment-term-fit.service';
+import { AssessmentReadRepo } from '../access-request/assessment-read.repo';
+import { CatalogLinkApplicationMismatchError, CatalogLinkRefusedError } from '../assessment/assessment.errors';
+import { canLinkCatalogPlan } from '../assessment/assessment.policy';
+import { AssessmentTermFitService } from '../assessment/assessment-term-fit.service';
+import { CatalogLinkDepartmentListService } from './catalog-link-department-list.service';
 
 /** What the link did: the request with its plan, and the place in the list of the department when the IT Admin asked for one. */
 export interface CatalogLinked {
@@ -33,6 +33,8 @@ export interface CatalogLinked {
  * that entry and it goes on as case A (R-25), without the person sending it again. With the tick `addToDepartmentList` the application and the
  * plan also go into the list of software of the department of the request (`QĐ-111c`), in the same transaction, which only an IT Admin in charge of
  * that department may ask. The audit names the IT Admin who answers for the application of the plan (`QĐ-111g`); the link does not wait for one.
+ * A short proposal (case B, `QĐ-111a`) was assessed for the plan of the application it names and not for the application again, so it links only to a
+ * plan of that application (`QĐ-53c`: software that is new goes through the gate of the control level); a proposal of software that is new links to any plan.
  * The plan can be of another kind than the one the assessment concluded, so the months of the request are judged again by the kind of the plan
  * (`AssessmentTermFitService`, the rule of the completion): a plan bought once clears them, a plan that does not take them refuses the link.
  */
@@ -41,17 +43,17 @@ export class CatalogLinkService {
   constructor(
     private readonly runner: TransactionRunner,
     private readonly requests: AccessRequestRepo,
+    private readonly assessments: AssessmentReadRepo,
     private readonly catalog: CatalogApi,
     private readonly audit: AuditApi,
-    private readonly departmentTools: LicensingDepartmentToolsApi,
-    private readonly organizationReads: OrganizationReadApi,
-    private readonly identity: IdentityAccessApi,
+    private readonly departmentList: CatalogLinkDepartmentListService,
     private readonly termFit: AssessmentTermFitService,
   ) {}
 
   /**
    * Throws AccessRequestNotFoundError, CatalogLinkRefusedError (the request cannot be linked now, or the department is not one the IT Admin is in
-   * charge of), AccessRequestPlanNotFoundError and AccessRequestApplicationRetiredError, and, for the tick, the refusals of the list of the department
+   * charge of), AccessRequestPlanNotFoundError, CatalogLinkApplicationMismatchError (a short proposal and a plan of another application) and
+   * AccessRequestApplicationRetiredError, and, for the tick, the refusals of the list of the department
    * (DepartmentSoftwareNotInCatalogError, DepartmentSoftwareNoteInvalidError, ToolsDepartmentNotFoundError) and AssessmentTermNotFitError (the months of the
    * request do not fit the kind of the plan). Nothing is written when any is thrown.
    */
@@ -65,16 +67,14 @@ export class CatalogLinkService {
       if (!request || request.branch !== 'NEW_SOFTWARE') throw new AccessRequestNotFoundError();
       if (!canLinkCatalogPlan(request)) throw new CatalogLinkRefusedError('NOT_LINKABLE');
 
-      const [target] = await this.catalog.findPlanSeatTargets([input.planId], tx);
-      if (!target) throw new AccessRequestPlanNotFoundError();
-      if (target.applicationStatus === 'RETIRED') throw new AccessRequestApplicationRetiredError();
+      const target = await this.targetOf(tx, requestId, input.planId);
       const responsibleItAdminEmployeeId = await this.catalog.getPlanResponsibleItAdminId(input.planId, tx);
       const fitted = await this.termFit.fitToLinkedPlan(tx, request, target.provisioningType, new Date());
 
       await this.requests.setPlan(tx, requestId, input.planId);
       const departmentList =
         input.addToDepartmentList === true
-          ? await this.listInDepartment(tx, actor, request.departmentId, target.applicationId, input.planId)
+          ? await this.departmentList.add(tx, actor, request.departmentId, target.applicationId, input.planId)
           : null;
       await this.audit.record(
         tx,
@@ -106,32 +106,16 @@ export class CatalogLinkService {
   }
 
   /**
-   * Puts the application and the plan in the list of the department of the request. The list facade does not judge who may write the list of which
-   * department: this does, before the facade is called (`D-118`); a refusal throws and the transaction of the link, with its plan, is undone.
+   * The plan as a target of the link: it exists, its application is still in the catalog, and, for a short proposal, it is a plan of the application
+   * the proposal names (`QĐ-111a`, `QĐ-53c`).
    */
-  private async listInDepartment(
-    tx: DbTx,
-    actor: AuthenticatedPrincipal,
-    departmentId: string,
-    applicationId: string,
-    planId: string,
-  ): Promise<DepartmentSoftwareEntryResult> {
-    await this.requireInCharge(tx, actor, departmentId);
+  private async targetOf(tx: DbTx, requestId: string, planId: string): Promise<SeatTarget> {
+    const [target] = await this.catalog.findPlanSeatTargets([planId], tx);
+    if (!target) throw new AccessRequestPlanNotFoundError();
+    const named = (await this.assessments.findProposal(requestId, tx))?.existingApplicationId ?? null;
+    if (named !== null && named !== target.applicationId) throw new CatalogLinkApplicationMismatchError(named);
+    if (target.applicationStatus === 'RETIRED') throw new AccessRequestApplicationRetiredError();
 
-    return this.departmentTools.addDepartmentSoftwareFromCatalogLink(tx, actor, {
-      departmentId,
-      applicationId,
-      planId,
-    });
-  }
-
-  /** Throws CatalogLinkRefusedError unless the department is one the IT Admin is in charge of (`US-01-11`: the ones that name them and, while nobody who can act is named, every active one). */
-  private async requireInCharge(tx: DbTx, actor: AuthenticatedPrincipal, departmentId: string): Promise<void> {
-    const scope = await this.organizationReads.getItAdminScope(
-      actor.employeeId,
-      (ids) => this.identity.findUsableItAdminEmployeeIds(ids, tx),
-      tx,
-    );
-    if (!scope.includes(departmentId)) throw new CatalogLinkRefusedError('DEPARTMENT_OUT_OF_SCOPE');
+    return target;
   }
 }

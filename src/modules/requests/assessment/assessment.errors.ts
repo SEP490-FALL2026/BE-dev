@@ -93,6 +93,18 @@ export class ProposalSoftwareInCatalogError extends Error {
 }
 
 /**
+ * A short proposal names an application of the catalog (`QĐ-111a`), and the IT Admin assessed only the plan of that application: it cannot be linked
+ * to the plan of another one, which no one assessed for this request and which the gate of the control level never saw (`QĐ-53c`). `expectedApplicationId`
+ * is the application the proposal names.
+ */
+export class CatalogLinkApplicationMismatchError extends Error {
+  constructor(readonly expectedApplicationId: string) {
+    super('The proposal names another application than the one the plan belongs to.');
+    this.name = 'CatalogLinkApplicationMismatchError';
+  }
+}
+
+/**
  * The request cannot be linked to the plan: it is not waiting for its grant (`US-05-06` AC-4, AC-8), or the IT Admin asked to list the software in a
  * department they are not in charge of (`QĐ-111c`).
  */

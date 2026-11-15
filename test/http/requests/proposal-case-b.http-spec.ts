@@ -4,10 +4,11 @@ import { App } from 'supertest/types';
 import { AccessRequestApplicationRetiredError } from '../../../src/modules/requests/access-request/access-request.errors';
 import {
   AssessmentReferenceNotFoundError,
+  CatalogLinkApplicationMismatchError,
   CatalogLinkRefusedError,
   ProposalSoftwareInCatalogError,
 } from '../../../src/modules/requests/assessment/assessment.errors';
-import { CatalogLinkService } from '../../../src/modules/requests/assessment/catalog-link.service';
+import { CatalogLinkService } from '../../../src/modules/requests/catalog-link/catalog-link.service';
 import { ProposalService } from '../../../src/modules/requests/assessment/proposal.service';
 import {
   DepartmentSoftwareNoteInvalidError,
@@ -167,6 +168,12 @@ describe('software that the catalog has or lacks: the proposal and the catalog l
       ],
       ['a department that is not there', 404, 'DEPARTMENT.NOT_FOUND', new ToolsDepartmentNotFoundError()],
       [
+        'a short proposal and a plan of another application',
+        422,
+        'ACCESS_REQUEST.CATALOG_LINK_APPLICATION_MISMATCH',
+        new CatalogLinkApplicationMismatchError(APPLICATION),
+      ],
+      [
         'software the catalog no longer offers to the list of the department',
         422,
         'DEPARTMENT_SOFTWARE.NOT_IN_CATALOG',
@@ -185,6 +192,14 @@ describe('software that the catalog has or lacks: the proposal and the catalog l
 
       expect(response.status).toBe(status);
       expect(bodyOf(response).error.code).toBe(code);
+    });
+
+    it('names the application the short proposal expects, so the screen can say which plan to pick', async () => {
+      link.mockRejectedValue(new CatalogLinkApplicationMismatchError(APPLICATION));
+
+      const response = await linkPlan({ planId: PLAN }).expect(422);
+
+      expect(bodyOf(response).error.details).toEqual({ expectedApplicationId: APPLICATION });
     });
 
     it('names every place the catalog no longer offers, as the routes of the list do', async () => {

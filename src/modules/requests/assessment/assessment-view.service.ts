@@ -48,7 +48,7 @@ export class AssessmentViewService {
     return {
       requestId: request.id,
       status: assessment.status,
-      proposal: toProposalWire(proposal),
+      proposal: await this.proposalView(proposal, tx),
       scope: assessmentScopeOf(proposal),
       step: step && toStepWire(step, person(step.assigneeEmployeeId)),
       classification: assessment.classification,
@@ -85,6 +85,15 @@ export class AssessmentViewService {
     };
   }
 
+  /** The declaration, with the application the person named by name (`existingApplication`): what a short proposal is set against. */
+  private async proposalView(proposal: ProposalRecord, tx?: DbTx): Promise<AssessmentWire['proposal']> {
+    const [existing] = proposal.existingApplicationId
+      ? await this.catalog.getCollectorApplications([proposal.existingApplicationId], tx)
+      : [];
+
+    return { ...proposal, existingApplication: existing ? { id: existing.id, name: existing.name } : null };
+  }
+
   private async quoteView(quote: Quote): Promise<NonNullable<AssessmentWire['quote']>> {
     return {
       unitPrice: await this.pricing.moneyView(quote.unitPrice),
@@ -105,8 +114,6 @@ const toolOf = (
 
   return found ? { planId: found.planId, planName: found.planName, applicationName: found.applicationName } : null;
 };
-
-const toProposalWire = (proposal: ProposalRecord): AssessmentWire['proposal'] => ({ ...proposal });
 
 const toStepWire = (
   step: AssessmentStepRecord,

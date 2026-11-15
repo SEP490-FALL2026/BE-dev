@@ -185,6 +185,8 @@ const assessmentSchema = z.strictObject({
     expectedUsers: z.number().int().positive(),
     /** The application of the catalog the software is already in, when only the plan asked for is missing (case B, short); null for software that is new. */
     existingApplicationId: z.uuid().nullable(),
+    /** That application by name, so the IT Admin sets it against the software the person typed and rejects the proposal when they differ; null when `existingApplicationId` is. */
+    existingApplication: z.strictObject({ id: z.uuid(), name: z.string() }).nullable(),
   }),
   /** What the IT Admin assesses: FULL is the software and its plan, PLAN_ONLY the plan alone (the proposal names an application of the catalog). */
   scope: z.enum(['FULL', 'PLAN_ONLY']),
