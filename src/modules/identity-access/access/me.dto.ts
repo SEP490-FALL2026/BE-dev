@@ -3,6 +3,7 @@ import { z } from 'zod';
 import { successEnvelopeSchema } from '../../../infrastructure/http/dto/success-envelope.dto';
 import { createZodDto } from '../../../infrastructure/http/dto/zod-dto';
 import { appRoleSchema } from '../accounts/account-management.dto';
+import { selfServiceProfileShape } from '../profile/profile.dto';
 
 export const meSchema = z.strictObject({
   appUserId: z.uuid(),
@@ -50,6 +51,7 @@ export const meSchema = z.strictObject({
   pendingPolicyAcknowledgements: z
     .array(z.strictObject({ code: z.string(), title: z.string(), versionNumber: z.number().int().positive() }))
     .max(20),
+  ...selfServiceProfileShape,
 });
 
 export class MeResponseDto extends createZodDto(successEnvelopeSchema(meSchema)) {}

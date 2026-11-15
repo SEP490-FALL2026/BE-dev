@@ -8,6 +8,7 @@ import { AccountRecordService } from '../accounts/account-record.service';
 import { ActionLinkService } from '../accounts/action-link.service';
 import { CredentialService } from '../credentials/credential.service';
 import { RoleGrantService } from '../accounts/role-grant.service';
+import { ProfileRepo } from '../profile/profile.repo';
 import {
   AccessBlockCause,
   AccessBlockRecord,
@@ -31,6 +32,7 @@ export class IdentityAccessApi {
     private readonly links: ActionLinkService,
     private readonly credentials: CredentialService,
     private readonly organizationReads: OrganizationReadApi,
+    private readonly profiles: ProfileRepo,
   ) {}
 
   /**
@@ -94,8 +96,19 @@ export class IdentityAccessApi {
    * Super Admin then lists such accounts and locks them with a reason. The sign-in and the guard refuse the person from the status of
    * the employee, not from this day. Nothing when the employee has no account.
    */
-  markEmployeeLeft(tx: DbTx, employeeId: string, leftOn: BusinessDate): Promise<void> {
-    return this.accounts.markEmployeeLeft(tx, employeeId, leftOn);
+  async markEmployeeLeft(tx: DbTx, employeeId: string, leftOn: BusinessDate): Promise<void> {
+    await this.accounts.markEmployeeLeft(tx, employeeId, leftOn);
+    await this.clearSelfServiceProfile(tx, employeeId);
+  }
+
+  /**
+   * The person left (`QĐ-111av`): the picture and the work phone are dropped from the account in the transaction that records it (the columns
+   * only), and the object of the picture is queued; the API process deletes it after the commit (`MAJ-12`: nothing here touches the
+   * storage, because this runs in the graph of the command too). Nothing when the employee has no account, and again changes nothing.
+   */
+  async clearSelfServiceProfile(tx: DbTx, employeeId: string): Promise<void> {
+    const cleared = await this.profiles.clearSelfService(tx, employeeId);
+    if (cleared?.previousKey) await this.profiles.enqueuePurge(tx, cleared.organizationId, cleared.previousKey);
   }
 
   /**

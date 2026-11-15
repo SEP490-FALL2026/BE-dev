@@ -26,7 +26,16 @@ export interface StoredObjectMetadata {
   etag: string | undefined;
 }
 
+export interface PutObjectInput {
+  key: string;
+  body: Buffer;
+  /** Stored with the object and answered when it is read: the caller checked it against the signature of the bytes. */
+  contentType: string;
+}
+
 export interface ObjectStoragePort {
+  /** Writes the object under the key, replacing what was there: for a small file the server itself has read and judged (a picture of a person). */
+  putObject(input: PutObjectInput): Promise<void>;
   createUploadUrl(input: CreateUploadUrlInput): Promise<string>;
   createDownloadUrl(input: CreateDownloadUrlInput): Promise<string>;
   head(key: string): Promise<StoredObjectMetadata>;

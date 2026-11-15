@@ -7,6 +7,7 @@ import {
   PendingPolicyAcknowledgements,
   type PendingPolicyAcknowledgement,
 } from '../public/identity-access.extension-points';
+import { ProfileQueryService, type SelfServiceProfile } from '../profile/profile-query.service';
 import type { AppRole } from '../public/identity-access.types';
 
 export interface MeView {
@@ -34,6 +35,9 @@ export interface MeView {
   }[];
   /** The policies in force the caller owes an acknowledgement of; the interface asks before the dashboard (`QĐ-111ar`). */
   pendingPolicyAcknowledgements: PendingPolicyAcknowledgement[];
+  /** The picture as a link that expires, and the work phone, which the person edits themselves (`QĐ-111at`). */
+  avatar: SelfServiceProfile['avatar'];
+  workPhone: SelfServiceProfile['workPhone'];
 }
 
 @Injectable()
@@ -42,6 +46,7 @@ export class MeService {
     private readonly accounts: AccountRecordService,
     private readonly organizationReads: OrganizationReadApi,
     private readonly policies: PendingPolicyAcknowledgements,
+    private readonly profile: ProfileQueryService,
   ) {}
 
   /** The caller's own identity, granted roles and Manager scope. Roles come from the principal resolved this request. */
@@ -67,6 +72,7 @@ export class MeService {
       managerScope: await this.managerScopeOf(principal, day),
       upcomingUnits: await this.upcomingUnitsOf(principal, day),
       pendingPolicyAcknowledgements: await this.pendingPoliciesOf(principal, roles),
+      ...(await this.profile.viewOf(principal.appUserId)),
     };
   }
 
