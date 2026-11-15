@@ -128,7 +128,33 @@ Không làm ở FIX-LB1 (rẻ nhưng đổi hợp đồng hoặc chạm file lan
 
 ## Seed cần cho Z2
 
-- **Seed hiện đỏ với BG-1:** `src/cli/seed/steps/finance.steps.ts` gọi `POST /budget-cycles` không có `sharedPoolReserve` (nay bắt buộc ⟹ 422), rồi `PUT …/department-ceilings` và `POST …/publish` (nay 404). Z2 đổi thành: `POST /budget-cycles` kèm `sharedPoolReserve`, rồi `POST /budget-cycles/{year}/opening`; bỏ hai bước kia và bỏ `ceilings` ở fixture. Khi đó `test/integration/installation/seed-calendar.integration-spec.ts` (đọc `first_published_at`) cũng phải đổi sang `opened_at IS NOT NULL`.
+> Lane B KHÔNG sửa `src/cli/seed/**` hay flows (việc của Z2). Hợp đồng ngân sách đã đổi (BG-1, BG-2) rộng hơn những gì ghi lúc đầu: **cho tới khi Z2 làm xong,
+> 4 suite seed (`test/integration/installation/seed.integration-spec.ts`, `seed-calendar`, `seed-rerun`, `test/integration/_serial/seed-check-runtime.integration-spec.ts`) sẽ ĐỎ ở
+> bước `budget.cycles`/`budget.*` (chúng chạy `ops:seed apply` qua API thật), và nightly `flows` (mf4 và mọi flow cần dataset) sẽ đỏ.** Đỏ vì hợp đồng
+> đã đổi chứ không phải test sai. Chi tiết theo từng file (số dòng ở `529beb0f`, có thể lệch vài dòng):
+
+1. **`src/cli/seed/steps/finance.steps.ts`** (bước `budget.cycles`):
+   - `:72`, `:109` `CycleRow.firstPublishedAt` — wire kỳ không còn trường này (có `status` `DRAFT|OPEN|LOCKED`, `openedAt`) ⟹ `found?.firstPublishedAt` luôn rỗng, kỳ không bao giờ "present". Đổi: nhận diện "đã có" bằng `openedAt !== null`.
+   - `:112-117` `POST /budget-cycles` thiếu `sharedPoolReserve` (nay bắt buộc ⟹ 422): thêm `sharedPoolReserve: money(plan.sharedPoolReserve)`.
+   - `:119-123` `PUT /budget-cycles/{year}/department-ceilings` và `POST …/publish` ⟹ 404 (đã xóa). Bỏ cả hai, gọi `POST /budget-cycles/{year}/opening`; bỏ `ceilingsOf` (`:91-102`); `evenShareOf` chỉ còn dùng ở `shared-demo-v4.spec.ts`.
+   - **Hạn nộp (cần Z2 quyết):** kỳ chỉ mở được khi hạn nộp chưa qua (422 `BUDGET_CYCLE.DEADLINE_PASSED`), và sau hạn đề nghị của trưởng phòng bị 409 `BUDGET_CYCLE.LOCKED`. `dayBeforeNewYear(year, 60)` của năm hiện hành (2/11/2026) đã qua so với ngày chạy seed ⟹ kỳ năm hiện hành không mở được và không nộp được đề nghị. Z2 chọn: tính hạn từ "hôm nay + N ngày" (kỳ năm hiện hành mở với hạn còn), hoặc dựng ngân sách năm hiện hành bằng `source: 'BASELINE'` (được phép sau hạn khi phòng không có đề nghị; xem mục 2).
+2. **`src/cli/seed/steps/budget.steps.ts`** (+ `finance-kit.ts`):
+   - `:45-49` `POST /budget-proposals` gửi `{ year, lines }` ⟹ 422 (khóa lạ `lines`; thiếu `requestedAmount`, `attachmentIds`). Đổi sang `{ year, requestedAmount: money(…), note?, attachmentIds }`. Tệp BM-10 phải tải trước: `POST /budget-proposals/attachments` (khai tên, loại, dung lượng) ⟹ PUT lên URL trả về ⟹ `POST /budget-attachments/{id}/complete`; 1–10 tệp, không trùng. `finance-kit.ts:12-23` `proposalLines` bỏ.
+   - `:61`, `:127`, `:149` `POST /budget-versions/{id}/submission` cần ≥ 1 tệp của phiên bản (422 `BUDGET_VERSION.ATTACHMENT_REQUIRED`): tải trước bằng `POST /budget-versions/{id}/attachments` ⟹ PUT ⟹ `POST /budget-attachments/{id}/complete`.
+   - `:133-135` quyết định `'REQUEST_CHANGES'` ⟹ 422. Đổi `'RETURN'` (lý do bắt buộc, đã có `plan.reason`); `REJECT` cũng 422.
+   - `:74` `POST /budget-versions { source: 'BASELINE', costCenterId, year }` vẫn dùng được nhưng phiên bản sinh ra có `origin = BASELINE_NO_PROPOSAL` (không còn dòng; phiên bản cũ `BASELINE_NO_HEAD` chỉ còn để đọc), chỉ lập được sau hạn nộp và khi phòng không có đề nghị đang chờ (409 `BUDGET.BASELINE_VERSION_NOT_ALLOWED`); `base` bỏ trống ⟹ = số chạy sang (0 tới khi `requests` bind, mục "Bị chặn").
+   - `:83`, `:145` `POST /budget-versions { proposalId, base }` vẫn đúng (dự phòng mặc định 10 % không cần lý do). Nếu fixture muốn dự phòng khác 10 % (`reservePercent` hoặc `reserve`) thì phải kèm `reserveReason` khi gửi (D-B17, 422 `BUDGET.RESERVE_REASON_REQUIRED`).
+3. **`src/cli/seed/fixture/shared-demo-v4/finance.ts`** + **`src/cli/seed/fixture/demo-fixture.types.ts`** + **`src/cli/seed/fixture/shared-demo-v4.spec.ts`:**
+   - `budgets[].lines` (`:56-105`) và `nextYear[].lines` (`:112-150`) ⟹ thay bằng `requestedAmount` (+ `note`); dòng `RENEW/CHANGE/NEW/CANCEL`, `zbb`, `note` "vượt trần phòng", xếp hạng và cờ vượt Trần phòng không còn (đã bỏ ở BG-2); `DemoBudgetLine` bỏ khi không còn nơi dùng.
+   - `nextCycle.ceilings` (`finance.ts:39-48`) và `DemoCycle.ceilings` (`demo-fixture.types.ts:114-123`) ⟹ bỏ (Trần phòng không còn, chỉ còn Trần năm + Dự phòng kho); sửa các chú thích ở `finance.ts:25-26`, `:32-33`, `:50-55`, `:107-111` và `note` "Vượt trần phòng" (`:122`, `:126`) nhắc "Trần của từng phòng", "dòng", "vượt trần".
+   - `shared-demo-v4.spec.ts:173-197` (và `import { evenShareOf }` ở `:4`) kiểm Trần phòng và `evenShareOf` ⟹ viết lại theo luật mới: tổng (cơ sở + dự phòng) các phiên bản năm ≤ Trần năm − Dự phòng kho.
+4. **`src/cli/seed/fixture/shared-demo-v4/README.md`** `:253-257` (kịch bản demo MF-4) còn các route đã xóa: `PUT …/department-ceilings`, `POST …/publish`, `GET /budget-proposals/{id}/lines` ⟹ thay bằng `POST …/opening`, tải tệp BM-10, `GET /budget-proposals/{id}`.
+5. **`test/integration/installation/seed-calendar.integration-spec.ts`** `:127-133` đọc `first_published_at` (cột không còn được ghi; biến `published`) ⟹ `opened_at IS NOT NULL AS opened`; kỳ vọng đếm phiên bản (`2026: 8`, `2027: 2`) phụ thuộc cách Z2 dựng ngân sách năm hiện hành (mục 1, hạn nộp).
+6. **`test/flows/mf4-budget.flow-spec.ts`:**
+   - `:44-71` thân `BM-10` gửi `lines` ⟹ `{ year, requestedAmount: { amount }, note?, attachmentIds: [≥ 1 tệp] }` (có sẵn `uploadedFile` ở `:27`; `proposal()` mặc định `attachmentIds = []` nay là 422).
+   - `:166-207` ca 422: `valid` dùng `lines` + `attachmentIds: []` ⟹ thân `BM-10` mới kèm một tệp (ca 201 cuối `:207` cần tệp); `withCurrency` đổi sang `requestedAmount: { amount, currency }` và `issuesOf` kỳ vọng `['requestedAmount']` (hiện `['lines.0.amount']`).
+   - `:115`, `:260`, `:274`, `:282` mọi `POST …/submission` cần ≥ 1 tệp phiên bản đã đính trước (`:250` vẫn 422 `RESERVE_REASON_REQUIRED` vì luật lý do kiểm trước luật tệp). Ca dự phòng 6.000.000 trên cơ sở 30.000.000 (`:241-260`) vẫn đúng với D-B17.
+7. **`test/flows/mf1-request-contract.flow-spec.ts`** `:103-130` (review LBG-04 chưa nêu): ca "ngân sách: dòng BM-10 còn khoảng mua" gửi `POST /budget-proposals { year, lines: [proposalLine] }` mong 201 ⟹ nay 422. Đổi sang thân `BM-10` (có `requestedAmount` + một tệp) cho nhánh 201, và dùng khóa bị bỏ (`lines`, `highValuePercent`) làm nhánh 422.
 
 ## Bị chặn
 
