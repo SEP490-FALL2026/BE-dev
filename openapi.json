@@ -113628,6 +113628,32 @@
                       "additionalProperties": false,
                       "nullable": true
                     },
+                    "effectiveBudget": {
+                      "type": "object",
+                      "properties": {
+                        "base": {
+                          "type": "object",
+                          "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                          "required": ["amount", "currency"],
+                          "additionalProperties": false
+                        },
+                        "reserve": {
+                          "type": "object",
+                          "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                          "required": ["amount", "currency"],
+                          "additionalProperties": false
+                        },
+                        "total": {
+                          "type": "object",
+                          "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                          "required": ["amount", "currency"],
+                          "additionalProperties": false
+                        }
+                      },
+                      "required": ["base", "reserve", "total"],
+                      "additionalProperties": false,
+                      "nullable": true
+                    },
                     "held": {
                       "type": "object",
                       "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
@@ -113684,6 +113710,7 @@
                     "budget",
                     "base",
                     "reserve",
+                    "effectiveBudget",
                     "held",
                     "spent",
                     "remaining",
@@ -120781,6 +120808,7 @@
                     "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
                     "required": ["amount", "currency"],
                     "additionalProperties": false,
+                    "description": "The base of the approved version, before the adjustments.",
                     "nullable": true
                   },
                   "reserve": {
@@ -120795,6 +120823,44 @@
                     "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
                     "required": ["amount", "currency"],
                     "additionalProperties": false,
+                    "description": "The base and the reserve of the approved version, before the adjustments.",
+                    "nullable": true
+                  },
+                  "effectiveBudget": {
+                    "type": "object",
+                    "properties": {
+                      "base": {
+                        "type": "object",
+                        "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                        "required": ["amount", "currency"],
+                        "additionalProperties": false,
+                        "description": "The base of the approved version plus the adjustments approved for the year (what was received less what was given)."
+                      },
+                      "reserve": {
+                        "type": "object",
+                        "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                        "required": ["amount", "currency"],
+                        "additionalProperties": false,
+                        "description": "The reserve of the approved version; an adjustment never changes it."
+                      },
+                      "total": {
+                        "type": "object",
+                        "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                        "required": ["amount", "currency"],
+                        "additionalProperties": false,
+                        "description": "The effective base and the reserve together: what a request is checked against."
+                      },
+                      "adjustment": {
+                        "type": "object",
+                        "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                        "required": ["amount", "currency"],
+                        "additionalProperties": false,
+                        "description": "What the approved adjustments added to the base of the version; negative when more was given than received."
+                      }
+                    },
+                    "required": ["base", "reserve", "total", "adjustment"],
+                    "additionalProperties": false,
+                    "description": "Null when the Cost Center has no budget of the year. What is left below is worked out on this.",
                     "nullable": true
                   },
                   "committed": {
@@ -120895,6 +120961,7 @@
                   "base",
                   "reserve",
                   "total",
+                  "effectiveBudget",
                   "committed",
                   "spent",
                   "pendingSpend",
@@ -121041,6 +121108,41 @@
                       "required": ["amount", "currency"],
                       "additionalProperties": false
                     },
+                    "effectiveBudget": {
+                      "type": "object",
+                      "properties": {
+                        "base": {
+                          "type": "object",
+                          "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                          "required": ["amount", "currency"],
+                          "additionalProperties": false,
+                          "description": "The base of the approved version plus the adjustments approved for the year (what was received less what was given)."
+                        },
+                        "reserve": {
+                          "type": "object",
+                          "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                          "required": ["amount", "currency"],
+                          "additionalProperties": false,
+                          "description": "The reserve of the approved version; an adjustment never changes it."
+                        },
+                        "total": {
+                          "type": "object",
+                          "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                          "required": ["amount", "currency"],
+                          "additionalProperties": false,
+                          "description": "The effective base and the reserve together: what a request is checked against."
+                        },
+                        "adjustment": {
+                          "type": "object",
+                          "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                          "required": ["amount", "currency"],
+                          "additionalProperties": false,
+                          "description": "What the approved adjustments added to the base of the version; negative when more was given than received."
+                        }
+                      },
+                      "required": ["base", "reserve", "total", "adjustment"],
+                      "additionalProperties": false
+                    },
                     "committed": {
                       "type": "object",
                       "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
@@ -121085,6 +121187,7 @@
                     "base",
                     "reserve",
                     "total",
+                    "effectiveBudget",
                     "committed",
                     "spent",
                     "remaining",
@@ -121177,6 +121280,7 @@
                       "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
                       "required": ["amount", "currency"],
                       "additionalProperties": false,
+                      "description": "The base of the approved version, before the adjustments.",
                       "nullable": true
                     },
                     "reserve": {
@@ -121191,6 +121295,44 @@
                       "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
                       "required": ["amount", "currency"],
                       "additionalProperties": false,
+                      "description": "The base and the reserve of the approved version, before the adjustments.",
+                      "nullable": true
+                    },
+                    "effectiveBudget": {
+                      "type": "object",
+                      "properties": {
+                        "base": {
+                          "type": "object",
+                          "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                          "required": ["amount", "currency"],
+                          "additionalProperties": false,
+                          "description": "The base of the approved version plus the adjustments approved for the year (what was received less what was given)."
+                        },
+                        "reserve": {
+                          "type": "object",
+                          "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                          "required": ["amount", "currency"],
+                          "additionalProperties": false,
+                          "description": "The reserve of the approved version; an adjustment never changes it."
+                        },
+                        "total": {
+                          "type": "object",
+                          "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                          "required": ["amount", "currency"],
+                          "additionalProperties": false,
+                          "description": "The effective base and the reserve together: what a request is checked against."
+                        },
+                        "adjustment": {
+                          "type": "object",
+                          "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                          "required": ["amount", "currency"],
+                          "additionalProperties": false,
+                          "description": "What the approved adjustments added to the base of the version; negative when more was given than received."
+                        }
+                      },
+                      "required": ["base", "reserve", "total", "adjustment"],
+                      "additionalProperties": false,
+                      "description": "Null when the Cost Center has no budget of the year. What is left below is worked out on this.",
                       "nullable": true
                     },
                     "committed": {
@@ -121251,6 +121393,7 @@
                     "base",
                     "reserve",
                     "total",
+                    "effectiveBudget",
                     "committed",
                     "spent",
                     "pendingSpend",
