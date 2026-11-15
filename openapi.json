@@ -23896,7 +23896,7 @@
             "name": "expiry",
             "required": false,
             "in": "query",
-            "description": "SOON lists the subscriptions from the point of adjustment to the day of its deadline, EXPIRED those past the deadline while seats are still held. A purchase made once is never listed.",
+            "description": "SOON lists the subscriptions from the point of adjustment to the last day of their period (a plan by the year stays SOON after its deadline to cancel, up to its renewal day, else its end day); EXPIRED those past that last day while seats are still held. A plan by the month goes on from one payment day to the next, so only one that does not renew itself is EXPIRED, after its end day. A purchase made once is never listed.",
             "schema": { "type": "string", "enum": ["SOON", "EXPIRED"] }
           },
           {
@@ -23920,7 +23920,7 @@
         ],
         "responses": {
           "200": {
-            "description": "A page of subscriptions by application, plan and creation, optionally filtered; warning=NO_ALERT_ANCHOR lists those with no date to alert from, mine=true those the caller answers for, expiry=SOON or EXPIRED those near or past the point of adjustment (a plan by the month 7 days before its payment day, a plan by the year 30 days before the deadline to cancel; a purchase made once never). Each row says the days left to the deadline, the seats of a shared pool (K2), who answers for it and the logo of the application. Who administers the plan at the vendor (vendorAdmins), the email of the company account that owns it there (ownerAccountEmail) and the note (adminNote) are for the IT Admin: Finance reads them empty, with the two flags.",
+            "description": "A page of subscriptions by application, plan and creation, optionally filtered; warning=NO_ALERT_ANCHOR lists those with no date to alert from, mine=true those the caller answers for, expiry=SOON or EXPIRED those from the point of adjustment to the last day of their period, or past it (a plan by the month opens 7 days before its next payment day, a plan by the year 30 days before the deadline to cancel; a purchase made once never). Each row says the days left to the deadline, the seats of a shared pool (K2), who answers for it and the logo of the application. Who administers the plan at the vendor (vendorAdmins), the email of the company account that owns it there (ownerAccountEmail) and the note (adminNote) are for the IT Admin: Finance reads them empty, with the two flags.",
             "content": {
               "application/json": {
                 "schema": {
@@ -95936,20 +95936,20 @@
                     "expiry": {
                       "type": "string",
                       "enum": ["SOON", "EXPIRED", null],
-                      "description": "SOON from the point of adjustment to the day of its deadline, EXPIRED past it while seats are still held; null before the point, for a purchase made once and when no date is known to count from.",
+                      "description": "SOON from the point of adjustment to the last day of the period (a plan by the year stays SOON past its deadline to cancel); EXPIRED after the renewal day (else the end day) while seats are still held; null before the point, for a purchase made once and when no date is known to count from.",
                       "nullable": true
                     },
                     "daysLeft": {
                       "type": "integer",
                       "minimum": -9007199254740991,
                       "maximum": 9007199254740991,
-                      "description": "The days from today to the deadline the point counts to; negative once it is past; null when there is no point.",
+                      "description": "The days from today to the deadline the point counts to; negative once it is past while the period still runs (a plan by the year after its deadline to cancel); once EXPIRED it counts from the renewal day (else the end day) instead, and deadlineKind says which; null when there is no point.",
                       "nullable": true
                     },
                     "deadlineKind": {
                       "type": "string",
                       "enum": ["PAYMENT_DATE", "NOTICE_DEADLINE", "RENEWAL_DATE", "END_DATE", null],
-                      "description": "What daysLeft counts to: the payment day of a plan by the month; by the year, the deadline to cancel, else the renewal day, else the end day.",
+                      "description": "What daysLeft counts to: the next payment day of a plan by the month; by the year, the deadline to cancel, else the renewal day, else the end day; once EXPIRED, the renewal day or the end day it counts from.",
                       "nullable": true
                     },
                     "seats": {
@@ -96311,20 +96311,20 @@
               "expiry": {
                 "type": "string",
                 "enum": ["SOON", "EXPIRED", null],
-                "description": "SOON from the point of adjustment to the day of its deadline, EXPIRED past it while seats are still held; null before the point, for a purchase made once and when no date is known to count from.",
+                "description": "SOON from the point of adjustment to the last day of the period (a plan by the year stays SOON past its deadline to cancel); EXPIRED after the renewal day (else the end day) while seats are still held; null before the point, for a purchase made once and when no date is known to count from.",
                 "nullable": true
               },
               "daysLeft": {
                 "type": "integer",
                 "minimum": -9007199254740991,
                 "maximum": 9007199254740991,
-                "description": "The days from today to the deadline the point counts to; negative once it is past; null when there is no point.",
+                "description": "The days from today to the deadline the point counts to; negative once it is past while the period still runs (a plan by the year after its deadline to cancel); once EXPIRED it counts from the renewal day (else the end day) instead, and deadlineKind says which; null when there is no point.",
                 "nullable": true
               },
               "deadlineKind": {
                 "type": "string",
                 "enum": ["PAYMENT_DATE", "NOTICE_DEADLINE", "RENEWAL_DATE", "END_DATE", null],
-                "description": "What daysLeft counts to: the payment day of a plan by the month; by the year, the deadline to cancel, else the renewal day, else the end day.",
+                "description": "What daysLeft counts to: the next payment day of a plan by the month; by the year, the deadline to cancel, else the renewal day, else the end day; once EXPIRED, the renewal day or the end day it counts from.",
                 "nullable": true
               },
               "seats": {
