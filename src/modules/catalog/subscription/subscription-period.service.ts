@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import type { BusinessDate } from '../../../core/business-date';
+import { fromDateColumn, type BusinessDate } from '../../../core/business-date';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../../audit/public/audit.api';
@@ -7,7 +7,7 @@ import { OrganizationReadApi } from '../../organization/public/organization-read
 import { catalogAuditEvent } from '../catalog-audit-event.mapper';
 import { PlanFactsService } from '../plan/plan-facts.service';
 import { SubscriptionPeriodRefusedError } from '../public/subscription-period.errors';
-import type { NextPeriodInput, RenewalPeriodFacts } from '../public/subscription-period.types';
+import type { NextPeriodInput, PaymentScheduleFacts, RenewalPeriodFacts } from '../public/subscription-period.types';
 import { assertPoolTerms } from './pool/subscription-pool.policy';
 import { SubscriptionPoolService } from './pool/subscription-pool.service';
 import { snapshotOf } from './subscription.mapper';
@@ -19,7 +19,7 @@ import {
   subscriptionStatusOf,
 } from './subscription.policy';
 import { SubscriptionPriceNotVndError } from './subscription.errors';
-import { SubscriptionRepo } from './subscription.repo';
+import { SubscriptionRepo, type PaidTermRow } from './subscription.repo';
 import { SubscriptionPricingService } from './subscription-pricing.service';
 import type { ApplicationKind, BillingCycle, ProvisioningType, SubscriptionRecord } from './subscription.types';
 
@@ -59,6 +59,24 @@ function factsOf(record: OwnedRecord, renewedById: string | null): RenewalPeriod
     notice: { source: notice.source, deadline: notice.deadline, baseDate: notice.baseDate },
     renewedFromId: record.renewedFromId,
     renewedById,
+  };
+}
+
+/** The payment schedule of a row that has what one needs (an owner, a cycle and a start day); a row that lacks one has no payment day. */
+function scheduleOf(row: PaidTermRow): PaymentScheduleFacts | null {
+  if (row.ownerDepartmentId === null || row.startDate === null) return null;
+  if (row.billingCycle !== 'MONTHLY' && row.billingCycle !== 'QUARTERLY' && row.billingCycle !== 'ANNUAL') return null;
+
+  return {
+    subscriptionId: row.id,
+    planId: row.planId,
+    ownerDepartmentId: row.ownerDepartmentId,
+    billingCycle: row.billingCycle,
+    startDate: fromDateColumn(row.startDate),
+    endDate: row.endDate ? fromDateColumn(row.endDate) : null,
+    renewalDate: row.renewalDate ? fromDateColumn(row.renewalDate) : null,
+    autoRenew: row.autoRenew,
+    recordedAt: row.createdAt,
   };
 }
 
@@ -110,6 +128,14 @@ export class SubscriptionPeriodService {
     const facts = await this.withSuccessors([...dated.slice(0, SWEEP_LIMIT), ...undated]);
 
     return facts.filter((period) => period.renewedById === null);
+  }
+
+  /**
+   * The subscriptions a department owns that run a period, with the days their payments follow (`PI-2`): `departmentIds` narrows to those
+   * departments, null reads every owner. One statement; the invoices of the periods are not read here.
+   */
+  async paymentSchedules(departmentIds: readonly string[] | null, tx?: DbTx): Promise<PaymentScheduleFacts[]> {
+    return (await this.subscriptions.listPaidTerms(departmentIds, tx)).flatMap((row) => scheduleOf(row) ?? []);
   }
 
   /**

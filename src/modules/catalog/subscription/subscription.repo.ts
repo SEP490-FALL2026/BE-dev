@@ -34,6 +34,20 @@ const WITH_PLAN = {
   },
 } as const;
 type Row = Prisma.SubscriptionGetPayload<{ include: typeof WITH_PLAN }>;
+/** The columns the payment days of a subscription are worked out from. */
+export type PaidTermRow = Prisma.SubscriptionGetPayload<{
+  select: {
+    id: true;
+    planId: true;
+    ownerDepartmentId: true;
+    billingCycle: true;
+    startDate: true;
+    endDate: true;
+    renewalDate: true;
+    autoRenew: true;
+    createdAt: true;
+  };
+}>;
 /** A subscription that runs a period (`QĐ-111o`): not a purchase made once, not a draft, not a period a later one continues. */
 const RUNS_A_PERIOD: Prisma.SubscriptionWhereInput = { kind: 'TERM', status: 'ACTIVE', renewedBy: null };
 
@@ -506,6 +520,36 @@ export class SubscriptionRepo {
     return (await this.prisma.subscription.findMany({ where, include: WITH_PLAN, orderBy: { id: 'asc' } })).map(
       toRecord,
     );
+  }
+
+  /**
+   * The subscriptions a department owns that run a period and are paid by a cycle from a start day, whose payment days an invoice follows
+   * (`PI-2`); every owner when `departmentIds` is null, none for an empty list. Only the columns the payment days are worked out from,
+   * one statement, by id. A subscription no department owns (the shared pool) is not among them: an invoice names only an owned one.
+   */
+  async listPaidTerms(departmentIds: readonly string[] | null, tx?: DbTx): Promise<PaidTermRow[]> {
+    if (departmentIds !== null && departmentIds.length === 0) return [];
+
+    return (tx ?? this.prisma).subscription.findMany({
+      where: {
+        ...RUNS_A_PERIOD,
+        startDate: { not: null },
+        billingCycle: { in: ['MONTHLY', 'QUARTERLY', 'ANNUAL'] },
+        ownerDepartmentId: departmentIds === null ? { not: null } : { in: [...departmentIds] },
+      },
+      select: {
+        id: true,
+        planId: true,
+        ownerDepartmentId: true,
+        billingCycle: true,
+        startDate: true,
+        endDate: true,
+        renewalDate: true,
+        autoRenew: true,
+        createdAt: true,
+      },
+      orderBy: { id: 'asc' },
+    });
   }
 
   private conditionsOf(filter: SubscriptionListScope & { ids?: readonly string[] }): Prisma.SubscriptionWhereInput[] {

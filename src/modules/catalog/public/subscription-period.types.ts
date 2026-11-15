@@ -62,3 +62,20 @@ export type PeriodRefusal =
   | 'NO_OWNER_DEPARTMENT'
   /** The price of the new period is not in dong: a price is entered in dong only (`QĐ-111an`). */
   | 'PRICE_NOT_VND';
+
+/**
+ * What the payment days of a subscription follow (`PI-2`): the cycle it is paid by, the days it begins, ends and renews, whether it renews itself,
+ * and the day the system came to know it. Of a subscription a department owns that runs a period.
+ */
+export interface PaymentScheduleFacts {
+  subscriptionId: string;
+  planId: string;
+  ownerDepartmentId: string;
+  billingCycle: 'MONTHLY' | 'QUARTERLY' | 'ANNUAL';
+  startDate: BusinessDate;
+  endDate: BusinessDate | null;
+  renewalDate: BusinessDate | null;
+  autoRenew: boolean;
+  /** The instant the subscription was recorded: a period paid before it is not one the system answers for. */
+  recordedAt: Date;
+}
