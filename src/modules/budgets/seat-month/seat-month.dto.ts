@@ -32,11 +32,17 @@ const seatMonthChargeSchema = z.strictObject({
 
 const poolLineSchema = z.strictObject({
   subscriptionId: z.uuid(),
-  invoiced: moneyView.meta({ description: 'What the invoices of the pool for the month cost.' }),
+  paid: moneyView.nullable().meta({
+    description:
+      'The seats paid for at the price of a month: the seats bought times the price of a month, for each month the purchase runs; null when the seats bought or the price is not known.',
+  }),
+  invoiced: moneyView.meta({
+    description: 'What the invoices of the pool booked to the month cost: the proof of what was paid, not the line.',
+  }),
   allocated: moneyView.meta({ description: 'What the seat-months of the month took of it.' }),
   unallocated: moneyView.meta({
     description:
-      'The line "not allocated, shared pool": the invoices of the month less the seat-months charged to departments.',
+      'The line "not allocated, shared pool": the seats paid for at the price of a month less the seat-months charged to departments (the invoices of the month less them when the seats or the price are not known).',
   }),
   withoutCostCenter: moneyView.meta({
     description:

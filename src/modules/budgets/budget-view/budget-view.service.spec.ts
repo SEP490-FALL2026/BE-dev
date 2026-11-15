@@ -1,5 +1,6 @@
 import type { BudgetFactsService } from '../budget/budget-facts.service';
 import type { ReferenceFigures } from '../budget/version.repo';
+import { SeatMonthPoolService } from '../seat-month/seat-month-pool.service';
 import { SeatMonthRepo } from '../seat-month/seat-month.repo';
 import { BudgetTableViewService } from './budget-table-view.service';
 import type { BudgetViewRepo } from './budget-view.repo';
@@ -51,8 +52,9 @@ function serviceOver(
       formatter: (currency: string) => Promise.resolve((minor: bigint) => ({ amount: minor.toString(), currency })),
     } as unknown as BudgetFactsService,
     {
-      yearTotals: jest.fn().mockResolvedValue({ companyMinor: 0n, poolInvoicedMinor: 0n, allocatedMinor: 0n }),
+      yearTotals: jest.fn().mockResolvedValue({ companyMinor: 0n, withoutCostCenterMinor: 0n }),
     } as unknown as SeatMonthRepo,
+    { yearLineMinor: jest.fn().mockResolvedValue(0n) } as unknown as SeatMonthPoolService,
   );
 }
 

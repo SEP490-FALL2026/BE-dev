@@ -2,7 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { pageOf } from '../../../core/application/pagination';
 import { BudgetFactsService, type MoneyView } from '../budget/budget-facts.service';
 import { SeatMonthRepo } from '../seat-month/seat-month.repo';
-import { stockLineMinor } from '../seat-month/seat-month.policy';
+import { SeatMonthPoolService } from '../seat-month/seat-month-pool.service';
 import type { BudgetSummaryWire, TableRowWire } from '../budget/budget.dto';
 import { BudgetViewNumbersService, type BudgetViewNumbers } from './budget-view-numbers.service';
 import { budgetNumbers } from './budget-view.mapper';
@@ -27,6 +27,7 @@ export class BudgetTableViewService {
     private readonly numbers: BudgetViewNumbersService,
     private readonly facts: BudgetFactsService,
     private readonly seatMonths: SeatMonthRepo,
+    private readonly pool: SeatMonthPoolService,
   ) {}
 
   async table(query: { year?: number; page: number; pageSize: number }) {
@@ -97,10 +98,7 @@ export class BudgetTableViewService {
     >
   > {
     const company = await this.seatMonths.yearTotals(year);
-    const unallocatedMinor = stockLineMinor({
-      invoicedMinor: company.poolInvoicedMinor,
-      allocatedMinor: company.allocatedMinor,
-    });
+    const unallocatedMinor = await this.pool.yearLineMinor(year);
 
     return {
       companySpent: money ? money(company.companyMinor) : null,

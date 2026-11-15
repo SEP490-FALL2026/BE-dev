@@ -148,40 +148,54 @@ export class SeatMonthRepo {
   }
 
   /**
-   * The line of the pool for each subscription that has an invoice of the pool or a seat-month in the month: what its invoices cost (the ones booked
-   * to the subscription, with no commitment and no Cost Center, `QĐ-104c`) and what the seats of the month took of it; the line is the difference
-   * (`stockLineMinor`), not stored. `withoutCostCenterMinor` is the part of the seat-months that fell to a department with no Cost Center yet: it is in
-   * no Cost Center and not in the line of the pool, it is the line "not allocated to a Cost Center" (`QĐ-103t`, `SM1-05`). By subscription, at most `limit`.
+   * What the pool figures of each subscription and month in `[from, until)` need: what its invoices cost (the ones booked to the subscription with no
+   * commitment and no Cost Center, `QĐ-104c`, only for the ids given: the pool of shared seats, never the purchase of a department), what the seat-months took
+   * of it, and the part of those that fell to a department with no Cost Center yet (`SM1-05`). The line itself is the seats paid for less the seat-months
+   * (`poolLineMinor`), worked out by the caller; nothing is stored. Narrowed to one subscription when `only` is given.
    */
-  async poolLinesOfMonth(
-    month: BusinessDate,
-    subscriptionId: string | undefined,
-    limit: number,
-  ): Promise<
-    { subscriptionId: string; invoicedMinor: bigint; allocatedMinor: bigint; withoutCostCenterMinor: bigint }[]
+  async monthlyFigures(input: {
+    from: BusinessDate;
+    until: BusinessDate;
+    invoicedIds: readonly string[];
+    only?: string;
+  }): Promise<
+    {
+      subscriptionId: string;
+      month: BusinessDate;
+      invoicedMinor: bigint;
+      allocatedMinor: bigint;
+      withoutCostCenterMinor: bigint;
+    }[]
   > {
     const only = (column: string) =>
-      subscriptionId ? Prisma.sql`AND ${Prisma.raw(column)} = ${subscriptionId}::uuid` : Prisma.empty;
+      input.only ? Prisma.sql`AND ${Prisma.raw(column)} = ${input.only}::uuid` : Prisma.empty;
     const rows = await this.prisma.$queryRaw<
-      { subscription_id: string; invoiced: string; allocated: string; without_cost_center: string }[]
+      {
+        subscription_id: string;
+        month: string;
+        invoiced: string;
+        allocated: string;
+        without_cost_center: string;
+      }[]
     >`
       SELECT COALESCE(i.subscription_id, a.subscription_id) AS subscription_id,
+             to_char(COALESCE(i.month, a.month), 'YYYY-MM-DD') AS month,
              COALESCE(i.invoiced, 0)::text AS invoiced, COALESCE(a.allocated, 0)::text AS allocated,
              COALESCE(a.without_cost_center, 0)::text AS without_cost_center
-        FROM (SELECT subscription_id, SUM(actual_cost_minor) AS invoiced FROM invoices
-               WHERE subscription_id IS NOT NULL AND commitment_id IS NULL AND cost_center_id IS NULL
-                 AND service_month = ${month}::date ${only('subscription_id')}
-               GROUP BY subscription_id) i
-        FULL JOIN (SELECT subscription_id, SUM(amount_minor) AS allocated,
+        FROM (SELECT subscription_id, service_month AS month, SUM(actual_cost_minor) AS invoiced FROM invoices
+               WHERE subscription_id = ANY(${[...input.invoicedIds]}::uuid[]) AND commitment_id IS NULL AND cost_center_id IS NULL
+                 AND service_month >= ${input.from}::date AND service_month < ${input.until}::date ${only('subscription_id')}
+               GROUP BY subscription_id, service_month) i
+        FULL JOIN (SELECT subscription_id, month, SUM(amount_minor) AS allocated,
                           SUM(amount_minor) FILTER (WHERE cost_center_id IS NULL) AS without_cost_center
                      FROM seat_month_charges
-                    WHERE month = ${month}::date ${only('subscription_id')}
-                    GROUP BY subscription_id) a ON a.subscription_id = i.subscription_id
-       ORDER BY 1
-       LIMIT ${limit}`;
+                    WHERE month >= ${input.from}::date AND month < ${input.until}::date ${only('subscription_id')}
+                    GROUP BY subscription_id, month) a ON a.subscription_id = i.subscription_id AND a.month = i.month
+       ORDER BY 1, 2`;
 
     return rows.map((row) => ({
       subscriptionId: row.subscription_id,
+      month: row.month,
       invoicedMinor: BigInt(row.invoiced),
       allocatedMinor: BigInt(row.allocated),
       withoutCostCenterMinor: BigInt(row.without_cost_center),
@@ -189,23 +203,12 @@ export class SeatMonthRepo {
   }
 
   /**
-   * What the year cost the company and what of it the pool still holds (`MG-03`): every invoice of the year whatever it is booked to, the invoices of
-   * the pool, and what the seat-months of the year took of them. The year of an invoice is the one of the month it pays for, else its commitment's.
+   * What the year cost the company and what of it fell to no Cost Center (`MG-03`, `SM1-05`): every invoice of the year whatever it is booked to, and the
+   * seat-months of the year of a department that has no Cost Center yet. The year of an invoice is the one of the month it pays for, else its commitment's.
    */
-  async yearTotals(year: number): Promise<{
-    companyMinor: bigint;
-    poolInvoicedMinor: bigint;
-    allocatedMinor: bigint;
-    withoutCostCenterMinor: bigint;
-  }> {
-    const rows = await this.prisma.$queryRaw<
-      { company: string; pool: string; allocated: string; without_cost_center: string }[]
-    >`
+  async yearTotals(year: number): Promise<{ companyMinor: bigint; withoutCostCenterMinor: bigint }> {
+    const rows = await this.prisma.$queryRaw<{ company: string; without_cost_center: string }[]>`
       SELECT COALESCE(SUM(i.actual_cost_minor), 0)::text AS company,
-             COALESCE(SUM(i.actual_cost_minor) FILTER (WHERE i.subscription_id IS NOT NULL AND i.commitment_id IS NULL
-                                                         AND i.cost_center_id IS NULL), 0)::text AS pool,
-             (SELECT COALESCE(SUM(s.amount_minor), 0)::text FROM seat_month_charges s
-               WHERE EXTRACT(YEAR FROM s.month)::int = ${year}::int) AS allocated,
              (SELECT COALESCE(SUM(s.amount_minor), 0)::text FROM seat_month_charges s
                WHERE EXTRACT(YEAR FROM s.month)::int = ${year}::int AND s.cost_center_id IS NULL) AS without_cost_center
         FROM invoices i LEFT JOIN budget_commitments c ON c.id = i.commitment_id
@@ -214,8 +217,6 @@ export class SeatMonthRepo {
 
     return {
       companyMinor: BigInt(row?.company ?? '0'),
-      poolInvoicedMinor: BigInt(row?.pool ?? '0'),
-      allocatedMinor: BigInt(row?.allocated ?? '0'),
       withoutCostCenterMinor: BigInt(row?.without_cost_center ?? '0'),
     };
   }

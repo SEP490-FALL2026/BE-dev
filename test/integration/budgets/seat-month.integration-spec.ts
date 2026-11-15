@@ -2,6 +2,8 @@ import { randomUUID } from 'node:crypto';
 import request from 'supertest';
 import { BudgetsApi } from '../../../src/modules/budgets/public/budgets.api';
 import { OrganizationReadApi } from '../../../src/modules/organization/public/organization-read.api';
+import { SeatMonthPoolService } from '../../../src/modules/budgets/seat-month/seat-month-pool.service';
+import { pretendBusinessToday } from '../../support/pretend-today';
 import { SeatMonthSubscriptionService } from '../../../src/modules/budgets/seat-month/seat-month-subscription.service';
 import { SeatMonthRepo } from '../../../src/modules/budgets/seat-month/seat-month.repo';
 import { SeatMonthService } from '../../../src/modules/budgets/seat-month/seat-month.service';
@@ -29,6 +31,7 @@ describe('a month of the seats of a K2 pool is charged to the departments of the
   let counter = 0;
   const month = () => `${h.year}-10-01`;
   const service = () => h.ctx.app.get(SeatMonthService, { strict: false });
+  const poolService = () => h.ctx.app.get(SeatMonthPoolService, { strict: false });
 
   beforeAll(async () => {
     await h.start();
@@ -340,24 +343,65 @@ describe('a month of the seats of a K2 pool is charged to the departments of the
 
     const rows = new Map((await rowsOf(pool)).map((row) => [row.department_id, row]));
     expect(rows.get(without.department.id)).toMatchObject({ cost_center_id: null, amount_minor: '400000' });
-    const [line] = await h.ctx.app.get(SeatMonthRepo, { strict: false }).poolLinesOfMonth(month(), pool, 10);
-    expect(line).toEqual({
-      subscriptionId: pool,
-      invoicedMinor: 800_000n,
-      allocatedMinor: 800_000n,
-      withoutCostCenterMinor: 400_000n,
-    });
+    const [line] = await poolService().linesOfMonth(month(), pool, 10);
+    expect(line).toMatchObject({ invoicedMinor: 800_000n, allocatedMinor: 800_000n, withoutCostCenterMinor: 400_000n });
     const departments = (await facts(withCenter))?.spentMinor ?? 0n;
     expect(departments).toBe(400_000n);
-    expect(departments + line.withoutCostCenterMinor + (line.invoicedMinor - line.allocatedMinor)).toBe(
-      invoice.actualCostMinor,
-    );
+    // The two seat-months are the department that has a Cost Center and the line that has none: nothing of them vanished.
+    expect(departments + line.withoutCostCenterMinor).toBe(invoice.actualCostMinor);
     const year = await h.ctx.app.get(SeatMonthRepo, { strict: false }).yearTotals(h.year);
     expect(year.withoutCostCenterMinor).toBeGreaterThanOrEqual(400_000n);
     const summary = h.dataOf<{ seatMonthsWithoutCostCenter: { amount: string } }>(
       await h.summary(h.finance, { year: h.year }).expect(200),
     );
     expect(BigInt(summary.seatMonthsWithoutCostCenter.amount)).toBe(year.withoutCostCenterMinor);
+  });
+
+  it('SM1-04: a pool of 10 seats bought for a year from 01/07 is the line of 600.000 each month (10 seats paid at 300.000, 8 held), 3.600.000 for the six months, not the year in the month it was invoiced; the pool of a department does not enter it', async () => {
+    const pool = await newPool();
+    const planId = await h.planOf(pool);
+    const vendorId = (await h.vendorOf(planId)).id;
+    await h.ctx.sql.query(
+      `UPDATE subscriptions SET unit_price_minor = 3600000, price_reporting_minor = 3600000, billing_cycle = 'ANNUAL',
+         purchased_quantity = 10, start_date = $2, end_date = $3 WHERE id = $1`,
+      [pool, `${h.year}-07-01`, `${h.year + 1}-06-30`],
+    );
+    const unit = await department();
+    for (let index = 0; index < 8; index += 1) {
+      await seat(pool, planId, await holder(`E-SM-YR${index}`, unit), { validFrom: `${h.year}-07-01` });
+    }
+    // The whole year is invoiced in July; a department's own purchase of the same plan is invoiced beside it and is no line of the pool.
+    await h.recordPurchase(vendorId, { subscriptionId: pool, serviceMonth: `${h.year}-07-01`, netMinor: 36_000_000n });
+    const owned = await h.subscription(5, 'K1', unit.department.id);
+    await h.recordPurchase((await h.vendorOf(await h.planOf(owned))).id, {
+      subscriptionId: owned,
+      serviceMonth: `${h.year}-07-01`,
+      netMinor: 7_000_000n,
+    });
+    pretendBusinessToday(h.ctx.app, `${h.year + 1}-01-10`);
+    for (let index = 7; index <= 12; index += 1) {
+      await service().chargeMonth(`${h.year}-${String(index).padStart(2, '0')}-01`);
+    }
+
+    const july = await poolService().linesOfMonth(`${h.year}-07-01`, pool, 10);
+    const september = await poolService().linesOfMonth(`${h.year}-09-01`, pool, 10);
+    const year = await poolService().yearLineMinor(h.year, pool);
+    jest.restoreAllMocks();
+
+    expect(july).toEqual([
+      {
+        subscriptionId: pool,
+        paidMinor: 3_000_000n,
+        invoicedMinor: 36_000_000n,
+        allocatedMinor: 2_400_000n,
+        withoutCostCenterMinor: 0n,
+        unallocatedMinor: 600_000n,
+      },
+    ]);
+    expect(september[0]).toMatchObject({ invoicedMinor: 0n, unallocatedMinor: 600_000n });
+    // The six months of the year add 6 x 600.000 to the line of the year (the seats of the pool were held in them), and the purchase of the department adds nothing.
+    expect(year).toBe(3_600_000n);
+    expect(await poolService().linesOfMonth(`${h.year}-07-01`, owned, 10)).toEqual([]);
   });
 
   const facts = async (unit: Unit) =>
@@ -394,15 +438,17 @@ describe('a month of the seats of a K2 pool is charged to the departments of the
     expect(invoice).toMatchObject({ booking: 'SUBSCRIPTION', actualCostMinor: 4_000_000n });
     expect(await facts(x)).toMatchObject({ spentMinor: 6n * 400_000n });
     expect(await facts(y)).toMatchObject({ spentMinor: 2n * 400_000n });
-    const [line] = await h.ctx.app.get(SeatMonthRepo, { strict: false }).poolLinesOfMonth(month(), pool, 10);
+    const [line] = await poolService().linesOfMonth(month(), pool, 10);
     expect(line).toEqual({
       subscriptionId: pool,
+      paidMinor: 4_000_000n,
       invoicedMinor: 4_000_000n,
       allocatedMinor: 3_200_000n,
       withoutCostCenterMinor: 0n,
+      unallocatedMinor: 800_000n,
     });
     // The company spent the invoice: the departments' share and the line of the pool add up to it, and the seat-months leave the invoice as it was.
-    expect(6n * 400_000n + 2n * 400_000n + (line.invoicedMinor - line.allocatedMinor)).toBe(invoice.actualCostMinor);
+    expect(6n * 400_000n + 2n * 400_000n + line.unallocatedMinor).toBe(invoice.actualCostMinor);
     const summary = h.dataOf<{ companySpent: { amount: string }; sharedPoolUnallocated: { amount: string } }>(
       await h.summary(h.finance, { year: h.year }).expect(200),
     );
@@ -410,13 +456,18 @@ describe('a month of the seats of a K2 pool is charged to the departments of the
     const year = await h.ctx.app.get(SeatMonthRepo, { strict: false }).yearTotals(h.year);
     expect(year.companyMinor).toBeGreaterThanOrEqual(4_000_000n);
     expect(BigInt(summary.companySpent.amount)).toBe(year.companyMinor);
-    expect(BigInt(summary.sharedPoolUnallocated.amount)).toBe(year.poolInvoicedMinor - year.allocatedMinor);
+    expect(BigInt(summary.sharedPoolUnallocated.amount)).toBe(await poolService().yearLineMinor(h.year));
   });
 
   interface ListWire {
     items: Array<{ department: { id: string }; costCenter: { id: string } | null; amount: { amount: string } }>;
     pagination: { totalItems: number };
-    poolLines: Array<{ subscriptionId: string; invoiced: { amount: string }; unallocated: { amount: string } }>;
+    poolLines: Array<{
+      subscriptionId: string;
+      paid: { amount: string } | null;
+      invoiced: { amount: string };
+      unallocated: { amount: string };
+    }>;
   }
   const listing = (account: Parameters<typeof h.as>[0], query: Record<string, string | number> = {}) =>
     request(h.server())
@@ -441,7 +492,12 @@ describe('a month of the seats of a K2 pool is charged to the departments of the
 
     expect(finance.items.map((row) => row.amount.amount).sort()).toEqual(['322581', '77419']);
     expect(finance.poolLines).toMatchObject([
-      { subscriptionId: pool, invoiced: { amount: '400000' }, unallocated: { amount: '0' } },
+      {
+        subscriptionId: pool,
+        paid: { amount: '4000000' },
+        invoiced: { amount: '400000' },
+        unallocated: { amount: '3600000' },
+      },
     ]);
     expect(own.items.map((row) => [row.costCenter?.id, row.amount.amount])).toEqual([
       [from.department.unitId, '322581'],

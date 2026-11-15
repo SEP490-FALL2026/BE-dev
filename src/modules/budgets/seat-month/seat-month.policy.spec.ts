@@ -1,10 +1,4 @@
-import {
-  commitmentApplication,
-  endedMonthsOf,
-  roundHalfAway,
-  splitSeatMonth,
-  stockLineMinor,
-} from './seat-month.policy';
+import { commitmentApplication, endedMonthsOf, roundHalfAway, splitSeatMonth } from './seat-month.policy';
 import type { PlacementPeriod } from './seat-month.types';
 
 const A = 'dept-a';
@@ -157,14 +151,6 @@ describe('the cost of a K2 seat in a month, split by the day (SM-1.1; T-SM1)', (
 
     it('leaves a commitment of another Cost Center, or no commitment, alone: the department bears the cost without one', () => {
       expect(commitmentApplication({ amountMinor: 400_000n, heldMinor: 1_000_000n, sameCostCenter: false })).toBe(0n);
-    });
-  });
-
-  describe('stockLineMinor', () => {
-    it('is what the invoices of the pool cost less what the seats took', () => {
-      // MG-03: 10 seats bought, 6 + 2 held, 2 idle.
-      expect(stockLineMinor({ invoicedMinor: 4_000_000n, allocatedMinor: 3_200_000n })).toBe(800_000n);
-      expect(stockLineMinor({ invoicedMinor: 0n, allocatedMinor: 0n })).toBe(0n);
     });
   });
 

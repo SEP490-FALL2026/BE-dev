@@ -91,11 +91,6 @@ export function commitmentApplication(input: {
   return input.amountMinor < input.heldMinor ? input.amountMinor : input.heldMinor;
 }
 
-/** The line the pool keeps for a subscription in a month: what its invoices cost less what the seats held took (`QĐ-104c`); not stored. */
-export function stockLineMinor(input: { invoicedMinor: bigint; allocatedMinor: bigint }): bigint {
-  return input.invoicedMinor - input.allocatedMinor;
-}
-
 /**
  * The months that have ended as of `today` and are still worth charging: the months of this year before the month of `today`, and December
  * of the year before while `today` is in January. Each is the first day of a month, the earliest first.

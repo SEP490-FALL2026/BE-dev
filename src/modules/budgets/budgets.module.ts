@@ -83,6 +83,7 @@ import { BudgetAttachmentExpiryService } from './attachment/budget-attachment-ex
 import { BudgetAttachmentExpirySweeper } from './attachment/budget-attachment-expiry.job';
 import { SeatMonthRepo } from './seat-month/seat-month.repo';
 import { SeatMonthChargesController } from './seat-month/seat-month-charges.controller';
+import { SeatMonthPoolService } from './seat-month/seat-month-pool.service';
 import { SeatMonthQueryService } from './seat-month/seat-month-query.service';
 import { SeatMonthService } from './seat-month/seat-month.service';
 import { SeatMonthSubscriptionService } from './seat-month/seat-month-subscription.service';
@@ -180,6 +181,7 @@ import { BudgetProposalTemplateListener } from './proposal/budget-proposal-templ
     SeatMonthRepo,
     SeatMonthSubscriptionService,
     SeatMonthService,
+    SeatMonthPoolService,
     SeatMonthQueryService,
     SeatMonthSweeper,
     // Until a review period can sign a month (RV-1), no month is signed.

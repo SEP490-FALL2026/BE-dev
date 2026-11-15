@@ -4,7 +4,7 @@ import type { AuthenticatedPrincipal } from '../../../infrastructure/security/to
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { BudgetFactsService } from '../budget/budget-facts.service';
 import type { SeatMonthChargeWire, SeatMonthPoolLineWire } from './seat-month.dto';
-import { stockLineMinor } from './seat-month.policy';
+import { SeatMonthPoolService } from './seat-month-pool.service';
 import { SeatMonthRepo, type SeatMonthChargeRecord } from './seat-month.repo';
 
 export interface SeatMonthChargesFilter {
@@ -34,6 +34,7 @@ export class SeatMonthQueryService {
     private readonly repo: SeatMonthRepo,
     private readonly facts: BudgetFactsService,
     private readonly organizationReads: OrganizationReadApi,
+    private readonly pool: SeatMonthPoolService,
   ) {}
 
   async list(
@@ -75,13 +76,14 @@ export class SeatMonthQueryService {
 
   private async poolLines(month: string, subscriptionId: string | undefined): Promise<SeatMonthPoolLineWire[]> {
     const money = await this.facts.formatter(await this.facts.reportingCurrency());
-    const lines = await this.repo.poolLinesOfMonth(month, subscriptionId, MAX_POOL_LINES);
+    const lines = await this.pool.linesOfMonth(month, subscriptionId, MAX_POOL_LINES);
 
     return lines.map((line) => ({
       subscriptionId: line.subscriptionId,
       invoiced: money(line.invoicedMinor),
       allocated: money(line.allocatedMinor),
-      unallocated: money(stockLineMinor({ invoicedMinor: line.invoicedMinor, allocatedMinor: line.allocatedMinor })),
+      paid: line.paidMinor === null ? null : money(line.paidMinor),
+      unallocated: money(line.unallocatedMinor),
       withoutCostCenter: money(line.withoutCostCenterMinor),
     }));
   }
