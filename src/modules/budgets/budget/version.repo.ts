@@ -520,6 +520,14 @@ export class VersionRepo {
     return row ? toRecord(row) : null;
   }
 
+  /** A version made by an adjustment is current the moment it is made: it was asked for by Finance and is approved with the adjustment (`R-48`). */
+  async setApprovedByAdjustment(tx: DbTx, id: string, byEmployeeId: string, now: Date): Promise<void> {
+    await tx.budgetVersion.update({
+      where: { id },
+      data: { state: 'APPROVED', sentByEmployeeId: byEmployeeId, sentAt: now },
+    });
+  }
+
   async setSent(tx: DbTx, id: string, byEmployeeId: string, now: Date): Promise<void> {
     await tx.budgetVersion.update({
       where: { id },

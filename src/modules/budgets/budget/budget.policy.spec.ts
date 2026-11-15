@@ -1,5 +1,6 @@
 import type { BusinessDate } from '../../../core/business-date';
 import {
+  adjustmentDeltasOf,
   belowCarriedOver,
   carriedOverShortfall,
   versionAttachmentMissing,
@@ -330,5 +331,56 @@ describe('the figures of a version as Finance gives them (QĐ-111ac, BG-2.5)', (
   it('sends a version only with one file at least that explains it', () => {
     expect(versionAttachmentMissing(0)).toBe(true);
     expect(versionAttachmentMissing(1)).toBe(false);
+  });
+});
+
+describe('what the approved adjustments add to the base of a Cost Center (AD-1, QĐ-111bh)', () => {
+  const A = 'a';
+  const B = 'b';
+  const C = 'c';
+
+  it('adds to the one that receives, takes from the one that gives, and leaves a Cost Center with no budget out', () => {
+    const rows = [
+      { fromCostCenterId: A, toCostCenterId: B, amountMinor: 20n, createdVersionId: null },
+      { fromCostCenterId: null, toCostCenterId: B, amountMinor: 5n, createdVersionId: null },
+      { fromCostCenterId: A, toCostCenterId: null, amountMinor: 3n, createdVersionId: null },
+      { fromCostCenterId: null, toCostCenterId: C, amountMinor: 9n, createdVersionId: null },
+    ];
+
+    const deltas = adjustmentDeltasOf(
+      rows,
+      new Map([
+        [A, 'va'],
+        [B, 'vb'],
+      ]),
+    );
+
+    expect(deltas.get(A)).toBe(-23n);
+    expect(deltas.get(B)).toBe(25n);
+    expect(deltas.has(C)).toBe(false);
+  });
+
+  it('counts once the adjustment that made the version of the Cost Center: its amount is already the base of that version (R-48)', () => {
+    const rows = [
+      { fromCostCenterId: A, toCostCenterId: B, amountMinor: 20n, createdVersionId: 'vb' },
+      { fromCostCenterId: null, toCostCenterId: B, amountMinor: 5n, createdVersionId: null },
+    ];
+
+    const deltas = adjustmentDeltasOf(
+      rows,
+      new Map([
+        [A, 'va'],
+        [B, 'vb'],
+      ]),
+    );
+
+    expect(deltas.get(B)).toBe(5n);
+    expect(deltas.get(A)).toBe(-20n);
+  });
+
+  it('counts the adjustment that made the version of another Cost Center against the one that gives', () => {
+    const rows = [{ fromCostCenterId: A, toCostCenterId: B, amountMinor: 20n, createdVersionId: 'vb' }];
+
+    expect(adjustmentDeltasOf(rows, new Map([[A, 'va']])).get(A)).toBe(-20n);
   });
 });

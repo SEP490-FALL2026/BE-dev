@@ -82,6 +82,15 @@ import { BudgetAttachmentLinkService } from './attachment/budget-attachment-link
 import { BudgetAttachmentExpiryService } from './attachment/budget-attachment-expiry.service';
 import { BudgetAttachmentExpirySweeper } from './attachment/budget-attachment-expiry.job';
 import { SeatMonthRepo } from './seat-month/seat-month.repo';
+import { BudgetAdjustmentApplyService } from './adjustment/budget-adjustment-apply.service';
+import { BudgetAdjustmentController } from './adjustment/budget-adjustment.controller';
+import { BudgetAdjustmentCreateService } from './adjustment/budget-adjustment-create.service';
+import { BudgetAdjustmentDecisionService } from './adjustment/budget-adjustment-decision.service';
+import { BudgetAdjustmentJudgeService } from './adjustment/budget-adjustment-judge.service';
+import { BudgetAdjustmentLockService } from './adjustment/budget-adjustment-lock.service';
+import { BudgetAdjustmentNotifierService } from './adjustment/budget-adjustment-notifier.service';
+import { BudgetAdjustmentQueryService } from './adjustment/budget-adjustment-query.service';
+import { VersionAdjustmentCreationService } from './version/version-adjustment-creation.service';
 import { BudgetAdjustmentRepo } from './adjustment/budget-adjustment.repo';
 import { BudgetReviewRepo } from './review/budget-review.repo';
 import { BudgetReviewController } from './review/budget-review.controller';
@@ -137,6 +146,7 @@ import { BudgetProposalTemplateListener } from './proposal/budget-proposal-templ
     BudgetAttachmentReadsController,
     SeatMonthChargesController,
     BudgetReviewController,
+    BudgetAdjustmentController,
   ],
   providers: [
     BudgetProposalTemplateListener,
@@ -191,6 +201,14 @@ import { BudgetProposalTemplateListener } from './proposal/budget-proposal-templ
     BaselineFlags,
     SeatMonthRepo,
     BudgetAdjustmentRepo,
+    BudgetAdjustmentApplyService,
+    BudgetAdjustmentCreateService,
+    BudgetAdjustmentDecisionService,
+    BudgetAdjustmentJudgeService,
+    BudgetAdjustmentLockService,
+    BudgetAdjustmentNotifierService,
+    BudgetAdjustmentQueryService,
+    VersionAdjustmentCreationService,
     BudgetReviewRepo,
     BudgetReviewPriceService,
     BudgetReviewFiguresService,

@@ -4,10 +4,14 @@ export interface YearBudgetFacts {
   currency: string;
   /** Base and reserve together. */
   totalMinor: bigint;
-  /** The base of the approved version: what the department may spend without the reserve (`BR-MF1-06e`). */
+  /** The EFFECTIVE base: the base of the approved version plus the adjustments approved for the year (`AD-1`, `QĐ-111bh`): what the department may spend without the reserve (`BR-MF1-06e`). */
   baseMinor: bigint;
   /** The reserve of the approved version: what is left to use, with the head's confirmation, once the base is gone. */
   reserveMinor: bigint;
+  /** The base of the approved version itself, before the adjustments: the starting point that is kept. */
+  versionBaseMinor: bigint;
+  /** What the adjustments approved for the year added to (positive) or took from (negative) the base of the version. */
+  adjustmentMinor: bigint;
   /** What the commitments attached to the budget hold now. */
   heldMinor: bigint;
   /** What has become an expense in the year. */

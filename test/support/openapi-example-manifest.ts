@@ -12,7 +12,6 @@
  * - NO_EXAMPLE_RESPONSES: declared error responses the running system cannot answer yet, so they show no example (their declaration
  *   says why in `noExampleBecause`). The list only shrinks: the slice that makes one reachable adds its examples and removes the entry.
  */
-
 import { SUCCESS_MESSAGES_POLICIES } from './openapi-example-messages-policies';
 import { ROUTE_ERROR_CODES_AI_ASSIST } from './openapi-example-route-codes-ai-assist';
 import { ROUTE_ERROR_CODES_BUDGETS } from './openapi-example-route-codes-budgets';
@@ -117,6 +116,9 @@ export const SUCCESS_MESSAGES: Readonly<Record<string, string>> = {
   budgetReviewPeriodGet: 'BUDGET_REVIEW.RETRIEVED',
   budgetReviewPeriodList: 'BUDGET_REVIEW.LISTED',
   budgetReviewPeriodSign: 'BUDGET_REVIEW.SIGNED',
+  budgetAdjustmentCreate: 'BUDGET_ADJUSTMENT.CREATED',
+  budgetAdjustmentDecide: 'BUDGET_ADJUSTMENT.DECIDED',
+  budgetAdjustmentList: 'BUDGET_ADJUSTMENT.LISTED',
   budgetCycleDelete: 'BUDGET_CYCLE.DELETED',
   budgetCycleOpen: 'BUDGET_CYCLE.OPENED',
   budgetCycleUpdate: 'BUDGET_CYCLE.UPDATED',

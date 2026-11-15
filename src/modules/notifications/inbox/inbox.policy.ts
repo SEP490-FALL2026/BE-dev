@@ -116,6 +116,9 @@ export const PARAM_KEYS_BY_CODE: Readonly<Record<InAppNotificationCode, readonly
   BUDGET_REVIEW_DUE: ['year', 'month'],
   BUDGET_REVIEW_SUMMARY: ['periodId', 'year', 'month', 'kind', 'greenCount', 'yellowCount', 'redCount', 'underCount'],
   BUDGET_SHARED_POOL_OVER_RESERVE: ['year', 'month'],
+  // An adjustment of the budget in the year (`QĐ-111ag`): asked of the spending approver, and decided for Finance and the head of a Cost Center it concerns; the id, the year, the kind and the decision, never a figure.
+  BUDGET_ADJUSTMENT_REQUESTED: ['adjustmentId', 'year', 'kind'],
+  BUDGET_ADJUSTMENT_DECIDED: ['adjustmentId', 'year', 'kind', 'decision', 'costCenterId'],
   // The alerts of the rights (`a03-license-inbox-alerts`): the right, the person, the day and the role asked; never a key, an
   // account identifier, a price or the text of a note.
   LICENSE_EXPIRY_REMINDER: ['assignmentId', 'holderEmployeeId', 'planId', 'expectedEndDate', 'audience'],

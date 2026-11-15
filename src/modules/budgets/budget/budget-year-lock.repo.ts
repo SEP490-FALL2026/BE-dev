@@ -10,6 +10,10 @@ import type { DbTx } from '../../../infrastructure/database/transaction-runner';
  * The order of the locks of this context is fixed: the proposal rows, then the version rows of the Cost Center and year (by id),
  * then this lock, and the years of one transaction earliest first. The transactions of a request take the row of the request
  * first and this lock after it. A transaction takes no proposal or version row after this lock that it did not take before it.
+ *
+ * An adjustment of the budget of the year (`AD-1`, `D11`) is the one thing that spans the whole year, since what is not allocated is a total over every Cost Center: it takes the row of the
+ * cycle (`budget_cycles ... FOR UPDATE`) BEFORE any lock of this kind, then the lock of each Cost Center it names with the lower id first, so that two adjustments (and a version sent) take
+ * turns, and two transfers between the same two Cost Centers never wait for each other in a circle (`BudgetAdjustmentLockService`).
  */
 @Injectable()
 export class BudgetYearLockRepo {

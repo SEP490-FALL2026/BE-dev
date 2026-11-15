@@ -1,5 +1,5 @@
 import { Injectable } from '@nestjs/common';
-import { monthBoundsOf } from '../../../core/business-date';
+import { monthBoundsOf, type BusinessDate } from '../../../core/business-date';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { BudgetFactsRepo } from '../budget/budget-facts.repo';
 import { CommitmentRepo, heldKey } from '../budget/commitment.repo';
@@ -43,6 +43,37 @@ export class BudgetReviewFiguresService {
     const approved = [...(await this.budgets.approvedOfYear(year, tx))]
       .filter(([, budget]) => budget.currency === currency)
       .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0));
+
+    return this.linesFor(tx, year, month, approved);
+  }
+
+  /**
+   * The forecast of the end of the year of each of these Cost Centers as it stands `today`, worked out by the formula of the review and no other (`AD-1`: the floor of a
+   * return and of the source of a transfer is this figure, `R-40`). It is the figure of the month before this one, the last that has ended; of January it is the first month,
+   * and of a year that has not begun it is the first too, with nothing spent. A Cost Center with no budget of the year is absent.
+   */
+  async forecastsOf(
+    tx: DbTx,
+    year: number,
+    costCenterIds: readonly string[],
+    today: BusinessDate,
+  ): Promise<Map<string, bigint>> {
+    const forecasts = new Map<string, bigint>();
+    const approved = [...(await this.budgets.approvedOfCostCenters(costCenterIds, year, tx))];
+    if (approved.length === 0) return forecasts;
+    const month = year > Number(today.slice(0, 4)) ? 1 : Math.max(1, Number(today.slice(5, 7)) - 1);
+    for (const line of await this.linesFor(tx, year, month, approved))
+      forecasts.set(line.costCenterId, line.forecastMinor);
+
+    return forecasts;
+  }
+
+  private async linesFor(
+    tx: DbTx,
+    year: number,
+    month: number,
+    approved: readonly [string, { baseMinor: bigint; reserveMinor: bigint }][],
+  ): Promise<NewReviewLine[]> {
     if (approved.length === 0) return [];
     const costCenterIds = approved.map(([costCenterId]) => costCenterId);
     const pairs = costCenterIds.map((costCenterId) => ({ costCenterId, year }));

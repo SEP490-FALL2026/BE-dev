@@ -130,6 +130,9 @@ export const IN_APP_NOTIFICATION_CODES = [
   'BUDGET_REVIEW_DUE',
   'BUDGET_REVIEW_SUMMARY',
   'BUDGET_SHARED_POOL_OVER_RESERVE',
+  // An adjustment of the budget in the year (`QĐ-111ag`): the spending approver is asked to decide it; Finance who made it and the head of each Cost Center it concerns are told how it was decided. The id, the year and the kind, never a figure.
+  'BUDGET_ADJUSTMENT_REQUESTED',
+  'BUDGET_ADJUSTMENT_DECIDED',
   // The alerts of the rights (`a03-license-inbox-alerts`, `FR-5.14`): a right about to end, a handover not confirmed, a service
   // account whose person leaves, a person who left and keeps a K1 access to the end of the paid period. Ids, codes and days only.
   // The codes of the handover and of the service account are read only (`QĐ-110g`, `QĐ-110m`): nothing writes one any more, a row of

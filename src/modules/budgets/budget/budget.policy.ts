@@ -273,3 +273,36 @@ export function annualCheck(input: {
     ? { kind: 'OVER', gapMinor: total - input.availableMinor }
     : { kind: 'OK', totalMinor: total };
 }
+
+/** An approved adjustment as the base of a Cost Center reads it (`AD-1`). */
+export interface AdjustmentDeltaRow {
+  fromCostCenterId: string | null;
+  toCostCenterId: string | null;
+  amountMinor: bigint;
+  createdVersionId: string | null;
+}
+
+/**
+ * What the approved adjustments add to (positive) or take from (negative) the base of each Cost Center (`QĐ-111bh`): the Cost Center that receives gains the amount, the
+ * one that gives loses it, the reserve is never touched. The adjustment that made the version of the Cost Center that received it is left out: that version already has the
+ * amount as its base (`R-48`), so it is counted once. `versionIdOf` is the version each Cost Center reads as its budget.
+ */
+export function adjustmentDeltasOf(
+  rows: readonly AdjustmentDeltaRow[],
+  versionIdOf: ReadonlyMap<string, string>,
+): Map<string, bigint> {
+  const deltas = new Map<string, bigint>();
+  const add = (costCenterId: string, minor: bigint) =>
+    deltas.set(costCenterId, (deltas.get(costCenterId) ?? 0n) + minor);
+  for (const row of rows) {
+    if (row.fromCostCenterId !== null && versionIdOf.has(row.fromCostCenterId))
+      add(row.fromCostCenterId, -row.amountMinor);
+    const madeItsVersion =
+      row.createdVersionId !== null && row.createdVersionId === versionIdOf.get(row.toCostCenterId ?? '');
+    if (row.toCostCenterId !== null && versionIdOf.has(row.toCostCenterId) && !madeItsVersion) {
+      add(row.toCostCenterId, row.amountMinor);
+    }
+  }
+
+  return deltas;
+}
