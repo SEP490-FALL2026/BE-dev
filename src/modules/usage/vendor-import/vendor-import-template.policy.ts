@@ -31,7 +31,8 @@ export const USAGE_REPORT_TEMPLATE: ImportTemplateDefinition = {
       required: true,
       format: 'YYYY-MM-DD, có thể kèm giờ; định dạng DD/MM/YYYY hoặc MM/DD/YYYY nếu nguồn đã khai',
       example: '2026-11-10',
-      constraint: 'Không ở tương lai; phải nằm trong cửa sổ dữ liệu của file.',
+      constraint:
+        'Không sau ngày cuối của khoảng báo cáo; một ngày trước khoảng vẫn hợp lệ (là lần thấy cuối của người đó).',
     },
   ],
   sampleRows: [
@@ -40,6 +41,7 @@ export const USAGE_REPORT_TEMPLATE: ImportTemplateDefinition = {
     ['thu.ha@congty.example', '2026-09-30'],
   ],
   notes: [
+    'Báo cáo chỉ có ngày hoạt động gần nhất (như mẫu này): khi tải lên phải nhập khoảng thời gian của báo cáo (từ ngày – đến ngày, tối đa 366 ngày, không sau ngày mai); thiếu thì cả file bị từ chối (WINDOW_REQUIRED).',
     'Tên cột phải đúng với mẫu cột đã khai cho nguồn dữ liệu của ứng dụng; cột thừa không được đọc, cột thiếu làm cả file bị từ chối.',
     'Tối đa số dòng mỗi báo cáo theo giới hạn nhập báo cáo; file không có họ tên, ảnh hay nội dung hoạt động.',
     'Báo cáo dạng sự kiện (mỗi dòng một ngày) có thêm cột ngày và loại sự kiện theo mẫu cột của nguồn.',
