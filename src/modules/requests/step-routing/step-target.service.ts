@@ -85,6 +85,7 @@ export class StepTargetService {
         const decision = routeNeedStep(holdsHead ? { ...gathered, requesterEmployeeId: head } : gathered);
 
         return needStepTarget(decision, {
+          chainHasSpendStep: request.chainHasSpendStep,
           successorRecorded: await this.successorRecorded(tx, decision, departmentId, facts.today),
         });
       }

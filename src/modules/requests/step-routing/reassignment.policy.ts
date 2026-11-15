@@ -4,7 +4,7 @@
  * which steps an event may touch, and whether the holder stays, changes, or the step waits under control. Nothing here
  * approves, refuses or cancels a request, and an absence, a leave or a heavy backlog is not an event (`AC-5`).
  */
-import type { RoutingDecision } from '../access-request/routing.policy';
+import type { OneStepReason, RoutingDecision } from '../access-request/routing.policy';
 
 /** The kinds of step that are given to a person to decide. The task of the IT Admin to carry out a grant is not one of them (`BR-03.4`). */
 export type ReassignableStepKind = 'NEED' | 'SPEND_APPROVAL' | 'IT_ASSESSMENT';
@@ -42,23 +42,27 @@ export interface OpenStep {
   waitingReason: string | null;
 }
 
+/** Why the need step of free internal software needs nobody to decide it: the department has no head, or its requester is the head. */
+export type NeedNotRequiredReason = 'NO_DEPARTMENT_HEAD' | 'REQUESTER_IS_HEAD';
+
 /**
  * Who the routing table gives the step on today's data: a person, nobody and why, or nobody because nobody needs to decide it. The last
  * is the need step of free internal software in a department with no head and none recorded to follow: it has no spend step, so it goes straight to
  * the IT Admin as one sent now would (`QĐ-111bc`, `routeNeedStep`); a paid request never gets it, it waits for a head (`QĐ-110i`), and neither does
- * free software while a head is recorded to follow: what waits goes to that head the day the period starts (`QĐ-110h`).
+ * free software while a head is recorded to follow: what waits goes to that head the day the period starts (`QĐ-110h`). The same goes for free
+ * software whose requester has become the head: a head asking for themselves needs nobody (`QĐ-103p`, `US-05-24`).
  */
 export type StepTarget =
   | { assigneeEmployeeId: string; routingRow: number | null }
   | { assigneeEmployeeId: null; reason: WaitingReasonCode }
-  | { assigneeEmployeeId: null; notRequired: 'NO_DEPARTMENT_HEAD'; routingRow: number };
+  | { assigneeEmployeeId: null; notRequired: NeedNotRequiredReason; routingRow: number };
 
 export type ReassignmentDecision =
   | { action: 'KEEP' }
   | { action: 'ASSIGN'; assigneeEmployeeId: string; routingRow: number | null }
   | { action: 'WAIT'; reason: WaitingReasonCode }
   /** The need step ends without anybody deciding it and the request goes on in one step; written once, as the step is no longer open. */
-  | { action: 'END_NOT_REQUIRED'; oneStepReason: 'NO_DEPARTMENT_HEAD'; routingRow: number }
+  | { action: 'END_NOT_REQUIRED'; oneStepReason: NeedNotRequiredReason; routingRow: number }
   /** A step that waits goes on waiting, for another reason: only the reason is written, the stretch and the deadline stay. */
   | { action: 'REWAIT'; reason: WaitingReasonCode };
 
@@ -136,25 +140,37 @@ export function decideReassignment(
  * What the routing table of the need step says, as the target the reassignment reads. Free internal software of a department with no head
  * needs nobody to decide it (`QĐ-111bc`) unless a head is recorded to follow (`successorRecorded`): the work that waits moves to that head on the
  * day the period starts (`QĐ-110h`, `QĐ-110i`: the successor is required, so "no head" with none to follow is the department that never had
- * one), so it waits. Every other request that has no head waits for one (`QĐ-110i`), and so does one whose requester heads the department
- * today, as before (a head's own request is not ended here). A request sent now is routed by the table alone and is not changed by this.
+ * one), so it waits. Free software whose requester heads the department today needs nobody either: a head asking for themselves goes to the IT
+ * Admin (`QĐ-103p`, `US-05-24`), and a request that was with the former head is ended the same way. Every other request that has no head waits
+ * for one (`QĐ-110i`), and so does a paid request whose requester heads the department: the spend step it has is not one the Owner has chosen to
+ * open here (`B2A-Q2`). A request sent now is routed by the table alone and is not changed by this.
  */
-export function needStepTarget(decision: RoutingDecision, facts: { successorRecorded: boolean }): StepTarget {
+export function needStepTarget(
+  decision: RoutingDecision,
+  facts: { chainHasSpendStep: boolean; successorRecorded: boolean },
+): StepTarget {
   if (decision.outcome === 'ASSIGNED') {
     return { assigneeEmployeeId: decision.assigneeEmployeeId, routingRow: decision.row };
   }
-  if (
-    decision.outcome === 'NOT_REQUIRED' &&
-    decision.oneStepReason === 'NO_DEPARTMENT_HEAD' &&
-    !facts.successorRecorded
-  ) {
-    return { assigneeEmployeeId: null, notRequired: 'NO_DEPARTMENT_HEAD', routingRow: decision.row };
+  if (decision.outcome === 'NOT_REQUIRED' && endsAsFree(decision.oneStepReason, facts)) {
+    return { assigneeEmployeeId: null, notRequired: decision.oneStepReason, routingRow: decision.row };
   }
 
   return {
     assigneeEmployeeId: null,
     reason: decision.outcome === 'NOT_REQUIRED' ? 'NO_DEPARTMENT_HEAD' : decision.reason,
   };
+}
+
+/** Whether the need step needs nobody, for the reason the table gives: only a chain with no spend step (free software) ends, and not while a head is recorded to follow a department that has none. */
+function endsAsFree(
+  reason: OneStepReason,
+  facts: { chainHasSpendStep: boolean; successorRecorded: boolean },
+): reason is NeedNotRequiredReason {
+  if (facts.chainHasSpendStep) return false;
+  if (reason === 'NO_DEPARTMENT_HEAD') return !facts.successorRecorded;
+
+  return reason === 'REQUESTER_IS_HEAD';
 }
 
 function endNotRequired(target: Extract<StepTarget, { notRequired: unknown }>): ReassignmentDecision {

@@ -384,6 +384,86 @@ describe('a department with no head: paid requests and case B wait for one, over
       expect(await h.audit('ACCESS_REQUEST.STEP_NOT_REQUIRED', before.id)).toEqual([]);
     });
 
+    it('goes to the IT Admin when its requester becomes the head, as a head asking for themselves does, flagged and audited once, while a paid request of the same person keeps waiting (QĐ-103p, US-05-24, B2A-R4)', async () => {
+      n += 1;
+      const unit = await h.departmentWithHead(`P-XH${n}`);
+      const free = await h.sent(unit.member, internal);
+      const sentPaid = await h.sent(unit.member, paid);
+      const before = await h.stepOf(free.id, 'NEED');
+      expect(before).toMatchObject({ state: 'PENDING', assignee_employee_id: unit.head.employeeId });
+
+      // The Super Admin makes the requester the head of the department.
+      await h.makeHead(unit.department, unit.member);
+
+      expect(await h.stepOf(free.id, 'NEED')).toMatchObject({
+        id: before.id,
+        state: 'NOT_REQUIRED',
+        assignee_employee_id: null,
+        waiting_reason: null,
+        waiting_since: null,
+        routing_row: 2,
+        created_at: before.created_at,
+      });
+      expect(await requestRow(free.id)).toEqual({
+        routing_mode: 'ONE_STEP',
+        one_step_reason: 'REQUESTER_IS_HEAD',
+        state: 'AWAITING_EXECUTION',
+      });
+      expect((await h.requestRow(free.id)).policy).toMatchObject({ chain: ['IT_EXECUTION'] });
+      const flagged = await h.audit('ACCESS_REQUEST.NO_NEED_APPROVER', free.id);
+      expect(flagged).toHaveLength(1);
+      expect(flagged[0].after).toMatchObject({ routingMode: 'ONE_STEP', oneStepReason: 'REQUESTER_IS_HEAD' });
+      const ended = await h.audit('ACCESS_REQUEST.STEP_NOT_REQUIRED', before.id);
+      expect(ended).toHaveLength(1);
+      expect(ended[0]).toMatchObject({
+        actor_kind: 'SYSTEM',
+        before: { assigneeEmployeeId: unit.head.employeeId },
+        after: { requestId: free.id, stepKind: 'NEED', oneStepReason: 'REQUESTER_IS_HEAD' },
+      });
+      // Nothing the worker does later moves it again.
+      await h.sweep();
+      expect(await h.audit('ACCESS_REQUEST.STEP_NOT_REQUIRED', before.id)).toHaveLength(1);
+      expect(await h.audit('ACCESS_REQUEST.NO_NEED_APPROVER', free.id)).toHaveLength(1);
+      // A paid request is another matter (B2A-Q2): it has a spend step, so it still waits and is not flagged.
+      expect(await h.stepOf(sentPaid.id, 'NEED')).toMatchObject({
+        state: 'WAITING',
+        waiting_reason: 'NO_DEPARTMENT_HEAD',
+      });
+      expect(await h.audit('ACCESS_REQUEST.NO_NEED_APPROVER', sentPaid.id)).toEqual([]);
+    });
+
+    it('also puts right a request of its own head that waited for a head under the rule before this one: the next pass of the worker sends it on (B2A-R4)', async () => {
+      n += 1;
+      const unit = await h.departmentWithHead(`P-XQ${n}`);
+      // The head asks for themselves: a one-step request. What the earlier rule left was this request waiting for a head, through the need step.
+      const free = await h.sent(unit.head, internal);
+      await h.ctx.sql.query(
+        `UPDATE access_requests SET routing_mode = 'VIA_HEAD', one_step_reason = NULL, state = 'WAITING_CONTROLLED',
+                policy = jsonb_set(policy, '{chain}', '["NEED","IT_EXECUTION"]'::jsonb) WHERE id = $1`,
+        [free.id],
+      );
+      await h.ctx.sql.query(
+        `UPDATE access_request_steps SET state = 'WAITING', waiting_reason = 'NO_DEPARTMENT_HEAD' WHERE request_id = $1 AND kind = 'NEED'`,
+        [free.id],
+      );
+      const waiting = await h.stepOf(free.id, 'NEED');
+      expect(waiting).toMatchObject({ state: 'WAITING', waiting_reason: 'NO_DEPARTMENT_HEAD' });
+
+      await h.sweep();
+
+      expect(await h.stepOf(free.id, 'NEED')).toMatchObject({
+        id: waiting.id,
+        state: 'NOT_REQUIRED',
+        waiting_reason: null,
+      });
+      expect(await requestRow(free.id)).toEqual({
+        routing_mode: 'ONE_STEP',
+        one_step_reason: 'REQUESTER_IS_HEAD',
+        state: 'AWAITING_EXECUTION',
+      });
+      expect(await h.audit('ACCESS_REQUEST.STEP_NOT_REQUIRED', waiting.id)).toHaveLength(1);
+    });
+
     it('leaves the sending as it was: a request of free internal software sent into the gap goes in one step (B2A-R2 changes only what already waits)', async () => {
       n += 1;
       const unit = await h.departmentWithHead(`P-XK${n}`);

@@ -3,7 +3,7 @@ import type { Prisma } from '../../../generated/prisma/client';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import { requestPolicyJson } from '../access-request/access-request.json';
-import type { ReassignableStepKind } from './reassignment.policy';
+import type { NeedNotRequiredReason, ReassignableStepKind } from './reassignment.policy';
 
 /** An open step as the reassignment reads it, with what the table of its kind needs to run again. */
 export interface ReassignableStep {
@@ -273,7 +273,7 @@ export class StepReassignmentRepo {
     requestId: string,
     stepId: string,
     routingRow: number,
-    oneStepReason: 'NO_DEPARTMENT_HEAD',
+    oneStepReason: NeedNotRequiredReason,
   ): Promise<void> {
     await tx.accessRequestStep.update({
       where: { id: stepId },

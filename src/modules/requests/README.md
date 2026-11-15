@@ -281,7 +281,7 @@ Phòng **mất** trưởng phòng khi Request `K5` đang chờ (hết kỳ, trư
 `ACCESS_REQUEST.STEP_NOT_REQUIRED` ở bước). Bước hết mở nên các lượt sau không đụng lại (chạy lại không ghi gì). Request trả phí và case B vẫn chờ
 (`QĐ-110i`). Khi đã ghi kế nhiệm bắt đầu ngày sau (`nextHeadPeriodOf`) thì `K5` đang chờ **chờ tiếp** `NO_DEPARTMENT_HEAD` qua khoảng giữa và chuyển sang
 người kế nhiệm ở `HEAD_PERIOD_START`, không kết thúc (`QĐ-110h`: việc đang chờ chuyển sang kế nhiệm; `StepTargetService`, `needStepTarget(…, { successorRecorded })`). Chỉ
-lượt xét lại đọc kế nhiệm; Request gửi mới vào khoảng giữa vẫn đi thẳng IT theo `routeNeedStep` (Owner chưa chọn đồng bộ, `OVERNIGHT-DECISIONS` D-53).
+lượt xét lại đọc kế nhiệm; Request gửi mới vào khoảng giữa vẫn đi thẳng IT theo `routeNeedStep` (Owner chưa chọn đồng bộ, `OVERNIGHT-DECISIONS` D-53). Request `K5` của người xin **vừa trở thành** trưởng phòng (Super Admin đổi trưởng phòng) cũng kết thúc bước nhu cầu như trưởng phòng gửi cho chính mình: `NOT_REQUIRED` dòng 2, `ONE_STEP` lý do `REQUESTER_IS_HEAD`, sang `AWAITING_EXECUTION` với cờ `NO_NEED_APPROVER` (`QĐ-103p`, US-05-24; `needStepTarget(…, { chainHasSpendStep })`); Request trả phí của người đó vẫn chờ `NO_DEPARTMENT_HEAD` (Owner chưa chọn, `OVERNIGHT-DECISIONS` B2A-Q2).
 
 Request một bước trả phí (trưởng phòng gửi cho chính mình) kiểm ngân sách ngay khi gửi bằng `BudgetCheckService`: đủ số cơ sở hoặc dùng dự phòng
 mở bước chi; bị chặn hoặc thiếu giá thì lưu `AWAITING_REQUESTER_REVISION`. Người yêu cầu bổ sung qua `accessRequestSupplementAdd`, gửi lại qua

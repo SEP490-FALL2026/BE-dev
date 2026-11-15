@@ -204,6 +204,18 @@ describe('free internal software of a department that lost its head (QĐ-110i, Q
     expect(decideReassignment(held('NEED'), on('WAITING_RETRY'), noNeedApprover)).toEqual({ action: 'KEEP' });
   });
 
+  it('ends a need step of a requester who became the head on the same events, with the reason of a head asking for themselves (B2A-R4)', () => {
+    const requesterIsHead: StepTarget = { assigneeEmployeeId: null, notRequired: 'REQUESTER_IS_HEAD', routingRow: 2 };
+    const endsAsHead = { action: 'END_NOT_REQUIRED', oneStepReason: 'REQUESTER_IS_HEAD', routingRow: 2 };
+
+    expect(decideReassignment(held('NEED'), on('HEAD_CHANGED'), requesterIsHead)).toEqual(endsAsHead);
+    for (const trigger of EVERYDAY_TRIGGERS) {
+      expect(decideReassignment(waiting('NEED', 'NO_DEPARTMENT_HEAD'), on(trigger), requesterIsHead)).toEqual(
+        endsAsHead,
+      );
+    }
+  });
+
   it('still makes a held need step wait when the table names nobody and does not say it is not required (a paid request)', () => {
     expect(decideReassignment(held('NEED'), on('HEAD_CHANGED'), nobody)).toEqual({
       action: 'WAIT',
@@ -216,7 +228,13 @@ describe('free internal software of a department that lost its head (QĐ-110i, Q
 });
 
 describe('who the need step is given to by the routing table (needStepTarget)', () => {
-  const free = { successorRecorded: false };
+  const free = { chainHasSpendStep: false, successorRecorded: false };
+  const requesterIsHead = {
+    outcome: 'NOT_REQUIRED',
+    row: 2,
+    reason: null,
+    oneStepReason: 'REQUESTER_IS_HEAD',
+  } as const;
   const noHeadFree = { outcome: 'NOT_REQUIRED', row: 4, reason: null, oneStepReason: 'NO_DEPARTMENT_HEAD' } as const;
 
   it('names the head when the table assigns the step', () => {
@@ -235,7 +253,7 @@ describe('who the need step is given to by the routing table (needStepTarget)', 
   });
 
   it('makes the step of free software wait while a head is recorded to follow: the work goes to that head the day the period starts (QĐ-110h, B2A-R2)', () => {
-    expect(needStepTarget(noHeadFree, { successorRecorded: true })).toEqual(nobody);
+    expect(needStepTarget(noHeadFree, { chainHasSpendStep: false, successorRecorded: true })).toEqual(nobody);
   });
 
   it('keeps making a step wait for the reason the table gives', () => {
@@ -244,9 +262,24 @@ describe('who the need step is given to by the routing table (needStepTarget)', 
       assigneeEmployeeId: null,
       reason: 'NO_SPENDING_APPROVER',
     });
-    expect(
-      needStepTarget({ outcome: 'NOT_REQUIRED', row: 2, reason: null, oneStepReason: 'REQUESTER_IS_HEAD' }, free),
-    ).toEqual(nobody);
+  });
+
+  it('says nobody needs to decide the step of free software when its requester heads the department: a head asking for themselves goes to the IT Admin, as one sent now (QĐ-103p, US-05-24, B2A-R4)', () => {
+    expect(needStepTarget(requesterIsHead, free)).toEqual({
+      assigneeEmployeeId: null,
+      notRequired: 'REQUESTER_IS_HEAD',
+      routingRow: 2,
+    });
+    // A head is recorded to follow nobody here: the department has a head, so the successor is of no concern.
+    expect(needStepTarget(requesterIsHead, { chainHasSpendStep: false, successorRecorded: true })).toEqual({
+      assigneeEmployeeId: null,
+      notRequired: 'REQUESTER_IS_HEAD',
+      routingRow: 2,
+    });
+  });
+
+  it('leaves a paid request of the person who became the head waiting, as before: it has a spend step, and what it becomes is for the Owner to choose (B2A-Q2)', () => {
+    expect(needStepTarget(requesterIsHead, { chainHasSpendStep: true, successorRecorded: false })).toEqual(nobody);
   });
 });
 
