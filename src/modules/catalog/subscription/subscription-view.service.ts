@@ -99,7 +99,7 @@ export class SubscriptionViewService {
       records.map((record) => {
         // Only a subscription that runs a period has a point: the rule of the filter by expiry, so a badge and the filter never disagree.
         const point = runsAPeriod({ ...record, hasSuccessor: continued.has(record.id) })
-          ? adjustmentPointOf(record)
+          ? adjustmentPointOf(record, today)
           : null;
 
         return [record.id, expiryReading(point, today, (seats.get(record.id)?.occupied ?? 0) > 0)];

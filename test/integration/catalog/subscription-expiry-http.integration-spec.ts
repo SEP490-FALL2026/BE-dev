@@ -1,5 +1,6 @@
 import request from 'supertest';
 import { addDays } from '../../../src/core/business-date';
+import { addMonths } from '../../../src/core/fiscal-year';
 import type { ApiAccount } from '../../support/api-accounts';
 import { declareSubscription } from '../../support/builders/catalog.builder';
 import { ProvisioningHarness } from '../../support/provisioning-harness';
@@ -77,8 +78,11 @@ describe('the subscriptions near or past their adjustment point, over HTTP (inte
     ids.paymentUnknown = await byTheMonth();
     ids.noticeSoon = await byTheYear({ noticeDeadline: addDays(today, 25), renewalDate: addDays(today, 40) });
     ids.noticeFar = await byTheYear({ noticeDeadline: addDays(today, 90), renewalDate: addDays(today, 120) });
-    ids.pastWithSeat = await byTheMonth({ renewalDate: addDays(today, -3) });
-    ids.pastNoSeat = await byTheMonth({ renewalDate: addDays(today, -3) });
+    // A plan by the month that does not renew itself ends on its end day: past it, with seats held, it is EXPIRED.
+    ids.pastWithSeat = await byTheMonth({ endDate: addDays(today, 5) });
+    ids.pastNoSeat = await byTheMonth({ endDate: addDays(today, -3) });
+    // A plan by the month whose payment day passed yesterday and that nobody adjusted just goes on (QĐ-103e): its deadline is the next payment day.
+    ids.monthGoesOn = await byTheMonth({ renewalDate: addDays(today, -1) });
     ids.once = await h.subscription(3, 'K4');
     // A plan by the year past its deadline to cancel with its renewal day still ahead: the contract runs, so it is near its end, not past it.
     ids.noticePast = await byTheYear({ noticeDeadline: addDays(today, -2), renewalDate: addDays(today, 10) });
@@ -101,6 +105,12 @@ describe('the subscriptions near or past their adjustment point, over HTTP (inte
     );
     await holdSeats(ids.paymentSoon, 2);
     await holdSeats(ids.pastWithSeat, 1);
+    // A seat can only be given on a subscription that has not ended: its end day passes after the grant.
+    await h.ctx.sql.query(`UPDATE subscriptions SET end_date = $2::date WHERE id = $1`, [
+      ids.pastWithSeat,
+      addDays(today, -3),
+    ]);
+    await holdSeats(ids.monthGoesOn, 1);
     await holdSeats(ids.noticePast, 1);
     await holdSeats(ids.renewalPast, 1);
     await request(h.server())
@@ -196,6 +206,17 @@ describe('the subscriptions near or past their adjustment point, over HTTP (inte
         daysLeft: -3,
         deadlineKind: 'PAYMENT_DATE',
       });
+    });
+
+    it('does not list a plan by the month whose payment day has passed while seats are held: it goes on to the next payment day', async () => {
+      const nextPayment = addMonths(addDays(today, -1), 1);
+      const daysLeft = Math.round(
+        (Date.parse(`${nextPayment}T00:00:00Z`) - Date.parse(`${today}T00:00:00Z`)) / 86_400_000,
+      );
+
+      expect(await idsOf({ expiry: 'EXPIRED' })).not.toContain(ids.monthGoesOn);
+      expect(await rowOf(ids.monthGoesOn)).toMatchObject({ expiry: null, daysLeft, deadlineKind: 'PAYMENT_DATE' });
+      expect(daysLeft).toBeGreaterThan(27);
     });
 
     it('does not list what is past its deadline when nobody holds a seat any more: nothing is left to adjust', async () => {
