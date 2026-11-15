@@ -278,6 +278,28 @@ describe('a version built from the baseline (integration, real PostgreSQL)', () 
     });
   });
 
+  it('tells nobody that a department sent no proposal while the cycle is still a draft, even when its deadline is already behind us (FIX-LB3 LBG-17)', async () => {
+    const quiet = await headless();
+    const flagOf = async () =>
+      h
+        .dataOf<{ departments: { departmentId: string; noProposalSubmitted: boolean }[] }>(
+          await request(h.server()).get(`/api/v1/budget-cycles/${h.year}/baseline`).set(h.as(h.finance)).expect(200),
+        )
+        .departments.find((department) => department.departmentId === quiet.id)?.noProposalSubmitted;
+    expect(await flagOf()).toBe(true);
+    await h.ctx.sql.query(`UPDATE budget_cycles SET opened_at = NULL, opened_by_employee_id = NULL WHERE year = $1`, [
+      h.year,
+    ]);
+    try {
+      expect(await flagOf()).toBe(false);
+    } finally {
+      await h.ctx.sql.query(`UPDATE budget_cycles SET opened_at = now(), opened_by_employee_id = $2 WHERE year = $1`, [
+        h.year,
+        h.finance.employeeId,
+      ]);
+    }
+  });
+
   it('builds a version with a base of zero for a department that carries nothing into the year, whatever it runs (F-086)', async () => {
     counter += 1;
     const empty = await h.departmentWithUnit(`P-BVZ${counter}`);

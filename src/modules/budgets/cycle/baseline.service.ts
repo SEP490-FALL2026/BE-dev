@@ -27,6 +27,7 @@ import {
 } from './baseline.policy';
 import type { BaselineSubscription } from '../../catalog/public/catalog.types';
 import type { BaselineWire } from './cycle.dto';
+import { cycleStateOf } from './cycle.policy';
 import { CycleRepo } from './cycle.repo';
 
 type Reading = {
@@ -202,7 +203,8 @@ export class BaselineService {
     const spentOf = await this.spentByDepartment(history, today);
 
     const costCenterIds = [...costCenters.values()];
-    const carriedOf = await this.flags.of(costCenterIds, year, today > cycle.submissionDeadline);
+    // Locked is a state of the cycle (`QĐ-111z`): a draft whose deadline is behind us is not locked, and nobody missed a deadline yet.
+    const carriedOf = await this.flags.of(costCenterIds, year, cycleStateOf(cycle, today) === 'LOCKED');
     const departments = inOrderOf(wanted, briefs).map((brief) => {
       const seats = allocation.byDepartment.get(brief.id) ?? new Map<string, number>();
 
