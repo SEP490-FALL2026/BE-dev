@@ -61,10 +61,10 @@ describe('BR-MF4-05 budgetMine over PostgreSQL', () => {
     const open = await mine(u);
 
     expect(open.cycle).toMatchObject({
-      submissionDeadline: `${h.year}-12-01`,
-      decisionDeadline: `${h.year}-12-15`,
+      submissionDeadline: `${h.year}-12-31`,
+      decisionDeadline: `${h.year}-12-31`,
     });
-    expect(['OPEN', 'LOCKED']).toContain(open.cycle?.status);
+    expect(open.cycle?.status).toBe('OPEN');
     expect(open).not.toHaveProperty('departmentCeiling');
     expect(open).not.toHaveProperty('annualCeiling');
     expect(open).not.toHaveProperty('sharedPoolReserve');

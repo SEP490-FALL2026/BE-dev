@@ -86,12 +86,17 @@ export class BudgetHarness extends RequestHarness {
     for (let year = this.year; year <= this.year + 3; year += 1) await this.openedCycle(year);
   }
 
-  /** The budget cycle of a year as a fixture: opened, a ceiling no version reaches, no reserve. Idempotent. */
+  /**
+   * The budget cycle of a year as a fixture: opened, a ceiling no version reaches, no reserve. Idempotent. Both deadlines are the last
+   * day of the year: a cycle locks from the day after its submission deadline (`QĐ-111z`), and the fixture must stay writable on every
+   * day a suite can run on, not only until the day a real cycle would close (a deadline of 1 December locked every budget of the running
+   * year from 2 December on).
+   */
   async openedCycle(year: number): Promise<void> {
     await this.ctx.sql.query(
       `INSERT INTO budget_cycles (id, organization_id, year, submission_deadline, decision_deadline, annual_ceiling_minor,
          shared_pool_reserve_minor, currency, opened_by_employee_id, opened_at, updated_at)
-       SELECT gen_random_uuid(), o.id, $1, make_date($1, 12, 1), make_date($1, 12, 15), 100000000000000, 0, $2, $3, now(), now()
+       SELECT gen_random_uuid(), o.id, $1, make_date($1, 12, 31), make_date($1, 12, 31), 100000000000000, 0, $2, $3, now(), now()
          FROM organizations o
        ON CONFLICT (organization_id, year) DO NOTHING`,
       [year, this.reporting, this.finance.employeeId],
