@@ -84751,8 +84751,8 @@
             "name": "format",
             "required": false,
             "in": "query",
-            "description": "xlsx: a sheet of data and a sheet of instructions; csv: UTF-8 with a byte order mark.",
-            "schema": { "default": "xlsx", "type": "string", "enum": ["xlsx", "csv"] }
+            "description": "xlsx: a sheet of data and a sheet of instructions; csv: UTF-8 with a byte order mark. Left out, the format the parser of that file reads first; one it does not read is refused.",
+            "schema": { "type": "string", "enum": ["xlsx", "csv"] }
           }
         ],
         "responses": {
@@ -84840,7 +84840,7 @@
             }
           },
           "422": {
-            "description": "The kind or the format is not one of the lists (VALIDATION_ERROR).",
+            "description": "The kind or the format is not one of the lists (VALIDATION_ERROR), or the parser of that file does not read the format asked (IMPORT_TEMPLATE.FORMAT_NOT_SUPPORTED, details.formats).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -84853,6 +84853,18 @@
                         "code": "VALIDATION_ERROR",
                         "message": "Request validation failed.",
                         "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "IMPORT_TEMPLATE.FORMAT_NOT_SUPPORTED": {
+                    "summary": "This file is read in csv only.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "IMPORT_TEMPLATE.FORMAT_NOT_SUPPORTED",
+                        "message": "This file is read in csv only.",
+                        "details": { "formats": ["csv"] },
                         "requestId": "req_example"
                       }
                     }
@@ -122622,6 +122634,12 @@
               "isCurrent": { "type": "boolean" },
               "publishedAt": { "type": "string", "format": "date-time" },
               "changeNote": { "type": "string" },
+              "publishedByAppUserId": {
+                "type": "string",
+                "format": "uuid",
+                "description": "The account that published the version; null for a version the installation wrote.",
+                "nullable": true
+              },
               "requiresReacknowledgement": { "type": "boolean" },
               "applicableRoles": {
                 "maxItems": 6,
@@ -122693,6 +122711,7 @@
               "isCurrent",
               "publishedAt",
               "changeNote",
+              "publishedByAppUserId",
               "requiresReacknowledgement",
               "applicableRoles",
               "content",
@@ -122726,6 +122745,12 @@
                     },
                     "publishedAt": { "type": "string", "format": "date-time" },
                     "changeNote": { "type": "string" },
+                    "publishedByAppUserId": {
+                      "type": "string",
+                      "format": "uuid",
+                      "description": "The account that published the version; null for a version the installation wrote.",
+                      "nullable": true
+                    },
                     "requiresReacknowledgement": { "type": "boolean" },
                     "applicableRoles": {
                       "maxItems": 6,
@@ -122740,6 +122765,7 @@
                     "versionNumber",
                     "publishedAt",
                     "changeNote",
+                    "publishedByAppUserId",
                     "requiresReacknowledgement",
                     "applicableRoles"
                   ],
@@ -122978,12 +123004,9 @@
           },
           "applicableRoles": {
             "minItems": 1,
-            "maxItems": 6,
+            "maxItems": 5,
             "type": "array",
-            "items": {
-              "type": "string",
-              "enum": ["SUPER_ADMIN", "IT_ADMIN", "FINANCE", "EMPLOYEE", "MANAGER", "SPENDING_APPROVER"]
-            },
+            "items": { "type": "string", "enum": ["IT_ADMIN", "FINANCE", "EMPLOYEE", "MANAGER", "SPENDING_APPROVER"] },
             "description": "The roles that must acknowledge the version; a person of none of them is never asked."
           },
           "requiresReacknowledgement": {

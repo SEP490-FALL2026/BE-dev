@@ -36,18 +36,22 @@
 - **Phương án:** (A) không lọc, trả trang theo mã nhân viên với `state` từng dòng; (B) lọc bằng SQL join `app_users`/`role_grants` (bảng của module khác) hoặc đọc cả tập rồi cắt trang trong bộ nhớ (cả hai vi phạm luật).
 - **Chọn A** (đúng chữ SPEC, không lách luật module/phân trang); FE lọc trang đang xem. **Đổi lại:** thêm điều kiện `state` vào `IdentityAccessApi.pageUsableRoleHolders` cùng một câu join `policy_acknowledgements` qua facade.
 
-### D-B5 — căn cứ ban hành bản 1 khi cài đặt và nơi nạp 8 chính sách
+### D-B5 — căn cứ ban hành bản 1 và nơi nạp 8 chính sách (SỬA theo FIX-LB1 LB1-01, LB1-02)
 
-- **Câu hỏi:** POLICY-SEED-DRAFT ghi căn cứ demo ("Quyết định số 01/2026/QĐ-GĐ") và đề xuất cho cài đặt thật "Bộ mẫu SaaS-Sentry 1.0 — công ty xuất bản phiên bản 2 kèm quyết định của mình"; nạp ở đâu khi PLAN ghi `src/cli/seed/**`, bootstrap cài đặt còn lệnh giao việc cấm sửa demo seed?
-- **Phương án:** (A) lệnh cài đặt nạp bản 1 với căn cứ bộ mẫu, seed demo gọi cùng API với căn cứ riêng; (B) chỉ seed demo nạp (cài đặt thật không có chính sách ⟹ mọi bước duyệt bị khóa vì không có bản hiện hành); (C) migration dữ liệu (không có tổ chức lúc migrate).
-- **Chọn A:** đúng "Không nạp nháp, vì checklist cần bản hiện hành" (điểm Owner 6) và không đụng demo seed. `PoliciesBootstrapApi.seedInitialPolicies(tx, orgId, changeNote?)` chạy lại an toàn. Cài đặt gọi qua `InstallationInitialDataService` (nhóm chức năng + chính sách) vì constructor `InstallationApi` đã 8 tham số.
-- **File:** `policies/initial/*`, `policies/public/policies-bootstrap.api.ts`, `installation/installation-initial-data.service.ts`. **Đổi lại:** bỏ lời gọi ở service; hoặc đổi `INITIAL_CHANGE_NOTE`.
+- **Câu hỏi:** nạp 8 chính sách ở đâu và căn cứ bản 1 ghi gì khi tổ chức mới cài và khi tổ chức đã cài từ trước.
+- **Phương án:** (A) lệnh cài đặt nạp cho tổ chức mới; (B) thêm migration bù cho mọi tổ chức đã có (tiền lệ CT-1.1); (C) chỉ seed demo nạp.
+- **Chọn A + B** (bản đầu chọn A và loại B vì "không có tổ chức lúc migrate" — sai với môi trường đã cài; reviewer chỉ ra, đã sửa). Cài đặt mới: `PoliciesBootstrapApi.seedInitialPolicies` qua `InstallationInitialDataService`. Môi trường có sẵn: migration `20261113100300_fixlb1_policies_backfill` (SQL sinh từ `INITIAL_POLICIES`, mỗi câu bỏ qua cái đã có nên chạy lại không nhân đôi và không đụng bản Super Admin đã xuất bản; test DB thật đọc lại và so với code). Căn cứ bản 1 = đúng văn bản chính thức: _"Bộ mẫu SaaS-Sentry 1.0 — công ty xuất bản phiên bản 2 kèm quyết định của mình"_ (không còn "v1.9").
+- **File:** `policies/initial/*`, `installation/installation-initial-data.service.ts`, `prisma/migrations/20261113100300_*`. **Đổi lại:** sửa `INITIAL_CHANGE_NOTE` trước khi cài; migration đã chạy thì bản 1 bất biến — sửa bằng bản 2.
 
 ### D-B6 — chưa bỏ mục đích tệp `COST_STATEMENT` ("sao kê") khỏi enum nhận mới
 
 - **Câu hỏi:** PLAN PL-3.1 bảo bỏ mục đích tệp sao kê khỏi enum nhận mới (US-01-12 AC-10, US-04-04 AC-11). Mục đích đó là `COST_STATEMENT` trong `catalog/contract/contract.dto.ts` + `contract.policy.ts`.
 - **Phương án:** (A) bỏ ngay ở lane B; (B) để lại tới lượt hợp nhất vì cùng file lane A (CO-1 sửa hợp đồng/tệp, PI-1 thêm mục đích tệp cho hóa đơn); (C) giữ vĩnh viễn.
 - **Chọn B** (tránh xung đột file chung, không mất gì: không có route nào của PL-3 nhận file sao kê, và **không có mẫu sao kê**). **Việc cho chat điều phối:** sau khi lane A xong PI-1, bỏ `COST_STATEMENT` khỏi danh sách nhận mới (`contract.dto.ts:95`, `contract.policy.ts:20,35`, `contract.policy.spec.ts`), giữ giá trị trong DB để đọc tệp cũ.
+
+### D-B7 — các điểm Optional/Nit của review để lại (LB1-07…LB1-20, LB3-07…LB3-16)
+
+Không làm ở FIX-LB1 (rẻ nhưng đổi hợp đồng hoặc chạm file lane A); chờ lượt hợp nhất: LB1-07 khóa ngoại `organization_id` của ba bảng; LB1-09 thông báo xuất bản theo lô (hiện tuần tự trong transaction, quy mô cỡ 100–500 tài khoản); LB1-10 `POLICY_ROLES` suy từ `AppRole`; LB1-12 báo cáo xác nhận chưa có tổng đã/chưa (FE ghi chú); LB1-13 `GET /policy-steps/{stepCode}` để FE khỏi cứng hóa bước ⟹ chính sách; LB1-14 `applicableRoles` của xuất bản tùy chọn; LB1-16 `totalItems` đếm cả chính sách chưa có bản; LB1-17 `versionNumber` trả về khi DONE là bản hiện hành chứ không phải bản đã xác nhận; LB1-18 tên file `initial/pol-*.types.ts`; LB1-19 owner sổ collection (D-B3); LB1-20 migration không `IF NOT EXISTS`; LB3-07 `COST_STATEMENT` (D-B6); LB3-08 quyền tải mẫu do module sở hữu import khai; LB3-09 hai nguồn cùng một `kind`; LB3-10 dòng ví dụ có thể bị nhập thật; LB3-11 cách mở CSV trên máy Việt Nam; LB3-12 spec nhân sự ghim cột bằng literal; LB3-13 BOM viết bằng ký tự vô hình; LB3-14 nhánh `??` chết ở mẫu usage; LB3-15 tên `*-template.policy.ts` chứa hằng dữ liệu; LB3-16 tên file `mau-usage-csv.xlsx`. Chi tiết ở AUDIT-LB-PL1.md và AUDIT-LB-PL3.md.
 
 ## Optional và việc để lại
 
@@ -65,4 +69,4 @@
 
 ## Dừng ở đâu
 
-- Xong PL-1 (commit cuối `e20b09e6`) và PL-3 (commit cuối `df3a8933`). Việc tiếp: PF-1 → BG-1 → BG-2.
+- Xong PL-1, PL-3, PF-1 (code), FIX-LB1 (12 mục, commit cuối `077c179d`). Nợ: integration DB thật cho PF-1 (upload ⟹ LEFT ⟹ sweeper). Việc tiếp: BG-1 → BG-2.
