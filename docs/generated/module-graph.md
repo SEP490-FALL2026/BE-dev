@@ -82,7 +82,7 @@ flowchart BT
   devices -->|12| organization
   finance -->|3| audit
   finance -->|3| organization
-  identity_access -->|16| audit
+  identity_access -->|18| audit
   identity_access -->|10| notifications
   identity_access -->|36| organization
   installation -->|6| audit
