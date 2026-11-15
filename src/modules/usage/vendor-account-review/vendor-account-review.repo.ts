@@ -28,28 +28,35 @@ export class VendorAccountReviewRepo {
   constructor(private readonly prisma: PrismaService) {}
 
   /**
-   * Writes what was seen, one row for each thing; a thing seen again only moves its last time and the day of its evidence while it is open, and a
-   * decided one is left as it is. Returns how many rows were new.
+   * Writes what was seen, one row open for each thing: a thing seen again moves its last time and the day of its evidence while it is open. A thing
+   * that was decided is opened again as a new row, linked to the decided one, when it is seen with evidence newer than that of the decision; with the
+   * same day or an older one nothing is written (`QĐ-106j`, `US-13-05` AC-26). A decided row is never changed. Returns how many rows were new.
    */
   async upsertMany(tx: DbTx, rows: readonly NewDiscrepancy[]): Promise<number> {
     if (rows.length === 0) return 0;
     const col = <T>(pick: (row: NewDiscrepancy) => T) => rows.map(pick);
     const inserted = await tx.$queryRaw<{ inserted: boolean }[]>`
       INSERT INTO vendor_account_discrepancies (organization_id, source, source_ref, application_id, vendor_id, employee_id, identity,
-        internal_value, vendor_value, evidence_on, first_seen_at, last_seen_at)
+        internal_value, vendor_value, evidence_on, first_seen_at, last_seen_at, reopened_from_id)
       SELECT t.org::uuid, t.source::"VendorAccountDiscrepancySource", t.ref, NULLIF(t.app, '')::uuid, NULLIF(t.vendor, '')::uuid,
-        NULLIF(t.emp, '')::uuid, NULLIF(t.identity, ''), t.internal_value, t.vendor_value, t.evidence_on::date, t.seen::timestamptz, t.seen::timestamptz
+        NULLIF(t.emp, '')::uuid, NULLIF(t.identity, ''), t.internal_value, t.vendor_value, t.evidence_on::date, t.seen::timestamptz, t.seen::timestamptz,
+        (SELECT d.id FROM vendor_account_discrepancies d
+          WHERE d.organization_id = t.org::uuid AND d.source = t.source::"VendorAccountDiscrepancySource" AND d.source_ref = t.ref AND d.state = 'DECIDED'
+          ORDER BY d.decided_at DESC, d.id LIMIT 1)
       FROM unnest(${col((r) => r.organizationId)}::text[], ${col((r) => r.source)}::text[], ${col((r) => r.sourceRef)}::text[],
         ${col((r) => r.applicationId ?? '')}::text[], ${col((r) => r.vendorId ?? '')}::text[], ${col((r) => r.employeeId ?? '')}::text[],
         ${col((r) => r.identity ?? '')}::text[], ${col((r) => r.internalValue)}::text[], ${col((r) => r.vendorValue)}::text[],
         ${col((r) => r.evidenceOn)}::text[], ${col((r) => r.now.toISOString())}::text[])
         AS t(org, source, ref, app, vendor, emp, identity, internal_value, vendor_value, evidence_on, seen)
-      ON CONFLICT (organization_id, source, source_ref) DO UPDATE
+      WHERE NOT EXISTS (
+        SELECT 1 FROM vendor_account_discrepancies d
+         WHERE d.organization_id = t.org::uuid AND d.source = t.source::"VendorAccountDiscrepancySource" AND d.source_ref = t.ref
+           AND d.state = 'DECIDED' AND d.evidence_on >= t.evidence_on::date)
+      ON CONFLICT (organization_id, source, source_ref) WHERE state = 'OPEN' DO UPDATE
         SET last_seen_at = EXCLUDED.last_seen_at,
             evidence_on = GREATEST(vendor_account_discrepancies.evidence_on, EXCLUDED.evidence_on),
             internal_value = EXCLUDED.internal_value,
             vendor_value = EXCLUDED.vendor_value
-        WHERE vendor_account_discrepancies.state = 'OPEN'
       RETURNING (xmax = 0) AS inserted`;
 
     return inserted.filter((row) => row.inserted).length;
@@ -113,27 +120,38 @@ export class VendorAccountReviewRepo {
     return { rows: page.rows.map(toDiscrepancy), total: page.total };
   }
 
-  async insertCase(
+  /**
+   * The case open for the account a difference is about (`QĐ-98h`): the one that is open already, which the difference then joins, or a new one. One
+   * statement decides, so two differences of one account decided together get the same case.
+   */
+  async openOrJoinCase(
     tx: DbTx,
     input: {
       organizationId: string;
       discrepancyId: string;
       applicationId: string | null;
       vendorId: string | null;
+      identityKey: string;
       at: Date;
     },
-  ): Promise<OutOfProcessCaseRecord> {
-    const row = await tx.outOfProcessCase.create({
-      data: {
-        organizationId: input.organizationId,
-        discrepancyId: input.discrepancyId,
-        applicationId: input.applicationId,
-        vendorId: input.vendorId,
-        openedAt: input.at,
-      },
+  ): Promise<{ record: OutOfProcessCaseRecord; joined: boolean }> {
+    const created = await tx.$queryRaw<{ id: string }[]>`
+      INSERT INTO out_of_process_cases (organization_id, discrepancy_id, application_id, vendor_id, opened_at, identity_key)
+      VALUES (${input.organizationId}::uuid, ${input.discrepancyId}::uuid, ${input.applicationId}::uuid, ${input.vendorId}::uuid,
+        ${input.at}::timestamptz, ${input.identityKey})
+      ON CONFLICT (organization_id, identity_key) WHERE state = 'OPEN' AND identity_key IS NOT NULL DO NOTHING
+      RETURNING id`;
+    if (created.length > 0) {
+      return {
+        record: toCase(await tx.outOfProcessCase.findUniqueOrThrow({ where: { id: created[0].id } })),
+        joined: false,
+      };
+    }
+    const open = await tx.outOfProcessCase.findFirstOrThrow({
+      where: { organizationId: input.organizationId, identityKey: input.identityKey, state: 'OPEN' },
     });
 
-    return toCase(row);
+    return { record: toCase(open), joined: true };
   }
 
   async lockCase(tx: DbTx, id: string): Promise<OutOfProcessCaseRecord | null> {

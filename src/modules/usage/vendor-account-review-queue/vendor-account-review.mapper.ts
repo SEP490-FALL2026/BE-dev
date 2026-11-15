@@ -27,6 +27,7 @@ export function toDiscrepancyWire(row: DiscrepancyRecord, names: ApplicationName
     decidedBy: row.decidedByEmployeeId === null ? null : { employeeId: row.decidedByEmployeeId },
     decidedAt: row.decidedAt?.toISOString() ?? null,
     outOfProcessCaseId: row.outOfProcessCaseId,
+    reopenedFromId: row.reopenedFromId,
   };
 }
 

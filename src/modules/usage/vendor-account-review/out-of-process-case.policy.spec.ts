@@ -1,4 +1,4 @@
-import { closureRefusal } from './out-of-process-case.policy';
+import { closureRefusal, openCaseKeyOf } from './out-of-process-case.policy';
 
 const spent = {
   outcome: 'RECORD_SPENT' as const,
@@ -71,5 +71,31 @@ describe('how a case outside the process is closed (SBF-07a, R-45)', () => {
     expect(closureRefusal({ ...spent, amountMinor: 0n })).toBe('AMOUNT_INVALID');
     expect(closureRefusal({ ...spent, amountMinor: -5n })).toBe('AMOUNT_INVALID');
     expect(closureRefusal({ ...spent, hasVendor: false })).toBe('NO_VENDOR');
+  });
+});
+
+describe('the account a case outside the process is about (QĐ-98h: one case is open for each account of a vendor)', () => {
+  const base = {
+    vendorId: 'v-1',
+    identity: null as string | null,
+    employeeId: null as string | null,
+    discrepancyId: 'd-1',
+  };
+
+  it('is the identifier at the vendor, lower-cased and trimmed, so that the same account written twice is one', () => {
+    expect(openCaseKeyOf({ ...base, identity: ' Twice@Gmail.com ' })).toBe('v-1:twice@gmail.com');
+    expect(openCaseKeyOf({ ...base, identity: 'twice@gmail.com' })).toBe('v-1:twice@gmail.com');
+  });
+
+  it('is the person when only the person is known, and the difference itself when nothing says which account it is', () => {
+    expect(openCaseKeyOf({ ...base, employeeId: 'e-1' })).toBe('v-1:employee:e-1');
+    expect(openCaseKeyOf(base)).toBe('v-1:discrepancy:d-1');
+  });
+
+  it('is told apart by vendor, and a difference with no vendor is of no vendor', () => {
+    expect(openCaseKeyOf({ ...base, vendorId: 'v-2', identity: 'a@x.vn' })).not.toBe(
+      openCaseKeyOf({ ...base, identity: 'a@x.vn' }),
+    );
+    expect(openCaseKeyOf({ ...base, vendorId: null, identity: 'CODEX' })).toBe('no-vendor:codex');
   });
 });

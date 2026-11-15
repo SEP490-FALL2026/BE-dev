@@ -28,3 +28,23 @@ export function closureRefusal(input: {
 
   return null;
 }
+
+/**
+ * The account a case is about, as the key that keeps one case open for each (`QĐ-98h`, `US-13-03` AC-11): the vendor, then the identifier at the vendor
+ * lower-cased, or the person when only the person is known, or the difference itself when nothing says which account it is (it is then its own account).
+ */
+export function openCaseKeyOf(input: {
+  vendorId: string | null;
+  identity: string | null;
+  employeeId: string | null;
+  discrepancyId: string;
+}): string {
+  const identity = input.identity?.trim().toLowerCase();
+  const account = identity
+    ? identity
+    : input.employeeId !== null
+      ? `employee:${input.employeeId}`
+      : `discrepancy:${input.discrepancyId}`;
+
+  return `${input.vendorId ?? 'no-vendor'}:${account}`;
+}

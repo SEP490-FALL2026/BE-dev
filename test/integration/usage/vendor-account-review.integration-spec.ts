@@ -25,6 +25,7 @@ interface Difference {
   decision: string | null;
   decisionNote: string | null;
   outOfProcessCaseId: string | null;
+  reopenedFromId: string | null;
 }
 interface CaseWire {
   id: string;
@@ -360,6 +361,85 @@ describe('the review of the accounts at the vendors over PostgreSQL (integration
       expect(
         (await h.ctx.sql.query(`SELECT 1 FROM out_of_process_cases WHERE discrepancy_id = $1`, [open.id])).rowCount,
       ).toBe(0);
+    });
+
+    it('opens a difference again when the thing it was about is seen with newer evidence after it was decided, links it to the one it follows, and does nothing for the same day or an older one (B3C-04, QĐ-106j, US-13-05 AC-26)', async () => {
+      const intake = h.ctx.app.get(VendorAccountIntakeService);
+      const seen = (date: string) =>
+        h.ctx.app.get(TransactionRunner).run((tx) =>
+          intake.fromUnlistedTools(tx, {
+            organizationId: h.seed.organizationId,
+            sightings: [{ tool: 'REOPEN-TOOL', date }],
+          }),
+        );
+      const ofTool = async (state: string) =>
+        (await listed(`&state=${state}&source=COLLECTOR_UNLISTED`)).items.filter(
+          (item) => item.identity === 'REOPEN-TOOL',
+        );
+      await seen(`${h.year}-10-03`);
+      const [first] = await ofTool('OPEN');
+      await differences('post', `/${first.id}/decision`)
+        .send({ decision: 'FALSE_ALARM', note: 'Công cụ thử' })
+        .expect(201);
+
+      await seen(`${h.year}-10-03`);
+      await seen(`${h.year}-09-20`);
+      expect(await ofTool('OPEN')).toEqual([]);
+
+      await seen(`${h.year}-10-20`);
+      const [again, ...rest] = await ofTool('OPEN');
+      expect(rest).toEqual([]);
+      expect(again).toMatchObject({ evidenceOn: `${h.year}-10-20`, reopenedFromId: first.id, decision: null });
+      expect(again.id).not.toBe(first.id);
+      expect((await ofTool('DECIDED')).map((item) => item.id)).toEqual([first.id]);
+
+      await seen(`${h.year}-10-25`);
+      expect((await ofTool('OPEN')).map((item) => [item.id, item.evidenceOn])).toEqual([[again.id, `${h.year}-10-25`]]);
+    });
+
+    it('keeps one open case for each account of a vendor: a second difference of the same account, from another source, decided outside the process joins the case that is open instead of opening a second (B3C-02, QĐ-98h)', async () => {
+      const first = await difference('twice@gmail.com');
+      const second = (
+        await h.ctx.sql.query<{ id: string }>(
+          `INSERT INTO vendor_account_discrepancies (organization_id, source, source_ref, application_id, vendor_id, identity, internal_value,
+             vendor_value, evidence_on, first_seen_at, last_seen_at)
+           VALUES ($1, 'UNMATCHED_IDENTITY', $2, $3, $4, 'Twice@Gmail.com', 'x', 'y', $5, now(), now()) RETURNING id`,
+          [h.seed.organizationId, `again-${randomUUID()}`, applicationId, vendorId, `${h.year}-11-02`],
+        )
+      ).rows[0];
+      const decide = async (id: string) =>
+        h.dataOf<Difference>(
+          await differences('post', `/${id}/decision`)
+            .send({ decision: 'OUT_OF_PROCESS', note: 'Ngoài quy trình' })
+            .expect(201),
+        );
+
+      const one = await decide(first.id);
+      const two = await decide(second.id);
+
+      expect(two.outOfProcessCaseId).toBe(one.outOfProcessCaseId);
+      expect(
+        (
+          await h.ctx.sql.query(
+            `SELECT 1 FROM out_of_process_cases WHERE id = $1 OR identity_key ILIKE '%twice@gmail.com'`,
+            [one.outOfProcessCaseId],
+          )
+        ).rowCount,
+      ).toBe(1);
+      // The table keeps it too: a second open case for the same account is refused.
+      await expect(
+        h.ctx.sql.query(
+          `INSERT INTO out_of_process_cases (organization_id, discrepancy_id, opened_at, identity_key)
+           SELECT organization_id, gen_random_uuid(), now(), identity_key FROM out_of_process_cases WHERE id = $1`,
+          [one.outOfProcessCaseId],
+        ),
+      ).rejects.toMatchObject({ code: '23505' });
+      // Closed, the case lets the next sighting of the account open a new one.
+      await cases('post', `/${one.outOfProcessCaseId as string}/closure`)
+        .send({ outcome: 'REPORT_ONLY', note: 'Chỉ báo cáo' })
+        .expect(201);
+      const third = await difference('twice-later@gmail.com');
+      expect((await decide(third.id)).outOfProcessCaseId).not.toBe(one.outOfProcessCaseId);
     });
 
     it('opens one case for OUT_OF_PROCESS, in the same step, and the table refuses to change what was decided', async () => {

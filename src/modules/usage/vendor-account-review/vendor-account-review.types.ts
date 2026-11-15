@@ -34,6 +34,7 @@ export interface DiscrepancyRecord extends DiscrepancyValues {
   decidedByEmployeeId: string | null;
   decidedAt: Date | null;
   outOfProcessCaseId: string | null;
+  reopenedFromId: string | null;
 }
 
 export interface OutOfProcessCaseRecord {

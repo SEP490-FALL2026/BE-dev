@@ -87,7 +87,14 @@ const discrepancySchema = z.strictObject({
   decisionNote: z.string().nullable(),
   decidedBy: personRef.nullable(),
   decidedAt: z.iso.datetime().nullable(),
-  outOfProcessCaseId: z.uuid().nullable().meta({ description: 'The case an OUT_OF_PROCESS decision opened.' }),
+  outOfProcessCaseId: z.uuid().nullable().meta({
+    description:
+      'The case an OUT_OF_PROCESS decision opened, or the one already open for the same account that it joined.',
+  }),
+  reopenedFromId: z.uuid().nullable().meta({
+    description:
+      'The decided difference of the same thing this one follows, when it was seen again with newer evidence after it was decided; null for a first sighting.',
+  }),
 });
 
 const caseSchema = z.strictObject({

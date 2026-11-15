@@ -467,8 +467,11 @@ model VendorAccountDiscrepancy {
   decidedByEmployeeId String?                        @map("decided_by_employee_id") @db.Uuid
   decidedAt           DateTime?                      @map("decided_at") @db.Timestamptz(3)
   outOfProcessCaseId  String?                        @map("out_of_process_case_id") @db.Uuid
+  // The decided row of the same thing this one follows when it was seen again with newer evidence (QĐ-106j); the one still open is unique (SQL: partial).
+  reopenedFromId      String?                        @map("reopened_from_id") @db.Uuid
 
-  @@unique([organizationId, source, sourceRef], map: "vendor_account_discrepancies_source_key")
+  @@unique([organizationId, source, sourceRef], map: "vendor_account_discrepancies_open_key")
+  @@index([organizationId, source, sourceRef], map: "vendor_account_discrepancies_source_idx")
   @@index([organizationId, state, firstSeenAt(sort: Desc), id], map: "vendor_account_discrepancies_state_seen_idx")
   @@index([evidenceOn], map: "vendor_account_discrepancies_evidence_on_idx")
   @@map("vendor_account_discrepancies")
@@ -492,7 +495,10 @@ model OutOfProcessCase {
   amountMinor        BigInt?               @map("amount_minor")
   costCenterId       String?               @map("cost_center_id") @db.Uuid
   documentIds        String[]              @default([]) @map("document_ids") @db.Uuid
+  // The account the case is about: one case is open for each (`QĐ-98h`); null once closed or for a case older than the rule (SQL: partial unique).
+  identityKey        String?               @map("identity_key")
 
+  @@unique([organizationId, identityKey], map: "out_of_process_cases_open_identity_key")
   @@index([organizationId, state, openedAt(sort: Desc), id], map: "out_of_process_cases_state_opened_idx")
   @@map("out_of_process_cases")
 }
