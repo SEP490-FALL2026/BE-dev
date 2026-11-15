@@ -401,7 +401,7 @@ export class CycleService {
       sharedPoolReserve: cycle.sharedPoolReserveMinor === null ? null : format(cycle.sharedPoolReserveMinor),
       priorities: cycle.priorities,
       status,
-      openedAt: cycle.openedAt.toISOString(),
+      openedAt: cycle.openedAt?.toISOString() ?? null,
       publishedAt: cycle.publishedAt?.toISOString() ?? null,
       firstPublishedAt: cycle.firstPublishedAt?.toISOString() ?? null,
       allocated: format(allocated),

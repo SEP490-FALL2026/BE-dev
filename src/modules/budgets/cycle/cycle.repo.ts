@@ -15,8 +15,9 @@ export interface CycleRecord {
   sharedPoolReserveMinor: bigint | null;
   currency: string;
   priorities: string | null;
-  openedByEmployeeId: string;
-  openedAt: Date;
+  /** NULL while the cycle is a draft. */
+  openedByEmployeeId: string | null;
+  openedAt: Date | null;
   publishedByEmployeeId: string | null;
   publishedAt: Date | null;
   firstPublishedAt: Date | null;

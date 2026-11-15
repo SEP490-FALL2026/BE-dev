@@ -501,9 +501,10 @@ model BudgetAttachment {
   @@map("budget_attachments")
 }
 
-/// The budget cycle of a year (QĐ-103i, BR-MF4-01): the deadlines, the annual ceiling of the software budget, the shared-pool reserve
-/// and the ceilings of the departments. Finance opens, changes and publishes it. `publishedAt` is set while it is published and cleared
-/// when a ceiling is changed; `firstPublishedAt` is never cleared (from it a department head may submit the proposal of the year).
+/// The budget cycle of a year (QĐ-103i, BR-MF4-01, QĐ-111z): the deadlines, the annual ceiling of the software budget and the shared-pool
+/// reserve. It is a draft while `openedAt` is NULL (Finance edits or deletes it freely), open from then until the submission deadline, and
+/// locked after it. `publishedAt`, `publishedByEmployeeId`, `firstPublishedAt` and the ceilings of the departments are no longer written
+/// (QĐ-111aa); the columns stay for the cycles written before.
 model BudgetCycle {
   id                    String    @id @default(uuid(7)) @db.Uuid
   organizationId        String    @map("organization_id") @db.Uuid
@@ -514,8 +515,8 @@ model BudgetCycle {
   sharedPoolReserveMinor BigInt?  @map("shared_pool_reserve_minor")
   currency              String    @db.Char(3)
   priorities            String?
-  openedByEmployeeId    String    @map("opened_by_employee_id") @db.Uuid
-  openedAt              DateTime  @map("opened_at") @db.Timestamptz(3)
+  openedByEmployeeId    String?   @map("opened_by_employee_id") @db.Uuid
+  openedAt              DateTime? @map("opened_at") @db.Timestamptz(3)
   publishedByEmployeeId String?   @map("published_by_employee_id") @db.Uuid
   publishedAt           DateTime? @map("published_at") @db.Timestamptz(3)
   firstPublishedAt      DateTime? @map("first_published_at") @db.Timestamptz(3)
@@ -523,7 +524,7 @@ model BudgetCycle {
 
   organization   Organization              @relation(fields: [organizationId], references: [id])
   currencyRecord Currency                  @relation("BudgetCycleCurrency", fields: [currency], references: [code], onDelete: Restrict)
-  openedBy       Employee                  @relation("BudgetCycleOpener", fields: [openedByEmployeeId], references: [id], onDelete: Restrict)
+  openedBy       Employee?                 @relation("BudgetCycleOpener", fields: [openedByEmployeeId], references: [id], onDelete: Restrict)
   publishedBy    Employee?                 @relation("BudgetCyclePublisher", fields: [publishedByEmployeeId], references: [id], onDelete: Restrict)
   ceilings       BudgetDepartmentCeiling[]
 

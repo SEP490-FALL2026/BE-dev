@@ -68,7 +68,10 @@ const cycleSummary = {
   priorities: z.string().nullable(),
   /** `NOT_PUBLISHED` before the first publication; `PUBLISHED`; `CHANGED_AFTER_PUBLISH` until it is published again. */
   status: z.enum(['NOT_PUBLISHED', 'PUBLISHED', 'CHANGED_AFTER_PUBLISH']),
-  openedAt: z.iso.datetime(),
+  openedAt: z.iso
+    .datetime()
+    .nullable()
+    .meta({ description: 'When Finance opened the cycle; null while it is a draft.' }),
   publishedAt: z.iso.datetime().nullable(),
   firstPublishedAt: z.iso.datetime().nullable(),
   allocated: moneyView.meta({ description: 'The ceilings of the departments and the reserve, added.' }),
