@@ -121177,12 +121177,20 @@
                   "type": "object",
                   "properties": {
                     "subscriptionId": { "type": "string", "format": "uuid" },
+                    "paid": {
+                      "type": "object",
+                      "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                      "required": ["amount", "currency"],
+                      "additionalProperties": false,
+                      "description": "The seats paid for at the price of a month: the seats bought times the price of a month, for each month the purchase runs; null when the seats bought or the price is not known.",
+                      "nullable": true
+                    },
                     "invoiced": {
                       "type": "object",
                       "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
                       "required": ["amount", "currency"],
                       "additionalProperties": false,
-                      "description": "What the invoices of the pool for the month cost."
+                      "description": "What the invoices of the pool booked to the month cost: the proof of what was paid, not the line."
                     },
                     "allocated": {
                       "type": "object",
@@ -121196,7 +121204,7 @@
                       "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
                       "required": ["amount", "currency"],
                       "additionalProperties": false,
-                      "description": "The line \"not allocated, shared pool\": the invoices of the month less the seat-months charged to departments."
+                      "description": "The line \"not allocated, shared pool\": the seats paid for at the price of a month less the seat-months charged to departments (the invoices of the month less them when the seats or the price are not known)."
                     },
                     "withoutCostCenter": {
                       "type": "object",
@@ -121206,7 +121214,7 @@
                       "description": "The line \"not allocated to a Cost Center\": the part of the seat-months that fell to a department with no Cost Center yet. It is in no Cost Center and not in the line of the pool."
                     }
                   },
-                  "required": ["subscriptionId", "invoiced", "allocated", "unallocated", "withoutCostCenter"],
+                  "required": ["subscriptionId", "paid", "invoiced", "allocated", "unallocated", "withoutCostCenter"],
                   "additionalProperties": false
                 },
                 "description": "The line of the shared pool of each subscription with an invoice or a seat-month in the month (Finance only; empty for a manager)."
