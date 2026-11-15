@@ -43,12 +43,24 @@ describe('the holders of a subscription and their revocation, over HTTP (integra
     k1Revoked: '',
     k1Plain: '',
     k1Ended: '',
+    states: '',
+    queued: '',
+    failed: '',
+    retrying: '',
+    closedFailed: '',
   };
-  const tasks: Record<'waiting' | 'grace' | 'keyHolderRevoked' | 'k1Revoked', string> = {
+  const tasks: Record<
+    'waiting' | 'grace' | 'keyHolderRevoked' | 'k1Revoked' | 'queued' | 'failed' | 'retrying' | 'closedFailed',
+    string
+  > = {
     waiting: '',
     grace: '',
     keyHolderRevoked: '',
     k1Revoked: '',
+    queued: '',
+    failed: '',
+    retrying: '',
+    closedFailed: '',
   };
 
   const get = (query: Record<string, string | number>, account: ApiAccount = h.it1) =>
@@ -140,6 +152,29 @@ describe('the holders of a subscription and their revocation, over HTTP (integra
     ids.keyHolderRevoked = given[0].assignmentId;
     ids.keyHolder = given[1].assignmentId;
     tasks.keyHolderRevoked = (await h.open(ids.keyHolderRevoked, 'RETURN')).taskId;
+
+    // The states a revocation task can be in while its seat is still held: waiting, failed and waiting for a decision, waiting for its next
+    // try (a task of the connector that failed for a while), and closed as failed (the seat is still held, nobody is taking it back).
+    ids.states = await h.subscription(10, 'K2');
+    const reopened = async (assignmentId: string): Promise<string> => {
+      const { taskId } = await h.open(assignmentId, 'RETURN');
+      await h.claim(taskId).expect(200);
+
+      return taskId;
+    };
+    ids.queued = await h.seat({ subscriptionId: ids.states }, code());
+    tasks.queued = (await h.open(ids.queued, 'RETURN')).taskId;
+    ids.failed = await h.seat({ subscriptionId: ids.states }, code());
+    tasks.failed = await reopened(ids.failed);
+    await h.fail(tasks.failed, { reason: 'The workspace admin cannot sign in' }).expect(200);
+    ids.retrying = await h.seat({ subscriptionId: ids.states }, code());
+    tasks.retrying = await reopened(ids.retrying);
+    await h.makeConnector(tasks.retrying);
+    await h.recordFailure(tasks.retrying, 'TRANSIENT');
+    ids.closedFailed = await h.seat({ subscriptionId: ids.states }, code());
+    tasks.closedFailed = await reopened(ids.closedFailed);
+    await h.fail(tasks.closedFailed, { reason: 'The workspace admin cannot sign in' }).expect(200);
+    await h.closeFailed(tasks.closedFailed, { reason: 'Handled outside the system later' }).expect(200);
   }, 300000);
 
   afterAll(async () => {
@@ -199,6 +234,60 @@ describe('the holders of a subscription and their revocation, over HTTP (integra
       ).task;
 
       expect(task).toMatchObject({ kind: 'REVOKE', assignmentId: ids.waiting });
+    });
+  });
+
+  describe('the states of the task that is open', () => {
+    it('is open while the task waits, and says so: QUEUED', async () => {
+      expect((await rowOf(ids.states, ids.queued))?.revocation).toEqual({
+        taskId: tasks.queued,
+        status: 'QUEUED',
+        claimableNow: true,
+      });
+    });
+
+    it('is still open when the task failed and waits for the decision of the IT Admin: FAILED, which the front end reads from status', async () => {
+      expect((await rowOf(ids.states, ids.failed))?.revocation).toEqual({
+        taskId: tasks.failed,
+        status: 'FAILED',
+        claimableNow: true,
+      });
+      // claimableNow does not say that the task can be taken: a failed one waits for a decision, so the front end reads status as well.
+      expect(h.codeOf(await h.claim(tasks.failed).expect(409))).toBe('PROVISIONING_TASK.NOT_CLAIMABLE');
+    });
+
+    it('is still open when the task waits for its next try: RETRY_SCHEDULED', async () => {
+      expect((await rowOf(ids.states, ids.retrying))?.revocation).toEqual({
+        taskId: tasks.retrying,
+        status: 'RETRY_SCHEDULED',
+        claimableNow: true,
+      });
+    });
+
+    it('is not open once the task was closed as failed: the seat is held and nobody is taking it back', async () => {
+      const row = await rowOf(ids.states, ids.closedFailed, { activeOnly: 'true' });
+
+      expect(row).toMatchObject({ validUntil: null, revocation: null });
+      expect(await h.liveTaskOf(ids.closedFailed)).toBeNull();
+    });
+
+    it('is what the stock counts as being taken back: the plan revoking is the number of rows with a revocation', async () => {
+      for (const subscriptionId of [ids.states, ids.k2]) {
+        const rows = (await pageOf({ subscriptionId, activeOnly: 'true', pageSize: 100 })).items;
+        const stock = h.dataOf<{ items: { stock: { kind: string; revoking?: number } }[] }>(
+          await request(h.server())
+            .get('/api/v1/stock-summary')
+            .query({ planId: await h.planOf(subscriptionId) })
+            .set(h.as(h.it1))
+            .expect(200),
+        ).items[0].stock;
+
+        expect(rows.filter((row) => row.revocation !== null).length).toBeGreaterThan(0);
+        expect(stock).toMatchObject({
+          kind: 'SEATS',
+          revoking: rows.filter((row) => row.revocation !== null).length,
+        });
+      }
     });
   });
 
