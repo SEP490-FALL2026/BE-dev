@@ -11,6 +11,8 @@ export interface BudgetViewFigures {
   baseMinor: bigint | null;
   reserveMinor: bigint | null;
   totalMinor: bigint | null;
+  /** What the approved adjustments added to (positive) or took from (negative) the base of the version; null with no version (`AD-1`). */
+  adjustmentMinor: bigint | null;
 }
 
 /**
@@ -23,6 +25,16 @@ const figuresQuery = (year?: number) => Prisma.sql`
       FROM budget_versions
      WHERE (state = 'APPROVED' OR (state = 'EXPIRED' AND NOT never_current))
      ORDER BY cost_center_id, year, number DESC
+  ), adjusted AS (
+    SELECT x.cost_center_id, x.year, SUM(x.delta)::bigint AS delta FROM (
+      SELECT a.to_cost_center_id AS cost_center_id, a.year, a.amount_minor AS delta, a.created_version_id
+        FROM budget_adjustments a WHERE a.state = 'APPROVED' AND a.to_cost_center_id IS NOT NULL
+      UNION ALL
+      SELECT a.from_cost_center_id, a.year, -a.amount_minor, NULL::uuid
+        FROM budget_adjustments a WHERE a.state = 'APPROVED' AND a.from_cost_center_id IS NOT NULL
+    ) x JOIN reference r ON r.cost_center_id = x.cost_center_id AND r.year = x.year
+    WHERE x.created_version_id IS DISTINCT FROM r.id
+    GROUP BY x.cost_center_id, x.year
   ), pairs AS (
     SELECT cost_center_id, year, currency FROM reference
     UNION
@@ -39,8 +51,10 @@ const figuresQuery = (year?: number) => Prisma.sql`
   )
   SELECT p.cost_center_id AS "costCenterId", p.year, p.currency,
          v.id AS "versionId", v.number, v.base_minor AS "baseMinor",
-         v.reserve_minor AS "reserveMinor", v.total_minor AS "totalMinor"
+         v.reserve_minor AS "reserveMinor", v.total_minor AS "totalMinor",
+         CASE WHEN v.id IS NULL THEN NULL ELSE COALESCE(j.delta, 0) END AS "adjustmentMinor"
     FROM pairs p LEFT JOIN reference v ON v.cost_center_id = p.cost_center_id AND v.year = p.year
+    LEFT JOIN adjusted j ON j.cost_center_id = p.cost_center_id AND j.year = p.year
    WHERE ${year ?? null}::int IS NULL OR p.year = ${year ?? null}::int`;
 
 /** Reads only tables owned by budgets. Page and count use one repeatable snapshot. */

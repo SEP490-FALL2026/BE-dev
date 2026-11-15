@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
+import { BudgetFactsRepo } from '../budget/budget-facts.repo';
 import { CommitmentRepo } from '../budget/commitment.repo';
 import { InvoiceRepo } from '../budget/invoice.repo';
 import { CycleRepo } from '../cycle/cycle.repo';
@@ -21,7 +22,13 @@ export class BudgetViewNumbersService {
     private readonly invoices: InvoiceRepo,
     private readonly cycles: CycleRepo,
     private readonly organization: OrganizationReadApi,
+    private readonly budgets: BudgetFactsRepo,
   ) {}
+
+  /** What the adjustments approved for the year added to the base of the Cost Center (`AD-1`); nothing when it has none. */
+  async adjustmentOf(costCenterId: string, year: number): Promise<bigint> {
+    return (await this.budgets.approvedOfCostCenters([costCenterId], year)).get(costCenterId)?.adjustmentMinor ?? 0n;
+  }
 
   async totals(pairs: readonly { costCenterId: string; year: number }[]): Promise<Map<string, BudgetViewNumbers>> {
     if (pairs.length === 0) return new Map();

@@ -29,6 +29,7 @@ function serviceOver(
       rows: jest.fn().mockResolvedValue(versions.map((row) => ({ ...row, versionId: 'version', number: 1 }))),
     } as unknown as BudgetViewRepo,
     {
+      adjustmentOf: jest.fn().mockResolvedValue(0n),
       totals: jest.fn().mockResolvedValue(
         new Map(
           versions.map((row) => {
@@ -78,6 +79,12 @@ describe('BR-MF4-05 BudgetTableViewService.summary', () => {
       base: { amount: '1350', currency: 'VND' },
       reserve: { amount: '150', currency: 'VND' },
       total: { amount: '1500', currency: 'VND' },
+      effectiveBudget: {
+        base: { amount: '1350', currency: 'VND' },
+        reserve: { amount: '150', currency: 'VND' },
+        total: { amount: '1500', currency: 'VND' },
+        adjustment: { amount: '0', currency: 'VND' },
+      },
       committed: { amount: '700', currency: 'VND' },
       spent: { amount: '350', currency: 'VND' },
       remaining: { amount: '450', currency: 'VND' },

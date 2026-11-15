@@ -60,8 +60,13 @@ export class BudgetViewService {
     const format = await this.facts.formatter(current?.currency ?? (await this.facts.reportingCurrency()));
     const totals = (await this.numbers.totals([{ costCenterId: ownId, year }])).get(`${ownId}:${year}`)!;
     const cycle = await this.numbers.cycle(year);
+    const adjustmentMinor = current ? await this.numbers.adjustmentOf(ownId, year) : null;
     return {
-      ...budgetNumbers(current ?? { baseMinor: null, reserveMinor: null, totalMinor: null }, totals, format),
+      ...budgetNumbers(
+        current ? { ...current, adjustmentMinor } : { baseMinor: null, reserveMinor: null, totalMinor: null },
+        totals,
+        format,
+      ),
       cycle: cycle
         ? {
             submissionDeadline: cycle.submissionDeadline,

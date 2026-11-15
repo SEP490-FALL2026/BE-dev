@@ -12,6 +12,7 @@ function setup() {
     decisionDeadline: '2026-12-15',
   };
   const numbers = {
+    adjustmentOf: jest.fn().mockResolvedValue(0n),
     totals: jest
       .fn()
       .mockResolvedValue(

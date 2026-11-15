@@ -281,10 +281,30 @@ const versionSummarySchema = z.strictObject({
   createdAt: z.iso.datetime(),
   sentAt: z.iso.datetime().nullable(),
 });
+/** The budget as it is read: the base of the approved version with the adjustments approved for it, the reserve as it is (`QĐ-111bh`). */
+const effectiveBudgetSchema = z.strictObject({
+  base: moneyView.meta({
+    description:
+      'The base of the approved version plus the adjustments approved for the year (what was received less what was given).',
+  }),
+  reserve: moneyView.meta({ description: 'The reserve of the approved version; an adjustment never changes it.' }),
+  total: moneyView.meta({
+    description: 'The effective base and the reserve together: what a request is checked against.',
+  }),
+  adjustment: moneyView.meta({
+    description:
+      'What the approved adjustments added to the base of the version; negative when more was given than received.',
+  }),
+});
 const budgetNumbersSchema = {
-  base: moneyView.nullable(),
+  base: moneyView.nullable().meta({ description: 'The base of the approved version, before the adjustments.' }),
   reserve: moneyView.nullable(),
-  total: moneyView.nullable(),
+  total: moneyView
+    .nullable()
+    .meta({ description: 'The base and the reserve of the approved version, before the adjustments.' }),
+  effectiveBudget: effectiveBudgetSchema.nullable().meta({
+    description: 'Null when the Cost Center has no budget of the year. What is left below is worked out on this.',
+  }),
   committed: moneyView,
   spent: moneyView,
   pendingSpend: moneyView,
@@ -328,6 +348,7 @@ const summaryTotalSchema = z.strictObject({
   base: moneyView,
   reserve: moneyView,
   total: moneyView,
+  effectiveBudget: effectiveBudgetSchema,
   committed: moneyView,
   spent: moneyView,
   remaining: moneyView,
