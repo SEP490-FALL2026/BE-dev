@@ -68000,6 +68000,641 @@
         "tags": ["seat-month-charges"]
       }
     },
+    "/api/v1/budget-review-periods": {
+      "post": {
+        "operationId": "budgetReviewPeriodClose",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/CreateReviewPeriodBodyDto" } } }
+        },
+        "responses": {
+          "201": {
+            "description": "The seat-months of the month are worked out and the picture of the month is kept: for every Cost Center with an effective budget of the year its budget, what it spent, holds and has waiting, what is left, the difference k of its invoices, the price increase already known, the forecast of the end of the year, the pace and the light, and the figures of the company with the line of the shared pool against its reserve. March, June and September are the quarterly review. The picture is never changed; an invoice that comes later is read in the next month.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/ReviewPeriodResponseDto" },
+                    { "properties": { "message": { "example": "BUDGET_REVIEW.CLOSED" } } }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_BAD_REQUEST": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_BAD_REQUEST",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHENTICATION_REQUIRED": {
+                    "summary": "A Bearer access token is required.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHENTICATION_REQUIRED",
+                        "message": "A Bearer access token is required.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "INVALID_ACCESS_TOKEN": {
+                    "summary": "The access token is invalid.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "INVALID_ACCESS_TOKEN",
+                        "message": "The access token is invalid.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only Finance closes a month.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHORIZATION.FORBIDDEN": {
+                    "summary": "You do not have permission to perform this action.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHORIZATION.FORBIDDEN",
+                        "message": "You do not have permission to perform this action.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The month was closed already (BUDGET_REVIEW.PERIOD_EXISTS), or its seat-months could not all be worked out and nothing was closed (BUDGET_REVIEW.SEAT_MONTHS_NOT_READY).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "BUDGET_REVIEW.PERIOD_EXISTS": {
+                    "summary": "The month 10/2026 was closed already.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "BUDGET_REVIEW.PERIOD_EXISTS",
+                        "message": "The month 10/2026 was closed already.",
+                        "details": { "year": 2026, "month": 10 },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "BUDGET_REVIEW.SEAT_MONTHS_NOT_READY": {
+                    "summary": "The seat-months of the month could not be worked out; the month was not closed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "BUDGET_REVIEW.SEAT_MONTHS_NOT_READY",
+                        "message": "The seat-months of the month could not be worked out; the month was not closed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_PAYLOAD_TOO_LARGE": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_PAYLOAD_TOO_LARGE",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_UNSUPPORTED_MEDIA_TYPE": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_UNSUPPORTED_MEDIA_TYPE",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The body is invalid (VALIDATION_ERROR), or the month has not ended (BUDGET_REVIEW.MONTH_NOT_ENDED).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "VALIDATION_ERROR": {
+                    "summary": "Request validation failed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "VALIDATION_ERROR",
+                        "message": "Request validation failed.",
+                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "BUDGET_REVIEW.MONTH_NOT_ENDED": {
+                    "summary": "The month 11/2026 has not ended.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "BUDGET_REVIEW.MONTH_NOT_ENDED",
+                        "message": "The month 11/2026 has not ended.",
+                        "details": { "year": 2026, "month": 11 },
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_TOO_MANY_REQUESTS": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_TOO_MANY_REQUESTS",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "TOKEN_VERIFICATION_UNAVAILABLE": {
+                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
+                        "message": "Authentication is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SERVICE_UNAVAILABLE": {
+                    "summary": "The service is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SERVICE_UNAVAILABLE",
+                        "message": "The service is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "bearer": [] }],
+        "summary": "Close a month that has ended",
+        "tags": ["budget-review-periods"]
+      },
+      "get": {
+        "operationId": "budgetReviewPeriodList",
+        "parameters": [
+          {
+            "name": "year",
+            "required": false,
+            "in": "query",
+            "description": "Only the periods of this year.",
+            "schema": { "minimum": 2000, "maximum": 2100, "type": "integer" }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maximum": 9007199254740991,
+              "exclusiveMinimum": true,
+              "default": 1,
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": { "maximum": 100, "exclusiveMinimum": true, "default": 20, "type": "integer", "minimum": 0 }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "A page of the review periods, the latest month first, each with its state, who closed and who signed it, how many Cost Centers have each light and, for Finance and the spending approver, the figures of the company. A manager reads the counts of the Cost Center of their own department only.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/ReviewPeriodListResponseDto" },
+                    { "properties": { "message": { "example": "BUDGET_REVIEW.LISTED" } } }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHENTICATION_REQUIRED": {
+                    "summary": "A Bearer access token is required.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHENTICATION_REQUIRED",
+                        "message": "A Bearer access token is required.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "INVALID_ACCESS_TOKEN": {
+                    "summary": "The access token is invalid.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "INVALID_ACCESS_TOKEN",
+                        "message": "The access token is invalid.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only Finance, the spending approver and the manager of a department read the review periods.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHORIZATION.FORBIDDEN": {
+                    "summary": "You do not have permission to perform this action.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHORIZATION.FORBIDDEN",
+                        "message": "You do not have permission to perform this action.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The query is invalid (VALIDATION_ERROR).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "VALIDATION_ERROR": {
+                    "summary": "Request validation failed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "VALIDATION_ERROR",
+                        "message": "Request validation failed.",
+                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_TOO_MANY_REQUESTS": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_TOO_MANY_REQUESTS",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "TOKEN_VERIFICATION_UNAVAILABLE": {
+                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
+                        "message": "Authentication is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SERVICE_UNAVAILABLE": {
+                    "summary": "The service is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SERVICE_UNAVAILABLE",
+                        "message": "The service is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "bearer": [] }],
+        "summary": "List the months that were closed",
+        "tags": ["budget-review-periods"]
+      }
+    },
+    "/api/v1/budget-review-periods/{id}": {
+      "get": {
+        "operationId": "budgetReviewPeriodGet",
+        "parameters": [
+          { "name": "id", "required": true, "in": "path", "schema": { "format": "uuid", "type": "string" } },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "description": "The page of the lines.",
+            "schema": {
+              "maximum": 9007199254740991,
+              "exclusiveMinimum": true,
+              "default": 1,
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "description": "The lines in a page, at most 100.",
+            "schema": { "maximum": 100, "exclusiveMinimum": true, "default": 50, "type": "integer", "minimum": 0 }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The period and a page of its lines, the Cost Centers that need the eye first (red, yellow, under, then green). Finance and the spending approver read every line; a manager reads the line of the Cost Center of their own department.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/ReviewPeriodDetailResponseDto" },
+                    { "properties": { "message": { "example": "BUDGET_REVIEW.RETRIEVED" } } }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHENTICATION_REQUIRED": {
+                    "summary": "A Bearer access token is required.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHENTICATION_REQUIRED",
+                        "message": "A Bearer access token is required.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "INVALID_ACCESS_TOKEN": {
+                    "summary": "The access token is invalid.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "INVALID_ACCESS_TOKEN",
+                        "message": "The access token is invalid.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only Finance, the spending approver and the manager of a department read the review periods.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHORIZATION.FORBIDDEN": {
+                    "summary": "You do not have permission to perform this action.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHORIZATION.FORBIDDEN",
+                        "message": "You do not have permission to perform this action.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The review period does not exist, or none of its Cost Centers is in the scope of the caller (BUDGET_REVIEW.NOT_FOUND).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "BUDGET_REVIEW.NOT_FOUND": {
+                    "summary": "The review period does not exist.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "BUDGET_REVIEW.NOT_FOUND",
+                        "message": "The review period does not exist.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The id or the query is invalid (VALIDATION_ERROR).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "VALIDATION_ERROR": {
+                    "summary": "Request validation failed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "VALIDATION_ERROR",
+                        "message": "Request validation failed.",
+                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_TOO_MANY_REQUESTS": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_TOO_MANY_REQUESTS",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "TOKEN_VERIFICATION_UNAVAILABLE": {
+                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
+                        "message": "Authentication is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SERVICE_UNAVAILABLE": {
+                    "summary": "The service is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SERVICE_UNAVAILABLE",
+                        "message": "The service is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "bearer": [] }],
+        "summary": "Read one closed month with its lines",
+        "tags": ["budget-review-periods"]
+      }
+    },
     "/api/v1/monitoring-notice-versions": {
       "post": {
         "operationId": "monitoringNoticeVersionCreate",
@@ -121221,6 +121856,577 @@
               }
             },
             "required": ["items", "pagination", "poolLines"],
+            "additionalProperties": false,
+            "nullable": true
+          }
+        },
+        "required": ["success", "message", "data"],
+        "additionalProperties": false
+      },
+      "CreateReviewPeriodBodyDto": {
+        "type": "object",
+        "properties": {
+          "year": {
+            "type": "integer",
+            "minimum": 2000,
+            "maximum": 2100,
+            "description": "The fiscal year of the month to close, as YYYY."
+          },
+          "month": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 12,
+            "description": "The month to close, 1 to 12. It must have ended: a month is closed from the day after its last day."
+          }
+        },
+        "required": ["year", "month"],
+        "additionalProperties": false
+      },
+      "ReviewPeriodResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "enum": [true] },
+          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "id": { "type": "string", "format": "uuid" },
+              "year": { "type": "integer", "minimum": -9007199254740991, "maximum": 9007199254740991 },
+              "month": { "type": "integer", "minimum": -9007199254740991, "maximum": 9007199254740991 },
+              "kind": {
+                "type": "string",
+                "enum": ["MONTH", "QUARTER"],
+                "description": "QUARTER for March, June and September, the quarterly review; MONTH for the others."
+              },
+              "state": {
+                "type": "string",
+                "enum": ["SNAPSHOT", "AWAITING_EXPLANATIONS", "SIGNED"],
+                "description": "SNAPSHOT: closed on its figures. AWAITING_EXPLANATIONS: a quarter waiting for the explanations of the departments. SIGNED: signed by Finance, for good."
+              },
+              "currency": { "type": "string" },
+              "closedBy": {
+                "type": "object",
+                "properties": {
+                  "employeeId": { "type": "string", "format": "uuid" },
+                  "employeeCode": { "type": "string" },
+                  "fullName": { "type": "string" }
+                },
+                "required": ["employeeId", "employeeCode", "fullName"],
+                "additionalProperties": false,
+                "nullable": true
+              },
+              "closedAt": { "type": "string", "format": "date-time" },
+              "signedBy": {
+                "type": "object",
+                "properties": {
+                  "employeeId": { "type": "string", "format": "uuid" },
+                  "employeeCode": { "type": "string" },
+                  "fullName": { "type": "string" }
+                },
+                "required": ["employeeId", "employeeCode", "fullName"],
+                "additionalProperties": false,
+                "nullable": true
+              },
+              "signedAt": { "type": "string", "format": "date-time", "nullable": true },
+              "note": { "type": "string", "nullable": true },
+              "lightCounts": {
+                "type": "object",
+                "properties": {
+                  "GREEN": { "type": "integer", "minimum": -9007199254740991, "maximum": 9007199254740991 },
+                  "YELLOW": { "type": "integer", "minimum": -9007199254740991, "maximum": 9007199254740991 },
+                  "RED": { "type": "integer", "minimum": -9007199254740991, "maximum": 9007199254740991 },
+                  "UNDER": { "type": "integer", "minimum": -9007199254740991, "maximum": 9007199254740991 }
+                },
+                "required": ["GREEN", "YELLOW", "RED", "UNDER"],
+                "additionalProperties": false,
+                "description": "How many Cost Centers of the period have each light (for a manager, only their own)."
+              },
+              "company": {
+                "type": "object",
+                "properties": {
+                  "spent": {
+                    "type": "object",
+                    "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                    "required": ["amount", "currency"],
+                    "additionalProperties": false,
+                    "description": "What the company spent in the year up to the close, the invoices of the shared pool in it."
+                  },
+                  "sharedPoolUnallocated": {
+                    "type": "object",
+                    "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                    "required": ["amount", "currency"],
+                    "additionalProperties": false,
+                    "description": "The line \"not allocated, shared pool\" of the year up to the close: the seats paid for at the price of a month less the seat-months charged to departments."
+                  },
+                  "sharedPoolReserve": {
+                    "type": "object",
+                    "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                    "required": ["amount", "currency"],
+                    "additionalProperties": false,
+                    "description": "The reserve of the shared pool of the budget cycle of the year, null when the cycle has none.",
+                    "nullable": true
+                  },
+                  "sharedPoolOverReserve": {
+                    "description": "Whether the line of the pool is above the reserve; null when there is no reserve.",
+                    "type": "boolean",
+                    "nullable": true
+                  },
+                  "annualCeiling": {
+                    "type": "object",
+                    "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                    "required": ["amount", "currency"],
+                    "additionalProperties": false,
+                    "nullable": true
+                  }
+                },
+                "required": [
+                  "spent",
+                  "sharedPoolUnallocated",
+                  "sharedPoolReserve",
+                  "sharedPoolOverReserve",
+                  "annualCeiling"
+                ],
+                "additionalProperties": false,
+                "description": "The figures of the company; Finance and the spending approver only, null for a manager.",
+                "nullable": true
+              }
+            },
+            "required": [
+              "id",
+              "year",
+              "month",
+              "kind",
+              "state",
+              "currency",
+              "closedBy",
+              "closedAt",
+              "signedBy",
+              "signedAt",
+              "note",
+              "lightCounts",
+              "company"
+            ],
+            "additionalProperties": false,
+            "nullable": true
+          }
+        },
+        "required": ["success", "message", "data"],
+        "additionalProperties": false
+      },
+      "ReviewPeriodListResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "enum": [true] },
+          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "items": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": { "type": "string", "format": "uuid" },
+                    "year": { "type": "integer", "minimum": -9007199254740991, "maximum": 9007199254740991 },
+                    "month": { "type": "integer", "minimum": -9007199254740991, "maximum": 9007199254740991 },
+                    "kind": {
+                      "type": "string",
+                      "enum": ["MONTH", "QUARTER"],
+                      "description": "QUARTER for March, June and September, the quarterly review; MONTH for the others."
+                    },
+                    "state": {
+                      "type": "string",
+                      "enum": ["SNAPSHOT", "AWAITING_EXPLANATIONS", "SIGNED"],
+                      "description": "SNAPSHOT: closed on its figures. AWAITING_EXPLANATIONS: a quarter waiting for the explanations of the departments. SIGNED: signed by Finance, for good."
+                    },
+                    "currency": { "type": "string" },
+                    "closedBy": {
+                      "type": "object",
+                      "properties": {
+                        "employeeId": { "type": "string", "format": "uuid" },
+                        "employeeCode": { "type": "string" },
+                        "fullName": { "type": "string" }
+                      },
+                      "required": ["employeeId", "employeeCode", "fullName"],
+                      "additionalProperties": false,
+                      "nullable": true
+                    },
+                    "closedAt": { "type": "string", "format": "date-time" },
+                    "signedBy": {
+                      "type": "object",
+                      "properties": {
+                        "employeeId": { "type": "string", "format": "uuid" },
+                        "employeeCode": { "type": "string" },
+                        "fullName": { "type": "string" }
+                      },
+                      "required": ["employeeId", "employeeCode", "fullName"],
+                      "additionalProperties": false,
+                      "nullable": true
+                    },
+                    "signedAt": { "type": "string", "format": "date-time", "nullable": true },
+                    "note": { "type": "string", "nullable": true },
+                    "lightCounts": {
+                      "type": "object",
+                      "properties": {
+                        "GREEN": { "type": "integer", "minimum": -9007199254740991, "maximum": 9007199254740991 },
+                        "YELLOW": { "type": "integer", "minimum": -9007199254740991, "maximum": 9007199254740991 },
+                        "RED": { "type": "integer", "minimum": -9007199254740991, "maximum": 9007199254740991 },
+                        "UNDER": { "type": "integer", "minimum": -9007199254740991, "maximum": 9007199254740991 }
+                      },
+                      "required": ["GREEN", "YELLOW", "RED", "UNDER"],
+                      "additionalProperties": false,
+                      "description": "How many Cost Centers of the period have each light (for a manager, only their own)."
+                    },
+                    "company": {
+                      "type": "object",
+                      "properties": {
+                        "spent": {
+                          "type": "object",
+                          "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                          "required": ["amount", "currency"],
+                          "additionalProperties": false,
+                          "description": "What the company spent in the year up to the close, the invoices of the shared pool in it."
+                        },
+                        "sharedPoolUnallocated": {
+                          "type": "object",
+                          "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                          "required": ["amount", "currency"],
+                          "additionalProperties": false,
+                          "description": "The line \"not allocated, shared pool\" of the year up to the close: the seats paid for at the price of a month less the seat-months charged to departments."
+                        },
+                        "sharedPoolReserve": {
+                          "type": "object",
+                          "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                          "required": ["amount", "currency"],
+                          "additionalProperties": false,
+                          "description": "The reserve of the shared pool of the budget cycle of the year, null when the cycle has none.",
+                          "nullable": true
+                        },
+                        "sharedPoolOverReserve": {
+                          "description": "Whether the line of the pool is above the reserve; null when there is no reserve.",
+                          "type": "boolean",
+                          "nullable": true
+                        },
+                        "annualCeiling": {
+                          "type": "object",
+                          "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                          "required": ["amount", "currency"],
+                          "additionalProperties": false,
+                          "nullable": true
+                        }
+                      },
+                      "required": [
+                        "spent",
+                        "sharedPoolUnallocated",
+                        "sharedPoolReserve",
+                        "sharedPoolOverReserve",
+                        "annualCeiling"
+                      ],
+                      "additionalProperties": false,
+                      "description": "The figures of the company; Finance and the spending approver only, null for a manager.",
+                      "nullable": true
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "year",
+                    "month",
+                    "kind",
+                    "state",
+                    "currency",
+                    "closedBy",
+                    "closedAt",
+                    "signedBy",
+                    "signedAt",
+                    "note",
+                    "lightCounts",
+                    "company"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "pagination": {
+                "type": "object",
+                "properties": {
+                  "page": { "type": "integer", "exclusiveMinimum": true, "maximum": 9007199254740991, "minimum": 0 },
+                  "pageSize": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "maximum": 9007199254740991,
+                    "minimum": 0
+                  },
+                  "totalItems": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                  "totalPages": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+                },
+                "required": ["page", "pageSize", "totalItems", "totalPages"],
+                "additionalProperties": false
+              }
+            },
+            "required": ["items", "pagination"],
+            "additionalProperties": false,
+            "nullable": true
+          }
+        },
+        "required": ["success", "message", "data"],
+        "additionalProperties": false
+      },
+      "ReviewPeriodDetailResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "enum": [true] },
+          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "period": {
+                "type": "object",
+                "properties": {
+                  "id": { "type": "string", "format": "uuid" },
+                  "year": { "type": "integer", "minimum": -9007199254740991, "maximum": 9007199254740991 },
+                  "month": { "type": "integer", "minimum": -9007199254740991, "maximum": 9007199254740991 },
+                  "kind": {
+                    "type": "string",
+                    "enum": ["MONTH", "QUARTER"],
+                    "description": "QUARTER for March, June and September, the quarterly review; MONTH for the others."
+                  },
+                  "state": {
+                    "type": "string",
+                    "enum": ["SNAPSHOT", "AWAITING_EXPLANATIONS", "SIGNED"],
+                    "description": "SNAPSHOT: closed on its figures. AWAITING_EXPLANATIONS: a quarter waiting for the explanations of the departments. SIGNED: signed by Finance, for good."
+                  },
+                  "currency": { "type": "string" },
+                  "closedBy": {
+                    "type": "object",
+                    "properties": {
+                      "employeeId": { "type": "string", "format": "uuid" },
+                      "employeeCode": { "type": "string" },
+                      "fullName": { "type": "string" }
+                    },
+                    "required": ["employeeId", "employeeCode", "fullName"],
+                    "additionalProperties": false,
+                    "nullable": true
+                  },
+                  "closedAt": { "type": "string", "format": "date-time" },
+                  "signedBy": {
+                    "type": "object",
+                    "properties": {
+                      "employeeId": { "type": "string", "format": "uuid" },
+                      "employeeCode": { "type": "string" },
+                      "fullName": { "type": "string" }
+                    },
+                    "required": ["employeeId", "employeeCode", "fullName"],
+                    "additionalProperties": false,
+                    "nullable": true
+                  },
+                  "signedAt": { "type": "string", "format": "date-time", "nullable": true },
+                  "note": { "type": "string", "nullable": true },
+                  "lightCounts": {
+                    "type": "object",
+                    "properties": {
+                      "GREEN": { "type": "integer", "minimum": -9007199254740991, "maximum": 9007199254740991 },
+                      "YELLOW": { "type": "integer", "minimum": -9007199254740991, "maximum": 9007199254740991 },
+                      "RED": { "type": "integer", "minimum": -9007199254740991, "maximum": 9007199254740991 },
+                      "UNDER": { "type": "integer", "minimum": -9007199254740991, "maximum": 9007199254740991 }
+                    },
+                    "required": ["GREEN", "YELLOW", "RED", "UNDER"],
+                    "additionalProperties": false,
+                    "description": "How many Cost Centers of the period have each light (for a manager, only their own)."
+                  },
+                  "company": {
+                    "type": "object",
+                    "properties": {
+                      "spent": {
+                        "type": "object",
+                        "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                        "required": ["amount", "currency"],
+                        "additionalProperties": false,
+                        "description": "What the company spent in the year up to the close, the invoices of the shared pool in it."
+                      },
+                      "sharedPoolUnallocated": {
+                        "type": "object",
+                        "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                        "required": ["amount", "currency"],
+                        "additionalProperties": false,
+                        "description": "The line \"not allocated, shared pool\" of the year up to the close: the seats paid for at the price of a month less the seat-months charged to departments."
+                      },
+                      "sharedPoolReserve": {
+                        "type": "object",
+                        "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                        "required": ["amount", "currency"],
+                        "additionalProperties": false,
+                        "description": "The reserve of the shared pool of the budget cycle of the year, null when the cycle has none.",
+                        "nullable": true
+                      },
+                      "sharedPoolOverReserve": {
+                        "description": "Whether the line of the pool is above the reserve; null when there is no reserve.",
+                        "type": "boolean",
+                        "nullable": true
+                      },
+                      "annualCeiling": {
+                        "type": "object",
+                        "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                        "required": ["amount", "currency"],
+                        "additionalProperties": false,
+                        "nullable": true
+                      }
+                    },
+                    "required": [
+                      "spent",
+                      "sharedPoolUnallocated",
+                      "sharedPoolReserve",
+                      "sharedPoolOverReserve",
+                      "annualCeiling"
+                    ],
+                    "additionalProperties": false,
+                    "description": "The figures of the company; Finance and the spending approver only, null for a manager.",
+                    "nullable": true
+                  }
+                },
+                "required": [
+                  "id",
+                  "year",
+                  "month",
+                  "kind",
+                  "state",
+                  "currency",
+                  "closedBy",
+                  "closedAt",
+                  "signedBy",
+                  "signedAt",
+                  "note",
+                  "lightCounts",
+                  "company"
+                ],
+                "additionalProperties": false
+              },
+              "items": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": { "type": "string", "format": "uuid" },
+                    "costCenter": {
+                      "type": "object",
+                      "properties": {
+                        "id": { "type": "string", "format": "uuid" },
+                        "code": { "type": "string" },
+                        "name": { "type": "string" }
+                      },
+                      "required": ["id", "code", "name"],
+                      "additionalProperties": false,
+                      "nullable": true
+                    },
+                    "base": {
+                      "type": "object",
+                      "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                      "required": ["amount", "currency"],
+                      "additionalProperties": false,
+                      "description": "The effective base of the year at the close."
+                    },
+                    "reserve": {
+                      "type": "object",
+                      "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                      "required": ["amount", "currency"],
+                      "additionalProperties": false
+                    },
+                    "spent": {
+                      "type": "object",
+                      "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                      "required": ["amount", "currency"],
+                      "additionalProperties": false,
+                      "description": "What the Cost Center spent in the year, the seat-months of the shared pool in it."
+                    },
+                    "committed": {
+                      "type": "object",
+                      "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                      "required": ["amount", "currency"],
+                      "additionalProperties": false,
+                      "description": "What its commitments still hold."
+                    },
+                    "pendingSpend": {
+                      "type": "object",
+                      "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                      "required": ["amount", "currency"],
+                      "additionalProperties": false,
+                      "description": "What its requests that wait for the spend decision would cost."
+                    },
+                    "remaining": {
+                      "type": "object",
+                      "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                      "required": ["amount", "currency"],
+                      "additionalProperties": false,
+                      "description": "The budget (base and reserve) less spent, held and waiting; negative when it is over."
+                    },
+                    "variancePpm": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "The difference k of the invoices of the year since 01/01, in millionths: what they cost over their price before tax, less one; 0 with no invoice."
+                    },
+                    "priceIncrease": {
+                      "type": "object",
+                      "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                      "required": ["amount", "currency"],
+                      "additionalProperties": false,
+                      "description": "The price increase already known: the rise of the price of a seat over what the commitment was made at, for the seats and months left; a price that fell adds nothing."
+                    },
+                    "forecast": {
+                      "type": "object",
+                      "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                      "required": ["amount", "currency"],
+                      "additionalProperties": false,
+                      "description": "The forecast of the end of the year: spent + (held + waiting) x (1 + k) + price increase already known."
+                    },
+                    "paceBasisPoints": {
+                      "type": "integer",
+                      "minimum": -9007199254740991,
+                      "maximum": 9007199254740991,
+                      "description": "The spent over the base of the months gone, in hundredths of a percent (11.200 is 112 %), rounded up; null when the Cost Center has no base.",
+                      "nullable": true
+                    },
+                    "light": {
+                      "type": "string",
+                      "enum": ["GREEN", "YELLOW", "RED", "UNDER"],
+                      "description": "The light of the Cost Center at the close: RED when the forecast is above the base and the reserve; YELLOW when it is above the base or the pace is above 110 % of the schedule; UNDER from June when the forecast is under 70 % of the base; GREEN otherwise. It only warns: it blocks no request."
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "costCenter",
+                    "base",
+                    "reserve",
+                    "spent",
+                    "committed",
+                    "pendingSpend",
+                    "remaining",
+                    "variancePpm",
+                    "priceIncrease",
+                    "forecast",
+                    "paceBasisPoints",
+                    "light"
+                  ],
+                  "additionalProperties": false
+                },
+                "description": "A page of the lines, the Cost Centers that need the eye first: red, yellow, under, then green."
+              },
+              "pagination": {
+                "type": "object",
+                "properties": {
+                  "page": { "type": "integer", "exclusiveMinimum": true, "maximum": 9007199254740991, "minimum": 0 },
+                  "pageSize": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "maximum": 9007199254740991,
+                    "minimum": 0
+                  },
+                  "totalItems": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                  "totalPages": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+                },
+                "required": ["page", "pageSize", "totalItems", "totalPages"],
+                "additionalProperties": false
+              }
+            },
+            "required": ["period", "items", "pagination"],
             "additionalProperties": false,
             "nullable": true
           }
