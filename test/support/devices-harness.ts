@@ -172,14 +172,25 @@ export class DevicesHarness extends DocumentHarness {
   myStatus = (account: ApiAccount, deviceId: string, query = '') =>
     request(this.server()).get(`/api/v1/me/devices/${deviceId}/tool-status${query}`).set(this.as(account));
 
-  /** An application of the catalog as the IT Admin declares it; `communication` makes it a messaging or meeting service. */
+  /**
+   * An application of the catalog as the IT Admin declares it; `communication` puts it in the functional group Liên lạc, which is what makes it
+   * a messaging or meeting service (`QĐ-111e`: the group, not an answer about messaging, decides).
+   */
   async catalogApplication(kind: 'SAAS' | 'LICENSED' | 'INTERNAL' = 'SAAS', communication = false): Promise<string> {
+    const group = communication
+      ? (
+          await this.ctx.sql.query<{ id: string }>(
+            `SELECT id FROM functional_groups WHERE system_key = 'COMMUNICATION'`,
+          )
+        ).rows[0].id
+      : undefined;
+
     return declareApplication(this.ctx, this.it1.accessToken, {
       name: this.unique('Tool'),
       kind,
       ...(kind === 'INTERNAL' ? {} : { vendorName: this.unique('Vendor') }),
       dataSensitivity: 'LOW',
-      communication: { personToPersonMessaging: communication, callsOrMeetings: false, mailbox: false },
+      ...(group === undefined ? {} : { functionalGroupId: group }),
     });
   }
 
