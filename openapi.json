@@ -67801,6 +67801,205 @@
         "tags": ["budgets"]
       }
     },
+    "/api/v1/seat-month-charges": {
+      "get": {
+        "operationId": "seatMonthChargeList",
+        "parameters": [
+          {
+            "name": "year",
+            "required": true,
+            "in": "query",
+            "description": "The year of the month, as YYYY.",
+            "schema": { "minimum": 2000, "maximum": 2100, "type": "integer" }
+          },
+          {
+            "name": "month",
+            "required": true,
+            "in": "query",
+            "description": "The month, 1 to 12.",
+            "schema": { "minimum": 1, "maximum": 12, "type": "integer" }
+          },
+          {
+            "name": "costCenterId",
+            "required": false,
+            "in": "query",
+            "description": "Only the seat-months charged to this Cost Center.",
+            "schema": { "format": "uuid", "type": "string" }
+          },
+          {
+            "name": "subscriptionId",
+            "required": false,
+            "in": "query",
+            "description": "Only the seat-months of this subscription of the pool.",
+            "schema": { "format": "uuid", "type": "string" }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maximum": 9007199254740991,
+              "exclusiveMinimum": true,
+              "default": 1,
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": { "maximum": 100, "exclusiveMinimum": true, "default": 20, "type": "integer", "minimum": 0 }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The seat-months of the month, one for each seat and department that held it (the days, the price of a month and what the days cost, with the Cost Center that bears it or none yet), and for Finance the line of the shared pool of each subscription: what its invoices of the month cost, what the seat-months took of it, and the rest.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/SeatMonthChargesResponseDto" },
+                    { "properties": { "message": { "example": "SEAT_MONTH_CHARGE.LISTED" } } }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHENTICATION_REQUIRED": {
+                    "summary": "A Bearer access token is required.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHENTICATION_REQUIRED",
+                        "message": "A Bearer access token is required.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "INVALID_ACCESS_TOKEN": {
+                    "summary": "The access token is invalid.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "INVALID_ACCESS_TOKEN",
+                        "message": "The access token is invalid.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only Finance and the manager of a department read the seat-months.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHORIZATION.FORBIDDEN": {
+                    "summary": "You do not have permission to perform this action.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHORIZATION.FORBIDDEN",
+                        "message": "You do not have permission to perform this action.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The query is invalid (VALIDATION_ERROR).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "VALIDATION_ERROR": {
+                    "summary": "Request validation failed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "VALIDATION_ERROR",
+                        "message": "Request validation failed.",
+                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_TOO_MANY_REQUESTS": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_TOO_MANY_REQUESTS",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "TOKEN_VERIFICATION_UNAVAILABLE": {
+                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
+                        "message": "Authentication is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SERVICE_UNAVAILABLE": {
+                    "summary": "The service is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SERVICE_UNAVAILABLE",
+                        "message": "The service is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "bearer": [] }],
+        "summary": "List the seat-months of a month",
+        "tags": ["seat-month-charges"]
+      }
+    },
     "/api/v1/monitoring-notice-versions": {
       "post": {
         "operationId": "monitoringNoticeVersionCreate",
@@ -119164,9 +119363,33 @@
                   "additionalProperties": false
                 }
               },
-              "lastInvoiceRecordedAt": { "type": "string", "format": "date-time", "nullable": true }
+              "lastInvoiceRecordedAt": { "type": "string", "format": "date-time", "nullable": true },
+              "companySpent": {
+                "type": "object",
+                "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                "required": ["amount", "currency"],
+                "additionalProperties": false,
+                "nullable": true
+              },
+              "sharedPoolUnallocated": {
+                "type": "object",
+                "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                "required": ["amount", "currency"],
+                "additionalProperties": false,
+                "nullable": true
+              },
+              "sharedPoolOverReserve": { "type": "boolean", "nullable": true }
             },
-            "required": ["year", "annualCeiling", "sharedPoolReserve", "totals", "lastInvoiceRecordedAt"],
+            "required": [
+              "year",
+              "annualCeiling",
+              "sharedPoolReserve",
+              "totals",
+              "lastInvoiceRecordedAt",
+              "companySpent",
+              "sharedPoolUnallocated",
+              "sharedPoolOverReserve"
+            ],
             "additionalProperties": false,
             "nullable": true
           }
@@ -120793,6 +121016,166 @@
               }
             },
             "required": ["items", "pagination"],
+            "additionalProperties": false,
+            "nullable": true
+          }
+        },
+        "required": ["success", "message", "data"],
+        "additionalProperties": false
+      },
+      "SeatMonthChargesResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "enum": [true] },
+          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "items": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": { "type": "string", "format": "uuid" },
+                    "subscriptionId": { "type": "string", "format": "uuid" },
+                    "assignmentId": { "type": "string", "format": "uuid" },
+                    "employee": {
+                      "type": "object",
+                      "properties": {
+                        "employeeId": { "type": "string", "format": "uuid" },
+                        "employeeCode": { "type": "string" },
+                        "fullName": { "type": "string" }
+                      },
+                      "required": ["employeeId", "employeeCode", "fullName"],
+                      "additionalProperties": false,
+                      "nullable": true
+                    },
+                    "department": {
+                      "type": "object",
+                      "properties": {
+                        "id": { "type": "string", "format": "uuid" },
+                        "code": { "type": "string" },
+                        "name": { "type": "string" }
+                      },
+                      "required": ["id", "code", "name"],
+                      "additionalProperties": false,
+                      "nullable": true
+                    },
+                    "costCenter": {
+                      "type": "object",
+                      "properties": {
+                        "id": { "type": "string", "format": "uuid" },
+                        "code": { "type": "string" },
+                        "name": { "type": "string" }
+                      },
+                      "required": ["id", "code", "name"],
+                      "additionalProperties": false,
+                      "description": "The Cost Center that bears it; empty when the department has none yet (not allocated to a Cost Center).",
+                      "nullable": true
+                    },
+                    "days": {
+                      "type": "integer",
+                      "exclusiveMinimum": true,
+                      "maximum": 9007199254740991,
+                      "description": "The days the seat was held in the department in the month.",
+                      "minimum": 0
+                    },
+                    "daysInMonth": {
+                      "type": "integer",
+                      "exclusiveMinimum": true,
+                      "maximum": 9007199254740991,
+                      "minimum": 0
+                    },
+                    "monthlyPrice": {
+                      "type": "object",
+                      "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                      "required": ["amount", "currency"],
+                      "additionalProperties": false,
+                      "description": "The price of a month of the seat the days are counted against."
+                    },
+                    "amount": {
+                      "type": "object",
+                      "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                      "required": ["amount", "currency"],
+                      "additionalProperties": false,
+                      "description": "What the days cost the department."
+                    },
+                    "appliedToCommitment": {
+                      "type": "object",
+                      "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                      "required": ["amount", "currency"],
+                      "additionalProperties": false,
+                      "description": "What of the amount took the commitment of the seat down."
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "subscriptionId",
+                    "assignmentId",
+                    "employee",
+                    "department",
+                    "costCenter",
+                    "days",
+                    "daysInMonth",
+                    "monthlyPrice",
+                    "amount",
+                    "appliedToCommitment"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "pagination": {
+                "type": "object",
+                "properties": {
+                  "page": { "type": "integer", "exclusiveMinimum": true, "maximum": 9007199254740991, "minimum": 0 },
+                  "pageSize": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "maximum": 9007199254740991,
+                    "minimum": 0
+                  },
+                  "totalItems": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                  "totalPages": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+                },
+                "required": ["page", "pageSize", "totalItems", "totalPages"],
+                "additionalProperties": false
+              },
+              "poolLines": {
+                "maxItems": 100,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "subscriptionId": { "type": "string", "format": "uuid" },
+                    "invoiced": {
+                      "type": "object",
+                      "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                      "required": ["amount", "currency"],
+                      "additionalProperties": false,
+                      "description": "What the invoices of the pool for the month cost."
+                    },
+                    "allocated": {
+                      "type": "object",
+                      "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                      "required": ["amount", "currency"],
+                      "additionalProperties": false,
+                      "description": "What the seat-months of the month took of it."
+                    },
+                    "unallocated": {
+                      "type": "object",
+                      "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                      "required": ["amount", "currency"],
+                      "additionalProperties": false,
+                      "description": "The line \"not allocated, shared pool\": the invoices of the month less the seat-months charged to departments."
+                    }
+                  },
+                  "required": ["subscriptionId", "invoiced", "allocated", "unallocated"],
+                  "additionalProperties": false
+                },
+                "description": "The line of the shared pool of each subscription with an invoice or a seat-month in the month (Finance only; empty for a manager)."
+              }
+            },
+            "required": ["items", "pagination", "poolLines"],
             "additionalProperties": false,
             "nullable": true
           }
