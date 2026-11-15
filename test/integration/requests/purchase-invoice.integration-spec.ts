@@ -269,6 +269,19 @@ describe('purchase invoices over PostgreSQL (integration; PI-1.4, T-PI)', () => 
     expect(stray.rowCount).toBe(1);
   });
 
+  it('refuses an invoice for a request whose software is internal and has no vendor, without guessing one, and keeps nothing', async () => {
+    const { requestId } = await approved();
+    const internal = await h.plan('K5');
+    await h.ctx.sql.query(`UPDATE access_requests SET plan_id = $2 WHERE id = $1`, [requestId, internal]);
+
+    const response = await api('post', '', h.it1)
+      .send({ ...form(requestId, { vendorInvoiceNumber: 'NOVENDOR-1' }), documentIds: [await document()] })
+      .expect(422);
+
+    expect((response.body as { error: { code: string } }).error.code).toBe('PURCHASE_INVOICE.NO_VENDOR');
+    expect((await h.ctx.sql.query(`SELECT 1 FROM purchase_invoices WHERE number = 'NOVENDOR-1'`)).rowCount).toBe(0);
+  });
+
   it('reads an invoice of a subscription as a renewal with no period, for the IT Admin of the department that owns it', async () => {
     const unit = await h.departmentWithHead(`P-PIS${counter++}`);
     await h.setItAdminInCharge(unit.department, { employeeId: h.it1.employeeId, account: h.it1 });
