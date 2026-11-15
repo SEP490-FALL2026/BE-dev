@@ -360,6 +360,7 @@ model BudgetCommitment {
   snapshotCheck   RequestBudgetCheck?       @relation(fields: [snapshotCheckId], references: [id], onDelete: Restrict)
   releases        BudgetCommitmentRelease[]
   invoices        Invoice[]
+  seatMonths      SeatMonthCharge[]
 
   @@unique([requestId, year])
   @@index([costCenterId, year, state])
@@ -567,4 +568,36 @@ model BudgetDepartmentCeiling {
 
   @@id([cycleId, departmentId])
   @@map("budget_department_ceilings")
+}
+
+/// What one seat of a K2 pool cost one department in one month that has ended (SM-1, QĐ-103k, QĐ-111bg): the days the seat was held in that
+/// department over the days of the month, times the price of a month, one row for each seat, month and department. The rows of a subscription and
+/// a month are replaced together until a review period signs the month, so the table is not evidence in itself. `costCenterId` is null for a
+/// department that has no Cost Center yet (shown as the line "not allocated to a Cost Center"); `commitmentId` and `appliedMinor` say what of
+/// the amount took the commitment of the seat down. The ids of other contexts are values, not foreign keys.
+model SeatMonthCharge {
+  id                String   @id @default(uuid(7)) @db.Uuid
+  organizationId    String   @map("organization_id") @db.Uuid
+  subscriptionId    String   @map("subscription_id") @db.Uuid
+  assignmentId      String   @map("assignment_id") @db.Uuid
+  employeeId        String   @map("employee_id") @db.Uuid
+  departmentId      String   @map("department_id") @db.Uuid
+  costCenterId      String?  @map("cost_center_id") @db.Uuid
+  // The first day of the month.
+  month             DateTime @db.Date
+  days              Int      @db.SmallInt
+  daysInMonth       Int      @map("days_in_month") @db.SmallInt
+  monthlyPriceMinor BigInt   @map("monthly_price_minor")
+  amountMinor       BigInt   @map("amount_minor")
+  commitmentId      String?  @map("commitment_id") @db.Uuid
+  appliedMinor      BigInt   @default(0) @map("applied_minor")
+  computedAt        DateTime @map("computed_at") @db.Timestamptz(3)
+
+  commitment BudgetCommitment? @relation(fields: [commitmentId], references: [id], onDelete: Restrict)
+
+  @@unique([assignmentId, month, departmentId])
+  @@index([subscriptionId, month])
+  @@index([costCenterId, month])
+  @@index([commitmentId])
+  @@map("seat_month_charges")
 }

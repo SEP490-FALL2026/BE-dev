@@ -81,6 +81,7 @@ import { BudgetAttachmentQueryService } from './attachment/budget-attachment-que
 import { BudgetAttachmentLinkService } from './attachment/budget-attachment-link.service';
 import { BudgetAttachmentExpiryService } from './attachment/budget-attachment-expiry.service';
 import { BudgetAttachmentExpirySweeper } from './attachment/budget-attachment-expiry.job';
+import { SeatMonthRepo } from './seat-month/seat-month.repo';
 import { PoliciesTemplateFacadeModule } from '../policies/policies-template-facade.module';
 import { BudgetProposalTemplateListener } from './proposal/budget-proposal-template.listener';
 
@@ -169,6 +170,7 @@ import { BudgetProposalTemplateListener } from './proposal/budget-proposal-templ
     PendingSpendContributions,
     CarriedOverContributions,
     BaselineFlags,
+    SeatMonthRepo,
     CommitmentReleaseGuardHook,
     CommitmentRequestFactsHook,
     PurchaseInvoiceFactsHook,
