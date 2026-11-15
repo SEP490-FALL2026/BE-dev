@@ -19,6 +19,22 @@ export interface DeviceSummaryRow {
   acknowledgedFrom: Date | null;
   collectionStoppedAt: Date | null;
   signatureRecorded: boolean;
+  /** The latest instant any credential of the open registration was accepted; null while nothing was, and for a machine nobody holds. */
+  lastAcceptedAt: Date | null;
+}
+
+/** One registration of a machine, as the history shows it: who held it, for which days, how it ended and where collection stands. */
+export interface DeviceRegistrationRow {
+  id: string;
+  holderEmployeeId: string;
+  validFrom: Date;
+  validUntil: Date | null;
+  endedAt: Date | null;
+  endCause: DeviceRegistrationEndCause | null;
+  acknowledgedFrom: Date | null;
+  collectionStoppedAt: Date | null;
+  signatureRecorded: boolean;
+  lastAcceptedAt: Date | null;
 }
 
 export interface DeviceListFilter {
@@ -47,6 +63,18 @@ const STATE_SQL = Prisma.sql`CASE
   WHEN r.collection_stopped_at IS NOT NULL THEN 'COLLECTION_STOPPED'
   WHEN r.acknowledged_from IS NOT NULL THEN 'ACTIVE'
   ELSE 'AWAITING_ACKNOWLEDGEMENT' END`;
+
+/**
+ * Whether a registration has a signed record, and the last instant any of its credentials was accepted: two reads of tables the register does not
+ * list, each one a sub-select of the row, so a page of any size is one statement.
+ */
+const SIGNED_SQL = Prisma.sql`EXISTS (SELECT 1 FROM device_signature_records s WHERE s.registration_id = r.id)`;
+const LAST_ACCEPTED_SQL = Prisma.sql`(SELECT max(c.last_accepted_at) FROM device_credentials c WHERE c.registration_id = r.id)`;
+
+const SUMMARY_COLUMNS = Prisma.sql`d.id, d.asset_code AS "assetCode", d.hostname, d.os, d.retired_at AS "retiredAt",
+  r.id AS "registrationId", r.holder_employee_id AS "holderEmployeeId", r.valid_from AS "validFrom",
+  r.acknowledged_from AS "acknowledgedFrom", r.collection_stopped_at AS "collectionStoppedAt",
+  ${SIGNED_SQL} AS "signatureRecorded", ${LAST_ACCEPTED_SQL} AS "lastAcceptedAt"`;
 
 const FROM_SQL = Prisma.sql`FROM managed_devices d
   LEFT JOIN device_registrations r ON r.device_id = d.id AND r.ended_at IS NULL`;
@@ -84,10 +112,7 @@ export class RegistryQueryRepo {
     return this.prisma.$transaction(
       async (tx) => {
         const rows = await tx.$queryRaw<DeviceSummaryRow[]>`
-          SELECT d.id, d.asset_code AS "assetCode", d.hostname, d.os, d.retired_at AS "retiredAt",
-                 r.id AS "registrationId", r.holder_employee_id AS "holderEmployeeId", r.valid_from AS "validFrom",
-                 r.acknowledged_from AS "acknowledgedFrom", r.collection_stopped_at AS "collectionStoppedAt",
-                 EXISTS (SELECT 1 FROM device_signature_records s WHERE s.registration_id = r.id) AS "signatureRecorded"
+          SELECT ${SUMMARY_COLUMNS}
           ${FROM_SQL} WHERE ${whereOf(filter)}
           ORDER BY d.normalized_asset_code, d.id LIMIT ${take} OFFSET ${skip}`;
         const counted = await tx.$queryRaw<{ total: bigint }[]>`
@@ -109,13 +134,41 @@ export class RegistryQueryRepo {
 
   async one(organizationId: string, id: string): Promise<DeviceSummaryRow | null> {
     const rows = await this.prisma.$queryRaw<DeviceSummaryRow[]>`
-      SELECT d.id, d.asset_code AS "assetCode", d.hostname, d.os, d.retired_at AS "retiredAt",
-             r.id AS "registrationId", r.holder_employee_id AS "holderEmployeeId", r.valid_from AS "validFrom",
-             r.acknowledged_from AS "acknowledgedFrom", r.collection_stopped_at AS "collectionStoppedAt",
-             EXISTS (SELECT 1 FROM device_signature_records s WHERE s.registration_id = r.id) AS "signatureRecorded"
+      SELECT ${SUMMARY_COLUMNS}
       ${FROM_SQL} WHERE ${whereOf({ organizationId }, id)}`;
 
     return rows[0] ?? null;
+  }
+
+  /**
+   * One page of the registrations of a machine, the newest first (the open one, then the ones that ended, the later start before the earlier), and the
+   * total, read in one snapshot with the check that the machine is in the register: null when it is not. A page of any size is three statements.
+   */
+  async registrationsPage(
+    organizationId: string,
+    deviceId: string,
+    skip: number,
+    take: number,
+  ): Promise<{ rows: DeviceRegistrationRow[]; total: number } | null> {
+    return this.prisma.$transaction(
+      async (tx) => {
+        const known = await tx.$queryRaw<{ id: string }[]>`
+          SELECT d.id FROM managed_devices d WHERE d.id = ${deviceId}::uuid AND d.organization_id = ${organizationId}::uuid`;
+        if (known.length === 0) return null;
+        const rows = await tx.$queryRaw<DeviceRegistrationRow[]>`
+          SELECT r.id, r.holder_employee_id AS "holderEmployeeId", r.valid_from AS "validFrom", r.valid_until AS "validUntil",
+                 r.ended_at AS "endedAt", r.end_cause AS "endCause", r.acknowledged_from AS "acknowledgedFrom",
+                 r.collection_stopped_at AS "collectionStoppedAt", ${SIGNED_SQL} AS "signatureRecorded",
+                 ${LAST_ACCEPTED_SQL} AS "lastAcceptedAt"
+            FROM device_registrations r WHERE r.device_id = ${deviceId}::uuid
+           ORDER BY r.valid_from DESC, r.created_at DESC, r.id DESC LIMIT ${take} OFFSET ${skip}`;
+        const counted = await tx.$queryRaw<{ total: bigint }[]>`
+          SELECT count(*) AS total FROM device_registrations r WHERE r.device_id = ${deviceId}::uuid`;
+
+        return { rows, total: Number(counted[0]?.total ?? 0n) };
+      },
+      { isolationLevel: 'RepeatableRead' },
+    );
   }
 
   /** What only the detail of a machine shows: its latest acknowledgement and signed record, how the last registration ended. */

@@ -31,7 +31,7 @@ Tầng: T5 (`scripts/arch/tiers.cjs`). Phụ thuộc: audit, organization, ident
 - `notice/` — phiên bản thông báo (Super Admin phát hành, mọi tài khoản đọc bản hiện hành); đánh số dưới advisory lock; phiên bản đòi
   xác nhận lại thì khóa mọi đăng ký mở rồi xóa đầu chuỗi xác nhận.
 - `registry/` — máy, đăng ký, đổi người giữ, ngừng dùng; `registration-end.service.ts` là nơi duy nhất kết thúc một đăng ký;
-  `signature-record.service.ts` gắn bản ký `BM-06` cho người ký; `registry-query.*` đọc danh sách và chi tiết.
+  `signature-record.service.ts` gắn bản ký `BM-06` cho người ký; `registry-query.*` đọc danh sách (mỗi máy có `collection { state, lastAcceptedAt }`, một truy vấn: `lastAcceptedAt` = lần gần nhất một credential của đăng ký đang mở được nhận), chi tiết và lịch sử người giữ `GET /devices/{id}/registrations` (mới nhất trước, phân trang).
 - `acknowledgement/` — người giữ máy xác nhận bản hiện hành sau khi IT lưu bản ký (`acknowledgement.policy.ts` là quyết định duy
   nhất cho cả `POST` và `canAcknowledge`/`blockedReason` của danh sách).
 - `my-devices/` — `GET /me/devices`.

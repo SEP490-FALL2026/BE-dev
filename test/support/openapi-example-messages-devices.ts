@@ -13,6 +13,7 @@ export const SUCCESS_MESSAGES_DEVICES: Readonly<Record<string, string>> = {
   deviceHolderChange: 'DEVICE.HOLDER_CHANGED',
   deviceIntakeRejectionList: 'DEVICE_INTAKE_REJECTION.LISTED',
   deviceList: 'DEVICE.LISTED',
+  deviceRegistrationList: 'DEVICE_REGISTRATION.LISTED',
   deviceRetire: 'DEVICE.RETIRED',
   deviceSessionGet: 'DEVICE_SESSION.FETCHED',
   deviceSessionRotationCreate: 'DEVICE_SESSION.ROTATED',

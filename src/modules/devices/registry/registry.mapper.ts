@@ -1,6 +1,6 @@
 import { fromDateColumn } from '../../../core/business-date';
 import { collectionStateOf } from '../devices-collection-state.policy';
-import type { DeviceExtras, DeviceSummaryRow } from './registry-query.repo';
+import type { DeviceExtras, DeviceRegistrationRow, DeviceSummaryRow } from './registry-query.repo';
 import type { SignatureRecordRow } from './registry.repo';
 
 export interface HolderBrief {
@@ -14,6 +14,8 @@ export function toDeviceSummary(row: DeviceSummaryRow, holders: ReadonlyMap<stri
     ? { acknowledgedFrom: row.acknowledgedFrom, collectionStoppedAt: row.collectionStoppedAt }
     : null;
 
+  const state = collectionStateOf({ retiredAt: row.retiredAt, registration });
+
   return {
     id: row.id,
     assetCode: row.assetCode,
@@ -22,7 +24,8 @@ export function toDeviceSummary(row: DeviceSummaryRow, holders: ReadonlyMap<stri
     holder: row.holderEmployeeId ? (holders.get(row.holderEmployeeId) ?? null) : null,
     registrationId: row.registrationId,
     registeredFrom: row.validFrom ? fromDateColumn(row.validFrom) : null,
-    state: collectionStateOf({ retiredAt: row.retiredAt, registration }),
+    state,
+    collection: { state, lastAcceptedAt: row.lastAcceptedAt ? row.lastAcceptedAt.toISOString() : null },
     signatureRecorded: row.signatureRecorded,
     retiredAt: row.retiredAt ? row.retiredAt.toISOString() : null,
   };
@@ -58,6 +61,21 @@ export function toDeviceDetail(row: DeviceSummaryRow, extras: DeviceExtras, hold
           }
         : null,
     retirementReason: extras.retirementReason,
+  };
+}
+
+export function toDeviceRegistration(row: DeviceRegistrationRow, holders: ReadonlyMap<string, HolderBrief>) {
+  return {
+    id: row.id,
+    holder: holders.get(row.holderEmployeeId) ?? null,
+    validFrom: fromDateColumn(row.validFrom),
+    validUntil: row.validUntil ? fromDateColumn(row.validUntil) : null,
+    endedAt: row.endedAt ? row.endedAt.toISOString() : null,
+    endCause: row.endCause,
+    acknowledgedFrom: row.acknowledgedFrom ? row.acknowledgedFrom.toISOString() : null,
+    collectionStoppedAt: row.collectionStoppedAt ? row.collectionStoppedAt.toISOString() : null,
+    signatureRecorded: row.signatureRecorded,
+    lastAcceptedAt: row.lastAcceptedAt ? row.lastAcceptedAt.toISOString() : null,
   };
 }
 

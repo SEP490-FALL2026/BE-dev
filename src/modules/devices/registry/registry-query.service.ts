@@ -3,7 +3,7 @@ import { OrganizationReadApi } from '../../organization/public/organization-read
 import type { CollectionState } from '../devices-collection-state.policy';
 import { DeviceNotFoundError } from '../public/devices.errors';
 import { RegistryQueryRepo } from './registry-query.repo';
-import { toDeviceDetail, toDeviceSummary, type HolderBrief } from './registry.mapper';
+import { toDeviceDetail, toDeviceRegistration, toDeviceSummary, type HolderBrief } from './registry.mapper';
 
 export interface DeviceListInput {
   page: number;
@@ -42,6 +42,29 @@ export class RegistryQueryService {
         pageSize: input.pageSize,
         totalItems: total,
         totalPages: Math.ceil(total / input.pageSize),
+      },
+    };
+  }
+
+  /** The registrations of a machine, the newest first: who held it, for which days and how each ended. Throws DeviceNotFoundError. */
+  async registrations(deviceId: string, input: { page: number; pageSize: number }) {
+    const organization = await this.requireOrganization();
+    const found = await this.queries.registrationsPage(
+      organization.id,
+      deviceId,
+      (input.page - 1) * input.pageSize,
+      input.pageSize,
+    );
+    if (!found) throw new DeviceNotFoundError();
+    const holders = await this.holdersOf(found.rows.map((row) => row.holderEmployeeId));
+
+    return {
+      items: found.rows.map((row) => toDeviceRegistration(row, holders)),
+      pagination: {
+        page: input.page,
+        pageSize: input.pageSize,
+        totalItems: found.total,
+        totalPages: Math.ceil(found.total / input.pageSize),
       },
     };
   }
