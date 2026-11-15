@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { businessDateAt, type BusinessDate } from '../../../core/business-date';
+import { MoneyOutOfRangeError } from '../../../core/money/money.errors';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { BudgetsApi } from '../../budgets/public/budgets.api';
@@ -153,16 +154,26 @@ export class PurchaseInvoicePlanService {
     return firstOfMonth(businessDateAt(request.grantCompletedAt, (organization as { timeZone: string }).timeZone));
   }
 
-  /** What the invoice says in money, in minor units: the dong taken out and the price of one in the currency it states. */
+  /**
+   * What the invoice says in money, in minor units: the dong taken out and the price of one in the currency it states. The net amount and the price
+   * of one are more than nothing and a tax is not less than nothing, as the table keeps them; one that is not is out of range, like every money
+   * field below zero. Throws the money errors of `core/money`.
+   */
   async moneyOf(form: PurchaseInvoiceFormInput, tx?: DbTx): Promise<PurchaseInvoiceMoney> {
-    const dong = async (input: { amount: string } | undefined): Promise<bigint> =>
-      input ? (await this.finance.parseMoney({ amount: input.amount, currency: 'VND' }, tx)).amountMinor : 0n;
+    const dong = async (input: { amount: string } | undefined, floor: 'POSITIVE' | 'NON_NEGATIVE'): Promise<bigint> => {
+      if (!input) return 0n;
+      const { amountMinor } = await this.finance.parseMoney({ amount: input.amount, currency: 'VND' }, tx);
+      if (floor === 'POSITIVE' ? amountMinor <= 0n : amountMinor < 0n) throw new MoneyOutOfRangeError();
+
+      return amountMinor;
+    };
     const original = await this.finance.parseMoney(form.unitPriceOriginal, tx);
+    if (original.amountMinor <= 0n) throw new MoneyOutOfRangeError();
 
     return {
-      netMinor: await dong(form.netAmount),
-      deductibleTaxMinor: await dong(form.deductibleTax),
-      nonDeductibleTaxMinor: await dong(form.nonDeductibleTax),
+      netMinor: await dong(form.netAmount, 'POSITIVE'),
+      deductibleTaxMinor: await dong(form.deductibleTax, 'NON_NEGATIVE'),
+      nonDeductibleTaxMinor: await dong(form.nonDeductibleTax, 'NON_NEGATIVE'),
       unitPriceOriginal: original,
     };
   }

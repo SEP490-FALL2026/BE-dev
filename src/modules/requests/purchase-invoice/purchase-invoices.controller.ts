@@ -70,16 +70,19 @@ const NOT_PURCHASABLE_TAKEN_OR_NOT_RETURNED = {
   ],
 } as const;
 
+const UNREADABLE_MONEY =
+  'an amount is not a plain number (VALIDATION_ERROR), has more decimals than its currency (MONEY_SCALE_EXCEEDED), is too large, below nothing, or nothing where it must be more (MONEY_OUT_OF_RANGE), or a currency is not one the system prices in (CURRENCY_NOT_SUPPORTED)';
+const MONEY_EXAMPLES = [EXAMPLES.MONEY_SCALE_EXCEEDED, EXAMPLES.MONEY_OUT_OF_RANGE, EXAMPLES.CURRENCY_NOT_SUPPORTED];
+
 const INVALID_PREVIEW = {
   status: HttpStatus.UNPROCESSABLE_ENTITY,
-  description: 'The form is invalid (VALIDATION_ERROR), or the software has no vendor (PURCHASE_INVOICE.NO_VENDOR).',
-  examples: [VALIDATION_EXAMPLE, EXAMPLES.NO_VENDOR],
+  description: `The form is invalid (VALIDATION_ERROR), ${UNREADABLE_MONEY}, or the software has no vendor (PURCHASE_INVOICE.NO_VENDOR).`,
+  examples: [VALIDATION_EXAMPLE, ...MONEY_EXAMPLES, EXAMPLES.NO_VENDOR],
 } as const;
 const INVALID_SUBMISSION = {
   status: HttpStatus.UNPROCESSABLE_ENTITY,
-  description:
-    'The form is invalid (VALIDATION_ERROR: at least one file, at most twenty), the software has no vendor (PURCHASE_INVOICE.NO_VENDOR), or a file is not a finished purchase document of the person who submits it (PURCHASE_INVOICE.DOCUMENT_INVALID, with the reason in details).',
-  examples: [VALIDATION_EXAMPLE, EXAMPLES.NO_VENDOR, EXAMPLES.DOCUMENT_INVALID],
+  description: `The form is invalid (VALIDATION_ERROR: at least one file, at most twenty), ${UNREADABLE_MONEY}, the software has no vendor (PURCHASE_INVOICE.NO_VENDOR), or a file is not a finished purchase document of the person who submits it (PURCHASE_INVOICE.DOCUMENT_INVALID, with the reason in details).`,
+  examples: [VALIDATION_EXAMPLE, ...MONEY_EXAMPLES, EXAMPLES.NO_VENDOR, EXAMPLES.DOCUMENT_INVALID],
 } as const;
 
 const PREVIEW_ERRORS = [...AUTH_ERRORS, FORBIDDEN, LINK_NOT_FOUND, NOT_PURCHASABLE, INVALID_PREVIEW] as const;

@@ -393,6 +393,55 @@ describe('purchase invoices over PostgreSQL (integration; PI-1.4, T-PI)', () => 
     });
   });
 
+  it.each([
+    ['a net amount that is not a number', { netAmount: { amount: 'abc' } }, 'VALIDATION_ERROR'],
+    ['a net amount with cents of a dong', { netAmount: { amount: '3840000.5' } }, 'MONEY_SCALE_EXCEEDED'],
+    ['a net amount beyond what money may hold', { netAmount: { amount: '1000000000000001' } }, 'MONEY_OUT_OF_RANGE'],
+    ['a negative net amount', { netAmount: { amount: '-3840000' } }, 'MONEY_OUT_OF_RANGE'],
+    ['a net amount of nothing', { netAmount: { amount: '0' } }, 'MONEY_OUT_OF_RANGE'],
+    ['a negative deductible tax', { deductibleTax: { amount: '-1' } }, 'MONEY_OUT_OF_RANGE'],
+    ['a non-deductible tax that is not a number', { nonDeductibleTax: { amount: '1,5' } }, 'VALIDATION_ERROR'],
+    [
+      'a price of one with more decimals than its currency',
+      { unitPriceOriginal: { amount: '15.123', currency: 'USD' } },
+      'MONEY_SCALE_EXCEEDED',
+    ],
+    ['a price of one of nothing', { unitPriceOriginal: { amount: '0', currency: 'USD' } }, 'MONEY_OUT_OF_RANGE'],
+    ['a negative price of one', { unitPriceOriginal: { amount: '-15', currency: 'USD' } }, 'MONEY_OUT_OF_RANGE'],
+    [
+      'a currency the system does not price in',
+      { unitPriceOriginal: { amount: '15', currency: 'ZZZ' } },
+      'CURRENCY_NOT_SUPPORTED',
+    ],
+  ])('answers %s with 422 and its code, never 500, and keeps nothing (RC-1-O2)', async (_name, over, code) => {
+    const { requestId } = await approved();
+    const answered = (response: request.Response): void => {
+      expect(response.status).toBe(422);
+      expect((response.body as { error: { code: string } }).error.code).toBe(code);
+    };
+
+    answered(await api('post', '/preview', h.it1).send(form(requestId, over)));
+    answered(await submit(requestId, over));
+    const sent = await submit(requestId, { vendorInvoiceNumber: `ONCE-${requestId}` });
+    expect(sent.status).toBe(201);
+    const kept = wire(sent);
+    await h.ctx.sql.query(
+      `UPDATE purchase_invoices SET state = 'RETURNED', decided_by_employee_id = $2, decided_at = now(), return_reason = 'Sai' WHERE id = $1`,
+      [kept.id, h.finance.employeeId],
+    );
+    const rest: Record<string, unknown> = form(requestId, { vendorInvoiceNumber: `ONCE-${requestId}`, ...over });
+    delete rest.link;
+    answered(
+      await api('post', `/${kept.id}/resubmission`, h.it1).send({ ...rest, documentIds: [await document(h.it1)] }),
+    );
+
+    const count = await h.ctx.sql.query<{ n: string }>(
+      `SELECT count(*)::text AS n FROM purchase_invoices WHERE request_id = $1`,
+      [requestId],
+    );
+    expect(count.rows[0].n).toBe('1');
+  });
+
   it('lists with filters and pages, and reads one: Finance every invoice, the IT Admin their own and the ones of their departments', async () => {
     const { requestId } = await approved();
     const a = wire(await submit(requestId, { servicePeriodMonth: `${h.year}-05` }));

@@ -1,5 +1,11 @@
 import { HttpStatus } from '@nestjs/common';
+import {
+  CurrencyNotSupportedError,
+  MoneyOutOfRangeError,
+  MoneyScaleExceededError,
+} from '../../../core/money/money.errors';
 import { ApiException } from '../../../infrastructure/http/errors/api.exception';
+import { toMoneyApiException } from '../../../infrastructure/http/errors/money-errors';
 import { errorExampleOf } from '../../../infrastructure/http/openapi-error-examples';
 import { PurchaseInvoiceRefusedError, type PurchaseInvoiceRefusal } from './purchase-invoice.errors';
 
@@ -17,7 +23,10 @@ const STATUS: Record<PurchaseInvoiceRefusal, HttpStatus> = {
   NO_PLACE: HttpStatus.CONFLICT,
 };
 
-/** Maps the refusals of the routes of purchase invoices to their HTTP answers and leaves the rest to the global filters. */
+/**
+ * Maps the refusals of the routes of purchase invoices to their HTTP answers, an amount or a currency that cannot be read to the shared 422 of
+ * money, and leaves the rest to the global filters.
+ */
 export function toPurchaseInvoiceApiException(error: unknown): unknown {
   if (error instanceof ApiException) return error;
   if (error instanceof PurchaseInvoiceRefusedError) {
@@ -28,7 +37,7 @@ export function toPurchaseInvoiceApiException(error: unknown): unknown {
     });
   }
 
-  return error;
+  return toMoneyApiException(error);
 }
 
 const example = (error: Error) => errorExampleOf(toPurchaseInvoiceApiException(error));
@@ -46,4 +55,7 @@ export const PURCHASE_INVOICE_ERROR_EXAMPLES = {
   SAME_PERSON: example(new PurchaseInvoiceRefusedError('SAME_PERSON')),
   NOT_SUBMITTED: example(new PurchaseInvoiceRefusedError('NOT_SUBMITTED')),
   NO_PLACE: example(new PurchaseInvoiceRefusedError('NO_PLACE')),
+  MONEY_SCALE_EXCEEDED: example(new MoneyScaleExceededError(0)),
+  MONEY_OUT_OF_RANGE: example(new MoneyOutOfRangeError()),
+  CURRENCY_NOT_SUPPORTED: example(new CurrencyNotSupportedError('ZZZ')),
 } as const;
