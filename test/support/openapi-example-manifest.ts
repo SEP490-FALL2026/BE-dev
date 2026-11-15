@@ -315,6 +315,7 @@ export const SUCCESS_MESSAGES: Readonly<Record<string, string>> = {
   seatBaselineImportGet: 'SEAT_BASELINE_IMPORT.FETCHED',
   seatBaselineImportRows: 'SEAT_BASELINE_IMPORT.ROWS_LISTED',
   seatBaselineImportUpload: 'SEAT_BASELINE_IMPORT.UPLOADED',
+  seatMonthChargeList: 'SEAT_MONTH_CHARGE.LISTED',
   spendApprovalDecide: 'SPEND_APPROVAL.DECIDED',
   spendApprovalGet: 'SPEND_APPROVAL.FETCHED',
   spendApprovalLineDecide: 'SPEND_APPROVAL.LINES_DECIDED',

@@ -1,6 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { pageOf } from '../../../core/application/pagination';
-import { BudgetFactsService } from '../budget/budget-facts.service';
+import { BudgetFactsService, type MoneyView } from '../budget/budget-facts.service';
+import { SeatMonthRepo } from '../seat-month/seat-month.repo';
+import { stockLineMinor } from '../seat-month/seat-month.policy';
 import type { BudgetSummaryWire, TableRowWire } from '../budget/budget.dto';
 import { BudgetViewNumbersService, type BudgetViewNumbers } from './budget-view-numbers.service';
 import { budgetNumbers } from './budget-view.mapper';
@@ -24,6 +26,7 @@ export class BudgetTableViewService {
     private readonly repo: BudgetViewRepo,
     private readonly numbers: BudgetViewNumbersService,
     private readonly facts: BudgetFactsService,
+    private readonly seatMonths: SeatMonthRepo,
   ) {}
 
   async table(query: { year?: number; page: number; pageSize: number }) {
@@ -71,12 +74,33 @@ export class BudgetTableViewService {
     for (const [currency, sum] of sums) totals[currency] = await this.summaryTotal(currency, sum);
     const cycle = await this.numbers.cycle(year);
     const money = cycle ? await this.facts.formatter(cycle.currency) : null;
+    const pool = await this.poolFigures(year, cycle?.sharedPoolReserveMinor ?? null, money);
     return {
       year,
       totals,
       lastInvoiceRecordedAt: await this.numbers.lastInvoice(year),
+      ...pool,
       annualCeiling: cycle && money ? money(cycle.annualCeilingMinor) : null,
       sharedPoolReserve: cycle?.sharedPoolReserveMinor != null && money ? money(cycle.sharedPoolReserveMinor) : null,
+    };
+  }
+
+  /** What the year cost the company, with the pool in it, and the line of the pool against the reserve of the cycle (`MG-03`, `QĐ-104i`). */
+  private async poolFigures(
+    year: number,
+    reserveMinor: bigint | null,
+    money: ((minor: bigint) => MoneyView) | null,
+  ): Promise<Pick<BudgetSummaryWire, 'companySpent' | 'sharedPoolUnallocated' | 'sharedPoolOverReserve'>> {
+    const company = await this.seatMonths.yearTotals(year);
+    const unallocatedMinor = stockLineMinor({
+      invoicedMinor: company.poolInvoicedMinor,
+      allocatedMinor: company.allocatedMinor,
+    });
+
+    return {
+      companySpent: money ? money(company.companyMinor) : null,
+      sharedPoolUnallocated: money ? money(unallocatedMinor) : null,
+      sharedPoolOverReserve: reserveMinor === null ? null : unallocatedMinor > reserveMinor,
     };
   }
 

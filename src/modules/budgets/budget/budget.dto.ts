@@ -347,6 +347,12 @@ const budgetSummarySchema = z.strictObject({
   totals: z.record(z.string(), summaryTotalSchema),
   /** When the last invoice was recorded, which is when the spent figure was last brought up to date; null when none was. */
   lastInvoiceRecordedAt: z.iso.datetime().nullable(),
+  /** What the year cost the company: every invoice of the year, those of the shared pool included, whatever they are booked to (`MG-03`). Null when the year has no cycle currency to say it in. */
+  companySpent: moneyView.nullable(),
+  /** The line of the shared pool: the invoices of the pool of the year less the seat-months charged to departments; it counts against the pool reserve of the cycle. */
+  sharedPoolUnallocated: moneyView.nullable(),
+  /** Whether the line of the pool is more than the pool reserve of the cycle (Finance is warned); null when the cycle sets no reserve. */
+  sharedPoolOverReserve: z.boolean().nullable(),
 });
 export const mineVersionSummarySchema = z.strictObject({
   id: z.uuid(),

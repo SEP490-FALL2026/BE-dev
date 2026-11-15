@@ -61,6 +61,10 @@ Một lõi `budget/` và sáu capability cùng cấp với nó. Lõi giữ repo,
 `budget-notifier.service.ts`, `version-view.service.ts`, `budget.dto.ts`); lõi không import capability nào, mỗi capability chỉ
 import lõi (`pnpm arch:capabilities --module budgets`).
 
+- `seat-month/` — seat-tháng `K2` (SM-1, `QĐ-103k`, `QĐ-111bg`): `seat-month.policy.ts` (chia theo ngày, làm tròn nửa ra xa 0, phần dư dồn đoạn cuối) và `seat-month-plan.policy.ts`
+  (phòng chịu và phần cam kết bị tiêu), `SeatMonthService` (tính một tháng), `SeatMonthSubscriptionService` (một thuê bao, một transaction; khóa tháng, hàng cam kết, rồi khóa năm),
+  `SeatMonthSweeper` mỗi giờ cho tháng đã kết thúc chưa có dòng; `GET /seat-month-charges` (`SeatMonthChargesController`, Finance và trưởng phòng của Cost Center mình) kèm dòng kho. Cam kết chỉ
+  bị tiêu thêm, không bao giờ hoàn lại (trigger `budget_commitments_guard`), nên tính lại một tháng giữ phần đã tiêu.
 - `proposal/` — đề xuất của trưởng phòng: gửi, rút, Finance trả về, gửi lại (US-06-10); `budget-proposals.controller.ts`;
   `ProposalService`, `ProposalViewService`, `ProposalSender`. **`BM-10`** (`QĐ-111ab`) = `{ costCenterId?, year, requestedAmount, note?,
 attachmentIds[1..10] }`, không có dòng (`requestedAmount` lưu ở `total_minor`, `note` 1–1000 ký tự, CHECK `budget_proposals_note_check`);
@@ -158,7 +162,10 @@ vendor, number)`; bảng `invoices` chỉ ghi thêm (trigger + quyền runtime `
 - Giải phóng (hủy/rút/thất bại) khóa các dòng commitment của Request theo thứ tự năm (`CommitmentRepo.lockOfRequest`, cùng thứ tự với `lockById`) rồi mới đọc, nên xếp hàng sau hóa đơn đang ghi thay vì đọc cũ. Phần chia cho từng người của Request nhóm vượt `held` chỉ giải phóng `held` (phần đã chi không quay về); dòng đã `EXPENSED` bị bỏ qua, dòng `RELEASED` vẫn `NOT_HELD`. Gắn commitment chờ ngân sách vào phiên bản chỉ gắn dòng còn `HELD`.
 - `spent` của một Cost Center và năm = Σ chi phí thực của hóa đơn thuộc commitment của chính Cost Center và năm đó (kể cả commitment chưa gắn
   phiên bản) + hóa đơn không commitment ghi thẳng vào Cost Center đó theo năm của tháng dịch vụ (PI-1 `COST_CENTER`, ca ngoài quy trình RC-2); hóa đơn
-  gắn thuê bao kho và ca `UNALLOCATED` không vào `spent` của phòng nào (MG-03). Một Cost Center chỉ có chi không commitment ở một năm vẫn có dòng ở bảng
+  gắn thuê bao kho (mọi hóa đơn `K2`, kể cả nối Request: `QĐ-104c`(3)) và ca `UNALLOCATED` không vào `spent` của phòng nào; phòng chịu `K2` bằng **seat-tháng** (`seat_month_charges`, SM-1, MG-03 = A):
+  `InvoiceRepo.spentOf` cộng cả `amount_minor` của các dòng seat-tháng có Cost Center theo năm của tháng, nên `yearFacts.spentMinor` (kiểm FR-3.20, snapshot Người duyệt chi),
+  bảng/summary ngân sách và `spentThisYear` đều thấy chúng một lần. Tổng thực chi công ty (`companySpent` ở summary) cộng cả hóa đơn kho; dòng _Chưa phân bổ — kho_ = hóa đơn kho −
+  seat-tháng (`sharedPoolUnallocated`, so với `sharedPoolReserve` ở `sharedPoolOverReserve`), không lưu. Một Cost Center chỉ có chi không commitment ở một năm vẫn có dòng ở bảng
   và tổng (`BudgetViewRepo` `pairs`, trạng thái `NO_BUDGET`). `held` chỉ tính commitment `HELD` đã gắn phiên bản (`CommitmentRepo.totals`, dùng chung cho bảng, ô tổng và kiểm tra ngân sách).
 - Proposal đã gửi không sửa tại chỗ; quyết định version là bản ghi không đổi và không quyết định sau khi năm tài
   chính đã hết (`BUDGET.YEAR_ENDED`, `version-decision.service.ts`).

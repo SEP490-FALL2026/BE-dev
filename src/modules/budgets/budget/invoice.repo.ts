@@ -166,22 +166,31 @@ export class InvoiceRepo {
   }
 
   /**
-   * What the invoices cost for each Cost Center and year, keyed `costCenterId:year`: every invoice of every commitment of that Cost
-   * Center and year, because an expense belongs to its year even before the budget of that year is approved, and every invoice booked
-   * to the Cost Center with no commitment (`PI-1`, `R-51`). The year is the one of the month the invoice pays for; an invoice of before
-   * has no such month and keeps the year of its commitment.
+   * What each Cost Center and year spent, keyed `costCenterId:year`: every invoice of every commitment of that Cost Center and year, because an
+   * expense belongs to its year even before the budget of that year is approved, every invoice booked to the Cost Center with no commitment
+   * (`PI-1`, `R-51`), and the seat-months of the shared pool of seats (`K2`) that Cost Center bore (`SM-1`, `MG-03`): an invoice of the pool is a
+   * line of the pool and costs no department anything, so what a department bears of it is its seat-months, once. The year is the one of the month
+   * the invoice or the seat-month pays for; an invoice of before has no such month and keeps the year of its commitment.
    */
   async spentOf(pairs: readonly { costCenterId: string; year: number }[], tx?: DbTx): Promise<Map<string, bigint>> {
     const spent = new Map<string, bigint>();
     if (pairs.length === 0) return spent;
     const wanted = Prisma.join(pairs.map((pair) => Prisma.sql`(${pair.costCenterId}::uuid, ${pair.year}::int)`));
     const rows = await (tx ?? this.prisma).$queryRaw<{ cost_center_id: string; year: number; spent: string }[]>`
-      SELECT COALESCE(i.cost_center_id, c.cost_center_id) AS cost_center_id,
-             COALESCE(EXTRACT(YEAR FROM i.service_month)::int, c.year) AS year,
-             SUM(i.actual_cost_minor)::text AS spent
-        FROM invoices i
-        LEFT JOIN budget_commitments c ON c.id = i.commitment_id
-       WHERE (COALESCE(i.cost_center_id, c.cost_center_id), COALESCE(EXTRACT(YEAR FROM i.service_month)::int, c.year)) IN (${wanted})
+      SELECT cost_center_id, year, SUM(amount)::text AS spent
+        FROM (
+          SELECT COALESCE(i.cost_center_id, c.cost_center_id) AS cost_center_id,
+                 COALESCE(EXTRACT(YEAR FROM i.service_month)::int, c.year) AS year,
+                 i.actual_cost_minor AS amount
+            FROM invoices i
+            LEFT JOIN budget_commitments c ON c.id = i.commitment_id
+           WHERE (COALESCE(i.cost_center_id, c.cost_center_id), COALESCE(EXTRACT(YEAR FROM i.service_month)::int, c.year)) IN (${wanted})
+          UNION ALL
+          SELECT s.cost_center_id, EXTRACT(YEAR FROM s.month)::int AS year, s.amount_minor AS amount
+            FROM seat_month_charges s
+           WHERE s.cost_center_id IS NOT NULL
+             AND (s.cost_center_id, EXTRACT(YEAR FROM s.month)::int) IN (${wanted})
+        ) spend
        GROUP BY 1, 2`;
     for (const row of rows) spent.set(`${row.cost_center_id}:${row.year}`, BigInt(row.spent));
 

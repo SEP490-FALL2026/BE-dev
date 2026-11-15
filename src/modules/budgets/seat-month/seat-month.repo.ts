@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { fromDateColumn, toDateColumn, type BusinessDate } from '../../../core/business-date';
-import type { Prisma } from '../../../generated/prisma/client';
+import { Prisma } from '../../../generated/prisma/client';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 
@@ -90,6 +90,86 @@ export class SeatMonthRepo {
     await tx.seatMonthCharge.createMany({
       data: rows.map((row) => ({ ...row, month: toDateColumn(row.month) })),
     });
+  }
+
+  /** One page of the rows of a month, by Cost Center then person; narrowed to some Cost Centers (a manager's own) and to a subscription. */
+  async page(filter: {
+    month: BusinessDate;
+    costCenterIds?: readonly string[];
+    subscriptionId?: string;
+    skip: number;
+    take: number;
+  }): Promise<{ rows: SeatMonthChargeRecord[]; total: number }> {
+    const where: Prisma.SeatMonthChargeWhereInput = {
+      month: toDateColumn(filter.month),
+      ...(filter.costCenterIds ? { costCenterId: { in: [...filter.costCenterIds] } } : {}),
+      ...(filter.subscriptionId ? { subscriptionId: filter.subscriptionId } : {}),
+    };
+    const [rows, total] = await this.prisma.$transaction([
+      this.prisma.seatMonthCharge.findMany({
+        where,
+        orderBy: [{ costCenterId: 'asc' }, { employeeId: 'asc' }, { id: 'asc' }],
+        skip: filter.skip,
+        take: filter.take,
+      }),
+      this.prisma.seatMonthCharge.count({ where }),
+    ]);
+
+    return { rows: rows.map(toRecord), total };
+  }
+
+  /**
+   * The line of the pool for each subscription that has an invoice of the pool or a seat-month in the month: what its invoices cost (the ones booked
+   * to the subscription, with no commitment and no Cost Center, `QĐ-104c`) and what the seats of the month took of it; the line is the difference
+   * (`stockLineMinor`), not stored. By subscription, at most `limit`.
+   */
+  async poolLinesOfMonth(
+    month: BusinessDate,
+    subscriptionId: string | undefined,
+    limit: number,
+  ): Promise<{ subscriptionId: string; invoicedMinor: bigint; allocatedMinor: bigint }[]> {
+    const only = (column: string) =>
+      subscriptionId ? Prisma.sql`AND ${Prisma.raw(column)} = ${subscriptionId}::uuid` : Prisma.empty;
+    const rows = await this.prisma.$queryRaw<{ subscription_id: string; invoiced: string; allocated: string }[]>`
+      SELECT COALESCE(i.subscription_id, a.subscription_id) AS subscription_id,
+             COALESCE(i.invoiced, 0)::text AS invoiced, COALESCE(a.allocated, 0)::text AS allocated
+        FROM (SELECT subscription_id, SUM(actual_cost_minor) AS invoiced FROM invoices
+               WHERE subscription_id IS NOT NULL AND commitment_id IS NULL AND cost_center_id IS NULL
+                 AND service_month = ${month}::date ${only('subscription_id')}
+               GROUP BY subscription_id) i
+        FULL JOIN (SELECT subscription_id, SUM(amount_minor) AS allocated FROM seat_month_charges
+                    WHERE month = ${month}::date ${only('subscription_id')}
+                    GROUP BY subscription_id) a ON a.subscription_id = i.subscription_id
+       ORDER BY 1
+       LIMIT ${limit}`;
+
+    return rows.map((row) => ({
+      subscriptionId: row.subscription_id,
+      invoicedMinor: BigInt(row.invoiced),
+      allocatedMinor: BigInt(row.allocated),
+    }));
+  }
+
+  /**
+   * What the year cost the company and what of it the pool still holds (`MG-03`): every invoice of the year whatever it is booked to, the invoices of
+   * the pool, and what the seat-months of the year took of them. The year of an invoice is the one of the month it pays for, else its commitment's.
+   */
+  async yearTotals(year: number): Promise<{ companyMinor: bigint; poolInvoicedMinor: bigint; allocatedMinor: bigint }> {
+    const rows = await this.prisma.$queryRaw<{ company: string; pool: string; allocated: string }[]>`
+      SELECT COALESCE(SUM(i.actual_cost_minor), 0)::text AS company,
+             COALESCE(SUM(i.actual_cost_minor) FILTER (WHERE i.subscription_id IS NOT NULL AND i.commitment_id IS NULL
+                                                         AND i.cost_center_id IS NULL), 0)::text AS pool,
+             (SELECT COALESCE(SUM(s.amount_minor), 0)::text FROM seat_month_charges s
+               WHERE EXTRACT(YEAR FROM s.month)::int = ${year}::int) AS allocated
+        FROM invoices i LEFT JOIN budget_commitments c ON c.id = i.commitment_id
+       WHERE COALESCE(EXTRACT(YEAR FROM i.service_month)::int, c.year) = ${year}::int`;
+    const row = rows[0];
+
+    return {
+      companyMinor: BigInt(row?.company ?? '0'),
+      poolInvoicedMinor: BigInt(row?.pool ?? '0'),
+      allocatedMinor: BigInt(row?.allocated ?? '0'),
+    };
   }
 
   /** How many rows a month has, in all: a month with none was never charged, or had no seat to charge. */

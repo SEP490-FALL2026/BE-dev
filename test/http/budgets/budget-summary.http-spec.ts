@@ -26,6 +26,9 @@ const SUMMARY = {
     },
   },
   lastInvoiceRecordedAt: null,
+  companySpent: null,
+  sharedPoolUnallocated: null,
+  sharedPoolOverReserve: null,
 };
 
 describe('GET /budgets/summary (HTTP contract, no database)', () => {

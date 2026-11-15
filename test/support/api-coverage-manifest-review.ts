@@ -7,4 +7,5 @@ export const API_COVERAGE_REVIEW: readonly string[] = [
   'POST /api/v1/vendor-account-discrepancies/{id}/decision',
   'GET /api/v1/out-of-process-cases',
   'POST /api/v1/out-of-process-cases/{id}/closure',
+  'GET /api/v1/seat-month-charges',
 ];

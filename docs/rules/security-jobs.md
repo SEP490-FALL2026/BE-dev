@@ -227,6 +227,7 @@
   priority, the workspaces by name and whether an emergency account is declared, never a password, a key or the name of that account) once, again
   when the roles change before the last working day and, with the highest priority, when a person who left still holds the Super Admin role or a
   workspace. Nothing here locks, revokes or reassigns anything; the notification channel reads the event (`g4-notification-delivery`).
+
 - A failed pass of a job (`*.job.ts`, the loops of the worker) or of a sweep that works record by record logs one line,
   `<kind> failed: <description>`, where the description is `describeForOperator`
   ([operator-error.ts](../../src/infrastructure/observability/operator-error.ts)): the class name of the error, its Prisma

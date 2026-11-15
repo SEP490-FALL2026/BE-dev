@@ -9,6 +9,7 @@ import { NESTED_ARRAYS_RD } from './api-collection-registry-nested-rd';
 import { NESTED_ARRAYS_PI1 } from './api-collection-registry-nested-pi1';
 import { NESTED_ARRAYS_RC1 } from './api-collection-registry-nested-rc1';
 import { NESTED_ARRAYS_RC2 } from './api-collection-registry-nested-rc2';
+import { NESTED_ARRAYS_SM1 } from './api-collection-registry-nested-sm1';
 import { NESTED_ARRAYS_US1 } from './api-collection-registry-nested-us1';
 import { NESTED_ARRAYS_W2 } from './api-collection-registry-nested-w2';
 import { NESTED_ARRAYS_W3 } from './api-collection-registry-nested-w3';
@@ -365,5 +366,6 @@ export const NESTED_ARRAYS_FIRST_HALF: readonly NestedArrayEntry[] = [
   ...NESTED_ARRAYS_PI1,
   ...NESTED_ARRAYS_RC1,
   ...NESTED_ARRAYS_RC2,
+  ...NESTED_ARRAYS_SM1,
   ...NESTED_ARRAYS_US1,
 ];

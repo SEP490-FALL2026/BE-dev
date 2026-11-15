@@ -9,6 +9,7 @@ import { RD_REGISTRY_EVENTS } from './api-collection-registry-events-rd';
 import { PI1_REGISTRY_EVENTS } from './api-collection-registry-events-pi1';
 import { RC1_REGISTRY_EVENTS } from './api-collection-registry-events-rc1';
 import { RC2_REGISTRY_EVENTS } from './api-collection-registry-events-rc2';
+import { SM1_REGISTRY_EVENTS } from './api-collection-registry-events-sm1';
 import { US1_REGISTRY_EVENTS } from './api-collection-registry-events-us1';
 import { W6_REGISTRY_EVENTS } from './api-collection-registry-events-w6';
 import { XIT_REGISTRY_EVENTS } from './api-collection-registry-events-xit';
@@ -51,4 +52,5 @@ export const W3_REGISTRY_EVENTS: readonly RegistryEvent[] = [
   ...PI1_REGISTRY_EVENTS,
   ...RC1_REGISTRY_EVENTS,
   ...RC2_REGISTRY_EVENTS,
+  ...SM1_REGISTRY_EVENTS,
 ];

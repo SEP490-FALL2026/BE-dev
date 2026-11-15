@@ -1,4 +1,7 @@
 import { randomUUID } from 'node:crypto';
+import request from 'supertest';
+import { BudgetsApi } from '../../../src/modules/budgets/public/budgets.api';
+import { SeatMonthRepo } from '../../../src/modules/budgets/seat-month/seat-month.repo';
 import { SeatMonthService } from '../../../src/modules/budgets/seat-month/seat-month.service';
 import { takeOwnerOff } from '../../support/shared-pool-subscription';
 import { InvoiceHarness } from '../../support/invoice-harness';
@@ -179,5 +182,91 @@ describe('a month of the seats of a K2 pool is charged to the departments of the
     await service().chargeMonth(month());
 
     expect(await rowsOf(pool)).toMatchObject([{ department_id: unit.department.id, days: 15, amount_minor: '193548' }]);
+  });
+
+  const facts = async (unit: Unit) =>
+    (await h.ctx.app.get(BudgetsApi, { strict: false }).yearFacts(unit.department.unitId, [h.year])).get(h.year);
+
+  it('is the spend of the department that bore the days, beside its invoices, wherever the budget reads it (MG-03 = A)', async () => {
+    const pool = await newPool();
+    const planId = await h.planOf(pool);
+    const [from, to] = [await department(), await department()];
+    const person = await holder('E-SM-SPEND', from, to, `${h.year}-10-26`);
+    await seat(pool, planId, person);
+
+    await service().chargeMonth(month());
+
+    expect(await facts(from)).toMatchObject({ spentMinor: 322_581n });
+    expect(await facts(to)).toMatchObject({ spentMinor: 77_419n });
+  });
+
+  it('MG-03: the renewal of a pool of 10 seats with 6 held in department X, 2 in Y and 2 idle: X bears 6 seat-months, Y 2, the line of the pool 2, and the company spent the invoice', async () => {
+    const pool = await newPool();
+    const planId = await h.planOf(pool);
+    const vendorId = (await h.vendorOf(planId)).id;
+    const [x, y] = [await department(), await department()];
+    for (let index = 0; index < 6; index += 1) await seat(pool, planId, await holder(`E-MG3-X${index}`, x));
+    for (let index = 0; index < 2; index += 1) await seat(pool, planId, await holder(`E-MG3-Y${index}`, y));
+    const invoice = await h.recordPurchase(vendorId, {
+      subscriptionId: pool,
+      serviceMonth: month(),
+      netMinor: BigInt(10 * 400_000),
+    });
+
+    await service().chargeMonth(month());
+
+    expect(invoice).toMatchObject({ booking: 'SUBSCRIPTION', actualCostMinor: 4_000_000n });
+    expect(await facts(x)).toMatchObject({ spentMinor: 6n * 400_000n });
+    expect(await facts(y)).toMatchObject({ spentMinor: 2n * 400_000n });
+    const [line] = await h.ctx.app.get(SeatMonthRepo, { strict: false }).poolLinesOfMonth(month(), pool, 10);
+    expect(line).toEqual({ subscriptionId: pool, invoicedMinor: 4_000_000n, allocatedMinor: 3_200_000n });
+    // The company spent the invoice: the departments' share and the line of the pool add up to it, and the seat-months leave the invoice as it was.
+    expect(6n * 400_000n + 2n * 400_000n + (line.invoicedMinor - line.allocatedMinor)).toBe(invoice.actualCostMinor);
+    const summary = h.dataOf<{ companySpent: { amount: string }; sharedPoolUnallocated: { amount: string } }>(
+      await h.summary(h.finance, { year: h.year }).expect(200),
+    );
+    // The invoice of the pool is in what the company spent, and what the seat-months left of the pools is the line of the pool (the year holds other pools too).
+    const year = await h.ctx.app.get(SeatMonthRepo, { strict: false }).yearTotals(h.year);
+    expect(year.companyMinor).toBeGreaterThanOrEqual(4_000_000n);
+    expect(BigInt(summary.companySpent.amount)).toBe(year.companyMinor);
+    expect(BigInt(summary.sharedPoolUnallocated.amount)).toBe(year.poolInvoicedMinor - year.allocatedMinor);
+  });
+
+  interface ListWire {
+    items: Array<{ department: { id: string }; costCenter: { id: string } | null; amount: { amount: string } }>;
+    pagination: { totalItems: number };
+    poolLines: Array<{ subscriptionId: string; invoiced: { amount: string }; unallocated: { amount: string } }>;
+  }
+  const listing = (account: Parameters<typeof h.as>[0], query: Record<string, string | number> = {}) =>
+    request(h.server())
+      .get('/api/v1/seat-month-charges')
+      .query({ year: h.year, month: 10, ...query })
+      .set(h.as(account));
+
+  it('answers Finance with every row of the month and the line of the pool, and a manager with the Cost Center of their own department only (D8)', async () => {
+    const pool = await newPool();
+    const planId = await h.planOf(pool);
+    const vendorId = (await h.vendorOf(planId)).id;
+    const [from, to] = [await department(), await department()];
+    await seat(pool, planId, await holder('E-SM-LIST', from, to, `${h.year}-10-26`));
+    await h.recordPurchase(vendorId, { subscriptionId: pool, serviceMonth: month(), netMinor: 400_000n });
+    await service().chargeMonth(month());
+
+    const finance = h.dataOf<ListWire>(await listing(h.finance, { subscriptionId: pool }).expect(200));
+    const own = h.dataOf<ListWire>(await listing(from.head.account, { subscriptionId: pool }).expect(200));
+    const other = h.dataOf<ListWire>(
+      await listing(from.head.account, { subscriptionId: pool, costCenterId: to.department.unitId }).expect(200),
+    );
+
+    expect(finance.items.map((row) => row.amount.amount).sort()).toEqual(['322581', '77419']);
+    expect(finance.poolLines).toMatchObject([
+      { subscriptionId: pool, invoiced: { amount: '400000' }, unallocated: { amount: '0' } },
+    ]);
+    expect(own.items.map((row) => [row.costCenter?.id, row.amount.amount])).toEqual([
+      [from.department.unitId, '322581'],
+    ]);
+    expect(own.poolLines).toEqual([]);
+    expect(other.items).toEqual([]);
+    await listing(h.it1).expect(403);
   });
 });

@@ -82,6 +82,8 @@ import { BudgetAttachmentLinkService } from './attachment/budget-attachment-link
 import { BudgetAttachmentExpiryService } from './attachment/budget-attachment-expiry.service';
 import { BudgetAttachmentExpirySweeper } from './attachment/budget-attachment-expiry.job';
 import { SeatMonthRepo } from './seat-month/seat-month.repo';
+import { SeatMonthChargesController } from './seat-month/seat-month-charges.controller';
+import { SeatMonthQueryService } from './seat-month/seat-month-query.service';
 import { SeatMonthService } from './seat-month/seat-month.service';
 import { SeatMonthSubscriptionService } from './seat-month/seat-month-subscription.service';
 import { SeatMonthSweeper } from './seat-month/seat-month.job';
@@ -122,6 +124,7 @@ import { BudgetProposalTemplateListener } from './proposal/budget-proposal-templ
     BudgetCyclesController,
     BudgetAttachmentUploadsController,
     BudgetAttachmentReadsController,
+    SeatMonthChargesController,
   ],
   providers: [
     BudgetProposalTemplateListener,
@@ -177,6 +180,7 @@ import { BudgetProposalTemplateListener } from './proposal/budget-proposal-templ
     SeatMonthRepo,
     SeatMonthSubscriptionService,
     SeatMonthService,
+    SeatMonthQueryService,
     SeatMonthSweeper,
     // Until a review period can sign a month (RV-1), no month is signed.
     { provide: SeatMonthSignedGuard, useValue: { isSigned: () => Promise.resolve(false) } },
