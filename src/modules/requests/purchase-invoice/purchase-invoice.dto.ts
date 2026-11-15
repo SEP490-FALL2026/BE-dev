@@ -17,7 +17,11 @@ const paymentSource = z.enum(['COMPANY_CARD', 'IT_ADVANCE']);
 /** An amount in dong, as typed: what the card took out of the company, fees and exchange loss included. */
 const dongInput = z.strictObject({ amount: z.string().max(40) });
 const moneyView = z.strictObject({ amount: z.string(), currency: z.string() });
-const serviceMonth = z.string().regex(/^\d{4}-(0[1-9]|1[0-2])$/, 'Must be a month as YYYY-MM.');
+/** A month as `YYYY-MM`, judged by the rule and not by a pattern the document would repeat. */
+const serviceMonth = z
+  .string()
+  .refine((value) => /^\d{4}-(0[1-9]|1[0-2])$/.test(value), { message: 'Must be a month as YYYY-MM.' })
+  .meta({ description: 'A calendar month as YYYY-MM.' });
 
 const link = z
   .strictObject({

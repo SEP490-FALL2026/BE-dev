@@ -36,27 +36,68 @@ const FORBIDDEN = {
   examples: [FORBIDDEN_EXAMPLE],
 } as const;
 
+const LINK_NOT_FOUND = {
+  status: HttpStatus.NOT_FOUND,
+  description:
+    'The request or subscription does not exist or is not one the IT Admin works (PURCHASE_INVOICE.LINK_NOT_FOUND).',
+  examples: [EXAMPLES.LINK_NOT_FOUND],
+} as const;
+
+const REFUSED_STATE =
+  'The request is not one whose purchase was approved to be spent (PURCHASE_INVOICE.REQUEST_NOT_PURCHASABLE)';
+const TAKEN_NUMBER = 'the vendor has an invoice with this number that was not returned (PURCHASE_INVOICE.NUMBER_TAKEN)';
+const NOT_PURCHASABLE = {
+  status: HttpStatus.CONFLICT,
+  description: `${REFUSED_STATE}.`,
+  examples: [EXAMPLES.REQUEST_NOT_PURCHASABLE],
+} as const;
+const NOT_PURCHASABLE_OR_TAKEN = {
+  status: HttpStatus.CONFLICT,
+  description: `${REFUSED_STATE}, or ${TAKEN_NUMBER}.`,
+  examples: [EXAMPLES.REQUEST_NOT_PURCHASABLE, EXAMPLES.NUMBER_TAKEN],
+} as const;
+const NOT_PURCHASABLE_TAKEN_OR_NOT_RETURNED = {
+  status: HttpStatus.CONFLICT,
+  description: `${REFUSED_STATE}, ${TAKEN_NUMBER}, the invoice was not returned (PURCHASE_INVOICE.NOT_RETURNED) or was already submitted again (PURCHASE_INVOICE.ALREADY_RESUBMITTED).`,
+  examples: [
+    EXAMPLES.REQUEST_NOT_PURCHASABLE,
+    EXAMPLES.NUMBER_TAKEN,
+    EXAMPLES.NOT_RETURNED,
+    EXAMPLES.ALREADY_RESUBMITTED,
+  ],
+} as const;
+
+const INVALID_PREVIEW = {
+  status: HttpStatus.UNPROCESSABLE_ENTITY,
+  description: 'The form is invalid (VALIDATION_ERROR), or the software has no vendor (PURCHASE_INVOICE.NO_VENDOR).',
+  examples: [VALIDATION_EXAMPLE, EXAMPLES.NO_VENDOR],
+} as const;
+const INVALID_SUBMISSION = {
+  status: HttpStatus.UNPROCESSABLE_ENTITY,
+  description:
+    'The form is invalid (VALIDATION_ERROR: at least one file, at most twenty), the software has no vendor (PURCHASE_INVOICE.NO_VENDOR), or a file is not a finished purchase document of the person who submits it (PURCHASE_INVOICE.DOCUMENT_INVALID, with the reason in details).',
+  examples: [VALIDATION_EXAMPLE, EXAMPLES.NO_VENDOR, EXAMPLES.DOCUMENT_INVALID],
+} as const;
+
+const PREVIEW_ERRORS = [...AUTH_ERRORS, FORBIDDEN, LINK_NOT_FOUND, NOT_PURCHASABLE, INVALID_PREVIEW] as const;
 const SUBMIT_ERRORS = [
+  ...AUTH_ERRORS,
+  FORBIDDEN,
+  LINK_NOT_FOUND,
+  NOT_PURCHASABLE_OR_TAKEN,
+  INVALID_SUBMISSION,
+] as const;
+const RESUBMIT_ERRORS = [
   ...AUTH_ERRORS,
   FORBIDDEN,
   {
     status: HttpStatus.NOT_FOUND,
     description:
-      'The request or subscription does not exist or is not one the IT Admin works (PURCHASE_INVOICE.LINK_NOT_FOUND).',
-    examples: [EXAMPLES.LINK_NOT_FOUND],
+      'The invoice does not exist or was not submitted by the caller (PURCHASE_INVOICE.NOT_FOUND), or its request or subscription is not one the IT Admin works (PURCHASE_INVOICE.LINK_NOT_FOUND).',
+    examples: [EXAMPLES.LINK_NOT_FOUND, EXAMPLES.NOT_FOUND],
   },
-  {
-    status: HttpStatus.CONFLICT,
-    description:
-      'The request is not one whose purchase was approved to be spent (PURCHASE_INVOICE.REQUEST_NOT_PURCHASABLE), or the vendor has an invoice with this number that was not returned (PURCHASE_INVOICE.NUMBER_TAKEN).',
-    examples: [EXAMPLES.REQUEST_NOT_PURCHASABLE, EXAMPLES.NUMBER_TAKEN],
-  },
-  {
-    status: HttpStatus.UNPROCESSABLE_ENTITY,
-    description:
-      'The form is invalid (VALIDATION_ERROR: at least one file, at most twenty), the software has no vendor (PURCHASE_INVOICE.NO_VENDOR), or a file is not a finished purchase document of the person who submits it (PURCHASE_INVOICE.DOCUMENT_INVALID, with the reason in details).',
-    examples: [VALIDATION_EXAMPLE, EXAMPLES.NO_VENDOR, EXAMPLES.DOCUMENT_INVALID],
-  },
+  NOT_PURCHASABLE_TAKEN_OR_NOT_RETURNED,
+  INVALID_SUBMISSION,
 ] as const;
 
 /**
@@ -76,14 +117,14 @@ export class PurchaseInvoicesController {
   @RequireRoles('IT_ADMIN')
   @ApiOperation({
     operationId: 'purchaseInvoicePreview',
-    summary: 'Read an invoice against its request or subscription before it is submitted',
+    summary: 'Read an invoice against its request before it is submitted',
   })
   @ApiSuccessResponse(PurchaseInvoicePreviewResponseDto, {
     message: 'PURCHASE_INVOICE.PREVIEWED',
     description:
       'What the invoice would be, with nothing kept: its label (new purchase, a period of the request, a renewal), the month and the period it pays for, whether the count and the price of one match what was approved or bought, the marks that would be laid on it, the Cost Center that would bear it and the commitment it would go into with what is left of it.',
   })
-  @ApiErrorResponses(...SUBMIT_ERRORS)
+  @ApiErrorResponses(...PREVIEW_ERRORS)
   async preview(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Body() body: PurchaseInvoicePreviewBodyDto) {
     try {
       return toPreview(await this.submissions.preview(actor, body));
@@ -122,20 +163,7 @@ export class PurchaseInvoicesController {
     description:
       'A new invoice for the same request or subscription that points back at the one Finance returned; the number of the returned one may come back. It says everything again, with its own files.',
   })
-  @ApiErrorResponses(
-    ...SUBMIT_ERRORS,
-    {
-      status: HttpStatus.NOT_FOUND,
-      description: 'The invoice does not exist or was not submitted by the caller (PURCHASE_INVOICE.NOT_FOUND).',
-      examples: [EXAMPLES.NOT_FOUND],
-    },
-    {
-      status: HttpStatus.CONFLICT,
-      description:
-        'The invoice was not returned (PURCHASE_INVOICE.NOT_RETURNED) or was already submitted again (PURCHASE_INVOICE.ALREADY_RESUBMITTED).',
-      examples: [EXAMPLES.NOT_RETURNED, EXAMPLES.ALREADY_RESUBMITTED],
-    },
-  )
+  @ApiErrorResponses(...RESUBMIT_ERRORS)
   async resubmit(
     @CurrentPrincipal() actor: AuthenticatedPrincipal,
     @Param() params: PurchaseInvoiceIdParamDto,
@@ -173,11 +201,20 @@ export class PurchaseInvoicesController {
     description:
       'The invoice with everything it says, its files, the reason it was returned and what was written when Finance signed it.',
   })
-  @ApiErrorResponses(...AUTH_ERRORS, FORBIDDEN, {
-    status: HttpStatus.NOT_FOUND,
-    description: 'The invoice does not exist or is not one the caller may read (PURCHASE_INVOICE.NOT_FOUND).',
-    examples: [EXAMPLES.NOT_FOUND],
-  })
+  @ApiErrorResponses(
+    ...AUTH_ERRORS,
+    FORBIDDEN,
+    {
+      status: HttpStatus.UNPROCESSABLE_ENTITY,
+      description: 'The id is not an id (VALIDATION_ERROR).',
+      examples: [VALIDATION_EXAMPLE],
+    },
+    {
+      status: HttpStatus.NOT_FOUND,
+      description: 'The invoice does not exist or is not one the caller may read (PURCHASE_INVOICE.NOT_FOUND).',
+      examples: [EXAMPLES.NOT_FOUND],
+    },
+  )
   async get(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Param() params: PurchaseInvoiceIdParamDto) {
     try {
       return await this.queries.get(actor, params.id);
