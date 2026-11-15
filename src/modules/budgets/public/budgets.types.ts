@@ -195,3 +195,23 @@ export interface PurchaseInvoiceRecorded {
   appliedMinor: bigint;
   matchResult: 'MATCHED' | 'TAX_ONLY' | 'PRICE_QUANTITY_EXCEPTION';
 }
+
+/** The money Finance or the IT Admin records for a case outside the process (`SBF-07a`, R-45): spent with a proof of payment, in dong, with no commitment. */
+export interface OutOfProcessSpendInput {
+  organizationId: string;
+  /** The case of the usage context; its money is the one invoice of the case. */
+  caseId: string;
+  vendorId: string;
+  amountMinor: bigint;
+  /** The Cost Center that bears it; null = not allocated to a department yet. */
+  costCenterId: string | null;
+  /** The day the money is recorded: the month of it is the month and the year the expense belongs to. */
+  recordedOn: string;
+  now: Date;
+}
+
+export interface OutOfProcessSpendRecorded {
+  invoiceId: string;
+  /** Where it was booked: as an expense of a Cost Center, or of no Cost Center yet. */
+  booking: 'COST_CENTER' | 'UNALLOCATED';
+}

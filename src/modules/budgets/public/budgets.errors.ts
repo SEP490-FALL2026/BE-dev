@@ -7,3 +7,13 @@ export class PurchaseInvoiceRecordRefusedError extends Error {
     this.name = 'PurchaseInvoiceRecordRefusedError';
   }
 }
+
+/** Why the money of a case outside the process (`SBF-07a`) could not be recorded: the amount is not above nothing, or the vendor has an invoice with this number. */
+export type OutOfProcessSpendRefusal = 'AMOUNT_NOT_POSITIVE' | 'DUPLICATE_NUMBER';
+
+export class OutOfProcessSpendRefusedError extends Error {
+  constructor(readonly reason: OutOfProcessSpendRefusal) {
+    super(`The money of the case outside the process was refused: ${reason}.`);
+    this.name = 'OutOfProcessSpendRefusedError';
+  }
+}

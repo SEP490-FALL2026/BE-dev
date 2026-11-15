@@ -27,6 +27,8 @@ export interface NewInvoice {
   purchaseInvoiceId?: string | null;
   subscriptionId?: string | null;
   costCenterId?: string | null;
+  /** The case of `SBF-07a` this invoice is the money of (a value of the usage context). */
+  outOfProcessCaseId?: string | null;
 }
 
 export interface InvoiceRecord {
@@ -103,6 +105,7 @@ export class InvoiceRepo {
         purchaseInvoiceId: input.purchaseInvoiceId ?? null,
         subscriptionId: input.subscriptionId ?? null,
         costCenterId: input.costCenterId ?? null,
+        outOfProcessCaseId: input.outOfProcessCaseId ?? null,
       },
     });
 

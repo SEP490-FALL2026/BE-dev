@@ -43,6 +43,7 @@ import { PackageService } from './cycle/package.service';
 import { CycleService } from './cycle/cycle.service';
 import { DepartmentCreationWindowListener } from './cycle/department-creation-window.listener';
 import { InvoiceService } from './invoice/invoice.service';
+import { OutOfProcessSpendRecorderService } from './invoice/out-of-process-spend-recorder.service';
 import { PurchaseInvoiceRecorderService } from './invoice/purchase-invoice-recorder.service';
 import { DecisionRepo } from './budget/decision.repo';
 import { LineImportService } from './version/line-import.service';
@@ -180,6 +181,7 @@ import { BudgetAttachmentExpirySweeper } from './attachment/budget-attachment-ex
     CommitmentService,
     InvoiceService,
     PurchaseInvoiceRecorderService,
+    OutOfProcessSpendRecorderService,
     BudgetsApi,
   ],
   exports: [
