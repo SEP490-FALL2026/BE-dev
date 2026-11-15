@@ -52126,6 +52126,1777 @@
         "tags": ["access-requests"]
       }
     },
+    "/api/v1/purchase-invoices/preview": {
+      "post": {
+        "operationId": "purchaseInvoicePreview",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/PurchaseInvoicePreviewBodyDto" } }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "What the invoice would be, with nothing kept: its label (new purchase, a period of the request, a renewal), the month and the period it pays for, whether the count and the price of one match what was approved or bought, the marks that would be laid on it, the Cost Center that would bear it and the commitment it would go into with what is left of it.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/PurchaseInvoicePreviewResponseDto" },
+                    { "properties": { "message": { "example": "PURCHASE_INVOICE.PREVIEWED" } } }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_BAD_REQUEST": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_BAD_REQUEST",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHENTICATION_REQUIRED": {
+                    "summary": "A Bearer access token is required.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHENTICATION_REQUIRED",
+                        "message": "A Bearer access token is required.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "INVALID_ACCESS_TOKEN": {
+                    "summary": "The access token is invalid.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "INVALID_ACCESS_TOKEN",
+                        "message": "The access token is invalid.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only the IT Admin submits an invoice, and only the IT Admin and Finance read one.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHORIZATION.FORBIDDEN": {
+                    "summary": "You do not have permission to perform this action.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHORIZATION.FORBIDDEN",
+                        "message": "You do not have permission to perform this action.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The request or subscription does not exist or is not one the IT Admin works (PURCHASE_INVOICE.LINK_NOT_FOUND).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "PURCHASE_INVOICE.LINK_NOT_FOUND": {
+                    "summary": "The purchase invoice was refused: LINK_NOT_FOUND.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "PURCHASE_INVOICE.LINK_NOT_FOUND",
+                        "message": "The purchase invoice was refused: LINK_NOT_FOUND.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The request is not one whose purchase was approved to be spent (PURCHASE_INVOICE.REQUEST_NOT_PURCHASABLE).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "PURCHASE_INVOICE.REQUEST_NOT_PURCHASABLE": {
+                    "summary": "The purchase invoice was refused: REQUEST_NOT_PURCHASABLE (STATE).",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "PURCHASE_INVOICE.REQUEST_NOT_PURCHASABLE",
+                        "message": "The purchase invoice was refused: REQUEST_NOT_PURCHASABLE (STATE).",
+                        "details": { "reason": "STATE" },
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_PAYLOAD_TOO_LARGE": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_PAYLOAD_TOO_LARGE",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_UNSUPPORTED_MEDIA_TYPE": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_UNSUPPORTED_MEDIA_TYPE",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The form is invalid (VALIDATION_ERROR), or the software has no vendor (PURCHASE_INVOICE.NO_VENDOR).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "VALIDATION_ERROR": {
+                    "summary": "Request validation failed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "VALIDATION_ERROR",
+                        "message": "Request validation failed.",
+                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "PURCHASE_INVOICE.NO_VENDOR": {
+                    "summary": "The purchase invoice was refused: NO_VENDOR.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "PURCHASE_INVOICE.NO_VENDOR",
+                        "message": "The purchase invoice was refused: NO_VENDOR.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_TOO_MANY_REQUESTS": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_TOO_MANY_REQUESTS",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "TOKEN_VERIFICATION_UNAVAILABLE": {
+                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
+                        "message": "Authentication is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SERVICE_UNAVAILABLE": {
+                    "summary": "The service is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SERVICE_UNAVAILABLE",
+                        "message": "The service is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "bearer": [] }],
+        "summary": "Read an invoice against its request before it is submitted",
+        "tags": ["purchase-invoices"]
+      }
+    },
+    "/api/v1/purchase-invoices": {
+      "post": {
+        "operationId": "purchaseInvoiceSubmit",
+        "parameters": [],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/PurchaseInvoiceSubmitBodyDto" } }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "The invoice is kept as it was read against its request or subscription, with its files, and Finance is told. Nothing is spent until Finance signs. The amounts are what was taken out in dong; the count and the price of one are what the invoice says in the currency it states.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/PurchaseInvoiceResponseDto" },
+                    { "properties": { "message": { "example": "PURCHASE_INVOICE.SUBMITTED" } } }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_BAD_REQUEST": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_BAD_REQUEST",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHENTICATION_REQUIRED": {
+                    "summary": "A Bearer access token is required.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHENTICATION_REQUIRED",
+                        "message": "A Bearer access token is required.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "INVALID_ACCESS_TOKEN": {
+                    "summary": "The access token is invalid.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "INVALID_ACCESS_TOKEN",
+                        "message": "The access token is invalid.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only the IT Admin submits an invoice, and only the IT Admin and Finance read one.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHORIZATION.FORBIDDEN": {
+                    "summary": "You do not have permission to perform this action.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHORIZATION.FORBIDDEN",
+                        "message": "You do not have permission to perform this action.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The request or subscription does not exist or is not one the IT Admin works (PURCHASE_INVOICE.LINK_NOT_FOUND).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "PURCHASE_INVOICE.LINK_NOT_FOUND": {
+                    "summary": "The purchase invoice was refused: LINK_NOT_FOUND.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "PURCHASE_INVOICE.LINK_NOT_FOUND",
+                        "message": "The purchase invoice was refused: LINK_NOT_FOUND.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The request is not one whose purchase was approved to be spent (PURCHASE_INVOICE.REQUEST_NOT_PURCHASABLE), or the vendor has an invoice with this number that was not returned (PURCHASE_INVOICE.NUMBER_TAKEN).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "PURCHASE_INVOICE.REQUEST_NOT_PURCHASABLE": {
+                    "summary": "The purchase invoice was refused: REQUEST_NOT_PURCHASABLE (STATE).",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "PURCHASE_INVOICE.REQUEST_NOT_PURCHASABLE",
+                        "message": "The purchase invoice was refused: REQUEST_NOT_PURCHASABLE (STATE).",
+                        "details": { "reason": "STATE" },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "PURCHASE_INVOICE.NUMBER_TAKEN": {
+                    "summary": "The purchase invoice was refused: NUMBER_TAKEN.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "PURCHASE_INVOICE.NUMBER_TAKEN",
+                        "message": "The purchase invoice was refused: NUMBER_TAKEN.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_PAYLOAD_TOO_LARGE": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_PAYLOAD_TOO_LARGE",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_UNSUPPORTED_MEDIA_TYPE": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_UNSUPPORTED_MEDIA_TYPE",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The form is invalid (VALIDATION_ERROR: at least one file, at most twenty), the software has no vendor (PURCHASE_INVOICE.NO_VENDOR), or a file is not a finished purchase document of the person who submits it (PURCHASE_INVOICE.DOCUMENT_INVALID, with the reason in details).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "VALIDATION_ERROR": {
+                    "summary": "Request validation failed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "VALIDATION_ERROR",
+                        "message": "Request validation failed.",
+                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "PURCHASE_INVOICE.NO_VENDOR": {
+                    "summary": "The purchase invoice was refused: NO_VENDOR.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "PURCHASE_INVOICE.NO_VENDOR",
+                        "message": "The purchase invoice was refused: NO_VENDOR.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "PURCHASE_INVOICE.DOCUMENT_INVALID": {
+                    "summary": "The purchase invoice was refused: DOCUMENT_INVALID (NOT_FOUND).",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "PURCHASE_INVOICE.DOCUMENT_INVALID",
+                        "message": "The purchase invoice was refused: DOCUMENT_INVALID (NOT_FOUND).",
+                        "details": { "reason": "NOT_FOUND" },
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_TOO_MANY_REQUESTS": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_TOO_MANY_REQUESTS",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "TOKEN_VERIFICATION_UNAVAILABLE": {
+                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
+                        "message": "Authentication is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SERVICE_UNAVAILABLE": {
+                    "summary": "The service is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SERVICE_UNAVAILABLE",
+                        "message": "The service is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "bearer": [] }],
+        "summary": "Submit the invoice of a purchase for Finance to sign the money out",
+        "tags": ["purchase-invoices"]
+      },
+      "get": {
+        "operationId": "purchaseInvoiceList",
+        "parameters": [
+          {
+            "name": "state",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string", "enum": ["SUBMITTED", "CONFIRMED", "RETURNED"] }
+          },
+          {
+            "name": "label",
+            "required": false,
+            "in": "query",
+            "schema": { "type": "string", "enum": ["NEW_PURCHASE", "PERIOD", "RENEWAL"] }
+          },
+          { "name": "vendorId", "required": false, "in": "query", "schema": { "format": "uuid", "type": "string" } },
+          {
+            "name": "subscriptionId",
+            "required": false,
+            "in": "query",
+            "schema": { "format": "uuid", "type": "string" }
+          },
+          { "name": "requestId", "required": false, "in": "query", "schema": { "format": "uuid", "type": "string" } },
+          {
+            "name": "servicePeriodMonth",
+            "required": false,
+            "in": "query",
+            "description": "A calendar month as YYYY-MM.",
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maximum": 9007199254740991,
+              "exclusiveMinimum": true,
+              "default": 1,
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": { "maximum": 100, "exclusiveMinimum": true, "default": 20, "type": "integer", "minimum": 0 }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "The newest submitted first. Finance reads every invoice; the IT Admin reads the ones they submitted and the ones of the requests of the departments they work. Filter by state, label, vendor, subscription, request or the month of the period.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/PurchaseInvoiceListResponseDto" },
+                    { "properties": { "message": { "example": "PURCHASE_INVOICE.LISTED" } } }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHENTICATION_REQUIRED": {
+                    "summary": "A Bearer access token is required.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHENTICATION_REQUIRED",
+                        "message": "A Bearer access token is required.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "INVALID_ACCESS_TOKEN": {
+                    "summary": "The access token is invalid.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "INVALID_ACCESS_TOKEN",
+                        "message": "The access token is invalid.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only the IT Admin submits an invoice, and only the IT Admin and Finance read one.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHORIZATION.FORBIDDEN": {
+                    "summary": "You do not have permission to perform this action.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHORIZATION.FORBIDDEN",
+                        "message": "You do not have permission to perform this action.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The query is invalid (VALIDATION_ERROR).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "VALIDATION_ERROR": {
+                    "summary": "Request validation failed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "VALIDATION_ERROR",
+                        "message": "Request validation failed.",
+                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_TOO_MANY_REQUESTS": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_TOO_MANY_REQUESTS",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "TOKEN_VERIFICATION_UNAVAILABLE": {
+                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
+                        "message": "Authentication is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SERVICE_UNAVAILABLE": {
+                    "summary": "The service is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SERVICE_UNAVAILABLE",
+                        "message": "The service is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "bearer": [] }],
+        "summary": "List purchase invoices",
+        "tags": ["purchase-invoices"]
+      }
+    },
+    "/api/v1/purchase-invoices/{id}/resubmission": {
+      "post": {
+        "operationId": "purchaseInvoiceResubmit",
+        "parameters": [
+          { "name": "id", "required": true, "in": "path", "schema": { "format": "uuid", "type": "string" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/PurchaseInvoiceResubmitBodyDto" } }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "A new invoice for the same request or subscription that points back at the one Finance returned; the number of the returned one may come back. It says everything again, with its own files.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/PurchaseInvoiceResponseDto" },
+                    { "properties": { "message": { "example": "PURCHASE_INVOICE.RESUBMITTED" } } }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_BAD_REQUEST": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_BAD_REQUEST",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHENTICATION_REQUIRED": {
+                    "summary": "A Bearer access token is required.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHENTICATION_REQUIRED",
+                        "message": "A Bearer access token is required.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "INVALID_ACCESS_TOKEN": {
+                    "summary": "The access token is invalid.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "INVALID_ACCESS_TOKEN",
+                        "message": "The access token is invalid.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only the IT Admin submits an invoice, and only the IT Admin and Finance read one.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHORIZATION.FORBIDDEN": {
+                    "summary": "You do not have permission to perform this action.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHORIZATION.FORBIDDEN",
+                        "message": "You do not have permission to perform this action.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The invoice does not exist or was not submitted by the caller (PURCHASE_INVOICE.NOT_FOUND), or its request or subscription is not one the IT Admin works (PURCHASE_INVOICE.LINK_NOT_FOUND).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "PURCHASE_INVOICE.LINK_NOT_FOUND": {
+                    "summary": "The purchase invoice was refused: LINK_NOT_FOUND.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "PURCHASE_INVOICE.LINK_NOT_FOUND",
+                        "message": "The purchase invoice was refused: LINK_NOT_FOUND.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "PURCHASE_INVOICE.NOT_FOUND": {
+                    "summary": "The purchase invoice was refused: NOT_FOUND.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "PURCHASE_INVOICE.NOT_FOUND",
+                        "message": "The purchase invoice was refused: NOT_FOUND.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The request is not one whose purchase was approved to be spent (PURCHASE_INVOICE.REQUEST_NOT_PURCHASABLE), the vendor has an invoice with this number that was not returned (PURCHASE_INVOICE.NUMBER_TAKEN), the invoice was not returned (PURCHASE_INVOICE.NOT_RETURNED) or was already submitted again (PURCHASE_INVOICE.ALREADY_RESUBMITTED).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "PURCHASE_INVOICE.REQUEST_NOT_PURCHASABLE": {
+                    "summary": "The purchase invoice was refused: REQUEST_NOT_PURCHASABLE (STATE).",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "PURCHASE_INVOICE.REQUEST_NOT_PURCHASABLE",
+                        "message": "The purchase invoice was refused: REQUEST_NOT_PURCHASABLE (STATE).",
+                        "details": { "reason": "STATE" },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "PURCHASE_INVOICE.NUMBER_TAKEN": {
+                    "summary": "The purchase invoice was refused: NUMBER_TAKEN.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "PURCHASE_INVOICE.NUMBER_TAKEN",
+                        "message": "The purchase invoice was refused: NUMBER_TAKEN.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "PURCHASE_INVOICE.NOT_RETURNED": {
+                    "summary": "The purchase invoice was refused: NOT_RETURNED.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "PURCHASE_INVOICE.NOT_RETURNED",
+                        "message": "The purchase invoice was refused: NOT_RETURNED.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "PURCHASE_INVOICE.ALREADY_RESUBMITTED": {
+                    "summary": "The purchase invoice was refused: ALREADY_RESUBMITTED.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "PURCHASE_INVOICE.ALREADY_RESUBMITTED",
+                        "message": "The purchase invoice was refused: ALREADY_RESUBMITTED.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_PAYLOAD_TOO_LARGE": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_PAYLOAD_TOO_LARGE",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_UNSUPPORTED_MEDIA_TYPE": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_UNSUPPORTED_MEDIA_TYPE",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The form is invalid (VALIDATION_ERROR: at least one file, at most twenty), the software has no vendor (PURCHASE_INVOICE.NO_VENDOR), or a file is not a finished purchase document of the person who submits it (PURCHASE_INVOICE.DOCUMENT_INVALID, with the reason in details).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "VALIDATION_ERROR": {
+                    "summary": "Request validation failed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "VALIDATION_ERROR",
+                        "message": "Request validation failed.",
+                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "PURCHASE_INVOICE.NO_VENDOR": {
+                    "summary": "The purchase invoice was refused: NO_VENDOR.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "PURCHASE_INVOICE.NO_VENDOR",
+                        "message": "The purchase invoice was refused: NO_VENDOR.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "PURCHASE_INVOICE.DOCUMENT_INVALID": {
+                    "summary": "The purchase invoice was refused: DOCUMENT_INVALID (NOT_FOUND).",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "PURCHASE_INVOICE.DOCUMENT_INVALID",
+                        "message": "The purchase invoice was refused: DOCUMENT_INVALID (NOT_FOUND).",
+                        "details": { "reason": "NOT_FOUND" },
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_TOO_MANY_REQUESTS": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_TOO_MANY_REQUESTS",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "TOKEN_VERIFICATION_UNAVAILABLE": {
+                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
+                        "message": "Authentication is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SERVICE_UNAVAILABLE": {
+                    "summary": "The service is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SERVICE_UNAVAILABLE",
+                        "message": "The service is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "bearer": [] }],
+        "summary": "Submit a returned invoice again",
+        "tags": ["purchase-invoices"]
+      }
+    },
+    "/api/v1/purchase-invoices/{id}": {
+      "get": {
+        "operationId": "purchaseInvoiceGet",
+        "parameters": [
+          { "name": "id", "required": true, "in": "path", "schema": { "format": "uuid", "type": "string" } }
+        ],
+        "responses": {
+          "200": {
+            "description": "The invoice with everything it says, its files, the reason it was returned and what was written when Finance signed it.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/PurchaseInvoiceResponseDto" },
+                    { "properties": { "message": { "example": "PURCHASE_INVOICE.READ" } } }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHENTICATION_REQUIRED": {
+                    "summary": "A Bearer access token is required.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHENTICATION_REQUIRED",
+                        "message": "A Bearer access token is required.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "INVALID_ACCESS_TOKEN": {
+                    "summary": "The access token is invalid.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "INVALID_ACCESS_TOKEN",
+                        "message": "The access token is invalid.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only the IT Admin submits an invoice, and only the IT Admin and Finance read one.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHORIZATION.FORBIDDEN": {
+                    "summary": "You do not have permission to perform this action.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHORIZATION.FORBIDDEN",
+                        "message": "You do not have permission to perform this action.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The invoice does not exist or is not one the caller may read (PURCHASE_INVOICE.NOT_FOUND).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "PURCHASE_INVOICE.NOT_FOUND": {
+                    "summary": "The purchase invoice was refused: NOT_FOUND.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "PURCHASE_INVOICE.NOT_FOUND",
+                        "message": "The purchase invoice was refused: NOT_FOUND.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The id is not an id (VALIDATION_ERROR).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "VALIDATION_ERROR": {
+                    "summary": "Request validation failed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "VALIDATION_ERROR",
+                        "message": "Request validation failed.",
+                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_TOO_MANY_REQUESTS": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_TOO_MANY_REQUESTS",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "TOKEN_VERIFICATION_UNAVAILABLE": {
+                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
+                        "message": "Authentication is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SERVICE_UNAVAILABLE": {
+                    "summary": "The service is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SERVICE_UNAVAILABLE",
+                        "message": "The service is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "bearer": [] }],
+        "summary": "Read one purchase invoice",
+        "tags": ["purchase-invoices"]
+      }
+    },
+    "/api/v1/purchase-invoices/{id}/confirmation": {
+      "post": {
+        "operationId": "purchaseInvoiceConfirm",
+        "parameters": [
+          { "name": "id", "required": true, "in": "path", "schema": { "format": "uuid", "type": "string" } }
+        ],
+        "responses": {
+          "201": {
+            "description": "Finance signs: the signer and the time are kept and the one invoice of the purchase is written, booked to the month and the year of the period (into the commitment of the request when the department that bears it is its own, as an expense of that department otherwise, as a line of the subscription for a renewal). The IT Admin who submitted it is told. Never signed by the person who submitted it.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/PurchaseInvoiceResponseDto" },
+                    { "properties": { "message": { "example": "PURCHASE_INVOICE.CONFIRMED" } } }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHENTICATION_REQUIRED": {
+                    "summary": "A Bearer access token is required.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHENTICATION_REQUIRED",
+                        "message": "A Bearer access token is required.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "INVALID_ACCESS_TOKEN": {
+                    "summary": "The access token is invalid.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "INVALID_ACCESS_TOKEN",
+                        "message": "The access token is invalid.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only Finance signs or returns a purchase invoice.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHORIZATION.FORBIDDEN": {
+                    "summary": "You do not have permission to perform this action.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHORIZATION.FORBIDDEN",
+                        "message": "You do not have permission to perform this action.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The invoice does not exist (PURCHASE_INVOICE.NOT_FOUND).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "PURCHASE_INVOICE.NOT_FOUND": {
+                    "summary": "The purchase invoice was refused: NOT_FOUND.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "PURCHASE_INVOICE.NOT_FOUND",
+                        "message": "The purchase invoice was refused: NOT_FOUND.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The invoice was decided already (PURCHASE_INVOICE.NOT_SUBMITTED), the person signing is the one who submitted it (PURCHASE_INVOICE.SAME_PERSON), the vendor already has an invoice with this number (PURCHASE_INVOICE.NUMBER_TAKEN), or there is nowhere to book it (PURCHASE_INVOICE.NO_PLACE).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "PURCHASE_INVOICE.NOT_SUBMITTED": {
+                    "summary": "The purchase invoice was refused: NOT_SUBMITTED.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "PURCHASE_INVOICE.NOT_SUBMITTED",
+                        "message": "The purchase invoice was refused: NOT_SUBMITTED.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "PURCHASE_INVOICE.SAME_PERSON": {
+                    "summary": "The purchase invoice was refused: SAME_PERSON.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "PURCHASE_INVOICE.SAME_PERSON",
+                        "message": "The purchase invoice was refused: SAME_PERSON.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "PURCHASE_INVOICE.NUMBER_TAKEN": {
+                    "summary": "The purchase invoice was refused: NUMBER_TAKEN.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "PURCHASE_INVOICE.NUMBER_TAKEN",
+                        "message": "The purchase invoice was refused: NUMBER_TAKEN.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "PURCHASE_INVOICE.NO_PLACE": {
+                    "summary": "The purchase invoice was refused: NO_PLACE.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "PURCHASE_INVOICE.NO_PLACE",
+                        "message": "The purchase invoice was refused: NO_PLACE.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The id is not an id (VALIDATION_ERROR).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "VALIDATION_ERROR": {
+                    "summary": "Request validation failed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "VALIDATION_ERROR",
+                        "message": "Request validation failed.",
+                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_TOO_MANY_REQUESTS": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_TOO_MANY_REQUESTS",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "TOKEN_VERIFICATION_UNAVAILABLE": {
+                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
+                        "message": "Authentication is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SERVICE_UNAVAILABLE": {
+                    "summary": "The service is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SERVICE_UNAVAILABLE",
+                        "message": "The service is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "bearer": [] }],
+        "summary": "Sign the money out for a purchase invoice",
+        "tags": ["purchase-invoices"]
+      }
+    },
+    "/api/v1/purchase-invoices/{id}/return": {
+      "post": {
+        "operationId": "purchaseInvoiceReturn",
+        "parameters": [
+          { "name": "id", "required": true, "in": "path", "schema": { "format": "uuid", "type": "string" } }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": { "schema": { "$ref": "#/components/schemas/PurchaseInvoiceReturnBodyDto" } }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Finance returns the invoice with the reason, which the IT Admin who submitted it reads and is told of. Nothing is written to the budget. The IT Admin submits it again as a new invoice that points back at this one.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/PurchaseInvoiceResponseDto" },
+                    { "properties": { "message": { "example": "PURCHASE_INVOICE.RETURNED" } } }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_BAD_REQUEST": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_BAD_REQUEST",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHENTICATION_REQUIRED": {
+                    "summary": "A Bearer access token is required.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHENTICATION_REQUIRED",
+                        "message": "A Bearer access token is required.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "INVALID_ACCESS_TOKEN": {
+                    "summary": "The access token is invalid.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "INVALID_ACCESS_TOKEN",
+                        "message": "The access token is invalid.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only Finance signs or returns a purchase invoice.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHORIZATION.FORBIDDEN": {
+                    "summary": "You do not have permission to perform this action.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHORIZATION.FORBIDDEN",
+                        "message": "You do not have permission to perform this action.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The invoice does not exist (PURCHASE_INVOICE.NOT_FOUND).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "PURCHASE_INVOICE.NOT_FOUND": {
+                    "summary": "The purchase invoice was refused: NOT_FOUND.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "PURCHASE_INVOICE.NOT_FOUND",
+                        "message": "The purchase invoice was refused: NOT_FOUND.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The invoice was decided already (PURCHASE_INVOICE.NOT_SUBMITTED).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "PURCHASE_INVOICE.NOT_SUBMITTED": {
+                    "summary": "The purchase invoice was refused: NOT_SUBMITTED.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "PURCHASE_INVOICE.NOT_SUBMITTED",
+                        "message": "The purchase invoice was refused: NOT_SUBMITTED.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_PAYLOAD_TOO_LARGE": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_PAYLOAD_TOO_LARGE",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_UNSUPPORTED_MEDIA_TYPE": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_UNSUPPORTED_MEDIA_TYPE",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The reason is missing or blank, or the id is not an id (VALIDATION_ERROR).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "VALIDATION_ERROR": {
+                    "summary": "Request validation failed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "VALIDATION_ERROR",
+                        "message": "Request validation failed.",
+                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_TOO_MANY_REQUESTS": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_TOO_MANY_REQUESTS",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "TOKEN_VERIFICATION_UNAVAILABLE": {
+                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
+                        "message": "Authentication is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SERVICE_UNAVAILABLE": {
+                    "summary": "The service is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SERVICE_UNAVAILABLE",
+                        "message": "The service is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "bearer": [] }],
+        "summary": "Return a purchase invoice with a reason",
+        "tags": ["purchase-invoices"]
+      }
+    },
     "/api/v1/controlled-waits": {
       "get": {
         "operationId": "controlledWaitList",
@@ -81089,13 +82860,15 @@
             "name": "from",
             "required": false,
             "in": "query",
-            "schema": { "pattern": "^\\d{4}-\\d{2}-\\d{2}$", "type": "string" }
+            "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused).",
+            "schema": { "format": "date", "type": "string" }
           },
           {
             "name": "to",
             "required": false,
             "in": "query",
-            "schema": { "pattern": "^\\d{4}-\\d{2}-\\d{2}$", "type": "string" }
+            "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused).",
+            "schema": { "format": "date", "type": "string" }
           },
           {
             "name": "granularity",
@@ -81311,13 +83084,15 @@
             "name": "from",
             "required": false,
             "in": "query",
-            "schema": { "pattern": "^\\d{4}-\\d{2}-\\d{2}$", "type": "string" }
+            "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused).",
+            "schema": { "format": "date", "type": "string" }
           },
           {
             "name": "to",
             "required": false,
             "in": "query",
-            "schema": { "pattern": "^\\d{4}-\\d{2}-\\d{2}$", "type": "string" }
+            "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused).",
+            "schema": { "format": "date", "type": "string" }
           },
           {
             "name": "page",
@@ -81523,13 +83298,15 @@
             "name": "from",
             "required": false,
             "in": "query",
-            "schema": { "pattern": "^\\d{4}-\\d{2}-\\d{2}$", "type": "string" }
+            "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused).",
+            "schema": { "format": "date", "type": "string" }
           },
           {
             "name": "to",
             "required": false,
             "in": "query",
-            "schema": { "pattern": "^\\d{4}-\\d{2}-\\d{2}$", "type": "string" }
+            "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused).",
+            "schema": { "format": "date", "type": "string" }
           }
         ],
         "responses": {
@@ -109583,6 +111360,615 @@
         "required": ["success", "message", "data"],
         "additionalProperties": false
       },
+      "PurchaseInvoicePreviewBodyDto": {
+        "type": "object",
+        "properties": {
+          "link": {
+            "type": "object",
+            "properties": {
+              "requestId": {
+                "description": "The request the purchase was approved for.",
+                "type": "string",
+                "format": "uuid"
+              },
+              "provisioningTaskId": {
+                "description": "The task of the grant the purchase belongs to; only with a request.",
+                "type": "string",
+                "format": "uuid"
+              },
+              "subscriptionId": {
+                "description": "The subscription the invoice renews; instead of a request.",
+                "type": "string",
+                "format": "uuid"
+              }
+            },
+            "additionalProperties": false
+          },
+          "vendorInvoiceNumber": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "The number on the invoice; one vendor has it once until the invoice is returned."
+          },
+          "issuedOn": {
+            "type": "string",
+            "format": "date",
+            "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."
+          },
+          "servicePeriodMonth": {
+            "type": "string",
+            "description": "The month the invoice pays for. The expense belongs to the month and the year of it, whatever day the invoice is dated."
+          },
+          "quantity": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000000,
+            "description": "The seats or keys the invoice says."
+          },
+          "unitPriceOriginal": {
+            "type": "object",
+            "properties": {
+              "amount": { "type": "string", "maxLength": 40 },
+              "currency": { "type": "string", "minLength": 3, "maxLength": 3 }
+            },
+            "required": ["amount", "currency"],
+            "additionalProperties": false,
+            "description": "The price of one on the invoice, in the currency it states: what the plan is compared with, never converted."
+          },
+          "netAmount": {
+            "type": "object",
+            "properties": { "amount": { "type": "string", "maxLength": 40 } },
+            "required": ["amount"],
+            "additionalProperties": false,
+            "description": "What was taken out of the company in dong for the goods, before tax."
+          },
+          "deductibleTax": {
+            "type": "object",
+            "properties": { "amount": { "type": "string", "maxLength": 40 } },
+            "required": ["amount"],
+            "additionalProperties": false,
+            "description": "Tax that can be deducted: shown apart, not an expense. Nothing when left out."
+          },
+          "nonDeductibleTax": {
+            "type": "object",
+            "properties": { "amount": { "type": "string", "maxLength": 40 } },
+            "required": ["amount"],
+            "additionalProperties": false,
+            "description": "Tax that cannot be deducted: an expense. Nothing when left out."
+          },
+          "paymentSource": { "type": "string", "enum": ["COMPANY_CARD", "IT_ADVANCE"] }
+        },
+        "required": [
+          "link",
+          "vendorInvoiceNumber",
+          "issuedOn",
+          "servicePeriodMonth",
+          "quantity",
+          "unitPriceOriginal",
+          "netAmount",
+          "paymentSource"
+        ],
+        "additionalProperties": false
+      },
+      "PurchaseInvoicePreviewResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "enum": [true] },
+          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "label": { "type": "string", "enum": ["NEW_PURCHASE", "PERIOD", "RENEWAL"] },
+              "servicePeriodMonth": { "type": "string", "description": "A calendar month as YYYY-MM." },
+              "periodIndex": {
+                "type": "integer",
+                "exclusiveMinimum": true,
+                "maximum": 9007199254740991,
+                "nullable": true,
+                "minimum": 0
+              },
+              "periodCount": {
+                "type": "integer",
+                "exclusiveMinimum": true,
+                "maximum": 9007199254740991,
+                "nullable": true,
+                "minimum": 0
+              },
+              "matchResult": { "type": "string", "enum": ["MATCHED", "PRICE_QUANTITY_EXCEPTION"] },
+              "flags": {
+                "maxItems": 2,
+                "type": "array",
+                "items": { "type": "string", "enum": ["OVER_APPROVED", "OUTSIDE_TERM"] }
+              },
+              "chargedCostCenter": {
+                "type": "object",
+                "properties": { "id": { "type": "string", "format": "uuid" } },
+                "required": ["id"],
+                "additionalProperties": false,
+                "nullable": true
+              },
+              "commitment": {
+                "type": "object",
+                "properties": {
+                  "id": { "type": "string", "format": "uuid" },
+                  "remaining": {
+                    "type": "object",
+                    "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                    "required": ["amount", "currency"],
+                    "additionalProperties": false
+                  }
+                },
+                "required": ["id", "remaining"],
+                "additionalProperties": false,
+                "nullable": true
+              }
+            },
+            "required": [
+              "label",
+              "servicePeriodMonth",
+              "periodIndex",
+              "periodCount",
+              "matchResult",
+              "flags",
+              "chargedCostCenter",
+              "commitment"
+            ],
+            "additionalProperties": false,
+            "nullable": true
+          }
+        },
+        "required": ["success", "message", "data"],
+        "additionalProperties": false
+      },
+      "PurchaseInvoiceSubmitBodyDto": {
+        "type": "object",
+        "properties": {
+          "link": {
+            "type": "object",
+            "properties": {
+              "requestId": {
+                "description": "The request the purchase was approved for.",
+                "type": "string",
+                "format": "uuid"
+              },
+              "provisioningTaskId": {
+                "description": "The task of the grant the purchase belongs to; only with a request.",
+                "type": "string",
+                "format": "uuid"
+              },
+              "subscriptionId": {
+                "description": "The subscription the invoice renews; instead of a request.",
+                "type": "string",
+                "format": "uuid"
+              }
+            },
+            "additionalProperties": false
+          },
+          "vendorInvoiceNumber": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "The number on the invoice; one vendor has it once until the invoice is returned."
+          },
+          "issuedOn": {
+            "type": "string",
+            "format": "date",
+            "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."
+          },
+          "servicePeriodMonth": {
+            "type": "string",
+            "description": "The month the invoice pays for. The expense belongs to the month and the year of it, whatever day the invoice is dated."
+          },
+          "quantity": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000000,
+            "description": "The seats or keys the invoice says."
+          },
+          "unitPriceOriginal": {
+            "type": "object",
+            "properties": {
+              "amount": { "type": "string", "maxLength": 40 },
+              "currency": { "type": "string", "minLength": 3, "maxLength": 3 }
+            },
+            "required": ["amount", "currency"],
+            "additionalProperties": false,
+            "description": "The price of one on the invoice, in the currency it states: what the plan is compared with, never converted."
+          },
+          "netAmount": {
+            "type": "object",
+            "properties": { "amount": { "type": "string", "maxLength": 40 } },
+            "required": ["amount"],
+            "additionalProperties": false,
+            "description": "What was taken out of the company in dong for the goods, before tax."
+          },
+          "deductibleTax": {
+            "type": "object",
+            "properties": { "amount": { "type": "string", "maxLength": 40 } },
+            "required": ["amount"],
+            "additionalProperties": false,
+            "description": "Tax that can be deducted: shown apart, not an expense. Nothing when left out."
+          },
+          "nonDeductibleTax": {
+            "type": "object",
+            "properties": { "amount": { "type": "string", "maxLength": 40 } },
+            "required": ["amount"],
+            "additionalProperties": false,
+            "description": "Tax that cannot be deducted: an expense. Nothing when left out."
+          },
+          "paymentSource": { "type": "string", "enum": ["COMPANY_CARD", "IT_ADVANCE"] },
+          "documentIds": {
+            "minItems": 1,
+            "maxItems": 20,
+            "type": "array",
+            "items": { "type": "string", "format": "uuid" }
+          }
+        },
+        "required": [
+          "link",
+          "vendorInvoiceNumber",
+          "issuedOn",
+          "servicePeriodMonth",
+          "quantity",
+          "unitPriceOriginal",
+          "netAmount",
+          "paymentSource",
+          "documentIds"
+        ],
+        "additionalProperties": false
+      },
+      "PurchaseInvoiceResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "enum": [true] },
+          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "label": { "type": "string", "enum": ["NEW_PURCHASE", "PERIOD", "RENEWAL"] },
+              "servicePeriodMonth": { "type": "string", "description": "A calendar month as YYYY-MM." },
+              "periodIndex": {
+                "type": "integer",
+                "exclusiveMinimum": true,
+                "maximum": 9007199254740991,
+                "nullable": true,
+                "minimum": 0
+              },
+              "periodCount": {
+                "type": "integer",
+                "exclusiveMinimum": true,
+                "maximum": 9007199254740991,
+                "nullable": true,
+                "minimum": 0
+              },
+              "matchResult": { "type": "string", "enum": ["MATCHED", "PRICE_QUANTITY_EXCEPTION"] },
+              "flags": {
+                "maxItems": 2,
+                "type": "array",
+                "items": { "type": "string", "enum": ["OVER_APPROVED", "OUTSIDE_TERM"] }
+              },
+              "id": { "type": "string", "format": "uuid" },
+              "state": { "type": "string", "enum": ["SUBMITTED", "CONFIRMED", "RETURNED"] },
+              "linkKind": { "type": "string", "enum": ["REQUEST", "SUBSCRIPTION"] },
+              "requestId": { "type": "string", "format": "uuid", "nullable": true },
+              "subscriptionId": { "type": "string", "format": "uuid", "nullable": true },
+              "vendorId": { "type": "string", "format": "uuid" },
+              "vendorInvoiceNumber": { "type": "string" },
+              "issuedOn": { "type": "string", "format": "date", "description": "A calendar date as YYYY-MM-DD." },
+              "quantity": { "type": "integer", "exclusiveMinimum": true, "maximum": 9007199254740991, "minimum": 0 },
+              "netAmount": {
+                "type": "object",
+                "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                "required": ["amount", "currency"],
+                "additionalProperties": false
+              },
+              "paymentSource": { "type": "string", "enum": ["COMPANY_CARD", "IT_ADVANCE"] },
+              "submittedBy": {
+                "type": "object",
+                "properties": { "employeeId": { "type": "string", "format": "uuid" } },
+                "required": ["employeeId"],
+                "additionalProperties": false
+              },
+              "submittedAt": { "type": "string", "format": "date-time" },
+              "decidedAt": { "type": "string", "format": "date-time", "nullable": true },
+              "provisioningTaskId": { "type": "string", "format": "uuid", "nullable": true },
+              "unitPriceOriginal": {
+                "type": "object",
+                "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                "required": ["amount", "currency"],
+                "additionalProperties": false
+              },
+              "deductibleTax": {
+                "type": "object",
+                "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                "required": ["amount", "currency"],
+                "additionalProperties": false
+              },
+              "nonDeductibleTax": {
+                "type": "object",
+                "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                "required": ["amount", "currency"],
+                "additionalProperties": false
+              },
+              "chargedCostCenterId": {
+                "type": "string",
+                "format": "uuid",
+                "description": "The Cost Center that bears the expense: the department that held the right in the month of the period.",
+                "nullable": true
+              },
+              "decidedBy": {
+                "type": "object",
+                "properties": { "employeeId": { "type": "string", "format": "uuid" } },
+                "required": ["employeeId"],
+                "additionalProperties": false,
+                "nullable": true
+              },
+              "returnReason": { "type": "string", "nullable": true },
+              "resubmissionOfId": { "type": "string", "format": "uuid", "nullable": true },
+              "resubmittedAsId": { "type": "string", "format": "uuid", "nullable": true },
+              "invoiceId": {
+                "type": "string",
+                "format": "uuid",
+                "description": "The invoice written when Finance signed; null before.",
+                "nullable": true
+              },
+              "documents": {
+                "maxItems": 20,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "documentId": { "type": "string", "format": "uuid" },
+                    "position": { "type": "integer", "minimum": 1, "maximum": 20 }
+                  },
+                  "required": ["documentId", "position"],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": [
+              "label",
+              "servicePeriodMonth",
+              "periodIndex",
+              "periodCount",
+              "matchResult",
+              "flags",
+              "id",
+              "state",
+              "linkKind",
+              "requestId",
+              "subscriptionId",
+              "vendorId",
+              "vendorInvoiceNumber",
+              "issuedOn",
+              "quantity",
+              "netAmount",
+              "paymentSource",
+              "submittedBy",
+              "submittedAt",
+              "decidedAt",
+              "provisioningTaskId",
+              "unitPriceOriginal",
+              "deductibleTax",
+              "nonDeductibleTax",
+              "chargedCostCenterId",
+              "decidedBy",
+              "returnReason",
+              "resubmissionOfId",
+              "resubmittedAsId",
+              "invoiceId",
+              "documents"
+            ],
+            "additionalProperties": false,
+            "nullable": true
+          }
+        },
+        "required": ["success", "message", "data"],
+        "additionalProperties": false
+      },
+      "PurchaseInvoiceResubmitBodyDto": {
+        "type": "object",
+        "properties": {
+          "vendorInvoiceNumber": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 64,
+            "description": "The number on the invoice; one vendor has it once until the invoice is returned."
+          },
+          "issuedOn": {
+            "type": "string",
+            "format": "date",
+            "description": "A calendar date as YYYY-MM-DD; it must exist (2026-02-30 is refused)."
+          },
+          "servicePeriodMonth": {
+            "type": "string",
+            "description": "The month the invoice pays for. The expense belongs to the month and the year of it, whatever day the invoice is dated."
+          },
+          "quantity": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 1000000,
+            "description": "The seats or keys the invoice says."
+          },
+          "unitPriceOriginal": {
+            "type": "object",
+            "properties": {
+              "amount": { "type": "string", "maxLength": 40 },
+              "currency": { "type": "string", "minLength": 3, "maxLength": 3 }
+            },
+            "required": ["amount", "currency"],
+            "additionalProperties": false,
+            "description": "The price of one on the invoice, in the currency it states: what the plan is compared with, never converted."
+          },
+          "netAmount": {
+            "type": "object",
+            "properties": { "amount": { "type": "string", "maxLength": 40 } },
+            "required": ["amount"],
+            "additionalProperties": false,
+            "description": "What was taken out of the company in dong for the goods, before tax."
+          },
+          "deductibleTax": {
+            "type": "object",
+            "properties": { "amount": { "type": "string", "maxLength": 40 } },
+            "required": ["amount"],
+            "additionalProperties": false,
+            "description": "Tax that can be deducted: shown apart, not an expense. Nothing when left out."
+          },
+          "nonDeductibleTax": {
+            "type": "object",
+            "properties": { "amount": { "type": "string", "maxLength": 40 } },
+            "required": ["amount"],
+            "additionalProperties": false,
+            "description": "Tax that cannot be deducted: an expense. Nothing when left out."
+          },
+          "paymentSource": { "type": "string", "enum": ["COMPANY_CARD", "IT_ADVANCE"] },
+          "documentIds": {
+            "minItems": 1,
+            "maxItems": 20,
+            "type": "array",
+            "items": { "type": "string", "format": "uuid" }
+          }
+        },
+        "required": [
+          "vendorInvoiceNumber",
+          "issuedOn",
+          "servicePeriodMonth",
+          "quantity",
+          "unitPriceOriginal",
+          "netAmount",
+          "paymentSource",
+          "documentIds"
+        ],
+        "additionalProperties": false
+      },
+      "PurchaseInvoiceListResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "enum": [true] },
+          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "items": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "label": { "type": "string", "enum": ["NEW_PURCHASE", "PERIOD", "RENEWAL"] },
+                    "servicePeriodMonth": { "type": "string", "description": "A calendar month as YYYY-MM." },
+                    "periodIndex": {
+                      "type": "integer",
+                      "exclusiveMinimum": true,
+                      "maximum": 9007199254740991,
+                      "nullable": true,
+                      "minimum": 0
+                    },
+                    "periodCount": {
+                      "type": "integer",
+                      "exclusiveMinimum": true,
+                      "maximum": 9007199254740991,
+                      "nullable": true,
+                      "minimum": 0
+                    },
+                    "matchResult": { "type": "string", "enum": ["MATCHED", "PRICE_QUANTITY_EXCEPTION"] },
+                    "flags": {
+                      "maxItems": 2,
+                      "type": "array",
+                      "items": { "type": "string", "enum": ["OVER_APPROVED", "OUTSIDE_TERM"] }
+                    },
+                    "id": { "type": "string", "format": "uuid" },
+                    "state": { "type": "string", "enum": ["SUBMITTED", "CONFIRMED", "RETURNED"] },
+                    "linkKind": { "type": "string", "enum": ["REQUEST", "SUBSCRIPTION"] },
+                    "requestId": { "type": "string", "format": "uuid", "nullable": true },
+                    "subscriptionId": { "type": "string", "format": "uuid", "nullable": true },
+                    "vendorId": { "type": "string", "format": "uuid" },
+                    "vendorInvoiceNumber": { "type": "string" },
+                    "issuedOn": { "type": "string", "format": "date", "description": "A calendar date as YYYY-MM-DD." },
+                    "quantity": {
+                      "type": "integer",
+                      "exclusiveMinimum": true,
+                      "maximum": 9007199254740991,
+                      "minimum": 0
+                    },
+                    "netAmount": {
+                      "type": "object",
+                      "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                      "required": ["amount", "currency"],
+                      "additionalProperties": false
+                    },
+                    "paymentSource": { "type": "string", "enum": ["COMPANY_CARD", "IT_ADVANCE"] },
+                    "submittedBy": {
+                      "type": "object",
+                      "properties": { "employeeId": { "type": "string", "format": "uuid" } },
+                      "required": ["employeeId"],
+                      "additionalProperties": false
+                    },
+                    "submittedAt": { "type": "string", "format": "date-time" },
+                    "decidedAt": { "type": "string", "format": "date-time", "nullable": true }
+                  },
+                  "required": [
+                    "label",
+                    "servicePeriodMonth",
+                    "periodIndex",
+                    "periodCount",
+                    "matchResult",
+                    "flags",
+                    "id",
+                    "state",
+                    "linkKind",
+                    "requestId",
+                    "subscriptionId",
+                    "vendorId",
+                    "vendorInvoiceNumber",
+                    "issuedOn",
+                    "quantity",
+                    "netAmount",
+                    "paymentSource",
+                    "submittedBy",
+                    "submittedAt",
+                    "decidedAt"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "pagination": {
+                "type": "object",
+                "properties": {
+                  "page": { "type": "integer", "exclusiveMinimum": true, "maximum": 9007199254740991, "minimum": 0 },
+                  "pageSize": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "maximum": 9007199254740991,
+                    "minimum": 0
+                  },
+                  "totalItems": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                  "totalPages": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+                },
+                "required": ["page", "pageSize", "totalItems", "totalPages"],
+                "additionalProperties": false
+              }
+            },
+            "required": ["items", "pagination"],
+            "additionalProperties": false,
+            "nullable": true
+          }
+        },
+        "required": ["success", "message", "data"],
+        "additionalProperties": false
+      },
+      "PurchaseInvoiceReturnBodyDto": {
+        "type": "object",
+        "properties": {
+          "reason": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000,
+            "description": "Why the invoice is returned. Required; the IT Admin reads it."
+          }
+        },
+        "required": ["reason"],
+        "additionalProperties": false
+      },
       "ControlledWaitListResponseDto": {
         "type": "object",
         "properties": {
@@ -119385,8 +121771,12 @@
                     "period": {
                       "type": "object",
                       "properties": {
-                        "start": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$" },
-                        "end": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$" },
+                        "start": {
+                          "type": "string",
+                          "format": "date",
+                          "description": "A calendar date as YYYY-MM-DD."
+                        },
+                        "end": { "type": "string", "format": "date", "description": "A calendar date as YYYY-MM-DD." },
                         "days": {
                           "type": "integer",
                           "exclusiveMinimum": true,
@@ -119500,8 +121890,8 @@
               "range": {
                 "type": "object",
                 "properties": {
-                  "from": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$" },
-                  "to": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$" },
+                  "from": { "type": "string", "format": "date", "description": "A calendar date as YYYY-MM-DD." },
+                  "to": { "type": "string", "format": "date", "description": "A calendar date as YYYY-MM-DD." },
                   "days": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
                 },
                 "required": ["from", "to", "days"],
@@ -119584,8 +121974,8 @@
               "range": {
                 "type": "object",
                 "properties": {
-                  "from": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$" },
-                  "to": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$" },
+                  "from": { "type": "string", "format": "date", "description": "A calendar date as YYYY-MM-DD." },
+                  "to": { "type": "string", "format": "date", "description": "A calendar date as YYYY-MM-DD." },
                   "days": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
                 },
                 "required": ["from", "to", "days"],
@@ -119610,7 +122000,7 @@
                     "activeDates": {
                       "maxItems": 366,
                       "type": "array",
-                      "items": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$" }
+                      "items": { "type": "string", "format": "date", "description": "A calendar date as YYYY-MM-DD." }
                     },
                     "updatedAt": { "type": "string", "format": "date-time", "nullable": true }
                   },
@@ -119633,7 +122023,7 @@
                     "items": {
                       "type": "object",
                       "properties": {
-                        "date": { "type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}$" },
+                        "date": { "type": "string", "format": "date", "description": "A calendar date as YYYY-MM-DD." },
                         "coverage": { "type": "string", "enum": ["COVERED", "PARTIAL"] },
                         "active": { "type": "boolean" },
                         "responses": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
