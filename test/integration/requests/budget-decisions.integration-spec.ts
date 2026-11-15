@@ -1,5 +1,5 @@
 import request from 'supertest';
-import { BudgetHarness, Pageable, VersionLineWire, VersionWire } from '../../support/budget-harness';
+import { BudgetHarness, Pageable, VersionWire } from '../../support/budget-harness';
 import { waitForLockWaiters } from '../../support/lock-wait';
 import type { Person } from '../../support/request-harness';
 
@@ -166,26 +166,17 @@ describe('budgets over HTTP: the decision of the spending approver (integration,
   });
 
   describe('what the approver sees of a version (AC-2; US-06-09 AC-10)', () => {
-    it('reads the version with the comments and the reasons of Finance, and the proposal it comes from beside it', async () => {
+    it('reads the version with the reasons of Finance, and the proposal it comes from beside it', async () => {
       counter += 1;
       const unit = await h.departmentWithHead(`P-D${counter}`);
       const proposal = await h.budgetProposed(unit.head, unit.department.unitId);
       const version = await h.built(proposal.id);
-      await h
-        .updateLine(version.id, 1, {
-          seats: 8,
-          amount: h.money(40_000_000),
-          financeComment: 'Two people moved to Miro',
-          adjustmentReason: 'Two people moved to Miro',
-        })
-        .expect(200);
       await h.sendVersion(version.id).expect(200);
 
       const detail = await wireOf(version.id, boss.account);
-      const lines = h.dataOf<Pageable<VersionLineWire>>(await h.versionLines(version.id, boss.account).expect(200));
-      const original = h.dataOf<Pageable<{ amount: { amount: string } }>>(
-        await h.proposalLines(proposal.id, boss.account).expect(200),
-      );
+      const original = h.dataOf<{ proposal: { total: { amount: string } } }>(
+        await h.proposalOf(proposal.id, boss.account).expect(200),
+      ).proposal;
       const queue = h.dataOf<Pageable<{ id: string }>>(
         await h.versionList(boss.account, { state: 'SENT', pageSize: 100 }).expect(200),
       );
@@ -193,14 +184,10 @@ describe('budgets over HTTP: the decision of the spending approver (integration,
       expect(detail).toMatchObject({
         proposalId: proposal.id,
         total: { amount: '80000000' },
+        reserveReason: 'The reserve of the test is not the default share',
         costCenter: { id: unit.department.unitId },
       });
-      expect(lines.items[0]).toMatchObject({
-        amount: { amount: '40000000' },
-        financeComment: 'Two people moved to Miro',
-        adjustmentReason: 'Two people moved to Miro',
-      });
-      expect(original.items[0].amount.amount).toBe('50000000');
+      expect(original.total.amount).toBe('70000000');
       expect(queue.items.map((item) => item.id)).toContain(version.id);
     });
 
@@ -209,7 +196,6 @@ describe('budgets over HTTP: the decision of the spending approver (integration,
 
       await h.versionOf(version.id, head.account).expect(403);
       await h.versionOf(version.id, h.it1).expect(403);
-      await h.versionLines(version.id, head.account).expect(403);
       await h.versionList(head.account).expect(403);
       await h.versionOf(version.id, boss.account).expect(200);
       await h.versionOf(version.id, h.finance).expect(200);
@@ -311,7 +297,6 @@ describe('budgets over HTTP: the decision of the spending approver (integration,
       const { version } = await sent();
 
       await h.updateVersion(version.id, { base: h.money(1) }, boss.account).expect(403);
-      await h.updateLine(version.id, 1, { financeComment: 'x' }, boss.account).expect(403);
       const extra = await h
         .decideVersion(version.id, { decision: 'APPROVE', base: h.money(1) }, boss.account)
         .expect(422);

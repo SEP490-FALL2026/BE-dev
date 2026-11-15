@@ -3,8 +3,8 @@ import { Page, pageOf } from '../../../core/application/pagination';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { BudgetCostCenterNotFoundError, BudgetProposalNotFoundError } from '../budget/budget.errors';
 import { BudgetFactsService } from '../budget/budget-facts.service';
-import { ProposalRepo, type ProposalLineRecord, type ProposalRecord } from '../budget/proposal.repo';
-import type { ProposalLineWire, ProposalSummaryWire, ProposalWire } from '../budget/budget.dto';
+import { ProposalRepo, type ProposalRecord } from '../budget/proposal.repo';
+import type { ProposalSummaryWire, ProposalWire } from '../budget/budget.dto';
 
 /**
  * What is read of the proposals (`US-06-10`): Finance and the spending approver read every proposal, a head of department those of
@@ -39,23 +39,6 @@ export class ProposalViewService {
 
   async get(actor: AuthenticatedPrincipal, id: string): Promise<ProposalWire> {
     return this.wire(await this.readable(actor, id));
-  }
-
-  async lines(
-    actor: AuthenticatedPrincipal,
-    id: string,
-    query: { page: number; pageSize: number },
-  ): Promise<Page<ProposalLineWire>> {
-    const proposal = await this.readable(actor, id);
-    const { items, total } = await this.proposals.pageLines(id, (query.page - 1) * query.pageSize, query.pageSize);
-    const money = await this.facts.formatter(proposal.currency);
-
-    return pageOf(
-      items.map((line) => toLineWire(line, money)),
-      total,
-      query.page,
-      query.pageSize,
-    );
   }
 
   /** Finance reads every proposal; a head reads those of their own Cost Center; anybody else finds nothing. */
@@ -128,20 +111,4 @@ const summaryOf = (proposal: ProposalWire): ProposalSummaryWire => ({
   previousProposalId: proposal.previousProposalId,
   total: proposal.total,
   submittedAt: proposal.submittedAt,
-});
-
-const toLineWire = (
-  line: ProposalLineRecord,
-  money: (minor: bigint) => { amount: string; currency: string },
-): ProposalLineWire => ({
-  position: line.position,
-  description: line.description,
-  planId: line.planId,
-  seats: line.seats,
-  amount: money(line.amountMinor),
-  note: line.note,
-  lineType: line.lineType,
-  zbb: line.zbb,
-  priorityRank: line.priorityRank,
-  overCeiling: line.overCeilingMinor === null ? null : money(line.overCeilingMinor),
 });

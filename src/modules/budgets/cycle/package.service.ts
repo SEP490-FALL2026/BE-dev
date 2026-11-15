@@ -7,7 +7,7 @@ import { ProposalRepo } from '../budget/proposal.repo';
 import { VersionRepo } from '../budget/version.repo';
 import { baselineVersionRefusal, inOrderOf, listedDepartments } from './baseline.policy';
 import type { PackageWire } from './cycle.dto';
-import type { ProposalLineRecord, ProposalRecord } from '../budget/proposal.repo';
+import type { ProposalRecord } from '../budget/proposal.repo';
 import type { VersionRecord } from '../budget/version.repo';
 import { CycleRepo, type CycleRecord } from './cycle.repo';
 
@@ -16,22 +16,11 @@ type Money = (minor: bigint) => { amount: string; currency: string };
 /** What the package knows of one department before it is written out. */
 interface DepartmentFacts {
   proposal: ProposalRecord | undefined;
-  lines: readonly ProposalLineRecord[];
   version: VersionRecord | undefined;
   head: { status: PackageWire['departments'][number]['headStatus']; refusal: BaselineVersionRefusal | null };
 }
 
-/** The lines of the open proposal by priority rank; a `CANCEL` line carries its amount for display and is never flagged (`QĐ-109c`). */
-const linesOf = (lines: readonly ProposalLineRecord[], format: Money) =>
-  lines.map((line) => ({
-    position: line.position,
-    lineType: line.lineType,
-    priorityRank: line.priorityRank,
-    amount: format(line.amountMinor),
-    overCeiling: line.overCeilingMinor === null ? null : format(line.overCeilingMinor),
-  }));
-
-/** One department of the package: the open proposal with its ranked lines, the version counted for it, and whether Finance may build it from the baseline. */
+/** One department of the package: the open proposal, the version counted for it, and whether Finance may build it from the baseline. */
 function departmentOf(
   brief: { id: string; code: string; name: string },
   facts: DepartmentFacts,
@@ -52,7 +41,6 @@ function departmentOf(
             id: proposal.id,
             total: format(proposal.totalMinor),
             state: proposal.state,
-            lines: linesOf(facts.lines, format),
           }
         : null,
     version:
@@ -99,7 +87,6 @@ export class PackageService {
       this.facts.formatter(cycle.currency),
     ]);
     const proposals = await this.proposals.openOfCostCenters([...costCenters.values()], year);
-    const lines = await this.proposals.linesOfMany([...proposals.values()].map((proposal) => proposal.id));
     const heads = await this.headFacts(cycle, listedIds, costCenters, proposals);
     const counted = new Map<string, VersionRecord>();
     let otherCurrency = 0;
@@ -117,7 +104,6 @@ export class PackageService {
     // The departments listed are the first ones by id: a version of the Cost Center of one that was cut off is outside them.
     const listedCostCenters = new Set(listedIds.flatMap((id) => costCenters.get(id) ?? []));
     const outside = sum([...counted.values()].filter((version) => !listedCostCenters.has(version.costCenterId)));
-    // A CANCEL line was not added to the total of its proposal (QĐ-109c), so the sum below leaves it out too.
     const proposalsTotal = [...proposals.values()].reduce((total, proposal) => total + proposal.totalMinor, 0n);
     const listed = inOrderOf(listedIds, briefs).map((brief) => {
       const costCenterId = costCenters.get(brief.id) ?? '';
@@ -127,7 +113,6 @@ export class PackageService {
         brief,
         {
           proposal,
-          lines: (proposal && lines.get(proposal.id)) ?? [],
           version: counted.get(costCenterId),
           head: heads.get(brief.id) ?? { status: 'NO_HEAD', refusal: 'CYCLE_NOT_OPEN' },
         },

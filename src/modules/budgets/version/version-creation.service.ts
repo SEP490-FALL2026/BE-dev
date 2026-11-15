@@ -9,7 +9,7 @@ import {
   BudgetVersionNotFoundError,
   BudgetYearEndedError,
 } from '../budget/budget.errors';
-import { copiedLineOf, versionSourceOf, yearHasEnded } from '../budget/budget.policy';
+import { versionSourceOf, yearHasEnded } from '../budget/budget.policy';
 import { BudgetFactsService } from '../budget/budget-facts.service';
 import { BudgetYearLockRepo } from '../budget/budget-year-lock.repo';
 import { ProposalRepo } from '../budget/proposal.repo';
@@ -21,7 +21,8 @@ import { VersionTrail } from './version-trail.service';
 
 /**
  * The first version of a budget, made from the proposal that waits (or made again from a proposal whose version was refused),
- * as Finance builds it (`US-06-09`). Finance never edits a proposal and never makes a version current.
+ * as Finance builds it (`US-06-09`): one figure for the year, no line (B-6). Finance never edits a proposal and never makes a version
+ * current.
  */
 @Injectable()
 export class VersionCreationService {
@@ -63,9 +64,6 @@ export class VersionCreationService {
         throw new BudgetVersionInFlightError();
 
       const figures = await this.figures.figures(tx, proposal.currency, { ...body, defaultPercent });
-      const lines = (await this.proposals.allLines(proposal.id, tx)).map((line) =>
-        copiedLineOf(line, { proposalId: proposal.id, proposalPosition: line.position }),
-      );
 
       const id = await this.versions.insert(tx, {
         organizationId: proposal.organizationId,
@@ -80,7 +78,7 @@ export class VersionCreationService {
         reason: null,
         createdByEmployeeId: actor.employeeId,
         now: new Date(),
-        lines,
+        lines: [],
       });
       await this.trail.created(tx, actor, {
         id,

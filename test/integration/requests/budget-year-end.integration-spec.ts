@@ -160,8 +160,6 @@ describe('the closure of the fiscal year of the budgets (integration, real Postg
       expect(table.items.find((row) => row.costCenter.id === b.department.unitId)).toBeUndefined();
       expect(mineA).toMatchObject({ status: 'ACTIVE', total: { amount: '80000000' } });
       expect(mineB).toMatchObject({ status: 'NO_ACTIVE_BUDGET', total: null, latestRefusal: null });
-      const lines = h.dataOf<Pageable<unknown>>(await h.mineLines(b.head.account, h.next).expect(200));
-      expect(lines.pagination.totalItems).toBe(0);
     });
   });
 

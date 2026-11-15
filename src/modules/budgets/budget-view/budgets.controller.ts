@@ -16,8 +16,6 @@ import {
   BudgetSummaryResponseDto,
   BudgetTablePageResponseDto,
   BudgetsQueryDto,
-  MineLinePageResponseDto,
-  MineLinesQueryDto,
   MineQueryDto,
   MineResponseDto,
   MineVersionPageResponseDto,
@@ -63,23 +61,6 @@ export class BudgetsController {
   async mine(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Query() query: MineQueryDto) {
     try {
       return { budget: await this.budgets.mine(actor, query.year, query.costCenterId) };
-    } catch (error) {
-      throw toBudgetApiException(error);
-    }
-  }
-
-  @Get('mine/lines')
-  @RequireRolesOrGrants(['MANAGER'], ['MANAGER'])
-  @ApiOperation({ operationId: 'budgetMineLineList', summary: 'List the lines of the budget of my department' })
-  @ApiSuccessResponse(MineLinePageResponseDto, {
-    message: 'BUDGET.LINES_LISTED',
-    description:
-      'The lines of the current version: what is planned to be bought (Renew, Change, New or Cancel), its seats and its amount, by priority rank. Without the comments Finance made.',
-  })
-  @ApiErrorResponses(...AUTH_ERRORS, HEADS_ONLY, MINE_INVALID)
-  async mineLines(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Query() query: MineLinesQueryDto) {
-    try {
-      return await this.budgets.mineLines(actor, query.year, query);
     } catch (error) {
       throw toBudgetApiException(error);
     }

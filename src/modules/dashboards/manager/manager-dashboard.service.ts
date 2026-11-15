@@ -71,7 +71,7 @@ export class ManagerDashboardService {
         spending: notAvailable('FINANCE_FIGURES_NOT_DELIVERED'),
         spendQueue: atSource('spendQueueList'),
         budgetProposals: atSource('budgetProposalList'),
-        approvedBudgetLines: atSource('budgetMineLineList'),
+        approvedBudgetLines: atSource('budgetMine'),
       },
     };
   }

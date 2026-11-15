@@ -83,10 +83,6 @@ export const ROUTE_ERROR_CODES_BUDGETS: Readonly<Record<string, Partial<Record<R
       '403': ['BUDGET.NOT_YOUR_COST_CENTER'],
       '422': ['BUDGET.COST_CENTER_REQUIRED'],
     },
-    budgetMineLineList: {
-      '403': ['BUDGET.NOT_YOUR_COST_CENTER'],
-      '422': ['BUDGET.COST_CENTER_REQUIRED'],
-    },
     budgetMineVersionList: {
       '403': ['BUDGET.NOT_YOUR_COST_CENTER'],
       '422': ['BUDGET.COST_CENTER_REQUIRED'],
@@ -100,9 +96,6 @@ export const ROUTE_ERROR_CODES_BUDGETS: Readonly<Record<string, Partial<Record<R
       '404': ['BUDGET.PROPOSAL_NOT_FOUND'],
     },
     budgetProposalGet: {
-      '404': ['BUDGET.PROPOSAL_NOT_FOUND'],
-    },
-    budgetProposalLineList: {
       '404': ['BUDGET.PROPOSAL_NOT_FOUND'],
     },
     budgetProposalResubmit: {
@@ -202,40 +195,6 @@ export const ROUTE_ERROR_CODES_BUDGETS: Readonly<Record<string, Partial<Record<R
     budgetVersionHistoryList: {
       '403': ['AUTHORIZATION.FORBIDDEN'],
       '404': ['BUDGET.VERSION_NOT_FOUND'],
-    },
-    budgetVersionImport: {
-      '404': ['BUDGET.VERSION_NOT_FOUND'],
-      '409': ['BUDGET.VERSION_NOT_EDITABLE'],
-      '422': ['BUDGET.IMPORT_FILE_INVALID', 'BUDGET.YEAR_ENDED'],
-    },
-    budgetVersionLineAdd: {
-      '404': ['BUDGET.VERSION_NOT_FOUND'],
-      '409': ['BUDGET.VERSION_NOT_EDITABLE'],
-      '422': [
-        'BUDGET.CURRENCY_NOT_REPORTING',
-        'BUDGET.PLAN_NOT_FOUND',
-        'BUDGET.YEAR_ENDED',
-        'CURRENCY_NOT_SUPPORTED',
-        'MONEY_OUT_OF_RANGE',
-        'MONEY_SCALE_EXCEEDED',
-      ],
-    },
-    budgetVersionLineList: {
-      '403': ['AUTHORIZATION.FORBIDDEN'],
-      '404': ['BUDGET.VERSION_NOT_FOUND'],
-    },
-    budgetVersionLineUpdate: {
-      '404': ['BUDGET.LINE_NOT_FOUND', 'BUDGET.VERSION_NOT_FOUND'],
-      '409': ['BUDGET.VERSION_NOT_EDITABLE'],
-      '422': [
-        'BUDGET.ADJUSTMENT_REASON_REQUIRED',
-        'BUDGET.CURRENCY_NOT_REPORTING',
-        'BUDGET.PLAN_NOT_FOUND',
-        'BUDGET.YEAR_ENDED',
-        'CURRENCY_NOT_SUPPORTED',
-        'MONEY_OUT_OF_RANGE',
-        'MONEY_SCALE_EXCEEDED',
-      ],
     },
     budgetVersionList: {
       '403': ['AUTHORIZATION.FORBIDDEN'],

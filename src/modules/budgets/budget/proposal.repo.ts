@@ -234,49 +234,6 @@ export class ProposalRepo {
     return rows.map(toLine);
   }
 
-  /** The lines of these proposals by priority rank, by proposal: one statement (the package reads the lines of every department's open proposal). */
-  async linesOfMany(proposalIds: readonly string[], tx?: DbTx): Promise<Map<string, ProposalLineRecord[]>> {
-    const grouped = new Map<string, ProposalLineRecord[]>();
-    if (proposalIds.length === 0) return grouped;
-    const rows = await (tx ?? this.prisma).budgetProposalLine.findMany({
-      where: { proposalId: { in: [...proposalIds] } },
-      orderBy: [{ proposalId: 'asc' }, { priorityRank: 'asc' }],
-    });
-    for (const row of rows) grouped.set(row.proposalId, [...(grouped.get(row.proposalId) ?? []), toLine(row)]);
-
-    return grouped;
-  }
-
-  /** The part over the published ceiling that each of these proposal lines carries, keyed `proposalId:position`; a line that is not flagged is absent. */
-  async overCeilingOf(
-    lines: readonly { proposalId: string; position: number }[],
-    tx?: DbTx,
-  ): Promise<Map<string, bigint>> {
-    const flagged = new Map<string, bigint>();
-    const ids = [...new Set(lines.map((line) => line.proposalId))];
-    if (ids.length === 0) return flagged;
-    const rows = await (tx ?? this.prisma).budgetProposalLine.findMany({
-      where: { proposalId: { in: ids }, overCeilingMinor: { not: null } },
-      select: { proposalId: true, position: true, overCeilingMinor: true },
-    });
-    for (const row of rows) flagged.set(`${row.proposalId}:${row.position}`, row.overCeilingMinor as bigint);
-
-    return flagged;
-  }
-
-  async pageLines(
-    proposalId: string,
-    skip: number,
-    take: number,
-  ): Promise<{ items: ProposalLineRecord[]; total: number }> {
-    const [rows, total] = await this.prisma.$transaction([
-      this.prisma.budgetProposalLine.findMany({ where: { proposalId }, orderBy: { position: 'asc' }, skip, take }),
-      this.prisma.budgetProposalLine.count({ where: { proposalId } }),
-    ]);
-
-    return { items: rows.map(toLine), total };
-  }
-
   async page(filter: ProposalFilter): Promise<{ items: ProposalRecord[]; total: number }> {
     const where: Prisma.BudgetProposalWhereInput = {
       ...(filter.costCenterIds ? { costCenterId: { in: [...filter.costCenterIds] } } : {}),

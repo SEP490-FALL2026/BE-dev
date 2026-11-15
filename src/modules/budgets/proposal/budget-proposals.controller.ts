@@ -17,9 +17,7 @@ import { CurrentPrincipal } from '../../../infrastructure/security/models/curren
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import {
   IdParamDto,
-  PageQueryDto,
   BudgetProposalBodyDto,
-  ProposalLinePageResponseDto,
   ProposalListQueryDto,
   ProposalPageResponseDto,
   ProposalResponseDto,
@@ -161,26 +159,6 @@ export class BudgetProposalsController {
   async get(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Param() params: IdParamDto) {
     try {
       return { proposal: await this.views.get(actor, params.id) };
-    } catch (error) {
-      throw toBudgetApiException(error);
-    }
-  }
-
-  @Get(':id/lines')
-  @AuthenticatedOnly()
-  @ApiOperation({ operationId: 'budgetProposalLineList', summary: 'List the lines of a budget proposal' })
-  @ApiSuccessResponse(ProposalLinePageResponseDto, {
-    message: 'BUDGET_PROPOSAL.LINES_LISTED',
-    description: 'The lines as they were sent, in order. They are never changed: Finance adjusts a copy in a version.',
-  })
-  @ApiErrorResponses(...AUTH_ERRORS, NOT_FOUND, INVALID)
-  async lines(
-    @CurrentPrincipal() actor: AuthenticatedPrincipal,
-    @Param() params: IdParamDto,
-    @Query() query: PageQueryDto,
-  ) {
-    try {
-      return await this.views.lines(actor, params.id, query);
     } catch (error) {
       throw toBudgetApiException(error);
     }

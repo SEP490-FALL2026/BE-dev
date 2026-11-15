@@ -31,10 +31,8 @@ function setup() {
   };
   const service = new BudgetViewService(
     versions as never,
-    {} as never,
     { chainOf: jest.fn().mockResolvedValue([]) } as never,
     numbers as never,
-    {} as never,
     {} as never,
     facts as never,
     {} as never,

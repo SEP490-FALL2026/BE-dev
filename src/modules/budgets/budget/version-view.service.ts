@@ -3,22 +3,18 @@ import { Page, pageOf } from '../../../core/application/pagination';
 
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { BudgetCostCenterNotFoundError, BudgetVersionNotFoundError } from './budget.errors';
-import { defaultReserveOf, versionLineOverCeiling, versionWaitingReason, type VersionStateName } from './budget.policy';
+import { defaultReserveOf, versionWaitingReason, type VersionStateName } from './budget.policy';
 import { BudgetFactsService } from './budget-facts.service';
 import { DecisionRepo, type DecisionRecord } from './decision.repo';
-import { ProposalRepo } from './proposal.repo';
-import { VersionLineRepo, type VersionLineRecord } from './version-line.repo';
 import { VersionRepo, type VersionRecord, type VersionState } from './version.repo';
-import type { VersionLineWire, VersionSummaryWire, VersionWire } from './budget.dto';
+import type { VersionSummaryWire, VersionWire } from './budget.dto';
 
 /** A version and its lines as a reader sees them: amounts in the currency of the version, people and Cost Centers by name. */
 @Injectable()
 export class VersionViewService {
   constructor(
     private readonly versions: VersionRepo,
-    private readonly lineRepo: VersionLineRepo,
     private readonly decisions: DecisionRepo,
-    private readonly proposals: ProposalRepo,
     private readonly facts: BudgetFactsService,
   ) {}
 
@@ -48,49 +44,6 @@ export class VersionViewService {
     });
 
     return pageOf((await this.wires(items)).map(summaryOf), total, query.page, query.pageSize);
-  }
-
-  async lines(
-    actor: AuthenticatedPrincipal,
-    id: string,
-    query: { page: number; pageSize: number },
-  ): Promise<Page<VersionLineWire>> {
-    await this.facts.requireVersionReader(actor);
-    const version = await this.require(id);
-    const { items, total } = await this.lineRepo.pageLines(id, (query.page - 1) * query.pageSize, query.pageSize);
-
-    return pageOf(await this.lineWires(version.currency, items), total, query.page, query.pageSize);
-  }
-
-  async lineWire(version: VersionRecord, line: VersionLineRecord): Promise<VersionLineWire> {
-    return (await this.lineWires(version.currency, [line]))[0];
-  }
-
-  async lineWires(currency: string, lines: readonly VersionLineRecord[]): Promise<VersionLineWire[]> {
-    const money = await this.facts.formatter(currency);
-    // The flag over the ceiling is the proposal line's (B3): a line of a version shows the one it adjusts, so the approver reads it at B5.
-    const flagged = await this.proposals.overCeilingOf(
-      lines.flatMap((line) =>
-        line.proposalId !== null && line.proposalPosition !== null
-          ? [{ proposalId: line.proposalId, position: line.proposalPosition }]
-          : [],
-      ),
-    );
-
-    return lines.map((line) => ({
-      position: line.position,
-      proposalPosition: line.proposalPosition,
-      description: line.description,
-      planId: line.planId,
-      seats: line.seats,
-      amount: money(line.amountMinor),
-      financeComment: line.financeComment,
-      adjustmentReason: line.adjustmentReason,
-      lineType: line.lineType,
-      zbb: line.zbb,
-      priorityRank: line.priorityRank,
-      overCeiling: overCeilingOf(line, flagged, money),
-    }));
   }
 
   async wire(version: VersionRecord): Promise<VersionWire> {
@@ -172,16 +125,6 @@ const summaryOf = (version: VersionWire): VersionSummaryWire => ({
   createdAt: version.createdAt,
   sentAt: version.sentAt,
 });
-
-const overCeilingOf = (
-  line: VersionLineRecord,
-  flagged: ReadonlyMap<string, bigint>,
-  money: (minor: bigint) => { amount: string; currency: string },
-) => {
-  const over = versionLineOverCeiling(line, flagged.get(`${line.proposalId}:${line.proposalPosition}`) ?? null);
-
-  return over === null ? null : money(over);
-};
 
 /** The database refuses `SUPERSEDED` (`budget_versions_no_superseded`), so a version read from it never stands there. */
 const wireStateOf = (state: VersionStateName): Exclude<VersionStateName, 'SUPERSEDED'> =>

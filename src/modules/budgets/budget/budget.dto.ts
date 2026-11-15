@@ -24,12 +24,6 @@ const zbbBody = z.strictObject({
   consequenceIfNot: text(REASON_MAX),
   usageIndicator: text(REASON_MAX),
 });
-const zbbView = z.strictObject({
-  purpose: z.string(),
-  alternatives: z.string(),
-  consequenceIfNot: z.string(),
-  usageIndicator: z.string(),
-});
 const priorityRank = z.number().int().min(1).max(100000);
 
 /**
@@ -58,13 +52,6 @@ const lineBody = lineBodyShape
   .meta({
     description:
       'A line is a plan or a description, the seats, the amount of the year, its kind, its priority rank and a note; the explanation (zbb) is required for NEW lines and where the rules ask.',
-  });
-/** A line Finance adds to a version: the kind is given; the rank and the explanation may be left out. */
-const financeLineBody = lineBodyShape
-  .refine((line) => line.planId !== undefined || line.description !== undefined, planOrDescription)
-  .meta({
-    description:
-      'A line Finance adds: a plan or a description, the seats, the amount of the year and its kind; the priority rank and the explanation are optional.',
   });
 
 export const proposalBodySchema = z.strictObject({
@@ -154,23 +141,6 @@ export const versionPatchSchema = z
   .partial()
   .refine((body) => Object.keys(body).length > 0, { message: 'Give at least one field.' })
   .meta({ minProperties: 1, description: 'Give at least one field.' });
-export const linePatchSchema = z
-  .strictObject({
-    description: text(LINE_DESCRIPTION_MAX),
-    planId: z.uuid().nullable(),
-    seats: z.number().int().min(1).max(100000).nullable(),
-    amount: money,
-    financeComment: text(REASON_MAX).nullable(),
-    adjustmentReason: text(REASON_MAX).nullable(),
-    lineType,
-    /** `null` takes the explanation away; absent keeps it. */
-    zbb: zbbBody.nullable(),
-    priorityRank: priorityRank.nullable(),
-  })
-  .partial()
-  .refine((body) => Object.keys(body).length > 0, { message: 'Give at least one field.' })
-  .meta({ minProperties: 1, description: 'Give at least one field.' });
-export const addLinesBodySchema = z.strictObject({ lines: z.array(financeLineBody).min(1).max(LINES_MAX) });
 
 export const pageQuery = {
   page: z.coerce.number().int().positive().default(1),
@@ -195,11 +165,6 @@ export const mineQuerySchema = z.strictObject({
   year: z.coerce.number().int().min(2000).max(2200),
   costCenterId: mineCostCenter,
 });
-export const mineLinesQuerySchema = z.strictObject({
-  year: z.coerce.number().int().min(2000).max(2200),
-  costCenterId: mineCostCenter,
-  ...pageQuery,
-});
 export const mineVersionsQuerySchema = z.strictObject({
   year: z.coerce.number().int().min(2000).max(2200).optional(),
   costCenterId: mineCostCenter,
@@ -211,7 +176,6 @@ export const budgetsQuerySchema = z.strictObject({
 });
 export const budgetSummaryQuerySchema = z.strictObject({ year: z.coerce.number().int().min(2000).max(2200) });
 export const idParamSchema = z.strictObject({ id: z.uuid() });
-export const lineParamSchema = z.strictObject({ id: z.uuid(), position: z.coerce.number().int().positive() });
 
 export const employeeRef = z.strictObject({ employeeId: z.uuid(), employeeCode: z.string(), fullName: z.string() });
 const costCenterRef = z.strictObject({ id: z.uuid(), code: z.string(), name: z.string() });
@@ -256,19 +220,6 @@ const proposalSummarySchema = z.strictObject({
 });
 /** Where a version stands (`QĐ-97b`: a version is never replaced, so `SUPERSEDED` is not one; the database refuses it). */
 const versionState = z.enum(['DRAFT', 'SENT', 'APPROVED', 'REJECTED', 'CHANGES_REQUESTED', 'EXPIRED']);
-const proposalLineSchema = z.strictObject({
-  position: z.number().int().positive(),
-  description: z.string(),
-  planId: z.uuid().nullable(),
-  seats: z.number().int().nullable(),
-  amount: moneyView,
-  note: z.string().nullable(),
-  lineType,
-  zbb: zbbView.nullable(),
-  priorityRank: z.number().int().positive(),
-  /** The part of the line that carries the proposal over the published ceiling of the department; null when the line is not flagged. */
-  overCeiling: moneyView.nullable(),
-});
 const versionSchema = z.strictObject({
   id: z.uuid(),
   costCenter: costCenterRef,
@@ -322,22 +273,6 @@ const versionSummarySchema = z.strictObject({
   total: moneyView,
   createdAt: z.iso.datetime(),
   sentAt: z.iso.datetime().nullable(),
-});
-const versionLineSchema = z.strictObject({
-  position: z.number().int().positive(),
-  proposalPosition: z.number().int().positive().nullable(),
-  description: z.string(),
-  planId: z.uuid().nullable(),
-  seats: z.number().int().nullable(),
-  amount: moneyView,
-  financeComment: z.string().nullable(),
-  adjustmentReason: z.string().nullable(),
-  lineType,
-  zbb: zbbView.nullable(),
-  /** Copied from the proposal; null for a line Finance added with none. */
-  priorityRank: z.number().int().positive().nullable(),
-  /** The part of the proposal line this adjusts that carried the proposal over the published ceiling (B3 flag); null when it was not flagged or the line is Finance's own. */
-  overCeiling: moneyView.nullable(),
 });
 const budgetNumbersSchema = {
   base: moneyView.nullable(),
@@ -418,11 +353,6 @@ export const mineVersionSummarySchema = z.strictObject({
   reserve: moneyView.meta({ description: 'The reserve on top of the base.' }),
   total: moneyView.meta({ description: 'Base plus reserve.' }),
 });
-const importSchema = z.strictObject({
-  added: z.number().int().nonnegative(),
-  rejected: z.number().int().nonnegative(),
-  errors: z.array(z.strictObject({ row: z.number().int().positive(), code: z.string() })),
-});
 
 export class BudgetProposalBodyDto extends createZodDto(proposalBodySchema) {}
 export class ResubmissionBodyDto extends createZodDto(resubmissionBodySchema) {}
@@ -434,47 +364,33 @@ export const VersionBodyDto = Object.defineProperty(createZodDto(versionBodySche
 });
 export type VersionBodyDto = z.infer<typeof versionBodySchema>;
 export class VersionPatchDto extends createZodDto(versionPatchSchema) {}
-export class LinePatchDto extends createZodDto(linePatchSchema) {}
-export class AddLinesBodyDto extends createZodDto(addLinesBodySchema) {}
 export class ProposalListQueryDto extends createZodDto(proposalListQuerySchema) {}
 export class VersionListQueryDto extends createZodDto(versionListQuerySchema) {}
 export class PageQueryDto extends createZodDto(pageQuerySchema) {}
 export class MineQueryDto extends createZodDto(mineQuerySchema) {}
-export class MineLinesQueryDto extends createZodDto(mineLinesQuerySchema) {}
 export class MineVersionsQueryDto extends createZodDto(mineVersionsQuerySchema) {}
 export class BudgetsQueryDto extends createZodDto(budgetsQuerySchema) {}
 export class BudgetSummaryQueryDto extends createZodDto(budgetSummaryQuerySchema) {}
 export class IdParamDto extends createZodDto(idParamSchema) {}
-export class LineParamDto extends createZodDto(lineParamSchema) {}
 
 export class ProposalResponseDto extends createZodDto(
   successEnvelopeSchema(z.strictObject({ proposal: proposalSchema })),
 ) {}
 export class ProposalPageResponseDto extends createZodDto(page(proposalSummarySchema)) {}
-export class ProposalLinePageResponseDto extends createZodDto(page(proposalLineSchema)) {}
 export class VersionResponseDto extends createZodDto(
   successEnvelopeSchema(z.strictObject({ version: versionSchema })),
 ) {}
 export class VersionPageResponseDto extends createZodDto(page(versionSummarySchema)) {}
-export class VersionLinePageResponseDto extends createZodDto(page(versionLineSchema)) {}
-export class LineResponseDto extends createZodDto(successEnvelopeSchema(z.strictObject({ line: versionLineSchema }))) {}
 export class MineResponseDto extends createZodDto(successEnvelopeSchema(z.strictObject({ budget: mineSchema }))) {}
-export class MineLinePageResponseDto extends createZodDto(page(versionLineSchema)) {}
 export class MineVersionPageResponseDto extends createZodDto(page(mineVersionSummarySchema)) {}
 export class BudgetTablePageResponseDto extends createZodDto(page(tableRowSchema)) {}
 export class BudgetSummaryResponseDto extends createZodDto(successEnvelopeSchema(budgetSummarySchema)) {}
-export class BudgetLineImportResponseDto extends createZodDto(
-  successEnvelopeSchema(z.strictObject({ result: importSchema })),
-) {}
 
 export type ProposalWire = z.infer<typeof proposalSchema>;
 export type ProposalSummaryWire = z.infer<typeof proposalSummarySchema>;
 export type VersionSummaryWire = z.infer<typeof versionSummarySchema>;
-export type ProposalLineWire = z.infer<typeof proposalLineSchema>;
 export type VersionWire = z.infer<typeof versionSchema>;
-export type VersionLineWire = z.infer<typeof versionLineSchema>;
 export type MineWire = z.infer<typeof mineSchema>;
 export type MineVersionSummaryWire = z.infer<typeof mineVersionSummarySchema>;
 export type TableRowWire = z.infer<typeof tableRowSchema>;
 export type BudgetSummaryWire = z.infer<typeof budgetSummarySchema>;
-export type ImportWire = z.infer<typeof importSchema>;

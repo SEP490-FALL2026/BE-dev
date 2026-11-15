@@ -35,7 +35,6 @@ const UNIQUE_ARRAYS: readonly (readonly [operationId: string, path: readonly str
 /** The bodies that need at least one field, whatever the field. */
 const AT_LEAST_ONE_FIELD: readonly string[] = [
   'budgetVersionUpdate',
-  'budgetVersionLineUpdate',
   'accessRequestAssessmentSave',
 ];
 

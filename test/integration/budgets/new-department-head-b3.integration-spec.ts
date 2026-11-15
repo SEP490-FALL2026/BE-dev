@@ -64,7 +64,6 @@ describe('the head of a department that starts next year does the budget work (i
     ).proposal;
     expect(sent.costCenter.id).toBe(department.unitId);
     await h.proposalOf(sent.id, head.account).expect(200);
-    await h.proposalLines(sent.id, head.account).expect(200);
     expect(
       h.dataOf<{ budget: { costCenter: { id: string }; proposal: { id: string } | null } }>(
         await h.mine(head.account, h.next).expect(200),
@@ -79,7 +78,7 @@ describe('the head of a department that starts next year does the budget work (i
     await h.resubmit(again.id, { lines: h.twoLines() }, head.account).expect(201);
   });
 
-  it('completes, links and reads the documents of the proposal, and reads its own lines and versions, before the department starts (DA2-09)', async () => {
+  it('completes, links and reads the documents of the proposal, and reads its own versions, before the department starts (DA2-09)', async () => {
     const department = await upcoming();
     const head = await futureHead(department);
     const file = await h.uploaded(SAMPLE_PDF, head.account);
@@ -91,7 +90,6 @@ describe('the head of a department that starts next year does the budget work (i
     await h.linkAttachment(file, head.account).expect(200);
 
     expect(h.dataOf<{ items: { id: string }[] }>(listed).items.map((item) => item.id)).toEqual([file]);
-    await h.mineLines(head.account, h.next).expect(200);
     await h.listMineVersions(`?year=${h.next}`, head.account).expect(200);
   });
 

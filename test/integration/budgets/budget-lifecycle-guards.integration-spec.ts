@@ -228,22 +228,15 @@ describe('the guards of the budget lifecycle (integration, real PostgreSQL)', ()
     it('is detached and stays a draft: it is neither changed nor sent nor deleted, and a new version can be made', async () => {
       const w = await waiting();
       const draft = await h.built(w.proposal.id);
-      const csv = ['cost_center_code,description,amount', `${draft.costCenter.code},Imported,1000`].join('\n');
 
       await h.withdraw(w.proposal.id, w.head.account).expect(200);
 
       const wire = h.dataOf<{ version: VersionWire }>(await h.versionOf(draft.id).expect(200)).version;
       expect(wire).toMatchObject({ state: 'DRAFT' });
       expect(wire.detachedAt).not.toBeNull();
-      const refused = [
-        await h.updateVersion(draft.id, { base: h.money(1) }),
-        await h.updateLine(draft.id, 1, { financeComment: 'late' }),
-        await h.addLines(draft.id, [h.line()]),
-        await h.importLines(draft.id, csv),
-        await h.sendVersion(draft.id),
-      ];
+      const refused = [await h.updateVersion(draft.id, { base: h.money(1) }), await h.sendVersion(draft.id)];
       expect(refused.map((response) => [response.status, h.codeOf(response)])).toEqual(
-        Array.from({ length: 5 }, () => [409, 'BUDGET.VERSION_NOT_EDITABLE']),
+        Array.from({ length: 2 }, () => [409, 'BUDGET.VERSION_NOT_EDITABLE']),
       );
       expect(await count(`budget_versions WHERE id = '${draft.id}'`)).toBe(1);
       // The head sends a new proposal, and Finance makes a version from it: the detached draft does not count as the one in progress.
@@ -278,7 +271,6 @@ describe('the guards of the budget lifecycle (integration, real PostgreSQL)', ()
   describe('the answers that were a 500 (F37, F39)', () => {
     it('refuses a plan that does not exist, on a proposal and on a line: 422 BUDGET.PLAN_NOT_FOUND', async () => {
       const w = await waiting();
-      const draft = await h.built(w.proposal.id);
       const stranger = randomUUID();
       const before = await count('budget_proposals');
 
@@ -286,13 +278,8 @@ describe('the guards of the budget lifecycle (integration, real PostgreSQL)', ()
         h.proposalBody(w.department.unitId, [h.line({ planId: stranger })], h.next + 1),
         w.head.account,
       );
-      const added = await h.addLines(draft.id, [h.line({ planId: stranger })]);
-      const adjusted = await h.updateLine(draft.id, 1, { planId: stranger, adjustmentReason: 'Another plan' });
-
-      expect([proposal.status, added.status, adjusted.status]).toEqual([422, 422, 422]);
-      expect([proposal, added, adjusted].map((response) => h.codeOf(response))).toEqual(
-        Array(3).fill('BUDGET.PLAN_NOT_FOUND'),
-      );
+      expect(proposal.status).toBe(422);
+      expect(h.codeOf(proposal)).toBe('BUDGET.PLAN_NOT_FOUND');
       expect(await count('budget_proposals')).toBe(before);
     });
 

@@ -1,5 +1,4 @@
 import { z } from 'zod';
-import { LINE_TYPES } from '../budget/budget-line-zbb.json';
 import { businessDate, responseBusinessDate } from '../../../infrastructure/http/dto/business-date.dto';
 import { successEnvelopeSchema } from '../../../infrastructure/http/dto/success-envelope.dto';
 import { createZodDto } from '../../../infrastructure/http/dto/zod-dto';
@@ -109,7 +108,7 @@ const baselineDepartmentView = z.strictObject({
   }),
   noProposalSubmitted: z.boolean().meta({
     description:
-      'The submission deadline has passed and the department has no proposal (QĐ-111bb): Finance builds its version from this baseline, flagged for the spending approver.',
+      'The submission deadline has passed and the department has no proposal: Finance builds its version from this baseline, flagged for the spending approver.',
   }),
   estimatedAnnualCost: moneyView,
   hasUnknownCost: z.boolean().meta({
@@ -170,16 +169,6 @@ export const baselineSchema = z.strictObject({
   }),
 });
 
-const packageLineView = z.strictObject({
-  position: z.number().int().positive(),
-  lineType: z.enum(LINE_TYPES),
-  priorityRank: z.number().int().positive(),
-  amount: moneyView,
-  overCeiling: moneyView.nullable().meta({
-    description:
-      'The part of the line that carries the proposal over the published ceiling; null when it is not flagged.',
-  }),
-});
 const packageDepartmentView = z.strictObject({
   departmentId: z.uuid(),
   departmentCode: z.string(),
@@ -198,12 +187,8 @@ const packageDepartmentView = z.strictObject({
   proposal: z
     .strictObject({
       id: z.uuid(),
-      total: moneyView.meta({ description: 'The lines counted: a CANCEL line is shown and not added.' }),
+      total: moneyView.meta({ description: 'The amount the head asked for.' }),
       state: z.enum(['SUBMITTED', 'REVIEWED']),
-      lines: z.array(packageLineView).max(200).meta({
-        description:
-          'The lines of the proposal by priority rank, with the flag over the published ceiling and the part that goes over.',
-      }),
     })
     .nullable(),
   version: z

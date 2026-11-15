@@ -17,7 +17,6 @@ import { SpendingApproverWaitListener } from './version/spending-approver-wait.l
 import { BudgetNotifierService } from './budget/budget-notifier.service';
 import { BudgetProposalsController } from './proposal/budget-proposals.controller';
 import { BudgetFactsService } from './budget/budget-facts.service';
-import { BudgetVersionLinesController } from './version/budget-version-lines.controller';
 import { BudgetVersionsController } from './version/budget-versions.controller';
 import { BudgetViewRepo } from './budget-view/budget-view.repo';
 import { BudgetViewNumbersService } from './budget-view/budget-view-numbers.service';
@@ -44,7 +43,6 @@ import { CycleService } from './cycle/cycle.service';
 import { DepartmentCreationWindowListener } from './cycle/department-creation-window.listener';
 import { InvoiceService } from './invoice/invoice.service';
 import { DecisionRepo } from './budget/decision.repo';
-import { LineImportService } from './version/line-import.service';
 import { ProposalRepo } from './budget/proposal.repo';
 import { ProposalService } from './proposal/proposal.service';
 import { ProposalLineJudge } from './proposal/proposal-line-judge.service';
@@ -55,11 +53,9 @@ import { VersionAccessService } from './version/version-access.service';
 import { VersionHistoryRepo } from './version/version-history.repo';
 import { VersionHistoryService } from './version/version-history.service';
 import { VersionHistoryViewService } from './version/version-history-view.service';
-import { VersionLineRepo } from './budget/version-line.repo';
 import { VersionDecisionJudge } from './version/version-decision-judge.service';
 import { VersionDecisionWriter } from './version/version-decision-writer.service';
 import { VersionDecisionService } from './version/version-decision.service';
-import { VersionLineService } from './version/version-line.service';
 import { VersionRepo } from './budget/version.repo';
 import { VersionBaselineCreationService } from './version/version-baseline-creation.service';
 import { VersionCreationService } from './version/version-creation.service';
@@ -112,7 +108,6 @@ import { BudgetProposalTemplateListener } from './proposal/budget-proposal-templ
   controllers: [
     BudgetProposalsController,
     BudgetVersionsController,
-    BudgetVersionLinesController,
     BudgetsController,
     BudgetCommitmentsController,
     BudgetInvoicesController,
@@ -124,7 +119,6 @@ import { BudgetProposalTemplateListener } from './proposal/budget-proposal-templ
     BudgetProposalTemplateListener,
     ProposalRepo,
     VersionRepo,
-    VersionLineRepo,
     VersionHistoryRepo,
     DecisionRepo,
     BudgetFactsService,
@@ -143,11 +137,9 @@ import { BudgetProposalTemplateListener } from './proposal/budget-proposal-templ
     VersionCreationService,
     VersionBaselineCreationService,
     VersionService,
-    VersionLineService,
     VersionDecisionJudge,
     VersionDecisionWriter,
     VersionDecisionService,
-    LineImportService,
     BudgetYearEndService,
     BudgetYearEndSweeper,
     NextYearReminderService,

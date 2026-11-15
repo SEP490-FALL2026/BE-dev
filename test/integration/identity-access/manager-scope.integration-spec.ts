@@ -82,7 +82,6 @@ describe('the scope of the Manager: MANAGER held, no department headed (integrat
 
       it.each([
         ['budgetMine', () => call('get', `/api/v1/budgets/mine?year=${year()}`, holder.account)],
-        ['budgetMineLineList', () => call('get', `/api/v1/budgets/mine/lines?year=${year()}`, holder.account)],
         ['budgetMineVersionList', () => call('get', `/api/v1/budgets/mine/versions?year=${year()}`, holder.account)],
         [
           'budgetProposalSubmit',

@@ -52,16 +52,6 @@ export interface VersionWire {
   } | null;
 }
 
-export interface VersionLineWire {
-  position: number;
-  proposalPosition: number | null;
-  description: string;
-  seats: number | null;
-  amount: { amount: string };
-  financeComment: string | null;
-  adjustmentReason: string | null;
-}
-
 export interface HistoryEntryWire {
   seq: number;
   kind: 'FIGURES_UPDATED' | 'LINE_UPDATED' | 'LINES_ADDED' | 'LINES_IMPORTED' | 'WINDOW_MOVED';
@@ -147,8 +137,6 @@ export class BudgetHarness extends RequestHarness {
     request(this.server()).get('/api/v1/budget-proposals').query(query).set(this.as(account));
   proposalOf = (id: string, account: ApiAccount) =>
     request(this.server()).get(`/api/v1/budget-proposals/${id}`).set(this.as(account));
-  proposalLines = (id: string, account: ApiAccount, query: Record<string, string | number> = {}) =>
-    request(this.server()).get(`/api/v1/budget-proposals/${id}/lines`).query(query).set(this.as(account));
   withdraw = (id: string, account: ApiAccount) =>
     request(this.server()).post(`/api/v1/budget-proposals/${id}/withdrawal`).set(this.as(account));
   giveBack = (id: string, body: object, account: ApiAccount) =>
@@ -173,34 +161,18 @@ export class BudgetHarness extends RequestHarness {
     request(this.server()).get(`/api/v1/budget-versions/${id}`).set(this.as(account));
   versionList = (account: ApiAccount = this.finance, query: Record<string, string | number> = {}) =>
     request(this.server()).get('/api/v1/budget-versions').query(query).set(this.as(account));
-  versionLines = (id: string, account: ApiAccount = this.finance, query: Record<string, string | number> = {}) =>
-    request(this.server()).get(`/api/v1/budget-versions/${id}/lines`).query(query).set(this.as(account));
   /** An edit of a draft; a change of the base carries the reason it needs (`QĐ-100v`) unless the test names one (or none, with `baseReason: undefined`). */
   updateVersion = (id: string, body: object, account: ApiAccount = this.finance) =>
     request(this.server())
       .put(`/api/v1/budget-versions/${id}`)
       .set(this.as(account))
       .send('base' in body && !('baseReason' in body) ? { baseReason: 'Finance moved the base', ...body } : body);
-  updateLine = (id: string, position: number, body: object, account: ApiAccount = this.finance) =>
-    request(this.server()).put(`/api/v1/budget-versions/${id}/lines/${position}`).set(this.as(account)).send(body);
-  addLines = (id: string, lines: object[], account: ApiAccount = this.finance) =>
-    request(this.server())
-      .post(`/api/v1/budget-versions/${id}/lines`)
-      .set(this.as(account))
-      .send({ lines: lines.map((line) => ({ lineType: 'RENEW', ...line })) });
   sendVersion = (id: string, account: ApiAccount = this.finance) =>
     request(this.server()).post(`/api/v1/budget-versions/${id}/submission`).set(this.as(account));
   versionHistory = (id: string, account: ApiAccount = this.finance, query: Record<string, string | number> = {}) =>
     request(this.server()).get(`/api/v1/budget-versions/${id}/history`).query(query).set(this.as(account));
-  importLines = (id: string, csv: string, account: ApiAccount = this.finance) =>
-    request(this.server())
-      .post(`/api/v1/budget-versions/${id}/imports`)
-      .set(this.as(account))
-      .attach('file', Buffer.from(csv, 'utf8'), 'lines.csv');
   mine = (account: ApiAccount, year: number) =>
     request(this.server()).get('/api/v1/budgets/mine').query({ year }).set(this.as(account));
-  mineLines = (account: ApiAccount, year: number) =>
-    request(this.server()).get('/api/v1/budgets/mine/lines').query({ year }).set(this.as(account));
   table = (account: ApiAccount, query: Record<string, string | number> = {}) =>
     request(this.server()).get('/api/v1/budgets').query(query).set(this.as(account));
   summary = (account: ApiAccount, query: Record<string, string | number> = {}) =>

@@ -38,8 +38,6 @@ import {
   BudgetPlanNotFoundError,
   BudgetVersionNumberTakenError,
   BudgetCurrentExistsError,
-  BudgetImportFileInvalidError,
-  BudgetLineNotFoundError,
   BudgetBaselineVersionNotAllowedError,
   BudgetBaseReasonRequiredError,
   BudgetCostCenterRequiredError,
@@ -81,8 +79,6 @@ export function toBudgetApiException(error: unknown): unknown {
   if (error instanceof BudgetVersionNotFoundError) {
     return refuse(HttpStatus.NOT_FOUND, 'BUDGET.VERSION_NOT_FOUND', error.message);
   }
-  if (error instanceof BudgetLineNotFoundError)
-    return refuse(HttpStatus.NOT_FOUND, 'BUDGET.LINE_NOT_FOUND', error.message);
   if (error instanceof BudgetCostCenterNotFoundError) {
     return refuse(HttpStatus.NOT_FOUND, 'BUDGET.COST_CENTER_NOT_FOUND', error.message);
   }
@@ -214,12 +210,6 @@ export function toBudgetApiException(error: unknown): unknown {
       positions: error.positions,
     });
   }
-  if (error instanceof BudgetImportFileInvalidError) {
-    return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'BUDGET.IMPORT_FILE_INVALID', error.message, {
-      reason: error.reason,
-      ...(error.detail ? { detail: error.detail } : {}),
-    });
-  }
   if (error instanceof BudgetProposalOpenError) {
     return refuse(HttpStatus.CONFLICT, 'BUDGET.PROPOSAL_ALREADY_OPEN', error.message);
   }
@@ -300,7 +290,6 @@ export const VERSION_READERS_DESCRIPTION = 'Only Finance and the spending approv
 export const BUDGET_ERROR_EXAMPLES = {
   PROPOSAL_NOT_FOUND: example(new BudgetProposalNotFoundError()),
   VERSION_NOT_FOUND: example(new BudgetVersionNotFoundError()),
-  LINE_NOT_FOUND: example(new BudgetLineNotFoundError()),
   COST_CENTER_NOT_FOUND: example(new BudgetCostCenterNotFoundError()),
   COMMITMENT_NOT_FOUND: example(new BudgetCommitmentNotFoundError()),
   COMMITMENT_NOT_HELD: example(new BudgetCommitmentRefusedError('NOT_HELD', 2026)),
@@ -341,7 +330,6 @@ export const BUDGET_ERROR_EXAMPLES = {
   PRIORITY_RANK_INVALID: example(new BudgetProposalLinesInvalidError('PRIORITY_RANK_INVALID', [1, 2])),
   ZBB_REQUIRED: example(new BudgetProposalLinesInvalidError('ZBB_REQUIRED', [1])),
   OVER_CEILING_NOTE_REQUIRED: example(new BudgetProposalLinesInvalidError('OVER_CEILING_NOTE_REQUIRED', [2])),
-  IMPORT_FILE_INVALID: example(new BudgetImportFileInvalidError('MISSING_COLUMNS', 'cost_center_code')),
   // Not shown yet: two writers at once answer the same code with the message given for the unique index above.
   PROPOSAL_ALREADY_OPEN: example(new BudgetProposalOpenError()),
   PROPOSAL_CANNOT_WITHDRAW: example(new BudgetProposalStateError('WITHDRAW', 'REVIEWED')),

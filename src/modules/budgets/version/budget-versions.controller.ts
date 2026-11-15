@@ -29,8 +29,6 @@ import {
 } from '../budget/budget.http-errors';
 import { VersionDecisionService } from './version-decision.service';
 import { VersionHistoryViewService } from './version-history-view.service';
-import { LineImportService } from './line-import.service';
-import { VersionLineService } from './version-line.service';
 import { VersionBaselineCreationService } from './version-baseline-creation.service';
 import { VersionCreationService } from './version-creation.service';
 import { VersionService } from './version.service';
@@ -49,10 +47,9 @@ const READERS_ONLY = {
   description: VERSION_READERS_DESCRIPTION,
   examples: [EXAMPLES.NOT_A_READER],
 } as const;
-/** Every route of this controller that names an id reaches only the version: none of them reads a line by position. */
 const NOT_FOUND = {
   status: HttpStatus.NOT_FOUND,
-  description: 'The version or the line does not exist (BUDGET.VERSION_NOT_FOUND, BUDGET.LINE_NOT_FOUND).',
+  description: 'The version does not exist (BUDGET.VERSION_NOT_FOUND).',
   examples: [EXAMPLES.VERSION_NOT_FOUND],
 } as const;
 /** A route that names a version only, and no line of it. */
@@ -93,11 +90,9 @@ export class BudgetVersionsController {
   constructor(
     private readonly versions: VersionService,
     private readonly creations: VersionCreationService,
-    private readonly lineOps: VersionLineService,
     private readonly decisions: VersionDecisionService,
     private readonly views: VersionViewService,
     private readonly history: VersionHistoryViewService,
-    private readonly imports: LineImportService,
     private readonly baselineCreations: VersionBaselineCreationService,
   ) {}
 

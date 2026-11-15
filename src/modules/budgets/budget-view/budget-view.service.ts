@@ -9,27 +9,17 @@ import { budgetNumbers } from './budget-view.mapper';
 import { DecisionRepo } from '../budget/decision.repo';
 import { ProposalRepo } from '../budget/proposal.repo';
 import { cycleStateOf } from '../cycle/cycle.policy';
-import { VersionLineRepo } from '../budget/version-line.repo';
 import { VersionRepo, type VersionRecord } from '../budget/version.repo';
-import { VersionViewService } from '../budget/version-view.service';
-import type {
-  BudgetSummaryWire,
-  MineVersionSummaryWire,
-  MineWire,
-  TableRowWire,
-  VersionLineWire,
-} from '../budget/budget.dto';
+import type { BudgetSummaryWire, MineVersionSummaryWire, MineWire, TableRowWire } from '../budget/budget.dto';
 
 /** The department head reads their own figures; Finance and the spending approver read the company views. */
 @Injectable()
 export class BudgetViewService {
   constructor(
     private readonly versions: VersionRepo,
-    private readonly lineRepo: VersionLineRepo,
     private readonly proposals: ProposalRepo,
     private readonly numbers: BudgetViewNumbersService,
     private readonly decisions: DecisionRepo,
-    private readonly views: VersionViewService,
     private readonly facts: BudgetFactsService,
     private readonly tableView: BudgetTableViewService,
   ) {}
@@ -80,30 +70,6 @@ export class BudgetViewService {
           }
         : null,
     };
-  }
-
-  async mineLines(
-    actor: AuthenticatedPrincipal,
-    year: number,
-    query: { page: number; pageSize: number; costCenterId?: string },
-  ): Promise<Page<VersionLineWire>> {
-    const costCenterId = await this.ownCostCenter(actor, { year, costCenterId: query.costCenterId });
-    const current = await this.versions.reference(costCenterId, year);
-    if (!current) return pageOf([], 0, query.page, query.pageSize);
-    const { items, total } = await this.lineRepo.pageLines(
-      current.id,
-      (query.page - 1) * query.pageSize,
-      query.pageSize,
-    );
-    // The head sees what is planned, not what Finance thought of it.
-    const lines = await this.views.lineWires(current.currency, items);
-
-    return pageOf(
-      lines.map((line) => ({ ...line, financeComment: null, adjustmentReason: null })),
-      total,
-      query.page,
-      query.pageSize,
-    );
   }
 
   table(query: { year?: number; page: number; pageSize: number }): Promise<Page<TableRowWire>> {

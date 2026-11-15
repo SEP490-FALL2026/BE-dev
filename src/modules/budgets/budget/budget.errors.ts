@@ -15,13 +15,6 @@ export class BudgetVersionNotFoundError extends Error {
   }
 }
 
-export class BudgetLineNotFoundError extends Error {
-  constructor() {
-    super('The line does not exist.');
-    this.name = 'BudgetLineNotFoundError';
-  }
-}
-
 /** The Cost Center does not exist, or is not a Unit a department is charged to. */
 export class BudgetCostCenterNotFoundError extends Error {
   constructor() {
@@ -226,17 +219,6 @@ export class BudgetVersionNumberTakenError extends Error {
   constructor() {
     super('Another version took the number of this one first; read the versions again and send it again.');
     this.name = 'BudgetVersionNumberTakenError';
-  }
-}
-
-/** The file of lines cannot be read at all (`US-06-09` AC-3). */
-export class BudgetImportFileInvalidError extends Error {
-  constructor(
-    readonly reason: 'NOT_CSV' | 'MISSING_COLUMNS' | 'RETIRED_COLUMNS' | 'EMPTY' | 'TOO_MANY_ROWS',
-    readonly detail?: string,
-  ) {
-    super(`The file cannot be read: ${reason}.`);
-    this.name = 'BudgetImportFileInvalidError';
   }
 }
 

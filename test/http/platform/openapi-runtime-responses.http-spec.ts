@@ -48,12 +48,10 @@ describe('API inventory (e2e): responses the runtime answers and the contract us
         .map((candidate) => candidate.operationId)
         .sort();
 
-    it('declares the 400 and 413 of the multipart limits on the five upload routes, which are the only multipart routes', () => {
-      // budgetVersionImport (G5) takes one file under the same limits (Prompt 02: it declared neither answer).
+    it('declares the 400 and 413 of the multipart limits on the four upload routes, which are the only multipart routes', () => {
       // usageImportUpload (MF-5) takes the report of a vendor under the same limits.
       // meAvatarUpload (PF-1) takes the picture of a person: one file of up to 1 MB, a little over which the policy answers and beyond which the parser does.
       const uploads = [
-        'budgetVersionImport',
         'employeeImportUpload',
         'meAvatarPut',
         'seatBaselineImportUpload',
@@ -91,7 +89,6 @@ describe('API inventory (e2e): responses the runtime answers and the contract us
       }
       // A 413 anywhere else is a multipart upload's own file limit, or a mistake.
       expect(idsWhere((candidate) => candidate.responses['413'] !== undefined && !takesJson(candidate))).toEqual([
-        'budgetVersionImport',
         'employeeImportUpload',
         'meAvatarPut',
         'seatBaselineImportUpload',

@@ -304,28 +304,6 @@ const DROPPED: Call[] = [
     at: 'base',
     field: 'currency',
   },
-  {
-    name: 'budgetVersionLineAdd: amount.currency (step 11)',
-    method: 'post',
-    path: `/api/v1/budget-versions/${ID}/lines`,
-    role: 'FINANCE',
-    body: {},
-    dropped: {
-      lines: [{ lineType: 'RENEW', priorityRank: 1, description: 'Tool', amount: { amount: '100', currency: 'VND' } }],
-    },
-    at: 'lines.0.amount',
-    field: 'currency',
-  },
-  {
-    name: 'budgetVersionLineUpdate: amount.currency (step 11)',
-    method: 'put',
-    path: `/api/v1/budget-versions/${ID}/lines/1`,
-    role: 'FINANCE',
-    body: {},
-    dropped: { amount: { amount: '100', currency: 'VND' } },
-    at: 'amount',
-    field: 'currency',
-  },
   ...['/api/v1/budget-proposals/attachments', `/api/v1/budget-versions/${ID}/attachments`].map((path) => ({
     name: `${path.includes('versions') ? 'budgetVersionAttachmentDeclare' : 'budgetProposalAttachmentDeclare'}: sizeBytes 0 (step 11)`,
     method: 'post' as const,
@@ -384,34 +362,6 @@ const DROPPED: Call[] = [
       field,
     })),
   ),
-  ...['windowFrom', 'windowTo', 'servicePeriodMonths', 'repeatCycle', 'quoteValidUntil'].map((field) => ({
-    name: `budgetVersionLineUpdate: ${field} (step 12b)`,
-    method: 'put' as const,
-    path: `/api/v1/budget-versions/${ID}/lines/1`,
-    role: 'FINANCE',
-    body: { financeComment: 'Checked' },
-    dropped: { [field]: field === 'servicePeriodMonths' ? 12 : field === 'repeatCycle' ? 'ANNUAL' : '2027-01-01' },
-  })),
-  {
-    name: 'budgetVersionLineAdd: lines[].windowFrom (step 12b)',
-    method: 'post',
-    path: `/api/v1/budget-versions/${ID}/lines`,
-    role: 'FINANCE',
-    body: {},
-    dropped: {
-      lines: [
-        {
-          lineType: 'RENEW',
-          priorityRank: 1,
-          description: 'Tool',
-          amount: { amount: '100' },
-          windowFrom: '2027-01-01',
-        },
-      ],
-    },
-    at: 'lines.0',
-    field: 'windowFrom',
-  },
   {
     name: 'budgetProposalSubmit: a line with neither plan nor description (step 12b)',
     method: 'post',

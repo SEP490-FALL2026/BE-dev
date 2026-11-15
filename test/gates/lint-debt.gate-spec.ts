@@ -19,7 +19,7 @@ const ROOT = join(__dirname, '..', '..');
 
 /** The most suppressions each rule and each part of the codebase may still carry. Lower these when you fix code, never raise them. */
 const CEILINGS = {
-  complexity: 44,
+  complexity: 43,
   'max-lines-per-function': 37,
   /** `complexity` and `max-lines-per-function` together: a function that is too long and too branched is two findings. */
   complexityAndLines: 81,

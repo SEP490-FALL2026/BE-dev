@@ -9,11 +9,6 @@
       "count": 1
     }
   },
-  "src/modules/budgets/version/line-import.service.ts": {
-    "complexity": {
-      "count": 1
-    }
-  },
   "src/modules/catalog/plan/plan.service.ts": {
     "complexity": {
       "count": 1

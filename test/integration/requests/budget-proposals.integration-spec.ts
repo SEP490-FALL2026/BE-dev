@@ -1,4 +1,4 @@
-import { BudgetHarness, Pageable, ProposalWire, VersionLineWire } from '../../support/budget-harness';
+import { BudgetHarness, Pageable, ProposalWire } from '../../support/budget-harness';
 import type { Person } from '../../support/request-harness';
 
 const h = new BudgetHarness();
@@ -46,10 +46,6 @@ describe('budgets over HTTP: the proposals of the heads (integration, real Postg
         await h.proposalList(h.finance, { state: 'SUBMITTED' }).expect(200),
       );
       expect(waiting.items.map((item) => item.id)).toContain(proposal.id);
-      const lines = h.dataOf<Pageable<{ position: number; description: string }>>(
-        await h.proposalLines(proposal.id, h.finance).expect(200),
-      );
-      expect(lines.items.map((line) => line.description)).toEqual(['Figma Organization 10 seats', 'Miro 5 seats']);
       const events = await h.auditEvents('BUDGET_PROPOSAL', proposal.id);
       expect(events.map((event) => event.action)).toEqual(['BUDGET_PROPOSAL.SUBMITTED']);
     });
@@ -185,13 +181,13 @@ describe('budgets over HTTP: the proposals of the heads (integration, real Postg
         await h.proposalList(head.account, { year: h.next }).expect(200),
       );
       expect(history.items.map((item) => item.id)).toEqual(expect.arrayContaining([first.id, second.id]));
-      const kept = h.dataOf<Pageable<{ amount: { amount: string } }>>(
-        await h.proposalLines(first.id, head.account).expect(200),
-      );
-      expect(kept.items.map((line) => line.amount.amount)).toEqual(['50000000', '20000000']);
+      const kept = h.dataOf<{ proposal: ProposalWire }>(
+        await h.proposalOf(first.id, head.account).expect(200),
+      ).proposal;
+      expect(kept.total.amount).toBe('70000000');
     });
 
-    it('is not edited in place: there is no route to change a proposal or a line of it, and it is sent again only after it was given back', async () => {
+    it('is not edited in place: there is no route to change a proposal, and it is sent again only after it was given back', async () => {
       const { head, department } = await fresh('P-R2');
       const proposal = await h.budgetProposed(head, department.unitId);
 
@@ -205,14 +201,6 @@ describe('budgets over HTTP: the proposals of the heads (integration, real Postg
           [method](target)
           .set(h.as(head.account))
           .send({ lines: [h.line()] })
-          .expect(404);
-        await (
-          await import('supertest')
-        )
-          .default(server)
-          [method](`${target}/lines/1`)
-          .set(h.as(h.finance))
-          .send({ amount: h.money(1) })
           .expect(404);
       }
       const early = await h.resubmit(proposal.id, { lines: [h.line()] }, head.account).expect(409);
@@ -243,13 +231,12 @@ describe('budgets over HTTP: the proposals of the heads (integration, real Postg
   });
 
   describe('what a head reads of the budget (AC-7; US-06-09 AC-5)', () => {
-    it('is the proposal, the total and the lines of the current version, with no word of what is left', async () => {
+    it('is the proposal and the total of the current version, with its own figures', async () => {
       const { head, department } = await fresh('P-V1');
       const proposal = await h.budgetProposed(head, department.unitId);
       const version = await h.current(proposal.id);
 
       const mine = h.dataOf<{ budget: Record<string, unknown> }>(await h.mine(head.account, h.next).expect(200)).budget;
-      const lines = h.dataOf<Pageable<VersionLineWire>>(await h.mineLines(head.account, h.next).expect(200));
 
       expect(mine).toMatchObject({
         status: 'ACTIVE',
@@ -258,13 +245,12 @@ describe('budgets over HTTP: the proposals of the heads (integration, real Postg
         version: { id: version.id, number: 1 },
         proposal: { id: proposal.id, total: { amount: '70000000' } },
       });
-      // MF4-C (BR-MF4-05): the screen of the head also reads the figures of its own budget, the cycle and the published ceiling.
+      // MF4-C (BR-MF4-05): the screen of the head also reads the figures of its own budget and the cycle (no ceiling of a department, QĐ-111aa).
       expect(Object.keys(mine).sort()).toEqual([
         'base',
         'committed',
         'costCenter',
         'cycle',
-        'departmentCeiling',
         'latestRefusal',
         'overBudget',
         'pendingSpend',
@@ -278,12 +264,6 @@ describe('budgets over HTTP: the proposals of the heads (integration, real Postg
         'version',
         'year',
       ]);
-      expect(lines.items.map((line) => [line.description, line.amount.amount])).toEqual([
-        ['Figma Organization 10 seats', '50000000'],
-        ['Miro 5 seats', '20000000'],
-      ]);
-      expect(lines.items.every((line) => line.financeComment === null && line.adjustmentReason === null)).toBe(true);
-      expect(JSON.stringify(lines)).not.toMatch(/remaining|left|check/i);
     });
 
     it('says there is no active budget, and nothing carries over from a year before (US-06-09 AC-16)', async () => {
@@ -292,10 +272,8 @@ describe('budgets over HTTP: the proposals of the heads (integration, real Postg
       await h.current(proposal.id);
 
       const next = h.dataOf<{ budget: Record<string, unknown> }>(await h.mine(head.account, h.next).expect(200)).budget;
-      const lines = h.dataOf<Pageable<VersionLineWire>>(await h.mineLines(head.account, h.next).expect(200));
 
       expect(next).toMatchObject({ status: 'NO_ACTIVE_BUDGET', total: null, version: null });
-      expect(lines.items).toEqual([]);
     });
 
     it('is the department of the head only: another head, a member and a person with no department read nothing of it', async () => {
