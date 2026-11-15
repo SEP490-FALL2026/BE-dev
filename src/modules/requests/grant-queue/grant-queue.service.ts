@@ -68,9 +68,12 @@ export class GrantQueueService {
     );
     const lookups = await this.lookupsOf(rows);
     const items = rows.flatMap((row) => {
+      // A request always names a plan and a department that exist; one that cannot be read is corrupt data, not a row to leave out (the
+      // total counts it, so a page shorter than its size would lie to the client), as for the person.
       const plan = lookups.plans.get(row.planId);
       const department = lookups.departments.get(row.departmentId);
-      if (!plan || !department) return [];
+      if (!plan) throw new Error(`The plan ${row.planId} of a request to carry out does not exist.`);
+      if (!department) throw new Error(`The department ${row.departmentId} of a request to carry out does not exist.`);
 
       return [
         {
