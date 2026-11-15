@@ -4,10 +4,11 @@ import type { AuthenticatedPrincipal } from '../../../infrastructure/security/to
 import { AuditApi } from '../../audit/public/audit.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { usageAuditEvent } from '../usage-audit-event.mapper';
+import { businessDateAt, type BusinessDate } from '../../../core/business-date';
 import { openCaseKeyOf } from './out-of-process-case.policy';
 import { VendorAccountReviewRefusedError } from './vendor-account-review.errors';
 import { VendorAccountReviewRepo } from './vendor-account-review.repo';
-import type { DiscrepancyRecord, VendorAccountDecision } from './vendor-account-review.types';
+import type { DiscrepancyRecord, NewVendorAccountDecision } from './vendor-account-review.types';
 
 /**
  * The one decision of the IT Admin on a difference of an account at the vendor (`SBF-08`, RC-2): let it go through a Request, revoke the access, call
@@ -27,7 +28,7 @@ export class VendorAccountDecisionService {
   async decide(
     actor: AuthenticatedPrincipal,
     id: string,
-    input: { decision: VendorAccountDecision; note: string },
+    input: { decision: NewVendorAccountDecision; companyAsset?: boolean; note: string },
     now: Date = new Date(),
   ): Promise<DiscrepancyRecord> {
     const organization = await this.organizationReads.getOrganization();
@@ -35,7 +36,14 @@ export class VendorAccountDecisionService {
 
     return this.runner.run(async (tx) => {
       const locked = await this.lockOpen(tx, id, input.decision, organization.id);
-      const opened = input.decision === 'OUT_OF_PROCESS' ? await this.openCase(tx, locked, now) : null;
+      const opened =
+        input.decision === 'OUT_OF_PROCESS'
+          ? await this.openCase(tx, locked, {
+              companyAsset: input.companyAsset === true,
+              concludedOn: businessDateAt(now, organization.timeZone),
+              now,
+            })
+          : null;
       const decided = await this.repo.decide(tx, id, {
         decision: input.decision,
         note: input.note.trim(),
@@ -67,7 +75,11 @@ export class VendorAccountDecisionService {
   }
 
   /** The case of `SBF-07a` for the account the difference is about: opened, or the one already open that the difference joins (`QĐ-98h`). */
-  private openCase(tx: DbTx, locked: DiscrepancyRecord, now: Date) {
+  private openCase(
+    tx: DbTx,
+    locked: DiscrepancyRecord,
+    concluded: { companyAsset: boolean; concludedOn: BusinessDate; now: Date },
+  ) {
     return this.repo.openOrJoinCase(tx, {
       organizationId: locked.organizationId,
       discrepancyId: locked.id,
@@ -79,7 +91,9 @@ export class VendorAccountDecisionService {
         employeeId: locked.employeeId,
         discrepancyId: locked.id,
       }),
-      at: now,
+      companyAsset: concluded.companyAsset,
+      concludedOn: concluded.concludedOn,
+      at: concluded.now,
     });
   }
 
@@ -90,7 +104,7 @@ export class VendorAccountDecisionService {
   private async lockOpen(
     tx: DbTx,
     id: string,
-    decision: VendorAccountDecision,
+    decision: NewVendorAccountDecision,
     organizationId: string,
   ): Promise<DiscrepancyRecord> {
     const locked = await this.repo.lockDiscrepancy(tx, id);

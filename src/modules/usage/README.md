@@ -64,9 +64,9 @@ Tầng: T6 (`scripts/arch/tiers.cjs`). Phụ thuộc: devices, catalog, licensin
   bảng trên; `vendor-account-intake.service.ts` tạo khác biệt từ cái đã thấy (tài khoản có hoạt động không có ghế và định danh chưa khớp khi
   xác nhận báo cáo — `vendor-account-review-import.listener.ts` bind `UsageImportListeners`; hồ sơ hóa đơn nghi ngờ của `requests` qua
   `InvoiceDiscrepancyReferralListeners`; công cụ ngoài allowlist mà collector thấy — `ai-usage-batch.service.ts` gọi khi từ chối `NOT_IN_ALLOWLIST`), mỗi
-  thứ một dòng (`source`, `source_ref`), thấy lại chỉ dời ngày bằng chứng; không bao giờ giữ tên người (`OQ-03`).
-  `vendor-account-decision.service.ts` (quyết định một lần: `LEGALIZE_VIA_REQUEST|REVOKE|FALSE_ALARM|OUT_OF_PROCESS`, `OUT_OF_PROCESS` mở ca cùng
-  transaction), `out-of-process-case-closure.service.ts` (`FALSE_ALARM|RECORD_SPENT|REPORT_ONLY`; ghi tiền chỉ khi có chứng từ + số VND + Cost Center hoặc
+  thứ một dòng (`source`, `source_ref`), thấy lại chỉ dời ngày bằng chứng của thứ có trong báo cáo vừa xác nhận (`last_import_id`); đã quyết mà thấy lại với bằng chứng mới hơn ⟹ mở lại thành dòng mới (`reopened_from_id`, `QĐ-106j`); không bao giờ giữ tên người (`OQ-03`).
+  `vendor-account-decision.service.ts` (quyết định một lần: `FALSE_ALARM|OUT_OF_PROCESS` kèm `companyAsset` — không còn `LEGALIZE_VIA_REQUEST`/`REVOKE`, `QĐ-103m`; hóa đơn lệch `INVOICE_DIFFERENCE` không đi `OUT_OF_PROCESS`; `OUT_OF_PROCESS` mở ca cùng
+  transaction hoặc gắn vào ca đang mở của cùng tài khoản, `QĐ-98h`), `out-of-process-case-closure.service.ts` (`FALSE_ALARM|RECORD_SPENT|REPORT_ONLY|REVOKED`; `RECORD_SPENT` chỉ FINANCE, `REVOKED` chỉ IT_ADMIN, chỉ ca trên tài sản công ty, kèm `renewalCancelled` + chứng từ hủy gia hạn; ghi tiền chỉ khi có chứng từ + số VND + Cost Center đang hiệu lực hoặc
   chưa phân bổ: đính tệp qua `CatalogApi.attachOutOfProcessCaseDocuments`, rồi `BudgetsApi.recordOutOfProcessSpend` ghi MỘT khoản thực chi không cam kết),
   `vendor-account-evidence-retention.service.ts` + `.job.ts` (`VendorAccountEvidenceSweeper` xóa bằng chứng quá 24 tháng, `US-14-04` AC-2). Policy thuần:
   `vendor-account-discrepancy.policy.ts` (hai giá trị, mốc 24 tháng), `out-of-process-case.policy.ts` (đóng ca).

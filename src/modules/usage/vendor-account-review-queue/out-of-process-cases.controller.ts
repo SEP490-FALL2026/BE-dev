@@ -37,8 +37,8 @@ const CLOSE_ERROR_RESPONSES = [
   {
     status: HttpStatus.FORBIDDEN,
     description:
-      'Only Finance and the IT Admin close the cases outside the process, and only Finance records the money already spent (OUT_OF_PROCESS_CASE.FINANCE_ONLY).',
-    examples: [FORBIDDEN_EXAMPLE, EXAMPLES.FINANCE_ONLY],
+      'Only Finance and the IT Admin close the cases outside the process, and only Finance records the money already spent (OUT_OF_PROCESS_CASE.FINANCE_ONLY) and only the IT Admin closes a case as revoked (OUT_OF_PROCESS_CASE.IT_ADMIN_ONLY).',
+    examples: [FORBIDDEN_EXAMPLE, EXAMPLES.FINANCE_ONLY, EXAMPLES.IT_ADMIN_ONLY],
   },
   {
     status: HttpStatus.NOT_FOUND,
@@ -54,7 +54,7 @@ const CLOSE_ERROR_RESPONSES = [
   {
     status: HttpStatus.UNPROCESSABLE_ENTITY,
     description:
-      'The note is missing (VALIDATION_ERROR); money is recorded with no proof of payment (OUT_OF_PROCESS_CASE.DOCUMENT_REQUIRED), with a file that is not a finished proof of payment of the person who closes it (OUT_OF_PROCESS_CASE.DOCUMENT_INVALID), without an amount or a Cost Center (OUT_OF_PROCESS_CASE.RECORD_FIELDS_MISSING) or with them on an outcome that records none (OUT_OF_PROCESS_CASE.RECORD_FIELDS_NOT_ALLOWED); the amount has digits after the point, is too large or is not above nothing (MONEY_SCALE_EXCEEDED, MONEY_OUT_OF_RANGE); the software has no vendor (OUT_OF_PROCESS_CASE.NO_VENDOR); or the Cost Center does not exist (OUT_OF_PROCESS_CASE.COST_CENTER_NOT_FOUND).',
+      'The note is missing (VALIDATION_ERROR); money is recorded with no proof of payment (OUT_OF_PROCESS_CASE.DOCUMENT_REQUIRED), with a file that is not a finished proof of payment of the person who closes it (OUT_OF_PROCESS_CASE.DOCUMENT_INVALID), without an amount or a Cost Center (OUT_OF_PROCESS_CASE.RECORD_FIELDS_MISSING) or with them on an outcome that records none (OUT_OF_PROCESS_CASE.RECORD_FIELDS_NOT_ALLOWED); the amount has digits after the point, is too large or is not above nothing (MONEY_SCALE_EXCEEDED, MONEY_OUT_OF_RANGE); the software has no vendor (OUT_OF_PROCESS_CASE.NO_VENDOR); the Cost Center does not exist (OUT_OF_PROCESS_CASE.COST_CENTER_NOT_FOUND); or a revocation is of a case that is not on a company asset (OUT_OF_PROCESS_CASE.REVOKE_NOT_ALLOWED) or lacks the cancelled renewal and its proof (OUT_OF_PROCESS_CASE.REVOKE_EVIDENCE_MISSING).',
     examples: [
       VALIDATION_EXAMPLE,
       EXAMPLES.DOCUMENT_REQUIRED,
@@ -65,6 +65,8 @@ const CLOSE_ERROR_RESPONSES = [
       EXAMPLES.MONEY_OUT_OF_RANGE,
       EXAMPLES.NO_VENDOR,
       EXAMPLES.COST_CENTER_NOT_FOUND,
+      EXAMPLES.REVOKE_NOT_ALLOWED,
+      EXAMPLES.REVOKE_EVIDENCE_MISSING,
     ],
   },
 ] as const;
@@ -117,6 +119,7 @@ export class OutOfProcessCasesController {
         outcome: body.outcome,
         note: body.note,
         documentIds: body.documentIds ?? [],
+        renewalCancelled: body.renewalCancelled === true,
         amount: body.amount,
         costCenterId:
           body.costCenterId === undefined ? undefined : body.costCenterId === 'UNALLOCATED' ? null : body.costCenterId,

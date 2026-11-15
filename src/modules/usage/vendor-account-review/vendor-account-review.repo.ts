@@ -20,7 +20,10 @@ const toDiscrepancy = (row: DiscrepancyRow): DiscrepancyRecord => ({
   ...row,
   evidenceOn: fromDateColumn(row.evidenceOn),
 });
-const toCase = (row: CaseRow): OutOfProcessCaseRecord => ({ ...row });
+const toCase = (row: CaseRow): OutOfProcessCaseRecord => ({
+  ...row,
+  concludedOn: row.concludedOn === null ? null : fromDateColumn(row.concludedOn),
+});
 
 /** The one writer of `vendor_account_discrepancies` and `out_of_process_cases` (`SBF-08`, `SBF-07a`, RC-2): all their SQL. */
 @Injectable()
@@ -132,13 +135,15 @@ export class VendorAccountReviewRepo {
       applicationId: string | null;
       vendorId: string | null;
       identityKey: string;
+      companyAsset: boolean;
+      concludedOn: BusinessDate;
       at: Date;
     },
   ): Promise<{ record: OutOfProcessCaseRecord; joined: boolean }> {
     const created = await tx.$queryRaw<{ id: string }[]>`
-      INSERT INTO out_of_process_cases (organization_id, discrepancy_id, application_id, vendor_id, opened_at, identity_key)
+      INSERT INTO out_of_process_cases (organization_id, discrepancy_id, application_id, vendor_id, opened_at, identity_key, company_asset, concluded_on)
       VALUES (${input.organizationId}::uuid, ${input.discrepancyId}::uuid, ${input.applicationId}::uuid, ${input.vendorId}::uuid,
-        ${input.at}::timestamptz, ${input.identityKey})
+        ${input.at}::timestamptz, ${input.identityKey}, ${input.companyAsset}, ${input.concludedOn}::date)
       ON CONFLICT (organization_id, identity_key) WHERE state = 'OPEN' AND identity_key IS NOT NULL DO NOTHING
       RETURNING id`;
     if (created.length > 0) {
@@ -174,6 +179,7 @@ export class VendorAccountReviewRepo {
       amountMinor: bigint | null;
       costCenterId: string | null;
       documentIds: readonly string[];
+      renewalCancelled: boolean;
     },
   ): Promise<OutOfProcessCaseRecord> {
     const row = await tx.outOfProcessCase.update({
@@ -187,6 +193,7 @@ export class VendorAccountReviewRepo {
         amountMinor: input.amountMinor,
         costCenterId: input.costCenterId,
         documentIds: [...input.documentIds],
+        renewalCancelled: input.renewalCancelled,
       },
     });
 

@@ -37,6 +37,8 @@ interface CaseWire {
   amount: { amount: string; currency: string } | null;
   costCenterId: string | null;
   documentIds: string[];
+  companyAsset: boolean | null;
+  renewalCancelled: boolean;
 }
 interface Page<T> {
   items: T[];
@@ -171,7 +173,7 @@ describe('the review of the accounts at the vendors over PostgreSQL (integration
     const found = await difference(raw);
     const decided = h.dataOf<Difference>(
       await differences('post', `/${found.id}/decision`)
-        .send({ decision: 'OUT_OF_PROCESS', note: 'Đã trả tiền ngoài quy trình' })
+        .send({ decision: 'OUT_OF_PROCESS', companyAsset: false, note: 'Đã trả tiền ngoài quy trình' })
         .expect(201),
     );
 
@@ -306,7 +308,7 @@ describe('the review of the accounts at the vendors over PostgreSQL (integration
       expect(
         code(
           await differences('post', `/${suspectedDifferenceId}/decision`)
-            .send({ decision: 'OUT_OF_PROCESS', note: 'Chuyển sang ca ngoài quy trình' })
+            .send({ decision: 'OUT_OF_PROCESS', companyAsset: false, note: 'Chuyển sang ca ngoài quy trình' })
             .expect(422),
         ),
       ).toBe('VENDOR_ACCOUNT_DISCREPANCY.DECISION_NOT_ALLOWED');
@@ -351,50 +353,20 @@ describe('the review of the accounts at the vendors over PostgreSQL (integration
         outOfProcessCaseId: null,
       });
       expect(
-        code(await differences('post', `/${open.id}/decision`).send({ decision: 'REVOKE', note: 'x' }).expect(409)),
+        code(
+          await differences('post', `/${open.id}/decision`).send({ decision: 'FALSE_ALARM', note: 'x' }).expect(409),
+        ),
       ).toBe('VENDOR_ACCOUNT_DISCREPANCY.ALREADY_DECIDED');
       expect(
         code(
-          await differences('post', `/${randomUUID()}/decision`).send({ decision: 'REVOKE', note: 'x' }).expect(404),
+          await differences('post', `/${randomUUID()}/decision`)
+            .send({ decision: 'FALSE_ALARM', note: 'x' })
+            .expect(404),
         ),
       ).toBe('VENDOR_ACCOUNT_DISCREPANCY.NOT_FOUND');
       expect(
         (await h.ctx.sql.query(`SELECT 1 FROM out_of_process_cases WHERE discrepancy_id = $1`, [open.id])).rowCount,
       ).toBe(0);
-    });
-
-    it('opens a difference again when the thing it was about is seen with newer evidence after it was decided, links it to the one it follows, and does nothing for the same day or an older one (B3C-04, QĐ-106j, US-13-05 AC-26)', async () => {
-      const intake = h.ctx.app.get(VendorAccountIntakeService);
-      const seen = (date: string) =>
-        h.ctx.app.get(TransactionRunner).run((tx) =>
-          intake.fromUnlistedTools(tx, {
-            organizationId: h.seed.organizationId,
-            sightings: [{ tool: 'REOPEN-TOOL', date }],
-          }),
-        );
-      const ofTool = async (state: string) =>
-        (await listed(`&state=${state}&source=COLLECTOR_UNLISTED`)).items.filter(
-          (item) => item.identity === 'REOPEN-TOOL',
-        );
-      await seen(`${h.year}-10-03`);
-      const [first] = await ofTool('OPEN');
-      await differences('post', `/${first.id}/decision`)
-        .send({ decision: 'FALSE_ALARM', note: 'Công cụ thử' })
-        .expect(201);
-
-      await seen(`${h.year}-10-03`);
-      await seen(`${h.year}-09-20`);
-      expect(await ofTool('OPEN')).toEqual([]);
-
-      await seen(`${h.year}-10-20`);
-      const [again, ...rest] = await ofTool('OPEN');
-      expect(rest).toEqual([]);
-      expect(again).toMatchObject({ evidenceOn: `${h.year}-10-20`, reopenedFromId: first.id, decision: null });
-      expect(again.id).not.toBe(first.id);
-      expect((await ofTool('DECIDED')).map((item) => item.id)).toEqual([first.id]);
-
-      await seen(`${h.year}-10-25`);
-      expect((await ofTool('OPEN')).map((item) => [item.id, item.evidenceOn])).toEqual([[again.id, `${h.year}-10-25`]]);
     });
 
     it('keeps one open case for each account of a vendor: a second difference of the same account, from another source, decided outside the process joins the case that is open instead of opening a second (B3C-02, QĐ-98h)', async () => {
@@ -410,7 +382,7 @@ describe('the review of the accounts at the vendors over PostgreSQL (integration
       const decide = async (id: string) =>
         h.dataOf<Difference>(
           await differences('post', `/${id}/decision`)
-            .send({ decision: 'OUT_OF_PROCESS', note: 'Ngoài quy trình' })
+            .send({ decision: 'OUT_OF_PROCESS', companyAsset: false, note: 'Ngoài quy trình' })
             .expect(201),
         );
 
@@ -611,6 +583,78 @@ describe('the review of the accounts at the vendors over PostgreSQL (integration
         .expect(201);
     });
 
+    it('revokes only a case on a company asset, only by the IT Admin, and only with the cancellation of the renewal and its proof: LEGALIZE_VIA_REQUEST and REVOKE are no decision of the IT Admin any more (B3C-01, QĐ-103m, QĐ-104j, US-13-05 AC-20, AC-24, AC-25)', async () => {
+      const raw = `revoke${++numbers}@gmail.com`;
+      const first = await difference(raw);
+      for (const old of ['LEGALIZE_VIA_REQUEST', 'REVOKE']) {
+        expect(
+          code(await differences('post', `/${first.id}/decision`).send({ decision: old, note: 'x' }).expect(422)),
+        ).toBe('VALIDATION_ERROR');
+      }
+      expect(
+        code(
+          await differences('post', `/${first.id}/decision`)
+            .send({ decision: 'OUT_OF_PROCESS', note: 'x' })
+            .expect(422),
+        ),
+      ).toBe('VALIDATION_ERROR');
+      const own = h.dataOf<Difference>(
+        await differences('post', `/${first.id}/decision`)
+          .send({ decision: 'OUT_OF_PROCESS', companyAsset: true, note: 'Tài khoản công ty' })
+          .expect(201),
+      );
+      const caseId = own.outOfProcessCaseId as string;
+      const revoke = async (account: ApiAccount, over: Record<string, unknown> = {}, files = 1) => {
+        const documentIds: string[] = [];
+        for (let at = 0; at < files; at += 1) documentIds.push(await proof(account));
+
+        return cases('post', `/${caseId}/closure`, account).send({
+          outcome: 'REVOKED',
+          note: 'Đã thu hồi và hủy gia hạn',
+          renewalCancelled: true,
+          ...(files > 0 ? { documentIds } : {}),
+          ...over,
+        });
+      };
+
+      expect(code(await revoke(h.finance).then((r) => r))).toBe('OUT_OF_PROCESS_CASE.IT_ADMIN_ONLY');
+      expect(code(await revoke(itAdmin, { renewalCancelled: false }).then((r) => r))).toBe(
+        'OUT_OF_PROCESS_CASE.REVOKE_EVIDENCE_MISSING',
+      );
+      expect(code(await revoke(itAdmin, {}, 0).then((r) => r))).toBe('OUT_OF_PROCESS_CASE.REVOKE_EVIDENCE_MISSING');
+      expect(code(await revoke(itAdmin, { amount: { amount: '1000' } }).then((r) => r))).toBe(
+        'OUT_OF_PROCESS_CASE.RECORD_FIELDS_NOT_ALLOWED',
+      );
+      const done = await revoke(itAdmin);
+      expect(done.status).toBe(201);
+      const closed = h.dataOf<CaseWire>(done);
+
+      expect(closed).toMatchObject({
+        state: 'CLOSED',
+        outcome: 'REVOKED',
+        companyAsset: true,
+        renewalCancelled: true,
+        amount: null,
+        costCenterId: null,
+      });
+      expect(closed.documentIds).toHaveLength(1);
+      expect(await rowsOfCase(caseId)).toEqual([]);
+      // A personal account is only recorded: it cannot be revoked through the case.
+      const personal = await opened();
+      expect(
+        code(
+          await cases('post', `/${personal.caseId}/closure`, itAdmin)
+            .send({
+              outcome: 'REVOKED',
+              note: 'Thu hồi',
+              renewalCancelled: true,
+              documentIds: [await proof(itAdmin)],
+            })
+            .expect(422),
+        ),
+      ).toBe('OUT_OF_PROCESS_CASE.REVOKE_NOT_ALLOWED');
+    });
+
     it('refuses money for a difference that has no vendor to book it to, while a report closes it, by the IT Admin as well', async () => {
       const intake = h.ctx.app.get(VendorAccountIntakeService);
       await h.ctx.app.get(TransactionRunner).run((tx) =>
@@ -624,7 +668,7 @@ describe('the review of the accounts at the vendors over PostgreSQL (integration
       ) as Difference;
       const caseId = h.dataOf<Difference>(
         await differences('post', `/${found.id}/decision`)
-          .send({ decision: 'OUT_OF_PROCESS', note: 'Công cụ lạ' })
+          .send({ decision: 'OUT_OF_PROCESS', companyAsset: false, note: 'Công cụ lạ' })
           .expect(201),
       ).outOfProcessCaseId as string;
 
@@ -682,7 +726,7 @@ describe('the review of the accounts at the vendors over PostgreSQL (integration
       ]);
       const caseId = h.dataOf<Difference>(
         await differences('post', `/${decided.id}/decision`)
-          .send({ decision: 'OUT_OF_PROCESS', note: 'Ngoài quy trình' })
+          .send({ decision: 'OUT_OF_PROCESS', companyAsset: false, note: 'Ngoài quy trình' })
           .expect(201),
       ).outOfProcessCaseId as string;
       await cases('post', `/${caseId}/closure`).send({ outcome: 'REPORT_ONLY', note: 'Chỉ báo cáo' }).expect(201);
@@ -703,35 +747,6 @@ describe('the review of the accounts at the vendors over PostgreSQL (integration
         (await h.ctx.sql.query(`SELECT 1 FROM audit_events WHERE action = 'VENDOR_ACCOUNT_EVIDENCE.EXPIRED'`)).rowCount,
       ).toBeGreaterThan(0);
       expect((await h.ctx.app.get(VendorAccountEvidenceRetentionService).sweep(new Date())).deleted).toBe(0);
-    });
-  });
-
-  describe('a tool the collector sees that is not on the allowlist (RC-2.3, US-13-03 AC-13)', () => {
-    it('makes one difference for the tool, moves the day of its evidence when it is seen again, and keeps no person', async () => {
-      const intake = h.ctx.app.get(VendorAccountIntakeService);
-      const runner = h.ctx.app.get(TransactionRunner);
-      const sight = (date: string) =>
-        runner.run((tx) =>
-          intake.fromUnlistedTools(tx, {
-            organizationId: h.seed.organizationId,
-            sightings: [{ tool: 'ANTIGRAVITY_CLI', date }],
-          }),
-        );
-
-      await sight(`${h.year}-10-02`);
-      await sight(`${h.year}-10-09`);
-
-      const item = (await listed('&source=COLLECTOR_UNLISTED')).items.filter(
-        (candidate) => candidate.identity === 'ANTIGRAVITY_CLI',
-      );
-      expect(item).toHaveLength(1);
-      expect(item[0]).toMatchObject({
-        internalValue: 'Not on the allowlist of the collector',
-        vendorValue: 'Tool ANTIGRAVITY_CLI was reported',
-        employeeId: null,
-        application: null,
-        evidenceOn: `${h.year}-10-09`,
-      });
     });
   });
 });

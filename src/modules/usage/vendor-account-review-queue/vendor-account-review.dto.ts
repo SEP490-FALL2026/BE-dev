@@ -8,9 +8,11 @@ export const OUT_OF_PROCESS_DOCUMENTS_MAX = 20;
 
 const source = z.enum(['NO_ASSIGNMENT', 'UNMATCHED_IDENTITY', 'INVOICE_DIFFERENCE', 'COLLECTOR_UNLISTED']);
 const discrepancyState = z.enum(['OPEN', 'DECIDED']);
-const decision = z.enum(['LEGALIZE_VIA_REQUEST', 'REVOKE', 'FALSE_ALARM', 'OUT_OF_PROCESS']);
+/** What a difference may be decided as now; rows decided before carry the two others (`LEGALIZE_VIA_REQUEST`, `REVOKE`; `QĐ-103m`). */
+const decision = z.enum(['FALSE_ALARM', 'OUT_OF_PROCESS']);
+const decisionRecorded = z.enum(['LEGALIZE_VIA_REQUEST', 'REVOKE', 'FALSE_ALARM', 'OUT_OF_PROCESS']);
 const caseState = z.enum(['OPEN', 'CLOSED']);
-const outcome = z.enum(['FALSE_ALARM', 'RECORD_SPENT', 'REPORT_ONLY']);
+const outcome = z.enum(['FALSE_ALARM', 'RECORD_SPENT', 'REPORT_ONLY', 'REVOKED']);
 
 const moneyView = z.strictObject({ amount: z.string(), currency: z.string() });
 /** An amount in dong, as typed: no currency (`QĐ-111an`). */
@@ -18,13 +20,22 @@ const dongInput = z.strictObject({ amount: z.string().max(40) });
 const note = z.string().trim().min(1).max(1000);
 const personRef = z.strictObject({ employeeId: z.uuid() });
 
-export const vendorAccountDecisionSchema = z.strictObject({
-  decision: decision.meta({
-    description:
-      'LEGALIZE_VIA_REQUEST when the account goes through a Request; REVOKE when the access is revoked; FALSE_ALARM when there is nothing wrong; OUT_OF_PROCESS when money or access was outside the process, which opens a case Finance or the IT Admin closes.',
-  }),
-  note: note.meta({ description: 'Why. Required; it stays with the difference.' }),
-});
+export const vendorAccountDecisionSchema = z
+  .strictObject({
+    decision: decision.meta({
+      description:
+        'FALSE_ALARM when there is nothing wrong; OUT_OF_PROCESS when money or access was outside the process, which opens the case that Finance and the IT Admin close, or joins the one already open for the same account. Nobody makes a Request to legalize it: whoever wants to use the software sends a new Request like anyone.',
+    }),
+    companyAsset: z.boolean().optional().meta({
+      description:
+        'Required with OUT_OF_PROCESS: true when the account is on a company asset (registered with the company email or in the company workspace), false for a personal one outside them. Only a case on a company asset can be closed as REVOKED.',
+    }),
+    note: note.meta({ description: 'Why. Required; it stays with the difference.' }),
+  })
+  .refine((body) => body.decision !== 'OUT_OF_PROCESS' || body.companyAsset !== undefined, {
+    path: ['companyAsset'],
+    message: 'companyAsset is required when the decision is OUT_OF_PROCESS.',
+  });
 
 export const vendorAccountListQuerySchema = z.strictObject({
   state: discrepancyState.optional(),
@@ -37,12 +48,16 @@ export const vendorAccountListQuerySchema = z.strictObject({
 export const outOfProcessClosureSchema = z.strictObject({
   outcome: outcome.meta({
     description:
-      'FALSE_ALARM when nothing was spent; REPORT_ONLY to report it with the reason when there is no proof of payment; RECORD_SPENT to record the money already spent, which needs a proof of payment, an amount and a Cost Center or UNALLOCATED.',
+      'FALSE_ALARM when nothing was spent; REPORT_ONLY to report it with the reason when there is no proof of payment; RECORD_SPENT (Finance) to record the money already spent, which needs a proof of payment, an amount and a Cost Center or UNALLOCATED; REVOKED (IT Admin) for an account on a company asset that was revoked, which needs renewalCancelled true and a proof of the cancellation.',
   }),
   note: note.meta({ description: 'Why the case is closed this way. Required; it stays with the case.' }),
+  renewalCancelled: z.boolean().optional().meta({
+    description:
+      'Only for REVOKED, and then true: the renewal or payment with the vendor was cancelled; a proof of it is needed among documentIds.',
+  }),
   documentIds: z.array(z.uuid()).min(1).max(OUT_OF_PROCESS_DOCUMENTS_MAX).optional().meta({
     description:
-      'The proofs of payment of the company, finished uploads of purpose PURCHASE_DOCUMENT of the person who closes. Only for RECORD_SPENT, and then at least one.',
+      'The proofs of payment of the company (RECORD_SPENT) or of the cancellation of the renewal or payment (REVOKED): finished uploads of purpose PURCHASE_DOCUMENT of the person who closes. Only for those two, and then at least one.',
   }),
   amount: dongInput
     .optional()
@@ -83,7 +98,7 @@ const discrepancySchema = z.strictObject({
   evidenceOn: responseBusinessDate,
   firstSeenAt: z.iso.datetime(),
   lastSeenAt: z.iso.datetime(),
-  decision: decision.nullable(),
+  decision: decisionRecorded.nullable(),
   decisionNote: z.string().nullable(),
   decidedBy: personRef.nullable(),
   decidedAt: z.iso.datetime().nullable(),
@@ -114,6 +129,15 @@ const caseSchema = z.strictObject({
     .nullable()
     .meta({ description: 'The Cost Center that bears it; null with an amount means not allocated yet.' }),
   documentIds: z.array(z.uuid()).max(OUT_OF_PROCESS_DOCUMENTS_MAX),
+  companyAsset: z.boolean().nullable().meta({
+    description:
+      'Concluded on a company asset (registered with the company email or in the company workspace); null for a case opened before it was asked.',
+  }),
+  concludedOn: responseBusinessDate.nullable().meta({
+    description:
+      'The day the difference was concluded to be outside the process; null for a case opened before it was kept.',
+  }),
+  renewalCancelled: z.boolean().meta({ description: 'The renewal or payment was cancelled; true only for REVOKED.' }),
 });
 
 const pagination = z.strictObject({

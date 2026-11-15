@@ -440,6 +440,8 @@ enum OutOfProcessOutcome {
   FALSE_ALARM
   RECORD_SPENT
   REPORT_ONLY
+  // The account was on a company asset and was revoked, with the renewal or payment cancelled and a proof of it (QĐ-104j, US-13-05 AC-25).
+  REVOKED
 }
 
 // One difference between what the company has on record (`internalValue`) and what the vendor shows (`vendorValue`), kept with the day of the
@@ -497,6 +499,10 @@ model OutOfProcessCase {
   documentIds        String[]              @default([]) @map("document_ids") @db.Uuid
   // The account the case is about: one case is open for each (`QĐ-98h`); null once closed or for a case older than the rule (SQL: partial unique).
   identityKey        String?               @map("identity_key")
+  // Concluded as outside the process on a company asset (registered with the company email or in the company workspace, QĐ-103y(3)); the day it was concluded.
+  companyAsset       Boolean?              @map("company_asset")
+  concludedOn        DateTime?             @map("concluded_on") @db.Date
+  renewalCancelled   Boolean               @default(false) @map("renewal_cancelled")
 
   @@unique([organizationId, identityKey], map: "out_of_process_cases_open_identity_key")
   @@index([organizationId, state, openedAt(sort: Desc), id], map: "out_of_process_cases_state_opened_idx")

@@ -19,6 +19,12 @@ export type VendorAccountReviewRefusal =
   | 'NUMBER_TAKEN'
   /** An invoice that is a difference (`SBF-11a`) is not a case outside the process: its money is already spent when Finance signed it (`US-13-03` AC-8, AC-11). */
   | 'DECISION_NOT_ALLOWED'
+  /** A revocation closes only a case on a company asset (`US-13-05` AC-24). */
+  | 'REVOKE_NOT_ALLOWED'
+  /** A revocation needs the renewal or payment cancelled and a proof of it (`US-13-05` AC-25). */
+  | 'REVOKE_EVIDENCE_MISSING'
+  /** Only the IT Admin closes a case as revoked (`US-13-05` AC-20, AC-25). */
+  | 'IT_ADMIN_ONLY'
   /** Only Finance records the money already spent and chooses the Cost Center (`SBF-07a`, `US-13-05` AC-19). */
   | 'FINANCE_ONLY';
 

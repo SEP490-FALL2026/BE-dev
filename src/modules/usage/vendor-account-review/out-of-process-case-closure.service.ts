@@ -24,6 +24,8 @@ export interface OutOfProcessClosureInput {
   amount: { amount: string } | undefined;
   /** The Cost Center that bears the money; `null` = none yet; absent = not chosen (only `RECORD_SPENT` chooses). */
   costCenterId: string | null | undefined;
+  /** The renewal or payment with the vendor was cancelled; only `REVOKED` says so, and then needs a proof among the files. */
+  renewalCancelled: boolean;
 }
 
 /**
@@ -50,9 +52,13 @@ export class OutOfProcessCaseClosureService {
     input: OutOfProcessClosureInput,
     now: Date = new Date(),
   ): Promise<OutOfProcessCaseRecord> {
-    // The money already spent, and the Cost Center that bears it, are Finance's to record; the IT Admin closes a false alarm or a report (`SBF-07a`, `US-13-05` AC-19).
+    // The money already spent, and the Cost Center that bears it, are Finance's to record; the revocation of an account is the IT Admin's; either closes a
+    // false alarm or a report (`SBF-07a`, `US-13-05` AC-19, AC-20).
     if (input.outcome === 'RECORD_SPENT' && !actor.roles.includes('FINANCE')) {
       throw new VendorAccountReviewRefusedError('FINANCE_ONLY');
+    }
+    if (input.outcome === 'REVOKED' && !actor.roles.includes('IT_ADMIN')) {
+      throw new VendorAccountReviewRefusedError('IT_ADMIN_ONLY');
     }
     const organization = await this.organizationReads.getOrganization();
     if (!organization) throw new Error('A case outside the process was closed before installation');
@@ -65,6 +71,8 @@ export class OutOfProcessCaseClosureService {
       const amountMinor = await this.judge(tx, locked, input);
       if (input.outcome === 'RECORD_SPENT') {
         await this.recordSpent(tx, actor, locked, input, amountMinor as bigint, now, organization);
+      } else if (input.outcome === 'REVOKED') {
+        await this.attachProofs(tx, actor, locked, input);
       }
       const closed = await this.repo.closeCase(tx, id, {
         outcome: input.outcome,
@@ -74,6 +82,7 @@ export class OutOfProcessCaseClosureService {
         amountMinor,
         costCenterId: input.outcome === 'RECORD_SPENT' ? (input.costCenterId ?? null) : null,
         documentIds: input.documentIds,
+        renewalCancelled: input.outcome === 'REVOKED',
       });
       await this.log(tx, actor, closed, input);
 
@@ -102,6 +111,8 @@ export class OutOfProcessCaseClosureService {
       amountMinor,
       costCenterChosen: input.costCenterId !== undefined,
       hasVendor: locked.vendorId !== null,
+      companyAsset: locked.companyAsset,
+      renewalCancelled: input.renewalCancelled,
     });
     if (refusal) throw new VendorAccountReviewRefusedError(refusal);
 
@@ -171,6 +182,26 @@ export class OutOfProcessCaseClosureService {
         throw new VendorAccountReviewRefusedError(
           error.reason === 'DUPLICATE_NUMBER' ? 'NUMBER_TAKEN' : 'AMOUNT_INVALID',
         );
+      }
+      throw error;
+    }
+  }
+
+  /** The proof of the cancellation of the renewal or payment, attached to the case in the transaction of the closing (`US-13-05` AC-25). */
+  private async attachProofs(
+    tx: Parameters<VendorAccountReviewRepo['lockCase']>[0],
+    actor: AuthenticatedPrincipal,
+    locked: OutOfProcessCaseRecord,
+    input: OutOfProcessClosureInput,
+  ): Promise<void> {
+    try {
+      await this.catalog.attachOutOfProcessCaseDocuments(tx, actor, {
+        documentIds: input.documentIds,
+        outOfProcessCaseId: locked.id,
+      });
+    } catch (error) {
+      if (error instanceof DocumentAttachRefusedError) {
+        throw new VendorAccountReviewRefusedError('DOCUMENT_INVALID', error.problem);
       }
       throw error;
     }

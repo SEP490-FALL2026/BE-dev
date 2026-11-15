@@ -46,5 +46,8 @@ export function toCaseWire(row: OutOfProcessCaseRecord, names: ApplicationNames)
     amount: row.amountMinor === null ? null : { amount: formatAmount(row.amountMinor, 0), currency: DONG },
     costCenterId: row.costCenterId,
     documentIds: row.documentIds,
+    companyAsset: row.companyAsset,
+    concludedOn: row.concludedOn,
+    renewalCancelled: row.renewalCancelled,
   };
 }

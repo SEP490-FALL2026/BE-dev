@@ -3,13 +3,22 @@ export type VendorAccountSource = 'NO_ASSIGNMENT' | 'UNMATCHED_IDENTITY' | 'INVO
 
 export type VendorAccountState = 'OPEN' | 'DECIDED';
 
-/** What the IT Admin decides about a difference: it goes through a Request, the access is revoked, it is a false alarm, or it is outside the process. */
+/**
+ * What a difference was decided as. The IT Admin decides a false alarm, or that it is outside the process (`QĐ-103m`: no Request is made to legalize
+ * it, and what is revoked is closed in the case with its proof, `US-13-05` AC-25); the two other values are only what rows decided before that carry.
+ */
 export type VendorAccountDecision = 'LEGALIZE_VIA_REQUEST' | 'REVOKE' | 'FALSE_ALARM' | 'OUT_OF_PROCESS';
+
+/** What the IT Admin may decide now. */
+export type NewVendorAccountDecision = Extract<VendorAccountDecision, 'FALSE_ALARM' | 'OUT_OF_PROCESS'>;
 
 export type OutOfProcessState = 'OPEN' | 'CLOSED';
 
-/** How a case outside the process ends (R-45): nothing happened, money was spent that has a proof of payment, or only a report with the reason. */
-export type OutOfProcessOutcome = 'FALSE_ALARM' | 'RECORD_SPENT' | 'REPORT_ONLY';
+/**
+ * How a case outside the process ends (R-45): nothing happened, money was spent that has a proof of payment, only a report with the reason, or the
+ * account on a company asset was revoked with the renewal or payment cancelled and a proof of it (`US-13-05` AC-25).
+ */
+export type OutOfProcessOutcome = 'FALSE_ALARM' | 'RECORD_SPENT' | 'REPORT_ONLY' | 'REVOKED';
 
 /** The two values side by side, as they were when the difference was seen. */
 export interface DiscrepancyValues {
@@ -52,6 +61,10 @@ export interface OutOfProcessCaseRecord {
   amountMinor: bigint | null;
   costCenterId: string | null;
   documentIds: string[];
+  /** Concluded on a company asset (`QĐ-103y`(3)); null for a case opened before the question was asked. */
+  companyAsset: boolean | null;
+  concludedOn: string | null;
+  renewalCancelled: boolean;
 }
 
 /** A difference as it is written when it is first seen, or seen again (only the day of the evidence moves). */
