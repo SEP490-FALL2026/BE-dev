@@ -57,6 +57,7 @@ const PRISMA_MODEL_OWNER: Readonly<Record<string, string>> = {
   GhostSeatEscalation: 'optimization',
   PurchaseInvoice: 'requests',
   PurchaseInvoiceDocument: 'requests',
+  InvoiceDiscrepancyCase: 'requests',
   UsageActivityDay: 'usage',
   UsageIdentityMapping: 'usage',
   UsageImport: 'usage',

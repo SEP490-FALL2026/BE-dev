@@ -1234,11 +1234,17 @@ model PurchaseInvoice {
   returnReason              String?                      @map("return_reason")
   resubmissionOfId          String?                      @unique @map("resubmission_of_id") @db.Uuid
   invoiceId                 String?                      @map("invoice_id") @db.Uuid
+  // What the invoice was read against, kept so the case of an invoice that differs shows both sides (R-44): the seats of the request or the
+  // count the subscription bought, and the price of one in the original currency of the plan or subscription. Null for a side nobody knew.
+  expectedQuantity                  Int?    @map("expected_quantity")
+  expectedUnitPriceOriginalMinor    BigInt? @map("expected_unit_price_original_minor")
+  expectedUnitPriceOriginalCurrency String? @map("expected_unit_price_original_currency") @db.Char(3)
 
-  request        AccessRequest?            @relation(fields: [requestId], references: [id], onDelete: Restrict)
-  resubmissionOf PurchaseInvoice?          @relation("PurchaseInvoiceResubmission", fields: [resubmissionOfId], references: [id], onDelete: Restrict)
-  resubmission   PurchaseInvoice?          @relation("PurchaseInvoiceResubmission")
-  documents      PurchaseInvoiceDocument[]
+  request         AccessRequest?            @relation(fields: [requestId], references: [id], onDelete: Restrict)
+  resubmissionOf  PurchaseInvoice?          @relation("PurchaseInvoiceResubmission", fields: [resubmissionOfId], references: [id], onDelete: Restrict)
+  resubmission    PurchaseInvoice?          @relation("PurchaseInvoiceResubmission")
+  documents       PurchaseInvoiceDocument[]
+  discrepancyCase InvoiceDiscrepancyCase?
 
   // The partial unique index of the open number, the checks and the trigger are SQL in the migration (ADR-0005).
   @@index([requestId, serviceMonth])
@@ -1257,4 +1263,37 @@ model PurchaseInvoiceDocument {
 
   @@id([purchaseInvoiceId, documentId])
   @@map("purchase_invoice_documents")
+}
+
+enum InvoiceDiscrepancyState {
+  OPEN
+  CLOSED
+}
+
+enum InvoiceDiscrepancyOutcome {
+  EXPLAINED
+  OUT_OF_PROCESS_SUSPECTED
+}
+
+// The case Finance works from a purchase invoice whose count of seats or price of one (in the currency the invoice states) differs from what was
+// approved or bought (R-44): opened when Finance signs such an invoice, once for it, and closed once with a reason. `mismatches` is what
+// differs (QUANTITY, UNIT_PRICE). The checks and the guard that lets an open case close once and never change after are SQL in the migrations (ADR-0005).
+model InvoiceDiscrepancyCase {
+  id                 String                     @id @default(uuid(7)) @db.Uuid
+  organizationId     String                     @map("organization_id") @db.Uuid
+  purchaseInvoiceId  String                     @unique @map("purchase_invoice_id") @db.Uuid
+  mismatches         String[]                   @default([])
+  state              InvoiceDiscrepancyState    @default(OPEN)
+  openedAt           DateTime                   @map("opened_at") @db.Timestamptz(3)
+  closedByEmployeeId String?                    @map("closed_by_employee_id") @db.Uuid
+  closedAt           DateTime?                  @map("closed_at") @db.Timestamptz(3)
+  outcome            InvoiceDiscrepancyOutcome?
+  reason             String?
+  // What the invoice cost beyond what was approved or bought, in dong, as Finance works it out; the money is already in the expense.
+  differenceMinor    BigInt?                    @map("difference_minor")
+
+  purchaseInvoice PurchaseInvoice @relation(fields: [purchaseInvoiceId], references: [id], onDelete: Restrict)
+
+  @@index([organizationId, state, openedAt, id])
+  @@map("invoice_discrepancy_cases")
 }
