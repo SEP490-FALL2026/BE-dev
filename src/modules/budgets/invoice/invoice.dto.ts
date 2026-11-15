@@ -1,35 +1,9 @@
 import { z } from 'zod';
-import { responseBusinessDate, businessDate } from '../../../infrastructure/http/dto/business-date.dto';
+import { responseBusinessDate } from '../../../infrastructure/http/dto/business-date.dto';
 import { successEnvelopeSchema } from '../../../infrastructure/http/dto/success-envelope.dto';
 import { createZodDto } from '../../../infrastructure/http/dto/zod-dto';
-import { commitmentResponseSchema } from '../commitment/commitment.dto';
 
-/** An amount Finance types: in the currency of the commitment, which the client never names (`currency` is refused). */
-const amountInput = z.strictObject({ amount: z.string().max(40) });
 const moneyView = z.strictObject({ amount: z.string(), currency: z.string() });
-
-/**
- * Finance records an invoice against a commitment (`US-12-02`). The price is the one on the invoice before tax; the tax that can be
- * deducted is shown apart and is not an expense; the tax that cannot be deducted is an expense. The currency is the commitment's, the
- * vendor is the one of the request behind it.
- */
-export const invoiceBodySchema = z.strictObject({
-  number: z
-    .string()
-    .trim()
-    .min(1)
-    .max(64)
-    .meta({ description: 'The number on the invoice; recorded once for the vendor.' }),
-  issuedOn: businessDate,
-  netAmount: amountInput.meta({ description: 'The price on the invoice before tax, more than nothing.' }),
-  deductibleTax: amountInput
-    .meta({ description: 'Tax that can be deducted: shown apart and not an expense. Nothing when left out.' })
-    .optional(),
-  nonDeductibleTax: amountInput
-    .meta({ description: 'Tax that cannot be deducted: an expense. Nothing when left out.' })
-    .optional(),
-  note: z.string().trim().min(1).max(1000).optional(),
-});
 
 export const invoiceListQuerySchema = z.strictObject({
   page: z.coerce.number().int().positive().default(1),
@@ -69,11 +43,7 @@ const pagination = z.strictObject({
   totalPages: z.number().int().nonnegative(),
 });
 
-export class InvoiceBodyDto extends createZodDto(invoiceBodySchema) {}
 export class InvoiceListQueryDto extends createZodDto(invoiceListQuerySchema) {}
-export class InvoiceRecordedResponseDto extends createZodDto(
-  successEnvelopeSchema(z.strictObject({ invoice: invoiceSchema, commitment: commitmentResponseSchema })),
-) {}
 export class InvoiceListResponseDto extends createZodDto(
   successEnvelopeSchema(z.strictObject({ items: z.array(invoiceSchema), pagination })),
 ) {}

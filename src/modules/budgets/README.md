@@ -104,9 +104,11 @@ import lõi (`pnpm arch:capabilities --module budgets`).
   dòng `CANCEL`. Chỉ phòng không có trưởng phòng hôm nay mới hỏi thêm "có người sắp làm trưởng phòng không" (song song).
 - `commitment/` — commitment của request, Finance xem (lọc `state`, kèm request, `invoiced`, `invoiceCount`, `hasDiscrepancy`) và nhả phần dư
   (US-06-06, US-06-07, US-12-01); `budget-commitments.controller.ts`; `CommitmentService`.
-- `invoice/` — Finance ghi và đọc hóa đơn của một commitment (US-12-02, `C-16`): `POST/GET /budget-commitments/{id}/invoices`;
-  `budget-invoices.controller.ts`; `InvoiceService`. Quy tắc thuần ở `budget/invoice.policy.ts` (`planInvoice`), SQL ở
-  `budget/invoice.repo.ts`.
+- `invoice/` — Finance đọc hóa đơn của một commitment (US-12-02, `C-16`): `GET /budget-commitments/{id}/invoices`
+  (`budget-invoices.controller.ts`; `InvoiceService`), kèm `servicePeriodMonth` (từ `invoices.service_month`), `label` và `paymentSource` của hóa
+  đơn mua đứng sau (điểm mở rộng `PurchaseInvoiceFactsHook`, `requests` bind); dòng cũ hoặc dòng không từ hóa đơn mua trả `null`. Finance không
+  ghi hóa đơn tay nữa (PI-1.7, B6): hóa đơn chỉ vào `invoices` qua `BudgetsApi.recordPurchaseInvoice` (`PurchaseInvoiceRecorderService`) khi Finance
+  ký hóa đơn mua của IT Admin. Quy tắc thuần ở `budget/invoice.policy.ts` (`planInvoice`, `bookPurchaseInvoice`), SQL ở `budget/invoice.repo.ts`.
 - `budget-view/` — trưởng phòng đọc đủ số ngân sách phòng mình (cơ sở, dự phòng, cam kết, thực chi, chờ duyệt chi, hai mức còn lại),
   Trần phòng đang phát hành và hạn kỳ; danh sách phiên bản đã gửi vẫn ở `budgetMineVersionList`. Finance và Người duyệt chi đọc bảng
   reference budget hoặc dòng `NO_BUDGET` có cam kết, `priorPeriodAdjustment` theo mốc 01/01 năm sau trong timezone tổ chức, và ô tổng
@@ -128,8 +130,8 @@ import lõi (`pnpm arch:capabilities --module budgets`).
 - Một request giữ tối đa một commitment mỗi năm (`@@unique([requestId, year])`, `BudgetCommitmentExistsError`).
 - Một commitment giữ `amount − released − applied` (`heldOf`); `applied` là phần giá chưa thuế mà hóa đơn đã làm thành chi phí. Hết giữ mà
   `applied > 0` ⟹ `EXPENSED` (không bao giờ về `HELD`), mà chưa chi ⟹ `RELEASED`; `applied` không giảm (trigger `budget_commitments_guard`).
-- Hóa đơn: chi phí thực = giá chưa thuế + thuế không khấu trừ; thuế khấu trừ ghi riêng, không phải chi phí. Ghi trong một giao dịch, khóa dòng
-  commitment (`lockById`), không khóa năm ngân sách và **không bao giờ bị chặn vì vượt ngân sách** (`C-08`). Chống trùng `(organization,
+- Hóa đơn: chi phí thực = giá chưa thuế + thuế không khấu trừ; thuế khấu trừ ghi riêng, không phải chi phí. Ghi trong giao dịch ký của Finance, khóa
+  dòng commitment của Request (`lockOfRequest`), khóa năm chỉ cho thực chi không cam kết và **không bao giờ bị chặn vì vượt ngân sách** (`C-08`). Chống trùng `(organization,
 vendor, number)`; bảng `invoices` chỉ ghi thêm (trigger + quyền runtime `INSERT, SELECT`).
 - Giải phóng (hủy/rút/thất bại) khóa các dòng commitment của Request theo thứ tự năm (`CommitmentRepo.lockOfRequest`, cùng thứ tự với `lockById`) rồi mới đọc, nên xếp hàng sau hóa đơn đang ghi thay vì đọc cũ. Phần chia cho từng người của Request nhóm vượt `held` chỉ giải phóng `held` (phần đã chi không quay về); dòng đã `EXPENSED` bị bỏ qua, dòng `RELEASED` vẫn `NOT_HELD`. Gắn commitment chờ ngân sách vào phiên bản chỉ gắn dòng còn `HELD`.
 - `spent` của một Cost Center và năm = Σ chi phí thực của hóa đơn thuộc commitment của chính Cost Center và năm đó, kể cả commitment chưa gắn

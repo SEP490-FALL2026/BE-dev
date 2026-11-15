@@ -117,7 +117,6 @@ export const SUCCESS_MESSAGES: Readonly<Record<string, string>> = {
   budgetCyclePublish: 'BUDGET_CYCLE.PUBLISHED',
   budgetCycleUpdate: 'BUDGET_CYCLE.UPDATED',
   budgetDepartmentCeilingsSet: 'BUDGET_CYCLE.CEILINGS_SET',
-  budgetCommitmentInvoiceRecord: 'BUDGET_COMMITMENT.INVOICE_RECORDED',
   budgetCommitmentRelease: 'BUDGET_COMMITMENT.RELEASED',
   budgetCommitmentReleases: 'BUDGET_COMMITMENT.RELEASES_LISTED',
   budgetMine: 'BUDGET.FETCHED',

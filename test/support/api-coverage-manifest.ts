@@ -128,7 +128,6 @@ export const API_COVERAGE_MANIFEST: readonly string[] = [
   'GET /api/v1/budget-commitments',
   'GET /api/v1/budget-commitments/{id}/releases',
   'POST /api/v1/budget-commitments/{id}/release',
-  'POST /api/v1/budget-commitments/{id}/invoices',
   'GET /api/v1/budget-commitments/{id}/invoices',
   'POST /api/v1/budget-versions/{id}/imports',
   'POST /api/v1/budget-attachments/{id}/complete',
