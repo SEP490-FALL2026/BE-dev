@@ -179,6 +179,7 @@ export type PlanChangeBlock =
   | 'LICENSE_KEYS'
   | 'PERPETUAL_SUBSCRIPTIONS'
   | 'TERM_SUBSCRIPTIONS'
+  | 'CONTRACT_LINKS'
   | 'SUBSCRIPTIONS';
 
 export class PlanInUseBlocksChangeError extends Error {

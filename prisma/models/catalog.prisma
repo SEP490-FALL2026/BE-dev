@@ -519,7 +519,6 @@ enum DocumentStatus {
   EXPIRED
 }
 
-// A contract, for now only a name (the Story of the contract itself is not written, OQ-B-17). Never changed or deleted.
 // A contract with a vendor (US-04-13, QĐ-111t). The fields beyond the name are optional in the table because the rows made when a contract was
 // only a name have none: such a contract reads as incomplete until the IT Admin fills them in. A contract that is made now has a vendor and an
 // effective-from day (the application checks it); an empty effective-to day means it never ends. There is no kind of contract and no renewal

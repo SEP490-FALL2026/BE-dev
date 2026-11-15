@@ -215,12 +215,15 @@ describe('which subscriptions a contract takes (US-04-13 AC-6, AC-7, AC-14; QĐ-
     expect(() => assertSubscriptionLinkable({ ...k2, provisioningType })).not.toThrow();
   });
 
-  it.each([['K1'], ['K5']])('refuses a subscription of a %s plan, the stock being not shared', (provisioningType) => {
-    expect(thrown(() => assertSubscriptionLinkable({ ...k2, provisioningType }))).toMatchObject({
-      name: 'ContractSubscriptionKindNotAllowedError',
-      provisioningType,
-    });
-  });
+  it.each([['K1'], ['K3'], ['K5']])(
+    'refuses a subscription of a %s plan, the stock being not shared',
+    (provisioningType) => {
+      expect(thrown(() => assertSubscriptionLinkable({ ...k2, provisioningType }))).toMatchObject({
+        name: 'ContractSubscriptionKindNotAllowedError',
+        provisioningType,
+      });
+    },
+  );
 
   it('refuses the kind first, then a contract with no vendor, then another vendor', () => {
     expect(() =>

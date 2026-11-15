@@ -328,6 +328,21 @@ describe('the contracts, over HTTP (integration, real PostgreSQL)', () => {
       expect((await h.auditEvents('Contract', id))[1].after).toEqual({ subscriptionId: k2.subscriptionId });
     });
 
+    it('lists an application once when two subscriptions of it, a K2 and a K4, rest on the contract', async () => {
+      const id = await h.contractWith({ name: 'Một ứng dụng hai thuê bao', vendorId: vendorA });
+      const k2 = await h.subscriptionOfVendor(NAME_A, 'K2');
+      const k4 = await h.subscriptionOfVendor(NAME_A, 'K4', k2.applicationId);
+      await h.linkSubscription(id, k2.subscriptionId).expect(201);
+      await h.linkSubscription(id, k4.subscriptionId).expect(201);
+
+      const contract = await h.contractOf(id);
+
+      expect(k4.applicationId).toBe(k2.applicationId);
+      expect(contract.subscriptionCount).toBe(2);
+      expect(contract.subscriptions?.map((subscription) => subscription.provisioningType)).toEqual(['K4', 'K2']);
+      expect(contract.applicationIds).toEqual([k2.applicationId]);
+    }, 120000);
+
     it('refuses the rights of a person (K1) with the kind in the answer, the subscription of another vendor, and one that is not there', async () => {
       const id = await h.contractWith({ name: 'Chỉ thuê bao kho', vendorId: vendorA });
       const k1 = await h.subscriptionOfVendor(NAME_A, 'K1');
@@ -570,7 +585,21 @@ describe('the contracts, over HTTP (integration, real PostgreSQL)', () => {
         'Danh sách vô thời hạn',
         'Danh sách hết hiệu lực',
       ]);
-      expect((await find({ search: '100%' })).items).toEqual([]);
+    });
+
+    it('reads what is typed as letters, never as wildcards: % and _ match only a name or a number that holds them', async () => {
+      await h.contractWith({ name: 'Tìm đúng chữ giảm 100% phí', number: 'LIT-0x1' });
+      await h.contractWith({ name: 'Tìm đúng chữ không có ký tự lạ', number: 'LIT_01' });
+      await h.contractWith({ name: 'Tìm đúng chữ số gần giống', number: 'LITx01' });
+
+      expect(namesOf(await find({ search: '%' }))).toEqual(['Tìm đúng chữ giảm 100% phí']);
+      expect(namesOf(await find({ search: '100%' }))).toEqual(['Tìm đúng chữ giảm 100% phí']);
+      expect(namesOf(await find({ search: '_' }))).toEqual(['Tìm đúng chữ không có ký tự lạ']);
+      // `_` is not "any character" in a number: LIT_01 does not find LITx01 and LITx01 is not found by it.
+      expect(namesOf(await find({ search: 'lit_01' }))).toEqual(['Tìm đúng chữ không có ký tự lạ']);
+      expect(namesOf(await find({ search: 'LITx01' }))).toEqual(['Tìm đúng chữ số gần giống']);
+      expect(namesOf(await find({ search: '\\' }))).toEqual([]);
+      expect(namesOf(await find({ search: 'Tìm đúng chữ', pageSize: 100 }))).toHaveLength(3);
     });
 
     it('narrows by vendor, by the status as of today, and by the day a contract is in effect', async () => {

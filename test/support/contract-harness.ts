@@ -61,20 +61,24 @@ export class ContractHarness extends DocumentHarness {
 
   /**
    * A subscription of a new application of the vendor named (the vendor is made once for the name), of a plan of the kind of provisioning
-   * given: its id and the id of the vendor. A K4 plan is of licensed software and a purchase for good.
+   * given: its id and the id of the vendor. A K4 plan is of licensed software and a purchase for good (unless the application is given).
    */
   async subscriptionOfVendor(
     vendorName: string,
     type: 'K1' | 'K2' | 'K4',
+    sharedApplicationId?: string,
   ): Promise<{ subscriptionId: string; vendorId: string; applicationId: string; planId: string }> {
     const token = this.it1.accessToken;
-    const applicationId = await declareApplication(this.ctx, token, {
-      name: this.unique('App'),
-      kind: type === 'K4' ? 'LICENSED' : 'SAAS',
-      vendorName,
-      dataSensitivity: 'LOW',
-      communication: NO,
-    });
+    // With an application given, the subscription is of a new plan of that application (two plans of one application, one vendor).
+    const applicationId =
+      sharedApplicationId ??
+      (await declareApplication(this.ctx, token, {
+        name: this.unique('App'),
+        kind: type === 'K4' ? 'LICENSED' : 'SAAS',
+        vendorName,
+        dataSensitivity: 'LOW',
+        communication: NO,
+      }));
     const planId = await declarePlan(this.ctx, token, {
       applicationId,
       name: this.unique('Plan'),

@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { fromDateColumn, toDateColumn, type BusinessDate } from '../../../core/business-date';
-import { searchKey } from '../../../core/search-key';
+import { escapeLikePattern, searchKey } from '../../../core/search-key';
 import { Prisma } from '../../../generated/prisma/client';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import { DbTx } from '../../../infrastructure/database/transaction-runner';
@@ -134,8 +134,13 @@ function whereOf(filter: ContractListFilter): Prisma.ContractWhereInput {
   const all: Prisma.ContractWhereInput[] = [];
   const term = filter.search?.trim();
   if (term) {
+    // What is typed is letters: Prisma `contains` does not escape `%` and `_`, which LIKE reads as wildcards, so the term goes in escaped
+    // (PostgreSQL's LIKE escape character is the backslash unless a statement says otherwise, and Prisma's says nothing).
     all.push({
-      OR: [{ name: { contains: term, mode: 'insensitive' } }, { numberKey: { contains: searchKey(term) } }],
+      OR: [
+        { name: { contains: escapeLikePattern(term), mode: 'insensitive' } },
+        { numberKey: { contains: escapeLikePattern(searchKey(term)) } },
+      ],
     });
   }
   if (filter.vendorId) all.push({ vendorId: filter.vendorId });
