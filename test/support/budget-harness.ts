@@ -41,7 +41,6 @@ export interface VersionWire {
   /** The default share of the base the reserve has, in whole percent, and why a reserve that is not that share is what it is. */
   reservePercent: number;
   reserveReason: string | null;
-  quarters: Record<'q1' | 'q2' | 'q3' | 'q4', { amount: string }> | null;
   reason: string | null;
   previousTotal: { amount: string } | null;
   /** Set while the version was sent and nobody who works holds the role of the spending approver. */

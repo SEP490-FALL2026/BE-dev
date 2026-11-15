@@ -21,7 +21,6 @@ export interface FigureFacts {
   baseMinor: bigint;
   reserveMinor: bigint;
   totalMinor: bigint;
-  quarters: readonly [bigint, bigint, bigint, bigint] | null;
   /** Why the reserve is not the default share of the base. */
   reserveReason: string | null;
   /** Why Finance moved the base (`QĐ-100v`). */
@@ -94,16 +93,11 @@ export function figureChange(
   money: (minor: bigint) => string,
 ): HistoryChange | null {
   const amount = (minor: bigint | null) => (minor === null ? null : money(minor));
-  const quarter = (facts: FigureFacts, index: 0 | 1 | 2 | 3) => amount(facts.quarters?.[index] ?? null);
 
   const change = changeOf([
     ['base', amount(before.baseMinor), amount(after.baseMinor)],
     ['reserve', amount(before.reserveMinor), amount(after.reserveMinor)],
     ['total', amount(before.totalMinor), amount(after.totalMinor)],
-    ['q1', quarter(before, 0), quarter(after, 0)],
-    ['q2', quarter(before, 1), quarter(after, 1)],
-    ['q3', quarter(before, 2), quarter(after, 2)],
-    ['q4', quarter(before, 3), quarter(after, 3)],
     ['reserveReason', before.reserveReason, after.reserveReason],
     ['baseReason', before.baseReason ?? null, after.baseReason ?? null],
   ]);

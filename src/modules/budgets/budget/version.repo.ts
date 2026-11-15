@@ -7,6 +7,9 @@ import { lineData, type VersionLineRecord } from './version-line.repo';
 
 export type VersionState = VersionStateName;
 
+/** Where a version came from (`QĐ-100h`, `QĐ-111bb`, `QĐ-111ag`). */
+export type VersionOrigin = 'PROPOSAL' | 'BASELINE_NO_HEAD' | 'BASELINE_NO_PROPOSAL' | 'ADJUSTMENT';
+
 export interface VersionRecord {
   id: string;
   organizationId: string;
@@ -21,7 +24,7 @@ export interface VersionRecord {
   /** Why Finance moved the base, when it did (`QĐ-100v`). */
   baseReason: string | null;
   /** Where the version came from: the head's proposal, or the baseline Finance built when nobody headed the department (`QĐ-100h`). */
-  origin: 'PROPOSAL' | 'BASELINE_NO_HEAD';
+  origin: VersionOrigin;
   reserveMinor: bigint;
   totalMinor: bigint;
   currency: string;
@@ -31,7 +34,6 @@ export interface VersionRecord {
   /** The share of the base the reserve defaulted to when the version was made; null before `QĐ-98`. */
   reservePercent: number | null;
   reserveReason: string | null;
-  quarters: [bigint, bigint, bigint, bigint] | null;
   reason: string | null;
   createdByEmployeeId: string;
   createdAt: Date;
@@ -55,13 +57,12 @@ export interface NewVersion {
   basedOnVersionId: string | null;
   rejectedPredecessorId?: string | null;
   /** Built from the baseline (`QĐ-100h`) rather than from a proposal; the default is a proposal. */
-  origin?: 'PROPOSAL' | 'BASELINE_NO_HEAD';
+  origin?: VersionOrigin;
   baseMinor: bigint;
   reserveMinor: bigint;
   currency: string;
   reservePercent: number | null;
   reserveReason: string | null;
-  quarters: [bigint, bigint, bigint, bigint] | null;
   reason: string | null;
   createdByEmployeeId: string;
   now: Date;
@@ -74,7 +75,6 @@ export interface VersionPatch {
   baseReason?: string | null;
   reserveMinor?: bigint;
   reserveReason?: string | null;
-  quarters?: [bigint, bigint, bigint, bigint] | null;
   reason?: string | null;
 }
 
@@ -98,10 +98,6 @@ const toRecord = (row: Prisma.BudgetVersionGetPayload<object>): VersionRecord =>
   highValueAmountMinor: row.highValueAmountMinor,
   reservePercent: row.reservePercent,
   reserveReason: row.reserveReason,
-  quarters:
-    row.q1Minor === null || row.q2Minor === null || row.q3Minor === null || row.q4Minor === null
-      ? null
-      : [row.q1Minor, row.q2Minor, row.q3Minor, row.q4Minor],
   reason: row.reason,
   createdByEmployeeId: row.createdByEmployeeId,
   createdAt: row.createdAt,
@@ -111,13 +107,6 @@ const toRecord = (row: Prisma.BudgetVersionGetPayload<object>): VersionRecord =>
   neverCurrent: row.neverCurrent,
   expiredAt: row.expiredAt,
   rejectedPredecessorId: row.rejectedPredecessorId,
-});
-
-const quarterColumns = (quarters: [bigint, bigint, bigint, bigint] | null) => ({
-  q1Minor: quarters?.[0] ?? null,
-  q2Minor: quarters?.[1] ?? null,
-  q3Minor: quarters?.[2] ?? null,
-  q4Minor: quarters?.[3] ?? null,
 });
 
 /**
@@ -183,7 +172,6 @@ export class VersionRepo {
         highValueAmountMinor: null,
         reservePercent: input.reservePercent,
         reserveReason: input.reserveReason,
-        ...quarterColumns(input.quarters),
         reason: input.reason,
         createdByEmployeeId: input.createdByEmployeeId,
         createdAt: input.now,
@@ -407,7 +395,6 @@ export class VersionRepo {
         baseMinor: nextBase,
         reserveMinor: nextReserve,
         totalMinor: nextBase + nextReserve,
-        ...(patch.quarters !== undefined ? quarterColumns(patch.quarters) : {}),
         ...(patch.reserveReason !== undefined ? { reserveReason: patch.reserveReason } : {}),
         ...(patch.baseReason !== undefined ? { baseReason: patch.baseReason } : {}),
       },

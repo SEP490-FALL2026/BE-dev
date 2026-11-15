@@ -246,7 +246,7 @@ export const ROUTE_ERROR_CODES_BUDGETS: Readonly<Record<string, Partial<Record<R
       '409': [
         'BUDGET.CYCLE_CURRENCY_MISMATCH',
         'BUDGET_CYCLE.NOT_OPEN',
-        'BUDGET.OVER_ANNUAL_CEILING',
+        'BUDGET_VERSION.OVER_CEILING',
         'BUDGET.PROPOSAL_NOT_SUBMITTED',
         'BUDGET.VERSION_NOT_EDITABLE',
       ],

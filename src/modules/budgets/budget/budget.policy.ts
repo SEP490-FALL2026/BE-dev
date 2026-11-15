@@ -42,13 +42,6 @@ export const countedTotalOf = (lines: readonly { lineType: LineType; amountMinor
 export const totalOf = (lines: readonly { amountMinor: bigint }[]): bigint =>
   lines.reduce((sum, line) => sum + line.amountMinor, 0n);
 
-/** The forecast by quarter adds up to the total of the version, or there is none; it never limits a payment (`US-06-09` AC-6). */
-export function quartersMatch(totalMinor: bigint, quarters: readonly [bigint, bigint, bigint, bigint]): boolean {
-  return (
-    quarters.every((quarter) => quarter >= 0n) && quarters.reduce((sum, quarter) => sum + quarter, 0n) === totalMinor
-  );
-}
-
 /** `CLOSED_FISCAL_YEAR_ENDED` is written by the year-end closure only (`QĐ-91c`). */
 export type ProposalState = 'SUBMITTED' | 'WITHDRAWN' | 'RETURNED' | 'REVIEWED' | 'CLOSED_FISCAL_YEAR_ENDED';
 
@@ -254,20 +247,6 @@ export function copiedLineOf(
     zbb: line.zbb,
     priorityRank: line.priorityRank,
   };
-}
-
-/**
- * Whether the quarters, as they are after an edit, no longer add up to the base and the reserve as they are after it (`QĐ-82e`): the total
- * of the edit when it gives one, the version's when it does not; quarters taken away have nothing to keep honest.
- */
-export function quartersMismatchAfter(
-  version: { baseMinor: bigint; reserveMinor: bigint; quarters: [bigint, bigint, bigint, bigint] | null },
-  next: { baseMinor?: bigint; reserveMinor?: bigint; quarters?: [bigint, bigint, bigint, bigint] | null },
-): boolean {
-  const total = (next.baseMinor ?? version.baseMinor) + (next.reserveMinor ?? version.reserveMinor);
-  const quarters = next.quarters === undefined ? version.quarters : next.quarters;
-
-  return quarters !== null && !quartersMatch(total, quarters);
 }
 
 /** The reserve a version has when Finance gives none: `percent` of the base, rounded to the nearest minor unit (`QĐ-98`). */

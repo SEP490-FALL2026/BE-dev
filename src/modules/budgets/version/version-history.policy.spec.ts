@@ -23,7 +23,6 @@ const figures: FigureFacts = {
   baseMinor: 60_000_000n,
   reserveMinor: 20_000_000n,
   totalMinor: 80_000_000n,
-  quarters: null,
   reserveReason: null,
 };
 
@@ -49,22 +48,15 @@ describe('the figures an edit of a version changed (F66, spec J.4)', () => {
     });
   });
 
-  it('writes the reason of the reserve and the forecast by quarter field by field', () => {
+  it('writes the reason of the reserve field by field', () => {
     const after: FigureFacts = {
       ...figures,
-      quarters: [20_000_000n, 20_000_000n, 20_000_000n, 20_000_000n],
       reserveReason: 'The plan buys more in the autumn',
     };
 
     expect(figureChange(figures, after, money)).toEqual({
-      before: { q1: null, q2: null, q3: null, q4: null, reserveReason: null },
-      after: {
-        q1: '20000000',
-        q2: '20000000',
-        q3: '20000000',
-        q4: '20000000',
-        reserveReason: 'The plan buys more in the autumn',
-      },
+      before: { reserveReason: null },
+      after: { reserveReason: 'The plan buys more in the autumn' },
     });
   });
 

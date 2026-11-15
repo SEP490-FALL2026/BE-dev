@@ -153,14 +153,6 @@ export class BudgetCurrentExistsError extends Error {
   }
 }
 
-/** The forecast by quarter does not add up to the total of the version; it is not saved (`US-06-09` AC-6). */
-export class BudgetQuartersMismatchError extends Error {
-  constructor() {
-    super('The four quarters do not add up to the total of the version.');
-    this.name = 'BudgetQuartersMismatchError';
-  }
-}
-
 /** A reason is needed: to send a reserve that is not the default share of the base, or to change a line that adjusts the proposal (`US-06-09` AC-14, AC-30). */
 export class BudgetReasonRequiredError extends Error {
   constructor(readonly what: 'ADJUSTMENT' | 'RESERVE') {

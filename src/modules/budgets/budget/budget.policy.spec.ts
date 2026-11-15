@@ -12,11 +12,9 @@ import {
   deciderOf,
   isEditable,
   copiedLineOf,
-  quartersMismatchAfter,
   patchChangesLine,
   versionDecidedDetail,
   proposalIsSucceedable,
-  quartersMatch,
   totalOf,
   versionSourceOf,
   versionWaitingReason,
@@ -45,12 +43,6 @@ describe('adding up a version', () => {
   it('is the sum of the lines', () => {
     expect(totalOf([{ amountMinor: 50_000_000n }, { amountMinor: 20_000_000n }])).toBe(70_000_000n);
     expect(totalOf([])).toBe(0n);
-  });
-
-  it('has a forecast by quarter only when the four quarters add up to the total (US-06-09 AC-6)', () => {
-    expect(quartersMatch(80n, [20n, 20n, 20n, 20n])).toBe(true);
-    expect(quartersMatch(80n, [20n, 20n, 20n, 15n])).toBe(false);
-    expect(quartersMatch(80n, [100n, -20n, 0n, 0n])).toBe(false);
   });
 });
 
@@ -275,7 +267,7 @@ describe('whether an adjustment changes what the line of the proposal said (US-0
   });
 });
 
-describe('what a version copies from the line before it, and whether an edit keeps the quarters honest (US-06-09, QĐ-82e)', () => {
+describe('what a version copies from the line before it (US-06-09)', () => {
   const line = {
     description: 'Giấy phép',
     planId: 'plan-1',
@@ -302,27 +294,6 @@ describe('what a version copies from the line before it, and whether an edit kee
       zbb: null,
       priorityRank: 2,
     });
-  });
-
-  const version = {
-    baseMinor: 800n,
-    reserveMinor: 200n,
-    quarters: [250n, 250n, 250n, 250n] as [bigint, bigint, bigint, bigint] | null,
-  };
-
-  it('is honest while the quarters add up to the base and the reserve, as they are after the edit', () => {
-    expect(quartersMismatchAfter(version, {})).toBe(false);
-    expect(quartersMismatchAfter(version, { baseMinor: 900n, quarters: [300n, 300n, 300n, 200n] })).toBe(false);
-  });
-
-  it('refuses an edit that moves the total and leaves the quarters, or sets quarters that do not add up', () => {
-    expect(quartersMismatchAfter(version, { baseMinor: 900n })).toBe(true);
-    expect(quartersMismatchAfter(version, { quarters: [1n, 1n, 1n, 1n] })).toBe(true);
-  });
-
-  it('has nothing to keep honest when there are no quarters, or when the edit takes them away', () => {
-    expect(quartersMismatchAfter({ ...version, quarters: null }, { baseMinor: 5n })).toBe(false);
-    expect(quartersMismatchAfter(version, { baseMinor: 5n, quarters: null })).toBe(false);
   });
 });
 

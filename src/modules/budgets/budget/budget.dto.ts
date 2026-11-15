@@ -117,14 +117,11 @@ export const decisionBodySchema = z
       'A refusal (REJECT) or a request to look again (REQUEST_CHANGES) gives its reason; an approval (APPROVE) gives none.',
   });
 
-const quarters = z.strictObject({ q1: money, q2: money, q3: money, q4: money });
 const versionFigures = {
   base: money,
   reserve: money,
   /** Why the reserve is not the default share of the base; asked when the version is sent (`US-06-09` AC-30). */
   reserveReason: text(REASON_MAX),
-  /** A forecast by quarter, never a limit: the four add up to the total or it is not saved (`US-06-09` AC-6). */
-  quarters: quarters.nullable(),
 };
 /** A first version from the proposal that waits for Finance (`source` PROPOSAL, the default): the proposal and the base. */
 const proposalVersionBody = z.strictObject({
@@ -133,7 +130,6 @@ const proposalVersionBody = z.strictObject({
   base: versionFigures.base,
   reserve: versionFigures.reserve.optional(),
   reserveReason: versionFigures.reserveReason.optional(),
-  quarters: versionFigures.quarters.optional(),
 });
 /** A first version built from the baseline (`source` BASELINE): only the Cost Center and the year; the base and the lines are the baseline's. */
 const baselineVersionBody = z.strictObject({
@@ -154,7 +150,6 @@ export const versionPatchSchema = z
     reserve: versionFigures.reserve,
     /** `null` takes the reason away: the reserve is the default share again, or is sent with another reason. */
     reserveReason: versionFigures.reserveReason.nullable(),
-    quarters: versionFigures.quarters,
   })
   .partial()
   .refine((body) => Object.keys(body).length > 0, { message: 'Give at least one field.' })
@@ -287,7 +282,7 @@ const versionSchema = z.strictObject({
   /** Why Finance moved the base, when it did (`QĐ-100v`). */
   baseReason: z.string().nullable(),
   /** Where the version came from: the head's proposal, or the baseline Finance built when nobody headed the department (`QĐ-100h`). */
-  origin: z.enum(['PROPOSAL', 'BASELINE_NO_HEAD']),
+  origin: z.enum(['PROPOSAL', 'BASELINE_NO_HEAD', 'BASELINE_NO_PROPOSAL', 'ADJUSTMENT']),
   reserve: moneyView,
   /** The share of the base the reserve defaults to when the version was made; null for a version made before `QĐ-98`. */
   reservePercent: z.number().int().nullable(),
@@ -295,7 +290,6 @@ const versionSchema = z.strictObject({
   defaultReserve: moneyView.nullable(),
   reserveReason: z.string().nullable(),
   total: moneyView,
-  quarters: z.strictObject({ q1: moneyView, q2: moneyView, q3: moneyView, q4: moneyView }).nullable(),
   reason: z.string().nullable(),
   /** Set while the version was sent and nobody who works holds the role of the spending approver: nobody else decides it (`QĐ-93d`(1)). */
   waitingReason: z.enum(['NO_SPENDING_APPROVER']).nullable(),

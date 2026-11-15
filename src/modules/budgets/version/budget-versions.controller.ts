@@ -136,9 +136,8 @@ export class BudgetVersionsController {
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
-      description:
-        'The body is invalid (VALIDATION_ERROR), the year has ended (BUDGET.YEAR_ENDED) or the quarters do not add up to the total (BUDGET.QUARTERS_MISMATCH).',
-      examples: [VALIDATION_EXAMPLE, EXAMPLES.YEAR_ENDED, EXAMPLES.QUARTERS_MISMATCH, ...MONEY_EXAMPLES],
+      description: 'The body is invalid (VALIDATION_ERROR) or the year has ended (BUDGET.YEAR_ENDED).',
+      examples: [VALIDATION_EXAMPLE, EXAMPLES.YEAR_ENDED, ...MONEY_EXAMPLES],
     },
   )
   async create(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Body() body: VersionBodyDto) {
@@ -221,19 +220,13 @@ export class BudgetVersionsController {
   @ApiSuccessResponse(VersionResponseDto, {
     message: 'BUDGET_VERSION.UPDATED',
     description:
-      'The base, the reserve with its reason, and the forecast by quarter; the total is the base and the reserve. A reserve that is still the default share of the base follows the base. The quarters add up to the total or nothing is saved.',
+      'The base, and the reserve with its reason; the total is the base and the reserve, one amount for the whole year. A reserve that is still the default share of the base follows the base.',
   })
   @ApiErrorResponses(...AUTH_ERRORS, FINANCE_ONLY, NOT_FOUND, NOT_EDITABLE, {
     status: HttpStatus.UNPROCESSABLE_ENTITY,
     description:
-      'The body is invalid (VALIDATION_ERROR), the year has ended (BUDGET.YEAR_ENDED), the quarters do not add up (BUDGET.QUARTERS_MISMATCH) or the base is changed with no reason (BUDGET.BASE_REASON_REQUIRED, `baseReason`).',
-    examples: [
-      VALIDATION_EXAMPLE,
-      EXAMPLES.YEAR_ENDED,
-      EXAMPLES.QUARTERS_MISMATCH,
-      EXAMPLES.BASE_REASON_REQUIRED,
-      ...MONEY_EXAMPLES,
-    ],
+      'The body is invalid (VALIDATION_ERROR), the year has ended (BUDGET.YEAR_ENDED) or the base is changed with no reason (BUDGET.BASE_REASON_REQUIRED, `baseReason`).',
+    examples: [VALIDATION_EXAMPLE, EXAMPLES.YEAR_ENDED, EXAMPLES.BASE_REASON_REQUIRED, ...MONEY_EXAMPLES],
   })
   async update(
     @CurrentPrincipal() actor: AuthenticatedPrincipal,

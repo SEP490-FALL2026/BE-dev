@@ -205,7 +205,7 @@ const packageDepartmentView = z.strictObject({
       reserve: moneyView,
       total: moneyView,
       state: z.enum(['SENT', 'CHANGES_REQUESTED', 'APPROVED']),
-      origin: z.enum(['PROPOSAL', 'BASELINE_NO_HEAD']),
+      origin: z.enum(['PROPOSAL', 'BASELINE_NO_HEAD', 'BASELINE_NO_PROPOSAL', 'ADJUSTMENT']),
     })
     .nullable(),
 });

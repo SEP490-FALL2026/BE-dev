@@ -339,7 +339,9 @@ describe('the guards of the budget lifecycle (integration, real PostgreSQL)', ()
       const versions = h.ctx.app.get(VersionService, { strict: false });
 
       await expect(proposals.giveBack(head, w.proposal.id, 'No')).rejects.toBeInstanceOf(BudgetNotFinanceError);
-      await expect(versions.update(head, version.id, { quarters: null })).rejects.toBeInstanceOf(BudgetNotFinanceError);
+      await expect(versions.update(head, version.id, { reserveReason: null })).rejects.toBeInstanceOf(
+        BudgetNotFinanceError,
+      );
       await expect(versions.send(head, version.id)).rejects.toBeInstanceOf(BudgetNotFinanceError);
       expect(await count(`budget_proposals WHERE id = '${w.proposal.id}' AND state = 'SUBMITTED'`)).toBe(1);
     });

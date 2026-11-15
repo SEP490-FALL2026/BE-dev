@@ -64,7 +64,6 @@ export class VersionBaselineCreationService {
         currency: allowed.currency,
         reservePercent: defaultPercent,
         reserveReason: null,
-        quarters: null,
         reason: null,
         createdByEmployeeId: actor.employeeId,
         now: new Date(),

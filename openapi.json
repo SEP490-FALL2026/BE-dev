@@ -58314,7 +58314,7 @@
             }
           },
           "422": {
-            "description": "The body is invalid (VALIDATION_ERROR), the year has ended (BUDGET.YEAR_ENDED) or the quarters do not add up to the total (BUDGET.QUARTERS_MISMATCH).",
+            "description": "The body is invalid (VALIDATION_ERROR) or the year has ended (BUDGET.YEAR_ENDED).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -58339,17 +58339,6 @@
                         "code": "BUDGET.YEAR_ENDED",
                         "message": "The year 2025 has ended.",
                         "details": { "year": 2025 },
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "BUDGET.QUARTERS_MISMATCH": {
-                    "summary": "The four quarters do not add up to the total of the version.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "BUDGET.QUARTERS_MISMATCH",
-                        "message": "The four quarters do not add up to the total of the version.",
                         "requestId": "req_example"
                       }
                     }
@@ -59026,7 +59015,7 @@
         },
         "responses": {
           "200": {
-            "description": "The base, the reserve with its reason, and the forecast by quarter; the total is the base and the reserve. A reserve that is still the default share of the base follows the base. The quarters add up to the total or nothing is saved.",
+            "description": "The base, and the reserve with its reason; the total is the base and the reserve, one amount for the whole year. A reserve that is still the default share of the base follows the base.",
             "content": {
               "application/json": {
                 "schema": {
@@ -59198,7 +59187,7 @@
             }
           },
           "422": {
-            "description": "The body is invalid (VALIDATION_ERROR), the year has ended (BUDGET.YEAR_ENDED), the quarters do not add up (BUDGET.QUARTERS_MISMATCH) or the base is changed with no reason (BUDGET.BASE_REASON_REQUIRED, `baseReason`).",
+            "description": "The body is invalid (VALIDATION_ERROR), the year has ended (BUDGET.YEAR_ENDED) or the base is changed with no reason (BUDGET.BASE_REASON_REQUIRED, `baseReason`).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -59223,17 +59212,6 @@
                         "code": "BUDGET.YEAR_ENDED",
                         "message": "The year 2025 has ended.",
                         "details": { "year": 2025 },
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "BUDGET.QUARTERS_MISMATCH": {
-                    "summary": "The four quarters do not add up to the total of the version.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "BUDGET.QUARTERS_MISMATCH",
-                        "message": "The four quarters do not add up to the total of the version.",
                         "requestId": "req_example"
                       }
                     }
@@ -59495,14 +59473,14 @@
                       }
                     }
                   },
-                  "BUDGET.OVER_ANNUAL_CEILING": {
+                  "BUDGET_VERSION.OVER_CEILING": {
                     "summary": "The versions of the year add up to more than the annual ceiling less the shared-pool reserve.",
                     "value": {
                       "success": false,
                       "error": {
-                        "code": "BUDGET.OVER_ANNUAL_CEILING",
+                        "code": "BUDGET_VERSION.OVER_CEILING",
                         "message": "The versions of the year add up to more than the annual ceiling less the shared-pool reserve.",
-                        "details": { "gapMinor": "1", "availableMinor": "100" },
+                        "details": { "overBy": "1", "availableMinor": "100" },
                         "requestId": "req_example"
                       }
                     }
@@ -114943,39 +114921,7 @@
                 "required": ["amount"],
                 "additionalProperties": false
               },
-              "reserveReason": { "type": "string", "minLength": 1, "maxLength": 1000 },
-              "quarters": {
-                "type": "object",
-                "properties": {
-                  "q1": {
-                    "type": "object",
-                    "properties": { "amount": { "type": "string", "maxLength": 40 } },
-                    "required": ["amount"],
-                    "additionalProperties": false
-                  },
-                  "q2": {
-                    "type": "object",
-                    "properties": { "amount": { "type": "string", "maxLength": 40 } },
-                    "required": ["amount"],
-                    "additionalProperties": false
-                  },
-                  "q3": {
-                    "type": "object",
-                    "properties": { "amount": { "type": "string", "maxLength": 40 } },
-                    "required": ["amount"],
-                    "additionalProperties": false
-                  },
-                  "q4": {
-                    "type": "object",
-                    "properties": { "amount": { "type": "string", "maxLength": 40 } },
-                    "required": ["amount"],
-                    "additionalProperties": false
-                  }
-                },
-                "required": ["q1", "q2", "q3", "q4"],
-                "additionalProperties": false,
-                "nullable": true
-              }
+              "reserveReason": { "type": "string", "minLength": 1, "maxLength": 1000 }
             },
             "required": ["proposalId", "base"],
             "additionalProperties": false
@@ -115029,7 +114975,10 @@
                     "additionalProperties": false
                   },
                   "baseReason": { "type": "string", "nullable": true },
-                  "origin": { "type": "string", "enum": ["PROPOSAL", "BASELINE_NO_HEAD"] },
+                  "origin": {
+                    "type": "string",
+                    "enum": ["PROPOSAL", "BASELINE_NO_HEAD", "BASELINE_NO_PROPOSAL", "ADJUSTMENT"]
+                  },
                   "reserve": {
                     "type": "object",
                     "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
@@ -115055,38 +115004,6 @@
                     "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
                     "required": ["amount", "currency"],
                     "additionalProperties": false
-                  },
-                  "quarters": {
-                    "type": "object",
-                    "properties": {
-                      "q1": {
-                        "type": "object",
-                        "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
-                        "required": ["amount", "currency"],
-                        "additionalProperties": false
-                      },
-                      "q2": {
-                        "type": "object",
-                        "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
-                        "required": ["amount", "currency"],
-                        "additionalProperties": false
-                      },
-                      "q3": {
-                        "type": "object",
-                        "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
-                        "required": ["amount", "currency"],
-                        "additionalProperties": false
-                      },
-                      "q4": {
-                        "type": "object",
-                        "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
-                        "required": ["amount", "currency"],
-                        "additionalProperties": false
-                      }
-                    },
-                    "required": ["q1", "q2", "q3", "q4"],
-                    "additionalProperties": false,
-                    "nullable": true
                   },
                   "reason": { "type": "string", "nullable": true },
                   "waitingReason": { "type": "string", "enum": ["NO_SPENDING_APPROVER", null], "nullable": true },
@@ -115145,7 +115062,6 @@
                   "defaultReserve",
                   "reserveReason",
                   "total",
-                  "quarters",
                   "reason",
                   "waitingReason",
                   "decision",
@@ -115371,39 +115287,7 @@
             "required": ["amount"],
             "additionalProperties": false
           },
-          "reserveReason": { "type": "string", "minLength": 1, "maxLength": 1000, "nullable": true },
-          "quarters": {
-            "type": "object",
-            "properties": {
-              "q1": {
-                "type": "object",
-                "properties": { "amount": { "type": "string", "maxLength": 40 } },
-                "required": ["amount"],
-                "additionalProperties": false
-              },
-              "q2": {
-                "type": "object",
-                "properties": { "amount": { "type": "string", "maxLength": 40 } },
-                "required": ["amount"],
-                "additionalProperties": false
-              },
-              "q3": {
-                "type": "object",
-                "properties": { "amount": { "type": "string", "maxLength": 40 } },
-                "required": ["amount"],
-                "additionalProperties": false
-              },
-              "q4": {
-                "type": "object",
-                "properties": { "amount": { "type": "string", "maxLength": 40 } },
-                "required": ["amount"],
-                "additionalProperties": false
-              }
-            },
-            "required": ["q1", "q2", "q3", "q4"],
-            "additionalProperties": false,
-            "nullable": true
-          }
+          "reserveReason": { "type": "string", "minLength": 1, "maxLength": 1000, "nullable": true }
         },
         "minProperties": 1,
         "description": "Give at least one field.",
@@ -117667,7 +117551,10 @@
                           "additionalProperties": false
                         },
                         "state": { "type": "string", "enum": ["SENT", "CHANGES_REQUESTED", "APPROVED"] },
-                        "origin": { "type": "string", "enum": ["PROPOSAL", "BASELINE_NO_HEAD"] }
+                        "origin": {
+                          "type": "string",
+                          "enum": ["PROPOSAL", "BASELINE_NO_HEAD", "BASELINE_NO_PROPOSAL", "ADJUSTMENT"]
+                        }
                       },
                       "required": ["id", "base", "reserve", "total", "state", "origin"],
                       "additionalProperties": false,

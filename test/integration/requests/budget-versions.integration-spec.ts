@@ -59,7 +59,6 @@ describe('budgets over HTTP: the versions Finance builds (integration, real Post
         reservePercent: 10,
         defaultReserve: { amount: '6000000' },
         reserveReason: 'The plan buys more in the autumn',
-        quarters: null,
         costCenter: { id: department.unitId },
       });
       expect((await linesOf(version.id)).map((line) => [line.proposalPosition, line.amount.amount])).toEqual([
@@ -193,45 +192,23 @@ describe('budgets over HTTP: the versions Finance builds (integration, real Post
     });
   });
 
-  describe('the forecast by quarter and the year (AC-6)', () => {
-    const quarters = (...amounts: number[]) => ({
-      q1: h.money(amounts[0]),
-      q2: h.money(amounts[1]),
-      q3: h.money(amounts[2]),
-      q4: h.money(amounts[3]),
-    });
-
-    it('is kept when the four quarters add up to the total, and is only a forecast', async () => {
+  describe('one amount for the whole year (QĐ-111ac)', () => {
+    it('has no quarter to give: a forecast by quarter is a field nobody defined (422), and a version shows none', async () => {
       const { proposal } = await waiting();
-      const version = await h.built(proposal.id, {
-        quarters: quarters(20_000_000, 20_000_000, 20_000_000, 20_000_000),
-      });
-
-      expect(version.quarters).toMatchObject({ q1: { amount: '20000000' }, q4: { amount: '20000000' } });
-      const cleared = await h.updateVersion(version.id, { quarters: null }).expect(200);
-      expect(h.dataOf<{ version: VersionWire }>(cleared).version.quarters).toBeNull();
-    });
-
-    it('is not saved when the four quarters add up to less or more than the total', async () => {
-      const { proposal } = await waiting();
-      const short = await h
-        .createVersion({
-          proposalId: proposal.id,
-          base: h.money(60_000_000),
-          reserve: h.money(20_000_000),
-          reserveReason: 'The plan buys more in the autumn',
-          quarters: quarters(20_000_000, 20_000_000, 20_000_000, 15_000_000),
-        })
-        .expect(422);
       const version = await h.built(proposal.id);
-      const update = await h.updateVersion(version.id, { quarters: quarters(1, 1, 1, 1) }).expect(422);
+      const quarters = { q1: h.money(1), q2: h.money(1), q3: h.money(1), q4: h.money(1) };
 
-      expect(h.codeOf(short)).toBe('BUDGET.QUARTERS_MISMATCH');
-      expect(h.codeOf(update)).toBe('BUDGET.QUARTERS_MISMATCH');
-      expect(h.dataOf<{ version: VersionWire }>(await h.versionOf(version.id).expect(200)).version.quarters).toBeNull();
+      const created = await h
+        .createVersion({ proposalId: proposal.id, base: h.money(1), reserve: h.money(0), quarters })
+        .expect(422);
+      const updated = await h.updateVersion(version.id, { quarters }).expect(422);
+
+      expect(h.codeOf(created)).toBe('VALIDATION_ERROR');
+      expect(h.codeOf(updated)).toBe('VALIDATION_ERROR');
+      expect(version).not.toHaveProperty('quarters');
     });
 
-    it('is the only phasing there is: a limit for a quarter or a month has no field to be given in', async () => {
+    it('has no limit for a quarter or a month either: no field to be given in', async () => {
       const { proposal } = await waiting();
       const base = { proposalId: proposal.id, base: h.money(1), reserve: h.money(0) };
 

@@ -38,7 +38,7 @@ export class VersionService {
 
   /**
    * Throws BudgetNotFinanceError, BudgetVersionNotFoundError, BudgetYearEndedError, BudgetVersionNotEditableError,
-   * BudgetReasonRequiredError, BudgetQuartersMismatchError and the money errors.
+   * BudgetReasonRequiredError, and the money errors.
    */
   async update(actor: AuthenticatedPrincipal, id: string, patch: VersionPatchDto): Promise<VersionWire> {
     this.access.begin(actor);

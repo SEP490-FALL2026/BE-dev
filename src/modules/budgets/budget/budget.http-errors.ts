@@ -50,7 +50,6 @@ import {
   BudgetProposalNotFoundError,
   BudgetProposalOpenError,
   BudgetProposalStateError,
-  BudgetQuartersMismatchError,
   BudgetReasonRequiredError,
   BudgetVersionInFlightError,
   BudgetVersionNotEditableError,
@@ -148,8 +147,8 @@ export function toBudgetApiException(error: unknown): unknown {
     return refuse(HttpStatus.CONFLICT, 'BUDGET.BASELINE_VERSION_NOT_ALLOWED', error.message, { reason: error.reason });
   }
   if (error instanceof BudgetOverAnnualCeilingError) {
-    return refuse(HttpStatus.CONFLICT, 'BUDGET.OVER_ANNUAL_CEILING', error.message, {
-      gapMinor: error.gapMinor.toString(),
+    return refuse(HttpStatus.CONFLICT, 'BUDGET_VERSION.OVER_CEILING', error.message, {
+      overBy: error.gapMinor.toString(),
       availableMinor: error.availableMinor.toString(),
     });
   }
@@ -206,9 +205,6 @@ export function toBudgetApiException(error: unknown): unknown {
       currency: error.currency,
       reporting: error.reporting,
     });
-  }
-  if (error instanceof BudgetQuartersMismatchError) {
-    return refuse(HttpStatus.UNPROCESSABLE_ENTITY, 'BUDGET.QUARTERS_MISMATCH', error.message);
   }
   if (error instanceof BudgetReasonRequiredError) {
     return refuse(HttpStatus.UNPROCESSABLE_ENTITY, `BUDGET.${error.what}_REASON_REQUIRED`, error.message);
@@ -340,7 +336,6 @@ export const BUDGET_ERROR_EXAMPLES = {
   CYCLE_DEADLINE_PASSED: example(new BudgetCycleDeadlinePassedError()),
   CYCLE_NOT_OPEN: example(new BudgetCycleNotOpenError(2027)),
   CURRENCY_NOT_REPORTING: example(new BudgetCurrencyError('USD', 'VND')),
-  QUARTERS_MISMATCH: example(new BudgetQuartersMismatchError()),
   RESERVE_REASON_REQUIRED: example(new BudgetReasonRequiredError('RESERVE')),
   ADJUSTMENT_REASON_REQUIRED: example(new BudgetReasonRequiredError('ADJUSTMENT')),
   PRIORITY_RANK_INVALID: example(new BudgetProposalLinesInvalidError('PRIORITY_RANK_INVALID', [1, 2])),

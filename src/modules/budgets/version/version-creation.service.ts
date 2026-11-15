@@ -38,7 +38,7 @@ export class VersionCreationService {
 
   /**
    * Throws BudgetNotFinanceError, BudgetProposalNotFoundError, FinanceSetupIncompleteError, BudgetYearEndedError,
-   * BudgetProposalStateError, BudgetCurrentExistsError, BudgetVersionInFlightError, BudgetQuartersMismatchError and the money errors.
+   * BudgetProposalStateError, BudgetCurrentExistsError, BudgetVersionInFlightError, and the money errors.
    */
   async createFromProposal(
     actor: AuthenticatedPrincipal,

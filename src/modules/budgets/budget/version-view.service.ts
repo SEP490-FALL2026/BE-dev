@@ -116,7 +116,6 @@ export class VersionViewService {
         const money = await this.facts.formatter(version.currency);
         const costCenter = centers.get(version.costCenterId);
         if (!costCenter) throw new BudgetCostCenterNotFoundError();
-        const [q1, q2, q3, q4] = version.quarters ?? [];
 
         return {
           id: version.id,
@@ -135,10 +134,6 @@ export class VersionViewService {
           baseReason: version.baseReason,
           origin: version.origin,
           total: money(version.totalMinor),
-          quarters:
-            q1 === undefined || q2 === undefined || q3 === undefined || q4 === undefined
-              ? null
-              : { q1: money(q1), q2: money(q2), q3: money(q3), q4: money(q4) },
           reason: version.reason,
           waitingReason: versionWaitingReason(version.state, approver),
           decision: toDecisionWire(latest.get(version.id), people),

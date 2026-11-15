@@ -4,11 +4,6 @@
       "count": 1
     }
   },
-  "src/modules/budgets/budget/version-view.service.ts": {
-    "complexity": {
-      "count": 1
-    }
-  },
   "src/modules/budgets/proposal/proposal-view.service.ts": {
     "complexity": {
       "count": 1

@@ -244,7 +244,7 @@ const DROPPED: Call[] = [
     method: 'put' as const,
     path: `/api/v1/budget-versions/${ID}`,
     role: 'FINANCE',
-    body: { quarters: null },
+    body: { reserveReason: null },
     dropped: {
       [field]: field === 'highValuePercent' ? 10 : field === 'reason' ? 'x' : { amount: '1' },
     },
