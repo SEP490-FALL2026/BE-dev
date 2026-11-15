@@ -142,6 +142,7 @@ const PRISMA_MODEL_OWNER: Readonly<Record<string, string>> = {
   BudgetInformationRequest: 'requests',
   ApplicationRetirementConfirmation: 'catalog',
   Contract: 'catalog',
+  ContractSubscription: 'catalog',
   DocumentAttachment: 'catalog',
   SeatBaselineState: 'licensing',
   SeatBaselineImport: 'data-import',

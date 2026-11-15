@@ -100,6 +100,7 @@ model Vendor {
   taxProfile      VendorTaxProfile?
   assessments     AccessRequestAssessment[]
   invoices        Invoice[]
+  contracts       Contract[]
 
   @@unique([organizationId, normalizedName])
   @@unique([organizationId, dictionaryGroupId])
@@ -396,6 +397,7 @@ model Subscription {
   seatBaselineImports SeatBaselineImport[]
   licenseAssignments  LicenseAssignment[]
   licenseKeys         LicenseKey[]
+  contractLink        ContractSubscription?
 
   @@index([planId])
   @@index([ownerDepartmentId])
@@ -518,18 +520,52 @@ enum DocumentStatus {
 }
 
 // A contract, for now only a name (the Story of the contract itself is not written, OQ-B-17). Never changed or deleted.
+// A contract with a vendor (US-04-13, QĐ-111t). The fields beyond the name are optional in the table because the rows made when a contract was
+// only a name have none: such a contract reads as incomplete until the IT Admin fills them in. A contract that is made now has a vendor and an
+// effective-from day (the application checks it); an empty effective-to day means it never ends. There is no kind of contract and no renewal
+// date or terms here (they belong to the subscription and the plan). `numberKey` is the number as `searchKey` reads it, unique in the organization.
+// Never deleted; what a change touches is the fields below, and who made it, where and when stay (a trigger).
 model Contract {
-  id                 String   @id @default(uuid()) @db.Uuid
-  organizationId     String   @map("organization_id") @db.Uuid
+  id                 String    @id @default(uuid()) @db.Uuid
+  organizationId     String    @map("organization_id") @db.Uuid
   name               String
+  vendorId           String?   @map("vendor_id") @db.Uuid
+  number             String?
+  numberKey          String?   @map("number_key")
+  effectiveFrom      DateTime? @map("effective_from") @db.Date
+  effectiveTo        DateTime? @map("effective_to") @db.Date
+  note               String?
   // A value, not a foreign key: the record outlives the account (as the audit trail does).
-  createdByAppUserId String   @map("created_by_app_user_id") @db.Uuid
-  createdAt          DateTime @default(now()) @map("created_at") @db.Timestamptz(3)
+  createdByAppUserId String    @map("created_by_app_user_id") @db.Uuid
+  createdAt          DateTime  @default(now()) @map("created_at") @db.Timestamptz(3)
+  updatedAt          DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(3)
 
-  organization Organization         @relation(fields: [organizationId], references: [id])
-  documents    DocumentAttachment[]
+  organization  Organization           @relation(fields: [organizationId], references: [id])
+  vendor        Vendor?                @relation(fields: [vendorId], references: [id], onDelete: Restrict)
+  documents     DocumentAttachment[]
+  subscriptions ContractSubscription[]
 
+  @@unique([organizationId, numberKey])
+  @@index([vendorId])
   @@map("contracts")
+}
+
+// The link of a subscription of a shared stock (K2 or K4) to the contract it rests on (QĐ-111t): a subscription has at most one contract (the
+// unique index), the contract and the subscription have the same vendor, and the plan is K2 or K4 (a trigger says no to the rest). A link is
+// made and unmade by the IT Admin, each with its audit event; the contract itself is never deleted.
+model ContractSubscription {
+  id                String   @id @default(uuid()) @db.Uuid
+  contractId        String   @map("contract_id") @db.Uuid
+  subscriptionId    String   @unique @map("subscription_id") @db.Uuid
+  // A value, not a foreign key, as on the contract.
+  linkedByAppUserId String   @map("linked_by_app_user_id") @db.Uuid
+  linkedAt          DateTime @default(now()) @map("linked_at") @db.Timestamptz(3)
+
+  contract     Contract     @relation(fields: [contractId], references: [id], onDelete: Restrict)
+  subscription Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Restrict)
+
+  @@index([contractId, linkedAt])
+  @@map("contract_subscriptions")
 }
 
 // A private file kept for a contract. The bytes are in the object storage; this row says where and what they are. It

@@ -87,7 +87,7 @@ describe('contracts and the files kept for them (integration, PostgreSQL constra
   });
 
   describe('a contract', () => {
-    it('has a name, and is never changed or deleted', async () => {
+    it('has a name, is never deleted and never changes who made it (its fields change since CO-1.1)', async () => {
       const id = await newContract();
 
       expect(
@@ -97,7 +97,9 @@ describe('contracts and the files kept for them (integration, PostgreSQL constra
           [organizationId, person()],
         ),
       ).toBe('23514');
-      expect(await sqlState(sql, `UPDATE contracts SET name = 'Khác' WHERE id = $1`, [id])).toBe('55000');
+      expect(
+        await sqlState(sql, `UPDATE contracts SET created_by_app_user_id = $2 WHERE id = $1`, [id, person()]),
+      ).toBe('55000');
       expect(await sqlState(sql, `DELETE FROM contracts WHERE id = $1`, [id])).toBe('55000');
     });
   });
