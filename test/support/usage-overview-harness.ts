@@ -13,6 +13,8 @@ export interface UsageWorld {
   y: { applicationId: string; subscriptionId: string | null };
   vendorSourceId: string;
   vendorSourceName: string;
+  /** The confirmed import of the report: three lines, one for each of two people of two departments and one nobody was tied to. */
+  importId: string;
   employeeA: string;
   employeeB: string;
   employeeC: string;
@@ -79,13 +81,14 @@ export class UsageOverviewHarness extends UsageHarness {
     ]);
     await this.seatsOn(y.subscriptionId as string, [{ code: 'E-A', grantedOn: '2026-01-05' }]);
     const source = await this.source(x.applicationId);
-    await this.confirmed(
+    const { import: confirmedImport } = await this.confirmed(
       source.id,
       this.report(
         ['email', 'last_active'],
         [
           ['e-a@acme.vn', '2026-11-05'],
           ['e-c@acme.vn', '2026-11-08'],
+          ['nobody-world@acme.vn', '2026-11-09'],
         ],
       ),
       { coverageFrom: '2026-11-01', coverageTo: '2026-11-10' },
@@ -98,6 +101,15 @@ export class UsageOverviewHarness extends UsageHarness {
       { date: '2026-11-13', responses: 0, coverage: 'COVERED' },
     ]);
 
-    return { x, y, vendorSourceId: source.id, vendorSourceName: source.name, employeeA, employeeB, employeeC };
+    return {
+      x,
+      y,
+      vendorSourceId: source.id,
+      vendorSourceName: source.name,
+      importId: confirmedImport.id,
+      employeeA,
+      employeeB,
+      employeeC,
+    };
   }
 }

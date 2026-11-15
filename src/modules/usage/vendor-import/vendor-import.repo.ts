@@ -184,9 +184,16 @@ export class VendorImportRepo {
 
   async pageRows(
     importId: string,
-    filter: { outcome?: RowOutcome; skip: number; take: number },
+    filter: { outcome?: RowOutcome; visibleEmployeeIds?: readonly string[]; skip: number; take: number },
   ): Promise<{ items: StoredRow[]; total: number }> {
-    const where = { importId, ...(filter.outcome ? { outcome: filter.outcome } : {}) };
+    const where: Prisma.UsageImportRowWhereInput = {
+      importId,
+      ...(filter.outcome ? { outcome: filter.outcome } : {}),
+      // A line tied to a person is shown only when that person is one the reader works; the lines nobody was tied to are shown to all.
+      ...(filter.visibleEmployeeIds
+        ? { OR: [{ outcome: { not: 'MATCHED' as const } }, { employeeId: { in: [...filter.visibleEmployeeIds] } }] }
+        : {}),
+    };
     const [rows, total] = await this.prisma.$transaction([
       this.prisma.usageImportRow.findMany({
         where,

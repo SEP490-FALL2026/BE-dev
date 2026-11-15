@@ -286,12 +286,16 @@ export class VendorImportController {
   @ApiSuccessResponse(UsageImportRowsResponseDto, {
     message: 'USAGE_IMPORT.ROWS_LISTED',
     description:
-      'A page of the rows in the order of the file, each with its days, who it was matched to and how, and the reasons it is wrong; outcome filters. An identifier that looks like a secret is shown masked.',
+      'A page of the rows in the order of the file, each with its days, how it was matched and the reasons it is wrong; outcome filters. A row matched to a person is shown only while that person is placed in a department the caller works; the rows nobody was matched to are shown to every IT Admin. An identifier that looks like a secret is shown masked.',
   })
   @ApiErrorResponses(...COMMON_ERRORS, NOT_FOUND, INVALID_ID)
-  async rows(@Param() params: UsageImportIdParamDto, @Query() query: ListUsageImportRowsQueryDto) {
+  async rows(
+    @CurrentPrincipal() actor: AuthenticatedPrincipal,
+    @Param() params: UsageImportIdParamDto,
+    @Query() query: ListUsageImportRowsQueryDto,
+  ) {
     try {
-      const page = await this.queries.rows(params.id, query);
+      const page = await this.queries.rows(actor, params.id, query);
 
       return { items: page.items.map(rowToWire), pagination: page.pagination };
     } catch (error) {

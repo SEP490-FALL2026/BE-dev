@@ -243,6 +243,43 @@ describe('the usage of one person over HTTP (integration, real PostgreSQL)', () 
     });
   });
 
+  describe('the lines of an import (US-08-04 AC-9, usageImportRowList)', () => {
+    const linesOf = async (account: ApiAccount) => {
+      const response = await request(h.server())
+        .get(`/api/v1/usage-imports/${world.importId}/rows`)
+        .query({ pageSize: 100 })
+        .set(h.as(account))
+        .expect(200);
+      expect(personalLeaksIn(response.body, FULL_NAMES)).toEqual([]);
+
+      return h.dataOf<{ items: Array<{ identifier: string; outcome: string }>; pagination: { totalItems: number } }>(
+        response,
+      );
+    };
+
+    it('shows a line tied to a person only to the IT Admin who works the department of that person, and the line nobody was tied to to both', async () => {
+      const ofIt1 = await linesOf(h.it1);
+      const ofIt2 = await linesOf(h.it2);
+
+      expect(ofIt1.items.map((line) => line.identifier).sort()).toEqual(['e-a@acme.vn', 'nobody-world@acme.vn']);
+      expect(ofIt2.items.map((line) => line.identifier).sort()).toEqual(['e-c@acme.vn', 'nobody-world@acme.vn']);
+      expect(ofIt1.pagination.totalItems).toBe(2);
+      expect(ofIt2.pagination.totalItems).toBe(2);
+    });
+
+    it('keeps the totals of the preview as they were: the counts are of the report, not of what the reader may see', async () => {
+      const shown = await request(h.server())
+        .get(`/api/v1/usage-imports/${world.importId}`)
+        .set(h.as(h.it2))
+        .expect(200);
+
+      expect(h.dataOf<{ summary: { matched: number; unmatched: number } }>(shown).summary).toMatchObject({
+        matched: 2,
+        unmatched: 1,
+      });
+    });
+  });
+
   it('is for the IT Admin alone: everyone else is refused with 403, and no token with 401', async () => {
     for (const account of [h.employee, h.finance]) {
       await list(world.employeeA, NOVEMBER, account).expect(403);
