@@ -1,4 +1,5 @@
 import { RevocationHarness } from '../../support/revocation-harness';
+import { carry, nextPeriod } from '../../support/subscription-periods';
 
 const h = new RevocationHarness();
 
@@ -13,44 +14,6 @@ describe('G9-01 the shared pool between a renewal recorded and the next period (
   const code = () => `E-NP-${(counter += 1)}`;
   let people: string[] = [];
   const person = (): string => people.shift() as string;
-
-  /** The next period of `previousId`, written by SQL as the outcome of a renewal writes it (only a renewal may point back). */
-  const nextPeriod = async (previousId: string, status: 'ACTIVE' | 'DRAFT', startDate: string): Promise<string> =>
-    (
-      await h.ctx.sql.query<{ id: string }>(
-        `INSERT INTO subscriptions (id, organization_id, plan_id, owner_department_id, kind, status, purchased_quantity, unit_price_minor,
-           unit_price_currency, price_recorded_on, price_rate, price_rate_date, price_rate_source, price_reporting_minor,
-           price_reporting_currency, billing_cycle, commitment_term_months, start_date, responsible_it_admin_employee_id, auto_renew,
-           allows_mid_term_reduction, renewed_from_id, updated_at)
-         SELECT gen_random_uuid(), organization_id, plan_id, owner_department_id, kind, $2::"SubscriptionStatus", purchased_quantity,
-                unit_price_minor, unit_price_currency, price_recorded_on, price_rate, price_rate_date, price_rate_source,
-                price_reporting_minor, price_reporting_currency, billing_cycle, commitment_term_months, $3::date,
-                responsible_it_admin_employee_id, auto_renew, allows_mid_term_reduction, id, now()
-           FROM subscriptions WHERE id = $1
-         RETURNING id`,
-        [previousId, status, startDate],
-      )
-    ).rows[0].id;
-
-  /** What `seats.carry` does: each seat of the period that runs continues on the next one from its first day, and ends that day. */
-  const carry = async (previousId: string, nextId: string, startDate: string): Promise<void> => {
-    await h.ctx.sql.query(
-      `INSERT INTO license_assignments (id, organization_id, kind, source, plan_id, subscription_id, employee_id, account_identifier,
-         normalized_account_identifier, reason, cost_center_id, owning_department_id, valid_from, valid_from_basis, valid_until,
-         expected_end_date, predecessor_id, created_by_app_user_id)
-       SELECT gen_random_uuid(), a.organization_id, a.kind, 'RENEWAL_CARRY', a.plan_id, $2::uuid, a.employee_id, a.account_identifier,
-              a.normalized_account_identifier, a.reason, a.cost_center_id, a.owning_department_id, $3::date, 'RECORDED', NULL,
-              a.expected_end_date, a.id, $4::uuid
-         FROM license_assignments a
-        WHERE a.subscription_id = $1 AND a.valid_until IS NULL
-        ORDER BY a.valid_from, a.id`,
-      [previousId, nextId, startDate, h.it1.appUserId],
-    );
-    await h.ctx.sql.query(
-      `UPDATE license_assignments SET valid_until = $2::date WHERE subscription_id = $1 AND valid_until IS NULL`,
-      [previousId, startDate],
-    );
-  };
 
   beforeAll(async () => {
     await h.start();
@@ -68,8 +31,8 @@ describe('G9-01 the shared pool between a renewal recorded and the next period (
     await h.seat({ subscriptionId: running }, code());
     await h.seat({ subscriptionId: running }, code());
     const startsOn = h.inDays(30);
-    const next = await nextPeriod(running, 'ACTIVE', startsOn);
-    await carry(running, next, startsOn);
+    const next = await nextPeriod(h, running, 'ACTIVE', startsOn);
+    await carry(h, running, next, startsOn);
 
     const capacity = await h.grant({ requestId: h.gate.grantable(person(), planId) }).expect(409);
     expect(h.codeOf(capacity)).toBe('LICENSE_ASSIGNMENT.SEAT_CAPACITY');
@@ -86,8 +49,8 @@ describe('G9-01 the shared pool between a renewal recorded and the next period (
     const planId = await h.planOf(running);
     await h.seat({ subscriptionId: running }, code());
     const startsOn = h.inDays(30);
-    const next = await nextPeriod(running, 'ACTIVE', startsOn);
-    await carry(running, next, startsOn);
+    const next = await nextPeriod(h, running, 'ACTIVE', startsOn);
+    await carry(h, running, next, startsOn);
     await h.ctx.sql.query(`UPDATE subscriptions SET purchased_quantity = 2 WHERE id = $1`, [next]);
 
     const refused = await h.grant({ requestId: h.gate.grantable(person(), planId), purchase: {} }).expect(409);
@@ -99,8 +62,8 @@ describe('G9-01 the shared pool between a renewal recorded and the next period (
     const running = await h.subscription(1, 'K2');
     const planId = await h.planOf(running);
     await h.seat({ subscriptionId: running }, code());
-    const next = await nextPeriod(running, 'ACTIVE', h.today());
-    await carry(running, next, h.today());
+    const next = await nextPeriod(h, running, 'ACTIVE', h.today());
+    await carry(h, running, next, h.today());
 
     const refused = await h
       .grant({ requestId: h.gate.grantable(person(), planId), subscriptionId: running, purchase: {} })
@@ -118,7 +81,7 @@ describe('G9-01 the shared pool between a renewal recorded and the next period (
     const running = await h.subscription(2, 'K2');
     const planId = await h.planOf(running);
     await h.seat({ subscriptionId: running }, code());
-    await nextPeriod(running, 'DRAFT', h.inDays(30));
+    await nextPeriod(h, running, 'DRAFT', h.inDays(30));
 
     const created = await h.grant({ requestId: h.gate.grantable(person(), planId) }).expect(201);
 

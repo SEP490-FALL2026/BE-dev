@@ -177,6 +177,17 @@ describe('the stock of the plans by what they give out, over HTTP (integration, 
       expect((await rowOf(plans.rights))?.stock).toEqual({ kind: 'HOLDERS', holders: 2 });
     });
 
+    it('gives the logo the IT Admin pasted for the application, null for one with none', async () => {
+      await h.ctx.sql.query(
+        `UPDATE applications SET logo_url = 'https://cdn.example.com/rights.png'
+          WHERE id = (SELECT application_id FROM plans WHERE id = $1)`,
+        [plans.rights],
+      );
+
+      expect((await rowOf(plans.rights))?.plan.logoUrl).toBe('https://cdn.example.com/rights.png');
+      expect((await rowOf(plans.keys))?.plan.logoUrl).toBeNull();
+    });
+
     it('names the plan, its application and the logo of it on each row', async () => {
       const row = await rowOf(plans.seats);
 
