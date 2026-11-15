@@ -262,6 +262,28 @@ async function freeKeyId(
   return keys[0]?.id;
 }
 
+/**
+ * What the grant of a K1 seat is completed with besides the evidence (`QĐ-111az`, K1-GR): the two steps of its checklist, the company email first,
+ * ticked a moment ago and in that order. The grant of any other kind takes none. No evidence goes in the checklist: it is sent beside it.
+ */
+export function grantChecklistBody(
+  type: string | null,
+  now: number,
+): { k1Checklist?: { items: { code: string; done: boolean; doneAt: string }[] } } {
+  if (type !== 'K1') return {};
+  const steps = ['COMPANY_EMAIL_REGISTERED', 'NO_PERSONAL_DEVICE_MFA'];
+
+  return {
+    k1Checklist: {
+      items: steps.map((code, index) => ({
+        code,
+        done: true,
+        doneAt: new Date(now - 1000 * (steps.length - index)).toISOString(),
+      })),
+    },
+  };
+}
+
 async function completeGrant(
   ctx: DemoRunContext,
   admin: string | null,
@@ -270,6 +292,7 @@ async function completeGrant(
 ) {
   if (!admin) throw new Error(`No IT Admin of the dataset carries out ${scenario.key}`);
   const email = await as(ctx, admin);
+  const type = planTypeOf(ctx, scenario);
   const tasks = await listAll<TaskRow>(ctx, email, '/provisioning-tasks?scope=ALL');
   const open = tasks.filter(
     (row) => row.requestId === requestId && row.kind === 'GRANT' && ['QUEUED', 'IN_PROGRESS'].includes(row.status),
@@ -281,6 +304,7 @@ async function completeGrant(
     await ctx.api.call(email, 'POST', `/provisioning-tasks/${task.id}/complete`, {
       evidence: `${tag(ctx, scenario.key)} Đã cấp quyền cho người dùng.`,
       ...(licenseKeyId ? { licenseKeyId } : {}),
+      ...grantChecklistBody(type, Date.now()),
     });
   }
 }
