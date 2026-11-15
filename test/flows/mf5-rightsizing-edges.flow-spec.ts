@@ -1,4 +1,5 @@
 import { FlowWorld } from '../support/flows/flow-world';
+import { k1Checklist } from '../support/k1-checklist';
 
 /**
  * MF-5, the edges of F5-02 (review D-M4): what the IT Admin may propose and what the head may confirm. The reduction names exactly the
@@ -38,9 +39,12 @@ describe('MF-5 giảm, hủy và đề xuất lỗi thời: các biên của F5-
     expect(task.status).toBe(201);
     const taskId = call().data<{ task: { id: string } }>(task).task.id;
     expect((await call().post('NV-ITA1', `/provisioning-tasks/${taskId}/claim`)).status).toBe(200);
-    expect(
-      (await call().post('NV-ITA1', `/provisioning-tasks/${taskId}/complete`, { evidence: 'Đã cấp' })).status,
-    ).toBe(200);
+    // Every plan of this file is K1: the grant is completed with the checklist of the grant as well as the evidence (QĐ-111az).
+    const completed = await call().post('NV-ITA1', `/provisioning-tasks/${taskId}/complete`, {
+      evidence: 'Đã cấp',
+      k1Checklist: k1Checklist('GRANT'),
+    });
+    expect(completed.status).toBe(200);
 
     return (
       await world.facts.one<{ id: string }>(
