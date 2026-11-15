@@ -74,6 +74,8 @@
   (one line that names the kind of error, the code and whether it can be retried: the bullet after this one).
   A change written for today is told in the transaction that writes it. It runs in the API graph because that is where every
   listener (requests, personnel) is registered. Run one by hand with `OrganizationHistoryService.announceDueChanges(day)`.
+  The API also runs `SeatMonthSweeper` once an hour (the first pass five minutes after start, unreferenced timer): for each month of this year that has ended (and December of the year before in January) with no seat-month row yet, it charges the seats of the shared pool (`K2`) to the departments of their holders, day by day, and takes the commitment of a seat down by the amount of the same Cost Center (`SM-1`). A lock of the subscription and the month queues two instances, charging a month again gives the same rows and applies nothing twice, a month a review period signed is never charged again, and a failed pass only logs.
+
   The API also runs `LeaveReturnSweeper` once an hour (the first pass five minutes after start, unreferenced timer): for each long leave
   that runs past its approved day of return it writes `return_overdue_noticed_for` (that approved day) and the audit event
   `LONG_LEAVE.RETURN_OVERDUE` in one transaction, so a day is told once however many instances run, and told again when the day moves

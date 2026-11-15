@@ -119,6 +119,7 @@ const PUBLIC_CONTRACT_EXPORTS: ReadonlySet<string> = new Set([
   'LicensingModule: LicensingDashboardApi',
   // P2-03: what the shared pool of a plan holds, which the queue of grants of requests shows beside each request.
   'LicensingModule: LicensingPoolStockApi',
+  'LicensingModule: LicensingSeatMonthApi',
   // The extension points requests and personnel bind or add to (public/licensing.extension-points.ts).
   'LicensingModule: GrantRequestGateHook',
   'LicensingModule: RevocationListeners',

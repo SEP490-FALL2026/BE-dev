@@ -63,7 +63,10 @@ describe('the table of seat-months keeps one row for a seat, a month and a depar
 
     await runner.run(async (tx) => {
       await repo.lockMonthOf(tx, subscriptionId, '2026-10-01');
-      await repo.deleteOfSubscriptionMonth(tx, subscriptionId, '2026-10-01');
+      await repo.deleteRows(
+        tx,
+        (await repo.ofSubscriptionMonth(tx, subscriptionId, '2026-10-01')).map((one) => one.id),
+      );
       await repo.insertMany(
         tx,
         rows.map((one) => ({ ...one, assignmentId: randomUUID() })),

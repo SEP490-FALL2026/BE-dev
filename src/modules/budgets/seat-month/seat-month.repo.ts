@@ -68,9 +68,21 @@ export class SeatMonthRepo {
     return rows.map(toRecord);
   }
 
-  /** Removes the rows of a subscription and a month; they are written again by the same transaction. */
-  async deleteOfSubscriptionMonth(tx: DbTx, subscriptionId: string, month: BusinessDate): Promise<void> {
-    await tx.seatMonthCharge.deleteMany({ where: { subscriptionId, month: toDateColumn(month) } });
+  /** Removes these rows; the ones that took a commitment down are not among them (an expense does not come back, see `SeatMonthService`). */
+  async deleteRows(tx: DbTx, ids: readonly string[]): Promise<void> {
+    if (ids.length === 0) return;
+    await tx.seatMonthCharge.deleteMany({ where: { id: { in: [...ids] } } });
+  }
+
+  /** Each id of a subscription that has at least one row in the month: the ones to look at again when a month is charged again. */
+  async subscriptionIdsOfMonth(month: BusinessDate, tx?: DbTx): Promise<string[]> {
+    const rows = await (tx ?? this.prisma).seatMonthCharge.findMany({
+      where: { month: toDateColumn(month) },
+      select: { subscriptionId: true },
+      distinct: ['subscriptionId'],
+    });
+
+    return rows.map((row) => row.subscriptionId);
   }
 
   async insertMany(tx: DbTx, rows: readonly NewSeatMonthCharge[]): Promise<void> {
