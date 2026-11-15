@@ -124,6 +124,12 @@ export const IN_APP_NOTIFICATION_CODES = [
   // The budget of the year after is not approved yet for a Cost Center (`QĐ-111am`, B-4): told to Finance and the spending approver on 01/12 and then every Monday
   // until a version is approved. The Cost Center and the year only.
   'BUDGET_NEXT_YEAR_MISSING',
+  // The close of the month of the review (`QĐ-111ae`, R-47): Finance is asked on the fifth working day to close the month before; the spending approver is told, when Finance signs
+  // the month, the summary with the table of lights (the number of Cost Centers of each light, never a figure); Finance is warned when the line of the shared pool is above its
+  // reserve (`QĐ-104i`). The year and month, the period and the counts only.
+  'BUDGET_REVIEW_DUE',
+  'BUDGET_REVIEW_SUMMARY',
+  'BUDGET_SHARED_POOL_OVER_RESERVE',
   // The alerts of the rights (`a03-license-inbox-alerts`, `FR-5.14`): a right about to end, a handover not confirmed, a service
   // account whose person leaves, a person who left and keeps a K1 access to the end of the paid period. Ids, codes and days only.
   // The codes of the handover and of the service account are read only (`QĐ-110g`, `QĐ-110m`): nothing writes one any more, a row of

@@ -134,3 +134,11 @@ export function reviewReminderFor(
 
   return month === 1 ? { year: year - 1, month: 12 } : { year, month: month - 1 };
 }
+
+/**
+ * Whether the line "not allocated, shared pool" of the year is above the reserve of the shared pool of the budget cycle (`QĐ-104i`, `MG-03`): Finance is warned
+ * when it is. Null when the cycle has no reserve: there is nothing to set the line against.
+ */
+export function sharedPoolOverReserve(unallocatedMinor: bigint, reserveMinor: bigint | null): boolean | null {
+  return reserveMinor === null ? null : unallocatedMinor > reserveMinor;
+}

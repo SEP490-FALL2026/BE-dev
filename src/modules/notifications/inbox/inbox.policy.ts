@@ -112,6 +112,10 @@ export const PARAM_KEYS_BY_CODE: Readonly<Record<InAppNotificationCode, readonly
   BUDGET_BASELINE_VERSION_HEAD_ASSIGNED: ['versionId', 'costCenterId', 'year'],
   // The budget of the year after is not approved yet for a Cost Center: the Cost Center and the year, never a figure.
   BUDGET_NEXT_YEAR_MISSING: ['costCenterId', 'year'],
+  // The close of a month (`QĐ-111ae`, `QĐ-104i`): the year and month, and for the summary the period and how many Cost Centers have each light; never a figure.
+  BUDGET_REVIEW_DUE: ['year', 'month'],
+  BUDGET_REVIEW_SUMMARY: ['periodId', 'year', 'month', 'kind', 'greenCount', 'yellowCount', 'redCount', 'underCount'],
+  BUDGET_SHARED_POOL_OVER_RESERVE: ['year', 'month'],
   // The alerts of the rights (`a03-license-inbox-alerts`): the right, the person, the day and the role asked; never a key, an
   // account identifier, a price or the text of a note.
   LICENSE_EXPIRY_REMINDER: ['assignmentId', 'holderEmployeeId', 'planId', 'expectedEndDate', 'audience'],

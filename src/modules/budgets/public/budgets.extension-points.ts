@@ -85,6 +85,8 @@ export interface CommitmentRequestView {
   id: string;
   software: { name: string };
   plan: { name: string } | null;
+  /** The plan the request is for, null before the IT Admin links one: what the price increase already known of a review reads the price of. */
+  planId: string | null;
   requester: { employeeCode: string; fullName: string };
   beneficiaryCount: number;
   spendApprovedAt: Date | null;

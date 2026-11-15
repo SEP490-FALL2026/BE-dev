@@ -32,6 +32,7 @@ const viewOf = (requestId: string): CommitmentRequestView => ({
   id: requestId,
   software: { name: 'Figma' },
   plan: { name: 'Team' },
+  planId: 'plan-1',
   requester: { employeeCode: 'NV-1', fullName: 'An Nguyen' },
   beneficiaryCount: 2,
   spendApprovedAt: new Date('2027-01-01T08:00:00.000Z'),

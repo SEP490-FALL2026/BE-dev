@@ -48,6 +48,31 @@ export class BudgetFactsRepo {
   }
 
   /**
+   * The approved budget of every Cost Center that has one for the year, the newest version of each: the Cost Centers a review of the year closes its month for
+   * (`RV-1`). A Cost Center with none has nothing to compare, so it has no light and is absent.
+   */
+  async approvedOfYear(
+    year: number,
+    tx?: DbTx,
+  ): Promise<Map<string, { currency: string; baseMinor: bigint; reserveMinor: bigint }>> {
+    const approved = new Map<string, { currency: string; baseMinor: bigint; reserveMinor: bigint }>();
+    const versions = await (tx ?? this.prisma).budgetVersion.findMany({
+      where: { year, ...REFERENCE_VERSION },
+      orderBy: [{ costCenterId: 'asc' }, { number: 'desc' }],
+    });
+    for (const version of versions) {
+      if (approved.has(version.costCenterId)) continue;
+      approved.set(version.costCenterId, {
+        currency: version.currency,
+        baseMinor: version.baseMinor,
+        reserveMinor: version.reserveMinor,
+      });
+    }
+
+    return approved;
+  }
+
+  /**
    * The approved budget (base and reserve, the currency it is kept in) of one year in each of the Cost Centers, in one statement; a Cost
    * Center with none is absent from the map, which is not a budget of nothing. What a notice about the year after reads (`QĐ-111al`).
    */

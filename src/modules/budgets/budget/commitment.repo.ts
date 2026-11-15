@@ -533,6 +533,49 @@ export class CommitmentRepo {
   }
 
   /**
+   * The commitments still held in these Cost Centers and years that know what one seat costs a month, with what each still holds: what the review of the
+   * price increase already known reads (`RV-1`, `R-52`). A commitment of a price that is not by the month has no seat price and is not here.
+   */
+  async heldWithSeatPrice(
+    pairs: readonly { costCenterId: string; year: number }[],
+    tx?: DbTx,
+  ): Promise<HeldWithSeatPrice[]> {
+    if (pairs.length === 0) return [];
+    const rows = await (tx ?? this.prisma).budgetCommitment.findMany({
+      where: {
+        state: 'HELD',
+        seatMonthlyMinor: { gt: 0n },
+        OR: pairs.map((pair) => ({ costCenterId: pair.costCenterId, year: pair.year })),
+      },
+      select: {
+        costCenterId: true,
+        year: true,
+        requestId: true,
+        amountMinor: true,
+        releasedMinor: true,
+        appliedMinor: true,
+        seatMonthlyMinor: true,
+      },
+      orderBy: { id: 'asc' },
+    });
+
+    return rows.flatMap((row) => {
+      const heldMinor = row.amountMinor - row.releasedMinor - row.appliedMinor;
+      return heldMinor > 0n && row.seatMonthlyMinor !== null
+        ? [
+            {
+              costCenterId: row.costCenterId,
+              year: row.year,
+              requestId: row.requestId,
+              heldMinor,
+              seatMonthlyMinor: row.seatMonthlyMinor,
+            },
+          ]
+        : [];
+    });
+  }
+
+  /**
    * The first `limit` commitments of the Cost Center that are still held, by id, and how many there are: a Cost Center with one
    * cannot be retired (`QĐ-87d(2)`). A commitment is held until nothing of it is left; one that became an expense or was released
    * keeps nothing in use.
@@ -564,6 +607,15 @@ export interface CommitmentOfRequest extends CommitmentRow {
 export interface LockedCommitmentOfRequest extends CommitmentOfRequest {
   origin: 'APPROVAL' | 'YEAR_START';
   seatMonthlyMinor: bigint | null;
+}
+
+/** A commitment still held that knows what one seat costs a month, with what it still holds. */
+export interface HeldWithSeatPrice {
+  costCenterId: string;
+  year: number;
+  requestId: string;
+  heldMinor: bigint;
+  seatMonthlyMinor: bigint;
 }
 
 /** What a commitment total says about the budget of a Cost Center and year. */

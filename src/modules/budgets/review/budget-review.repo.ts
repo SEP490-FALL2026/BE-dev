@@ -203,15 +203,31 @@ export class BudgetReviewRepo {
     );
   }
 
-  /** How many Cost Centers of the period have each light: what the summary of the month tells the spending approver. */
-  async lightCounts(periodId: string, tx?: DbTx): Promise<ReviewLightCounts> {
+  /**
+   * How many Cost Centers of each period have each light, in one statement: what the summary of the month tells the spending approver. `costCenterIds` limits it to
+   * a manager's own Cost Centers; a period with no line has all zeros.
+   */
+  async lightCountsOf(
+    periodIds: readonly string[],
+    costCenterIds?: readonly string[],
+    tx?: DbTx,
+  ): Promise<Map<string, ReviewLightCounts>> {
+    const counts = new Map<string, ReviewLightCounts>(
+      periodIds.map((id) => [id, { GREEN: 0, YELLOW: 0, RED: 0, UNDER: 0 }]),
+    );
+    if (periodIds.length === 0) return counts;
     const groups = await (tx ?? this.prisma).budgetReviewLine.groupBy({
-      by: ['light'],
-      where: { periodId },
+      by: ['periodId', 'light'],
+      where: {
+        periodId: { in: [...periodIds] },
+        ...(costCenterIds ? { costCenterId: { in: [...costCenterIds] } } : {}),
+      },
       _count: { _all: true },
     });
-    const counts: ReviewLightCounts = { GREEN: 0, YELLOW: 0, RED: 0, UNDER: 0 };
-    for (const group of groups) counts[group.light as ReviewLight] = group._count._all;
+    for (const group of groups) {
+      const of = counts.get(group.periodId);
+      if (of) of[group.light as ReviewLight] = group._count._all;
+    }
 
     return counts;
   }

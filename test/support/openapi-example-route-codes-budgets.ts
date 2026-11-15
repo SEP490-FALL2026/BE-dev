@@ -52,6 +52,13 @@ export const ROUTE_ERROR_CODES_BUDGETS: Readonly<Record<string, Partial<Record<R
       '409': ['BUDGET.CYCLE_EXISTS'],
       '422': ['BUDGET.CYCLE_DEADLINES_INVALID', 'BUDGET.CYCLE_YEAR_PAST', 'MONEY_OUT_OF_RANGE', 'MONEY_SCALE_EXCEEDED'],
     },
+    budgetReviewPeriodClose: {
+      '409': ['BUDGET_REVIEW.PERIOD_EXISTS', 'BUDGET_REVIEW.SEAT_MONTHS_NOT_READY'],
+      '422': ['BUDGET_REVIEW.MONTH_NOT_ENDED'],
+    },
+    budgetReviewPeriodGet: {
+      '404': ['BUDGET_REVIEW.NOT_FOUND'],
+    },
     budgetCycleDelete: {
       '404': ['BUDGET.CYCLE_NOT_FOUND'],
       '409': ['BUDGET_CYCLE.NOT_DRAFT'],

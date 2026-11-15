@@ -6,6 +6,7 @@ import {
   reviewFiguresOf,
   reviewKindOf,
   reviewReminderFor,
+  sharedPoolOverReserve,
   reviewedMonthHasEnded,
   variancePpm,
 } from './budget-review.policy';
@@ -223,6 +224,14 @@ describe('the review of the budget of a Cost Center at the close of a month (RV-
       // 01/01/2027 is a Friday and a holiday: working days 04, 05, 06, 07, 08, so the fifth is Friday 08/01.
       expect(reviewReminderFor('2027-01-08', new Set(['2027-01-01']))).toEqual({ year: 2026, month: 12 });
       expect(reviewReminderFor('2027-01-07', new Set(['2027-01-01']))).toBeNull();
+    });
+  });
+  describe('the line of the shared pool against its reserve (QĐ-104i, MG-03)', () => {
+    it('is over only when the line is above the reserve of the cycle, and says nothing when the cycle has no reserve', () => {
+      expect(sharedPoolOverReserve(5_000_001n, 5_000_000n)).toBe(true);
+      expect(sharedPoolOverReserve(5_000_000n, 5_000_000n)).toBe(false);
+      expect(sharedPoolOverReserve(-200_000n, 5_000_000n)).toBe(false);
+      expect(sharedPoolOverReserve(9_000_000n, null)).toBeNull();
     });
   });
 });

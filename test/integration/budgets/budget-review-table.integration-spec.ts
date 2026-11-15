@@ -75,7 +75,7 @@ describe('the tables of the review periods keep a picture that is never changed 
     expect(total).toBe(2);
     expect(rows.map((row) => row.light)).toEqual(['YELLOW', 'GREEN']);
     expect(rows[0]).toMatchObject({ forecastMinor: 309_750_000n, variancePpm: 50_000n, paceBasisPoints: 11_200n });
-    expect(await repo.lightCounts(created.id)).toEqual({ GREEN: 1, YELLOW: 1, RED: 0, UNDER: 0 });
+    expect((await repo.lightCountsOf([created.id])).get(created.id)).toEqual({ GREEN: 1, YELLOW: 1, RED: 0, UNDER: 0 });
   });
 
   it('refuses a second period for the same month, and accepts the same month of another year', async () => {

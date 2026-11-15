@@ -52,8 +52,11 @@ export class SeatMonthPoolService {
     return this.linesOf(month, pools, figures, only).slice(0, limit);
   }
 
-  /** What the year holds of the line: the sum over its months that have ended, the pool reserve of the cycle being set against it (`QĐ-104i`). */
-  async yearLineMinor(year: number, only?: string): Promise<bigint> {
+  /**
+   * What the year holds of the line: the sum over its months that have ended, up to `throughMonth` (the close of a review sums to the month it closes), the pool
+   * reserve of the cycle being set against it (`QĐ-104i`).
+   */
+  async yearLineMinor(year: number, only?: string, throughMonth = 12): Promise<bigint> {
     const pools = await this.pools();
     const todayStart = monthBoundsOf(await this.organizationReads.businessToday()).start;
     const all = await this.repo.monthlyFigures({
@@ -65,7 +68,7 @@ export class SeatMonthPoolService {
     let total = 0n;
     for (let index = 1; index <= 12; index += 1) {
       const month = `${year}-${String(index).padStart(2, '0')}-01`;
-      if (month >= todayStart) break;
+      if (month >= todayStart || index > throughMonth) break;
       const figures = all.filter((row) => row.month === month);
       total += this.linesOf(month, pools, figures, only).reduce((sum, line) => sum + line.unallocatedMinor, 0n);
     }

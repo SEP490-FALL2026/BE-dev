@@ -83,6 +83,12 @@ import { BudgetAttachmentExpiryService } from './attachment/budget-attachment-ex
 import { BudgetAttachmentExpirySweeper } from './attachment/budget-attachment-expiry.job';
 import { SeatMonthRepo } from './seat-month/seat-month.repo';
 import { BudgetReviewRepo } from './review/budget-review.repo';
+import { BudgetReviewController } from './review/budget-review.controller';
+import { BudgetReviewFiguresService } from './review/budget-review-figures.service';
+import { BudgetReviewPoolWatchService } from './review/budget-review-pool-watch.service';
+import { BudgetReviewPriceService } from './review/budget-review-price.service';
+import { BudgetReviewQueryService } from './review/budget-review-query.service';
+import { BudgetReviewSnapshotService } from './review/budget-review-snapshot.service';
 import { SeatMonthChargesController } from './seat-month/seat-month-charges.controller';
 import { SeatMonthPoolService } from './seat-month/seat-month-pool.service';
 import { SeatMonthQueryService } from './seat-month/seat-month-query.service';
@@ -126,6 +132,7 @@ import { BudgetProposalTemplateListener } from './proposal/budget-proposal-templ
     BudgetAttachmentUploadsController,
     BudgetAttachmentReadsController,
     SeatMonthChargesController,
+    BudgetReviewController,
   ],
   providers: [
     BudgetProposalTemplateListener,
@@ -180,12 +187,16 @@ import { BudgetProposalTemplateListener } from './proposal/budget-proposal-templ
     BaselineFlags,
     SeatMonthRepo,
     BudgetReviewRepo,
+    BudgetReviewPriceService,
+    BudgetReviewFiguresService,
+    BudgetReviewPoolWatchService,
+    BudgetReviewQueryService,
+    BudgetReviewSnapshotService,
     SeatMonthSubscriptionService,
     SeatMonthService,
     SeatMonthPoolService,
     SeatMonthQueryService,
     SeatMonthSweeper,
-    // Until a review period can sign a month (RV-1), no month is signed.
     CommitmentReleaseGuardHook,
     CommitmentRequestFactsHook,
     PurchaseInvoiceFactsHook,
