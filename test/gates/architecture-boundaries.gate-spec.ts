@@ -58,6 +58,8 @@ const PRISMA_MODEL_OWNER: Readonly<Record<string, string>> = {
   PurchaseInvoice: 'requests',
   PurchaseInvoiceDocument: 'requests',
   InvoiceDiscrepancyCase: 'requests',
+  VendorAccountDiscrepancy: 'usage',
+  OutOfProcessCase: 'usage',
   UsageActivityDay: 'usage',
   UsageIdentityMapping: 'usage',
   UsageImport: 'usage',

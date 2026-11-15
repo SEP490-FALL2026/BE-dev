@@ -587,6 +587,8 @@ model DocumentAttachment {
   signerEmployeeId    String?         @map("signer_employee_id") @db.Uuid
   // A `PURCHASE_DOCUMENT` that came with a purchase invoice of the requests context belongs to it (PI-1): a value, not a foreign key.
   purchaseInvoiceId   String?         @map("purchase_invoice_id") @db.Uuid
+  // The proof of payment a case outside the process (`SBF-07a`) was closed with belongs to it (RC-2): a value, not a foreign key.
+  outOfProcessCaseId  String?         @map("out_of_process_case_id") @db.Uuid
   attachedAt          DateTime?       @map("attached_at") @db.Timestamptz(3)
   createdAt           DateTime        @default(now()) @map("created_at") @db.Timestamptz(3)
 
@@ -595,6 +597,7 @@ model DocumentAttachment {
 
   @@index([contractId])
   @@index([purchaseInvoiceId])
+  @@index([outOfProcessCaseId])
   @@index([uploadedByAppUserId, status])
   @@map("document_attachments")
 }
