@@ -16,7 +16,7 @@ import type {
 import { assertPoolTerms } from './pool/subscription-pool.policy';
 import { SubscriptionPoolService } from './pool/subscription-pool.service';
 import { snapshotOf } from './subscription.mapper';
-import { monthlyCostOf } from './price/subscription-monthly-cost.policy';
+import { monthlyCostOf } from './price/subscription-price.policy';
 import {
   assertSubscriptionShape,
   declaredStateOf,

@@ -1,7 +1,7 @@
 import type { BusinessDate } from '../../../../core/business-date';
 import { DONG, type Money } from '../../../../core/money/money';
 import { SubscriptionPriceNotVndError } from '../subscription.errors';
-import type { PriceSnapshotRecord } from '../subscription.types';
+import type { PriceSnapshotRecord, SubscriptionRecord } from '../subscription.types';
 
 /** The one currency a unit price is entered in (`QĐ-111an`, R-4): the reporting currency of the organization is fixed to it. */
 export const PRICE_CURRENCY = DONG;
@@ -39,4 +39,21 @@ export function uniformSnapshotOf(price: Money, recordedOn: BusinessDate): Price
  */
 export function isPricedInDong(state: { unitPrice: { currency: string } | null; priceSnapshot: unknown }): boolean {
   return state.unitPrice !== null && state.unitPrice.currency === PRICE_CURRENCY && state.priceSnapshot !== null;
+}
+
+const CYCLE_MONTHS: Readonly<Record<string, number>> = { MONTHLY: 1, QUARTERLY: 3, ANNUAL: 12 };
+
+/** The price of one seat for a month in dong (the price of its cycle over the months of the cycle, rounded up) and the months a payment pays for. */
+export function monthlyCostOf(record: Pick<SubscriptionRecord, 'billingCycle' | 'priceSnapshot' | 'unitPrice'>): {
+  monthlyPriceMinor: bigint | null;
+  cycleMonths: number | null;
+} {
+  const cycleMonths = record.billingCycle === null ? null : (CYCLE_MONTHS[record.billingCycle] ?? null);
+  const price =
+    record.priceSnapshot?.reportingMinor ??
+    (record.unitPrice?.currency === 'VND' ? record.unitPrice.amountMinor : null);
+  if (cycleMonths === null || price === null) return { monthlyPriceMinor: null, cycleMonths };
+  const months = BigInt(cycleMonths);
+
+  return { monthlyPriceMinor: (price + months - 1n) / months, cycleMonths };
 }
