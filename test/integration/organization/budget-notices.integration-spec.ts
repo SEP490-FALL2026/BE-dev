@@ -61,9 +61,7 @@ describe('the notices of the budget loops (integration, real PostgreSQL)', () =>
       const version = await h.built(proposal.id);
 
       await h.sendVersion(version.id).expect(200);
-      await h
-        .decideVersion(version.id, { decision: 'REQUEST_CHANGES', reason: 'Look again' }, boss.account)
-        .expect(200);
+      await h.decideVersion(version.id, { decision: 'RETURN', reason: 'Look again' }, boss.account).expect(200);
       await h.sendVersion(version.id).expect(200);
 
       expect(await recipients('BUDGET_VERSION_AWAITING_DECISION', version.id)).toEqual([
@@ -81,7 +79,7 @@ describe('the notices of the budget loops (integration, real PostgreSQL)', () =>
       await h.sendVersion(version.id).expect(200);
 
       await h
-        .decideVersion(version.id, { decision: 'REJECT', reason: 'The reserve is too high' }, boss.account)
+        .decideVersion(version.id, { decision: 'RETURN', reason: 'The reserve is too high' }, boss.account)
         .expect(200);
 
       const notices = await h.budgetNoticesOf('BUDGET_VERSION_DECIDED', version.id);
@@ -92,7 +90,7 @@ describe('the notices of the budget loops (integration, real PostgreSQL)', () =>
         versionId: version.id,
         costCenterId: u.department.unitId,
         year: h.next,
-        decision: 'REJECTED',
+        decision: 'CHANGES_REQUESTED',
         reason: 'The reserve is too high',
       });
     });

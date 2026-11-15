@@ -69,4 +69,30 @@ describe('the routes of the budget lines (HTTP contract, no database)', () => {
       expect(bodyOf(response).error?.code).not.toBe('VALIDATION_ERROR');
     });
   });
+
+  describe('budgetVersionDecide takes APPROVE or RETURN only (QĐ-111ad)', () => {
+    const decide = (body: object) =>
+      request(app.getHttpServer())
+        .post(`/api/v1/budget-versions/${ID}/decision`)
+        .set('Authorization', bearer(principal(['EMPLOYEE'])))
+        .send(body);
+
+    it.each([
+      ['REJECT, with its reason', { decision: 'REJECT', reason: 'Too high' }],
+      ['REQUEST_CHANGES, with its reason', { decision: 'REQUEST_CHANGES', reason: 'Look again' }],
+      ['RETURN without its reason', { decision: 'RETURN' }],
+      ['APPROVE with a reason', { decision: 'APPROVE', reason: 'Fine' }],
+    ] as const)('turns away %s with 422', async (_name, body) => {
+      const response = await decide(body).expect(422);
+
+      expect(bodyOf(response).error.code).toBe('VALIDATION_ERROR');
+    });
+
+    it.each([
+      ['APPROVE', { decision: 'APPROVE' }],
+      ['RETURN with its reason', { decision: 'RETURN', reason: 'The reserve is too high' }],
+    ] as const)('takes %s: the next error is not a validation one', async (_name, body) => {
+      expect(bodyOf(await decide(body)).error?.code).not.toBe('VALIDATION_ERROR');
+    });
+  });
 });

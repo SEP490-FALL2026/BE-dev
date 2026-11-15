@@ -91,6 +91,11 @@ Không làm ở FIX-LB1 (rẻ nhưng đổi hợp đồng hoặc chạm file lan
 - **Chọn:** (1) `reservePercent` (0–100, số nguyên) **hoặc** `reserve` (loại trừ nhau ⟹ 422); tỷ lệ Finance chọn được lưu vào `reserve_percent` nên không cần lý do; số tiền giữ so với tỷ lệ mặc định ⟹ khác tỷ lệ thì vẫn cần `reserveReason` khi gửi (luật US-06-09 AC-30 có sẵn, SPEC ghi `reserveReason?` nên không bỏ luật); (2) `base` bỏ trống ⟹ điền `carriedOverNextYear` (cả nguồn `PROPOSAL` lẫn `BASELINE`; nguồn chạy sang chưa bind ⟹ 0); `PUT` không tự đổi cơ sở theo số chạy sang; (3) `belowCarriedOver` = **cơ sở** < số chạy sang (cam kết chạy sang tiêu vào cơ sở, dự phòng là phần dự trữ); ở số liệu nền cờ lấy theo phiên bản mới nhất (không tách rời) của Cost Center trong năm, không có phiên bản ⟹ `false`; (4) đếm tệp đính kèm khi gửi đọc `budget_attachments` qua `VersionRepo.countAttachedFiles` (capability `attachment` đã phụ thuộc `version`, import ngược tạo vòng — gate capability graph); (5) BG-2.5 và BG-2.6 vào một commit vì cùng DTO và cùng `VersionFigures`.
 - **Đổi lại:** đổi so sánh ở `belowCarriedOver` (một dòng, có test) nếu Owner muốn so tổng (cơ sở + dự phòng).
 
+### D-B15 — quyết định phiên bản chỉ `APPROVE` | `RETURN` (BG-2.7)
+
+- **Chọn:** `RETURN` (lý do bắt buộc) ghi quyết định `CHANGES_REQUESTED` và trạng thái `CHANGES_REQUESTED` có sẵn (Finance sửa và gửi lại); `REJECT`, `REQUEST_CHANGES` ⟹ 422 `VALIDATION_ERROR`. Giá trị enum `REJECTED` (trạng thái và quyết định) **giữ** để đọc bản cũ; luồng "bản bị từ chối ⟹ đề nghị kế tiếp / làm lại từ đề nghị" giữ nguyên cho dữ liệu cũ (không còn đường tạo mới). Mã thông báo `BUDGET_VERSION_DECIDED` mang `decision: CHANGES_REQUESTED` khi trả về.
+- **Đổi lại:** thêm lại giá trị vào `decisionBodySchema` và `decisionOutcomeOf`.
+
 ## Optional và việc để lại
 
 - Báo cáo xác nhận chưa có tổng `done`/`pending` toàn tập (cần join chéo module); thêm khi FE đòi.

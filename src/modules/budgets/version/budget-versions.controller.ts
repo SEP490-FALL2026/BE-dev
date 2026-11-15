@@ -286,7 +286,7 @@ export class BudgetVersionsController {
   @ApiSuccessResponse(VersionResponseDto, {
     message: 'BUDGET_VERSION.DECIDED',
     description:
-      'The spending approver approves a version that was sent (it becomes the current budget of its Cost Center and year, which has no other current version, and takes the commitments that waited for a budget), refuses it with a reason, or sends it back to Finance with a reason. The decision is written as a record that is never changed. No figure is changed here.',
+      'The spending approver approves a version that was sent (it becomes the current budget of its Cost Center and year, which has no other current version, and takes the commitments that waited for a budget), or returns it to Finance with the reason that must go with it (RETURN: the version is CHANGES_REQUESTED, Finance changes it and sends it again). There is no refusal. The decision is written as a record that is never changed. No figure is changed here.',
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,
@@ -305,7 +305,7 @@ export class BudgetVersionsController {
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
-        'The decision is invalid (VALIDATION_ERROR): a refusal or a request to look again without its reason, an approval with one; or the fiscal year of the version has ended (BUDGET.YEAR_ENDED).',
+        'The decision is invalid (VALIDATION_ERROR): REJECT or REQUEST_CHANGES, which are no longer decisions, a RETURN without its reason, an approval with one; or the fiscal year of the version has ended (BUDGET.YEAR_ENDED).',
       examples: [VALIDATION_EXAMPLE, EXAMPLES.YEAR_ENDED],
     },
   )

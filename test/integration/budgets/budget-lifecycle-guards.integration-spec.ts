@@ -270,7 +270,7 @@ describe('the guards of the budget lifecycle (integration, real PostgreSQL)', ()
       const w = await waiting();
       const first = await h.built(w.proposal.id);
       await h.sendVersion(first.id).expect(200);
-      await h.decideVersion(first.id, { decision: 'REJECT', reason: 'Too high' }, boss.account).expect(200);
+      await h.refusedBefore(first.id, boss.account, 'Too high');
       // Another writer took number 2 first: this one reads the number the version it follows has.
       const numbers = jest
         .spyOn(h.ctx.app.get(VersionRepo, { strict: false }), 'nextNumber')

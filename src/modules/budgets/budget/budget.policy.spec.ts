@@ -203,10 +203,9 @@ describe('who may decide a version, and when (US-06-11 AC-7, AC-8, SoD-8)', () =
 });
 
 describe('what the decision of the spending approver on a version of a budget records (US-06-11, F63)', () => {
-  it('maps each decision to what the record says and the state the version goes to', () => {
+  it('maps each decision to what the record says and the state the version goes to: approve, or return it to Finance (QĐ-111ad)', () => {
     expect(decisionOutcomeOf('APPROVE')).toEqual({ decision: 'APPROVED', state: 'APPROVED' });
-    expect(decisionOutcomeOf('REJECT')).toEqual({ decision: 'REJECTED', state: 'REJECTED' });
-    expect(decisionOutcomeOf('REQUEST_CHANGES')).toEqual({ decision: 'CHANGES_REQUESTED', state: 'CHANGES_REQUESTED' });
+    expect(decisionOutcomeOf('RETURN')).toEqual({ decision: 'CHANGES_REQUESTED', state: 'CHANGES_REQUESTED' });
   });
 
   const version = { costCenterId: 'cc-1', year: 2027, totalMinor: 5_000n };

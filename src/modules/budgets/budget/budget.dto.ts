@@ -42,21 +42,17 @@ export const proposalBodySchema = z.strictObject({
 export const resubmissionBodySchema = z.strictObject(proposalFigures);
 export const returnBodySchema = z.strictObject({ reason: text(REASON_MAX) });
 /**
- * The decision of the spending approver on a version (`US-06-11`): approve, refuse, or ask Finance to look again. A refusal
- * and a request to look again give their reason; an approval gives none. There is no way to change a figure here (`QĐ-82f`).
+ * The decision of the spending approver on a version (`US-06-11`, `QĐ-111ad`): approve it, or return it to Finance with the reason that
+ * must go with it; there is no refusal any more. An approval gives no reason. There is no way to change a figure here (`QĐ-82f`).
  */
 export const decisionBodySchema = z
   .strictObject({
-    decision: z.enum(['APPROVE', 'REJECT', 'REQUEST_CHANGES']),
+    decision: z.enum(['APPROVE', 'RETURN']),
     reason: text(REASON_MAX).optional(),
   })
   .superRefine((body, ctx) => {
-    if (body.decision !== 'APPROVE' && body.reason === undefined) {
-      ctx.addIssue({
-        code: 'custom',
-        path: ['reason'],
-        message: 'A refusal, or a request to look again, gives its reason.',
-      });
+    if (body.decision === 'RETURN' && body.reason === undefined) {
+      ctx.addIssue({ code: 'custom', path: ['reason'], message: 'A version returned to Finance gives its reason.' });
     }
     if (body.decision === 'APPROVE' && body.reason !== undefined) {
       ctx.addIssue({ code: 'custom', path: ['reason'], message: 'An approval gives no reason.' });
@@ -64,7 +60,7 @@ export const decisionBodySchema = z
   })
   .meta({
     description:
-      'A refusal (REJECT) or a request to look again (REQUEST_CHANGES) gives its reason; an approval (APPROVE) gives none.',
+      'APPROVE (no reason) or RETURN to Finance (the reason is required); REJECT and REQUEST_CHANGES are no longer decisions.',
   });
 
 const versionFigures = {

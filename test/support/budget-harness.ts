@@ -210,6 +210,20 @@ export class BudgetHarness extends RequestHarness {
     await this.ctx.sql.query(`UPDATE budget_versions SET state = 'APPROVED' WHERE id = $1`, [versionId]);
   }
 
+  /**
+   * A sent version the spending approver refused before refusal was taken out of the decision (`QĐ-111ad`: only APPROVE and RETURN are
+   * left): what older data holds, the state and the record the refusal wrote. The routes keep reading it, and a proposal can still be
+   * followed or built again from it.
+   */
+  async refusedBefore(versionId: string, by: ApiAccount, reason = 'The reserve is too high'): Promise<void> {
+    await this.ctx.sql.query(
+      `INSERT INTO budget_version_decisions (id, organization_id, version_id, decision, decided_by_employee_id, reason, total_minor, currency, decided_at)
+       SELECT gen_random_uuid(), organization_id, id, 'REJECTED', $2, $3, total_minor, currency, now() FROM budget_versions WHERE id = $1`,
+      [versionId, by.employeeId, reason],
+    );
+    await this.ctx.sql.query(`UPDATE budget_versions SET state = 'REJECTED' WHERE id = $1`, [versionId]);
+  }
+
   decideVersion = (id: string, body: object, account: ApiAccount) =>
     request(this.server()).post(`/api/v1/budget-versions/${id}/decision`).set(this.as(account)).send(body);
 

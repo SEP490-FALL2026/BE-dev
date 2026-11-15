@@ -75,7 +75,7 @@ describe('the closure of the fiscal year of the budgets (integration, real Postg
       const returned = await h.budgetProposed(givenBack.head, givenBack.department.unitId);
       await h.giveBack(returned.id, { reason: 'Add the quotes' }, h.finance).expect(200);
       const refused = await sentVersion();
-      await h.decideVersion(refused.version.id, { decision: 'REJECT', reason: 'Too high' }, boss.account).expect(200);
+      await h.refusedBefore(refused.version.id, boss.account, 'Too high');
 
       const done = await h.closeYears(h.inTwoYears());
 

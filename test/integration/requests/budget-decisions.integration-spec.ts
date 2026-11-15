@@ -129,12 +129,12 @@ describe('budgets over HTTP: the decision of the spending approver (integration,
       await approve(version.id).expect(200);
 
       const again = await approve(version.id).expect(409);
-      const reject = await h
-        .decideVersion(version.id, { decision: 'REJECT', reason: 'Too late' }, boss.account)
+      const returned = await h
+        .decideVersion(version.id, { decision: 'RETURN', reason: 'Too late' }, boss.account)
         .expect(409);
 
       expect(h.codeOf(again)).toBe('BUDGET.VERSION_NOT_SENT');
-      expect(h.codeOf(reject)).toBe('BUDGET.VERSION_NOT_SENT');
+      expect(h.codeOf(returned)).toBe('BUDGET.VERSION_NOT_SENT');
     });
 
     it('is decided by one of two who ask at once', async () => {
@@ -202,65 +202,62 @@ describe('budgets over HTTP: the decision of the spending approver (integration,
     });
   });
 
-  describe('refusing (AC-3)', () => {
+  describe('there is no refusal any more (QĐ-111ad)', () => {
     it.each([
-      ['without a reason', {}],
-      ['with a blank reason', { reason: '  ' }],
-    ])('is not saved %s', async (_name, over) => {
+      ['REJECT, with its reason', { decision: 'REJECT', reason: 'The reserve is too high' }],
+      ['REJECT, without one', { decision: 'REJECT' }],
+      ['REQUEST_CHANGES, with its reason', { decision: 'REQUEST_CHANGES', reason: 'Look again' }],
+    ])('refuses %s with 422 VALIDATION_ERROR and leaves the version waiting', async (_name, body) => {
       const { version } = await sent();
 
-      const response = await h.decideVersion(version.id, { decision: 'REJECT', ...over }, boss.account).expect(422);
+      const response = await h.decideVersion(version.id, body, boss.account).expect(422);
 
       expect(h.codeOf(response)).toBe('VALIDATION_ERROR');
       expect(await stateOf(version.id)).toBe('SENT');
+      expect(await h.budgetRows(`budget_version_decisions WHERE version_id = '${version.id}'`)).toBe(0);
     });
 
-    it('leaves the Cost Center without a budget and tells the head why; the proposal stays reviewed, is not given back, and a new proposal follows it (F63)', async () => {
+    it('still reads a version refused before, and the head still sends a proposal that follows it (F63)', async () => {
       const { version, head, department, proposal } = await sent();
-
-      await h
-        .decideVersion(version.id, { decision: 'REJECT', reason: 'The reserve is too high' }, boss.account)
-        .expect(200);
+      await h.refusedBefore(version.id, boss.account);
 
       const mine = h.dataOf<{ budget: { status: string; latestRefusal: { reason: string } | null } }>(
         await h.mine(head.account, h.next).expect(200),
       ).budget;
       expect(mine).toMatchObject({ status: 'NO_ACTIVE_BUDGET', latestRefusal: { reason: 'The reserve is too high' } });
-      expect(await stateOf(version.id)).toBe('REJECTED');
-      expect(await rowOf(department.unitId, h.next)).toBeUndefined();
       expect((await wireOf(version.id)).decision).toMatchObject({
         decision: 'REJECTED',
         reason: 'The reserve is too high',
       });
-      const kept = await h.proposalOf(proposal.id, head.account).expect(200);
-      expect(h.dataOf<{ proposal: { state: string; returned: unknown } }>(kept).proposal).toMatchObject({
-        state: 'REVIEWED',
-        returned: null,
-      });
-      // The proposal was not given back, so it is not sent again; the need changed, so the head sends a new one that follows it.
       expect(h.codeOf(await h.resubmit(proposal.id, h.bm10(50_000_000), head.account).expect(409))).toBe(
         'BUDGET.PROPOSAL_CANNOT_RESUBMIT',
       );
       const successor = await h.submitProposal(h.proposalBody(department.unitId), head.account).expect(201);
       expect(
         h.dataOf<{ proposal: { state: string; successorOfProposalId: string | null } }>(successor).proposal,
-      ).toMatchObject({
-        state: 'SUBMITTED',
-        successorOfProposalId: proposal.id,
-      });
-      expect(h.codeOf(await h.submitProposal(h.proposalBody(department.unitId), head.account).expect(409))).toBe(
-        'BUDGET.PROPOSAL_ALREADY_OPEN',
-      );
+      ).toMatchObject({ state: 'SUBMITTED', successorOfProposalId: proposal.id });
     });
   });
 
-  describe('asking Finance to look again (AC-4)', () => {
-    it('needs the reason, sends the version back to Finance, who changes it and sends it again', async () => {
+  describe('returning the version to Finance (AC-4, QĐ-111ad)', () => {
+    it.each([
+      ['without a reason', {}],
+      ['with a blank reason', { reason: '  ' }],
+    ])('is not saved %s', async (_name, over) => {
       const { version } = await sent();
 
-      const bare = await h.decideVersion(version.id, { decision: 'REQUEST_CHANGES' }, boss.account).expect(422);
+      const response = await h.decideVersion(version.id, { decision: 'RETURN', ...over }, boss.account).expect(422);
+
+      expect(h.codeOf(response)).toBe('VALIDATION_ERROR');
+      expect(await stateOf(version.id)).toBe('SENT');
+    });
+
+    it('needs the reason, sends the version back to Finance as CHANGES_REQUESTED, who changes it and sends it again', async () => {
+      const { version } = await sent();
+
+      const bare = await h.decideVersion(version.id, { decision: 'RETURN' }, boss.account).expect(422);
       await h
-        .decideVersion(version.id, { decision: 'REQUEST_CHANGES', reason: 'The reserve is too high' }, boss.account)
+        .decideVersion(version.id, { decision: 'RETURN', reason: 'The reserve is too high' }, boss.account)
         .expect(200);
       const back = await wireOf(version.id);
       await h.updateVersion(version.id, { reserve: h.money(10_000_000) }).expect(200);
@@ -280,9 +277,7 @@ describe('budgets over HTTP: the decision of the spending approver (integration,
     it('keeps the version in the list of versions, and the Cost Center still has no budget meanwhile', async () => {
       const { version, department } = await sent();
 
-      await h
-        .decideVersion(version.id, { decision: 'REQUEST_CHANGES', reason: 'Look again' }, boss.account)
-        .expect(200);
+      await h.decideVersion(version.id, { decision: 'RETURN', reason: 'Look again' }, boss.account).expect(200);
 
       const versions = h.dataOf<Pageable<{ id: string; state: string }>>(
         await h.versionList(h.finance, { year: h.next, pageSize: 100 }).expect(200),
@@ -293,7 +288,7 @@ describe('budgets over HTTP: the decision of the spending approver (integration,
   });
 
   describe('the approver changes no figure (AC-5)', () => {
-    it('has the three decisions and nothing else: no figure, no line, no send, and a figure in the decision is refused', async () => {
+    it('has the two decisions and nothing else: no figure, no line, no send, and a figure in the decision is refused', async () => {
       const { version } = await sent();
 
       await h.updateVersion(version.id, { base: h.money(1) }, boss.account).expect(403);
@@ -315,11 +310,7 @@ describe('budgets over HTTP: the decision of the spending approver (integration,
     ])('is not %s', async (_name, who) => {
       const { version, head } = await sent();
 
-      for (const decision of [
-        { decision: 'APPROVE' },
-        { decision: 'REJECT', reason: 'No' },
-        { decision: 'REQUEST_CHANGES', reason: 'No' },
-      ]) {
+      for (const decision of [{ decision: 'APPROVE' }, { decision: 'RETURN', reason: 'No' }]) {
         const response = await h.decideVersion(version.id, decision, who(head)).expect(403);
         expect(h.codeOf(response)).toBe('BUDGET.NOT_SPENDING_APPROVER');
       }
@@ -388,10 +379,9 @@ describe('budgets over HTTP: the decision of the spending approver (integration,
       const second = await commit(sentBack.department.unitId, h.next, 5_000_000);
       const third = await commit(refused.department.unitId, h.next, 5_000_000);
 
-      await h
-        .decideVersion(sentBack.version.id, { decision: 'REQUEST_CHANGES', reason: 'Again' }, boss.account)
-        .expect(200);
-      await h.decideVersion(refused.version.id, { decision: 'REJECT', reason: 'No' }, boss.account).expect(200);
+      await h.decideVersion(sentBack.version.id, { decision: 'RETURN', reason: 'Again' }, boss.account).expect(200);
+      // A refusal is no decision any more (QĐ-111ad): a version refused before is what older data holds.
+      await h.refusedBefore(refused.version.id, boss.account, 'No');
 
       for (const id of [first, second, third]) {
         expect(await attachedTo(id)).toEqual({ attached_version_id: null, unattached_reason: 'NO_BUDGET' });

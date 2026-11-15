@@ -41,7 +41,7 @@ describe('the history of the edits of a version (integration, real PostgreSQL)',
     const w = await waiting();
     const version = await h.built(w.proposal.id);
     await h.sendVersion(version.id).expect(200);
-    await h.decideVersion(version.id, { decision: 'REQUEST_CHANGES', reason: 'Look again' }, boss.account).expect(200);
+    await h.decideVersion(version.id, { decision: 'RETURN', reason: 'Look again' }, boss.account).expect(200);
 
     return { ...w, version };
   };
@@ -276,7 +276,7 @@ describe('the history of the edits of a version (integration, real PostgreSQL)',
       const version = await h.built(w.proposal.id);
       await h.sendVersion(version.id).expect(200);
 
-      await h.decideVersion(version.id, { decision: 'REJECT', reason: 'No' }, boss.account).expect(200);
+      await h.decideVersion(version.id, { decision: 'RETURN', reason: 'No' }, boss.account).expect(200);
 
       const { rows } = await h.ctx.sql.query<{ decider_role: string }>(
         `SELECT decider_role FROM budget_version_decisions WHERE version_id = $1`,

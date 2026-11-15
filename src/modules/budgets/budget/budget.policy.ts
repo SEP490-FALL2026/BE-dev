@@ -135,18 +135,14 @@ export const proposalIsSucceedable = (
 ): boolean => proposal.state === 'REVIEWED' && proposal.succeededAt === null && latestVersionState === 'REJECTED';
 
 /** What each decision of the spending approver on a version is recorded as, and the state the version goes to (`US-06-11`). */
-export function decisionOutcomeOf(decision: 'APPROVE' | 'REJECT' | 'REQUEST_CHANGES'): {
-  decision: 'APPROVED' | 'REJECTED' | 'CHANGES_REQUESTED';
-  state: 'APPROVED' | 'REJECTED' | 'CHANGES_REQUESTED';
+export function decisionOutcomeOf(decision: 'APPROVE' | 'RETURN'): {
+  decision: 'APPROVED' | 'CHANGES_REQUESTED';
+  state: 'APPROVED' | 'CHANGES_REQUESTED';
 } {
-  switch (decision) {
-    case 'APPROVE':
-      return { decision: 'APPROVED', state: 'APPROVED' };
-    case 'REJECT':
-      return { decision: 'REJECTED', state: 'REJECTED' };
-    case 'REQUEST_CHANGES':
-      return { decision: 'CHANGES_REQUESTED', state: 'CHANGES_REQUESTED' };
-  }
+  // A version returned to Finance is changed and sent again (`QĐ-111ad`): the state it has always had for that, CHANGES_REQUESTED.
+  return decision === 'APPROVE'
+    ? { decision: 'APPROVED', state: 'APPROVED' }
+    : { decision: 'CHANGES_REQUESTED', state: 'CHANGES_REQUESTED' };
 }
 
 /** What the audit entry `BUDGET_VERSION.<decision>` says: the version, what it replaced (amounts as text), and the reason when one was given. */
