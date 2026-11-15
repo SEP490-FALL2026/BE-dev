@@ -69,7 +69,7 @@ flowchart BT
   dashboards -->|6| organization
   dashboards -->|6| personnel
   dashboards -->|5| requests
-  dashboards -->|2| usage
+  dashboards -->|3| usage
   data_import -->|6| audit
   data_import -->|1| catalog
   data_import -->|9| licensing
@@ -147,9 +147,10 @@ flowchart BT
   usage -->|2| identity_access
   usage -->|8| licensing
   usage -->|2| notifications
-  usage -->|17| organization
+  usage -->|2| operating_parameters
+  usage -->|18| organization
   usage -->|4| policies
-  usage -->|3| requests
+  usage -->|4| requests
 ```
 
-109 module edges.
+110 module edges.

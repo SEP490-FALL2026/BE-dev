@@ -83212,7 +83212,7 @@
         ],
         "responses": {
           "200": {
-            "description": "The newest opened first. Filter by state or outcome.",
+            "description": "The newest opened first. Filter by state or outcome. Each case says in `revocation` what it asks of the IT Admin: an open case on a company asset waits at most ten working days (the day of the conclusion counting as the first) for the Request of the person to reach the step of the spending approver, and is `due` when there is none to wait for or the ceiling has passed.",
             "content": {
               "application/json": {
                 "schema": {
@@ -125540,6 +125540,34 @@
                     "renewalCancelled": {
                       "type": "boolean",
                       "description": "The renewal or payment was cancelled; true only for REVOKED."
+                    },
+                    "revocation": {
+                      "type": "object",
+                      "properties": {
+                        "required": {
+                          "type": "boolean",
+                          "description": "The IT Admin has an account to revoke for this case: it is open and on a company asset, and the person has no Request that was approved. False for a personal account, a closed case, or a person whose Request was approved (the grant then goes by the task of that Request)."
+                        },
+                        "waitingRequestId": {
+                          "type": "string",
+                          "format": "uuid",
+                          "description": "The Request of the person for the same software that is still on its way, which the case waits for or which goes on after the ceiling; null when there is none.",
+                          "nullable": true
+                        },
+                        "waitUntil": {
+                          "type": "string",
+                          "format": "date",
+                          "description": "The last day of the wait for that Request while it counts: the tenth working day from the day the case was concluded, which counts as the first. Null with no such Request, and once the Request is at the step of the spending approver in time (it is then waited for with no ceiling).",
+                          "nullable": true
+                        },
+                        "due": {
+                          "type": "boolean",
+                          "description": "The IT Admin has the revocation to do now: nothing to wait for, the ceiling has passed with the Request not yet at the step of the spending approver, or the Request came to that step after the ceiling. Worked out when the case is read, never stored."
+                        }
+                      },
+                      "required": ["required", "waitingRequestId", "waitUntil", "due"],
+                      "additionalProperties": false,
+                      "description": "What the case asks of the IT Admin by way of revocation, worked out when it is read from the Request the person sent for the same software (an account on a company asset waits at most ten working days for it to reach the step of the spending approver)."
                     }
                   },
                   "required": [
@@ -125558,7 +125586,8 @@
                     "documentIds",
                     "companyAsset",
                     "concludedOn",
-                    "renewalCancelled"
+                    "renewalCancelled",
+                    "revocation"
                   ],
                   "additionalProperties": false
                 }
@@ -125694,6 +125723,34 @@
               "renewalCancelled": {
                 "type": "boolean",
                 "description": "The renewal or payment was cancelled; true only for REVOKED."
+              },
+              "revocation": {
+                "type": "object",
+                "properties": {
+                  "required": {
+                    "type": "boolean",
+                    "description": "The IT Admin has an account to revoke for this case: it is open and on a company asset, and the person has no Request that was approved. False for a personal account, a closed case, or a person whose Request was approved (the grant then goes by the task of that Request)."
+                  },
+                  "waitingRequestId": {
+                    "type": "string",
+                    "format": "uuid",
+                    "description": "The Request of the person for the same software that is still on its way, which the case waits for or which goes on after the ceiling; null when there is none.",
+                    "nullable": true
+                  },
+                  "waitUntil": {
+                    "type": "string",
+                    "format": "date",
+                    "description": "The last day of the wait for that Request while it counts: the tenth working day from the day the case was concluded, which counts as the first. Null with no such Request, and once the Request is at the step of the spending approver in time (it is then waited for with no ceiling).",
+                    "nullable": true
+                  },
+                  "due": {
+                    "type": "boolean",
+                    "description": "The IT Admin has the revocation to do now: nothing to wait for, the ceiling has passed with the Request not yet at the step of the spending approver, or the Request came to that step after the ceiling. Worked out when the case is read, never stored."
+                  }
+                },
+                "required": ["required", "waitingRequestId", "waitUntil", "due"],
+                "additionalProperties": false,
+                "description": "What the case asks of the IT Admin by way of revocation, worked out when it is read from the Request the person sent for the same software (an account on a company asset waits at most ten working days for it to reach the step of the spending approver)."
               }
             },
             "required": [
@@ -125712,7 +125769,8 @@
               "documentIds",
               "companyAsset",
               "concludedOn",
-              "renewalCancelled"
+              "renewalCancelled",
+              "revocation"
             ],
             "additionalProperties": false,
             "nullable": true
@@ -130539,6 +130597,37 @@
                     "additionalProperties": false,
                     "description": "The periods of a right paid by the month or the year whose invoice has not been submitted five working days after the payment day, in the departments of the caller: the total of the list of them (`purchaseInvoiceMissingPeriodList`)."
                   },
+                  "outOfProcessRevocationsDue": {
+                    "type": "object",
+                    "properties": {
+                      "state": {
+                        "type": "string",
+                        "enum": ["COUNTED", "AT_SOURCE", "NOT_AVAILABLE"],
+                        "description": "COUNTED: count is how many, in the scope of the caller. AT_SOURCE: the rows are listed by sourceOperationId in the same scope and are not counted here. NOT_AVAILABLE: the data has no source yet; reason says why. A section that is not counted is never shown as zero."
+                      },
+                      "count": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991,
+                        "description": "Set only when state is COUNTED.",
+                        "nullable": true
+                      },
+                      "sourceOperationId": {
+                        "description": "The operation that lists the rows of the section; null when there is none yet.",
+                        "type": "string",
+                        "nullable": true
+                      },
+                      "reason": {
+                        "type": "string",
+                        "enum": ["FINANCE_FIGURES_NOT_DELIVERED", "USAGE_DATA_NOT_DELIVERED", "NO_DATA_SOURCE", null],
+                        "description": "Set only when state is NOT_AVAILABLE: the source of the data that is not delivered yet.",
+                        "nullable": true
+                      }
+                    },
+                    "required": ["state", "count", "sourceOperationId", "reason"],
+                    "additionalProperties": false,
+                    "description": "The open cases outside the process on a company asset whose revocation is due now: no Request of the person to wait for, or the ten working days of the wait have passed with the Request not yet at the step of the spending approver. The cases are listed by `outOfProcessCaseList`, each with its `revocation`; no list answers this number alone."
+                  },
                   "ghostSeats": {
                     "type": "object",
                     "properties": {
@@ -130586,6 +130675,7 @@
                   "unconfirmedDevices",
                   "saasIssues",
                   "missingInvoicePeriods",
+                  "outOfProcessRevocationsDue",
                   "ghostSeats"
                 ],
                 "additionalProperties": false
