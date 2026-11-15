@@ -66,7 +66,7 @@ flowchart BT
   dashboards -->|3| optimization
   dashboards -->|6| organization
   dashboards -->|6| personnel
-  dashboards -->|4| requests
+  dashboards -->|5| requests
   dashboards -->|2| usage
   data_import -->|6| audit
   data_import -->|1| catalog
@@ -123,13 +123,13 @@ flowchart BT
   personnel -->|8| requests
   requests -->|60| audit
   requests -->|29| budgets
-  requests -->|40| catalog
+  requests -->|42| catalog
   requests -->|9| finance
-  requests -->|36| identity_access
-  requests -->|60| licensing
+  requests -->|37| identity_access
+  requests -->|61| licensing
   requests -->|12| notifications
-  requests -->|11| operating_parameters
-  requests -->|94| organization
+  requests -->|12| operating_parameters
+  requests -->|95| organization
   usage -->|7| audit
   usage -->|11| catalog
   usage -->|16| devices

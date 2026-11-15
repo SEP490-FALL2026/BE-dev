@@ -53228,6 +53228,177 @@
         "tags": ["purchase-invoices"]
       }
     },
+    "/api/v1/purchase-invoices/missing-periods": {
+      "get": {
+        "operationId": "purchaseInvoiceMissingPeriodList",
+        "parameters": [
+          {
+            "name": "page",
+            "required": false,
+            "in": "query",
+            "schema": {
+              "maximum": 9007199254740991,
+              "exclusiveMinimum": true,
+              "default": 1,
+              "type": "integer",
+              "minimum": 0
+            }
+          },
+          {
+            "name": "pageSize",
+            "required": false,
+            "in": "query",
+            "schema": { "maximum": 100, "exclusiveMinimum": true, "default": 20, "type": "integer", "minimum": 0 }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Each period of a right paid by the month (a request for months of use of a plan bought by the month, while a seat of it is held) or by the cycle of a subscription whose invoice has not been submitted five working days after its payment day. The oldest due day first. An invoice that was returned does not count. Finance reads every period; the IT Admin the ones of the departments they work.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/PurchaseInvoiceMissingPeriodListResponseDto" },
+                    { "properties": { "message": { "example": "PURCHASE_INVOICE.MISSING_PERIODS_LISTED" } } }
+                  ]
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHENTICATION_REQUIRED": {
+                    "summary": "A Bearer access token is required.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHENTICATION_REQUIRED",
+                        "message": "A Bearer access token is required.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "INVALID_ACCESS_TOKEN": {
+                    "summary": "The access token is invalid.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "INVALID_ACCESS_TOKEN",
+                        "message": "The access token is invalid.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "Only the IT Admin submits an invoice, and only the IT Admin and Finance read one.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHORIZATION.FORBIDDEN": {
+                    "summary": "You do not have permission to perform this action.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHORIZATION.FORBIDDEN",
+                        "message": "You do not have permission to perform this action.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The query is invalid (VALIDATION_ERROR).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "VALIDATION_ERROR": {
+                    "summary": "Request validation failed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "VALIDATION_ERROR",
+                        "message": "Request validation failed.",
+                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_TOO_MANY_REQUESTS": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_TOO_MANY_REQUESTS",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "TOKEN_VERIFICATION_UNAVAILABLE": {
+                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
+                        "message": "Authentication is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SERVICE_UNAVAILABLE": {
+                    "summary": "The service is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SERVICE_UNAVAILABLE",
+                        "message": "The service is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "bearer": [] }],
+        "summary": "List the periods that have no invoice",
+        "tags": ["purchase-invoices"]
+      }
+    },
     "/api/v1/purchase-invoices/{id}": {
       "get": {
         "operationId": "purchaseInvoiceGet",
@@ -111650,6 +111821,108 @@
         "required": ["success", "message", "data"],
         "additionalProperties": false
       },
+      "PurchaseInvoiceMissingPeriodListResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "enum": [true] },
+          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "items": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "linkKind": { "type": "string", "enum": ["REQUEST", "SUBSCRIPTION"] },
+                    "requestId": { "type": "string", "format": "uuid", "nullable": true },
+                    "subscriptionId": { "type": "string", "format": "uuid", "nullable": true },
+                    "label": { "type": "string", "enum": ["NEW_PURCHASE", "PERIOD", "RENEWAL"] },
+                    "servicePeriodMonth": { "type": "string", "description": "A calendar month as YYYY-MM." },
+                    "periodIndex": {
+                      "type": "integer",
+                      "exclusiveMinimum": true,
+                      "maximum": 9007199254740991,
+                      "nullable": true,
+                      "minimum": 0
+                    },
+                    "periodCount": {
+                      "type": "integer",
+                      "exclusiveMinimum": true,
+                      "maximum": 9007199254740991,
+                      "nullable": true,
+                      "minimum": 0
+                    },
+                    "paymentDate": {
+                      "type": "string",
+                      "format": "date",
+                      "description": "A calendar date as YYYY-MM-DD."
+                    },
+                    "dueDate": { "type": "string", "format": "date", "description": "A calendar date as YYYY-MM-DD." },
+                    "plan": {
+                      "type": "object",
+                      "properties": {
+                        "planId": { "type": "string", "format": "uuid" },
+                        "planName": { "type": "string" },
+                        "applicationName": { "type": "string" },
+                        "logoUrl": {
+                          "description": "The https link to the logo image of the application that the IT Admin pasted, or null. The server never checks it: it may be broken, so show the first letter of the name when the image does not load.",
+                          "type": "string",
+                          "nullable": true
+                        }
+                      },
+                      "required": ["planId", "planName", "applicationName", "logoUrl"],
+                      "additionalProperties": false
+                    },
+                    "department": {
+                      "type": "object",
+                      "properties": { "id": { "type": "string", "format": "uuid" }, "name": { "type": "string" } },
+                      "required": ["id", "name"],
+                      "additionalProperties": false,
+                      "description": "The department of the request, or the one that owns the subscription."
+                    }
+                  },
+                  "required": [
+                    "linkKind",
+                    "requestId",
+                    "subscriptionId",
+                    "label",
+                    "servicePeriodMonth",
+                    "periodIndex",
+                    "periodCount",
+                    "paymentDate",
+                    "dueDate",
+                    "plan",
+                    "department"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "pagination": {
+                "type": "object",
+                "properties": {
+                  "page": { "type": "integer", "exclusiveMinimum": true, "maximum": 9007199254740991, "minimum": 0 },
+                  "pageSize": {
+                    "type": "integer",
+                    "exclusiveMinimum": true,
+                    "maximum": 9007199254740991,
+                    "minimum": 0
+                  },
+                  "totalItems": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
+                  "totalPages": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
+                },
+                "required": ["page", "pageSize", "totalItems", "totalPages"],
+                "additionalProperties": false
+              }
+            },
+            "required": ["items", "pagination"],
+            "additionalProperties": false,
+            "nullable": true
+          }
+        },
+        "required": ["success", "message", "data"],
+        "additionalProperties": false
+      },
       "PurchaseInvoiceReturnBodyDto": {
         "type": "object",
         "properties": {
@@ -125550,6 +125823,37 @@
                     "additionalProperties": false,
                     "description": "The SaaS error reports given to the caller that are not resolved, closed or marked duplicate."
                   },
+                  "missingInvoicePeriods": {
+                    "type": "object",
+                    "properties": {
+                      "state": {
+                        "type": "string",
+                        "enum": ["COUNTED", "AT_SOURCE", "NOT_AVAILABLE"],
+                        "description": "COUNTED: count is how many, in the scope of the caller. AT_SOURCE: the rows are listed by sourceOperationId in the same scope and are not counted here. NOT_AVAILABLE: the data has no source yet; reason says why. A section that is not counted is never shown as zero."
+                      },
+                      "count": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991,
+                        "description": "Set only when state is COUNTED.",
+                        "nullable": true
+                      },
+                      "sourceOperationId": {
+                        "description": "The operation that lists the rows of the section; null when there is none yet.",
+                        "type": "string",
+                        "nullable": true
+                      },
+                      "reason": {
+                        "type": "string",
+                        "enum": ["FINANCE_FIGURES_NOT_DELIVERED", "USAGE_DATA_NOT_DELIVERED", "NO_DATA_SOURCE", null],
+                        "description": "Set only when state is NOT_AVAILABLE: the source of the data that is not delivered yet.",
+                        "nullable": true
+                      }
+                    },
+                    "required": ["state", "count", "sourceOperationId", "reason"],
+                    "additionalProperties": false,
+                    "description": "The periods of a right paid by the month or the year whose invoice has not been submitted five working days after the payment day, in the departments of the caller: the total of the list of them (`purchaseInvoiceMissingPeriodList`)."
+                  },
                   "ghostSeats": {
                     "type": "object",
                     "properties": {
@@ -125596,6 +125900,7 @@
                   "offboardingHandovers",
                   "unconfirmedDevices",
                   "saasIssues",
+                  "missingInvoicePeriods",
                   "ghostSeats"
                 ],
                 "additionalProperties": false
