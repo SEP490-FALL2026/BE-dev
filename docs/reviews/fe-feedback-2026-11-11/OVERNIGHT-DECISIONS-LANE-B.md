@@ -36,6 +36,13 @@
 - **Phương án:** (A) không lọc, trả trang theo mã nhân viên với `state` từng dòng; (B) lọc bằng SQL join `app_users`/`role_grants` (bảng của module khác) hoặc đọc cả tập rồi cắt trang trong bộ nhớ (cả hai vi phạm luật).
 - **Chọn A** (đúng chữ SPEC, không lách luật module/phân trang); FE lọc trang đang xem. **Đổi lại:** thêm điều kiện `state` vào `IdentityAccessApi.pageUsableRoleHolders` cùng một câu join `policy_acknowledgements` qua facade.
 
+### D-B5 — căn cứ ban hành bản 1 khi cài đặt và nơi nạp 8 chính sách
+
+- **Câu hỏi:** POLICY-SEED-DRAFT ghi căn cứ demo ("Quyết định số 01/2026/QĐ-GĐ") và đề xuất cho cài đặt thật "Bộ mẫu SaaS-Sentry v1.9 — công ty xuất bản phiên bản 2 kèm quyết định của mình"; nạp ở đâu khi PLAN ghi `src/cli/seed/**`, bootstrap cài đặt còn lệnh giao việc cấm sửa demo seed?
+- **Phương án:** (A) lệnh cài đặt nạp bản 1 với căn cứ bộ mẫu, seed demo gọi cùng API với căn cứ riêng; (B) chỉ seed demo nạp (cài đặt thật không có chính sách ⟹ mọi bước duyệt bị khóa vì không có bản hiện hành); (C) migration dữ liệu (không có tổ chức lúc migrate).
+- **Chọn A:** đúng "Không nạp nháp, vì checklist cần bản hiện hành" (điểm Owner 6) và không đụng demo seed. `PoliciesBootstrapApi.seedInitialPolicies(tx, orgId, changeNote?)` chạy lại an toàn. Cài đặt gọi qua `InstallationInitialDataService` (nhóm chức năng + chính sách) vì constructor `InstallationApi` đã 8 tham số.
+- **File:** `policies/initial/*`, `policies/public/policies-bootstrap.api.ts`, `installation/installation-initial-data.service.ts`. **Đổi lại:** bỏ lời gọi ở service; hoặc đổi `INITIAL_CHANGE_NOTE`.
+
 ## Optional và việc để lại
 
 - Báo cáo xác nhận chưa có tổng `done`/`pending` toàn tập (cần join chéo module); thêm khi FE đòi.
@@ -52,4 +59,4 @@
 
 ## Dừng ở đâu
 
-- Xong PL-1.1–PL-1.4 và gate cuối PL-1 (chưa PL-1.5: nạp 8 chính sách). Việc tiếp: PL-1.5 → PL-3 → PF-1 → BG-1 → BG-2.
+- Xong cả PL-1 (PL-1.1–PL-1.5, commit cuối `e20b09e6`). Việc tiếp: PL-3 → PF-1 → BG-1 → BG-2.
