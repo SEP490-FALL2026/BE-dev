@@ -103,7 +103,7 @@ const lineSchema = z.strictObject({
   }),
   variancePpm: z.number().int().meta({
     description:
-      'The difference k of the invoices of the year since 01/01, in millionths: what they cost over their price before tax, less one; 0 with no invoice.',
+      'The difference k of the invoices of the commitments since 01/01, in millionths: what they cost (price, exchange rate, card fee and the tax that cannot be deducted) over the price in the commitment, less one; 0 with no such invoice.',
   }),
   priceIncrease: moneyView.meta({
     description:

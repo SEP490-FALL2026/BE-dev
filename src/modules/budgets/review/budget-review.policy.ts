@@ -16,13 +16,15 @@ const UNDER_PERCENT = 70n;
 const WORKING_DAY_OF_THE_CLOSE = 5;
 
 /**
- * The difference k of the invoices since the start of the year, in millionths: what they cost over their price before tax (the tax that cannot
- * be deducted and the fees, `QĐ-97d`). With no invoice there is nothing to measure the difference on, so it is 0.
+ * The difference k of the invoices of the commitments since the start of the year, in millionths (`QĐ-111ai`, `US-12-21`): what they cost over the price in the
+ * commitment of the part they took down, less one. What they cost is the price on the invoice with the exchange rate and the card fee in it and the tax that
+ * cannot be deducted (`QĐ-111an`, `QĐ-97d`); the price in the commitment is the part of it the invoices took down. With nothing taken down there is nothing to
+ * measure the difference on, so it is 0.
  */
-export function variancePpm(input: { invoiceNetMinor: bigint; invoiceActualMinor: bigint }): bigint {
-  if (input.invoiceNetMinor <= 0n) return 0n;
+export function variancePpm(input: { invoiceBasisMinor: bigint; invoiceActualMinor: bigint }): bigint {
+  if (input.invoiceBasisMinor <= 0n) return 0n;
 
-  return roundHalfAway((input.invoiceActualMinor - input.invoiceNetMinor) * 1_000_000n, input.invoiceNetMinor);
+  return roundHalfAway((input.invoiceActualMinor - input.invoiceBasisMinor) * 1_000_000n, input.invoiceBasisMinor);
 }
 
 /**
@@ -33,12 +35,12 @@ export function variancePpm(input: { invoiceNetMinor: bigint; invoiceActualMinor
 export function forecastOfYear(
   input: Pick<
     ReviewInput,
-    'spentMinor' | 'committedMinor' | 'pendingMinor' | 'invoiceNetMinor' | 'invoiceActualMinor' | 'priceIncreaseMinor'
+    'spentMinor' | 'committedMinor' | 'pendingMinor' | 'invoiceBasisMinor' | 'invoiceActualMinor' | 'priceIncreaseMinor'
   >,
 ): bigint {
   const open = input.committedMinor + input.pendingMinor;
   const grownOpen =
-    input.invoiceNetMinor > 0n ? roundHalfAway(open * input.invoiceActualMinor, input.invoiceNetMinor) : open;
+    input.invoiceBasisMinor > 0n ? roundHalfAway(open * input.invoiceActualMinor, input.invoiceBasisMinor) : open;
 
   return input.spentMinor + grownOpen + input.priceIncreaseMinor;
 }

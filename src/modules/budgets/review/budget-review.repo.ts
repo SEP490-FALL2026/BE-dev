@@ -28,7 +28,8 @@ export interface NewReviewLine {
   committedMinor: bigint;
   pendingSpendMinor: bigint;
   remainingMinor: bigint;
-  invoiceNetMinor: bigint;
+  /** The price in the commitments of what the invoices took down (the column `invoice_net_minor`), and what those invoices cost: the two sides of k. */
+  invoiceBasisMinor: bigint;
   invoiceActualMinor: bigint;
   variancePpm: bigint;
   priceIncreaseMinor: bigint;
@@ -100,7 +101,7 @@ const toLine = (row: LineRow): ReviewLineRecord => ({
   committedMinor: row.committed_minor,
   pendingSpendMinor: row.pending_spend_minor,
   remainingMinor: row.remaining_minor,
-  invoiceNetMinor: row.invoice_net_minor,
+  invoiceBasisMinor: row.invoice_net_minor,
   invoiceActualMinor: row.invoice_actual_minor,
   variancePpm: row.variance_ppm,
   priceIncreaseMinor: row.price_increase_minor,
@@ -122,7 +123,11 @@ export class BudgetReviewRepo {
     const created = await tx.budgetReviewPeriod.create({ data: { ...period, state: 'SNAPSHOT' } });
     if (lines.length > 0) {
       await tx.budgetReviewLine.createMany({
-        data: lines.map((line) => ({ ...line, periodId: created.id })),
+        data: lines.map(({ invoiceBasisMinor, ...line }) => ({
+          ...line,
+          invoiceNetMinor: invoiceBasisMinor,
+          periodId: created.id,
+        })),
       });
     }
 

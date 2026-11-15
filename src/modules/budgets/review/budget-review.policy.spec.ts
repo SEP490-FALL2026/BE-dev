@@ -21,7 +21,7 @@ const base: ReviewInput = {
   spentMinor: 168n * TR,
   committedMinor: 135n * TR,
   pendingMinor: 0n,
-  invoiceNetMinor: 160n * TR,
+  invoiceBasisMinor: 160n * TR,
   invoiceActualMinor: 168n * TR,
   priceIncreaseMinor: 0n,
 };
@@ -38,7 +38,7 @@ describe('the review of the budget of a Cost Center at the close of a month (RV-
     });
 
     it('is not what the old formula said: the tax is counted on the part still open, never again on what was spent (318,15 tr before)', () => {
-      const oldFormula = ((base.spentMinor + base.committedMinor) * base.invoiceActualMinor) / base.invoiceNetMinor;
+      const oldFormula = ((base.spentMinor + base.committedMinor) * base.invoiceActualMinor) / base.invoiceBasisMinor;
 
       expect(oldFormula).toBe(318_150_000n);
       expect(reviewFiguresOf(base).forecastMinor).toBe(309_750_000n);
@@ -49,10 +49,11 @@ describe('the review of the budget of a Cost Center at the close of a month (RV-
         ...base,
         spentMinor: 200n * TR,
         committedMinor: 100n * TR,
-        invoiceNetMinor: 180n * TR,
+        invoiceBasisMinor: 180n * TR,
         invoiceActualMinor: 200n * TR,
       };
-      const oldFormula = ((input.spentMinor + input.committedMinor) * input.invoiceActualMinor) / input.invoiceNetMinor;
+      const oldFormula =
+        ((input.spentMinor + input.committedMinor) * input.invoiceActualMinor) / input.invoiceBasisMinor;
       const figures = reviewFiguresOf(input);
 
       expect(oldFormula).toBe(333_333_333n);
@@ -69,7 +70,7 @@ describe('the review of the budget of a Cost Center at the close of a month (RV-
         spentMinor: 67n * TR,
         committedMinor: 54n * TR,
         pendingMinor: 5n * TR,
-        invoiceNetMinor: 64n * TR,
+        invoiceBasisMinor: 64n * TR,
         invoiceActualMinor: 67n * TR,
         priceIncreaseMinor: 0n,
       });
@@ -86,7 +87,7 @@ describe('the review of the budget of a Cost Center at the close of a month (RV-
         spentMinor: 10n * TR,
         committedMinor: 20n * TR,
         pendingMinor: 5n * TR,
-        invoiceNetMinor: 0n,
+        invoiceBasisMinor: 0n,
         invoiceActualMinor: 0n,
       });
 
@@ -105,12 +106,12 @@ describe('the review of the budget of a Cost Center at the close of a month (RV-
 
   describe('variancePpm (the difference of the invoices since the start of the year, in millionths)', () => {
     it('is the tax and fees over the price: 8 over 160 is 50.000 millionths, 20 over 180 rounded half away', () => {
-      expect(variancePpm({ invoiceNetMinor: 160n * TR, invoiceActualMinor: 168n * TR })).toBe(50_000n);
-      expect(variancePpm({ invoiceNetMinor: 180n * TR, invoiceActualMinor: 200n * TR })).toBe(111_111n);
+      expect(variancePpm({ invoiceBasisMinor: 160n * TR, invoiceActualMinor: 168n * TR })).toBe(50_000n);
+      expect(variancePpm({ invoiceBasisMinor: 180n * TR, invoiceActualMinor: 200n * TR })).toBe(111_111n);
     });
 
     it('is 0 when there is no invoice', () => {
-      expect(variancePpm({ invoiceNetMinor: 0n, invoiceActualMinor: 0n })).toBe(0n);
+      expect(variancePpm({ invoiceBasisMinor: 0n, invoiceActualMinor: 0n })).toBe(0n);
     });
   });
 

@@ -57,7 +57,7 @@ export class BudgetReviewFiguresService {
         spentMinor: totals.get(key)?.spent ?? 0n,
         committedMinor: totals.get(key)?.held ?? 0n,
         pendingMinor: pending.get(key) ?? 0n,
-        invoiceNetMinor: invoiceBasis?.netMinor ?? 0n,
+        invoiceBasisMinor: invoiceBasis?.basisMinor ?? 0n,
         invoiceActualMinor: invoiceBasis?.actualMinor ?? 0n,
         priceIncreaseMinor: knownPriceIncrease(increases.get(costCenterId) ?? []),
       };
@@ -71,7 +71,7 @@ export class BudgetReviewFiguresService {
         committedMinor: input.committedMinor,
         pendingSpendMinor: input.pendingMinor,
         remainingMinor: figures.remainingMinor,
-        invoiceNetMinor: input.invoiceNetMinor,
+        invoiceBasisMinor: input.invoiceBasisMinor,
         invoiceActualMinor: input.invoiceActualMinor,
         variancePpm: figures.variancePpm,
         priceIncreaseMinor: input.priceIncreaseMinor,

@@ -9,8 +9,8 @@ export type ReviewState = 'SNAPSHOT' | 'AWAITING_EXPLANATIONS' | 'SIGNED';
 
 /**
  * What the review of one Cost Center reads at the close of month `month` of a year, in one currency (VND, `D2`): the effective budget, what was spent
- * since 01/01, what is held, what waits for the spend decision, what the invoices of the year cost against their price before tax (the basis of the
- * difference k), and the price increase already known.
+ * since 01/01, what is held, what waits for the spend decision, what the invoices of the commitments cost against the price in the commitments of the part
+ * they took down (the basis of the difference k), and the price increase already known.
  */
 export interface ReviewInput {
   /** The month that was closed, 1 to 12. */
@@ -20,8 +20,8 @@ export interface ReviewInput {
   spentMinor: bigint;
   committedMinor: bigint;
   pendingMinor: bigint;
-  /** The price before tax of the invoices of the Cost Center and the year, and what they cost (price and the tax that cannot be deducted). */
-  invoiceNetMinor: bigint;
+  /** The price in the commitments of what the invoices of a commitment took down, and what those invoices cost (price with the exchange rate and the card fee, and the tax that cannot be deducted). */
+  invoiceBasisMinor: bigint;
   invoiceActualMinor: bigint;
   priceIncreaseMinor: bigint;
 }
@@ -30,7 +30,7 @@ export interface ReviewInput {
 export interface ReviewFigures {
   /** The budget (base and reserve) less what was spent, what is held and what waits; negative when the Cost Center is over. */
   remainingMinor: bigint;
-  /** The difference k in millionths: the tax and fees of the invoices over their price, 0 with no invoice. */
+  /** The difference k in millionths: what the invoices cost over the price in the commitment they took down, less one; 0 with none. */
   variancePpm: bigint;
   forecastMinor: bigint;
   /** The spent over the base of the months gone, in hundredths of a percent, rounded up; null with no base. */

@@ -48,7 +48,7 @@ describe('the tables of the review periods keep a picture that is never changed 
     committedMinor: 135_000_000n,
     pendingSpendMinor: 0n,
     remainingMinor: -3_000_000n,
-    invoiceNetMinor: 160_000_000n,
+    invoiceBasisMinor: 160_000_000n,
     invoiceActualMinor: 168_000_000n,
     variancePpm: 50_000n,
     priceIncreaseMinor: 0n,

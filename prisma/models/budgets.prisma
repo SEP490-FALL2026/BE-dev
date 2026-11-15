@@ -668,6 +668,7 @@ model BudgetReviewLine {
   committedMinor     BigInt  @map("committed_minor")
   pendingSpendMinor  BigInt  @map("pending_spend_minor")
   remainingMinor     BigInt  @map("remaining_minor")
+  // The price in the commitments of what the invoices of a commitment took down (their `applied`; named for what it held before FIX-RV1): the basis of k.
   invoiceNetMinor    BigInt  @map("invoice_net_minor")
   invoiceActualMinor BigInt  @map("invoice_actual_minor")
   variancePpm        BigInt  @map("variance_ppm")

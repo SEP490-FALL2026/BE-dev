@@ -130,13 +130,16 @@ describe('The figures of the close of a month are worked out as the documents de
   }
 
   /** One department for each case: a month is closed once and the figures of a Cost Center are read by its own line. */
-  const units: Record<'outside', Unit> = {} as Record<'outside', Unit>;
+  const units: Record<'outside' | 'basis', Unit> = {} as Record<'outside' | 'basis', Unit>;
   const versions: Record<string, string> = {};
 
   beforeAll(async () => {
     await h.start();
     await h.withApprover();
-    for (const [key, code] of [['outside', 'P-K2']] as const) {
+    for (const [key, code] of [
+      ['outside', 'P-K2'],
+      ['basis', 'P-K1'],
+    ] as const) {
       units[key] = await h.departmentWithHead(code);
       versions[key] = (await h.budgetFor(units[key], { total: 300 * M, reserve: 30 * M })).id;
     }
@@ -169,6 +172,24 @@ describe('The figures of the close of a month are worked out as the documents de
       variancePpm: 50_000,
       forecast: { amount: '349750000' },
       light: 'RED',
+    });
+  });
+
+  it('RV1-01: k is what the invoices cost over the price in the commitment, not over the price on the invoice: a commitment of 180 tr paid 200 tr, 100 tr held, September ⟹ k = 0,1111, forecast 311,1 tr, Vàng', async () => {
+    const unit = units.basis;
+    // The exchange rate and the card fee are in the price on the invoice (200 tr, no tax); the commitment took 180 tr down, its own price.
+    await expense(unit, versions.basis, { committed: 180 * M, net: 200 * M, tax: 0, serviceMonth: `${h.year}-02-01` });
+    await h.commit(unit, versions.basis, h.year, 100 * M, 'HELD');
+
+    const line = lineOf(await detail((await close(9)).id), unit);
+
+    expect(line).toMatchObject({
+      spent: { amount: String(200 * M) },
+      committed: { amount: String(100 * M) },
+      variancePpm: 111_111,
+      forecast: { amount: '311111111' },
+      paceBasisPoints: 8_889,
+      light: 'YELLOW',
     });
   });
 });
