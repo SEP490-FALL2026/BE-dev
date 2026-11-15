@@ -81,7 +81,7 @@ describe('budget proposal attachments (integration, real PostgreSQL)', () => {
       expect(row.proposal_id).toBe(proposalId);
       expect(row.attached_at).toBeTruthy();
     }
-    // Exactly the lines the head typed: the documents are not read into lines.
+    // BM-10 has no lines (QĐ-111ab), and the documents are not read into lines either.
     expect(
       Number(
         (
@@ -91,7 +91,7 @@ describe('budget proposal attachments (integration, real PostgreSQL)', () => {
           )
         ).rows[0].n,
       ),
-    ).toBe(2);
+    ).toBe(0);
     const events = await h.ctx.sql.query<{ n: string }>(
       `SELECT count(*) AS n FROM audit_events WHERE action = 'BUDGET_ATTACHMENT.ATTACHED' AND resource_id = ANY($1::text[])`,
       [[attachment.id, second]],
@@ -129,7 +129,7 @@ describe('budget proposal attachments (integration, real PostgreSQL)', () => {
     const proposalsBefore = await h.budgetRows('budget_proposals');
     const badIds = [someoneElses, awaiting, alreadyAttached, ofAVersion, unknown];
     const res = await h
-      .resubmit(pr1, { lines: [h.line()], attachmentIds: [good, ...badIds] }, w.head.account)
+      .resubmit(pr1, { ...h.bm10(50_000_000), attachmentIds: [good, ...badIds] }, w.head.account)
       .expect(422);
     const error = h.errorOf(res);
     expect(error.code).toBe('BUDGET_ATTACHMENT.NOT_ATTACHABLE');
@@ -182,11 +182,11 @@ describe('budget proposal attachments (integration, real PostgreSQL)', () => {
 
     // Finance gives it back; the document is not offered again by the resubmission.
     await h.giveBack(pr1, { reason: 'Add the quotes' }, h.finance).expect(200);
-    const reuse = await h.resubmit(pr1, { lines: [h.line()], attachmentIds: [first] }, w.head.account).expect(422);
+    const reuse = await h.resubmit(pr1, { ...h.bm10(50_000_000), attachmentIds: [first] }, w.head.account).expect(422);
     expect(h.errorOf(reuse).code).toBe('BUDGET_ATTACHMENT.NOT_ATTACHABLE');
 
     const fresh = await h.uploaded(SAMPLE_XLSX, w.head.account);
-    const again = await h.resubmit(pr1, { lines: [h.line()], attachmentIds: [fresh] }, w.head.account).expect(201);
+    const again = await h.resubmit(pr1, { ...h.bm10(50_000_000), attachmentIds: [fresh] }, w.head.account).expect(201);
     const pr2 = h.dataOf<{ proposal: { id: string } }>(again).proposal.id;
     expect(pr2).not.toBe(pr1);
 
@@ -222,13 +222,18 @@ describe('budget proposal attachments (integration, real PostgreSQL)', () => {
     ).toBe(pr1);
   });
 
-  it('still sends a proposal without documents as before, with or without an empty list', async () => {
+  it('no longer sends a proposal without documents, with or without an empty list: BM-10 names one file at least (QĐ-111ab)', async () => {
     for (const extra of [{}, { attachmentIds: [] }]) {
       const w = await waiting();
-      const res = await h
-        .submitProposal({ ...h.proposalBody(w.department.unitId), ...extra }, w.head.account)
-        .expect(201);
-      expect(h.dataOf<{ proposal: { id: string } }>(res).proposal.id).toBeTruthy();
+      const before = await h.budgetRows('budget_proposals');
+      // The route itself: the harness would add a file to a body that names none.
+      const res = await request(h.server())
+        .post('/api/v1/budget-proposals')
+        .set(h.as(w.head.account))
+        .send({ ...h.proposalBody(w.department.unitId), ...extra })
+        .expect(422);
+      expect(h.codeOf(res)).toBe('VALIDATION_ERROR');
+      expect(await h.budgetRows('budget_proposals')).toBe(before);
     }
   });
 

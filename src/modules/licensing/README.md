@@ -83,6 +83,7 @@ dashboards; gốc `src/app/app.module.ts`.
 - Đăng ký vào: `catalog.seat-occupancy` — `assignment/assignment-seat-occupancy.listener.ts`;
   `organization.department-service-account-reader` — `assignment/assignment-service-account.listener.ts`;
   `organization.department-use-readers` — `provisioning/department-use/department-open-work.listener.ts`.
+- Đăng ký vào (thêm): `license-key/license-key-template.listener.ts` góp định nghĩa cột của lô khóa vào `ImportTemplateContributions` của `policies` (file mẫu `license-keys`).
 
 ## Hướng phụ thuộc giữa capability (R6)
 

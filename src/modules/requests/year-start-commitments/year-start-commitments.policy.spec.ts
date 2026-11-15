@@ -1,6 +1,7 @@
 import { MAX_AMOUNT_MINOR } from '../../../core/money/money';
 import {
   bearingDepartmentOf,
+  carriedOverByCostCenter,
   judgeYearStart,
   lastDayOfSeat,
   seatCountsOn,
@@ -303,5 +304,23 @@ describe('BR-MF1-09e: what the pass does with one request', () => {
       status: 'LEFT_OUT',
       reason: 'AMOUNT_TOO_LARGE',
     });
+  });
+});
+
+describe('QĐ-111ac: what a Cost Center carries into the year is what the pass of 01/01 would commit in it', () => {
+  const commitment = (costCenterId: string, amountMinor: bigint) => ({ costCenterId, amountMinor });
+
+  it('adds the amounts of the commitments of each Cost Center asked about, and leaves out one nothing is committed in', () => {
+    const carried = carriedOverByCostCenter(
+      [commitment('cc-1', 120_000_000n), commitment('cc-2', 5n), commitment('cc-1', 3_000_000n)],
+      ['cc-1', 'cc-3'],
+    );
+
+    expect([...carried]).toEqual([['cc-1', 123_000_000n]]);
+  });
+
+  it('is empty when no Cost Center is asked about, and when nothing would be committed', () => {
+    expect(carriedOverByCostCenter([commitment('cc-1', 5n)], []).size).toBe(0);
+    expect(carriedOverByCostCenter([], ['cc-1']).size).toBe(0);
   });
 });

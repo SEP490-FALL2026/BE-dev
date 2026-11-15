@@ -1,6 +1,5 @@
 import type { BusinessDate } from '../../../core/business-date';
 import { fiscalYearOf } from '../../../core/fiscal-year';
-import type { LineType, ZbbExplanation } from './budget-line-zbb.json';
 
 /**
  * The rules of budget proposals and versions (`US-06-09`, `US-06-10`), as pure decisions: what a line must say, which
@@ -19,35 +18,8 @@ export const LINE_DESCRIPTION_MAX = 200;
  */
 export const yearIsOpen = (year: number, today: BusinessDate): boolean => year >= fiscalYearOf(today);
 
-/**
- * Whether a line is a saving that is shown and not counted: a `CANCEL` line gives up spend, so its amount is never added to the total of
- * the proposal, the package or the ceiling check (`QĐ-109c`, C4-16).
- */
-export const isNotCounted = (line: { lineType: LineType }): boolean => line.lineType === 'CANCEL';
-
-/**
- * The over-the-ceiling flag a version line shows (`AC-20`, `QĐ-109c`): the part of the proposal line it adjusts that carried the proposal
- * over the published ceiling (the B3 flag), while the line is still that proposal line. A line Finance changed (it carries an
- * `adjustmentReason`) or made a `CANCEL` (never added, never flagged) shows none: the flag was about what the head proposed.
- */
-export const versionLineOverCeiling = (
-  line: { lineType: LineType; adjustmentReason: string | null },
-  proposalOverMinor: bigint | null,
-): bigint | null => (isNotCounted(line) || line.adjustmentReason !== null ? null : proposalOverMinor);
-
-/** The sum a proposal is worth: every line but the `CANCEL` ones (`QĐ-109c`). */
-export const countedTotalOf = (lines: readonly { lineType: LineType; amountMinor: bigint }[]): bigint =>
-  lines.reduce((sum, line) => (isNotCounted(line) ? sum : sum + line.amountMinor), 0n);
-
 export const totalOf = (lines: readonly { amountMinor: bigint }[]): bigint =>
   lines.reduce((sum, line) => sum + line.amountMinor, 0n);
-
-/** The forecast by quarter adds up to the total of the version, or there is none; it never limits a payment (`US-06-09` AC-6). */
-export function quartersMatch(totalMinor: bigint, quarters: readonly [bigint, bigint, bigint, bigint]): boolean {
-  return (
-    quarters.every((quarter) => quarter >= 0n) && quarters.reduce((sum, quarter) => sum + quarter, 0n) === totalMinor
-  );
-}
 
 /** `CLOSED_FISCAL_YEAR_ENDED` is written by the year-end closure only (`QĐ-91c`). */
 export type ProposalState = 'SUBMITTED' | 'WITHDRAWN' | 'RETURNED' | 'REVIEWED' | 'CLOSED_FISCAL_YEAR_ENDED';
@@ -163,18 +135,14 @@ export const proposalIsSucceedable = (
 ): boolean => proposal.state === 'REVIEWED' && proposal.succeededAt === null && latestVersionState === 'REJECTED';
 
 /** What each decision of the spending approver on a version is recorded as, and the state the version goes to (`US-06-11`). */
-export function decisionOutcomeOf(decision: 'APPROVE' | 'REJECT' | 'REQUEST_CHANGES'): {
-  decision: 'APPROVED' | 'REJECTED' | 'CHANGES_REQUESTED';
-  state: 'APPROVED' | 'REJECTED' | 'CHANGES_REQUESTED';
+export function decisionOutcomeOf(decision: 'APPROVE' | 'RETURN'): {
+  decision: 'APPROVED' | 'CHANGES_REQUESTED';
+  state: 'APPROVED' | 'CHANGES_REQUESTED';
 } {
-  switch (decision) {
-    case 'APPROVE':
-      return { decision: 'APPROVED', state: 'APPROVED' };
-    case 'REJECT':
-      return { decision: 'REJECTED', state: 'REJECTED' };
-    case 'REQUEST_CHANGES':
-      return { decision: 'CHANGES_REQUESTED', state: 'CHANGES_REQUESTED' };
-  }
+  // A version returned to Finance is changed and sent again (`QĐ-111ad`): the state it has always had for that, CHANGES_REQUESTED.
+  return decision === 'APPROVE'
+    ? { decision: 'APPROVED', state: 'APPROVED' }
+    : { decision: 'CHANGES_REQUESTED', state: 'CHANGES_REQUESTED' };
 }
 
 /** What the audit entry `BUDGET_VERSION.<decision>` says: the version, what it replaced (amounts as text), and the reason when one was given. */
@@ -206,84 +174,69 @@ export function commitmentAttachedAfter(
   };
 }
 
-/** The fields of a line of a version that an adjustment can change. */
-export interface LineFields {
-  description: string;
-  planId: string | null;
-  seats: number | null;
-  amountMinor: bigint;
-  lineType: LineType;
-}
-
-const ADJUSTABLE_FIELDS = [
-  'description',
-  'planId',
-  'seats',
-  'amountMinor',
-  'lineType',
-] as const satisfies readonly (keyof LineFields)[];
-
-/** Whether the patch changes what the line of the proposal said: its words, its money, its window, its service or its cycle. */
-export function patchChangesLine(line: LineFields, patch: Partial<LineFields>): boolean {
-  return ADJUSTABLE_FIELDS.some((field) => patch[field] !== undefined && patch[field] !== line[field]);
-}
-
-/** The line of a version made from a line before it (of a proposal, or of the current budget): where it came from, and none of the work on it. */
-export function copiedLineOf(
-  line: {
-    description: string;
-    planId: string | null;
-    seats: number | null;
-    amountMinor: bigint;
-    lineType: LineType;
-    zbb: ZbbExplanation | null;
-    priorityRank: number | null;
-  },
-  origin: { proposalId: string | null; proposalPosition: number | null },
-) {
-  return {
-    proposalId: origin.proposalId,
-    proposalPosition: origin.proposalPosition,
-    description: line.description,
-    planId: line.planId,
-    seats: line.seats,
-    amountMinor: line.amountMinor,
-    financeComment: null,
-    adjustmentReason: null,
-    lineType: line.lineType,
-    zbb: line.zbb,
-    priorityRank: line.priorityRank,
-  };
-}
-
-/**
- * Whether the quarters, as they are after an edit, no longer add up to the base and the reserve as they are after it (`QĐ-82e`): the total
- * of the edit when it gives one, the version's when it does not; quarters taken away have nothing to keep honest.
- */
-export function quartersMismatchAfter(
-  version: { baseMinor: bigint; reserveMinor: bigint; quarters: [bigint, bigint, bigint, bigint] | null },
-  next: { baseMinor?: bigint; reserveMinor?: bigint; quarters?: [bigint, bigint, bigint, bigint] | null },
-): boolean {
-  const total = (next.baseMinor ?? version.baseMinor) + (next.reserveMinor ?? version.reserveMinor);
-  const quarters = next.quarters === undefined ? version.quarters : next.quarters;
-
-  return quarters !== null && !quartersMatch(total, quarters);
-}
-
 /** The reserve a version has when Finance gives none: `percent` of the base, rounded to the nearest minor unit (`QĐ-98`). */
 export const defaultReserveOf = (baseMinor: bigint, percent: number): bigint =>
   (baseMinor * BigInt(percent) + 50n) / 100n;
 
-/** A version whose reserve is not the default share of its base, and says not why (`US-06-09` AC-30); one made before the share was kept asks nothing. */
-export const reserveReasonMissing = (version: {
-  baseMinor: bigint;
-  reserveMinor: bigint;
-  reservePercent: number | null;
-  reserveReason: string | null;
-}): boolean =>
+/**
+ * A version whose reserve is not the default share of its base, and says not why (`US-06-09` AC-30, `QĐ-100h`, `QĐ-100k`, `FR-5.15`(2)).
+ * The default is the one of the organization (`BUDGET_RESERVE_DEFAULT_PERCENT`, read when the version is sent), never the share the version
+ * itself holds: a share Finance chose is a share that differs from the default and asks its reason. One made before the share was kept
+ * (`reservePercent` null) asks nothing.
+ */
+export const reserveReasonMissing = (
+  version: {
+    baseMinor: bigint;
+    reserveMinor: bigint;
+    reservePercent: number | null;
+    reserveReason: string | null;
+  },
+  defaultPercent: number,
+): boolean =>
   version.reservePercent !== null &&
-  version.reserveMinor !== defaultReserveOf(version.baseMinor, version.reservePercent) &&
+  version.reserveMinor !== defaultReserveOf(version.baseMinor, defaultPercent) &&
   !version.reserveReason;
+
+/**
+ * The figures of a version as Finance gives them (`QĐ-111ac`): the base, filled in with what the Cost Center carries into the year when
+ * Finance gives none; the reserve as a share Finance chooses (kept as it was given) or as an amount (the default share is kept), the default
+ * share when neither is given. Whichever way, a reserve that is not the default share of the organization asks its reason when the version
+ * is sent (`reserveReasonMissing`).
+ */
+export function versionFiguresOf(input: {
+  baseMinor?: bigint;
+  reservePercent?: number;
+  reserveMinor?: bigint;
+  carriedOverMinor: bigint;
+  defaultPercent: number;
+}): { baseMinor: bigint; reserveMinor: bigint; reservePercent: number } {
+  const baseMinor = input.baseMinor ?? input.carriedOverMinor;
+  if (input.reserveMinor !== undefined) {
+    return { baseMinor, reserveMinor: input.reserveMinor, reservePercent: input.defaultPercent };
+  }
+  const reservePercent = input.reservePercent ?? input.defaultPercent;
+
+  return { baseMinor, reserveMinor: defaultReserveOf(baseMinor, reservePercent), reservePercent };
+}
+
+/**
+ * The red flag of a version (`QĐ-111ac`): the budget of the department, its base and its reserve together, is below what the Cost Center
+ * carries into the year (`C-09`: the budget of a department is the base plus the reserve). It never stops anything.
+ */
+export const belowCarriedOver = (
+  version: { baseMinor: bigint; reserveMinor: bigint },
+  carriedOverMinor: bigint,
+): boolean => version.baseMinor + version.reserveMinor < carriedOverMinor;
+
+/** What the base and the reserve of a version lack of what the Cost Center carries into the year: the amount told with the red flag, zero when they cover it. */
+export const carriedOverShortfall = (
+  version: { baseMinor: bigint; reserveMinor: bigint },
+  carriedOverMinor: bigint,
+): bigint =>
+  belowCarriedOver(version, carriedOverMinor) ? carriedOverMinor - version.baseMinor - version.reserveMinor : 0n;
+
+/** A version is sent with one file at least that explains it (`QĐ-111ac`); saving a draft asks for none. */
+export const versionAttachmentMissing = (attachedCount: number): boolean => attachedCount < 1;
 
 /** A version as the annual check reads it. */
 export interface CountedVersion {

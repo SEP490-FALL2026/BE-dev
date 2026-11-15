@@ -4,9 +4,9 @@ import { BudgetHarness } from '../../support/budget-harness';
 const h = new BudgetHarness();
 
 /**
- * `qd103-department-effective-year`, Task 2 (QĐ-104e(3), R-I10, AC-16): a department is made only while the budget cycle of the next
- * year exists and was never published; it takes effect on 1 January of that year. With no cycle at all (the installation) it takes
- * effect today. The cycle of this year does not open the window.
+ * `QĐ-104e(3)`, `QĐ-111ba`, `R-16`, `AC-16`: a department is made only from the opening of the budget cycle of the next year until the
+ * first version of that year is sent to the spending approver; it takes effect on 1 January of that year. With no cycle at all (the
+ * installation) it takes effect today. A draft cycle and the cycle of this year do not open the window.
  */
 describe('the window a department is made in (integration, real PostgreSQL)', () => {
   let counter = 0;
@@ -16,15 +16,14 @@ describe('the window a department is made in (integration, real PostgreSQL)', ()
       .set({ Authorization: `Bearer ${h.admin}` })
       .send({ code: code ?? `W-${(counter += 1)}`, name: 'Window' });
   const sql = (text: string, values: unknown[] = []) => h.ctx.sql.query(text, values);
-  const cycleOf = async (year: number, state: 'NEVER' | 'PUBLISHED' | 'TAKEN_BACK') => {
+  /** The only cycle of the year, as a fixture: a draft (nobody opened it) or open. */
+  const cycleOf = async (year: number, state: 'DRAFT' | 'OPEN') => {
     await sql(`DELETE FROM budget_cycles WHERE year = $1`, [year]);
     await sql(
       `INSERT INTO budget_cycles (id, organization_id, year, submission_deadline, decision_deadline, annual_ceiling_minor,
-         shared_pool_reserve_minor, currency, opened_by_employee_id, opened_at, published_by_employee_id, published_at,
-         first_published_at, updated_at)
-       SELECT gen_random_uuid(), o.id, $1, make_date($1, 12, 1), make_date($1, 12, 15), 100000000000000, 0, $2, $3, now(),
-              CASE WHEN $4 = 'PUBLISHED' THEN $3::uuid END, CASE WHEN $4 = 'PUBLISHED' THEN now() END,
-              CASE WHEN $4 = 'NEVER' THEN NULL ELSE now() END, now()
+         shared_pool_reserve_minor, currency, opened_by_employee_id, opened_at, updated_at)
+       SELECT gen_random_uuid(), o.id, $1, make_date($1, 12, 1), make_date($1, 12, 15), 100000000000000, 0, $2,
+              CASE WHEN $4 = 'OPEN' THEN $3::uuid END, CASE WHEN $4 = 'OPEN' THEN now() END, now()
          FROM organizations o`,
       [year, h.reporting, h.finance.employeeId, state],
     );
@@ -39,21 +38,18 @@ describe('the window a department is made in (integration, real PostgreSQL)', ()
     await h.stop();
   });
 
-  it('makes a department that takes effect on 1 January of next year while that cycle was never published (R-I10)', async () => {
+  it('makes a department that takes effect on 1 January of next year while that cycle is open and no version was sent (R-16)', async () => {
     await noCycles();
-    await cycleOf(h.next, 'NEVER');
+    await cycleOf(h.next, 'OPEN');
 
     const made = await create().expect(201);
 
     expect(h.dataOf<{ effectiveFrom: string }>(made).effectiveFrom).toBe(`${h.next}-01-01`);
   });
 
-  it.each([
-    ['published once', 'PUBLISHED'],
-    ['published and then taken back to be changed', 'TAKEN_BACK'],
-  ] as const)('refuses a department once the cycle of next year was %s (409)', async (_name, state) => {
+  it('refuses a department while the cycle of next year is still a draft (409)', async () => {
     await noCycles();
-    await cycleOf(h.next, state);
+    await cycleOf(h.next, 'DRAFT');
 
     const refused = await create().expect(409);
 
@@ -62,7 +58,7 @@ describe('the window a department is made in (integration, real PostgreSQL)', ()
 
   it('refuses a department in the middle of the year when only the cycle of this year exists (AC-16)', async () => {
     await noCycles();
-    await cycleOf(h.year, 'NEVER');
+    await cycleOf(h.year, 'OPEN');
 
     const refused = await create().expect(409);
 
@@ -77,79 +73,34 @@ describe('the window a department is made in (integration, real PostgreSQL)', ()
     expect(h.dataOf<{ effectiveFrom: string }>(made).effectiveFrom).toBe(h.today());
   });
 
-  it('leaves a department that takes effect next year out of the division of this year, and puts it in the division of next year (QT 4.3)', async () => {
+  it('leaves a department that takes effect next year out of the departments of this year, and puts it among those of next year (QT 4.3)', async () => {
     await noCycles();
-    await cycleOf(h.next, 'NEVER');
+    await cycleOf(h.next, 'OPEN');
     const made = h.dataOf<{ id: string }>(await create().expect(201));
-    await cycleOf(h.year, 'NEVER');
-    const division = async (year: number, extra: string[] = []) => ({
-      sharedPoolReserve: h.money(0),
-      departments: [
-        ...(
-          await sql(`SELECT id FROM departments WHERE status = 'ACTIVE' AND effective_from <= make_date($1, 12, 31)`, [
-            year,
-          ])
-        ).rows.map((row: { id: string }) => row.id),
-        ...extra,
-      ].map((departmentId) => ({
-        departmentId,
-        signedCommitments: h.money(1),
-        plannedSeats: h.money(0),
-        priority: h.money(0),
-        explanation: 'Basis of the ceiling',
-      })),
-    });
-    const put = (year: number, body: object) =>
-      request(h.server()).put(`/api/v1/budget-cycles/${year}/department-ceilings`).set(h.as(h.finance)).send(body);
+    await cycleOf(h.year, 'OPEN');
+    const departmentsOf = async (year: number): Promise<string[]> =>
+      h
+        .dataOf<{ departments: { departmentId: string }[] }>(
+          await request(h.server()).get(`/api/v1/budget-cycles/${year}/package`).set(h.as(h.finance)).expect(200),
+        )
+        .departments.map((department) => department.departmentId);
 
-    // This year's division is complete without the new department, and may not name it.
-    await put(h.year, await division(h.year)).expect(200);
-    await request(h.server()).post(`/api/v1/budget-cycles/${h.year}/publish`).set(h.as(h.finance)).expect(201);
-    const named = await put(h.year, await division(h.year, [made.id])).expect(422);
-    expect(h.codeOf(named)).toBe('BUDGET.CEILING_DEPARTMENT_INVALID');
-
-    // Next year's division needs it.
-    await put(h.next, await division(h.next)).expect(200);
-    const published = await request(h.server())
-      .post(`/api/v1/budget-cycles/${h.next}/publish`)
-      .set(h.as(h.finance))
-      .expect(201);
-    expect(h.dataOf<{ status: string }>(published).status).toBe('PUBLISHED');
+    expect(await departmentsOf(h.year)).not.toContain(made.id);
+    expect(await departmentsOf(h.next)).toContain(made.id);
   });
 
-  it('never both makes a department and publishes a division that leaves it out when the two come at once (concurrency)', async () => {
+  // Last: the version it sends stays in the database, and from then on the window of next year is closed.
+  it('refuses a department once the first version of next year was sent to the spending approver, and not before (R-16)', async () => {
     await noCycles();
-    await cycleOf(h.next, 'NEVER');
-    const body = {
-      sharedPoolReserve: h.money(0),
-      departments: (
-        await sql(`SELECT id FROM departments WHERE status = 'ACTIVE' AND effective_from <= make_date($1, 12, 31)`, [
-          h.next,
-        ])
-      ).rows.map((row: { id: string }) => ({
-        departmentId: row.id,
-        signedCommitments: h.money(1),
-        plannedSeats: h.money(0),
-        priority: h.money(0),
-        explanation: 'Basis of the ceiling',
-      })),
-    };
-    await request(h.server())
-      .put(`/api/v1/budget-cycles/${h.next}/department-ceilings`)
-      .set(h.as(h.finance))
-      .send(body)
-      .expect(200);
+    await cycleOf(h.next, 'OPEN');
+    const u = await h.departmentWithHead(`P-WIN${(counter += 1)}`);
+    const proposal = await h.budgetProposed(u.head, u.department.unitId);
+    const version = await h.built(proposal.id);
+    // A version still being drafted is not sent: the window is open.
+    await create().expect(201);
 
-    const [made, published] = await Promise.all([
-      create(),
-      request(h.server()).post(`/api/v1/budget-cycles/${h.next}/publish`).set(h.as(h.finance)),
-    ]);
+    await h.sendVersion(version.id).expect(200);
 
-    // Either the department waited for the publication and was refused, or the publication waited and found the department missing.
-    expect(made.status === 201 && published.status === 201).toBe(false);
-    expect([201, 409]).toContain(made.status);
-    expect([201, 422]).toContain(published.status);
-    if (made.status === 201) expect(h.codeOf(published)).toBe('BUDGET.CEILINGS_INCOMPLETE');
-    if (made.status === 409) expect(h.codeOf(made)).toBe('DEPARTMENT.OUTSIDE_BUDGET_PERIOD');
+    expect(h.codeOf(await create().expect(409))).toBe('DEPARTMENT.OUTSIDE_BUDGET_PERIOD');
   });
 });

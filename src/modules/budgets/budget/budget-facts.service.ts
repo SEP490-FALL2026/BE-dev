@@ -18,7 +18,6 @@ import {
   BudgetNotFinanceError,
   BudgetCostCenterRequiredError,
   BudgetNotYourCostCenterError,
-  BudgetPlanNotFoundError,
 } from './budget.errors';
 
 export interface CostCenterRef {
@@ -111,24 +110,6 @@ export class BudgetFactsService {
     if (actor.roles.includes('FINANCE') || (await this.isSpendingApprover(actor.employeeId))) return;
 
     throw new BudgetNotAReaderError();
-  }
-
-  /** Throws BudgetPlanNotFoundError when a line names a plan the catalog does not have: a line points at a plan, it never makes one. */
-  async requirePlans(planIds: readonly (string | null | undefined)[]): Promise<void> {
-    const wanted = [...new Set(planIds.filter((id): id is string => typeof id === 'string'))];
-    if (wanted.length === 0) return;
-    const found = new Set((await this.catalog.getPlanSummaries(wanted)).map((plan) => plan.planId));
-    const missing = wanted.filter((id) => !found.has(id));
-    if (missing.length > 0) throw new BudgetPlanNotFoundError(missing);
-  }
-
-  /** The name a line takes when only its plan is given: the plan and its application (`QĐ-101n`). */
-  async planNames(planIds: readonly (string | null | undefined)[]): Promise<Map<string, string>> {
-    const wanted = [...new Set(planIds.filter((id): id is string => typeof id === 'string'))];
-    if (wanted.length === 0) return new Map();
-    const found = await this.catalog.getPlanSummaries(wanted);
-
-    return new Map(found.map((plan) => [plan.planId, `${plan.applicationName} - ${plan.planName}`.slice(0, 200)]));
   }
 
   /** The share of the base a new version sets aside as its reserve when Finance gives none (`QĐ-98`); read before a transaction opens. */

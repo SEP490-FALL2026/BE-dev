@@ -69,6 +69,8 @@ import { VendorAccountReviewRepo } from './vendor-account-review/vendor-account-
 import { OutOfProcessCasesController } from './vendor-account-review-queue/out-of-process-cases.controller';
 import { VendorAccountDiscrepanciesController } from './vendor-account-review-queue/vendor-account-discrepancies.controller';
 import { VendorAccountReviewQueryService } from './vendor-account-review-queue/vendor-account-review-query.service';
+import { PoliciesTemplateFacadeModule } from '../policies/policies-template-facade.module';
+import { VendorImportTemplateListener } from './vendor-import/vendor-import-template.listener';
 
 /**
  * What the collectors on company machines send and what is read of it (`G7`): the allowlist of tools, the days an AI tool was used,
@@ -77,6 +79,7 @@ import { VendorAccountReviewQueryService } from './vendor-account-review-queue/v
  */
 @Module({
   imports: [
+    PoliciesTemplateFacadeModule,
     DatabaseModule,
     AuditModule,
     BudgetsModule,
@@ -112,6 +115,7 @@ import { VendorAccountReviewQueryService } from './vendor-account-review-queue/v
     VendorAccountEvidenceRetentionService,
     VendorAccountEvidenceSweeper,
     VendorAccountReviewListener,
+    VendorImportTemplateListener,
     AllowlistRepo,
     AllowlistFactsService,
     AllowlistPublishService,

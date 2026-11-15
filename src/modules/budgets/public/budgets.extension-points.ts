@@ -48,6 +48,38 @@ export class PendingSpendContributions extends Contributions<PendingSpendContrib
   }
 }
 
+/**
+ * What a Cost Center carries into a year from the year before, in the reporting currency (`QĐ-111ac`, `QĐ-111k`): the amount already saved for that year
+ * by the requests approved so far, a right with an end at what the approval kept of it, a right with no end at twelve months of its monthly price of
+ * today. The requests context holds the one rule (the same as the pass of 01/01 that commits it), so the budget of the year after is made on the
+ * number the year will really start with, and the budgets never import it (ADR-0016).
+ */
+export interface CarriedOverContribution {
+  /** Each Cost Center that carries something into `year`, with the amount; a Cost Center that carries nothing may be left out. */
+  carriedOverOf(costCenterIds: readonly string[], year: number, tx?: DbTx): Promise<Map<string, bigint>>;
+}
+
+/** The contexts that tell the budgets what is carried over into a year. The answers are added up; with nobody added, nothing is carried over. */
+@Injectable()
+export class CarriedOverContributions extends Contributions<CarriedOverContribution> {
+  constructor() {
+    super('budgets.carried-over');
+  }
+
+  /** Per Cost Center, from every context that adds its part; a Cost Center that nobody names is not in the answer. */
+  async totals(costCenterIds: readonly string[], year: number, tx?: DbTx): Promise<Map<string, bigint>> {
+    const totals = new Map<string, bigint>();
+    if (costCenterIds.length === 0) return totals;
+    for (const contribution of this.all()) {
+      for (const [costCenterId, amount] of await contribution.carriedOverOf(costCenterIds, year, tx)) {
+        totals.set(costCenterId, (totals.get(costCenterId) ?? 0n) + amount);
+      }
+    }
+
+    return totals;
+  }
+}
+
 /** What a commitment shows of the request it is held for, as the context that keeps requests tells it. */
 export interface CommitmentRequestView {
   id: string;

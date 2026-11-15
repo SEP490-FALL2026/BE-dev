@@ -1,5 +1,6 @@
 import { API_COVERAGE_PURCHASE } from './api-coverage-manifest-purchase';
 import { API_COVERAGE_REVIEW } from './api-coverage-manifest-review';
+import { POLICY_AND_PROFILE_OPERATIONS } from './api-coverage-manifest-policies';
 
 /** Inventory of exported HTTP operations. Add entries and HTTP tests together. */
 export const API_COVERAGE_MANIFEST: readonly string[] = [
@@ -57,7 +58,6 @@ export const API_COVERAGE_MANIFEST: readonly string[] = [
   'GET /api/v1/budget-proposals',
   'GET /api/v1/budget-proposals/{id}',
   'GET /api/v1/budget-proposals/{id}/attachments',
-  'GET /api/v1/budget-proposals/{id}/lines',
   'POST /api/v1/budget-proposals/{id}/withdrawal',
   'POST /api/v1/budget-proposals/{id}/return',
   'POST /api/v1/budget-proposals/{id}/resubmission',
@@ -67,10 +67,7 @@ export const API_COVERAGE_MANIFEST: readonly string[] = [
   'GET /api/v1/budget-versions/{id}/attachments',
   'POST /api/v1/budget-versions/{id}/attachments',
   'POST /api/v1/budget-versions/{id}/attachments/{attachmentId}/removal',
-  'GET /api/v1/budget-versions/{id}/lines',
   'PUT /api/v1/budget-versions/{id}',
-  'PUT /api/v1/budget-versions/{id}/lines/{position}',
-  'POST /api/v1/budget-versions/{id}/lines',
   'GET /api/v1/budget-versions/{id}/history',
   'POST /api/v1/budget-versions/{id}/submission',
   'POST /api/v1/budget-versions/{id}/decision',
@@ -121,19 +118,17 @@ export const API_COVERAGE_MANIFEST: readonly string[] = [
   'GET /api/v1/budget-cycles/{year}/baseline',
   'GET /api/v1/budget-cycles/{year}/package',
   'PATCH /api/v1/budget-cycles/{year}',
-  'PUT /api/v1/budget-cycles/{year}/department-ceilings',
-  'POST /api/v1/budget-cycles/{year}/publish',
+  'DELETE /api/v1/budget-cycles/{year}',
+  'POST /api/v1/budget-cycles/{year}/opening',
   'GET /api/v1/budget-commitments',
   'GET /api/v1/budget-commitments/{id}/releases',
   'POST /api/v1/budget-commitments/{id}/release',
   'GET /api/v1/budget-commitments/{id}/invoices',
-  'POST /api/v1/budget-versions/{id}/imports',
   'POST /api/v1/budget-attachments/{id}/complete',
   'POST /api/v1/budget-attachments/{id}/discard',
   'POST /api/v1/budget-attachments/{id}/links',
   'GET /api/v1/budget-attachments/mine',
   'GET /api/v1/budgets/mine',
-  'GET /api/v1/budgets/mine/lines',
   'GET /api/v1/budgets/mine/versions',
   'GET /api/v1/budgets',
   'GET /api/v1/budgets/summary',
@@ -327,6 +322,7 @@ export const API_COVERAGE_MANIFEST: readonly string[] = [
   'GET /api/v1/health/live',
   'GET /api/v1/health/ready',
   'GET /api/v1/me',
+  ...POLICY_AND_PROFILE_OPERATIONS,
   'GET /api/v1/me/departure-notice',
   'GET /api/v1/me/department-transfer',
   'GET /api/v1/me/software-rights',

@@ -136,6 +136,22 @@ describe('budget cycles and department ceilings (integration, PostgreSQL constra
     expect(await cycle({ year: 2035, published: false, first: true })).toBeNull();
   });
 
+  it('keeps a draft cycle with neither opening time nor opener, and refuses one with only one of them (QĐ-111z)', async () => {
+    const draft = (year: number, openedAt: string | null, openedBy: string | null) =>
+      sqlState(
+        sql,
+        `INSERT INTO budget_cycles (id, organization_id, year, submission_deadline, decision_deadline, annual_ceiling_minor,
+           currency, opened_by_employee_id, opened_at, updated_at)
+         VALUES ($1, $2, $3, '2026-12-01', '2026-12-15', 1000, 'VND', $4, $5, now())`,
+        [randomUUID(), organizationId, year, openedBy, openedAt],
+      );
+
+    expect(await draft(2041, null, null)).toBeNull();
+    expect(await draft(2042, '2026-11-01T00:00:00Z', employeeId)).toBeNull();
+    expect(await draft(2043, '2026-11-01T00:00:00Z', null)).toBe('23514');
+    expect(await draft(2044, null, employeeId)).toBe('23514');
+  });
+
   it('keeps the total of a department ceiling equal to its three parts, none of them negative', async () => {
     expect(await ceiling()).toBeNull();
     expect(await ceiling({ total: '351' })).toBe('23514');

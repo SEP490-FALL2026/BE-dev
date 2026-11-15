@@ -31,8 +31,6 @@ export interface PaidSpec {
 export interface BudgetSpec {
   total: number;
   year?: number;
-  /** The lines of the plan; one line of the last month of the year when not given. */
-  lines?: object[];
   /** The reserve of the version, on top of the base `total`; none when not given (BR-MF1-06e). */
   reserve?: number;
   /** What the attached commitments hold, and what has become an expense. */
@@ -168,7 +166,7 @@ export class SpendHarness extends BudgetHarness {
       headToken: unit.head.account.accessToken,
       financeToken: this.finance.accessToken,
       deciderToken: this.deciderOf().accessToken,
-      proposal: this.proposalBody(unit.department.unitId, spec.lines ?? [this.line()], year),
+      proposal: this.proposalBody(unit.department.unitId, spec.total, year),
       version: {
         base: this.money(spec.total),
         reserve: this.money(spec.reserve ?? 0),

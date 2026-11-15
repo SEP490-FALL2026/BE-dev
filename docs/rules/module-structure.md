@@ -32,7 +32,7 @@ Module chỉ import module **tầng thấp hơn**, hoặc module cùng tầng c�
 | ---- | --------------------------------------------------------------- | -------------------------------- |
 | T1   | `audit`, `notifications`                                        | —                                |
 | T2   | `organization`, `identity-access`                               | `identity-access → organization` |
-| T3   | `finance`, `operating-parameters`                               | `operating-parameters → finance` |
+| T3   | `finance`, `operating-parameters`, `policies`                   | `operating-parameters → finance` |
 | T4   | `catalog`, `licensing`                                          | `licensing → catalog`            |
 | T5   | `budgets`, `requests`, `data-import`, `devices`                 | `requests → budgets`             |
 | T6   | `personnel`, `onboarding`, `installation`, `ai-assist`, `usage` | —                                |

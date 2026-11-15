@@ -3,6 +3,7 @@ import type {
   CreateDownloadUrlInput,
   CreateUploadUrlInput,
   ObjectStoragePort,
+  PutObjectInput,
   StoredObjectMetadata,
 } from '../../src/infrastructure/object-storage/object-storage.port';
 
@@ -26,7 +27,7 @@ const GENUINE_START: Record<string, number[]> = {
 };
 
 export type FakeStorageCall =
-  'head' | 'readPrefix' | 'copyIfMatch' | 'delete' | 'createUploadUrl' | 'createDownloadUrl';
+  'head' | 'readPrefix' | 'copyIfMatch' | 'delete' | 'putObject' | 'createUploadUrl' | 'createDownloadUrl';
 
 /**
  * The object storage in memory, for the tests that need what a real bucket would say: which links were asked for and
@@ -51,6 +52,8 @@ export class FakeObjectStorage implements ObjectStoragePort {
     issuedAt: Date;
   }[] = [];
   readonly copied: { from: string; to: string }[] = [];
+  /** The keys the server wrote with `putObject`, in order. */
+  readonly written: string[] = [];
   /** Runs after the object was looked at and before it is copied: a client that puts the file again in that moment. */
   beforeCopy: ((fromKey: string) => void) | undefined;
   /**
@@ -123,6 +126,19 @@ export class FakeObjectStorage implements ObjectStoragePort {
     }
     this.objects.set(toKey, { ...stored, etag: `e${(this.counter += 1)}` });
     this.copied.push({ from: fromKey, to: toKey });
+  }
+
+  /** What the server itself writes (a picture it read and judged): the bytes are kept as they came, with the type it declared. */
+  async putObject(input: PutObjectInput): Promise<void> {
+    this.refuseWhileDown('putObject');
+    await this.beforeCall?.('putObject', input.key);
+    this.objects.set(input.key, {
+      contentLength: input.body.length,
+      contentType: input.contentType,
+      content: Uint8Array.from(input.body),
+      etag: `e${(this.counter += 1)}`,
+    });
+    this.written.push(input.key);
   }
 
   async delete(key: string): Promise<void> {

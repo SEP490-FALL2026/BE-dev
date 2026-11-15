@@ -61,6 +61,16 @@ describe('contract and document routes (e2e, no database)', () => {
     }
   });
 
+  it('turns away a bank statement from Finance too, the only role that could choose it: 422, not 403', async () => {
+    const response = await request(app.getHttpServer())
+      .post(DOCUMENTS)
+      .set('Authorization', bearer(principal(['FINANCE'])))
+      .send({ fileName: 'a.pdf', contentType: 'application/pdf', sizeBytes: 1, purpose: 'COST_STATEMENT' })
+      .expect(422);
+
+    expect(bodyOf(response).error.code).toBe('VALIDATION_ERROR');
+  });
+
   it('keeps contract making for the IT Admin: Finance reads a contract and makes none', async () => {
     await request(app.getHttpServer())
       .post(CONTRACTS)
@@ -83,6 +93,12 @@ describe('contract and document routes (e2e, no database)', () => {
       'post',
       DOCUMENTS,
       { fileName: 'a.pdf', contentType: 'application/pdf', sizeBytes: 1, purpose: 'OTHER' },
+    ],
+    [
+      'a bank statement as the purpose, which no new file has any more',
+      'post',
+      DOCUMENTS,
+      { fileName: 'a.pdf', contentType: 'application/pdf', sizeBytes: 1, purpose: 'COST_STATEMENT' },
     ],
     [
       'a size that is not a whole number',

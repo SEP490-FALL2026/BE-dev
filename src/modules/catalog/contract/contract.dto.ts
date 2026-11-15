@@ -12,7 +12,7 @@ import {
   MAX_CONTRACT_NUMBER_LENGTH,
   MAX_CONTRACT_REASON_LENGTH,
 } from './contract-fields.policy';
-import { MAX_CONTRACT_NAME_LENGTH, MAX_FILE_NAME_LENGTH } from './contract.policy';
+import { MAX_CONTRACT_NAME_LENGTH, MAX_FILE_NAME_LENGTH, NEW_DOCUMENT_PURPOSES } from './contract.policy';
 
 /** A day a request carries, worded as every date of a request is (it must exist) with what the day means. */
 const day = (meaning: string) =>
@@ -86,14 +86,10 @@ export const listContractsQuerySchema = z.strictObject({
 });
 export const linkSubscriptionBodySchema = z.strictObject({ subscriptionId: z.uuid() });
 export const contractSubscriptionParamSchema = z.strictObject({ id: z.uuid(), subscriptionId: z.uuid() });
-const documentPurpose = z.enum([
-  'CONTRACT_ATTACHMENT',
-  'PURCHASE_DOCUMENT',
-  'TAX_PAYMENT_PROOF',
-  'SIGNATURE_RECORD',
-  'IMPORT_SOURCE',
-  'COST_STATEMENT',
-]);
+/** What a new file may be declared as: no bank statement any more. */
+const documentPurposeToDeclare = z.enum(NEW_DOCUMENT_PURPOSES);
+/** What a stored file shows as its purpose: a file kept before as a bank statement still reads as one (`COST_STATEMENT`), though no new one is taken. */
+const documentPurpose = z.enum([...NEW_DOCUMENT_PURPOSES, 'COST_STATEMENT']);
 export const createDocumentBodySchema = z.strictObject({
   fileName: z
     .string()
@@ -101,7 +97,7 @@ export const createDocumentBodySchema = z.strictObject({
     .max(MAX_FILE_NAME_LENGTH * 2),
   contentType: z.string().min(1).max(100),
   sizeBytes: z.number().int().nonnegative().max(1_000_000_000),
-  purpose: documentPurpose,
+  purpose: documentPurposeToDeclare,
 });
 export const attachDocumentBodySchema = z.strictObject({ contractId: z.uuid() });
 export const idParamSchema = z.strictObject({ id: z.uuid() });

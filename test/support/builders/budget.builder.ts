@@ -4,6 +4,7 @@ import { VersionDecisionService } from '../../../src/modules/budgets/version/ver
 import { VersionCreationService } from '../../../src/modules/budgets/version/version-creation.service';
 import { VersionService } from '../../../src/modules/budgets/version/version.service';
 import type { HttpTestApp } from '../http-test-app';
+import { attachedVersionFile, uploadedProposalFile } from '../budget-files';
 import { principalOf, sent } from './account.builder';
 
 /*
@@ -17,29 +18,20 @@ export interface ApprovedBudgetInput {
   headToken: string;
   financeToken: string;
   deciderToken: string;
-  /** The body of `POST /budget-proposals`. */
+  /** The body of `POST /budget-proposals` (`BM-10`); the file is uploaded here when it names none. */
   proposal: object;
   /** The body of `POST /budget-versions`, without the proposal it is built from. */
   version: Record<string, unknown>;
 }
 
-/** A proposal body whose lines have the kind and the priority rank the form requires (`QT 4.4`), by their place when the suite gives none. */
-function withKindAndRank(proposal: object): object {
-  const { lines } = proposal as { lines?: object[] };
-
-  return lines
-    ? { ...proposal, lines: lines.map((line, index) => ({ lineType: 'RENEW', priorityRank: index + 1, ...line })) }
-    : proposal;
-}
-
 /** Proposed, built, sent and approved; the version as `POST /budget-versions` answers it. */
 export async function approvedBudget<T>(ctx: HttpTestApp, input: ApprovedBudgetInput): Promise<T> {
+  const head = await principalOf(ctx, input.headToken);
+  // BM-10 names one file at least, and a version is sent with one at least (QĐ-111ab, QĐ-111ac).
+  const attachmentIds = [await uploadedProposalFile(ctx.sql, head.employeeId)];
   const proposal = await ctx.app
     .get(ProposalService, { strict: false })
-    .submit(
-      await principalOf(ctx, input.headToken),
-      BudgetProposalBodyDto.create(sent(withKindAndRank(input.proposal))),
-    );
+    .submit(head, BudgetProposalBodyDto.create(sent({ attachmentIds, ...input.proposal })));
   const versions = ctx.app.get(VersionService, { strict: false });
   const finance = await principalOf(ctx, input.financeToken);
   const version = await ctx.app
@@ -51,6 +43,7 @@ export async function approvedBudget<T>(ctx: HttpTestApp, input: ApprovedBudgetI
         { proposalId: string }
       >,
     );
+  await attachedVersionFile(ctx.sql, version.id, finance.employeeId);
   await versions.send(finance, version.id);
   await ctx.app
     .get(VersionDecisionService, { strict: false })

@@ -16,6 +16,7 @@ flowchart BT
   subgraph T3["T3"]
     finance["finance"]
     operating_parameters["operating-parameters"]
+    policies["policies"]
   end
   subgraph T4["T4"]
     catalog["catalog"]
@@ -44,14 +45,15 @@ flowchart BT
   ai_assist -->|2| operating_parameters
   ai_assist -->|4| organization
   ai_assist -->|4| requests
-  budgets -->|20| audit
-  budgets -->|5| catalog
-  budgets -->|3| finance
+  budgets -->|18| audit
+  budgets -->|4| catalog
+  budgets -->|2| finance
   budgets -->|5| identity_access
   budgets -->|2| licensing
   budgets -->|6| notifications
-  budgets -->|4| operating_parameters
-  budgets -->|19| organization
+  budgets -->|3| operating_parameters
+  budgets -->|18| organization
+  budgets -->|4| policies
   catalog -->|23| audit
   catalog -->|10| finance
   catalog -->|8| identity_access
@@ -73,13 +75,14 @@ flowchart BT
   data_import -->|9| licensing
   data_import -->|2| notifications
   data_import -->|11| organization
+  data_import -->|5| policies
   devices -->|10| audit
   devices -->|3| catalog
   devices -->|2| identity_access
   devices -->|12| organization
   finance -->|3| audit
   finance -->|3| organization
-  identity_access -->|16| audit
+  identity_access -->|18| audit
   identity_access -->|10| notifications
   identity_access -->|36| organization
   installation -->|6| audit
@@ -87,6 +90,7 @@ flowchart BT
   installation -->|2| finance
   installation -->|11| identity_access
   installation -->|8| organization
+  installation -->|2| policies
   licensing -->|30| audit
   licensing -->|54| catalog
   licensing -->|2| finance
@@ -94,6 +98,7 @@ flowchart BT
   licensing -->|8| notifications
   licensing -->|7| operating_parameters
   licensing -->|56| organization
+  licensing -->|4| policies
   onboarding -->|2| catalog
   onboarding -->|2| data_import
   onboarding -->|2| identity_access
@@ -121,15 +126,19 @@ flowchart BT
   personnel -->|8| operating_parameters
   personnel -->|97| organization
   personnel -->|8| requests
+  policies -->|5| audit
+  policies -->|4| identity_access
+  policies -->|2| notifications
+  policies -->|7| organization
   requests -->|62| audit
-  requests -->|29| budgets
+  requests -->|30| budgets
   requests -->|42| catalog
   requests -->|11| finance
   requests -->|38| identity_access
   requests -->|61| licensing
   requests -->|12| notifications
   requests -->|12| operating_parameters
-  requests -->|96| organization
+  requests -->|97| organization
   usage -->|10| audit
   usage -->|3| budgets
   usage -->|15| catalog
@@ -139,7 +148,8 @@ flowchart BT
   usage -->|8| licensing
   usage -->|2| notifications
   usage -->|17| organization
+  usage -->|4| policies
   usage -->|3| requests
 ```
 
-100 module edges.
+109 module edges.

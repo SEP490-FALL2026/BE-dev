@@ -3,9 +3,11 @@ import { Prisma } from '../../../generated/prisma/client';
 import { PrismaService } from '../../../infrastructure/database/prisma.service';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { VersionStateName } from './budget.policy';
-import { lineData, type VersionLineRecord } from './version-line.repo';
 
 export type VersionState = VersionStateName;
+
+/** Where a version came from (`QĐ-100h`, `QĐ-111bb`, `QĐ-111ag`). */
+export type VersionOrigin = 'PROPOSAL' | 'BASELINE_NO_HEAD' | 'BASELINE_NO_PROPOSAL' | 'ADJUSTMENT';
 
 export interface VersionRecord {
   id: string;
@@ -21,7 +23,7 @@ export interface VersionRecord {
   /** Why Finance moved the base, when it did (`QĐ-100v`). */
   baseReason: string | null;
   /** Where the version came from: the head's proposal, or the baseline Finance built when nobody headed the department (`QĐ-100h`). */
-  origin: 'PROPOSAL' | 'BASELINE_NO_HEAD';
+  origin: VersionOrigin;
   reserveMinor: bigint;
   totalMinor: bigint;
   currency: string;
@@ -31,7 +33,6 @@ export interface VersionRecord {
   /** The share of the base the reserve defaulted to when the version was made; null before `QĐ-98`. */
   reservePercent: number | null;
   reserveReason: string | null;
-  quarters: [bigint, bigint, bigint, bigint] | null;
   reason: string | null;
   createdByEmployeeId: string;
   createdAt: Date;
@@ -55,17 +56,15 @@ export interface NewVersion {
   basedOnVersionId: string | null;
   rejectedPredecessorId?: string | null;
   /** Built from the baseline (`QĐ-100h`) rather than from a proposal; the default is a proposal. */
-  origin?: 'PROPOSAL' | 'BASELINE_NO_HEAD';
+  origin?: VersionOrigin;
   baseMinor: bigint;
   reserveMinor: bigint;
   currency: string;
   reservePercent: number | null;
   reserveReason: string | null;
-  quarters: [bigint, bigint, bigint, bigint] | null;
   reason: string | null;
   createdByEmployeeId: string;
   now: Date;
-  lines: Omit<VersionLineRecord, 'position'>[];
 }
 
 /** The fields of a version Finance changes while it is a draft: a key that is present is written. */
@@ -73,8 +72,9 @@ export interface VersionPatch {
   baseMinor?: bigint;
   baseReason?: string | null;
   reserveMinor?: bigint;
+  /** The share of the base the reserve is, when Finance chose one (`QĐ-111ac`). */
+  reservePercent?: number;
   reserveReason?: string | null;
-  quarters?: [bigint, bigint, bigint, bigint] | null;
   reason?: string | null;
 }
 
@@ -98,10 +98,6 @@ const toRecord = (row: Prisma.BudgetVersionGetPayload<object>): VersionRecord =>
   highValueAmountMinor: row.highValueAmountMinor,
   reservePercent: row.reservePercent,
   reserveReason: row.reserveReason,
-  quarters:
-    row.q1Minor === null || row.q2Minor === null || row.q3Minor === null || row.q4Minor === null
-      ? null
-      : [row.q1Minor, row.q2Minor, row.q3Minor, row.q4Minor],
   reason: row.reason,
   createdByEmployeeId: row.createdByEmployeeId,
   createdAt: row.createdAt,
@@ -111,13 +107,6 @@ const toRecord = (row: Prisma.BudgetVersionGetPayload<object>): VersionRecord =>
   neverCurrent: row.neverCurrent,
   expiredAt: row.expiredAt,
   rejectedPredecessorId: row.rejectedPredecessorId,
-});
-
-const quarterColumns = (quarters: [bigint, bigint, bigint, bigint] | null) => ({
-  q1Minor: quarters?.[0] ?? null,
-  q2Minor: quarters?.[1] ?? null,
-  q3Minor: quarters?.[2] ?? null,
-  q4Minor: quarters?.[3] ?? null,
 });
 
 /**
@@ -183,11 +172,9 @@ export class VersionRepo {
         highValueAmountMinor: null,
         reservePercent: input.reservePercent,
         reserveReason: input.reserveReason,
-        ...quarterColumns(input.quarters),
         reason: input.reason,
         createdByEmployeeId: input.createdByEmployeeId,
         createdAt: input.now,
-        lines: { create: input.lines.map((line, index) => ({ position: index + 1, ...lineData(line) })) },
       },
       select: { id: true },
     });
@@ -276,7 +263,7 @@ export class VersionRepo {
     const rows = await (tx ?? this.prisma).budgetVersion.findMany({
       where: {
         costCenterId,
-        origin: 'BASELINE_NO_HEAD',
+        origin: { in: ['BASELINE_NO_HEAD', 'BASELINE_NO_PROPOSAL'] },
         state: { in: ['DRAFT', 'SENT', 'CHANGES_REQUESTED'] },
         detachedAt: null,
       },
@@ -392,23 +379,30 @@ export class VersionRepo {
     );
   }
 
+  /**
+   * Writes what Finance changed. The forecast by quarter is gone (`QĐ-111ac`) but a draft or a version sent back that an older release
+   * left can still hold it, and the database wants the four quarters to add up to the total or to be all empty
+   * (`budget_versions_quarters_check`): when the total moves, the quarters are let go.
+   */
   async patch(tx: DbTx, id: string, patch: VersionPatch): Promise<void> {
     const base = patch.baseMinor;
     const reserve = patch.reserveMinor;
     const current = await tx.budgetVersion.findUniqueOrThrow({
       where: { id },
-      select: { baseMinor: true, reserveMinor: true },
+      select: { baseMinor: true, reserveMinor: true, totalMinor: true },
     });
     const nextBase = base ?? current.baseMinor;
     const nextReserve = reserve ?? current.reserveMinor;
+    const nextTotal = nextBase + nextReserve;
     await tx.budgetVersion.update({
       where: { id },
       data: {
         baseMinor: nextBase,
         reserveMinor: nextReserve,
-        totalMinor: nextBase + nextReserve,
-        ...(patch.quarters !== undefined ? quarterColumns(patch.quarters) : {}),
+        totalMinor: nextTotal,
+        ...(nextTotal !== current.totalMinor ? { q1Minor: null, q2Minor: null, q3Minor: null, q4Minor: null } : {}),
         ...(patch.reserveReason !== undefined ? { reserveReason: patch.reserveReason } : {}),
+        ...(patch.reservePercent !== undefined ? { reservePercent: patch.reservePercent } : {}),
         ...(patch.baseReason !== undefined ? { baseReason: patch.baseReason } : {}),
       },
     });
@@ -432,6 +426,16 @@ export class VersionRepo {
     return (tx ?? this.prisma).budgetVersion.count({
       where: { organizationId, year, state: 'SENT', detachedAt: null },
     });
+  }
+
+  /** Whether any version of the year was ever sent to the spending approver, in any state it is in now (the first sending of the cycle, `R-16`). */
+  async anySentOfYear(organizationId: string, year: number, tx?: DbTx): Promise<boolean> {
+    return (
+      (await (tx ?? this.prisma).budgetVersion.count({
+        where: { organizationId, year, sentAt: { not: null } },
+        take: 1,
+      })) > 0
+    );
   }
 
   async setState(tx: DbTx, id: string, state: VersionState): Promise<void> {
@@ -481,6 +485,29 @@ export class VersionRepo {
     });
 
     return new Map(rows.map((row) => [row.id, row.totalMinor]));
+  }
+
+  /** How many files are attached to the version now (a removed one is not): what its sending needs one of (`QĐ-111ac`). */
+  countAttachedFiles(tx: DbTx, versionId: string): Promise<number> {
+    return tx.budgetAttachment.count({ where: { versionId, status: 'ATTACHED' } });
+  }
+
+  /** The newest version of each of these Cost Centers for the year that is not detached, whatever its state, by Cost Center: one statement. */
+  async latestOfCostCenters(
+    costCenterIds: readonly string[],
+    year: number,
+    tx?: DbTx,
+  ): Promise<Map<string, VersionRecord>> {
+    const latest = new Map<string, VersionRecord>();
+    if (costCenterIds.length === 0) return latest;
+    const rows = await (tx ?? this.prisma).budgetVersion.findMany({
+      where: { costCenterId: { in: [...costCenterIds] }, year, detachedAt: null },
+      orderBy: [{ costCenterId: 'asc' }, { number: 'desc' }],
+      distinct: ['costCenterId'],
+    });
+    for (const row of rows) latest.set(row.costCenterId, toRecord(row));
+
+    return latest;
   }
 
   /** The newest version of the Cost Center and year that is read as its budget or is not closed: what the head is told of. */

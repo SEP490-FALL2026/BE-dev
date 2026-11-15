@@ -30,7 +30,7 @@ import {
   isStorageObjectMissing as isNotFound,
   SIGNATURE_PREFIX_BYTES,
   mayOpen,
-  type DocumentPurpose,
+  type NewDocumentPurpose,
 } from './contract.policy';
 import { ContractRepo } from './contract.repo';
 import { DocumentRepo, type DocumentRecord } from './document.repo';
@@ -79,7 +79,7 @@ export class DocumentService {
    */
   async create(
     actor: AuthenticatedPrincipal,
-    input: { fileName: string; contentType: string; sizeBytes: number; purpose: DocumentPurpose },
+    input: { fileName: string; contentType: string; sizeBytes: number; purpose: NewDocumentPurpose },
   ): Promise<{ document: DocumentRecord; upload: UploadInstructions }> {
     assertMayChoosePurpose(input.purpose, actor.roles);
     assertPurposeAvailable(input.purpose);

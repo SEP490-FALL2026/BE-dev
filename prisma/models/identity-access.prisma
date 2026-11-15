@@ -46,6 +46,12 @@ model AppUser {
   emailVerifiedAt         DateTime?                @map("email_verified_at") @db.Timestamptz(3)
   // The day the person behind the account left (set once, by the record of a departure); the account itself is locked by the Super Admin.
   employeeLeftOn          DateTime?                @map("employee_left_on") @db.Date
+  // The two things a person edits on their own account (`QĐ-111at`): the key of the picture in the object storage and its type and time, and the work
+  // phone. All three picture columns are set together or none; both are cleared when the person is recorded as having left (`QĐ-111av`).
+  avatarObjectKey         String?                  @map("avatar_object_key")
+  avatarContentType       String?                  @map("avatar_content_type")
+  avatarUpdatedAt         DateTime?                @map("avatar_updated_at") @db.Timestamptz(3)
+  workPhone               String?                  @map("work_phone")
   createdAt               DateTime                 @default(now()) @map("created_at") @db.Timestamptz(3)
   updatedAt               DateTime                 @updatedAt @map("updated_at") @db.Timestamptz(3)
 
@@ -232,4 +238,16 @@ model EmployeeAccessBlock {
 
   @@index([organizationId])
   @@map("employee_access_blocks")
+}
+
+// The objects of the picture storage that nobody points to any more and that a sweeper of the API process deletes after the transaction that
+// stopped pointing at them committed (an object is never deleted inside a transaction: the transaction can still roll back). `purged_at` null = still to do.
+model AvatarPurge {
+  id             String    @id @default(uuid(7)) @db.Uuid
+  organizationId String    @map("organization_id") @db.Uuid
+  objectKey      String    @map("object_key")
+  requestedAt    DateTime  @default(now()) @map("requested_at") @db.Timestamptz(3)
+  purgedAt       DateTime? @map("purged_at") @db.Timestamptz(3)
+
+  @@map("avatar_purges")
 }

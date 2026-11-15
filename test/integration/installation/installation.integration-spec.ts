@@ -128,6 +128,44 @@ describe('installation command use case (integration, real PostgreSQL)', () => {
     expect(everything).not.toContain('$argon2');
   });
 
+  it('writes the eight policies with version one in force, each asking to be acknowledged, and never lets a published version change (QĐ-112b, PL-1.5)', async () => {
+    const result = await service.install(input(), PASSWORD);
+
+    const versions = await sql.query<{
+      code: string;
+      version_number: number;
+      requires_reacknowledgement: boolean;
+      change_note: string;
+      roles: number;
+      steps: number;
+    }>(
+      `SELECT p.code, v.version_number, v.requires_reacknowledgement, v.change_note,
+              cardinality(v.applicable_roles)::int AS roles, jsonb_array_length(v.content -> 'steps')::int AS steps
+         FROM policies p JOIN policy_versions v ON v.policy_id = p.id
+        WHERE p.organization_id = $1 ORDER BY p.code`,
+      [result.organizationId],
+    );
+    expect(versions.rows.map((row) => row.code)).toEqual([
+      'POL-GEN',
+      'POL-MF1',
+      'POL-MF2',
+      'POL-MF3',
+      'POL-MF4',
+      'POL-MF5',
+      'POL-SAAS',
+      'POL-USAGE',
+    ]);
+    expect(new Set(versions.rows.map((row) => row.version_number))).toEqual(new Set([1]));
+    expect(new Set(versions.rows.map((row) => row.requires_reacknowledgement))).toEqual(new Set([true]));
+    expect(versions.rows.every((row) => row.change_note.length > 10 && row.roles >= 2)).toBe(true);
+    expect(versions.rows.reduce((total, row) => total + row.steps, 0)).toBe(7);
+    await expect(
+      sql.query(`UPDATE policy_versions SET title = 'changed' WHERE version_number = 1 AND organization_id = $1`, [
+        result.organizationId,
+      ]),
+    ).rejects.toThrow(/never changed or deleted/);
+  });
+
   it('seeds the seven standard functional groups of the organization, two of them fixed (QĐ-111bf, CT-1.1)', async () => {
     await service.install(input(), PASSWORD);
 

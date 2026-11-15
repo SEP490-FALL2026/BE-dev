@@ -108,6 +108,9 @@ export const IN_APP_NOTIFICATION_CODES = [
   'BUDGET_PROPOSAL_TASK_ASSIGNED',
   'BUDGET_PROPOSAL_TASK_WAITING',
   'BUDGET_CYCLE_OPENED',
+  // The submission deadline of an open cycle moved, with a reason kept in the Audit Trail (`QĐ-111z`, `US-06-15` AC-21).
+  'BUDGET_CYCLE_DEADLINE_MOVED',
+  // No longer sent (`QĐ-111aa`: there is no ceiling of a department to publish); notices written before it stay readable.
   'BUDGET_DEPARTMENT_CEILING_PUBLISHED',
   // The deadlines of the cycle (`QĐ-103i`, `R-I05`): a head who has not proposed, the departments nobody heads, how many departments have
   // not proposed, the versions still waiting after the decision deadline, a department with no Cost Center yet, and a head named after a
@@ -186,6 +189,8 @@ export const IN_APP_NOTIFICATION_CODES = [
   // A handover cancelled after its last working day left revocation tasks in progress with no reason of the departure: the IT Admin closes
   // them by what happened at the provider (`QĐ-110c`, MF2-C).
   'DEPARTURE_REVOCATION_IT_CLOSE',
+  // A new version of a policy is in force (`QĐ-111bi`): told once to each account of a role it applies to, with the code, the number and whether it asks to be acknowledged again.
+  'POLICY_PUBLISHED',
 ] as const;
 
 export type InAppNotificationCode = (typeof IN_APP_NOTIFICATION_CODES)[number];

@@ -262,7 +262,7 @@ describe('MF-4 ngân sách năm: đề xuất → phiên bản → duyệt @MF4 
       expect(
         (
           await call().post('NV-CEO', `/budget-versions/${id}/decision`, {
-            decision: 'REQUEST_CHANGES',
+            decision: 'RETURN',
             reason: 'Giải trình thêm dự phòng',
           })
         ).status,
@@ -275,24 +275,29 @@ describe('MF-4 ngân sách năm: đề xuất → phiên bản → duyệt @MF4 
       expect(await versionState(id)).toBe('SENT');
     });
 
-    it('Người duyệt chi từ chối một phiên bản khác phải nêu lý do #14 @B2', async () => {
+    it('Người duyệt chi trả về một phiên bản khác phải nêu lý do; không còn từ chối (QĐ-111ad) #14 @B2', async () => {
       const proposalId = await proposal('NV-DEP');
       const created = await call().post('NV-FIN1', '/budget-versions', { proposalId, base: { amount: '30000000' } });
       const id = (wire(created).version as { id: string }).id;
       expect((await call().post('NV-FIN1', `/budget-versions/${id}/submission`)).status).toBe(200);
 
-      const noReason = await call().post('NV-CEO', `/budget-versions/${id}/decision`, { decision: 'REJECT' });
+      const noReason = await call().post('NV-CEO', `/budget-versions/${id}/decision`, { decision: 'RETURN' });
       expect([noReason.status, call().codeOf(noReason)]).toEqual([422, 'VALIDATION_ERROR']);
+      const refusal = await call().post('NV-CEO', `/budget-versions/${id}/decision`, {
+        decision: 'REJECT',
+        reason: 'Chưa cần năm nay',
+      });
+      expect([refusal.status, call().codeOf(refusal)]).toEqual([422, 'VALIDATION_ERROR']);
       expect(await versionState(id)).toBe('SENT');
       expect(
         (
           await call().post('NV-CEO', `/budget-versions/${id}/decision`, {
-            decision: 'REJECT',
+            decision: 'RETURN',
             reason: 'Chưa cần năm nay',
           })
         ).status,
       ).toBe(200);
-      expect(await versionState(id)).toBe('REJECTED');
+      expect(await versionState(id)).toBe('CHANGES_REQUESTED');
     });
   });
 

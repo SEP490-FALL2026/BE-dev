@@ -259,6 +259,10 @@ cùng cần; phần ghi nằm ở `assessment/assessment.repo.ts`.
   sách. Lượt lỗi giữa chừng: lượt sau đi tiếp sau `resume_after_id`, không ghi lại audit bỏ qua. Tổ chức chưa có dấu: lượt đầu chỉ đánh dấu khi chưa
   có Request gửi trước năm đó; có dấu cũ nhưng thiếu năm trước ⟹ log cảnh báo. Chạy tay: `YearStartCommitmentsService.run(now)`. Chỉ Request có
   khoản; quyền không có Request thì không (QĐ-109a).
+- Số chạy sang năm sau (`year-start-commitments/carried-over.listener.ts`, `YearStartCarriedOverService`; `QĐ-111ac`): `requests` bind
+  `CarriedOverContributions` của `budgets`, trả cho mỗi Cost Center đúng số khoản 01/01 của năm đó sẽ giữ, tính ngay bây giờ bằng cùng một luật
+  (`YearStartCommitmentsBatchService.judgeBatch`, dùng chung với lượt 01/01). Chỉ đọc: không khóa Request (`YearStartCommitmentsRepo.readBatch`),
+  không ghi khoản, không ghi audit; Request đã giữ khoản của năm đó không tính lại. Quét mọi Request trả phí của tổ chức theo lô 100 mỗi lần hỏi.
 - Mọi kết thúc request phát `requests.outcome` trong cùng transaction; listener ném lỗi thì kết thúc bị hoàn tác.
 - Sweep chuyển bước: mỗi request một transaction, khóa theo id, chỉ ghi khi bảng định tuyến chỉ ra người khác người
   đang giữ; sweep SLA chỉ ghi nhắc, thông báo và audit, không đổi bước hay request (`public/*-sweep.api.ts`).

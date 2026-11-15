@@ -1,5 +1,4 @@
 import { z } from 'zod';
-import { LINE_TYPES } from '../budget/budget-line-zbb.json';
 import { businessDate, responseBusinessDate } from '../../../infrastructure/http/dto/business-date.dto';
 import { successEnvelopeSchema } from '../../../infrastructure/http/dto/success-envelope.dto';
 import { createZodDto } from '../../../infrastructure/http/dto/zod-dto';
@@ -9,11 +8,14 @@ const amountInput = z.strictObject({ amount: z.string().max(40) });
 const moneyView = z.strictObject({ amount: z.string(), currency: z.string() });
 const year = z.number().int().min(2000).max(2999);
 
-export const openCycleBodySchema = z.strictObject({
+export const createCycleBodySchema = z.strictObject({
   year,
   submissionDeadline: businessDate,
   decisionDeadline: businessDate,
   annualCeiling: amountInput.meta({ description: 'The annual ceiling of the software budget.' }),
+  sharedPoolReserve: amountInput.meta({
+    description: 'The reserve of the shared pool, kept out of what the departments share; zero is a value.',
+  }),
   priorities: z.string().trim().min(1).max(2000).optional(),
 });
 
@@ -22,70 +24,37 @@ export const updateCycleBodySchema = z.strictObject({
   decisionDeadline: businessDate.optional(),
   priorities: z.string().trim().min(1).max(2000).nullable().optional(),
   annualCeiling: amountInput.optional(),
-  reason: z
-    .string()
-    .trim()
-    .min(1)
-    .max(1000)
-    .optional()
-    .meta({ description: 'Needed when the annual ceiling changes.' }),
-});
-
-export const setCeilingsBodySchema = z.strictObject({
-  sharedPoolReserve: amountInput.meta({ description: 'The reserve of the shared pool; zero is a value.' }),
-  departments: z
-    .array(
-      z.strictObject({
-        departmentId: z.uuid(),
-        signedCommitments: amountInput,
-        plannedSeats: amountInput,
-        priority: amountInput,
-        explanation: z.string().trim().min(1).max(2000).optional(),
-      }),
-    )
-    .max(500)
-    .refine((rows) => new Set(rows.map((row) => row.departmentId)).size === rows.length, {
-      message: 'A department is named once.',
-    }),
+  sharedPoolReserve: amountInput.optional(),
+  reason: z.string().trim().min(1).max(1000).optional().meta({
+    description:
+      'Needed once the cycle is open, when the submission deadline moves or the annual ceiling or the reserve changes; kept with the figures before and after.',
+  }),
 });
 
 export const cycleYearParamSchema = z.strictObject({ year: z.coerce.number().int().min(2000).max(2999) });
 
-const ceilingView = z.strictObject({
-  explanation: z.string().nullable(),
-  signedCommitments: moneyView,
-  plannedSeats: moneyView,
-  priority: moneyView,
-  total: moneyView,
-});
-
-const cycleSummary = {
+/** A cycle with its figures: what Finance entered and where it stands. */
+export const cycleSchema = z.strictObject({
   year: z.number().int(),
   submissionDeadline: responseBusinessDate,
   decisionDeadline: responseBusinessDate,
   annualCeiling: moneyView,
   sharedPoolReserve: moneyView.nullable(),
-  priorities: z.string().nullable(),
-  /** `NOT_PUBLISHED` before the first publication; `PUBLISHED`; `CHANGED_AFTER_PUBLISH` until it is published again. */
-  status: z.enum(['NOT_PUBLISHED', 'PUBLISHED', 'CHANGED_AFTER_PUBLISH']),
-  openedAt: z.iso.datetime(),
-  publishedAt: z.iso.datetime().nullable(),
-  firstPublishedAt: z.iso.datetime().nullable(),
-  allocated: moneyView.meta({ description: 'The ceilings of the departments and the reserve, added.' }),
-  unallocated: moneyView.meta({
-    description: 'The annual ceiling less what is allocated; below nothing is shown as zero.',
-  }),
-};
-/** A cycle in the list: the figures without the division. */
-export const cycleSummarySchema = z.strictObject(cycleSummary);
-/** A cycle with its division: the ceiling of each department, by the id of the department. */
-export const cycleSchema = z.strictObject({
-  ...cycleSummary,
-  ceilings: z.record(z.uuid(), ceilingView).meta({
+  available: moneyView.meta({
     description:
-      'The ceiling of each department, by department id: at most 500, the bound of the departments of budgetDepartmentCeilingsSet.',
+      'The annual ceiling less the shared-pool reserve: what the budgets of the departments may add up to (checked when a version is sent); below nothing is shown as zero.',
   }),
+  priorities: z.string().nullable(),
+  /** `DRAFT` until Finance opens it; `OPEN` through the day of the submission deadline; `LOCKED` after it, for good. */
+  status: z.enum(['DRAFT', 'OPEN', 'LOCKED']),
+  openedAt: z.iso
+    .datetime()
+    .nullable()
+    .meta({ description: 'When Finance opened the cycle; null while it is a draft.' }),
 });
+
+/** A cycle in the list: the same without the priorities, which are free text of up to 2,000 characters and are read with the cycle. */
+export const cycleSummarySchema = cycleSchema.omit({ priorities: true });
 
 export const listCyclesQuerySchema = z.strictObject({
   page: z.coerce.number().int().positive().default(1),
@@ -132,6 +101,22 @@ const baselineDepartmentView = z.strictObject({
   spentThisYear: moneyView.meta({
     description:
       'The invoices recorded this year against every Cost Center the department ever had (the seat-months of K2 are not in it yet).',
+  }),
+  carriedOverNextYear: moneyView.meta({
+    description:
+      'What the Cost Center carries into the year of the cycle: the amount already saved for it by the requests approved so far (a right with an end at what its approval kept, a right with no end at twelve months of its monthly price), the figure the base of its version is filled in with. Zero when it has none, and for a department with no Cost Center.',
+  }),
+  belowCarriedOver: z.boolean().meta({
+    description:
+      'The red flag: the newest version of the Cost Center for the year has a base and a reserve (its total) below carriedOverNextYear. False when it has none; it never stops anything.',
+  }),
+  carriedOverShortfall: moneyView.meta({
+    description:
+      'What the base and the reserve of that version lack of carriedOverNextYear: zero when they cover it or when there is no version.',
+  }),
+  noProposalSubmitted: z.boolean().meta({
+    description:
+      'The submission deadline has passed and the department has no proposal: Finance builds its version from this baseline, flagged for the spending approver.',
   }),
   estimatedAnnualCost: moneyView,
   hasUnknownCost: z.boolean().meta({
@@ -192,27 +177,10 @@ export const baselineSchema = z.strictObject({
   }),
 });
 
-const packageLineView = z.strictObject({
-  position: z.number().int().positive(),
-  lineType: z.enum(LINE_TYPES),
-  priorityRank: z.number().int().positive(),
-  amount: moneyView,
-  overCeiling: moneyView.nullable().meta({
-    description:
-      'The part of the line that carries the proposal over the published ceiling; null when it is not flagged.',
-  }),
-});
 const packageDepartmentView = z.strictObject({
   departmentId: z.uuid(),
   departmentCode: z.string(),
   departmentName: z.string(),
-  ceiling: moneyView
-    .nullable()
-    .meta({ description: 'The ceiling as it stands now, which Finance may still be editing.' }),
-  publishedCeiling: moneyView.nullable().meta({
-    description:
-      'The ceiling the head was told when the cycle was published; null before the first publication. The flags over the ceiling are judged against it (S4-01).',
-  }),
   headStatus: z.enum(['HAS_HEAD', 'HEAD_TO_COME', 'NO_HEAD']).meta({
     description: 'Whether somebody heads the department today, somebody is named to head it later, or nobody is.',
   }),
@@ -221,25 +189,14 @@ const packageDepartmentView = z.strictObject({
       'Finance may build the first version of the department from the baseline now: the same check as the version of source BASELINE.',
   }),
   baselineRefusal: z
-    .enum([
-      'CYCLE_NOT_PUBLISHED',
-      'DEPARTMENT_NOT_IN_CYCLE',
-      'BEFORE_DEADLINE',
-      'HAS_HEAD',
-      'HAS_SUCCESSOR',
-      'HAS_PROPOSAL',
-    ])
+    .enum(['CYCLE_NOT_OPEN', 'DEPARTMENT_NOT_IN_CYCLE', 'BEFORE_DEADLINE', 'HAS_PROPOSAL'])
     .nullable()
     .meta({ description: 'The first thing that stops it, or null when `baselineAllowed`.' }),
   proposal: z
     .strictObject({
       id: z.uuid(),
-      total: moneyView.meta({ description: 'The lines counted: a CANCEL line is shown and not added.' }),
+      total: moneyView.meta({ description: 'The amount the head asked for.' }),
       state: z.enum(['SUBMITTED', 'REVIEWED']),
-      lines: z.array(packageLineView).max(200).meta({
-        description:
-          'The lines of the proposal by priority rank, with the flag over the published ceiling and the part that goes over.',
-      }),
     })
     .nullable(),
   version: z
@@ -249,7 +206,7 @@ const packageDepartmentView = z.strictObject({
       reserve: moneyView,
       total: moneyView,
       state: z.enum(['SENT', 'CHANGES_REQUESTED', 'APPROVED']),
-      origin: z.enum(['PROPOSAL', 'BASELINE_NO_HEAD']),
+      origin: z.enum(['PROPOSAL', 'BASELINE_NO_HEAD', 'BASELINE_NO_PROPOSAL', 'ADJUSTMENT']),
     })
     .nullable(),
 });
@@ -298,9 +255,8 @@ const pagination = z.strictObject({
 export type CycleWire = z.infer<typeof cycleSchema>;
 export type CycleSummaryWire = z.infer<typeof cycleSummarySchema>;
 
-export class OpenCycleBodyDto extends createZodDto(openCycleBodySchema) {}
+export class CreateCycleBodyDto extends createZodDto(createCycleBodySchema) {}
 export class UpdateCycleBodyDto extends createZodDto(updateCycleBodySchema) {}
-export class SetCeilingsBodyDto extends createZodDto(setCeilingsBodySchema) {}
 export class CycleYearParamDto extends createZodDto(cycleYearParamSchema) {}
 export class CycleResponseDto extends createZodDto(successEnvelopeSchema(cycleSchema)) {}
 export class BaselineQueryDto extends createZodDto(baselineQuerySchema) {}
@@ -309,4 +265,7 @@ export class PackageResponseDto extends createZodDto(successEnvelopeSchema(packa
 export class ListCyclesQueryDto extends createZodDto(listCyclesQuerySchema) {}
 export class CycleListResponseDto extends createZodDto(
   successEnvelopeSchema(z.strictObject({ items: z.array(cycleSummarySchema), pagination })),
+) {}
+export class CycleDeletedResponseDto extends createZodDto(
+  successEnvelopeSchema(z.strictObject({ year: z.number().int() })),
 ) {}

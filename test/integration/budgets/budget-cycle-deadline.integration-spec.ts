@@ -65,7 +65,10 @@ describe('the deadlines of the budget cycle and the head named after a baseline 
       const silent = await h.departmentWithHead(`P-DLS${(counter += 1)}`);
       const done = await h.departmentWithHead(`P-DLD${(counter += 1)}`);
       const headless = await bare();
+      // The proposal was sent before the deadline: after it the cycle is locked (QĐ-111z).
+      await setDeadlines(addDays(h.today(), 5), addDays(h.today(), 20));
       await h.budgetProposed(done.head, done.department.unitId, undefined, h.year);
+      await setDeadlines(lateDay(), addDays(h.today(), 20));
 
       await service().run();
 
@@ -171,20 +174,19 @@ describe('the deadlines of the budget cycle and the head named after a baseline 
     expect(await noticesOf('BUDGET_SUBMISSION_DEADLINE_PASSED')).toHaveLength(0);
   });
 
-  it('a cycle that was never published tells nobody', async () => {
+  it('a cycle that is still a draft tells nobody', async () => {
     await setDeadlines(addDays(h.today(), -3), addDays(h.today(), -1));
-    await h.ctx.sql.query(
-      `UPDATE budget_cycles SET first_published_at = NULL, published_at = NULL, published_by_employee_id = NULL WHERE year = $1`,
-      [h.year],
-    );
+    await h.ctx.sql.query(`UPDATE budget_cycles SET opened_at = NULL, opened_by_employee_id = NULL WHERE year = $1`, [
+      h.year,
+    ]);
     const before = await h.budgetRows('in_app_notifications');
     try {
       await service().run();
     } finally {
-      await h.ctx.sql.query(
-        `UPDATE budget_cycles SET first_published_at = now(), published_at = now(), published_by_employee_id = $2 WHERE year = $1`,
-        [h.year, h.finance.employeeId],
-      );
+      await h.ctx.sql.query(`UPDATE budget_cycles SET opened_at = now(), opened_by_employee_id = $2 WHERE year = $1`, [
+        h.year,
+        h.finance.employeeId,
+      ]);
     }
 
     expect(await h.budgetRows('in_app_notifications')).toBe(before);
@@ -193,14 +195,16 @@ describe('the deadlines of the budget cycle and the head named after a baseline 
   describe('after the decision deadline', () => {
     it('tells the spending approver and Finance how many versions still wait, and nobody when none does', async () => {
       const decided = lateDay();
+      const unit = await h.departmentWithHead(`P-DLV${(counter += 1)}`);
+      // The proposal was sent before the deadline: after it the cycle is locked (QĐ-111z).
+      await setDeadlines(addDays(h.today(), 5), addDays(h.today(), 20));
+      const proposal = await h.budgetProposed(unit.head, unit.department.unitId, undefined, h.year);
       await setDeadlines(addDays(decided, -3), decided);
       const boss = await h.staff(await bare(), `DLB${counter}`);
       await h.setRole('SPENDING_APPROVER', boss);
       await service().run();
       expect(await noticesOf('BUDGET_DECISION_DEADLINE_REMINDER')).toHaveLength(0);
 
-      const unit = await h.departmentWithHead(`P-DLV${(counter += 1)}`);
-      const proposal = await h.budgetProposed(unit.head, unit.department.unitId, undefined, h.year);
       const version = await h.built(proposal.id);
       await h.sendVersion(version.id).expect(200);
       await service().run();

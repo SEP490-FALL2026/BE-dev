@@ -65,8 +65,14 @@ const PUBLIC_CONTRACT_EXPORTS: ReadonlySet<string> = new Set([
   'CatalogPricingFacadeModule: CatalogPricingApi',
   // CT-1.1 (QĐ-111bf): the installation command makes the standard functional groups of a new organization through this facade.
   'CatalogBootstrapFacadeModule: CatalogBootstrapApi',
+  // QĐ-112b: the installation writes the eight policies and their first versions through this one facade.
+  'PoliciesBootstrapFacadeModule: PoliciesBootstrapApi',
+  // QĐ-111as: the point the modules that read import files add their columns to, so the library builds the template files from what the parsers read.
+  'PoliciesTemplateFacadeModule: ImportTemplateContributions',
   // The extension points the requests context binds (public/budgets.extension-points.ts): what waits to be decided as spend, the release guard and the facts of a commitment request.
   'BudgetsModule: PendingSpendContributions',
+  // QĐ-111ac: what a Cost Center carries into the year, added by the requests context from a dry run of the pass of 01/01.
+  'BudgetsModule: CarriedOverContributions',
   'BudgetsModule: CommitmentReleaseGuardHook',
   'BudgetsModule: CommitmentRequestFactsHook',
   // PI-1.7: the purchase invoice behind an invoice of a commitment (its label and how it was paid), bound by the requests context.
@@ -131,6 +137,9 @@ const PUBLIC_CONTRACT_EXPORTS: ReadonlySet<string> = new Set([
   // QĐ-93d(3): where the grant of SPENDING_APPROVER asks the modules above it for the open work of a person; requests, budgets and
   // licensing add a check each from a `*.listener.ts`, so the one point the facade holds is injected by them.
   'IdentityAccessFacadeModule: SpendingApproverGrantChecks',
+  // QĐ-111ar: where `GET /me` asks the modules above it which policies the caller has not acknowledged; the library of policies adds the one
+  // source from a `*.listener.ts`, so the point the facade holds is injected by it.
+  'IdentityAccessFacadeModule: PendingPolicyAcknowledgements',
   'IdentityAccessFacadeModule: RoleGrantService',
   // H6.1: the read-only account contract of `ops:inspect`, declared only in the inspection graph.
   'IdentityAccessInspectionFacadeModule: IdentityAccessInspectionApi',

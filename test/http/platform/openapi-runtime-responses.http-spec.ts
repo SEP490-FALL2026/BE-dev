@@ -49,9 +49,9 @@ describe('API inventory (e2e): responses the runtime answers and the contract us
         .sort();
 
     it('declares the 400 and 413 of the multipart limits on the four upload routes, which are the only multipart routes', () => {
-      // budgetVersionImport (G5) takes one file under the same limits (Prompt 02: it declared neither answer).
       // usageImportUpload (MF-5) takes the report of a vendor under the same limits.
-      const uploads = ['budgetVersionImport', 'employeeImportUpload', 'seatBaselineImportUpload', 'usageImportUpload'];
+      // meAvatarUpload (PF-1) takes the picture of a person: one file of up to 1 MB, a little over which the policy answers and beyond which the parser does.
+      const uploads = ['employeeImportUpload', 'meAvatarPut', 'seatBaselineImportUpload', 'usageImportUpload'];
       expect(idsWhere((candidate) => Boolean(candidate.requestBody?.content?.['multipart/form-data']))).toEqual(
         uploads,
       );
@@ -64,8 +64,9 @@ describe('API inventory (e2e): responses the runtime answers and the contract us
         });
         expect(responses['400']?.description).toContain('HTTP_BAD_REQUEST');
         expect(responses['413']?.description).toContain('HTTP_PAYLOAD_TOO_LARGE');
-        // A vendor usage report may be larger: its own limit is 10 MiB (MF-5); the other uploads keep 2 MiB.
-        expect(responses['413']?.description).toContain(id === 'usageImportUpload' ? '10 MiB' : '2 MiB');
+        // A vendor usage report may be larger: its own limit is 10 MiB (MF-5); a picture is 1 MiB (PF-1); the other uploads keep 2 MiB.
+        const limit = id === 'usageImportUpload' ? '10 MiB' : id === 'meAvatarPut' ? '1 MiB' : '2 MiB';
+        expect(responses['413']?.description).toContain(limit);
       }
     });
 
@@ -83,8 +84,8 @@ describe('API inventory (e2e): responses the runtime answers and the contract us
       }
       // A 413 anywhere else is a multipart upload's own file limit, or a mistake.
       expect(idsWhere((candidate) => candidate.responses['413'] !== undefined && !takesJson(candidate))).toEqual([
-        'budgetVersionImport',
         'employeeImportUpload',
+        'meAvatarPut',
         'seatBaselineImportUpload',
         'usageImportUpload',
       ]);
@@ -113,7 +114,10 @@ describe('API inventory (e2e): responses the runtime answers and the contract us
           code415: true,
         });
       }
-      expect(idsWhere((candidate) => candidate.responses['415'] !== undefined && !takesJson(candidate))).toEqual([]);
+      // The one 415 outside a JSON body is the type of a picture, told by the policy from its first bytes (PROFILE.AVATAR_TYPE_UNSUPPORTED).
+      expect(idsWhere((candidate) => candidate.responses['415'] !== undefined && !takesJson(candidate))).toEqual([
+        'meAvatarPut',
+      ]);
       expect(
         idsWhere((candidate) => Boolean(candidate.requestBody?.content?.['application/x-www-form-urlencoded'])),
       ).toEqual([]);

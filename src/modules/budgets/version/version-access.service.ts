@@ -2,14 +2,15 @@ import { Injectable } from '@nestjs/common';
 import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import {
+  BudgetVersionAttachmentRequiredError,
   BudgetCycleCurrencyMismatchError,
-  BudgetCycleNotPublishedError,
+  BudgetCycleNotOpenError,
   BudgetOverAnnualCeilingError,
   BudgetVersionNotEditableError,
   BudgetVersionNotFoundError,
   BudgetYearEndedError,
 } from '../budget/budget.errors';
-import { annualCheck, isEditable, yearHasEnded } from '../budget/budget.policy';
+import { annualCheck, isEditable, versionAttachmentMissing, yearHasEnded } from '../budget/budget.policy';
 import { BudgetFactsService } from '../budget/budget-facts.service';
 import { VersionRepo, type VersionRecord } from '../budget/version.repo';
 import { cycleAcceptsWork } from '../cycle/cycle.policy';
@@ -71,14 +72,21 @@ export class VersionAccessService {
   /**
    * The cycle of the version's year, locked `FOR UPDATE` before any proposal or version row (the order of the module: cycle, proposal,
    * version, year), so that two sendings of two departments take turns and cannot both pass the annual check. Null for a year that
-   * has ended (the sending is refused as ended later). Throws BudgetCycleNotPublishedError.
+   * has ended (the sending is refused as ended later). Throws BudgetCycleNotOpenError.
    */
   async lockCycleOf(tx: DbTx, version: Pick<VersionRecord, 'organizationId' | 'year'>): Promise<CycleRecord | null> {
     if (yearHasEnded(version.year, await this.facts.today(new Date(), tx))) return null;
     const cycle = await this.cycles.lockByYear(tx, version.organizationId, version.year, 'UPDATE');
-    if (!cycle || !cycleAcceptsWork(cycle)) throw new BudgetCycleNotPublishedError(version.year);
+    if (!cycle || !cycleAcceptsWork(cycle)) throw new BudgetCycleNotOpenError(version.year);
 
     return cycle;
+  }
+
+  /** One file at least explains a version that is sent (`QĐ-111ac`); a draft is saved without one. Throws BudgetVersionAttachmentRequiredError. */
+  async requireExplained(tx: DbTx, versionId: string): Promise<void> {
+    if (versionAttachmentMissing(await this.versions.countAttachedFiles(tx, versionId))) {
+      throw new BudgetVersionAttachmentRequiredError();
+    }
   }
 
   /**

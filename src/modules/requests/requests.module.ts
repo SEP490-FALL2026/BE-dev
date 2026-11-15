@@ -123,6 +123,8 @@ import { ControlledWaitController } from './reassignment/controlled-wait.control
 import { CongestionController } from './sla/congestion.controller';
 import { CongestionService } from './sla/congestion.service';
 import { RequestsWorkFacadeModule } from './requests-work-facade.module';
+import { CarriedOverListener } from './year-start-commitments/carried-over.listener';
+import { YearStartCarriedOverService } from './year-start-commitments/year-start-carried-over.service';
 import { YearStartCommitmentsBatchService } from './year-start-commitments/year-start-commitments-batch.service';
 import { YearStartCommitmentsSweeper } from './year-start-commitments/year-start-commitments.job';
 import { YearStartCommitmentsRepo } from './year-start-commitments/year-start-commitments.repo';
@@ -434,6 +436,9 @@ import { PurchaseInvoicesController } from './purchase-invoice/purchase-invoices
     // The pass of 01/01 and the sweeper that runs it every hour in the API process (ADR-0018).
     YearStartCommitmentsRepo,
     YearStartCommitmentsBatchService,
+    // QĐ-111ac: what a Cost Center carries into the year, told to the budgets by a dry run of the same rule.
+    YearStartCarriedOverService,
+    CarriedOverListener,
     YearStartCommitmentsService,
     YearStartCommitmentsSweeper,
   ],

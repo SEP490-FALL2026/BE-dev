@@ -99,6 +99,14 @@ thái hiện tại. Quyết định của Owner (29/10/2026): **O1** chấp nh�
 | S12 | `Dockerfile` thêm `COPY scripts/build` cho bước build (spec: không chạm Dockerfile)                          | `pnpm build` sinh alias CLI cần script đó trong image builder; đường chạy không đổi                                                          | Owner chấp nhận 29/10/2026 (O2)                                |
 | S13 | Ba văn bản OpenAPI đổi (summary 73 ký tự, hai message > 160 ký tự)                                           | Test `api-inventory` đỏ sẵn ở mốc; mã lỗi giữ nguyên, message của lệnh vận hành vẫn nêu lệnh đó                                              | Owner chấp nhận 29/10/2026 (O3)                                |
 
+## Bổ sung: module `policies` ở T3 (15/11/2026)
+
+Owner chấp nhận (`B-3`, `S-2` của review feedback FE): thư viện chính sách, xác nhận đã đọc, checklist khi quyết định và file mẫu
+import dùng chung một mô hình nên không thuộc module sẵn có nào; đặt `policies` ở **T3**, cạnh `finance` và
+`operating-parameters`, không có cạnh cùng tầng. `requests`, `budgets` (T5) và `optimization` (T7) gọi `public/` của nó;
+`identity-access` (T2) lấy cờ "chưa xác nhận" cho `GET /me` qua `Contributions` do chính nó mở và `policies` đăng ký trong một
+`*.listener.ts`; module sở hữu một parser góp định nghĩa cột file mẫu qua `Contributions` do `policies` mở.
+
 ## Hệ quả
 
 - Thứ tự đọc của một route: [routes](../generated/routes.md) → controller → service → repo; luồng ngược đọc trong module

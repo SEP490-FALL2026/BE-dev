@@ -1,4 +1,4 @@
-import { Body, Controller, Get, HttpStatus, Param, Patch, Post, Put, Query } from '@nestjs/common';
+import { Body, Controller, Delete, Get, HttpStatus, Param, Patch, Post, Query } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
   ApiErrorResponses,
@@ -16,12 +16,12 @@ import {
   BaselineQueryDto,
   BaselineResponseDto,
   PackageResponseDto,
+  CreateCycleBodyDto,
+  CycleDeletedResponseDto,
   CycleListResponseDto,
   CycleResponseDto,
   CycleYearParamDto,
   ListCyclesQueryDto,
-  OpenCycleBodyDto,
-  SetCeilingsBodyDto,
   UpdateCycleBodyDto,
 } from './cycle.dto';
 import { BaselineService } from './baseline.service';
@@ -46,9 +46,10 @@ const NOT_FOUND = {
 } as const;
 
 /**
- * The budget cycle of a year (`QĐ-103i`, `BR-MF4-01`, `BR-MF4-02`, `US-06-15`): Finance opens it with the deadlines and the annual
- * ceiling, divides the ceiling among the departments and the shared-pool reserve, and publishes it. The spending approver and Finance
- * read it. The cycle of a year that has passed can only be read.
+ * The budget cycle of a year (`QĐ-111z`, `QĐ-111aa`, `BR-MF4-01`, `US-06-15`): Finance makes it as a draft with the deadlines, the annual
+ * ceiling and the reserve of the shared pool, opens it, and may move the submission deadline and change the two amounts while it is open;
+ * from the day after the submission deadline it is locked for good. The spending approver and Finance read it. The cycle of a year that
+ * has passed can only be read.
  */
 @ApiTags('budget-cycles')
 @Controller({ path: 'budget-cycles', version: '1' })
@@ -61,19 +62,19 @@ export class BudgetCyclesController {
 
   @Post()
   @RequireRoles('FINANCE')
-  @ApiOperation({ operationId: 'budgetCycleOpen', summary: 'Open the budget cycle of a year' })
+  @ApiOperation({ operationId: 'budgetCycleCreate', summary: 'Make the budget cycle of a year as a draft' })
   @ApiSuccessResponse(CycleResponseDto, {
     status: HttpStatus.CREATED,
-    message: 'BUDGET_CYCLE.OPENED',
+    message: 'BUDGET_CYCLE.CREATED',
     description:
-      'The cycle of the year is opened with its deadlines, the annual ceiling of the software budget and the priorities; the heads of the departments hear it. The current year and the years to come can be opened, once each.',
+      'The cycle of the year is made as a draft with its deadlines, the annual ceiling of the software budget, the reserve of the shared pool and the priorities; nobody is told yet. Finance edits or deletes a draft freely and opens it with budgetCycleOpen. The current year and the years to come can be made, once each.',
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,
     FINANCE_ONLY,
     {
       status: HttpStatus.CONFLICT,
-      description: 'The cycle of that year is already open (BUDGET.CYCLE_EXISTS).',
+      description: 'The cycle of that year exists already (BUDGET.CYCLE_EXISTS).',
       examples: [EXAMPLES.CYCLE_EXISTS],
     },
     {
@@ -89,9 +90,9 @@ export class BudgetCyclesController {
       ],
     },
   )
-  async open(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Body() body: OpenCycleBodyDto) {
+  async create(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Body() body: CreateCycleBodyDto) {
     try {
-      return await this.cycles.open(actor, body);
+      return await this.cycles.create(actor, body);
     } catch (error) {
       throw toBudgetApiException(error);
     }
@@ -103,7 +104,7 @@ export class BudgetCyclesController {
   @ApiSuccessResponse(CycleListResponseDto, {
     message: 'BUDGET_CYCLE.LISTED',
     description:
-      'A page of the budget cycles of the organization, the latest year first, each with its figures and what is left to allocate; the division of a cycle is read with budgetCycleGet.',
+      'A page of the budget cycles of the organization, the latest year first, each with its deadlines, its two amounts, what is available to the departments and its status (DRAFT, OPEN or LOCKED).',
   })
   @ApiErrorResponses(...AUTH_ERRORS, READERS, {
     status: HttpStatus.UNPROCESSABLE_ENTITY,
@@ -124,7 +125,7 @@ export class BudgetCyclesController {
   @ApiSuccessResponse(CycleResponseDto, {
     message: 'BUDGET_CYCLE.FETCHED',
     description:
-      'The cycle of the year: deadlines, annual ceiling, shared-pool reserve, ceilings of the departments and its status.',
+      'The cycle of the year: deadlines, annual ceiling, shared-pool reserve, what is available to the departments and its status (DRAFT, OPEN or LOCKED).',
   })
   @ApiErrorResponses(...AUTH_ERRORS, READERS, NOT_FOUND, {
     status: HttpStatus.UNPROCESSABLE_ENTITY,
@@ -143,26 +144,38 @@ export class BudgetCyclesController {
   @RequireRoles('FINANCE')
   @ApiOperation({
     operationId: 'budgetCycleUpdate',
-    summary: 'Change the deadlines, priorities or annual ceiling of a cycle',
+    summary: 'Change a budget cycle',
   })
   @ApiSuccessResponse(CycleResponseDto, {
     message: 'BUDGET_CYCLE.UPDATED',
     description:
-      'The cycle after the change. A new annual ceiling needs the reason and takes the publication back: the division is checked again when Finance publishes. The change is recorded in the Audit Trail with the figures before and after.',
+      'The cycle after the change. A draft takes any change. An open cycle moves the submission deadline (to today or later; the heads are told) and changes the annual ceiling or the reserve, each with a reason; the decision deadline and the priorities move freely. From the day after the submission deadline the cycle is locked and takes no change. The figures before and after, and the reason, are recorded in the Audit Trail.',
   })
-  @ApiErrorResponses(...AUTH_ERRORS, FINANCE_ONLY, NOT_FOUND, {
-    status: HttpStatus.UNPROCESSABLE_ENTITY,
-    description:
-      'The body is invalid (VALIDATION_ERROR), the year has passed (BUDGET.CYCLE_YEAR_PAST), the deadlines are out of order (BUDGET.CYCLE_DEADLINES_INVALID), a new annual ceiling has no reason (BUDGET.CYCLE_REASON_REQUIRED), or the amount is refused.',
-    examples: [
-      VALIDATION_EXAMPLE,
-      EXAMPLES.CYCLE_YEAR_PAST,
-      EXAMPLES.CYCLE_DEADLINES_INVALID,
-      EXAMPLES.CYCLE_REASON_REQUIRED,
-      EXAMPLES.MONEY_SCALE_EXCEEDED,
-      EXAMPLES.MONEY_OUT_OF_RANGE,
-    ],
-  })
+  @ApiErrorResponses(
+    ...AUTH_ERRORS,
+    FINANCE_ONLY,
+    NOT_FOUND,
+    {
+      status: HttpStatus.CONFLICT,
+      description:
+        'The submission deadline has passed: the cycle is locked and never opens again (BUDGET_CYCLE.LOCKED).',
+      examples: [EXAMPLES.CYCLE_LOCKED],
+    },
+    {
+      status: HttpStatus.UNPROCESSABLE_ENTITY,
+      description:
+        'The body is invalid (VALIDATION_ERROR), the year has passed (BUDGET.CYCLE_YEAR_PAST), the deadlines are out of order (BUDGET.CYCLE_DEADLINES_INVALID), an open cycle is moved to a submission deadline before today (BUDGET_CYCLE.DEADLINE_PASSED), an open cycle is changed without the reason (BUDGET.CYCLE_REASON_REQUIRED), or the amount is refused.',
+      examples: [
+        VALIDATION_EXAMPLE,
+        EXAMPLES.CYCLE_YEAR_PAST,
+        EXAMPLES.CYCLE_DEADLINES_INVALID,
+        EXAMPLES.CYCLE_DEADLINE_PASSED,
+        EXAMPLES.CYCLE_REASON_REQUIRED,
+        EXAMPLES.MONEY_SCALE_EXCEEDED,
+        EXAMPLES.MONEY_OUT_OF_RANGE,
+      ],
+    },
+  )
   async update(
     @CurrentPrincipal() actor: AuthenticatedPrincipal,
     @Param() params: CycleYearParamDto,
@@ -175,36 +188,66 @@ export class BudgetCyclesController {
     }
   }
 
-  @Put(':year/department-ceilings')
+  @Delete(':year')
   @RequireRoles('FINANCE')
-  @ApiOperation({
-    operationId: 'budgetDepartmentCeilingsSet',
-    summary: 'Divide the annual ceiling among the departments',
-  })
-  @ApiSuccessResponse(CycleResponseDto, {
-    message: 'BUDGET_CYCLE.CEILINGS_SET',
+  @ApiOperation({ operationId: 'budgetCycleDelete', summary: 'Delete a draft budget cycle' })
+  @ApiSuccessResponse(CycleDeletedResponseDto, {
+    message: 'BUDGET_CYCLE.DELETED',
     description:
-      'Replaces the ceilings of the departments (three parts each) and the shared-pool reserve. A change of a number (a part of a ceiling, the reserve, a department added or left out) or a ceiling with no explanation unpublishes the cycle, which must be published again; a change of an explanation alone does not. The figures before and after are recorded in the Audit Trail.',
+      'The draft cycle of the year is deleted, and the year can be made again. The deletion is recorded in the Audit Trail.',
   })
-  @ApiErrorResponses(...AUTH_ERRORS, FINANCE_ONLY, NOT_FOUND, {
-    status: HttpStatus.UNPROCESSABLE_ENTITY,
-    description:
-      'The body is invalid (VALIDATION_ERROR), the year has passed (BUDGET.CYCLE_YEAR_PAST), a ceiling is for a department that is not among the departments of the year (BUDGET.CEILING_DEPARTMENT_INVALID, details.departmentIds), or an amount is refused.',
-    examples: [
-      VALIDATION_EXAMPLE,
-      EXAMPLES.CYCLE_YEAR_PAST,
-      EXAMPLES.CEILING_DEPARTMENT_INVALID,
-      EXAMPLES.MONEY_SCALE_EXCEEDED,
-      EXAMPLES.MONEY_OUT_OF_RANGE,
-    ],
-  })
-  async setCeilings(
-    @CurrentPrincipal() actor: AuthenticatedPrincipal,
-    @Param() params: CycleYearParamDto,
-    @Body() body: SetCeilingsBodyDto,
-  ) {
+  @ApiErrorResponses(
+    ...AUTH_ERRORS,
+    FINANCE_ONLY,
+    NOT_FOUND,
+    {
+      status: HttpStatus.CONFLICT,
+      description: 'The cycle was opened: only a draft is deleted (BUDGET_CYCLE.NOT_DRAFT).',
+      examples: [EXAMPLES.CYCLE_NOT_DRAFT],
+    },
+    {
+      status: HttpStatus.UNPROCESSABLE_ENTITY,
+      description: 'The year is not a year (VALIDATION_ERROR) or it has passed (BUDGET.CYCLE_YEAR_PAST).',
+      examples: [VALIDATION_EXAMPLE, EXAMPLES.CYCLE_YEAR_PAST],
+    },
+  )
+  async remove(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Param() params: CycleYearParamDto) {
     try {
-      return await this.cycles.setCeilings(actor, params.year, body);
+      return await this.cycles.remove(actor, params.year);
+    } catch (error) {
+      throw toBudgetApiException(error);
+    }
+  }
+
+  @Post(':year/opening')
+  @RequireRoles('FINANCE')
+  @ApiOperation({ operationId: 'budgetCycleOpen', summary: 'Open a draft budget cycle' })
+  @ApiSuccessResponse(CycleResponseDto, {
+    status: HttpStatus.CREATED,
+    message: 'BUDGET_CYCLE.OPENED',
+    description:
+      'The draft becomes open: the head of each department of the year is told the submission deadline and which form to fill in (the file of the form BM-10 comes from the import templates), with the baseline of the department one call away. From then on the heads submit; the cycle is locked the day after the submission deadline.',
+  })
+  @ApiErrorResponses(
+    ...AUTH_ERRORS,
+    FINANCE_ONLY,
+    NOT_FOUND,
+    {
+      status: HttpStatus.CONFLICT,
+      description:
+        'The cycle is open already (BUDGET_CYCLE.ALREADY_OPEN) or locked, which is never undone (BUDGET_CYCLE.LOCKED).',
+      examples: [EXAMPLES.CYCLE_ALREADY_OPEN, EXAMPLES.CYCLE_LOCKED],
+    },
+    {
+      status: HttpStatus.UNPROCESSABLE_ENTITY,
+      description:
+        'The year is not a year (VALIDATION_ERROR), it has passed (BUDGET.CYCLE_YEAR_PAST), or the submission deadline of the draft is before today and is edited first (BUDGET_CYCLE.DEADLINE_PASSED).',
+      examples: [VALIDATION_EXAMPLE, EXAMPLES.CYCLE_YEAR_PAST, EXAMPLES.CYCLE_DEADLINE_PASSED],
+    },
+  )
+  async open(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Param() params: CycleYearParamDto) {
+    try {
+      return await this.cycles.open(actor, params.year);
     } catch (error) {
       throw toBudgetApiException(error);
     }
@@ -251,7 +294,7 @@ export class BudgetCyclesController {
   @ApiSuccessResponse(PackageResponseDto, {
     message: 'BUDGET_CYCLE.PACKAGE_FETCHED',
     description:
-      'The year against its annual ceiling: the annual ceiling, the shared-pool reserve, what is available (the ceiling less the reserve), the proposals added up and whether they are over it, the versions counted at the annual check added up and by how much they are over, and for each department its ceiling, its open proposal and the version counted for it (with its origin).',
+      'The year against its annual ceiling: the annual ceiling, the shared-pool reserve, what is available (the ceiling less the reserve), the proposals added up and whether they are over it, the versions counted at the annual check added up and by how much they are over, and for each department its open proposal and the version counted for it (with its origin).',
   })
   @ApiErrorResponses(...AUTH_ERRORS, READERS, NOT_FOUND, {
     status: HttpStatus.UNPROCESSABLE_ENTITY,
@@ -261,40 +304,6 @@ export class BudgetCyclesController {
   async package(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Param() params: CycleYearParamDto) {
     try {
       return await this.packages.read(actor, params.year);
-    } catch (error) {
-      throw toBudgetApiException(error);
-    }
-  }
-
-  @Post(':year/publish')
-  @RequireRoles('FINANCE')
-  @ApiOperation({ operationId: 'budgetCyclePublish', summary: 'Publish the division of a budget cycle' })
-  @ApiSuccessResponse(CycleResponseDto, {
-    status: HttpStatus.CREATED,
-    message: 'BUDGET_CYCLE.PUBLISHED',
-    description:
-      'The division is published when every department of the year has a ceiling with its explanation, the shared-pool reserve is entered and the ceilings with the reserve are within the annual ceiling. The heads whose ceiling changed hear it. A refused publication is recorded in the Audit Trail.',
-  })
-  @ApiErrorResponses(
-    ...AUTH_ERRORS,
-    FINANCE_ONLY,
-    NOT_FOUND,
-    {
-      status: HttpStatus.CONFLICT,
-      description:
-        'The ceilings and the reserve are more than the annual ceiling (BUDGET.CEILINGS_OVER_ANNUAL, details.gapMinor).',
-      examples: [EXAMPLES.CEILINGS_OVER_ANNUAL],
-    },
-    {
-      status: HttpStatus.UNPROCESSABLE_ENTITY,
-      description:
-        'The year is not a year (VALIDATION_ERROR), it has passed (BUDGET.CYCLE_YEAR_PAST), or the division is not complete (BUDGET.CEILINGS_INCOMPLETE, details.missingDepartmentIds, details.staleDepartmentIds, details.explanationMissingDepartmentIds, details.reserveMissing).',
-      examples: [VALIDATION_EXAMPLE, EXAMPLES.CYCLE_YEAR_PAST, EXAMPLES.CEILINGS_INCOMPLETE],
-    },
-  )
-  async publish(@CurrentPrincipal() actor: AuthenticatedPrincipal, @Param() params: CycleYearParamDto) {
-    try {
-      return await this.cycles.publish(actor, params.year);
     } catch (error) {
       throw toBudgetApiException(error);
     }

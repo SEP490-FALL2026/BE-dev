@@ -48,39 +48,33 @@ export const ROUTE_ERROR_CODES_BUDGETS: Readonly<Record<string, Partial<Record<R
     budgetCyclePackage: {
       '404': ['BUDGET.CYCLE_NOT_FOUND'],
     },
-    budgetCycleOpen: {
+    budgetCycleCreate: {
       '409': ['BUDGET.CYCLE_EXISTS'],
       '422': ['BUDGET.CYCLE_DEADLINES_INVALID', 'BUDGET.CYCLE_YEAR_PAST', 'MONEY_OUT_OF_RANGE', 'MONEY_SCALE_EXCEEDED'],
     },
-    budgetCyclePublish: {
+    budgetCycleDelete: {
       '404': ['BUDGET.CYCLE_NOT_FOUND'],
-      '409': ['BUDGET.CEILINGS_OVER_ANNUAL'],
-      '422': ['BUDGET.CEILINGS_INCOMPLETE', 'BUDGET.CYCLE_YEAR_PAST'],
+      '409': ['BUDGET_CYCLE.NOT_DRAFT'],
+      '422': ['BUDGET.CYCLE_YEAR_PAST'],
+    },
+    budgetCycleOpen: {
+      '404': ['BUDGET.CYCLE_NOT_FOUND'],
+      '409': ['BUDGET_CYCLE.ALREADY_OPEN', 'BUDGET_CYCLE.LOCKED'],
+      '422': ['BUDGET.CYCLE_YEAR_PAST', 'BUDGET_CYCLE.DEADLINE_PASSED'],
     },
     budgetCycleUpdate: {
       '404': ['BUDGET.CYCLE_NOT_FOUND'],
+      '409': ['BUDGET_CYCLE.LOCKED'],
       '422': [
         'BUDGET.CYCLE_DEADLINES_INVALID',
         'BUDGET.CYCLE_REASON_REQUIRED',
         'BUDGET.CYCLE_YEAR_PAST',
-        'MONEY_OUT_OF_RANGE',
-        'MONEY_SCALE_EXCEEDED',
-      ],
-    },
-    budgetDepartmentCeilingsSet: {
-      '404': ['BUDGET.CYCLE_NOT_FOUND'],
-      '422': [
-        'BUDGET.CEILING_DEPARTMENT_INVALID',
-        'BUDGET.CYCLE_YEAR_PAST',
+        'BUDGET_CYCLE.DEADLINE_PASSED',
         'MONEY_OUT_OF_RANGE',
         'MONEY_SCALE_EXCEEDED',
       ],
     },
     budgetMine: {
-      '403': ['BUDGET.NOT_YOUR_COST_CENTER'],
-      '422': ['BUDGET.COST_CENTER_REQUIRED'],
-    },
-    budgetMineLineList: {
       '403': ['BUDGET.NOT_YOUR_COST_CENTER'],
       '422': ['BUDGET.COST_CENTER_REQUIRED'],
     },
@@ -99,23 +93,17 @@ export const ROUTE_ERROR_CODES_BUDGETS: Readonly<Record<string, Partial<Record<R
     budgetProposalGet: {
       '404': ['BUDGET.PROPOSAL_NOT_FOUND'],
     },
-    budgetProposalLineList: {
-      '404': ['BUDGET.PROPOSAL_NOT_FOUND'],
-    },
     budgetProposalResubmit: {
       '404': ['BUDGET.PROPOSAL_NOT_FOUND'],
       '409': [
-        'BUDGET.CYCLE_NOT_PUBLISHED',
+        'BUDGET_CYCLE.LOCKED',
+        'BUDGET_CYCLE.NOT_OPEN',
         'BUDGET.PROPOSAL_ALREADY_OPEN',
         'BUDGET.PROPOSAL_CANNOT_RESUBMIT',
         'FINANCE.SETUP_INCOMPLETE',
       ],
       '422': [
-        'BUDGET.OVER_CEILING_NOTE_REQUIRED',
-        'BUDGET.PRIORITY_RANK_INVALID',
-        'BUDGET.ZBB_REQUIRED',
         'BUDGET.CURRENCY_NOT_REPORTING',
-        'BUDGET.PLAN_NOT_FOUND',
         'BUDGET.YEAR_ENDED',
         'BUDGET_ATTACHMENT.NOT_ATTACHABLE',
         'CURRENCY_NOT_SUPPORTED',
@@ -125,20 +113,21 @@ export const ROUTE_ERROR_CODES_BUDGETS: Readonly<Record<string, Partial<Record<R
     },
     budgetProposalReturn: {
       '404': ['BUDGET.PROPOSAL_NOT_FOUND'],
-      '409': ['BUDGET.PROPOSAL_CANNOT_RETURN'],
+      '409': ['BUDGET_CYCLE.LOCKED', 'BUDGET_CYCLE.NOT_OPEN', 'BUDGET.PROPOSAL_CANNOT_RETURN'],
       '422': ['BUDGET.YEAR_ENDED'],
     },
     budgetProposalSubmit: {
       '403': ['BUDGET.NOT_YOUR_COST_CENTER'],
       '404': ['BUDGET.COST_CENTER_NOT_FOUND'],
-      '409': ['BUDGET.CYCLE_NOT_PUBLISHED', 'BUDGET.PROPOSAL_ALREADY_OPEN', 'FINANCE.SETUP_INCOMPLETE'],
+      '409': [
+        'BUDGET_CYCLE.LOCKED',
+        'BUDGET_CYCLE.NOT_OPEN',
+        'BUDGET.PROPOSAL_ALREADY_OPEN',
+        'FINANCE.SETUP_INCOMPLETE',
+      ],
       '422': [
-        'BUDGET.OVER_CEILING_NOTE_REQUIRED',
-        'BUDGET.PRIORITY_RANK_INVALID',
-        'BUDGET.ZBB_REQUIRED',
         'BUDGET.COST_CENTER_REQUIRED',
         'BUDGET.CURRENCY_NOT_REPORTING',
-        'BUDGET.PLAN_NOT_FOUND',
         'BUDGET.YEAR_ENDED',
         'BUDGET_ATTACHMENT.NOT_ATTACHABLE',
         'CURRENCY_NOT_SUPPORTED',
@@ -148,7 +137,7 @@ export const ROUTE_ERROR_CODES_BUDGETS: Readonly<Record<string, Partial<Record<R
     },
     budgetProposalWithdraw: {
       '404': ['BUDGET.PROPOSAL_NOT_FOUND'],
-      '409': ['BUDGET.PROPOSAL_CANNOT_WITHDRAW'],
+      '409': ['BUDGET_CYCLE.LOCKED', 'BUDGET_CYCLE.NOT_OPEN', 'BUDGET.PROPOSAL_CANNOT_WITHDRAW'],
       '422': ['BUDGET.YEAR_ENDED'],
     },
     budgetVersionAttachmentDeclare: {
@@ -180,7 +169,6 @@ export const ROUTE_ERROR_CODES_BUDGETS: Readonly<Record<string, Partial<Record<R
       ],
       '422': [
         'BUDGET.CURRENCY_NOT_REPORTING',
-        'BUDGET.QUARTERS_MISMATCH',
         'BUDGET.YEAR_ENDED',
         'CURRENCY_NOT_SUPPORTED',
         'MONEY_OUT_OF_RANGE',
@@ -201,40 +189,6 @@ export const ROUTE_ERROR_CODES_BUDGETS: Readonly<Record<string, Partial<Record<R
       '403': ['AUTHORIZATION.FORBIDDEN'],
       '404': ['BUDGET.VERSION_NOT_FOUND'],
     },
-    budgetVersionImport: {
-      '404': ['BUDGET.VERSION_NOT_FOUND'],
-      '409': ['BUDGET.VERSION_NOT_EDITABLE'],
-      '422': ['BUDGET.IMPORT_FILE_INVALID', 'BUDGET.YEAR_ENDED'],
-    },
-    budgetVersionLineAdd: {
-      '404': ['BUDGET.VERSION_NOT_FOUND'],
-      '409': ['BUDGET.VERSION_NOT_EDITABLE'],
-      '422': [
-        'BUDGET.CURRENCY_NOT_REPORTING',
-        'BUDGET.PLAN_NOT_FOUND',
-        'BUDGET.YEAR_ENDED',
-        'CURRENCY_NOT_SUPPORTED',
-        'MONEY_OUT_OF_RANGE',
-        'MONEY_SCALE_EXCEEDED',
-      ],
-    },
-    budgetVersionLineList: {
-      '403': ['AUTHORIZATION.FORBIDDEN'],
-      '404': ['BUDGET.VERSION_NOT_FOUND'],
-    },
-    budgetVersionLineUpdate: {
-      '404': ['BUDGET.LINE_NOT_FOUND', 'BUDGET.VERSION_NOT_FOUND'],
-      '409': ['BUDGET.VERSION_NOT_EDITABLE'],
-      '422': [
-        'BUDGET.ADJUSTMENT_REASON_REQUIRED',
-        'BUDGET.CURRENCY_NOT_REPORTING',
-        'BUDGET.PLAN_NOT_FOUND',
-        'BUDGET.YEAR_ENDED',
-        'CURRENCY_NOT_SUPPORTED',
-        'MONEY_OUT_OF_RANGE',
-        'MONEY_SCALE_EXCEEDED',
-      ],
-    },
     budgetVersionList: {
       '403': ['AUTHORIZATION.FORBIDDEN'],
     },
@@ -242,12 +196,12 @@ export const ROUTE_ERROR_CODES_BUDGETS: Readonly<Record<string, Partial<Record<R
       '404': ['BUDGET.VERSION_NOT_FOUND'],
       '409': [
         'BUDGET.CYCLE_CURRENCY_MISMATCH',
-        'BUDGET.CYCLE_NOT_PUBLISHED',
-        'BUDGET.OVER_ANNUAL_CEILING',
+        'BUDGET_CYCLE.NOT_OPEN',
+        'BUDGET_VERSION.OVER_CEILING',
         'BUDGET.PROPOSAL_NOT_SUBMITTED',
         'BUDGET.VERSION_NOT_EDITABLE',
       ],
-      '422': ['BUDGET.RESERVE_REASON_REQUIRED', 'BUDGET.YEAR_ENDED'],
+      '422': ['BUDGET_VERSION.ATTACHMENT_REQUIRED', 'BUDGET.RESERVE_REASON_REQUIRED', 'BUDGET.YEAR_ENDED'],
     },
     budgetVersionUpdate: {
       '404': ['BUDGET.VERSION_NOT_FOUND'],
@@ -255,7 +209,6 @@ export const ROUTE_ERROR_CODES_BUDGETS: Readonly<Record<string, Partial<Record<R
       '422': [
         'BUDGET.BASE_REASON_REQUIRED',
         'BUDGET.CURRENCY_NOT_REPORTING',
-        'BUDGET.QUARTERS_MISMATCH',
         'BUDGET.YEAR_ENDED',
         'CURRENCY_NOT_SUPPORTED',
         'MONEY_OUT_OF_RANGE',

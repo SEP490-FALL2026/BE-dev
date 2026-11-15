@@ -23,7 +23,7 @@ notifications. Được dùng bởi: onboarding; gốc `src/app/app.module.ts`.
 ## Extension point
 
 - Mở: không có.
-- Đăng ký vào: không có (module không có file `*.listener.ts`).
+- Đăng ký vào: `data-import-template.listener.ts` thêm định nghĩa cột của file nhân viên và file seat vào `ImportTemplateContributions` của `policies` (file mẫu `GET /import-templates/{kind}`); spec đọc lại file mẫu bằng chính parser.
 
 ## Capability → file chính
 

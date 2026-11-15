@@ -3,7 +3,7 @@
 const TIERS = [
   ['audit', 'notifications'],
   ['organization', 'identity-access'],
-  ['finance', 'operating-parameters'],
+  ['finance', 'operating-parameters', 'policies'],
   ['catalog', 'licensing'],
   ['budgets', 'requests', 'data-import', 'devices'],
   ['personnel', 'onboarding', 'installation', 'ai-assist', 'usage'],

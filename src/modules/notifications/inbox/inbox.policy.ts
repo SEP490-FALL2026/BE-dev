@@ -98,8 +98,10 @@ export const PARAM_KEYS_BY_CODE: Readonly<Record<InAppNotificationCode, readonly
   BUDGET_PROPOSAL_CLOSED_YEAR_END: ['proposalId', 'costCenterId', 'year'],
   BUDGET_PROPOSAL_TASK_ASSIGNED: ['costCenterId', 'departmentId', 'year'],
   BUDGET_PROPOSAL_TASK_WAITING: ['proposalId', 'costCenterId', 'year'],
-  // The cycle of a year opened and a department ceiling published: the year and the department, never the figure (FIGURE_WORDS).
-  BUDGET_CYCLE_OPENED: ['cycleId', 'year', 'submissionDeadline'],
+  // The cycle of a year opened (with the kind of the form to download, `templateKind`) and its submission deadline moved: the year and the days, never a figure (FIGURE_WORDS).
+  // A department ceiling published is no longer sent (QĐ-111aa); the notices written before stay readable.
+  BUDGET_CYCLE_OPENED: ['cycleId', 'year', 'submissionDeadline', 'templateKind'],
+  BUDGET_CYCLE_DEADLINE_MOVED: ['cycleId', 'year', 'submissionDeadline', 'previousSubmissionDeadline'],
   BUDGET_DEPARTMENT_CEILING_PUBLISHED: ['cycleId', 'year', 'departmentId'],
   // The deadlines of the cycle: the year, the day, and how many departments or versions (a count, never a figure of money).
   BUDGET_PROPOSAL_DEADLINE_REMINDER: ['cycleId', 'year', 'costCenterId', 'submissionDeadline'],
@@ -192,6 +194,8 @@ export const PARAM_KEYS_BY_CODE: Readonly<Record<InAppNotificationCode, readonly
   IT_ADMIN_HANDOVER_RECEIVED: ['sourceKind', 'sourceId', 'fromEmployeeId', 'subscriptions', 'applications'],
   // A departure cancelled after the last working day: how many revocation tasks in progress the IT Admin closes by hand (`QĐ-110c`).
   DEPARTURE_REVOCATION_IT_CLOSE: ['caseId', 'employeeId', 'taskCount'],
+  // A new version of a policy: which policy, which version, and whether the reader is asked to acknowledge it (`QĐ-111bi`).
+  POLICY_PUBLISHED: ['policyCode', 'versionNumber', 'requiresReacknowledgement'],
 };
 
 /** Whether the code is one of the closed table. */
