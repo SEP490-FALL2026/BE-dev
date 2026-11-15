@@ -56279,7 +56279,7 @@
         },
         "responses": {
           "201": {
-            "description": "The proposal of the department for a Cost Center and a year that is running or to come, with its lines and their total. Finance sees it in their queue.",
+            "description": "The proposal of the department for a Cost Center and a year that is running or to come (BM-10): the files, the amount asked for the whole year and a note; there are no lines. Finance sees it in their queue.",
             "content": {
               "application/json": {
                 "schema": {
@@ -56398,7 +56398,7 @@
             }
           },
           "409": {
-            "description": "The department has no Cost Center in use yet (FINANCE.SETUP_INCOMPLETE), a proposal for the Cost Center and the year already waits or is being reviewed and no refused version leaves room for a successor (BUDGET.PROPOSAL_ALREADY_OPEN), or Finance has not opened the budget cycle of the year yet (BUDGET_CYCLE.NOT_OPEN).",
+            "description": "The department has no Cost Center in use yet (FINANCE.SETUP_INCOMPLETE), a proposal for the Cost Center and the year already waits or is being reviewed and no refused version leaves room for a successor (BUDGET.PROPOSAL_ALREADY_OPEN), or Finance has not opened the budget cycle of the year yet (BUDGET_CYCLE.NOT_OPEN), or its submission deadline has passed and it is locked (BUDGET_CYCLE.LOCKED).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -56432,6 +56432,18 @@
                       "error": {
                         "code": "BUDGET_CYCLE.NOT_OPEN",
                         "message": "The budget cycle of 2027 is not open yet.",
+                        "details": { "year": 2027 },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "BUDGET_CYCLE.LOCKED": {
+                    "summary": "The budget cycle of 2027 is locked: its submission deadline has passed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "BUDGET_CYCLE.LOCKED",
+                        "message": "The budget cycle of 2027 is locked: its submission deadline has passed.",
                         "details": { "year": 2027 },
                         "requestId": "req_example"
                       }
@@ -56484,7 +56496,7 @@
             }
           },
           "422": {
-            "description": "The form is invalid (VALIDATION_ERROR), two lines share a priority rank (BUDGET.PRIORITY_RANK_INVALID, details.positions), a line lacks its zero-based-budget explanation (BUDGET.ZBB_REQUIRED, details.positions), a line that carries the proposal over the published ceiling of the department has no note (BUDGET.OVER_CEILING_NOTE_REQUIRED, details.positions), a line names a plan that does not exist (BUDGET.PLAN_NOT_FOUND), the year has ended (BUDGET.YEAR_ENDED) an amount is not in the reporting currency (BUDGET.CURRENCY_NOT_REPORTING), or the head answers for more than one Cost Center that year and names none (BUDGET.COST_CENTER_REQUIRED).",
+            "description": "The form is invalid (VALIDATION_ERROR: no file, more than ten, a line of the old form), a file is not one the head uploaded for a proposal (BUDGET_ATTACHMENT.NOT_ATTACHABLE), the year has ended (BUDGET.YEAR_ENDED), the amount is not in the reporting currency (BUDGET.CURRENCY_NOT_REPORTING), or the head answers for more than one Cost Center that year and names none (BUDGET.COST_CENTER_REQUIRED).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -56497,54 +56509,6 @@
                         "code": "VALIDATION_ERROR",
                         "message": "Request validation failed.",
                         "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "BUDGET.PRIORITY_RANK_INVALID": {
-                    "summary": "Each line has its own priority rank.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "BUDGET.PRIORITY_RANK_INVALID",
-                        "message": "Each line has its own priority rank.",
-                        "details": { "positions": [1, 2] },
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "BUDGET.ZBB_REQUIRED": {
-                    "summary": "These lines need the zero-based-budget explanation.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "BUDGET.ZBB_REQUIRED",
-                        "message": "These lines need the zero-based-budget explanation.",
-                        "details": { "positions": [1] },
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "BUDGET.OVER_CEILING_NOTE_REQUIRED": {
-                    "summary": "These lines carry the proposal over the ceiling of the department and need a note.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "BUDGET.OVER_CEILING_NOTE_REQUIRED",
-                        "message": "These lines carry the proposal over the ceiling of the department and need a note.",
-                        "details": { "positions": [2] },
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "BUDGET.PLAN_NOT_FOUND": {
-                    "summary": "A line names a plan that does not exist.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "BUDGET.PLAN_NOT_FOUND",
-                        "message": "A line names a plan that does not exist.",
-                        "details": { "planIds": ["<plan-id>"] },
                         "requestId": "req_example"
                       }
                     }
@@ -57011,178 +56975,6 @@
         "tags": ["budget-proposals"]
       }
     },
-    "/api/v1/budget-proposals/{id}/lines": {
-      "get": {
-        "operationId": "budgetProposalLineList",
-        "parameters": [
-          { "name": "id", "required": true, "in": "path", "schema": { "format": "uuid", "type": "string" } },
-          {
-            "name": "page",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "maximum": 9007199254740991,
-              "exclusiveMinimum": true,
-              "default": 1,
-              "type": "integer",
-              "minimum": 0
-            }
-          },
-          {
-            "name": "pageSize",
-            "required": false,
-            "in": "query",
-            "schema": { "maximum": 100, "exclusiveMinimum": true, "default": 20, "type": "integer", "minimum": 0 }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "The lines as they were sent, in order. They are never changed: Finance adjusts a copy in a version.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "allOf": [
-                    { "$ref": "#/components/schemas/ProposalLinePageResponseDto" },
-                    { "properties": { "message": { "example": "BUDGET_PROPOSAL.LINES_LISTED" } } }
-                  ]
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Authentication is required or the token is no longer valid.",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "AUTHENTICATION_REQUIRED": {
-                    "summary": "A Bearer access token is required.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "AUTHENTICATION_REQUIRED",
-                        "message": "A Bearer access token is required.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "INVALID_ACCESS_TOKEN": {
-                    "summary": "The access token is invalid.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "INVALID_ACCESS_TOKEN",
-                        "message": "The access token is invalid.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "The proposal does not exist, or the caller has no part in it (BUDGET.PROPOSAL_NOT_FOUND).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "BUDGET.PROPOSAL_NOT_FOUND": {
-                    "summary": "The proposal does not exist.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "BUDGET.PROPOSAL_NOT_FOUND",
-                        "message": "The proposal does not exist.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "The request is invalid (VALIDATION_ERROR).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "VALIDATION_ERROR": {
-                    "summary": "Request validation failed.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "VALIDATION_ERROR",
-                        "message": "Request validation failed.",
-                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "HTTP_TOO_MANY_REQUESTS": {
-                    "summary": "The request could not be processed.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "HTTP_TOO_MANY_REQUESTS",
-                        "message": "The request could not be processed.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "TOKEN_VERIFICATION_UNAVAILABLE": {
-                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
-                        "message": "Authentication is temporarily unavailable. Retry shortly.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "SERVICE_UNAVAILABLE": {
-                    "summary": "The service is temporarily unavailable. Retry shortly.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "SERVICE_UNAVAILABLE",
-                        "message": "The service is temporarily unavailable. Retry shortly.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        },
-        "security": [{ "bearer": [] }],
-        "summary": "List the lines of a budget proposal",
-        "tags": ["budget-proposals"]
-      }
-    },
     "/api/v1/budget-proposals/{id}/withdrawal": {
       "post": {
         "operationId": "budgetProposalWithdraw",
@@ -57278,7 +57070,7 @@
             }
           },
           "409": {
-            "description": "The proposal is no longer waiting for Finance (BUDGET.PROPOSAL_CANNOT_WITHDRAW).",
+            "description": "The proposal is no longer waiting for Finance (BUDGET.PROPOSAL_CANNOT_WITHDRAW), or Finance has not opened the budget cycle of the year yet (BUDGET_CYCLE.NOT_OPEN), or its submission deadline has passed and it is locked (BUDGET_CYCLE.LOCKED).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -57291,6 +57083,30 @@
                         "code": "BUDGET.PROPOSAL_CANNOT_WITHDRAW",
                         "message": "The proposal cannot be changed this way while it is REVIEWED.",
                         "details": { "state": "REVIEWED" },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "BUDGET_CYCLE.NOT_OPEN": {
+                    "summary": "The budget cycle of 2027 is not open yet.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "BUDGET_CYCLE.NOT_OPEN",
+                        "message": "The budget cycle of 2027 is not open yet.",
+                        "details": { "year": 2027 },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "BUDGET_CYCLE.LOCKED": {
+                    "summary": "The budget cycle of 2027 is locked: its submission deadline has passed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "BUDGET_CYCLE.LOCKED",
+                        "message": "The budget cycle of 2027 is locked: its submission deadline has passed.",
+                        "details": { "year": 2027 },
                         "requestId": "req_example"
                       }
                     }
@@ -57406,7 +57222,7 @@
         },
         "responses": {
           "200": {
-            "description": "Finance gives the proposal back with the reason that must go with it; the head corrects it and sends it again.",
+            "description": "Finance gives the proposal back with the reason that must go with it, before the submission deadline; the head corrects it and sends it again.",
             "content": {
               "application/json": {
                 "schema": {
@@ -57514,7 +57330,7 @@
             }
           },
           "409": {
-            "description": "The proposal is not waiting for Finance (BUDGET.PROPOSAL_CANNOT_RETURN).",
+            "description": "The proposal is not waiting for Finance (BUDGET.PROPOSAL_CANNOT_RETURN), or Finance has not opened the budget cycle of the year yet (BUDGET_CYCLE.NOT_OPEN), or its submission deadline has passed and it is locked (BUDGET_CYCLE.LOCKED).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -57527,6 +57343,30 @@
                         "code": "BUDGET.PROPOSAL_CANNOT_RETURN",
                         "message": "The proposal cannot be changed this way while it is REVIEWED.",
                         "details": { "state": "REVIEWED" },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "BUDGET_CYCLE.NOT_OPEN": {
+                    "summary": "The budget cycle of 2027 is not open yet.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "BUDGET_CYCLE.NOT_OPEN",
+                        "message": "The budget cycle of 2027 is not open yet.",
+                        "details": { "year": 2027 },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "BUDGET_CYCLE.LOCKED": {
+                    "summary": "The budget cycle of 2027 is locked: its submission deadline has passed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "BUDGET_CYCLE.LOCKED",
+                        "message": "The budget cycle of 2027 is locked: its submission deadline has passed.",
+                        "details": { "year": 2027 },
                         "requestId": "req_example"
                       }
                     }
@@ -57682,7 +57522,7 @@
         },
         "responses": {
           "201": {
-            "description": "A new proposal with the corrected lines, pointing at the one given back, which stays as it was.",
+            "description": "A new proposal with the corrected files, amount and note, pointing at the one given back, which stays as it was.",
             "content": {
               "application/json": {
                 "schema": {
@@ -57790,7 +57630,7 @@
             }
           },
           "409": {
-            "description": "The proposal was not given back (BUDGET.PROPOSAL_CANNOT_RESUBMIT), another waits (BUDGET.PROPOSAL_ALREADY_OPEN), the Cost Center of the department was retired and has none in use yet, though the head still owns the proposal given back (FINANCE.SETUP_INCOMPLETE), or the budget cycle of the year was never published (BUDGET_CYCLE.NOT_OPEN).",
+            "description": "The proposal was not given back (BUDGET.PROPOSAL_CANNOT_RESUBMIT), another waits (BUDGET.PROPOSAL_ALREADY_OPEN), the Cost Center of the department was retired and has none in use yet, though the head still owns the proposal given back (FINANCE.SETUP_INCOMPLETE), or Finance has not opened the budget cycle of the year yet (BUDGET_CYCLE.NOT_OPEN), or its submission deadline has passed and it is locked (BUDGET_CYCLE.LOCKED).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -57836,6 +57676,18 @@
                       "error": {
                         "code": "BUDGET_CYCLE.NOT_OPEN",
                         "message": "The budget cycle of 2027 is not open yet.",
+                        "details": { "year": 2027 },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "BUDGET_CYCLE.LOCKED": {
+                    "summary": "The budget cycle of 2027 is locked: its submission deadline has passed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "BUDGET_CYCLE.LOCKED",
+                        "message": "The budget cycle of 2027 is locked: its submission deadline has passed.",
                         "details": { "year": 2027 },
                         "requestId": "req_example"
                       }
@@ -57901,54 +57753,6 @@
                         "code": "VALIDATION_ERROR",
                         "message": "Request validation failed.",
                         "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "BUDGET.PRIORITY_RANK_INVALID": {
-                    "summary": "Each line has its own priority rank.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "BUDGET.PRIORITY_RANK_INVALID",
-                        "message": "Each line has its own priority rank.",
-                        "details": { "positions": [1, 2] },
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "BUDGET.ZBB_REQUIRED": {
-                    "summary": "These lines need the zero-based-budget explanation.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "BUDGET.ZBB_REQUIRED",
-                        "message": "These lines need the zero-based-budget explanation.",
-                        "details": { "positions": [1] },
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "BUDGET.OVER_CEILING_NOTE_REQUIRED": {
-                    "summary": "These lines carry the proposal over the ceiling of the department and need a note.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "BUDGET.OVER_CEILING_NOTE_REQUIRED",
-                        "message": "These lines carry the proposal over the ceiling of the department and need a note.",
-                        "details": { "positions": [2] },
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "BUDGET.PLAN_NOT_FOUND": {
-                    "summary": "A line names a plan that does not exist.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "BUDGET.PLAN_NOT_FOUND",
-                        "message": "A line names a plan that does not exist.",
-                        "details": { "planIds": ["<plan-id>"] },
                         "requestId": "req_example"
                       }
                     }
@@ -58097,7 +57901,7 @@
         },
         "responses": {
           "201": {
-            "description": "A draft with the base and the reserve (the default share of the base unless Finance gives another with its reason), and the lines of the proposal copied to be reviewed; the proposal itself is not changed. A proposal whose latest version was refused is made again the same way: the new draft points at the refused one (rejectedPredecessorId). With source BASELINE (costCenterId and year, no proposal and no base) the draft is built from the baseline of the department when nobody heads it at the deadline: one Renew line for each subscription that runs in the year, the base is their sum, origin is BASELINE_NO_HEAD.",
+            "description": "A draft with one figure for the year and no line: the base Finance gives, or what the Cost Center carries into the year when it gives none (carriedOverNextYear), and the reserve as a share (reservePercent, the default share when nothing is given) or as an amount with its reason; the proposal itself is not changed. Saving a draft is never refused for its figures. A proposal whose latest version was refused is made again the same way: the new draft points at the refused one (rejectedPredecessorId). With source BASELINE (costCenterId and year, no proposal) the draft is built after the deadline for a department that has no proposal (a head that sent none, or a department made after the deadline), the same way; origin is BASELINE_NO_PROPOSAL and noProposalSubmitted is true.",
             "content": {
               "application/json": {
                 "schema": {
@@ -58216,7 +58020,7 @@
             }
           },
           "409": {
-            "description": "The proposal is neither waiting nor reviewed with its latest version refused and nobody following it (BUDGET.PROPOSAL_NOT_SUBMITTED), the Cost Center is no longer in use (FINANCE.SETUP_INCOMPLETE), has a current budget (BUDGET.CURRENT_EXISTS) or a version in progress (BUDGET.VERSION_IN_FLIGHT), or a version built from the baseline is not allowed: the cycle was never published, the department is not in the cycle of the year (DEPARTMENT_NOT_IN_CYCLE), the deadline has not passed, somebody heads the department or is to, or a proposal waits (BUDGET.BASELINE_VERSION_NOT_ALLOWED, details.reason).",
+            "description": "The proposal is neither waiting nor reviewed with its latest version refused and nobody following it (BUDGET.PROPOSAL_NOT_SUBMITTED), the Cost Center is no longer in use (FINANCE.SETUP_INCOMPLETE), has a current budget (BUDGET.CURRENT_EXISTS) or a version in progress (BUDGET.VERSION_IN_FLIGHT), or a version built from the baseline is not allowed: the cycle was never published, the department is not in the cycle of the year (DEPARTMENT_NOT_IN_CYCLE), the deadline has not passed, or a proposal waits (BUDGET.BASELINE_VERSION_NOT_ALLOWED, details.reason).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -58262,7 +58066,7 @@
                       "error": {
                         "code": "BUDGET.BASELINE_VERSION_NOT_ALLOWED",
                         "message": "A version is built from the baseline only after the deadline, for a department nobody heads and nobody proposed for.",
-                        "details": { "reason": "HAS_HEAD" },
+                        "details": { "reason": "HAS_PROPOSAL" },
                         "requestId": "req_example"
                       }
                     }
@@ -58314,7 +58118,7 @@
             }
           },
           "422": {
-            "description": "The body is invalid (VALIDATION_ERROR) or the year has ended (BUDGET.YEAR_ENDED).",
+            "description": "The body is invalid (VALIDATION_ERROR: the reserve given both as an amount and as a share) or the year has ended (BUDGET.YEAR_ENDED).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -58838,7 +58642,7 @@
         ],
         "responses": {
           "200": {
-            "description": "The version without its lines, which are a paged list of their own.",
+            "description": "One figure for the year: the base, the reserve and their total, what the Cost Center carries into the year (carriedOverNextYear) with the red flag when the base is below it (belowCarriedOver, never a refusal), and whether Finance built it from the baseline because the department had no proposal (noProposalSubmitted).",
             "content": {
               "application/json": {
                 "schema": {
@@ -58904,7 +58708,7 @@
             }
           },
           "404": {
-            "description": "The version or the line does not exist (BUDGET.VERSION_NOT_FOUND, BUDGET.LINE_NOT_FOUND).",
+            "description": "The version does not exist (BUDGET.VERSION_NOT_FOUND).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -59015,7 +58819,7 @@
         },
         "responses": {
           "200": {
-            "description": "The base, and the reserve with its reason; the total is the base and the reserve, one amount for the whole year. A reserve that is still the default share of the base follows the base.",
+            "description": "The base, and the reserve as a share (reservePercent) or as an amount with its reason, not both; the total is the base and the reserve, one amount for the whole year. A reserve that is still its share of the base follows the base. A draft is saved whatever its figures: the ceiling is checked when it is sent.",
             "content": {
               "application/json": {
                 "schema": {
@@ -59102,7 +58906,7 @@
             }
           },
           "404": {
-            "description": "The version or the line does not exist (BUDGET.VERSION_NOT_FOUND, BUDGET.LINE_NOT_FOUND).",
+            "description": "The version does not exist (BUDGET.VERSION_NOT_FOUND).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -59345,7 +59149,7 @@
         ],
         "responses": {
           "200": {
-            "description": "The version waits for the spending approver. A reserve that is not the default share of the base is sent with its reason. The versions of the year (this one in the place of the one of its own Cost Center) must add up to no more than the annual ceiling less the shared-pool reserve of the budget cycle.",
+            "description": "The version waits for the spending approver. It is sent with one file at least that explains it, and a reserve that is not its share of the base with its reason. The versions of the year (this one in the place of the one of its own Cost Center) must add up to no more than the annual ceiling less the shared-pool reserve of the budget cycle (BUDGET_VERSION.OVER_CEILING, details.overBy).",
             "content": {
               "application/json": {
                 "schema": {
@@ -59411,7 +59215,7 @@
             }
           },
           "404": {
-            "description": "The version or the line does not exist (BUDGET.VERSION_NOT_FOUND, BUDGET.LINE_NOT_FOUND).",
+            "description": "The version does not exist (BUDGET.VERSION_NOT_FOUND).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -59502,7 +59306,7 @@
             }
           },
           "422": {
-            "description": "A reserve that is not the default share of the base has no reason (BUDGET.RESERVE_REASON_REQUIRED) or the year has ended (BUDGET.YEAR_ENDED).",
+            "description": "The version has no file that explains it (BUDGET_VERSION.ATTACHMENT_REQUIRED), a reserve that is not its share of the base has no reason (BUDGET.RESERVE_REASON_REQUIRED) or the year has ended (BUDGET.YEAR_ENDED).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -59515,6 +59319,17 @@
                         "code": "VALIDATION_ERROR",
                         "message": "Request validation failed.",
                         "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "BUDGET_VERSION.ATTACHMENT_REQUIRED": {
+                    "summary": "A version is sent with one file at least that explains it.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "BUDGET_VERSION.ATTACHMENT_REQUIRED",
+                        "message": "A version is sent with one file at least that explains it.",
                         "requestId": "req_example"
                       }
                     }
@@ -59617,7 +59432,7 @@
         },
         "responses": {
           "200": {
-            "description": "The spending approver approves a version that was sent (it becomes the current budget of its Cost Center and year, which has no other current version, and takes the commitments that waited for a budget), refuses it with a reason, or sends it back to Finance with a reason. The decision is written as a record that is never changed. No figure is changed here.",
+            "description": "The spending approver approves a version that was sent (it becomes the current budget of its Cost Center and year, which has no other current version, and takes the commitments that waited for a budget), or returns it to Finance with the reason that must go with it (RETURN: the version is CHANGES_REQUESTED, Finance changes it and sends it again). There is no refusal. The decision is written as a record that is never changed. No figure is changed here.",
             "content": {
               "application/json": {
                 "schema": {
@@ -59726,7 +59541,7 @@
             }
           },
           "404": {
-            "description": "The version or the line does not exist (BUDGET.VERSION_NOT_FOUND, BUDGET.LINE_NOT_FOUND).",
+            "description": "The version does not exist (BUDGET.VERSION_NOT_FOUND).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -59810,7 +59625,7 @@
             }
           },
           "422": {
-            "description": "The decision is invalid (VALIDATION_ERROR): a refusal or a request to look again without its reason, an approval with one; or the fiscal year of the version has ended (BUDGET.YEAR_ENDED).",
+            "description": "The decision is invalid (VALIDATION_ERROR): REJECT or REQUEST_CHANGES, which are no longer decisions, a RETURN without its reason, an approval with one; or the fiscal year of the version has ended (BUDGET.YEAR_ENDED).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -59899,1170 +59714,6 @@
         },
         "security": [{ "bearer": [] }],
         "summary": "Decide a version of a budget",
-        "tags": ["budget-versions"]
-      }
-    },
-    "/api/v1/budget-versions/{id}/lines": {
-      "get": {
-        "operationId": "budgetVersionLineList",
-        "parameters": [
-          { "name": "id", "required": true, "in": "path", "schema": { "format": "uuid", "type": "string" } },
-          {
-            "name": "page",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "maximum": 9007199254740991,
-              "exclusiveMinimum": true,
-              "default": 1,
-              "type": "integer",
-              "minimum": 0
-            }
-          },
-          {
-            "name": "pageSize",
-            "required": false,
-            "in": "query",
-            "schema": { "maximum": 100, "exclusiveMinimum": true, "default": 20, "type": "integer", "minimum": 0 }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "In order, with the position of the line of the proposal each adjusts.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "allOf": [
-                    { "$ref": "#/components/schemas/VersionLinePageResponseDto" },
-                    { "properties": { "message": { "example": "BUDGET_VERSION.LINES_LISTED" } } }
-                  ]
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Authentication is required or the token is no longer valid.",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "AUTHENTICATION_REQUIRED": {
-                    "summary": "A Bearer access token is required.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "AUTHENTICATION_REQUIRED",
-                        "message": "A Bearer access token is required.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "INVALID_ACCESS_TOKEN": {
-                    "summary": "The access token is invalid.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "INVALID_ACCESS_TOKEN",
-                        "message": "The access token is invalid.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Only Finance and the spending approver read the versions of a budget.",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "AUTHORIZATION.FORBIDDEN": {
-                    "summary": "Only Finance and the spending approver read the versions of a budget.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "AUTHORIZATION.FORBIDDEN",
-                        "message": "Only Finance and the spending approver read the versions of a budget.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "The version or the line does not exist (BUDGET.VERSION_NOT_FOUND, BUDGET.LINE_NOT_FOUND).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "BUDGET.VERSION_NOT_FOUND": {
-                    "summary": "The version does not exist.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "BUDGET.VERSION_NOT_FOUND",
-                        "message": "The version does not exist.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "The request is invalid (VALIDATION_ERROR).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "VALIDATION_ERROR": {
-                    "summary": "Request validation failed.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "VALIDATION_ERROR",
-                        "message": "Request validation failed.",
-                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "HTTP_TOO_MANY_REQUESTS": {
-                    "summary": "The request could not be processed.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "HTTP_TOO_MANY_REQUESTS",
-                        "message": "The request could not be processed.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "TOKEN_VERIFICATION_UNAVAILABLE": {
-                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
-                        "message": "Authentication is temporarily unavailable. Retry shortly.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "SERVICE_UNAVAILABLE": {
-                    "summary": "The service is temporarily unavailable. Retry shortly.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "SERVICE_UNAVAILABLE",
-                        "message": "The service is temporarily unavailable. Retry shortly.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        },
-        "security": [{ "bearer": [] }],
-        "summary": "List the lines of a version",
-        "tags": ["budget-versions"]
-      },
-      "post": {
-        "operationId": "budgetVersionLineAdd",
-        "parameters": [
-          { "name": "id", "required": true, "in": "path", "schema": { "format": "uuid", "type": "string" } }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/AddLinesBodyDto" } } }
-        },
-        "responses": {
-          "201": {
-            "description": "Lines of Finance own, saying what every line says.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "allOf": [
-                    { "$ref": "#/components/schemas/VersionResponseDto" },
-                    { "properties": { "message": { "example": "BUDGET_VERSION.LINES_ADDED" } } }
-                  ]
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "HTTP_BAD_REQUEST": {
-                    "summary": "The request could not be processed.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "HTTP_BAD_REQUEST",
-                        "message": "The request could not be processed.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Authentication is required or the token is no longer valid.",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "AUTHENTICATION_REQUIRED": {
-                    "summary": "A Bearer access token is required.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "AUTHENTICATION_REQUIRED",
-                        "message": "A Bearer access token is required.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "INVALID_ACCESS_TOKEN": {
-                    "summary": "The access token is invalid.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "INVALID_ACCESS_TOKEN",
-                        "message": "The access token is invalid.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Only Finance builds the versions of a budget.",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "AUTHORIZATION.FORBIDDEN": {
-                    "summary": "You do not have permission to perform this action.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "AUTHORIZATION.FORBIDDEN",
-                        "message": "You do not have permission to perform this action.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "The version or the line does not exist (BUDGET.VERSION_NOT_FOUND, BUDGET.LINE_NOT_FOUND).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "BUDGET.VERSION_NOT_FOUND": {
-                    "summary": "The version does not exist.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "BUDGET.VERSION_NOT_FOUND",
-                        "message": "The version does not exist.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "The version is not a draft nor sent back to Finance, or is a draft left behind by a proposal that was withdrawn or given back, so it is not changed (BUDGET.VERSION_NOT_EDITABLE).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "BUDGET.VERSION_NOT_EDITABLE": {
-                    "summary": "The version is SENT, so it is not changed.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "BUDGET.VERSION_NOT_EDITABLE",
-                        "message": "The version is SENT, so it is not changed.",
-                        "details": { "state": "SENT" },
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "413": {
-            "description": "The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "HTTP_PAYLOAD_TOO_LARGE": {
-                    "summary": "The request could not be processed.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "HTTP_PAYLOAD_TOO_LARGE",
-                        "message": "The request could not be processed.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "415": {
-            "description": "The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "HTTP_UNSUPPORTED_MEDIA_TYPE": {
-                    "summary": "The request could not be processed.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "HTTP_UNSUPPORTED_MEDIA_TYPE",
-                        "message": "The request could not be processed.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "The body is invalid (VALIDATION_ERROR), a line names a plan that does not exist (BUDGET.PLAN_NOT_FOUND) or the fiscal year of the version has ended (BUDGET.YEAR_ENDED).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "VALIDATION_ERROR": {
-                    "summary": "Request validation failed.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "VALIDATION_ERROR",
-                        "message": "Request validation failed.",
-                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "BUDGET.PLAN_NOT_FOUND": {
-                    "summary": "A line names a plan that does not exist.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "BUDGET.PLAN_NOT_FOUND",
-                        "message": "A line names a plan that does not exist.",
-                        "details": { "planIds": ["<plan-id>"] },
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "BUDGET.YEAR_ENDED": {
-                    "summary": "The year 2025 has ended.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "BUDGET.YEAR_ENDED",
-                        "message": "The year 2025 has ended.",
-                        "details": { "year": 2025 },
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "BUDGET.CURRENCY_NOT_REPORTING": {
-                    "summary": "Budgets are kept in VND, not USD.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "BUDGET.CURRENCY_NOT_REPORTING",
-                        "message": "Budgets are kept in VND, not USD.",
-                        "details": { "currency": "USD", "reporting": "VND" },
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "CURRENCY_NOT_SUPPORTED": {
-                    "summary": "The currency XYZ is not supported.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "CURRENCY_NOT_SUPPORTED",
-                        "message": "The currency XYZ is not supported.",
-                        "details": { "currency": "XYZ" },
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "MONEY_SCALE_EXCEEDED": {
-                    "summary": "This currency allows at most 2 decimal digit(s).",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "MONEY_SCALE_EXCEEDED",
-                        "message": "This currency allows at most 2 decimal digit(s).",
-                        "details": { "allowedDecimals": 2 },
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "MONEY_OUT_OF_RANGE": {
-                    "summary": "The amount is outside the range a money value may hold.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "MONEY_OUT_OF_RANGE",
-                        "message": "The amount is outside the range a money value may hold.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "HTTP_TOO_MANY_REQUESTS": {
-                    "summary": "The request could not be processed.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "HTTP_TOO_MANY_REQUESTS",
-                        "message": "The request could not be processed.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "TOKEN_VERIFICATION_UNAVAILABLE": {
-                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
-                        "message": "Authentication is temporarily unavailable. Retry shortly.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "SERVICE_UNAVAILABLE": {
-                    "summary": "The service is temporarily unavailable. Retry shortly.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "SERVICE_UNAVAILABLE",
-                        "message": "The service is temporarily unavailable. Retry shortly.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        },
-        "security": [{ "bearer": [] }],
-        "summary": "Add lines to a version being built",
-        "tags": ["budget-versions"]
-      }
-    },
-    "/api/v1/budget-versions/{id}/lines/{position}": {
-      "put": {
-        "operationId": "budgetVersionLineUpdate",
-        "parameters": [
-          { "name": "id", "required": true, "in": "path", "schema": { "format": "uuid", "type": "string" } },
-          {
-            "name": "position",
-            "required": true,
-            "in": "path",
-            "schema": { "maximum": 9007199254740991, "exclusiveMinimum": true, "type": "integer", "minimum": 0 }
-          }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/LinePatchDto" } } }
-        },
-        "responses": {
-          "200": {
-            "description": "The line of the proposal it comes from stays as it was; changing what it said needs the reason.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "allOf": [
-                    { "$ref": "#/components/schemas/LineResponseDto" },
-                    { "properties": { "message": { "example": "BUDGET_VERSION.LINE_CHANGED" } } }
-                  ]
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "HTTP_BAD_REQUEST": {
-                    "summary": "The request could not be processed.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "HTTP_BAD_REQUEST",
-                        "message": "The request could not be processed.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Authentication is required or the token is no longer valid.",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "AUTHENTICATION_REQUIRED": {
-                    "summary": "A Bearer access token is required.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "AUTHENTICATION_REQUIRED",
-                        "message": "A Bearer access token is required.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "INVALID_ACCESS_TOKEN": {
-                    "summary": "The access token is invalid.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "INVALID_ACCESS_TOKEN",
-                        "message": "The access token is invalid.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Only Finance builds the versions of a budget.",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "AUTHORIZATION.FORBIDDEN": {
-                    "summary": "You do not have permission to perform this action.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "AUTHORIZATION.FORBIDDEN",
-                        "message": "You do not have permission to perform this action.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "The version or the line does not exist (BUDGET.VERSION_NOT_FOUND, BUDGET.LINE_NOT_FOUND).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "BUDGET.VERSION_NOT_FOUND": {
-                    "summary": "The version does not exist.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "BUDGET.VERSION_NOT_FOUND",
-                        "message": "The version does not exist.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "BUDGET.LINE_NOT_FOUND": {
-                    "summary": "The line does not exist.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "BUDGET.LINE_NOT_FOUND",
-                        "message": "The line does not exist.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "The version is not a draft nor sent back to Finance, or is a draft left behind by a proposal that was withdrawn or given back, so it is not changed (BUDGET.VERSION_NOT_EDITABLE).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "BUDGET.VERSION_NOT_EDITABLE": {
-                    "summary": "The version is SENT, so it is not changed.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "BUDGET.VERSION_NOT_EDITABLE",
-                        "message": "The version is SENT, so it is not changed.",
-                        "details": { "state": "SENT" },
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "413": {
-            "description": "The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "HTTP_PAYLOAD_TOO_LARGE": {
-                    "summary": "The request could not be processed.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "HTTP_PAYLOAD_TOO_LARGE",
-                        "message": "The request could not be processed.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "415": {
-            "description": "The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "HTTP_UNSUPPORTED_MEDIA_TYPE": {
-                    "summary": "The request could not be processed.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "HTTP_UNSUPPORTED_MEDIA_TYPE",
-                        "message": "The request could not be processed.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "The body is invalid (VALIDATION_ERROR), the reason of the adjustment is missing (BUDGET.ADJUSTMENT_REASON_REQUIRED), the line names a plan that does not exist (BUDGET.PLAN_NOT_FOUND) or the fiscal year of the version has ended (BUDGET.YEAR_ENDED).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "VALIDATION_ERROR": {
-                    "summary": "Request validation failed.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "VALIDATION_ERROR",
-                        "message": "Request validation failed.",
-                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "BUDGET.ADJUSTMENT_REASON_REQUIRED": {
-                    "summary": "A reason is required for the adjustment.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "BUDGET.ADJUSTMENT_REASON_REQUIRED",
-                        "message": "A reason is required for the adjustment.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "BUDGET.PLAN_NOT_FOUND": {
-                    "summary": "A line names a plan that does not exist.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "BUDGET.PLAN_NOT_FOUND",
-                        "message": "A line names a plan that does not exist.",
-                        "details": { "planIds": ["<plan-id>"] },
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "BUDGET.YEAR_ENDED": {
-                    "summary": "The year 2025 has ended.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "BUDGET.YEAR_ENDED",
-                        "message": "The year 2025 has ended.",
-                        "details": { "year": 2025 },
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "BUDGET.CURRENCY_NOT_REPORTING": {
-                    "summary": "Budgets are kept in VND, not USD.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "BUDGET.CURRENCY_NOT_REPORTING",
-                        "message": "Budgets are kept in VND, not USD.",
-                        "details": { "currency": "USD", "reporting": "VND" },
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "CURRENCY_NOT_SUPPORTED": {
-                    "summary": "The currency XYZ is not supported.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "CURRENCY_NOT_SUPPORTED",
-                        "message": "The currency XYZ is not supported.",
-                        "details": { "currency": "XYZ" },
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "MONEY_SCALE_EXCEEDED": {
-                    "summary": "This currency allows at most 2 decimal digit(s).",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "MONEY_SCALE_EXCEEDED",
-                        "message": "This currency allows at most 2 decimal digit(s).",
-                        "details": { "allowedDecimals": 2 },
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "MONEY_OUT_OF_RANGE": {
-                    "summary": "The amount is outside the range a money value may hold.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "MONEY_OUT_OF_RANGE",
-                        "message": "The amount is outside the range a money value may hold.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "HTTP_TOO_MANY_REQUESTS": {
-                    "summary": "The request could not be processed.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "HTTP_TOO_MANY_REQUESTS",
-                        "message": "The request could not be processed.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "TOKEN_VERIFICATION_UNAVAILABLE": {
-                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
-                        "message": "Authentication is temporarily unavailable. Retry shortly.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "SERVICE_UNAVAILABLE": {
-                    "summary": "The service is temporarily unavailable. Retry shortly.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "SERVICE_UNAVAILABLE",
-                        "message": "The service is temporarily unavailable. Retry shortly.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        },
-        "security": [{ "bearer": [] }],
-        "summary": "Comment on and adjust a line of a version",
-        "tags": ["budget-versions"]
-      }
-    },
-    "/api/v1/budget-versions/{id}/imports": {
-      "post": {
-        "operationId": "budgetVersionImport",
-        "parameters": [
-          { "name": "id", "required": true, "in": "path", "schema": { "format": "uuid", "type": "string" } }
-        ],
-        "requestBody": {
-          "required": true,
-          "content": {
-            "multipart/form-data": {
-              "schema": {
-                "type": "object",
-                "required": ["file"],
-                "properties": { "file": { "type": "string", "format": "binary" } }
-              }
-            }
-          }
-        },
-        "responses": {
-          "201": {
-            "description": "Each row is judged on its own: the right ones are added to the version, which is a draft and so budgets nothing until it is approved, and the others are reported with the row and the reason.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "allOf": [
-                    { "$ref": "#/components/schemas/BudgetLineImportResponseDto" },
-                    { "properties": { "message": { "example": "BUDGET_VERSION.LINES_IMPORTED" } } }
-                  ]
-                }
-              }
-            }
-          },
-          "400": {
-            "description": "The form breaks a limit of the upload before it is read — more than 1 file, any text field, more than 1 part — or it is not a readable multipart form (HTTP_BAD_REQUEST).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "HTTP_BAD_REQUEST": {
-                    "summary": "The request could not be processed.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "HTTP_BAD_REQUEST",
-                        "message": "The request could not be processed.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Authentication is required or the token is no longer valid.",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "AUTHENTICATION_REQUIRED": {
-                    "summary": "A Bearer access token is required.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "AUTHENTICATION_REQUIRED",
-                        "message": "A Bearer access token is required.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "INVALID_ACCESS_TOKEN": {
-                    "summary": "The access token is invalid.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "INVALID_ACCESS_TOKEN",
-                        "message": "The access token is invalid.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "Only Finance builds the versions of a budget.",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "AUTHORIZATION.FORBIDDEN": {
-                    "summary": "You do not have permission to perform this action.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "AUTHORIZATION.FORBIDDEN",
-                        "message": "You do not have permission to perform this action.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "404": {
-            "description": "The version or the line does not exist (BUDGET.VERSION_NOT_FOUND, BUDGET.LINE_NOT_FOUND).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "BUDGET.VERSION_NOT_FOUND": {
-                    "summary": "The version does not exist.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "BUDGET.VERSION_NOT_FOUND",
-                        "message": "The version does not exist.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "409": {
-            "description": "The version is not a draft nor sent back to Finance, or is a draft left behind by a proposal that was withdrawn or given back, so it is not changed (BUDGET.VERSION_NOT_EDITABLE).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "BUDGET.VERSION_NOT_EDITABLE": {
-                    "summary": "The version is SENT, so it is not changed.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "BUDGET.VERSION_NOT_EDITABLE",
-                        "message": "The version is SENT, so it is not changed.",
-                        "details": { "state": "SENT" },
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "413": {
-            "description": "The file is larger than 2 MiB (HTTP_PAYLOAD_TOO_LARGE).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "HTTP_PAYLOAD_TOO_LARGE": {
-                    "summary": "The request could not be processed.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "HTTP_PAYLOAD_TOO_LARGE",
-                        "message": "The request could not be processed.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "The file cannot be read as a table, lacks a column, or is empty (BUDGET.IMPORT_FILE_INVALID), or the fiscal year of the version has ended (BUDGET.YEAR_ENDED).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "VALIDATION_ERROR": {
-                    "summary": "Request validation failed.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "VALIDATION_ERROR",
-                        "message": "Request validation failed.",
-                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "BUDGET.IMPORT_FILE_INVALID": {
-                    "summary": "The file cannot be read: MISSING_COLUMNS.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "BUDGET.IMPORT_FILE_INVALID",
-                        "message": "The file cannot be read: MISSING_COLUMNS.",
-                        "details": { "reason": "MISSING_COLUMNS", "detail": "cost_center_code" },
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "BUDGET.YEAR_ENDED": {
-                    "summary": "The year 2025 has ended.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "BUDGET.YEAR_ENDED",
-                        "message": "The year 2025 has ended.",
-                        "details": { "year": 2025 },
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "HTTP_TOO_MANY_REQUESTS": {
-                    "summary": "The request could not be processed.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "HTTP_TOO_MANY_REQUESTS",
-                        "message": "The request could not be processed.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "TOKEN_VERIFICATION_UNAVAILABLE": {
-                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
-                        "message": "Authentication is temporarily unavailable. Retry shortly.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "SERVICE_UNAVAILABLE": {
-                    "summary": "The service is temporarily unavailable. Retry shortly.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "SERVICE_UNAVAILABLE",
-                        "message": "The service is temporarily unavailable. Retry shortly.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        },
-        "security": [{ "bearer": [] }],
-        "summary": "Load lines into a version from a file",
         "tags": ["budget-versions"]
       }
     },
@@ -61251,212 +59902,6 @@
         },
         "security": [{ "bearer": [] }],
         "summary": "Get the budget of my department",
-        "tags": ["budgets"]
-      }
-    },
-    "/api/v1/budgets/mine/lines": {
-      "get": {
-        "operationId": "budgetMineLineList",
-        "parameters": [
-          {
-            "name": "year",
-            "required": true,
-            "in": "query",
-            "schema": { "minimum": 2000, "maximum": 2200, "type": "integer" }
-          },
-          {
-            "name": "costCenterId",
-            "required": false,
-            "in": "query",
-            "description": "The Cost Center asked about, when the caller answers for more than one that year (a department they head and one that starts on 1 January).",
-            "schema": { "format": "uuid", "type": "string" }
-          },
-          {
-            "name": "page",
-            "required": false,
-            "in": "query",
-            "schema": {
-              "maximum": 9007199254740991,
-              "exclusiveMinimum": true,
-              "default": 1,
-              "type": "integer",
-              "minimum": 0
-            }
-          },
-          {
-            "name": "pageSize",
-            "required": false,
-            "in": "query",
-            "schema": { "maximum": 100, "exclusiveMinimum": true, "default": 20, "type": "integer", "minimum": 0 }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "The lines of the current version: what is planned to be bought (Renew, Change, New or Cancel), its seats and its amount, by priority rank. Without the comments Finance made.",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "allOf": [
-                    { "$ref": "#/components/schemas/MineLinePageResponseDto" },
-                    { "properties": { "message": { "example": "BUDGET.LINES_LISTED" } } }
-                  ]
-                }
-              }
-            }
-          },
-          "401": {
-            "description": "Authentication is required or the token is no longer valid.",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "AUTHENTICATION_REQUIRED": {
-                    "summary": "A Bearer access token is required.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "AUTHENTICATION_REQUIRED",
-                        "message": "A Bearer access token is required.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "INVALID_ACCESS_TOKEN": {
-                    "summary": "The access token is invalid.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "INVALID_ACCESS_TOKEN",
-                        "message": "The access token is invalid.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "403": {
-            "description": "The caller heads no department (BUDGET.NOT_YOUR_COST_CENTER).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "AUTHORIZATION.FORBIDDEN": {
-                    "summary": "You do not have permission to perform this action.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "AUTHORIZATION.FORBIDDEN",
-                        "message": "You do not have permission to perform this action.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "BUDGET.NOT_YOUR_COST_CENTER": {
-                    "summary": "Only the head of the department proposes a budget for its Cost Center.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "BUDGET.NOT_YOUR_COST_CENTER",
-                        "message": "Only the head of the department proposes a budget for its Cost Center.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "422": {
-            "description": "The query is invalid (VALIDATION_ERROR), or the caller answers for more than one Cost Center that year and names none (BUDGET.COST_CENTER_REQUIRED).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "VALIDATION_ERROR": {
-                    "summary": "Request validation failed.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "VALIDATION_ERROR",
-                        "message": "Request validation failed.",
-                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "BUDGET.COST_CENTER_REQUIRED": {
-                    "summary": "The person answers for more than one Cost Center for that year: name the one the work is for.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "BUDGET.COST_CENTER_REQUIRED",
-                        "message": "The person answers for more than one Cost Center for that year: name the one the work is for.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "429": {
-            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "HTTP_TOO_MANY_REQUESTS": {
-                    "summary": "The request could not be processed.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "HTTP_TOO_MANY_REQUESTS",
-                        "message": "The request could not be processed.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          },
-          "503": {
-            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
-            "content": {
-              "application/json": {
-                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
-                "examples": {
-                  "TOKEN_VERIFICATION_UNAVAILABLE": {
-                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
-                        "message": "Authentication is temporarily unavailable. Retry shortly.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  },
-                  "SERVICE_UNAVAILABLE": {
-                    "summary": "The service is temporarily unavailable. Retry shortly.",
-                    "value": {
-                      "success": false,
-                      "error": {
-                        "code": "SERVICE_UNAVAILABLE",
-                        "message": "The service is temporarily unavailable. Retry shortly.",
-                        "requestId": "req_example"
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-        },
-        "security": [{ "bearer": [] }],
-        "summary": "List the lines of the budget of my department",
         "tags": ["budgets"]
       }
     },
@@ -114756,54 +113201,29 @@
             "type": "string",
             "format": "uuid"
           },
-          "lines": {
-            "minItems": 1,
-            "maxItems": 200,
-            "type": "array",
-            "items": {
-              "type": "object",
-              "properties": {
-                "planId": { "type": "string", "format": "uuid" },
-                "description": { "type": "string", "minLength": 1, "maxLength": 200 },
-                "seats": { "type": "integer", "minimum": 1, "maximum": 100000 },
-                "amount": {
-                  "type": "object",
-                  "properties": { "amount": { "type": "string", "maxLength": 40 } },
-                  "required": ["amount"],
-                  "additionalProperties": false
-                },
-                "note": { "type": "string", "minLength": 1, "maxLength": 1000 },
-                "lineType": {
-                  "type": "string",
-                  "enum": ["RENEW", "CHANGE", "NEW", "CANCEL"],
-                  "description": "RENEW carries on what runs, CHANGE changes it, NEW is a new purchase, CANCEL gives it up: a CANCEL amount is shown and never added to the total."
-                },
-                "zbb": {
-                  "type": "object",
-                  "properties": {
-                    "purpose": { "type": "string", "minLength": 1, "maxLength": 1000 },
-                    "alternatives": { "type": "string", "minLength": 1, "maxLength": 1000 },
-                    "consequenceIfNot": { "type": "string", "minLength": 1, "maxLength": 1000 },
-                    "usageIndicator": { "type": "string", "minLength": 1, "maxLength": 1000 }
-                  },
-                  "required": ["purpose", "alternatives", "consequenceIfNot", "usageIndicator"],
-                  "additionalProperties": false
-                },
-                "priorityRank": { "type": "integer", "minimum": 1, "maximum": 100000 }
-              },
-              "required": ["amount", "lineType", "priorityRank"],
-              "additionalProperties": false,
-              "description": "A line is a plan or a description, the seats, the amount of the year, its kind, its priority rank and a note; the explanation (zbb) is required for NEW lines and where the rules ask."
-            }
+          "requestedAmount": {
+            "type": "object",
+            "properties": { "amount": { "type": "string", "maxLength": 40 } },
+            "required": ["amount"],
+            "additionalProperties": false,
+            "description": "The amount the head asks for the whole year, in the reporting currency."
+          },
+          "note": {
+            "description": "What the head says beside the amount, if anything.",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000
           },
           "attachmentIds": {
-            "maxItems": 20,
+            "minItems": 1,
+            "maxItems": 10,
             "type": "array",
             "items": { "type": "string", "format": "uuid" },
-            "uniqueItems": true
+            "uniqueItems": true,
+            "description": "The files of the proposal (the template of BM-10 filled in, and anything that explains it), uploaded first: one to ten."
           }
         },
-        "required": ["year", "lines"],
+        "required": ["year", "requestedAmount", "attachmentIds"],
         "additionalProperties": false
       },
       "ProposalResponseDto": {
@@ -114840,7 +113260,20 @@
                     "type": "object",
                     "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
                     "required": ["amount", "currency"],
-                    "additionalProperties": false
+                    "additionalProperties": false,
+                    "description": "The amount asked for: the same as requestedAmount."
+                  },
+                  "requestedAmount": {
+                    "type": "object",
+                    "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                    "required": ["amount", "currency"],
+                    "additionalProperties": false,
+                    "description": "The amount the head asked for the whole year (BM-10)."
+                  },
+                  "note": {
+                    "description": "What the head wrote beside the amount; null when nothing.",
+                    "type": "string",
+                    "nullable": true
                   },
                   "submittedBy": {
                     "type": "object",
@@ -114888,6 +113321,8 @@
                   "successorOfProposalId",
                   "successorProposalId",
                   "total",
+                  "requestedAmount",
+                  "note",
                   "submittedBy",
                   "submittedAt",
                   "returned",
@@ -114973,111 +113408,6 @@
         "required": ["success", "message", "data"],
         "additionalProperties": false
       },
-      "ProposalLinePageResponseDto": {
-        "type": "object",
-        "properties": {
-          "success": { "type": "boolean", "enum": [true] },
-          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
-          "data": {
-            "type": "object",
-            "properties": {
-              "items": {
-                "type": "array",
-                "items": {
-                  "type": "object",
-                  "properties": {
-                    "position": {
-                      "type": "integer",
-                      "exclusiveMinimum": true,
-                      "maximum": 9007199254740991,
-                      "minimum": 0
-                    },
-                    "description": { "type": "string" },
-                    "planId": { "type": "string", "format": "uuid", "nullable": true },
-                    "seats": {
-                      "type": "integer",
-                      "minimum": -9007199254740991,
-                      "maximum": 9007199254740991,
-                      "nullable": true
-                    },
-                    "amount": {
-                      "type": "object",
-                      "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
-                      "required": ["amount", "currency"],
-                      "additionalProperties": false
-                    },
-                    "note": { "type": "string", "nullable": true },
-                    "lineType": {
-                      "type": "string",
-                      "enum": ["RENEW", "CHANGE", "NEW", "CANCEL"],
-                      "description": "RENEW carries on what runs, CHANGE changes it, NEW is a new purchase, CANCEL gives it up: a CANCEL amount is shown and never added to the total."
-                    },
-                    "zbb": {
-                      "type": "object",
-                      "properties": {
-                        "purpose": { "type": "string" },
-                        "alternatives": { "type": "string" },
-                        "consequenceIfNot": { "type": "string" },
-                        "usageIndicator": { "type": "string" }
-                      },
-                      "required": ["purpose", "alternatives", "consequenceIfNot", "usageIndicator"],
-                      "additionalProperties": false,
-                      "nullable": true
-                    },
-                    "priorityRank": {
-                      "type": "integer",
-                      "exclusiveMinimum": true,
-                      "maximum": 9007199254740991,
-                      "minimum": 0
-                    },
-                    "overCeiling": {
-                      "type": "object",
-                      "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
-                      "required": ["amount", "currency"],
-                      "additionalProperties": false,
-                      "nullable": true
-                    }
-                  },
-                  "required": [
-                    "position",
-                    "description",
-                    "planId",
-                    "seats",
-                    "amount",
-                    "note",
-                    "lineType",
-                    "zbb",
-                    "priorityRank",
-                    "overCeiling"
-                  ],
-                  "additionalProperties": false
-                }
-              },
-              "pagination": {
-                "type": "object",
-                "properties": {
-                  "page": { "type": "integer", "exclusiveMinimum": true, "maximum": 9007199254740991, "minimum": 0 },
-                  "pageSize": {
-                    "type": "integer",
-                    "exclusiveMinimum": true,
-                    "maximum": 9007199254740991,
-                    "minimum": 0
-                  },
-                  "totalItems": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
-                  "totalPages": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
-                },
-                "required": ["page", "pageSize", "totalItems", "totalPages"],
-                "additionalProperties": false
-              }
-            },
-            "required": ["items", "pagination"],
-            "additionalProperties": false,
-            "nullable": true
-          }
-        },
-        "required": ["success", "message", "data"],
-        "additionalProperties": false
-      },
       "BudgetProposalReturnBodyDto": {
         "type": "object",
         "properties": { "reason": { "type": "string", "minLength": 1, "maxLength": 1000 } },
@@ -115087,54 +113417,29 @@
       "ResubmissionBodyDto": {
         "type": "object",
         "properties": {
-          "lines": {
-            "minItems": 1,
-            "maxItems": 200,
-            "type": "array",
-            "items": {
-              "type": "object",
-              "properties": {
-                "planId": { "type": "string", "format": "uuid" },
-                "description": { "type": "string", "minLength": 1, "maxLength": 200 },
-                "seats": { "type": "integer", "minimum": 1, "maximum": 100000 },
-                "amount": {
-                  "type": "object",
-                  "properties": { "amount": { "type": "string", "maxLength": 40 } },
-                  "required": ["amount"],
-                  "additionalProperties": false
-                },
-                "note": { "type": "string", "minLength": 1, "maxLength": 1000 },
-                "lineType": {
-                  "type": "string",
-                  "enum": ["RENEW", "CHANGE", "NEW", "CANCEL"],
-                  "description": "RENEW carries on what runs, CHANGE changes it, NEW is a new purchase, CANCEL gives it up: a CANCEL amount is shown and never added to the total."
-                },
-                "zbb": {
-                  "type": "object",
-                  "properties": {
-                    "purpose": { "type": "string", "minLength": 1, "maxLength": 1000 },
-                    "alternatives": { "type": "string", "minLength": 1, "maxLength": 1000 },
-                    "consequenceIfNot": { "type": "string", "minLength": 1, "maxLength": 1000 },
-                    "usageIndicator": { "type": "string", "minLength": 1, "maxLength": 1000 }
-                  },
-                  "required": ["purpose", "alternatives", "consequenceIfNot", "usageIndicator"],
-                  "additionalProperties": false
-                },
-                "priorityRank": { "type": "integer", "minimum": 1, "maximum": 100000 }
-              },
-              "required": ["amount", "lineType", "priorityRank"],
-              "additionalProperties": false,
-              "description": "A line is a plan or a description, the seats, the amount of the year, its kind, its priority rank and a note; the explanation (zbb) is required for NEW lines and where the rules ask."
-            }
+          "requestedAmount": {
+            "type": "object",
+            "properties": { "amount": { "type": "string", "maxLength": 40 } },
+            "required": ["amount"],
+            "additionalProperties": false,
+            "description": "The amount the head asks for the whole year, in the reporting currency."
+          },
+          "note": {
+            "description": "What the head says beside the amount, if anything.",
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 1000
           },
           "attachmentIds": {
-            "maxItems": 20,
+            "minItems": 1,
+            "maxItems": 10,
             "type": "array",
             "items": { "type": "string", "format": "uuid" },
-            "uniqueItems": true
+            "uniqueItems": true,
+            "description": "The files of the proposal (the template of BM-10 filled in, and anything that explains it), uploaded first: one to ten."
           }
         },
-        "required": ["lines"],
+        "required": ["requestedAmount", "attachmentIds"],
         "additionalProperties": false
       },
       "VersionBodyDto": {
@@ -115148,17 +113453,25 @@
                 "type": "object",
                 "properties": { "amount": { "type": "string", "maxLength": 40 } },
                 "required": ["amount"],
-                "additionalProperties": false
+                "additionalProperties": false,
+                "description": "The base of the year. Left out, it is filled in with what the Cost Center carries into the year (carriedOverNextYear)."
               },
               "reserve": {
                 "type": "object",
                 "properties": { "amount": { "type": "string", "maxLength": 40 } },
                 "required": ["amount"],
-                "additionalProperties": false
+                "additionalProperties": false,
+                "description": "The reserve as an amount; not with reservePercent. An amount that is not the default share asks a reason."
+              },
+              "reservePercent": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 100,
+                "description": "The reserve as a share of the base, in whole percent; not with reserve. The default share when neither is given."
               },
               "reserveReason": { "type": "string", "minLength": 1, "maxLength": 1000 }
             },
-            "required": ["proposalId", "base"],
+            "required": ["proposalId"],
             "additionalProperties": false
           },
           {
@@ -115166,7 +113479,28 @@
             "properties": {
               "source": { "type": "string", "enum": ["BASELINE"] },
               "costCenterId": { "type": "string", "format": "uuid" },
-              "year": { "type": "integer", "minimum": 2000, "maximum": 2200 }
+              "year": { "type": "integer", "minimum": 2000, "maximum": 2200 },
+              "base": {
+                "type": "object",
+                "properties": { "amount": { "type": "string", "maxLength": 40 } },
+                "required": ["amount"],
+                "additionalProperties": false,
+                "description": "The base of the year. Left out, it is filled in with what the Cost Center carries into the year (carriedOverNextYear)."
+              },
+              "reserve": {
+                "type": "object",
+                "properties": { "amount": { "type": "string", "maxLength": 40 } },
+                "required": ["amount"],
+                "additionalProperties": false,
+                "description": "The reserve as an amount; not with reservePercent. An amount that is not the default share asks a reason."
+              },
+              "reservePercent": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 100,
+                "description": "The reserve as a share of the base, in whole percent; not with reserve. The default share when neither is given."
+              },
+              "reserveReason": { "type": "string", "minLength": 1, "maxLength": 1000 }
             },
             "required": ["source", "costCenterId", "year"],
             "additionalProperties": false
@@ -115241,6 +113575,21 @@
                     "additionalProperties": false
                   },
                   "reason": { "type": "string", "nullable": true },
+                  "carriedOverNextYear": {
+                    "type": "object",
+                    "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                    "required": ["amount", "currency"],
+                    "additionalProperties": false,
+                    "description": "What the Cost Center carries into the year of the version: the amount the requests approved so far already saved for it (zero until the requests context tells it)."
+                  },
+                  "belowCarriedOver": {
+                    "type": "boolean",
+                    "description": "The red flag: the base is below carriedOverNextYear. It never stops a sending or a decision."
+                  },
+                  "noProposalSubmitted": {
+                    "type": "boolean",
+                    "description": "Finance built the version from the baseline because the department had no proposal at the deadline."
+                  },
                   "waitingReason": { "type": "string", "enum": ["NO_SPENDING_APPROVER", null], "nullable": true },
                   "decision": {
                     "type": "object",
@@ -115298,6 +113647,9 @@
                   "reserveReason",
                   "total",
                   "reason",
+                  "carriedOverNextYear",
+                  "belowCarriedOver",
+                  "noProposalSubmitted",
                   "waitingReason",
                   "decision",
                   "createdBy",
@@ -115513,14 +113865,22 @@
             "type": "object",
             "properties": { "amount": { "type": "string", "maxLength": 40 } },
             "required": ["amount"],
-            "additionalProperties": false
+            "additionalProperties": false,
+            "description": "The base of the year. Left out, it is filled in with what the Cost Center carries into the year (carriedOverNextYear)."
           },
           "baseReason": { "type": "string", "minLength": 1, "maxLength": 1000 },
           "reserve": {
             "type": "object",
             "properties": { "amount": { "type": "string", "maxLength": 40 } },
             "required": ["amount"],
-            "additionalProperties": false
+            "additionalProperties": false,
+            "description": "The reserve as an amount; not with reservePercent. An amount that is not the default share asks a reason."
+          },
+          "reservePercent": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100,
+            "description": "The reserve as a share of the base, in whole percent; not with reserve. The default share when neither is given."
           },
           "reserveReason": { "type": "string", "minLength": 1, "maxLength": 1000, "nullable": true }
         },
@@ -115531,351 +113891,11 @@
       "DecisionBodyDto": {
         "type": "object",
         "properties": {
-          "decision": { "type": "string", "enum": ["APPROVE", "REJECT", "REQUEST_CHANGES"] },
+          "decision": { "type": "string", "enum": ["APPROVE", "RETURN"] },
           "reason": { "type": "string", "minLength": 1, "maxLength": 1000 }
         },
         "required": ["decision"],
-        "description": "A refusal (REJECT) or a request to look again (REQUEST_CHANGES) gives its reason; an approval (APPROVE) gives none.",
-        "additionalProperties": false
-      },
-      "VersionLinePageResponseDto": {
-        "type": "object",
-        "properties": {
-          "success": { "type": "boolean", "enum": [true] },
-          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
-          "data": {
-            "type": "object",
-            "properties": {
-              "items": {
-                "type": "array",
-                "items": {
-                  "type": "object",
-                  "properties": {
-                    "position": {
-                      "type": "integer",
-                      "exclusiveMinimum": true,
-                      "maximum": 9007199254740991,
-                      "minimum": 0
-                    },
-                    "proposalPosition": {
-                      "type": "integer",
-                      "exclusiveMinimum": true,
-                      "maximum": 9007199254740991,
-                      "nullable": true,
-                      "minimum": 0
-                    },
-                    "description": { "type": "string" },
-                    "planId": { "type": "string", "format": "uuid", "nullable": true },
-                    "seats": {
-                      "type": "integer",
-                      "minimum": -9007199254740991,
-                      "maximum": 9007199254740991,
-                      "nullable": true
-                    },
-                    "amount": {
-                      "type": "object",
-                      "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
-                      "required": ["amount", "currency"],
-                      "additionalProperties": false
-                    },
-                    "financeComment": { "type": "string", "nullable": true },
-                    "adjustmentReason": { "type": "string", "nullable": true },
-                    "lineType": {
-                      "type": "string",
-                      "enum": ["RENEW", "CHANGE", "NEW", "CANCEL"],
-                      "description": "RENEW carries on what runs, CHANGE changes it, NEW is a new purchase, CANCEL gives it up: a CANCEL amount is shown and never added to the total."
-                    },
-                    "zbb": {
-                      "type": "object",
-                      "properties": {
-                        "purpose": { "type": "string" },
-                        "alternatives": { "type": "string" },
-                        "consequenceIfNot": { "type": "string" },
-                        "usageIndicator": { "type": "string" }
-                      },
-                      "required": ["purpose", "alternatives", "consequenceIfNot", "usageIndicator"],
-                      "additionalProperties": false,
-                      "nullable": true
-                    },
-                    "priorityRank": {
-                      "type": "integer",
-                      "exclusiveMinimum": true,
-                      "maximum": 9007199254740991,
-                      "nullable": true,
-                      "minimum": 0
-                    },
-                    "overCeiling": {
-                      "type": "object",
-                      "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
-                      "required": ["amount", "currency"],
-                      "additionalProperties": false,
-                      "nullable": true
-                    }
-                  },
-                  "required": [
-                    "position",
-                    "proposalPosition",
-                    "description",
-                    "planId",
-                    "seats",
-                    "amount",
-                    "financeComment",
-                    "adjustmentReason",
-                    "lineType",
-                    "zbb",
-                    "priorityRank",
-                    "overCeiling"
-                  ],
-                  "additionalProperties": false
-                }
-              },
-              "pagination": {
-                "type": "object",
-                "properties": {
-                  "page": { "type": "integer", "exclusiveMinimum": true, "maximum": 9007199254740991, "minimum": 0 },
-                  "pageSize": {
-                    "type": "integer",
-                    "exclusiveMinimum": true,
-                    "maximum": 9007199254740991,
-                    "minimum": 0
-                  },
-                  "totalItems": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
-                  "totalPages": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
-                },
-                "required": ["page", "pageSize", "totalItems", "totalPages"],
-                "additionalProperties": false
-              }
-            },
-            "required": ["items", "pagination"],
-            "additionalProperties": false,
-            "nullable": true
-          }
-        },
-        "required": ["success", "message", "data"],
-        "additionalProperties": false
-      },
-      "LinePatchDto": {
-        "type": "object",
-        "properties": {
-          "description": { "type": "string", "minLength": 1, "maxLength": 200 },
-          "planId": { "type": "string", "format": "uuid", "nullable": true },
-          "seats": { "type": "integer", "minimum": 1, "maximum": 100000, "nullable": true },
-          "amount": {
-            "type": "object",
-            "properties": { "amount": { "type": "string", "maxLength": 40 } },
-            "required": ["amount"],
-            "additionalProperties": false
-          },
-          "financeComment": { "type": "string", "minLength": 1, "maxLength": 1000, "nullable": true },
-          "adjustmentReason": { "type": "string", "minLength": 1, "maxLength": 1000, "nullable": true },
-          "lineType": {
-            "type": "string",
-            "enum": ["RENEW", "CHANGE", "NEW", "CANCEL"],
-            "description": "RENEW carries on what runs, CHANGE changes it, NEW is a new purchase, CANCEL gives it up: a CANCEL amount is shown and never added to the total."
-          },
-          "zbb": {
-            "type": "object",
-            "properties": {
-              "purpose": { "type": "string", "minLength": 1, "maxLength": 1000 },
-              "alternatives": { "type": "string", "minLength": 1, "maxLength": 1000 },
-              "consequenceIfNot": { "type": "string", "minLength": 1, "maxLength": 1000 },
-              "usageIndicator": { "type": "string", "minLength": 1, "maxLength": 1000 }
-            },
-            "required": ["purpose", "alternatives", "consequenceIfNot", "usageIndicator"],
-            "additionalProperties": false,
-            "nullable": true
-          },
-          "priorityRank": { "type": "integer", "minimum": 1, "maximum": 100000, "nullable": true }
-        },
-        "minProperties": 1,
-        "description": "Give at least one field.",
-        "additionalProperties": false
-      },
-      "LineResponseDto": {
-        "type": "object",
-        "properties": {
-          "success": { "type": "boolean", "enum": [true] },
-          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
-          "data": {
-            "type": "object",
-            "properties": {
-              "line": {
-                "type": "object",
-                "properties": {
-                  "position": {
-                    "type": "integer",
-                    "exclusiveMinimum": true,
-                    "maximum": 9007199254740991,
-                    "minimum": 0
-                  },
-                  "proposalPosition": {
-                    "type": "integer",
-                    "exclusiveMinimum": true,
-                    "maximum": 9007199254740991,
-                    "nullable": true,
-                    "minimum": 0
-                  },
-                  "description": { "type": "string" },
-                  "planId": { "type": "string", "format": "uuid", "nullable": true },
-                  "seats": {
-                    "type": "integer",
-                    "minimum": -9007199254740991,
-                    "maximum": 9007199254740991,
-                    "nullable": true
-                  },
-                  "amount": {
-                    "type": "object",
-                    "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
-                    "required": ["amount", "currency"],
-                    "additionalProperties": false
-                  },
-                  "financeComment": { "type": "string", "nullable": true },
-                  "adjustmentReason": { "type": "string", "nullable": true },
-                  "lineType": {
-                    "type": "string",
-                    "enum": ["RENEW", "CHANGE", "NEW", "CANCEL"],
-                    "description": "RENEW carries on what runs, CHANGE changes it, NEW is a new purchase, CANCEL gives it up: a CANCEL amount is shown and never added to the total."
-                  },
-                  "zbb": {
-                    "type": "object",
-                    "properties": {
-                      "purpose": { "type": "string" },
-                      "alternatives": { "type": "string" },
-                      "consequenceIfNot": { "type": "string" },
-                      "usageIndicator": { "type": "string" }
-                    },
-                    "required": ["purpose", "alternatives", "consequenceIfNot", "usageIndicator"],
-                    "additionalProperties": false,
-                    "nullable": true
-                  },
-                  "priorityRank": {
-                    "type": "integer",
-                    "exclusiveMinimum": true,
-                    "maximum": 9007199254740991,
-                    "nullable": true,
-                    "minimum": 0
-                  },
-                  "overCeiling": {
-                    "type": "object",
-                    "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
-                    "required": ["amount", "currency"],
-                    "additionalProperties": false,
-                    "nullable": true
-                  }
-                },
-                "required": [
-                  "position",
-                  "proposalPosition",
-                  "description",
-                  "planId",
-                  "seats",
-                  "amount",
-                  "financeComment",
-                  "adjustmentReason",
-                  "lineType",
-                  "zbb",
-                  "priorityRank",
-                  "overCeiling"
-                ],
-                "additionalProperties": false
-              }
-            },
-            "required": ["line"],
-            "additionalProperties": false,
-            "nullable": true
-          }
-        },
-        "required": ["success", "message", "data"],
-        "additionalProperties": false
-      },
-      "AddLinesBodyDto": {
-        "type": "object",
-        "properties": {
-          "lines": {
-            "minItems": 1,
-            "maxItems": 200,
-            "type": "array",
-            "items": {
-              "type": "object",
-              "properties": {
-                "planId": { "type": "string", "format": "uuid" },
-                "description": { "type": "string", "minLength": 1, "maxLength": 200 },
-                "seats": { "type": "integer", "minimum": 1, "maximum": 100000 },
-                "amount": {
-                  "type": "object",
-                  "properties": { "amount": { "type": "string", "maxLength": 40 } },
-                  "required": ["amount"],
-                  "additionalProperties": false
-                },
-                "note": { "type": "string", "minLength": 1, "maxLength": 1000 },
-                "lineType": {
-                  "type": "string",
-                  "enum": ["RENEW", "CHANGE", "NEW", "CANCEL"],
-                  "description": "RENEW carries on what runs, CHANGE changes it, NEW is a new purchase, CANCEL gives it up: a CANCEL amount is shown and never added to the total."
-                },
-                "zbb": {
-                  "type": "object",
-                  "properties": {
-                    "purpose": { "type": "string", "minLength": 1, "maxLength": 1000 },
-                    "alternatives": { "type": "string", "minLength": 1, "maxLength": 1000 },
-                    "consequenceIfNot": { "type": "string", "minLength": 1, "maxLength": 1000 },
-                    "usageIndicator": { "type": "string", "minLength": 1, "maxLength": 1000 }
-                  },
-                  "required": ["purpose", "alternatives", "consequenceIfNot", "usageIndicator"],
-                  "additionalProperties": false
-                },
-                "priorityRank": { "type": "integer", "minimum": 1, "maximum": 100000 }
-              },
-              "required": ["amount", "lineType"],
-              "additionalProperties": false,
-              "description": "A line Finance adds: a plan or a description, the seats, the amount of the year and its kind; the priority rank and the explanation are optional."
-            }
-          }
-        },
-        "required": ["lines"],
-        "additionalProperties": false
-      },
-      "BudgetLineImportResponseDto": {
-        "type": "object",
-        "properties": {
-          "success": { "type": "boolean", "enum": [true] },
-          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
-          "data": {
-            "type": "object",
-            "properties": {
-              "result": {
-                "type": "object",
-                "properties": {
-                  "added": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
-                  "rejected": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
-                  "errors": {
-                    "type": "array",
-                    "items": {
-                      "type": "object",
-                      "properties": {
-                        "row": {
-                          "type": "integer",
-                          "exclusiveMinimum": true,
-                          "maximum": 9007199254740991,
-                          "minimum": 0
-                        },
-                        "code": { "type": "string" }
-                      },
-                      "required": ["row", "code"],
-                      "additionalProperties": false
-                    }
-                  }
-                },
-                "required": ["added", "rejected", "errors"],
-                "additionalProperties": false
-              }
-            },
-            "required": ["result"],
-            "additionalProperties": false,
-            "nullable": true
-          }
-        },
-        "required": ["success", "message", "data"],
+        "description": "APPROVE (no reason) or RETURN to Finance (the reason is required); REJECT and REQUEST_CHANGES are no longer decisions.",
         "additionalProperties": false
       },
       "MineResponseDto": {
@@ -116035,122 +114055,6 @@
               }
             },
             "required": ["budget"],
-            "additionalProperties": false,
-            "nullable": true
-          }
-        },
-        "required": ["success", "message", "data"],
-        "additionalProperties": false
-      },
-      "MineLinePageResponseDto": {
-        "type": "object",
-        "properties": {
-          "success": { "type": "boolean", "enum": [true] },
-          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
-          "data": {
-            "type": "object",
-            "properties": {
-              "items": {
-                "type": "array",
-                "items": {
-                  "type": "object",
-                  "properties": {
-                    "position": {
-                      "type": "integer",
-                      "exclusiveMinimum": true,
-                      "maximum": 9007199254740991,
-                      "minimum": 0
-                    },
-                    "proposalPosition": {
-                      "type": "integer",
-                      "exclusiveMinimum": true,
-                      "maximum": 9007199254740991,
-                      "nullable": true,
-                      "minimum": 0
-                    },
-                    "description": { "type": "string" },
-                    "planId": { "type": "string", "format": "uuid", "nullable": true },
-                    "seats": {
-                      "type": "integer",
-                      "minimum": -9007199254740991,
-                      "maximum": 9007199254740991,
-                      "nullable": true
-                    },
-                    "amount": {
-                      "type": "object",
-                      "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
-                      "required": ["amount", "currency"],
-                      "additionalProperties": false
-                    },
-                    "financeComment": { "type": "string", "nullable": true },
-                    "adjustmentReason": { "type": "string", "nullable": true },
-                    "lineType": {
-                      "type": "string",
-                      "enum": ["RENEW", "CHANGE", "NEW", "CANCEL"],
-                      "description": "RENEW carries on what runs, CHANGE changes it, NEW is a new purchase, CANCEL gives it up: a CANCEL amount is shown and never added to the total."
-                    },
-                    "zbb": {
-                      "type": "object",
-                      "properties": {
-                        "purpose": { "type": "string" },
-                        "alternatives": { "type": "string" },
-                        "consequenceIfNot": { "type": "string" },
-                        "usageIndicator": { "type": "string" }
-                      },
-                      "required": ["purpose", "alternatives", "consequenceIfNot", "usageIndicator"],
-                      "additionalProperties": false,
-                      "nullable": true
-                    },
-                    "priorityRank": {
-                      "type": "integer",
-                      "exclusiveMinimum": true,
-                      "maximum": 9007199254740991,
-                      "nullable": true,
-                      "minimum": 0
-                    },
-                    "overCeiling": {
-                      "type": "object",
-                      "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
-                      "required": ["amount", "currency"],
-                      "additionalProperties": false,
-                      "nullable": true
-                    }
-                  },
-                  "required": [
-                    "position",
-                    "proposalPosition",
-                    "description",
-                    "planId",
-                    "seats",
-                    "amount",
-                    "financeComment",
-                    "adjustmentReason",
-                    "lineType",
-                    "zbb",
-                    "priorityRank",
-                    "overCeiling"
-                  ],
-                  "additionalProperties": false
-                }
-              },
-              "pagination": {
-                "type": "object",
-                "properties": {
-                  "page": { "type": "integer", "exclusiveMinimum": true, "maximum": 9007199254740991, "minimum": 0 },
-                  "pageSize": {
-                    "type": "integer",
-                    "exclusiveMinimum": true,
-                    "maximum": 9007199254740991,
-                    "minimum": 0
-                  },
-                  "totalItems": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 },
-                  "totalPages": { "type": "integer", "minimum": 0, "maximum": 9007199254740991 }
-                },
-                "required": ["page", "pageSize", "totalItems", "totalPages"],
-                "additionalProperties": false
-              }
-            },
-            "required": ["items", "pagination"],
             "additionalProperties": false,
             "nullable": true
           }
@@ -117420,6 +115324,21 @@
                       "additionalProperties": false,
                       "description": "The invoices recorded this year against every Cost Center the department ever had (the seat-months of K2 are not in it yet)."
                     },
+                    "carriedOverNextYear": {
+                      "type": "object",
+                      "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                      "required": ["amount", "currency"],
+                      "additionalProperties": false,
+                      "description": "What the Cost Center carries into the year of the cycle: the amount already saved for it by the requests approved so far (a right with an end at what its approval kept, a right with no end at twelve months of its monthly price), the figure the base of its version is filled in with. Zero when it has none, and for a department with no Cost Center."
+                    },
+                    "belowCarriedOver": {
+                      "type": "boolean",
+                      "description": "The red flag: the newest version of the Cost Center for the year has a base below carriedOverNextYear. False when it has none; it never stops anything."
+                    },
+                    "noProposalSubmitted": {
+                      "type": "boolean",
+                      "description": "The submission deadline has passed and the department has no proposal: Finance builds its version from this baseline, flagged for the spending approver."
+                    },
                     "estimatedAnnualCost": {
                       "type": "object",
                       "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
@@ -117504,6 +115423,9 @@
                     "departmentName",
                     "costCenterId",
                     "spentThisYear",
+                    "carriedOverNextYear",
+                    "belowCarriedOver",
+                    "noProposalSubmitted",
                     "estimatedAnnualCost",
                     "hasUnknownCost",
                     "seatsAssigned",
@@ -117695,15 +115617,7 @@
                     },
                     "baselineRefusal": {
                       "type": "string",
-                      "enum": [
-                        "CYCLE_NOT_OPEN",
-                        "DEPARTMENT_NOT_IN_CYCLE",
-                        "BEFORE_DEADLINE",
-                        "HAS_HEAD",
-                        "HAS_SUCCESSOR",
-                        "HAS_PROPOSAL",
-                        null
-                      ],
+                      "enum": ["CYCLE_NOT_OPEN", "DEPARTMENT_NOT_IN_CYCLE", "BEFORE_DEADLINE", "HAS_PROPOSAL", null],
                       "description": "The first thing that stops it, or null when `baselineAllowed`.",
                       "nullable": true
                     },
@@ -117716,50 +115630,11 @@
                           "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
                           "required": ["amount", "currency"],
                           "additionalProperties": false,
-                          "description": "The lines counted: a CANCEL line is shown and not added."
+                          "description": "The amount the head asked for."
                         },
-                        "state": { "type": "string", "enum": ["SUBMITTED", "REVIEWED"] },
-                        "lines": {
-                          "maxItems": 200,
-                          "type": "array",
-                          "items": {
-                            "type": "object",
-                            "properties": {
-                              "position": {
-                                "type": "integer",
-                                "exclusiveMinimum": true,
-                                "maximum": 9007199254740991,
-                                "minimum": 0
-                              },
-                              "lineType": { "type": "string", "enum": ["RENEW", "CHANGE", "NEW", "CANCEL"] },
-                              "priorityRank": {
-                                "type": "integer",
-                                "exclusiveMinimum": true,
-                                "maximum": 9007199254740991,
-                                "minimum": 0
-                              },
-                              "amount": {
-                                "type": "object",
-                                "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
-                                "required": ["amount", "currency"],
-                                "additionalProperties": false
-                              },
-                              "overCeiling": {
-                                "type": "object",
-                                "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
-                                "required": ["amount", "currency"],
-                                "additionalProperties": false,
-                                "description": "The part of the line that carries the proposal over the published ceiling; null when it is not flagged.",
-                                "nullable": true
-                              }
-                            },
-                            "required": ["position", "lineType", "priorityRank", "amount", "overCeiling"],
-                            "additionalProperties": false
-                          },
-                          "description": "The lines of the proposal by priority rank, with the flag over the published ceiling and the part that goes over."
-                        }
+                        "state": { "type": "string", "enum": ["SUBMITTED", "REVIEWED"] }
                       },
-                      "required": ["id", "total", "state", "lines"],
+                      "required": ["id", "total", "state"],
                       "additionalProperties": false,
                       "nullable": true
                     },
@@ -125977,7 +123852,7 @@
                     },
                     "required": ["state", "count", "sourceOperationId", "reason"],
                     "additionalProperties": false,
-                    "description": "The lines of the approved budget version of the department."
+                    "description": "The approved budget of the department: one figure for the year, read at its source."
                   }
                 },
                 "required": [
