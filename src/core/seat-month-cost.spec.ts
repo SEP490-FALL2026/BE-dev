@@ -1,4 +1,4 @@
-import { monthCostBefore, releaseOnLateGrant, releaseOnRevocation } from './seat-month-cost.policy';
+import { monthCostBefore, releaseOnLateGrant, releaseOnRevocation, seatHeldRange } from './seat-month-cost';
 
 describe('monthCostBefore (RV-07)', () => {
   it('costs nothing on day 1 of the month', () => {
@@ -50,5 +50,26 @@ describe('releaseOnLateGrant (M-10)', () => {
 
   it('gives back nothing for a grant on day 1 of the first month', () => {
     expect(releaseOnLateGrant({ monthlyMinor: 15n, grantedOn: '2026-01-01', firstMonth: 1 })).toBe(0n);
+  });
+});
+
+describe('seatHeldRange (SM-1.3)', () => {
+  it('starts on the day the right begins (the grant completed), not the day the seat was decided, and stays open with no end', () => {
+    expect(seatHeldRange({ validFrom: '2026-10-05', grantedOn: '2026-10-09', validUntil: null })).toEqual({
+      from: '2026-10-09',
+      until: null,
+    });
+  });
+
+  it('starts on the day the seat was decided when no grant task gave a day, and ends the first day it no longer holds', () => {
+    expect(seatHeldRange({ validFrom: '2026-01-05', grantedOn: null, validUntil: '2026-11-16' })).toEqual({
+      from: '2026-01-05',
+      until: '2026-11-16',
+    });
+  });
+
+  it('is nothing for a seat whose period is empty: taken back on or before the day the right would have begun', () => {
+    expect(seatHeldRange({ validFrom: '2026-10-05', grantedOn: '2026-10-09', validUntil: '2026-10-09' })).toBeNull();
+    expect(seatHeldRange({ validFrom: '2026-10-05', grantedOn: null, validUntil: '2026-10-05' })).toBeNull();
   });
 });

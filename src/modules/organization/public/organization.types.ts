@@ -315,6 +315,14 @@ export interface PlacementInForce {
   validTo: BusinessDate | null;
 }
 
+/** A stretch of days a person is placed in one department, `[validFrom, validTo)`, `validTo` null while it is open. */
+export interface EmployeePlacementSpan {
+  employeeId: string;
+  departmentId: string;
+  validFrom: BusinessDate;
+  validTo: BusinessDate | null;
+}
+
 /** A change of the department of a person from a day: what `scheduleStructureChange` writes. The title stays (`QĐ-87e`). */
 export interface StructureChangeInput {
   organizationId: string;

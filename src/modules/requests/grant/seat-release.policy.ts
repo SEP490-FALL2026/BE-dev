@@ -3,7 +3,7 @@ import { fiscalYearOf } from '../../../core/fiscal-year';
 import { lastMonthBeginsOn } from '../../../core/term-limit';
 import type { SeatCommitment } from '../../budgets/public/budgets.types';
 import type { ProvisioningKind, RevocationCompletedFacts } from '../../licensing/public/licensing.types';
-import { releaseOnLateGrant, releaseOnRevocation } from '../../licensing/public/seat-month-cost.policy';
+import { releaseOnLateGrant, releaseOnRevocation } from '../../../core/seat-month-cost';
 
 /**
  * How much of the money a request holds for a seat goes back by the day (`RV-07`, `M-06`, `M-10`), as pure decisions. In the month the right

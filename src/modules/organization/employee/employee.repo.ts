@@ -22,6 +22,7 @@ import {
   EmployeeRecord,
   EmployeeWorkState,
   OfficialFieldsPatch,
+  EmployeePlacementSpan,
   PlacementInForce,
   ScheduledStructureChange,
   StructureChangeInput,
@@ -327,6 +328,32 @@ export class EmployeeRepo {
           validTo: row.valid_to ? fromDateColumn(row.valid_to) : null,
         }
       : null;
+  }
+
+  /** The placements of these employees that touch `[from, to)`, by employee then first day, in one read (a day nobody was placed is just not covered). */
+  async placementsBetween(
+    employeeIds: readonly string[],
+    from: BusinessDate,
+    to: BusinessDate,
+    tx?: DbTx,
+  ): Promise<EmployeePlacementSpan[]> {
+    if (employeeIds.length === 0) return [];
+    const rows = await (tx ?? this.prisma).employeePlacement.findMany({
+      where: {
+        employeeId: { in: [...employeeIds] },
+        validFrom: { lt: toDateColumn(to) },
+        OR: [{ validTo: null }, { validTo: { gt: toDateColumn(from) } }],
+      },
+      select: { employeeId: true, departmentId: true, validFrom: true, validTo: true },
+      orderBy: [{ employeeId: 'asc' }, { validFrom: 'asc' }],
+    });
+
+    return rows.map((row) => ({
+      employeeId: row.employeeId,
+      departmentId: row.departmentId,
+      validFrom: fromDateColumn(row.validFrom),
+      validTo: row.validTo ? fromDateColumn(row.validTo) : null,
+    }));
   }
 
   /** The first day of a placement, or null when it does not exist. */

@@ -81,6 +81,8 @@ import { LicensingUsageApi } from './public/licensing-usage.api';
 import { LicensingDepartmentToolsApi } from './public/licensing-department-tools.api';
 import { LicensingOpenGrantsApi } from './public/licensing-open-grants.api';
 import { LicensingPoolStockApi } from './public/licensing-pool-stock.api';
+import { LicensingSeatMonthApi } from './public/licensing-seat-month.api';
+import { AssignmentSeatMonthRepo } from './assignment/assignment-seat-month.repo';
 import { LicensingRenewalApi } from './public/licensing-renewal.api';
 import { LicensingSeatBaselineApi } from './public/licensing-seat-baseline.api';
 import { ProvisioningCancellationService } from './provisioning/grant-cancellation/provisioning-cancellation.service';
@@ -322,6 +324,8 @@ import { LicenseKeyTemplateListener } from './license-key/license-key-template.l
     SharedPoolVacancyService,
     LicensingOpenGrantsApi,
     LicensingPoolStockApi,
+    AssignmentSeatMonthRepo,
+    LicensingSeatMonthApi,
     LicensingDepartmentToolsApi,
     LicensingRenewalApi,
     LicensingSeatBaselineApi,
@@ -334,6 +338,7 @@ import { LicenseKeyTemplateListener } from './license-key/license-key-template.l
     LicensingUsageApi,
     LicensingOpenGrantsApi,
     LicensingPoolStockApi,
+    LicensingSeatMonthApi,
     LicensingDepartmentToolsApi,
     LicensingRenewalApi,
     LicensingSeatBaselineApi,
