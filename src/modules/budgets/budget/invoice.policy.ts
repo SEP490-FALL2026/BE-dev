@@ -39,19 +39,14 @@ export type InvoicePlan =
       appliedAfterMinor: bigint;
       heldAfterMinor: bigint;
       stateAfter: 'HELD' | 'EXPENSED';
-      matchResult: InvoiceMatch;
     }
   | { ok: false; refusal: InvoiceRefusal };
 
 /**
- * `recordedNetMinor` is the price before tax of the invoices already recorded for this commitment: whether an invoice fits is judged
- * on the whole of them against what the commitment allowed (its amount less what went back to the budget), not on the one alone.
+ * The dong an invoice costs more than the commitment held is never a difference of the invoice: only the count and the price of one say
+ * a difference (`R-44`), and the exchange rate and the card fee go straight into what was spent (`QĐ-111an`).
  */
-export function planInvoice(
-  commitment: InvoiceCommitment,
-  recordedNetMinor: bigint,
-  figures: InvoiceFigures,
-): InvoicePlan {
+export function planInvoice(commitment: InvoiceCommitment, figures: InvoiceFigures): InvoicePlan {
   if (figures.netMinor <= 0n || figures.deductibleTaxMinor < 0n || figures.nonDeductibleTaxMinor < 0n) {
     return { ok: false, refusal: 'AMOUNT_NOT_POSITIVE' };
   }
@@ -61,7 +56,6 @@ export function planInvoice(
     commitment.state === 'HELD' ? commitment.amountMinor - commitment.releasedMinor - commitment.appliedMinor : 0n;
   const takeMinor = figures.netMinor < heldMinor ? figures.netMinor : heldMinor;
   const heldAfterMinor = heldMinor - takeMinor;
-  const allowedMinor = commitment.amountMinor - commitment.releasedMinor;
 
   return {
     ok: true,
@@ -70,14 +64,7 @@ export function planInvoice(
     appliedAfterMinor: commitment.appliedMinor + takeMinor,
     heldAfterMinor,
     stateAfter: heldAfterMinor === 0n ? 'EXPENSED' : 'HELD',
-    matchResult: matchOf(recordedNetMinor + figures.netMinor, allowedMinor, figures),
   };
-}
-
-function matchOf(cumulativeNetMinor: bigint, allowedMinor: bigint, figures: InvoiceFigures): InvoiceMatch {
-  if (cumulativeNetMinor > allowedMinor) return 'PRICE_QUANTITY_EXCEPTION';
-
-  return figures.deductibleTaxMinor > 0n || figures.nonDeductibleTaxMinor > 0n ? 'TAX_ONLY' : 'MATCHED';
 }
 
 /** A commitment of the request that an invoice of a purchase may be booked to. */

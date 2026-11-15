@@ -117,13 +117,6 @@ export class InvoiceRepo {
     return (await tx.invoice.count({ where: { organizationId, vendorId, number } })) > 0;
   }
 
-  /** The price before tax of the invoices already recorded for the commitment. */
-  async netRecorded(tx: DbTx, commitmentId: string): Promise<bigint> {
-    const sum = await tx.invoice.aggregate({ where: { commitmentId }, _sum: { netMinor: true } });
-
-    return sum._sum.netMinor ?? 0n;
-  }
-
   /** One page of the invoices of a commitment, the newest first; the total is read in the same snapshot as the page. */
   async page(commitmentId: string, skip: number, take: number): Promise<{ rows: InvoiceRecord[]; total: number }> {
     return this.prisma.$transaction(

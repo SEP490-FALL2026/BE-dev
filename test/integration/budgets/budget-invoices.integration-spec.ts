@@ -231,30 +231,30 @@ describe('invoices booked against commitments over PostgreSQL (US-12-02, US-06-0
   });
 
   describe('how an invoice stands against what the commitment allowed (US-12-02 AC-5, AC-6)', () => {
-    it('matches an invoice of exactly the amount, and flags one more by a unit', async () => {
+    it('matches an invoice of exactly the amount, and does not flag one that costs more dong: only the count and the price of one say a difference (R-44, QĐ-111an)', async () => {
       const exact = await committed();
       const over = await committed();
 
       const matched = await record(exact, { net: 20 * M });
-      const flagged = await record(over, { net: 20 * M + 1 });
+      const dearer = await record(over, { net: 20 * M + 1 });
 
       expect(matched.invoice.matchResult).toBe('MATCHED');
       expect(matched.commitment).toMatchObject({ state: 'EXPENSED', hasDiscrepancy: false });
-      expect(flagged.invoice.matchResult).toBe('PRICE_QUANTITY_EXCEPTION');
-      expect(flagged.commitment).toMatchObject({ state: 'EXPENSED', hasDiscrepancy: true });
+      expect(dearer.invoice.matchResult).toBe('MATCHED');
+      expect(dearer.commitment).toMatchObject({ state: 'EXPENSED', hasDiscrepancy: false });
       // The whole price is an expense although the commitment gave up only what it held (QĐ-34b).
       expect((await tableRow(over.unit))?.spent.amount).toBe(String(20 * M + 1));
     });
 
-    it('judges the invoices together: the second one that takes the total over the allowance is the one flagged', async () => {
+    it('judges the invoices of a commitment one by one: the second that takes the total over the allowance is not flagged for the dong', async () => {
       const target = await committed();
 
       const first = await record(target, { net: 12 * M });
       const second = await record(target, { net: 8 * M + 1 });
 
       expect(first.invoice.matchResult).toBe('MATCHED');
-      expect(second.invoice.matchResult).toBe('PRICE_QUANTITY_EXCEPTION');
-      expect(second.commitment.hasDiscrepancy).toBe(true);
+      expect(second.invoice.matchResult).toBe('MATCHED');
+      expect(second.commitment.hasDiscrepancy).toBe(false);
     });
 
     it('is recorded with a difference in tax alone as TAX_ONLY and does not open a discrepancy', async () => {
@@ -603,7 +603,7 @@ describe('invoices booked against commitments over PostgreSQL (US-12-02, US-06-0
       );
       expect(applied.rows).toEqual([
         { number: 'RACE-1', applied_minor: String(15 * M), match_result: 'MATCHED' },
-        { number: 'RACE-2', applied_minor: String(5 * M), match_result: 'PRICE_QUANTITY_EXCEPTION' },
+        { number: 'RACE-2', applied_minor: String(5 * M), match_result: 'MATCHED' },
       ]);
     });
 

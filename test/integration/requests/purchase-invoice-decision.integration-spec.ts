@@ -284,6 +284,26 @@ describe('Finance signs or returns a purchase invoice over PostgreSQL (integrati
     ).toEqual({ charged_cost_center_id: null });
   });
 
+  it('does not make a difference of the dong that the exchange rate and the card fee added: 10 seats at 15 USD, 3.750.000 đ held, 3.840.000 đ paid is MATCHED and leaves no discrepancy on the commitment (B3B-02, QĐ-111an, T-PI)', async () => {
+    const { unit, requestId } = await approved(plan, 3_750_000);
+    const purchase = await submitted(requestId);
+    expect(purchase.matchResult).toBe('MATCHED');
+
+    await confirm(purchase.id).expect(201);
+
+    const [invoice] = await invoiceOf(purchase.id);
+    expect(invoice).toMatchObject({ match_result: 'MATCHED', applied_minor: '3750000', actual_cost_minor: '3840000' });
+    expect(await commitmentOf(requestId)).toMatchObject({ applied_minor: '3750000', state: 'EXPENSED' });
+    expect(
+      h.dataOf<{ items: Array<{ hasDiscrepancy: boolean }> }>(
+        await h.commitmentList(h.finance, { requestId }).expect(200),
+      ).items,
+    ).toMatchObject([{ hasDiscrepancy: false }]);
+    expect(
+      (await h.ctx.app.get(BudgetsApi, { strict: false }).yearFacts(unit.department.unitId, [h.year])).get(h.year),
+    ).toMatchObject({ spentMinor: 3_840_000n });
+  });
+
   it('keeps the exception of a purchase invoice whose count or price differs on the invoice it writes, and never refuses it', async () => {
     const { requestId } = await approved();
     const purchase = await submitted(requestId, { quantity: 2 });

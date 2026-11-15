@@ -42,7 +42,7 @@ const input = (over: Partial<PurchaseInvoiceRecordInput> = {}): PurchaseInvoiceR
   ...over,
 });
 
-function build(opts: { commitments?: ReturnType<typeof commitment>[]; exists?: boolean; recorded?: bigint } = {}) {
+function build(opts: { commitments?: ReturnType<typeof commitment>[]; exists?: boolean } = {}) {
   const calls: string[] = [];
   const lockOfRequest = jest.fn(() => {
     calls.push('lock');
@@ -74,7 +74,6 @@ function build(opts: { commitments?: ReturnType<typeof commitment>[]; exists?: b
     {
       insert,
       exists: jest.fn().mockResolvedValue(opts.exists ?? false),
-      netRecorded: jest.fn().mockResolvedValue(opts.recorded ?? 0n),
     } as unknown as InvoiceRepo,
     { lock },
     { record } as unknown as AuditApi,
@@ -154,7 +153,7 @@ describe('PurchaseInvoiceRecorderService.record (PI-1.5, PI-1.7)', () => {
     );
   });
 
-  it('never takes the commitment down by more than it holds, and flags what goes over what it allowed', async () => {
+  it('never takes the commitment down by more than it holds, and does not call the dong that goes over it a difference of count or price (R-44, QĐ-111an)', async () => {
     const { service, insert } = build();
 
     await service.record(TX, ACTOR, input({ netMinor: 25_000n }));
@@ -162,8 +161,16 @@ describe('PurchaseInvoiceRecorderService.record (PI-1.5, PI-1.7)', () => {
     expect(insert.mock.calls[0][1]).toMatchObject({
       appliedMinor: 20_000n,
       actualCostMinor: 25_000n,
-      matchResult: 'PRICE_QUANTITY_EXCEPTION',
+      matchResult: 'MATCHED',
     });
+  });
+
+  it('says only the tax differs when the invoice carries tax, whatever it costs against the commitment', async () => {
+    const { service, insert } = build();
+
+    await service.record(TX, ACTOR, input({ netMinor: 25_000n, deductibleTaxMinor: 2_500n }));
+
+    expect(insert.mock.calls[0][1]).toMatchObject({ matchResult: 'TAX_ONLY' });
   });
 
   it('keeps the exception the purchase invoice carries even when the price fits the commitment', async () => {

@@ -133,19 +133,14 @@ export class PurchaseInvoiceRecorderService {
     if (booking.kind === 'COMMITMENT') {
       const row = rows.find((candidate) => candidate.id === booking.commitmentId);
       if (!row) throw new PurchaseInvoiceRecordRefusedError('NO_PLACE');
-      const plan = planInvoice(row, await this.invoices.netRecorded(tx, row.id), {
+      const plan = planInvoice(row, {
         netMinor: input.netMinor,
         deductibleTaxMinor: input.deductibleTaxMinor,
         nonDeductibleTaxMinor: input.nonDeductibleTaxMinor,
       });
       if (!plan.ok) throw new PurchaseInvoiceRecordRefusedError('AMOUNT_NOT_POSITIVE');
       await this.commitments.applyInvoice(tx, row, plan);
-      placed = {
-        commitmentId: row.id,
-        costCenterId: null,
-        appliedMinor: plan.takeMinor,
-        matchResult: plan.matchResult,
-      };
+      placed = { ...placed, commitmentId: row.id, appliedMinor: plan.takeMinor };
     } else if (booking.kind === 'COST_CENTER') {
       await this.yearLock.lock(tx, booking.costCenterId, [serviceYear]);
       placed = { ...placed, costCenterId: booking.costCenterId };
