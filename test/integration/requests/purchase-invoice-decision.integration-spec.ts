@@ -314,6 +314,30 @@ describe('Finance signs or returns a purchase invoice over PostgreSQL (integrati
     expect((await invoiceOf(purchase.id))[0].match_result).toBe('PRICE_QUANTITY_EXCEPTION');
   });
 
+  it('flags in the audit that Finance signed an invoice for a request they are themselves the beneficiary of, and signs it all the same; a request of another person carries no flag (B3B-03, QĐ-104h)', async () => {
+    const own = await approved();
+    await h.ctx.sql.query(`UPDATE access_request_beneficiaries SET employee_id = $2 WHERE request_id = $1`, [
+      own.requestId,
+      h.finance.employeeId,
+    ]);
+    const other = await approved();
+    const ownInvoice = await submitted(own.requestId);
+    const otherInvoice = await submitted(other.requestId);
+
+    await confirm(ownInvoice.id).expect(201);
+    await confirm(otherInvoice.id).expect(201);
+
+    const afterOf = async (id: string) =>
+      (
+        await h.ctx.sql.query<{ after: Record<string, unknown> }>(
+          `SELECT after FROM audit_events WHERE action = 'PURCHASE_INVOICE.CONFIRMED' AND resource_id = $1`,
+          [id],
+        )
+      ).rows[0].after;
+    expect(await afterOf(ownInvoice.id)).toMatchObject({ state: 'CONFIRMED', selfBeneficiary: true });
+    expect(await afterOf(otherInvoice.id)).not.toHaveProperty('selfBeneficiary');
+  });
+
   it('is never signed by the person who submitted it, and the refusal writes nothing', async () => {
     const { requestId } = await approved();
     const purchase = await submitted(requestId);

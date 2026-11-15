@@ -288,6 +288,11 @@ export class PurchaseInvoiceRepo {
     return locked.length === 0 ? null : this.find(id, tx);
   }
 
+  /** Whether the person is one of those the request is for (`QĐ-104h`: Finance who signs an invoice of their own request is flagged in the audit). */
+  async isBeneficiary(tx: DbTx, requestId: string, employeeId: string): Promise<boolean> {
+    return (await tx.accessRequestBeneficiary.count({ where: { requestId, employeeId } })) > 0;
+  }
+
   /** Records that Finance signed the invoice: the person, the time, and the invoice that was written. One statement, and only from SUBMITTED. */
   async markConfirmed(tx: DbTx, id: string, by: string, at: Date, invoiceId: string): Promise<boolean> {
     const changed = await tx.purchaseInvoice.updateMany({

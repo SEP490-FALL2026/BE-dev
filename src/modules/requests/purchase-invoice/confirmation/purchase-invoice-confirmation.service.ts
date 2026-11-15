@@ -43,7 +43,11 @@ export class PurchaseInvoiceConfirmationService {
       if (!(await this.invoices.markConfirmed(tx, id, actor.employeeId, now, recorded.invoiceId))) {
         throw new PurchaseInvoiceRefusedError('NOT_SUBMITTED');
       }
-      await this.trail(tx, actor, row, 'CONFIRMED', { invoiceId: recorded.invoiceId, booking: recorded.booking });
+      await this.trail(tx, actor, row, 'CONFIRMED', {
+        invoiceId: recorded.invoiceId,
+        booking: recorded.booking,
+        ...(await this.selfSigned(tx, actor, row)),
+      });
       if (row.matchResult === 'PRICE_QUANTITY_EXCEPTION') await this.openCase(tx, actor, row, now);
       await this.tell(tx, row, 'PURCHASE_INVOICE_CONFIRMED');
 
@@ -63,6 +67,17 @@ export class PurchaseInvoiceConfirmationService {
 
       return (await this.invoices.find(id, tx)) as PurchaseInvoiceRow;
     });
+  }
+
+  /** The audit flag of a signature by Finance on an invoice of a request they are themselves a beneficiary of: allowed, and never silent (`QĐ-104h`). */
+  private async selfSigned(
+    tx: DbTx,
+    actor: AuthenticatedPrincipal,
+    row: PurchaseInvoiceRow,
+  ): Promise<{ selfBeneficiary?: true }> {
+    return row.requestId !== null && (await this.invoices.isBeneficiary(tx, row.requestId, actor.employeeId))
+      ? { selfBeneficiary: true }
+      : {};
   }
 
   /** The case Finance works from an invoice whose count or price differs, opened in the transaction that signs it (`RC-1`). */
@@ -120,7 +135,7 @@ export class PurchaseInvoiceConfirmationService {
     actor: AuthenticatedPrincipal,
     row: PurchaseInvoiceRow,
     decision: 'CONFIRMED' | 'RETURNED',
-    after: { [key: string]: string },
+    after: { [key: string]: string | boolean },
   ): Promise<void> {
     await this.audit.record(tx, {
       organizationId: row.organizationId,
