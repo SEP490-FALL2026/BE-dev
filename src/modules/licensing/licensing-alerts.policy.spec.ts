@@ -44,7 +44,7 @@ describe('what each alert says and its key (FR-5.14 lines 3, 12, 13, 38)', () =>
 
     expect(holder).toEqual({
       code: 'LICENSE_EXPIRY_REMINDER',
-      subject: { type: 'LicenseAssignment', id: A },
+      subject: { type: 'LICENSE_ASSIGNMENT', id: A },
       params: { assignmentId: A, holderEmployeeId: E, planId: P, expectedEndDate: '2026-09-30', audience: 'EMPLOYEE' },
       eventKey: `LICENSE_EXPIRY_REMINDER:${A}:2026-09-30`,
     });
@@ -66,7 +66,7 @@ describe('what each alert says and its key (FR-5.14 lines 3, 12, 13, 38)', () =>
       leaverAccessAlert({ taskId: T, assignmentId: A, employeeId: E, planId: P, accessUntil: '2026-11-30' }),
     ).toEqual({
       code: 'LEAVER_K1_ACCESS_RUNS_ON',
-      subject: { type: 'ProvisioningTask', id: T },
+      subject: { type: 'PROVISIONING_TASK', id: T },
       params: { taskId: T, assignmentId: A, employeeId: E, planId: P, accessUntil: '2026-11-30' },
       eventKey: `LEAVER_K1_ACCESS_RUNS_ON:${T}`,
     });
