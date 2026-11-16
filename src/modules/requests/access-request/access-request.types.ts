@@ -147,7 +147,8 @@ export interface NeedStepWithDecision extends NeedStepRecord {
 
 /** The electronic approval record of a decision (never changed once written). */
 export interface ApprovalRecordRecord {
-  decision: 'APPROVED' | 'REJECTED';
+  /** `RETURNED`: sent back to the person who sent the request, to add what is missing (`QĐ-111ap`, R-24). */
+  decision: 'APPROVED' | 'REJECTED' | 'RETURNED';
   decidedByEmployeeId: string;
   deciderRole: DeciderRole;
   reason: string | null;

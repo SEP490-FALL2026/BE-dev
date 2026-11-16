@@ -77,8 +77,11 @@ export class SpendDecisionRepo {
     if (!row) return null;
     const { step, ...decision } = row;
 
+    if (decision.decision === 'RETURNED') throw new Error('The spend decision of a step is never returned.');
+
     return {
       ...decision,
+      decision: decision.decision,
       reason: step.approvalRecord?.reason ?? null,
     };
   }

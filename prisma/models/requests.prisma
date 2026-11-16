@@ -122,6 +122,9 @@ enum AccessRequestStepState {
 enum ApprovalDecision {
   APPROVED
   REJECTED
+  // The head, the spending approver or the IT Admin sent the request back to the person who sent it, to add what is missing and send it
+  // again (QĐ-111ap, R-24): the step ends without a grant and the request waits for its sender.
+  RETURNED
 }
 
 // A question of the spending approver to Finance: open until Finance answers or the request goes away (US-06-02, US-06-03).

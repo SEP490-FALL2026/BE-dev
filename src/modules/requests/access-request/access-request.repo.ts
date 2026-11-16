@@ -184,7 +184,8 @@ export class AccessRequestRepo {
     const { record } = input;
     await tx.accessRequestStep.update({
       where: { id: input.stepId },
-      data: { state: record.decision, decidedAt: record.decidedAt },
+      // A step that was sent back is closed: its record says it was returned, and the request waits for its sender, who sends it again (`QĐ-111ap`, R-24).
+      data: { state: record.decision === 'RETURNED' ? 'CLOSED' : record.decision, decidedAt: record.decidedAt },
     });
     await tx.accessRequest.update({ where: { id: input.requestId }, data: { state: input.requestState } });
     await tx.approvalRecord.create({
