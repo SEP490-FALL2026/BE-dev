@@ -116,3 +116,9 @@ export interface MyLine {
   state: import('../access-request/group-request.types').LineState;
   outcomeReason: string | null;
 }
+
+/** What a Request asks for: the plan of the catalog, and the name of software proposed that is not in the catalog (or whose plan is not linked yet). */
+export interface RequestedSoftware {
+  planId: string | null;
+  proposedName: string | null;
+}
