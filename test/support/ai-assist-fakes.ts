@@ -76,7 +76,8 @@ export class FakeInvocationRepo
   /** The writes of a use case in the order made, with their transaction: `finish`, `recordAdmitted`, `recordAnswered`, `audit:…`. */
   readonly steps: FakeStep[] = [];
 
-  insert(_tx: DbTx, input: NewInvocation): Promise<{ id: string }> {
+  insert(tx: DbTx, input: NewInvocation): Promise<{ id: string }> {
+    this.steps.push({ step: 'insert', tx });
     if (KEPT.has(input.status) && [...this.rows.values()].some((row) => KEPT.has(row.status) && sameKey(row, input))) {
       return Promise.reject(
         new Prisma.PrismaClientKnownRequestError('Unique constraint failed', {
@@ -124,6 +125,13 @@ export class FakeInvocationRepo
     row.result = call.answer.result;
 
     return Promise.resolve();
+  }
+
+  /** The first `count` steps by name and in how many transactions they ran: a use case that admits a call runs them in one. */
+  firstSteps(count: number): { steps: string[]; transactions: number } {
+    const first = this.steps.slice(0, count);
+
+    return { steps: first.map((entry) => entry.step), transactions: new Set(first.map((entry) => entry.tx)).size };
   }
 
   findLive(key: InvocationKey & { sourceRevision: string }): Promise<LiveInvocation | null> {
