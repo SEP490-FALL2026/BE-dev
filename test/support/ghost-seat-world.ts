@@ -249,8 +249,12 @@ export class GhostSeatWorld extends RevocationHarness {
    * A department with a head who can sign in (a MANAGER account, placed in it) from the start of the year, owned by the IT Admin of the
    * world; `personIn` and `seatOf` put holders in it. `headEmployeeId` is the person who heads it.
    */
-  async headedDepartment(code: string): Promise<{ departmentId: string; headEmployeeId: string; head: ApiAccount }> {
-    const department = await this.department(code, this.worldItAdmin.employeeId);
+  async headedDepartment(
+    code: string,
+    /** The IT Admin that answers for the department: the one of the world by default, `null` for a department with none. */
+    itAdminEmployeeId: string | null = this.worldItAdmin.employeeId,
+  ): Promise<{ departmentId: string; headEmployeeId: string; head: ApiAccount }> {
+    const department = await this.department(code, itAdminEmployeeId ?? undefined);
     const headEmployeeId = await this.personIn(`${code}-HEAD`, department.id);
     const head = await this.account(`${code}-HEAD`, headEmployeeId, 'MANAGER');
     await this.ctx.sql.query(

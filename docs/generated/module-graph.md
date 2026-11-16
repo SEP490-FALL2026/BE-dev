@@ -109,7 +109,7 @@ flowchart BT
   operating_parameters -->|6| organization
   optimization -->|7| audit
   optimization -->|8| catalog
-  optimization -->|5| identity_access
+  optimization -->|6| identity_access
   optimization -->|25| licensing
   optimization -->|7| notifications
   optimization -->|6| operating_parameters
