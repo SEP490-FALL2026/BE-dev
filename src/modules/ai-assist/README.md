@@ -31,6 +31,27 @@ Tầng: T6 ([tiers.cjs](../../../scripts/arch/tiers.cjs)). Phụ thuộc: audit,
 
 - Mở: không có. Đăng ký vào: không có.
 
+### Port lưu lịch sử AI (`AiInvocationHistoryStore`)
+
+Mọi đọc/ghi `ai_invocation_contents` (câu gửi, câu trả lời thô, kết quả đã parse, ngữ cảnh) đi qua port
+`invocation/invocation-history-store.types.ts` (QĐ-102g); bản hiện có là PostgreSQL (`AiInvocationContentRepo`, nối bằng
+`useExisting` ở `ai-assist.module.ts` và `purge/ai-assist-purge-cli.module.ts`). Port không phải extension point giữa module (không
+export ra ngoài `ai-assist`), chỉ là chỗ thay kho.
+
+| Điểm cắm                                               | Method                                                                                                 | Gọi từ (cùng transaction với)                                |
+| ------------------------------------------------------ | ------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------ |
+| Nhận lần gọi (kể cả `SOURCE_UNREADABLE`, context rỗng) | `recordAdmitted(tx, call)`                                                                             | `queue-summary.service.ts` (audit `REQUESTED`)               |
+| Lần gọi kết thúc có câu trả lời                        | `recordAnswered(tx, call)` — chỉ khi run là bên kết thúc lần gọi                                       | `queue-summary-run.service.ts` (audit `COMPLETED`/`FAILED`)  |
+| Super Admin đọc nội dung                               | `find(tx, invocationId)` → bản ghi hoặc `null`                                                         | `invocation-content-query.service.ts` (audit `CONTENT_READ`) |
+| Purge: đếm / xóa                                       | `countPurgeable(before)` / `purge(tx, before)` (lần gọi `COMPLETED` có nội dung bị xóa chuyển `STALE`) | `public/ai-purge.api.ts` (audit `PURGED`)                    |
+
+`result` cho chủ lần gọi (`AiInvocationRepo.findOwned`) ở lại PostgreSQL ngoài port (QĐ-79a, `content: { isNot: null }` là dấu đã purge).
+
+Thêm kho khác (ví dụ MongoDB ở repo WDP): viết một class `extends`/`implements AiInvocationHistoryStore`, đổi `provide: AiInvocationHistoryStore`
+trong hai `*.module.ts` (chọn theo env), **không sửa** `queue-summary.service.ts`, `queue-summary-run.service.ts`,
+`invocation-content-query.service.ts`. `find` trả `null` khi không có; trạng thái riêng của kho (đang ghi, kho lỗi) là lỗi do adapter
+ném và map ở `invocation-content.http-errors.ts` của nhánh đó — không thêm mã lỗi vào API đồ án.
+
 ## Cấu hình
 
 - Hai công tắc tham số vận hành `AI_ENABLED`, `AI_ACCESS_REQUEST_SUMMARY_ENABLED` (mặc định `OFF`; cả hai phải `ON`).
@@ -67,8 +88,8 @@ Tầng: T6 ([tiers.cjs](../../../scripts/arch/tiers.cjs)). Phụ thuộc: audit,
 - `ai-service/` — client của dịch vụ AI (`ai-service-client.service.ts`, hợp đồng và kiểu ở `ai-service.types.ts`, lỗi
   `ai-service.errors.ts`, cấu hình `ai-service-environment.policy.ts`), client giả lập (`ai-service-simulated-client.service.ts`,
   câu mẫu ở `ai-service-simulated.policy.ts`) và chọn client theo chế độ (`ai-service-clients.service.ts`).
-- `invocation/` — bản ghi mỗi lần gọi: `invocation.repo.ts` (SQL của `ai_invocations` và ghi nội dung của một lần gọi),
-  `invocation-content.repo.ts` (đọc một nội dung, đếm và xóa nội dung theo mốc cắt), `invocation-content.json.ts` (codec cột JSON),
+- `invocation/` — bản ghi mỗi lần gọi: `invocation.repo.ts` (SQL của `ai_invocations`, không ghi nội dung),
+  `invocation-history-store.types.ts` (port lưu lịch sử), `invocation-content.repo.ts` (bản PostgreSQL của port: ghi, đọc, đếm và xóa nội dung), `invocation-content.json.ts` (codec cột JSON),
   `invocation-audit-event.mapper.ts` (`AI_INVOCATION.CONTENT_READ`, `AI_INVOCATION.PURGED`), `invocation.types.ts`.
 - `invocation-content/` — đọc nội dung (chỉ Super Admin): `invocation-content-query.service.ts`, `.controller.ts`, `.dto.ts`,
   `invocation-content.errors.ts`, `invocation-content.http-errors.ts`.

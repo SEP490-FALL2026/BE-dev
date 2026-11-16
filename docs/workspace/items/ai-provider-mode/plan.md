@@ -180,3 +180,10 @@ thái để lại trên DB dev: hai công tắc `ON`, `AI_PROVIDER_MODE=SIMULATE
 
 Giới hạn: chưa có Modal, nên `latencyMs` lạnh/ấm của model thật, `modal app stop` và GPU chưa đo (Task 2.4 còn mở); không chạy qua
 FE; một trưởng phòng và một Người duyệt chi, hàng đợi 1–2 bước.
+
+## Port lưu lịch sử AI (prompt 5c, 17/11/2026)
+
+Nhánh `feat/p5-c-ai` từ `dev` `94a8ee84`: merge `Bao_dev_be` `501c3c08` (`1b45378d`), rồi port `AiInvocationHistoryStore` (`f2a4cb2e`, không đổi hành vi, không đổi DB). Thiết kế: SPEC-5C-AI §A2 (thư mục `docs/reviews/p5-2026-11-17/` của repo BE chính, chưa commit).
+
+- Lệch spec: `QueueSummaryService` bỏ inject `AiServiceClients`, hỏi `QueueSummaryRunService.canAnswerIn(mode)` (lint `max-params` 8); thứ tự tham số constructor: `(runner, repo, history, source, parameters, organizations, audit, runs)`.
+- Kiểm chứng local (chỉ bộ nhanh, theo chỉ đạo điều phối 17/11): `pnpm typecheck`, `pnpm lint`, `pnpm arch:check`, `pnpm rules:check`, `pnpm rules:format`, `pnpm test:gates` (16 suite / 335 test), `pnpm test -- src/modules/ai-assist` (14 suite / 267 test sau port); integration `test/integration/ai-assist` + `operating-parameters` (11 suite / 138 test sau merge; `invocation-repo` và các file ai-assist chạm port chạy lại sau port). `pnpm check`, `test:http` và full suite chạy ở CI GitHub, chưa chạy local.
