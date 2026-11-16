@@ -65649,7 +65649,7 @@
         ],
         "responses": {
           "200": {
-            "description": "The year against its annual ceiling: the annual ceiling, the shared-pool reserve, what is available (the ceiling less the reserve), the proposals added up and whether they are over it, the versions counted at the annual check added up and by how much they are over, and for each department its open proposal and the version counted for it (with its origin).",
+            "description": "The year against its annual ceiling: the annual ceiling, the shared-pool reserve, what is available (the ceiling less the reserve), the proposals added up and whether they are over it, the versions counted at the annual check added up with the adjustments approved for them, what is not allocated (what a supplement or a reduction of the annual ceiling may take) and by how much they are over, and for each department its open proposal and the version counted for it (with its origin).",
             "content": {
               "application/json": {
                 "schema": {
@@ -68920,7 +68920,7 @@
         },
         "responses": {
           "201": {
-            "description": "Finance asks, with the reason, to give a Cost Center money from what is not allocated under the annual ceiling (SUPPLEMENT), to move money between two Cost Centers (TRANSFER, with COST_CENTER_CHANGE when a department changed its Cost Center), to give money back (RETURN), or to lower the annual ceiling (CEILING_REDUCTION). A supplement and a reduction of the ceiling cannot be more than what is not allocated; a return and the Cost Center that gives in a transfer are never left with less than the forecast of the end of their year (a transfer for COST_CENTER_CHANGE is not held to that) and never give more than their base. The spending approver is asked to decide; nothing in the budget changes until then.",
+            "description": "Finance asks, with the reason, to give a Cost Center money from what is not allocated under the annual ceiling (SUPPLEMENT), to move money between two Cost Centers (TRANSFER, with COST_CENTER_CHANGE when a department changed its Cost Center), to give money back (RETURN), or to lower the annual ceiling (CEILING_REDUCTION). A supplement and a reduction of the ceiling cannot be more than what is not allocated; a return and the Cost Center that gives in a transfer are never left with less than the forecast of the end of their year and never give more than their base; a transfer for COST_CENTER_CHANGE is not held to the forecast but moves only what is left of the budget of the old Cost Center after what it used (BUDGET_ADJUSTMENT.OVER_REMAINING). The spending approver is asked to decide; nothing in the budget changes until then.",
             "content": {
               "application/json": {
                 "schema": {
@@ -69007,7 +69007,7 @@
             }
           },
           "409": {
-            "description": "The budget cycle of the year is not open yet (BUDGET_CYCLE.NOT_OPEN).",
+            "description": "The budget cycle of the year is not open yet (BUDGET_CYCLE.NOT_OPEN) or still takes proposals, so no budget of the year is made to adjust (BUDGET_ADJUSTMENT.CYCLE_NOT_LOCKED: asked once the cycle is locked, the day after its submission deadline); the Cost Center that receives was retired (FINANCE.SETUP_INCOMPLETE), has a version of the year still being decided (BUDGET_ADJUSTMENT.VERSION_IN_FLIGHT) or a proposal that waits for its version (BUDGET_ADJUSTMENT.BUDGET_IN_PREPARATION).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -69020,6 +69020,53 @@
                         "code": "BUDGET_CYCLE.NOT_OPEN",
                         "message": "The budget cycle of 2026 is not open yet.",
                         "details": { "year": 2026 },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "BUDGET_ADJUSTMENT.CYCLE_NOT_LOCKED": {
+                    "summary": "The budget cycle of the year still takes proposals: an adjustment is made once it is locked.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "BUDGET_ADJUSTMENT.CYCLE_NOT_LOCKED",
+                        "message": "The budget cycle of the year still takes proposals: an adjustment is made once it is locked.",
+                        "details": { "year": 2026, "submissionDeadline": "2026-11-30" },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "FINANCE.SETUP_INCOMPLETE": {
+                    "summary": "The department has no Cost Center in use yet: Finance has to create one for it first.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "FINANCE.SETUP_INCOMPLETE",
+                        "message": "The department has no Cost Center in use yet: Finance has to create one for it first.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "BUDGET_ADJUSTMENT.VERSION_IN_FLIGHT": {
+                    "summary": "The Cost Center has a version of the year that is still being decided.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "BUDGET_ADJUSTMENT.VERSION_IN_FLIGHT",
+                        "message": "The Cost Center has a version of the year that is still being decided.",
+                        "details": { "costCenterId": "cost-center-1" },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "BUDGET_ADJUSTMENT.BUDGET_IN_PREPARATION": {
+                    "summary": "The budget of the Cost Center is still being prepared: a proposal waits for Finance to build its version.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "BUDGET_ADJUSTMENT.BUDGET_IN_PREPARATION",
+                        "message": "The budget of the Cost Center is still being prepared: a proposal waits for Finance to build its version.",
+                        "details": { "costCenterId": "cost-center-1" },
                         "requestId": "req_example"
                       }
                     }
@@ -69071,7 +69118,7 @@
             }
           },
           "422": {
-            "description": "The body is invalid (VALIDATION_ERROR), the year has ended (BUDGET.YEAR_ENDED), the adjustment is not made as its kind is meant (BUDGET_ADJUSTMENT.INVALID_SHAPE), it is more than what is not allocated (BUDGET_ADJUSTMENT.OVER_UNALLOCATED), it would leave a Cost Center below its forecast (BUDGET_ADJUSTMENT.BELOW_FORECAST_FLOOR) or give more than its base (BUDGET_ADJUSTMENT.OVER_BASE), or the Cost Center has no budget to give from (BUDGET_ADJUSTMENT.NO_BUDGET).",
+            "description": "The body is invalid (VALIDATION_ERROR), the year has ended (BUDGET.YEAR_ENDED), the adjustment is not made as its kind is meant (BUDGET_ADJUSTMENT.INVALID_SHAPE), it is more than what is not allocated (BUDGET_ADJUSTMENT.OVER_UNALLOCATED), it would leave a Cost Center below its forecast (BUDGET_ADJUSTMENT.BELOW_FORECAST_FLOOR) or give more than its base (BUDGET_ADJUSTMENT.OVER_BASE), a transfer for COST_CENTER_CHANGE is more than what is left after what the Cost Center used (BUDGET_ADJUSTMENT.OVER_REMAINING), or the Cost Center has no budget to give from (BUDGET_ADJUSTMENT.NO_BUDGET).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -69084,6 +69131,18 @@
                         "code": "VALIDATION_ERROR",
                         "message": "Request validation failed.",
                         "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "BUDGET.YEAR_ENDED": {
+                    "summary": "The year 2025 has ended.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "BUDGET.YEAR_ENDED",
+                        "message": "The year 2025 has ended.",
+                        "details": { "year": 2025 },
                         "requestId": "req_example"
                       }
                     }
@@ -69136,6 +69195,22 @@
                         "code": "BUDGET_ADJUSTMENT.OVER_BASE",
                         "message": "The amount is more than the base of the Cost Center.",
                         "details": { "costCenterId": "cost-center-1", "baseMinor": "180000000" },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "BUDGET_ADJUSTMENT.OVER_REMAINING": {
+                    "summary": "The amount is more than what is left of the budget of the Cost Center after what it used.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "BUDGET_ADJUSTMENT.OVER_REMAINING",
+                        "message": "The amount is more than what is left of the budget of the Cost Center after what it used.",
+                        "details": {
+                          "costCenterId": "cost-center-1",
+                          "remainingMinor": "88000000",
+                          "usedMinor": "110000000"
+                        },
                         "requestId": "req_example"
                       }
                     }
@@ -69481,7 +69556,7 @@
             }
           },
           "403": {
-            "description": "Only the spending approver decides, and never an adjustment they asked for (BUDGET.CONFLICT_OF_INTEREST).",
+            "description": "Only the spending approver decides.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -69523,7 +69598,7 @@
             }
           },
           "409": {
-            "description": "The adjustment was decided already (BUDGET_ADJUSTMENT.ALREADY_DECIDED), the Cost Center that receives has a version of the year still being decided (BUDGET_ADJUSTMENT.VERSION_IN_FLIGHT), or the year has ended (BUDGET.YEAR_ENDED).",
+            "description": "The adjustment was decided already (BUDGET_ADJUSTMENT.ALREADY_DECIDED), the cycle of the year does not stand locked (BUDGET_CYCLE.NOT_OPEN, BUDGET_ADJUSTMENT.CYCLE_NOT_LOCKED), or the Cost Center that receives was retired (FINANCE.SETUP_INCOMPLETE), has a version of the year still being decided (BUDGET_ADJUSTMENT.VERSION_IN_FLIGHT) or a proposal that waits for its version (BUDGET_ADJUSTMENT.BUDGET_IN_PREPARATION).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -69539,6 +69614,41 @@
                       }
                     }
                   },
+                  "BUDGET_CYCLE.NOT_OPEN": {
+                    "summary": "The budget cycle of 2026 is not open yet.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "BUDGET_CYCLE.NOT_OPEN",
+                        "message": "The budget cycle of 2026 is not open yet.",
+                        "details": { "year": 2026 },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "BUDGET_ADJUSTMENT.CYCLE_NOT_LOCKED": {
+                    "summary": "The budget cycle of the year still takes proposals: an adjustment is made once it is locked.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "BUDGET_ADJUSTMENT.CYCLE_NOT_LOCKED",
+                        "message": "The budget cycle of the year still takes proposals: an adjustment is made once it is locked.",
+                        "details": { "year": 2026, "submissionDeadline": "2026-11-30" },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "FINANCE.SETUP_INCOMPLETE": {
+                    "summary": "The department has no Cost Center in use yet: Finance has to create one for it first.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "FINANCE.SETUP_INCOMPLETE",
+                        "message": "The department has no Cost Center in use yet: Finance has to create one for it first.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
                   "BUDGET_ADJUSTMENT.VERSION_IN_FLIGHT": {
                     "summary": "The Cost Center has a version of the year that is still being decided.",
                     "value": {
@@ -69546,6 +69656,18 @@
                       "error": {
                         "code": "BUDGET_ADJUSTMENT.VERSION_IN_FLIGHT",
                         "message": "The Cost Center has a version of the year that is still being decided.",
+                        "details": { "costCenterId": "cost-center-1" },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "BUDGET_ADJUSTMENT.BUDGET_IN_PREPARATION": {
+                    "summary": "The budget of the Cost Center is still being prepared: a proposal waits for Finance to build its version.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "BUDGET_ADJUSTMENT.BUDGET_IN_PREPARATION",
+                        "message": "The budget of the Cost Center is still being prepared: a proposal waits for Finance to build its version.",
                         "details": { "costCenterId": "cost-center-1" },
                         "requestId": "req_example"
                       }
@@ -69598,7 +69720,7 @@
             }
           },
           "422": {
-            "description": "The body or the id is invalid (VALIDATION_ERROR), a refusal has no reason (BUDGET.ADJUSTMENT_REASON_REQUIRED), or a condition no longer holds on today's figures (BUDGET_ADJUSTMENT.OVER_UNALLOCATED, BELOW_FORECAST_FLOOR, OVER_BASE, NO_BUDGET).",
+            "description": "The body or the id is invalid (VALIDATION_ERROR), a refusal has no reason (BUDGET.ADJUSTMENT_REASON_REQUIRED), the year has ended so that an approval is no longer possible (BUDGET.YEAR_ENDED; a refusal still is), or a condition no longer holds on today's figures (BUDGET_ADJUSTMENT.OVER_UNALLOCATED, BELOW_FORECAST_FLOOR, OVER_BASE, OVER_REMAINING, NO_BUDGET).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -69611,6 +69733,18 @@
                         "code": "VALIDATION_ERROR",
                         "message": "Request validation failed.",
                         "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "BUDGET.YEAR_ENDED": {
+                    "summary": "The year 2025 has ended.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "BUDGET.YEAR_ENDED",
+                        "message": "The year 2025 has ended.",
+                        "details": { "year": 2025 },
                         "requestId": "req_example"
                       }
                     }
@@ -69651,6 +69785,22 @@
                         "code": "BUDGET_ADJUSTMENT.OVER_BASE",
                         "message": "The amount is more than the base of the Cost Center.",
                         "details": { "costCenterId": "cost-center-1", "baseMinor": "180000000" },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "BUDGET_ADJUSTMENT.OVER_REMAINING": {
+                    "summary": "The amount is more than what is left of the budget of the Cost Center after what it used.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "BUDGET_ADJUSTMENT.OVER_REMAINING",
+                        "message": "The amount is more than what is left of the budget of the Cost Center after what it used.",
+                        "details": {
+                          "costCenterId": "cost-center-1",
+                          "remainingMinor": "88000000",
+                          "usedMinor": "110000000"
+                        },
                         "requestId": "req_example"
                       }
                     }
@@ -120826,7 +120976,7 @@
                     "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
                     "required": ["amount", "currency"],
                     "additionalProperties": false,
-                    "description": "The base of the approved version, before the adjustments.",
+                    "description": "The base of the approved version, before the adjustments (the base with them is effectiveBudget.base; the check of a request names that one `base`).",
                     "nullable": true
                   },
                   "reserve": {
@@ -121298,7 +121448,7 @@
                       "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
                       "required": ["amount", "currency"],
                       "additionalProperties": false,
-                      "description": "The base of the approved version, before the adjustments.",
+                      "description": "The base of the approved version, before the adjustments (the base with them is effectiveBudget.base; the check of a request names that one `base`).",
                       "nullable": true
                     },
                     "reserve": {
@@ -122435,7 +122585,21 @@
                 "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
                 "required": ["amount", "currency"],
                 "additionalProperties": false,
-                "description": "The versions counted at the annual check, in the currency of the cycle, whether or not their department is listed below."
+                "description": "The versions counted at the annual check, in the currency of the cycle, whether or not their department is listed below, with the adjustments approved for them (the version of a row keeps its own figures)."
+              },
+              "versionsAdjustment": {
+                "type": "object",
+                "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                "required": ["amount", "currency"],
+                "additionalProperties": false,
+                "description": "Of versionsTotal, what the adjustments approved in the year gave to (positive) or took from (negative) the base of the approved versions; the versions in the rows are as they were approved."
+              },
+              "unallocated": {
+                "type": "object",
+                "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                "required": ["amount", "currency"],
+                "additionalProperties": false,
+                "description": "`available` less versionsTotal, never below nothing: what is not allocated, which a supplement or a reduction of the annual ceiling may take."
               },
               "versionsOutsideListed": {
                 "type": "object",
@@ -122555,6 +122719,8 @@
               "proposalsTotal",
               "proposalsOverAvailable",
               "versionsTotal",
+              "versionsAdjustment",
+              "unallocated",
               "versionsOutsideListed",
               "versionsInOtherCurrency",
               "overBy",
@@ -123733,7 +123899,7 @@
           },
           "reason": { "type": "string", "minLength": 1, "maxLength": 1000 },
           "transferReason": {
-            "description": "Only for TRANSFER: the department changed its Cost Center in the year and what is left moves to the new one; such a transfer is not held to the forecast of the end of the year.",
+            "description": "Only for TRANSFER: the department changed its Cost Center in the year and what is left moves to the new one; such a transfer is not held to the forecast of the end of the year, and takes at most what is left of the budget of the old Cost Center after what it used.",
             "type": "string",
             "enum": ["COST_CENTER_CHANGE"]
           }

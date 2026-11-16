@@ -45,7 +45,7 @@ flowchart BT
   ai_assist -->|2| operating_parameters
   ai_assist -->|4| organization
   ai_assist -->|4| requests
-  budgets -->|24| audit
+  budgets -->|25| audit
   budgets -->|8| catalog
   budgets -->|2| finance
   budgets -->|5| identity_access
