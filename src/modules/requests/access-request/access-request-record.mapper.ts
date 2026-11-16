@@ -139,6 +139,14 @@ export function limitExemptionOf(value: string | null): LimitExemption | null {
 /** A date column that may be empty, as a business date. */
 const dayOrNull = (value: Date | null): BusinessDate | null => (value === null ? null : fromDateColumn(value));
 
+/**
+ * A request for a group keeps the step of its first head first; the step of a request for one person is the last it has, as a request that was
+ * sent back and sent on again has a new one (`QĐ-111ap`, R-24).
+ */
+function currentNeedStepOf<S>(type: string, steps: readonly S[]): S | undefined {
+  return type === 'GROUP_GRANT' ? steps[0] : steps[steps.length - 1];
+}
+
 export function toRecord(row: RequestRow): AccessRequestRecord {
   const sent = sentColumns(row);
   const needSteps = row.steps.map((step) => ({
@@ -159,7 +167,7 @@ export function toRecord(row: RequestRow): AccessRequestRecord {
         step.approvalRecord.deciderRole === 'MANAGER' ? ('MANAGER' as const) : ('SPENDING_APPROVER' as const),
     },
   }));
-  const first = needSteps[0];
+  const first = currentNeedStepOf(row.type, needSteps);
   if (!first) throw new Error(`The request ${row.id} has no need step.`);
   const { decision: firstDecision, ...step } = first;
 

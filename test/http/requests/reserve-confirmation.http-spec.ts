@@ -6,12 +6,19 @@ import { SpendBatchService } from '../../../src/modules/requests/spend-submissio
 import { SpendBatchViewService } from '../../../src/modules/requests/spend-submission/spend-batch-view.service';
 import { SpendConfirmationNotInBatchError } from '../../../src/modules/requests/spend/spend.errors';
 import { SpendReserveRefusedError } from '../../../src/modules/requests/spend/spend.errors';
+import {
+  PolicyChecklistHasNoError,
+  PolicyChecklistIncompleteError,
+  PolicyVersionChangedError,
+} from '../../../src/modules/policies/public/policy-checklist.errors';
 import { bodyOf } from '../../support/api-body';
 import { bearer, createHttpContractApp, principal } from '../../support/http-contract-app';
 
 const ID = '8a4d7c1e-2b3f-4c5d-9e6f-0a1b2c3d4e5f';
 const OTHER = '9b5e8d2f-3c4a-4d6e-8f70-1b2c3d4e5f60';
 const PATH = `/api/v1/access-requests/${ID}/reserve-confirmation`;
+/** The checklist of the step (`QĐ-111ap`): the shape is judged here, the answers by the policy. */
+const CHECKLIST = { policyVersionId: ID, answers: [{ itemCode: '1.6-03', answer: 'YES' as const }] };
 
 /**
  * The contract of the confirmation of the reserve (`BR-MF1-06h`, `P0-04`, `RV-11`): who may call it, what the body is, and what each refusal
@@ -69,7 +76,7 @@ describe('the confirmation of the reserve (http contract, no database)', () => {
 
   it('BR-MF1-06h: refuses every role but the head (MANAGER) with 403 and calls nothing', async () => {
     for (const roles of [['EMPLOYEE'], ['IT_ADMIN'], ['FINANCE'], ['SPENDING_APPROVER'], ['SUPER_ADMIN'], []]) {
-      const response = await post(PATH, roles, { reason: 'Gấp cho dự án' }).expect(403);
+      const response = await post(PATH, roles, { reason: 'Gấp cho dự án', checklist: CHECKLIST }).expect(403);
 
       expect(bodyOf(response).error.code).toBe('AUTHORIZATION.FORBIDDEN');
     }
@@ -90,9 +97,11 @@ describe('the confirmation of the reserve (http contract, no database)', () => {
   });
 
   it('US-06-16 AC-1: a reason of 500 characters is taken, trimmed, and the result is given as it is', async () => {
-    const response = await post(PATH, ['MANAGER'], { reason: `  ${'x'.repeat(500)}  ` }).expect(200);
+    const response = await post(PATH, ['MANAGER'], { reason: `  ${'x'.repeat(500)}  `, checklist: CHECKLIST }).expect(
+      200,
+    );
 
-    expect(confirm).toHaveBeenCalledWith(expect.anything(), ID, 'x'.repeat(500));
+    expect(confirm).toHaveBeenCalledWith(expect.anything(), ID, { reason: 'x'.repeat(500), checklist: CHECKLIST });
     expect((bodyOf(response).data as Record<string, unknown>).reserveConfirmation).toMatchObject({
       result: 'SPEND_STEP_OPENED',
       confirmationKept: true,
@@ -102,10 +111,17 @@ describe('the confirmation of the reserve (http contract, no database)', () => {
   it.each([
     ['SPEND.RESERVE_NOT_PENDING', new SpendReserveRefusedError('RESERVE_NOT_PENDING'), 409],
     ['SPEND.RESERVE_CONFIRMER_IS_BENEFICIARY', new SpendReserveRefusedError('RESERVE_CONFIRMER_IS_BENEFICIARY'), 403],
+    ['POLICY.VERSION_CHANGED', new PolicyVersionChangedError('1.6', ID, 3), 409],
+    ['POLICY.CHECKLIST_INCOMPLETE', new PolicyChecklistIncompleteError('1.6', ['1.6-03'], []), 422],
+    [
+      'POLICY.CHECKLIST_HAS_NO',
+      new PolicyChecklistHasNoError('1.6', [{ code: '1.6-03', text: 'Seen the part over the base' }]),
+      422,
+    ],
   ])('answers %s as the refusal it is (%s)', async (code, error, status) => {
     confirm.mockRejectedValue(error);
 
-    const response = await post(PATH, ['MANAGER'], { reason: 'Gấp' }).expect(status);
+    const response = await post(PATH, ['MANAGER'], { reason: 'Gấp', checklist: CHECKLIST }).expect(status);
 
     expect(bodyOf(response).error.code).toBe(code);
   });

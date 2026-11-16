@@ -1,6 +1,7 @@
 import { createZodDto } from '../../../infrastructure/http/dto/zod-dto';
 import { z } from 'zod';
 import { successEnvelopeSchema } from '../../../infrastructure/http/dto/success-envelope.dto';
+import { checklistBodySchema } from '../../policies/public/policy-checklist.types';
 import { requestStateSchema } from '../access-request/access-request.dto';
 
 const text = (max: number) => z.string().trim().min(1).max(max);
@@ -38,7 +39,10 @@ export const submitBatchBodySchema = z.strictObject({
     .optional(),
 });
 
-export const reserveConfirmationBodySchema = z.strictObject({ reason: reserveReasonSchema });
+export const reserveConfirmationBodySchema = z.strictObject({
+  reason: reserveReasonSchema,
+  checklist: checklistBodySchema,
+});
 
 export const supplementBodySchema = z
   .strictObject({

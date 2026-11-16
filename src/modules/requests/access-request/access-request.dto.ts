@@ -2,6 +2,7 @@ import { createZodDto } from '../../../infrastructure/http/dto/zod-dto';
 import { z } from 'zod';
 import { successEnvelopeSchema } from '../../../infrastructure/http/dto/success-envelope.dto';
 import { READABLE_CANCEL_CAUSES } from './group-request.types';
+import { checklistBodySchema } from '../../policies/public/policy-checklist.types';
 import { LIMIT_EXEMPTIONS } from './access-request.types';
 
 /**
@@ -39,16 +40,13 @@ export const submitBodySchema = z.strictObject({
  */
 export const needDecisionBodySchema = z
   .strictObject({
-    decision: z.enum(['APPROVE', 'REJECT']),
+    decision: z.enum(['APPROVE', 'REJECT', 'RETURN']),
     reason: z.string().trim().min(1).max(REASON_MAX_LENGTH).optional(),
-  })
-  .superRefine((body, ctx) => {
-    if (body.decision === 'REJECT' && body.reason === undefined) {
-      ctx.addIssue({ code: 'custom', path: ['reason'], message: 'A refusal gives its reason.' });
-    }
+    checklist: checklistBodySchema,
   })
   .meta({
-    description: 'A refusal (REJECT) gives its reason. An approval (APPROVE) gives none.',
+    description:
+      'The checklist of the policy in force at this step, and the decision: approve, refuse (REJECT) or send back to the person who asked (RETURN). A refusal and a return give their reason, or leave it to be filled in from the questions answered No. An approval is locked while an answer is No.',
   });
 const pageQuery = {
   page: z.coerce.number().int().positive().default(1),
@@ -78,7 +76,7 @@ const needStepSchema = z.strictObject({
 
 /** The decision of the need step; one object, not a list. */
 const needDecisionSchema = z.strictObject({
-  decision: z.enum(['APPROVED', 'REJECTED']),
+  decision: z.enum(['APPROVED', 'REJECTED', 'RETURNED']),
   decidedBy: employeeRef,
   deciderRole: z.enum(['MANAGER', 'SPENDING_APPROVER']),
   reason: z.string().nullable(),

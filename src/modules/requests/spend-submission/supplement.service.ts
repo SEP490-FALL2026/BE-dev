@@ -44,7 +44,11 @@ export class SupplementService {
       if (request.routing?.mode === 'ONE_STEP') {
         if (request.requesterEmployeeId !== actor.employeeId) throw new AccessRequestNotRequesterError();
         if (request.state !== 'AWAITING_REQUESTER_REVISION') throw new SpendSupplementRefusedError('NOT_IN_QUEUE');
-      } else if (request.departmentId !== (await this.head.departmentOf(actor))) throw new AccessRequestNotFoundError();
+      } else {
+        if (request.departmentId !== (await this.head.departmentOf(actor))) throw new AccessRequestNotFoundError();
+        // A request that went back to its sender from the need step is not in the queue of the head: its sender sends it on again first.
+        if (request.state === 'AWAITING_REQUESTER_REVISION') throw new SpendSupplementRefusedError('NOT_IN_QUEUE');
+      }
       const { pricing } = request;
       // The people of a group the head leaves out are judged first: a request for one person has none to leave out.
       const dropped = this.groups.check(request, body.dropEmployeeIds ?? []);

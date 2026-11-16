@@ -6,12 +6,7 @@ import { AccessRequestDecisionRefusedError, AccessRequestNotFoundError } from '.
 import { canViewRequest, viewFactsOf } from '../access-request/access-request.policy';
 import { AccessRequestRepo } from '../access-request/access-request.repo';
 import type { AccessRequestRecord, NeedStepWithDecision } from '../access-request/access-request.types';
-import {
-  checkLineNeedDecider,
-  compareLines,
-  needStepOf,
-  type LineVerdict,
-} from '../group-request/group-line-decision.policy';
+import { checkLineNeedDecider, compareLines, needStepOf } from '../group-request/group-line-decision.policy';
 import {
   GroupRequestLineHoldsAccessError,
   GroupRequestLinesMismatchError,
@@ -28,7 +23,7 @@ export interface GroupNeedDecidable {
 
 /** What the person decides with: the verdict of each of their people. */
 interface LineNeedVerdicts {
-  lines: readonly LineVerdict[];
+  lines: readonly { employeeId: string; decision: 'APPROVE' | 'REJECT' | 'RETURN' }[];
 }
 
 /**
@@ -82,7 +77,10 @@ export class GroupNeedPreconditions {
   }
 
   /** A person who holds a seat of the plan since the request was sent is not approved: the line is checked again (`AC-15`). */
-  private async assertNobodyHoldsAccess(request: AccessRequestRecord, verdicts: readonly LineVerdict[]): Promise<void> {
+  private async assertNobodyHoldsAccess(
+    request: AccessRequestRecord,
+    verdicts: readonly { employeeId: string; decision: string }[],
+  ): Promise<void> {
     if (request.planId === null) return;
     const holding: string[] = [];
     for (const verdict of verdicts.filter((candidate) => candidate.decision === 'APPROVE')) {

@@ -25,7 +25,7 @@ export class ChecklistRecordService {
         organizationId: input.organizationId,
         verdict: input.verdict,
         subject,
-        decision: input.decision,
+        decision: subject.decision ?? input.decision,
         decidedByEmployeeId: input.decidedByEmployeeId,
         decidedAt: input.decidedAt,
       })),

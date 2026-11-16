@@ -1,4 +1,5 @@
 import { SPEND_ERROR_EXAMPLES } from '../spend/spend.http-errors';
+import { CHECKLIST_ERROR_EXAMPLES } from '../checklist/checklist.http-errors';
 import { Body, Controller, Get, HttpStatus, Param, Post, Query } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import {
@@ -86,7 +87,7 @@ export class GroupLinesController {
   @ApiSuccessResponse(GroupResponseDto, {
     message: 'GROUP_REQUEST.NEED_DECIDED',
     description:
-      'The person who holds a need step decides all the people of that step at once, approving some and refusing others, each refusal with its reason. A person who holds a seat of the plan since the request was sent is not approved. The step gets its electronic approval record and each person a decision of their own. When no person waits for a need any more the request is priced again for those who remain and goes on to be sent as spend, or ends when every person was refused.',
+      'The person who holds a need step answers one checklist of the policy in force for the whole group and decides all the people of that step at once, approving some and refusing others, each refusal with its reason (or the reason taken from the answers No); with an answer No nobody can be approved, and the group can be sent back to its sender as a whole (RETURN for every person), who adds what is missing and sends it again. A person who holds a seat of the plan since the request was sent is not approved. The step gets its electronic approval record and each person a decision of their own. When no person waits for a need any more the request is priced again for those who remain and goes on to be sent as spend, or ends when every person was refused.',
   })
   @ApiErrorResponses(
     ...AUTH_ERRORS,
@@ -100,14 +101,23 @@ export class GroupLinesController {
     {
       status: HttpStatus.CONFLICT,
       description:
-        'The step is not pending (ACCESS_REQUEST.STEP_NOT_PENDING), or a person approved holds a seat of the plan now (GROUP_REQUEST.LINE_HOLDS_ACCESS, with the people): the person who decides refuses that line and the others are not touched.',
-      examples: [GROUP_REQUEST_ERROR_EXAMPLES.NEED_STEP_NOT_PENDING, GROUP_REQUEST_ERROR_EXAMPLES.LINE_HOLDS_ACCESS],
+        'The step is not pending (ACCESS_REQUEST.STEP_NOT_PENDING), a person approved holds a seat of the plan now (GROUP_REQUEST.LINE_HOLDS_ACCESS, with the people): the person who decides refuses that line and the others are not touched; or the policy has a newer version in force than the checklist answered (POLICY.VERSION_CHANGED).',
+      examples: [
+        GROUP_REQUEST_ERROR_EXAMPLES.NEED_STEP_NOT_PENDING,
+        GROUP_REQUEST_ERROR_EXAMPLES.LINE_HOLDS_ACCESS,
+        CHECKLIST_ERROR_EXAMPLES.VERSION_CHANGED,
+      ],
     },
     {
       status: HttpStatus.UNPROCESSABLE_ENTITY,
       description:
-        'The body is invalid (VALIDATION_ERROR: a refusal without its reason, a person twice); the decision leaves out people of the step or names others (GROUP_REQUEST.LINES_MISMATCH, with who). Nothing is saved.',
-      examples: [VALIDATION_EXAMPLE, GROUP_REQUEST_ERROR_EXAMPLES.LINES_MISMATCH],
+        'The body is invalid (VALIDATION_ERROR: a refusal or a return with no reason and no answer No to take it from, a person twice, a group sent back in part); the decision leaves out people of the step or names others (GROUP_REQUEST.LINES_MISMATCH, with who); the checklist is not answered in full (POLICY.CHECKLIST_INCOMPLETE) or an answer is No and somebody is approved (POLICY.CHECKLIST_HAS_NO). Nothing is saved.',
+      examples: [
+        VALIDATION_EXAMPLE,
+        GROUP_REQUEST_ERROR_EXAMPLES.LINES_MISMATCH,
+        CHECKLIST_ERROR_EXAMPLES.INCOMPLETE,
+        CHECKLIST_ERROR_EXAMPLES.HAS_NO,
+      ],
     },
   )
   async decideNeed(
@@ -118,6 +128,7 @@ export class GroupLinesController {
     try {
       const record = await this.needs.decide(actor, params.id, {
         lines: body.lines,
+        checklist: body.checklist,
       });
 
       return { request: toWire(await this.queries.view(record)) };

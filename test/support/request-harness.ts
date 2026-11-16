@@ -4,6 +4,7 @@ import request from 'supertest';
 import { ApiAccount } from './api-accounts';
 import { clearSpendingApprover, insertEmployeeWithoutPlacement, setSpendingApprover } from './builders/account.builder';
 import { assignHead } from './builders/organization.builder';
+import { DecisionChecklists } from './decision-checklist';
 import { ProvisioningHarness } from './provisioning-harness';
 import { SeatHarness } from './seat-baseline-harness';
 
@@ -103,6 +104,9 @@ export interface Department {
 export class RequestHarness extends ProvisioningHarness {
   private titleName: string | null = null;
 
+  /** The checklist of each decision step, as the policies in force ask it (`QĐ-111ap`): every decision a suite makes sends one. */
+  readonly checklists = new DecisionChecklists();
+
   /**
    * Starts the application with the real gate of the module of requests: the fake gate of the provisioning harness is not used. The suites of
    * other rules send many requests for one person, often for the same plan while the first is still open, so the disposable database of the
@@ -134,6 +138,7 @@ export class RequestHarness extends ProvisioningHarness {
       await this.ctx.sql.query(`CREATE TRIGGER test_harness_exempt_from_request_limits BEFORE INSERT ON ${table}
         FOR EACH ROW EXECUTE FUNCTION test_harness_exempt_from_request_limits()`);
     }
+    await this.checklists.load(this.ctx.sql, this.seed.organizationId);
   }
 
   /** Judges GH-1, GH-2 and GH-3 as the product does: the exemption of `start` is no longer written on new rows. */
@@ -208,7 +213,10 @@ export class RequestHarness extends ProvisioningHarness {
 
   /** The decision of the need step: the head approves or refuses, and no line of the plan is chosen (`QĐ-101n`). */
   decide = (id: string, body: object, account: ApiAccount) =>
-    request(this.server()).post(`/api/v1/access-requests/${id}/need-decision`).set(this.as(account)).send(body);
+    request(this.server())
+      .post(`/api/v1/access-requests/${id}/need-decision`)
+      .set(this.as(account))
+      .send(this.checklists.withYes('1.2', body));
   fetch = (id: string, account: ApiAccount) =>
     request(this.server()).get(`/api/v1/access-requests/${id}`).set(this.as(account));
 

@@ -51,6 +51,8 @@ export const IN_APP_NOTIFICATION_CODES = [
   'REQUEST_SUBMITTED',
   'REQUEST_NEED_APPROVED',
   'REQUEST_REJECTED',
+  // A step sent the request back to its sender to add what is missing and send it again (`QĐ-111ap`, R-24).
+  'REQUEST_RETURNED',
   'REQUEST_IT_REJECTED',
   'REQUEST_SPEND_APPROVED',
   'REQUEST_GRANTED',

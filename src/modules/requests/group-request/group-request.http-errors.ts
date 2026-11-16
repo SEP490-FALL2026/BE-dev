@@ -28,6 +28,7 @@ import {
   GroupRequestTooManyLinesError,
   GroupSupplementDropRefusedError,
 } from './group-request.errors';
+import { toChecklistApiException } from '../checklist/checklist.http-errors';
 
 /**
  * Maps the errors of the request for a group to their HTTP answers. The rest are those of the request and of the spend decision,
@@ -35,6 +36,8 @@ import {
  */
 export function toGroupRequestApiException(error: unknown): unknown {
   if (error instanceof ApiException) return error;
+  const checklist = toChecklistApiException(error);
+  if (checklist) return checklist;
 
   if (error instanceof GroupRequestPlanNotEligibleError) {
     return new ApiException(HttpStatus.UNPROCESSABLE_ENTITY, {

@@ -130,7 +130,7 @@ flowchart BT
   policies -->|4| identity_access
   policies -->|2| notifications
   policies -->|7| organization
-  requests -->|62| audit
+  requests -->|63| audit
   requests -->|30| budgets
   requests -->|42| catalog
   requests -->|11| finance
@@ -139,6 +139,7 @@ flowchart BT
   requests -->|12| notifications
   requests -->|12| operating_parameters
   requests -->|97| organization
+  requests -->|13| policies
   usage -->|10| audit
   usage -->|3| budgets
   usage -->|15| catalog
@@ -153,4 +154,4 @@ flowchart BT
   usage -->|4| requests
 ```
 
-110 module edges.
+111 module edges.

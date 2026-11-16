@@ -43875,7 +43875,7 @@
         },
         "responses": {
           "200": {
-            "description": "The person who holds the need step approves or refuses it. A refusal gives its reason; a term over twelve months is approved only with a confirmation. The decision becomes an electronic approval record that is never changed. An approval sends the request on (the IT Admin for internal software, the spend submission for paid software); a refusal ends it with no spend step and no commitment.",
+            "description": "The person who holds the need step answers the checklist of the policy in force and approves, refuses or sends the request back to its sender. A refusal or a return gives its reason, or takes it from the answers No; an approval is locked while an answer is No. A return leaves the request with its sender, who adds what is missing and sends it again. A refusal gives its reason; a term over twelve months is approved only with a confirmation. The decision becomes an electronic approval record that is never changed. An approval sends the request on (the IT Admin for internal software, the spend submission for paid software); a refusal ends it with no spend step and no commitment.",
             "content": {
               "application/json": {
                 "schema": {
@@ -43994,7 +43994,7 @@
             }
           },
           "409": {
-            "description": "The step is not pending: it is decided, or waits for somebody to hold it (ACCESS_REQUEST.STEP_NOT_PENDING).",
+            "description": "The step is not pending: it is decided, or waits for somebody to hold it (ACCESS_REQUEST.STEP_NOT_PENDING), or the policy has a newer version in force than the checklist answered (POLICY.VERSION_CHANGED).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -44017,6 +44017,18 @@
                       "error": {
                         "code": "ACCESS_REQUEST.GROUP_USES_LINES",
                         "message": "A request for a group is decided and withdrawn for each person: use the routes of its lines.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "POLICY.VERSION_CHANGED": {
+                    "summary": "The policy of the step has a new version in force since the checklist was shown.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "POLICY.VERSION_CHANGED",
+                        "message": "The policy of the step has a new version in force since the checklist was shown.",
+                        "details": { "stepCode": "1.2", "policyVersionId": "v3", "versionNumber": 3 },
                         "requestId": "req_example"
                       }
                     }
@@ -44068,7 +44080,7 @@
             }
           },
           "422": {
-            "description": "The decision is invalid (VALIDATION_ERROR: a refusal without a reason, or a field the decision does not take).",
+            "description": "The decision is invalid (VALIDATION_ERROR: a refusal or a return with no reason and no answer No to take it from, or a field the decision does not take), the checklist is not answered in full (POLICY.CHECKLIST_INCOMPLETE), or an answer is No and the decision approves (POLICY.CHECKLIST_HAS_NO).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -44081,6 +44093,33 @@
                         "code": "VALIDATION_ERROR",
                         "message": "Request validation failed.",
                         "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "POLICY.CHECKLIST_INCOMPLETE": {
+                    "summary": "The checklist of the step is not answered in full.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "POLICY.CHECKLIST_INCOMPLETE",
+                        "message": "The checklist of the step is not answered in full.",
+                        "details": { "stepCode": "1.2", "missing": ["1.2-05"], "unexpected": [] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "POLICY.CHECKLIST_HAS_NO": {
+                    "summary": "An answer of the checklist is No, so the decision cannot go on.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "POLICY.CHECKLIST_HAS_NO",
+                        "message": "An answer of the checklist is No, so the decision cannot go on.",
+                        "details": {
+                          "stepCode": "1.2",
+                          "items": [{ "code": "1.2-05", "text": "The tools they have do not meet the need" }]
+                        },
                         "requestId": "req_example"
                       }
                     }
@@ -48299,7 +48338,7 @@
             }
           },
           "409": {
-            "description": "The request does not wait for the confirmation of the reserve: its check is within the base or blocked, a spend step is open, it was withdrawn or is not in the queue, or another confirmation came first (SPEND.RESERVE_NOT_PENDING).",
+            "description": "The request does not wait for the confirmation of the reserve: its check is within the base or blocked, a spend step is open, it was withdrawn or is not in the queue, or another confirmation came first (SPEND.RESERVE_NOT_PENDING); or the policy has a newer version in force than the checklist answered (POLICY.VERSION_CHANGED).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -48311,6 +48350,18 @@
                       "error": {
                         "code": "SPEND.RESERVE_NOT_PENDING",
                         "message": "The reserve cannot be confirmed: RESERVE_NOT_PENDING.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "POLICY.VERSION_CHANGED": {
+                    "summary": "The policy of the step has a new version in force since the checklist was shown.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "POLICY.VERSION_CHANGED",
+                        "message": "The policy of the step has a new version in force since the checklist was shown.",
+                        "details": { "stepCode": "1.2", "policyVersionId": "v3", "versionNumber": 3 },
                         "requestId": "req_example"
                       }
                     }
@@ -48362,7 +48413,7 @@
             }
           },
           "422": {
-            "description": "The request is invalid (VALIDATION_ERROR).",
+            "description": "The request is invalid (VALIDATION_ERROR), the checklist is not answered in full (POLICY.CHECKLIST_INCOMPLETE), or an answer is No, which locks the confirmation (POLICY.CHECKLIST_HAS_NO).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -48375,6 +48426,33 @@
                         "code": "VALIDATION_ERROR",
                         "message": "Request validation failed.",
                         "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "POLICY.CHECKLIST_INCOMPLETE": {
+                    "summary": "The checklist of the step is not answered in full.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "POLICY.CHECKLIST_INCOMPLETE",
+                        "message": "The checklist of the step is not answered in full.",
+                        "details": { "stepCode": "1.2", "missing": ["1.2-05"], "unexpected": [] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "POLICY.CHECKLIST_HAS_NO": {
+                    "summary": "An answer of the checklist is No, so the decision cannot go on.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "POLICY.CHECKLIST_HAS_NO",
+                        "message": "An answer of the checklist is No, so the decision cannot go on.",
+                        "details": {
+                          "stepCode": "1.2",
+                          "items": [{ "code": "1.2-05", "text": "The tools they have do not meet the need" }]
+                        },
                         "requestId": "req_example"
                       }
                     }
@@ -56959,7 +57037,7 @@
         },
         "responses": {
           "200": {
-            "description": "The person who holds a need step decides all the people of that step at once, approving some and refusing others, each refusal with its reason. A person who holds a seat of the plan since the request was sent is not approved. The step gets its electronic approval record and each person a decision of their own. When no person waits for a need any more the request is priced again for those who remain and goes on to be sent as spend, or ends when every person was refused.",
+            "description": "The person who holds a need step answers one checklist of the policy in force for the whole group and decides all the people of that step at once, approving some and refusing others, each refusal with its reason (or the reason taken from the answers No); with an answer No nobody can be approved, and the group can be sent back to its sender as a whole (RETURN for every person), who adds what is missing and sends it again. A person who holds a seat of the plan since the request was sent is not approved. The step gets its electronic approval record and each person a decision of their own. When no person waits for a need any more the request is priced again for those who remain and goes on to be sent as spend, or ends when every person was refused.",
             "content": {
               "application/json": {
                 "schema": {
@@ -57078,7 +57156,7 @@
             }
           },
           "409": {
-            "description": "The step is not pending (ACCESS_REQUEST.STEP_NOT_PENDING), or a person approved holds a seat of the plan now (GROUP_REQUEST.LINE_HOLDS_ACCESS, with the people): the person who decides refuses that line and the others are not touched.",
+            "description": "The step is not pending (ACCESS_REQUEST.STEP_NOT_PENDING), a person approved holds a seat of the plan now (GROUP_REQUEST.LINE_HOLDS_ACCESS, with the people): the person who decides refuses that line and the others are not touched; or the policy has a newer version in force than the checklist answered (POLICY.VERSION_CHANGED).",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -57102,6 +57180,18 @@
                         "code": "GROUP_REQUEST.LINE_HOLDS_ACCESS",
                         "message": "A person of the lines already holds a seat of the plan.",
                         "details": { "lines": ["<employee-id>"] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "POLICY.VERSION_CHANGED": {
+                    "summary": "The policy of the step has a new version in force since the checklist was shown.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "POLICY.VERSION_CHANGED",
+                        "message": "The policy of the step has a new version in force since the checklist was shown.",
+                        "details": { "stepCode": "1.2", "policyVersionId": "v3", "versionNumber": 3 },
                         "requestId": "req_example"
                       }
                     }
@@ -57153,7 +57243,7 @@
             }
           },
           "422": {
-            "description": "The body is invalid (VALIDATION_ERROR: a refusal without its reason, a person twice); the decision leaves out people of the step or names others (GROUP_REQUEST.LINES_MISMATCH, with who). Nothing is saved.",
+            "description": "The body is invalid (VALIDATION_ERROR: a refusal or a return with no reason and no answer No to take it from, a person twice, a group sent back in part); the decision leaves out people of the step or names others (GROUP_REQUEST.LINES_MISMATCH, with who); the checklist is not answered in full (POLICY.CHECKLIST_INCOMPLETE) or an answer is No and somebody is approved (POLICY.CHECKLIST_HAS_NO). Nothing is saved.",
             "content": {
               "application/json": {
                 "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
@@ -57178,6 +57268,33 @@
                         "code": "GROUP_REQUEST.LINES_MISMATCH",
                         "message": "The decision must name every line of the step, once.",
                         "details": { "missing": ["<employee-id>"], "extra": [] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "POLICY.CHECKLIST_INCOMPLETE": {
+                    "summary": "The checklist of the step is not answered in full.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "POLICY.CHECKLIST_INCOMPLETE",
+                        "message": "The checklist of the step is not answered in full.",
+                        "details": { "stepCode": "1.2", "missing": ["1.2-05"], "unexpected": [] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "POLICY.CHECKLIST_HAS_NO": {
+                    "summary": "An answer of the checklist is No, so the decision cannot go on.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "POLICY.CHECKLIST_HAS_NO",
+                        "message": "An answer of the checklist is No, so the decision cannot go on.",
+                        "details": {
+                          "stepCode": "1.2",
+                          "items": [{ "code": "1.2-05", "text": "The tools they have do not meet the need" }]
+                        },
                         "requestId": "req_example"
                       }
                     }
@@ -111007,7 +111124,7 @@
                   "needDecision": {
                     "type": "object",
                     "properties": {
-                      "decision": { "type": "string", "enum": ["APPROVED", "REJECTED"] },
+                      "decision": { "type": "string", "enum": ["APPROVED", "REJECTED", "RETURNED"] },
                       "decidedBy": {
                         "type": "object",
                         "properties": {
@@ -111589,7 +111706,7 @@
                   "needDecision": {
                     "type": "object",
                     "properties": {
-                      "decision": { "type": "string", "enum": ["APPROVED", "REJECTED"] },
+                      "decision": { "type": "string", "enum": ["APPROVED", "REJECTED", "RETURNED"] },
                       "decidedBy": {
                         "type": "object",
                         "properties": {
@@ -112584,7 +112701,7 @@
                       "needDecision": {
                         "type": "object",
                         "properties": {
-                          "decision": { "type": "string", "enum": ["APPROVED", "REJECTED"] },
+                          "decision": { "type": "string", "enum": ["APPROVED", "REJECTED", "RETURNED"] },
                           "decidedBy": {
                             "type": "object",
                             "properties": {
@@ -112728,11 +112845,37 @@
       "NeedDecisionBodyDto": {
         "type": "object",
         "properties": {
-          "decision": { "type": "string", "enum": ["APPROVE", "REJECT"] },
-          "reason": { "type": "string", "minLength": 1, "maxLength": 1000 }
+          "decision": { "type": "string", "enum": ["APPROVE", "REJECT", "RETURN"] },
+          "reason": { "type": "string", "minLength": 1, "maxLength": 1000 },
+          "checklist": {
+            "type": "object",
+            "properties": {
+              "policyVersionId": {
+                "type": "string",
+                "format": "uuid",
+                "description": "The version of the policy whose questions were shown (from the step of the policy)."
+              },
+              "answers": {
+                "maxItems": 30,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "itemCode": { "type": "string", "minLength": 1, "maxLength": 30 },
+                    "answer": { "type": "string", "enum": ["YES", "NO"] }
+                  },
+                  "required": ["itemCode", "answer"],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": ["policyVersionId", "answers"],
+            "additionalProperties": false,
+            "description": "The answers to the questions of the policy in force at this step. Every question the person answers needs an answer; a question the system answers is Yes by itself."
+          }
         },
-        "required": ["decision"],
-        "description": "A refusal (REJECT) gives its reason. An approval (APPROVE) gives none.",
+        "required": ["decision", "checklist"],
+        "description": "The checklist of the policy in force at this step, and the decision: approve, refuse (REJECT) or send back to the person who asked (RETURN). A refusal and a return give their reason, or leave it to be filled in from the questions answered No. An approval is locked while an answer is No.",
         "additionalProperties": false
       },
       "WithdrawBodyDto": {
@@ -113807,7 +113950,7 @@
                   "needDecision": {
                     "type": "object",
                     "properties": {
-                      "decision": { "type": "string", "enum": ["APPROVED", "REJECTED"] },
+                      "decision": { "type": "string", "enum": ["APPROVED", "REJECTED", "RETURNED"] },
                       "decidedBy": {
                         "type": "object",
                         "properties": {
@@ -114459,8 +114602,36 @@
       },
       "ReserveConfirmationBodyDto": {
         "type": "object",
-        "properties": { "reason": { "type": "string", "minLength": 1, "maxLength": 500 } },
-        "required": ["reason"],
+        "properties": {
+          "reason": { "type": "string", "minLength": 1, "maxLength": 500 },
+          "checklist": {
+            "type": "object",
+            "properties": {
+              "policyVersionId": {
+                "type": "string",
+                "format": "uuid",
+                "description": "The version of the policy whose questions were shown (from the step of the policy)."
+              },
+              "answers": {
+                "maxItems": 30,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "itemCode": { "type": "string", "minLength": 1, "maxLength": 30 },
+                    "answer": { "type": "string", "enum": ["YES", "NO"] }
+                  },
+                  "required": ["itemCode", "answer"],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": ["policyVersionId", "answers"],
+            "additionalProperties": false,
+            "description": "The answers to the questions of the policy in force at this step. Every question the person answers needs an answer; a question the system answers is Yes by itself."
+          }
+        },
+        "required": ["reason", "checklist"],
         "additionalProperties": false
       },
       "ReserveConfirmationResponseDto": {
@@ -117014,7 +117185,7 @@
                   "needDecision": {
                     "type": "object",
                     "properties": {
-                      "decision": { "type": "string", "enum": ["APPROVED", "REJECTED"] },
+                      "decision": { "type": "string", "enum": ["APPROVED", "REJECTED", "RETURNED"] },
                       "decidedBy": {
                         "type": "object",
                         "properties": {
@@ -119219,7 +119390,7 @@
                   "needDecision": {
                     "type": "object",
                     "properties": {
-                      "decision": { "type": "string", "enum": ["APPROVED", "REJECTED"] },
+                      "decision": { "type": "string", "enum": ["APPROVED", "REJECTED", "RETURNED"] },
                       "decidedBy": {
                         "type": "object",
                         "properties": {
@@ -119588,17 +119759,43 @@
               "type": "object",
               "properties": {
                 "employeeId": { "type": "string", "format": "uuid" },
-                "decision": { "type": "string", "enum": ["APPROVE", "REJECT"] },
+                "decision": { "type": "string", "enum": ["APPROVE", "REJECT", "RETURN"] },
                 "reason": { "type": "string", "minLength": 1, "maxLength": 1000 }
               },
               "required": ["employeeId", "decision"],
               "additionalProperties": false,
-              "description": "A refusal (REJECT) gives its reason; an approval (APPROVE) gives none."
+              "description": "A refusal (REJECT) and a return (RETURN) give a reason or leave it to the checklist; an approval (APPROVE) gives none."
             }
+          },
+          "checklist": {
+            "type": "object",
+            "properties": {
+              "policyVersionId": {
+                "type": "string",
+                "format": "uuid",
+                "description": "The version of the policy whose questions were shown (from the step of the policy)."
+              },
+              "answers": {
+                "maxItems": 30,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "itemCode": { "type": "string", "minLength": 1, "maxLength": 30 },
+                    "answer": { "type": "string", "enum": ["YES", "NO"] }
+                  },
+                  "required": ["itemCode", "answer"],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": ["policyVersionId", "answers"],
+            "additionalProperties": false,
+            "description": "The answers to the questions of the policy in force at this step. Every question the person answers needs an answer; a question the system answers is Yes by itself."
           }
         },
-        "required": ["lines"],
-        "description": "Each person of the step is decided once. A choice of line of the plan (spend) is accepted only when at least one person is approved.",
+        "required": ["lines", "checklist"],
+        "description": "Each person of the step is decided once, with one checklist for the group. A group is sent back (RETURN) as a whole: every person or none. A choice of line of the plan (spend) is accepted only when at least one person is approved.",
         "additionalProperties": false
       },
       "LineSpendDecisionBodyDto": {

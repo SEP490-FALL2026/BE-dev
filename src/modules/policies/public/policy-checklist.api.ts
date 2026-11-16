@@ -31,7 +31,7 @@ export class PolicyChecklistApi {
       decision: ChecklistDecision;
       reason?: string | null;
     },
-  ): Promise<{ verdict: ChecklistVerdict; reason: string | null }> {
+  ): Promise<{ verdict: ChecklistVerdict; reason: string | null; autoReason: string | null }> {
     return this.judging.judge(tx, input);
   }
 

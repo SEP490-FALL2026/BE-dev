@@ -1,5 +1,6 @@
 import { createZodDto } from '../../../infrastructure/http/dto/zod-dto';
 import { z } from 'zod';
+import { checklistBodySchema } from '../../policies/public/policy-checklist.types';
 import { REASON_MAX_LENGTH, withdrawBodySchema } from '../access-request/access-request.dto';
 import { GROUP_HEAD_MAX } from './group-request.policy';
 
@@ -23,22 +24,46 @@ const verdictSchema = z
   .meta({ description: 'A refusal (REJECT) gives its reason; an approval (APPROVE) gives none.' });
 
 /**
- * The decision of the need on the people of a step (`US-05-17` AC-4): every person of the step, each approved or refused with the
- * reason, in one go, with what a head gives when they approve a request that costs money.
+ * What the decider says of one person at the need step: approve, refuse, or send back (`QĐ-111ap`, `US-05-04` AC-22). A refusal and a return give
+ * their reason, or leave it to be filled in from the questions of the checklist answered No.
+ */
+const needVerdictSchema = z
+  .strictObject({
+    employeeId: z.uuid(),
+    decision: z.enum(['APPROVE', 'REJECT', 'RETURN']),
+    reason: reason.optional(),
+  })
+  .superRefine((verdict, ctx) => {
+    if (verdict.decision === 'APPROVE' && verdict.reason !== undefined) {
+      ctx.addIssue({ code: 'custom', path: ['reason'], message: 'Only a refusal or a return gives a reason.' });
+    }
+  })
+  .meta({
+    description:
+      'A refusal (REJECT) and a return (RETURN) give a reason or leave it to the checklist; an approval (APPROVE) gives none.',
+  });
+
+/**
+ * The decision of the need on the people of a step (`US-05-17` AC-4, `US-05-04` AC-22): every person of the step, each approved or refused, in one
+ * go, with one checklist for the whole group; the group goes back to its sender as a whole or not at all.
  */
 export const lineNeedDecisionBodySchema = z
   .strictObject({
-    lines: z.array(verdictSchema).min(1).max(GROUP_HEAD_MAX),
+    lines: z.array(needVerdictSchema).min(1).max(GROUP_HEAD_MAX),
+    checklist: checklistBodySchema,
   })
   .superRefine((body, ctx) => {
     if (new Set(body.lines.map((line) => line.employeeId)).size !== body.lines.length) {
       ctx.addIssue({ code: 'custom', path: ['lines'], message: 'A person is decided once.' });
     }
+    const returned = body.lines.filter((line) => line.decision === 'RETURN').length;
+    if (returned > 0 && returned < body.lines.length) {
+      ctx.addIssue({ code: 'custom', path: ['lines'], message: 'A group is sent back as a whole.' });
+    }
   })
   .meta({
     description:
-      'Each person of the step is decided once. A choice of line of the plan (spend) is accepted only ' +
-      'when at least one person is approved.',
+      'Each person of the step is decided once, with one checklist for the group. A group is sent back (RETURN) as a whole: every person or none. A choice of line of the plan (spend) is accepted only when at least one person is approved.',
   });
 
 /**

@@ -12,7 +12,7 @@ import type {
   ChecklistVerdict,
   DecisionStepCode,
 } from '../public/policy-checklist.types';
-import { evaluateChecklist, judgeDecision, type StepInForce } from './checklist.policy';
+import { autoReasonOf, evaluateChecklist, judgeDecision, type StepInForce } from './checklist.policy';
 import { ChecklistRepo } from './checklist.repo';
 
 /**
@@ -26,7 +26,8 @@ export class ChecklistJudgeService {
 
   /**
    * Throws PolicyVersionChangedError, PolicyChecklistIncompleteError, PolicyChecklistHasNoError and PolicyDecisionReasonRequiredError. Returns the
-   * verdict and the reason the decision is kept with (the typed one, or the one filled in from the questions answered No).
+   * verdict, the reason the decision is kept with (the typed one, or the one filled in from the questions answered No) and that filled-in text itself
+   * (null with no No), for a decision on many things that each give their own reason.
    */
   async judge(
     tx: DbTx,
@@ -37,7 +38,7 @@ export class ChecklistJudgeService {
       decision: ChecklistDecision;
       reason?: string | null;
     },
-  ): Promise<{ verdict: ChecklistVerdict; reason: string | null }> {
+  ): Promise<{ verdict: ChecklistVerdict; reason: string | null; autoReason: string | null }> {
     const inForce = await this.stepInForce(tx, input.organizationId, input.stepCode);
     const evaluated = evaluateChecklist(inForce, input.checklist);
     if (!evaluated.ok) {
@@ -51,7 +52,9 @@ export class ChecklistJudgeService {
     if (judged.kind === 'HAS_NO') throw new PolicyChecklistHasNoError(input.stepCode, judged.items);
     if (judged.kind === 'REASON_REQUIRED') throw new PolicyDecisionReasonRequiredError();
 
-    return { verdict: evaluated.verdict, reason: judged.reason };
+    const { verdict } = evaluated;
+
+    return { verdict, reason: judged.reason, autoReason: verdict.hasNo ? autoReasonOf(verdict.noItems) : null };
   }
 
   /** The step in the policy that has it, in the version in force: each of the seven steps belongs to exactly one policy and the library keeps the set fixed. */

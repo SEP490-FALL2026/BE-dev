@@ -12,6 +12,7 @@ import { ApiSuccessResponse } from '../../../infrastructure/http/decorators/api-
 import { AuthenticatedOnly, RequireRoles } from '../../../infrastructure/security/decorators/access.decorators';
 import { CurrentPrincipal } from '../../../infrastructure/security/models/current-principal';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
+import { CHECKLIST_ERROR_EXAMPLES } from '../checklist/checklist.http-errors';
 import { ReserveConfirmationService } from '../reserve-confirmation/reserve-confirmation.service';
 import { SpendBatchService } from './spend-batch.service';
 import { SpendBatchListService } from './spend-batch-list.service';
@@ -154,10 +155,15 @@ export class SpendSubmissionController {
     {
       status: HttpStatus.CONFLICT,
       description:
-        'The request does not wait for the confirmation of the reserve: its check is within the base or blocked, a spend step is open, it was withdrawn or is not in the queue, or another confirmation came first (SPEND.RESERVE_NOT_PENDING).',
-      examples: [SPEND_ERROR_EXAMPLES.RESERVE_NOT_PENDING],
+        'The request does not wait for the confirmation of the reserve: its check is within the base or blocked, a spend step is open, it was withdrawn or is not in the queue, or another confirmation came first (SPEND.RESERVE_NOT_PENDING); or the policy has a newer version in force than the checklist answered (POLICY.VERSION_CHANGED).',
+      examples: [SPEND_ERROR_EXAMPLES.RESERVE_NOT_PENDING, CHECKLIST_ERROR_EXAMPLES.VERSION_CHANGED],
     },
-    INVALID,
+    {
+      status: HttpStatus.UNPROCESSABLE_ENTITY,
+      description:
+        'The request is invalid (VALIDATION_ERROR), the checklist is not answered in full (POLICY.CHECKLIST_INCOMPLETE), or an answer is No, which locks the confirmation (POLICY.CHECKLIST_HAS_NO).',
+      examples: [VALIDATION_EXAMPLE, CHECKLIST_ERROR_EXAMPLES.INCOMPLETE, CHECKLIST_ERROR_EXAMPLES.HAS_NO],
+    },
   )
   async confirmReserve(
     @CurrentPrincipal() actor: AuthenticatedPrincipal,
@@ -165,7 +171,12 @@ export class SpendSubmissionController {
     @Body() body: ReserveConfirmationBodyDto,
   ) {
     try {
-      return { reserveConfirmation: await this.reserve.confirm(actor, params.id, body.reason) };
+      return {
+        reserveConfirmation: await this.reserve.confirm(actor, params.id, {
+          reason: body.reason,
+          checklist: body.checklist,
+        }),
+      };
     } catch (error) {
       throw toSpendApiException(error);
     }

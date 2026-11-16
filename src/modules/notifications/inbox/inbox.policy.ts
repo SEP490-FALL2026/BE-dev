@@ -30,6 +30,7 @@ export const PARAM_KEYS_BY_CODE: Readonly<Record<InAppNotificationCode, readonly
   REQUEST_SUBMITTED: ['requestId', 'stage'],
   REQUEST_NEED_APPROVED: ['requestId', 'next'],
   REQUEST_REJECTED: ['requestId', 'by', 'reason', 'suggestedPlanId'],
+  REQUEST_RETURNED: ['requestId', 'by', 'reason'],
   REQUEST_IT_REJECTED: ['requestId', 'kind', 'reason', 'alternativePlanId', 'alternativeNote', 'noAlternative'],
   REQUEST_SPEND_APPROVED: ['requestId'],
   REQUEST_GRANTED: ['requestId', 'accessGuide', 'homepageUrl'],

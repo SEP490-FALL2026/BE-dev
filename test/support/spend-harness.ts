@@ -284,7 +284,10 @@ export class SpendHarness extends BudgetHarness {
       .send(reserveConfirmations ? { requestIds, reserveConfirmations } : { requestIds });
   /** The head confirms, with a line of reason, that a request uses the reserve (`spendReserveConfirm`). */
   confirmReserve = (id: string, body: object, account: ApiAccount) =>
-    request(this.server()).post(`/api/v1/access-requests/${id}/reserve-confirmation`).set(this.as(account)).send(body);
+    request(this.server())
+      .post(`/api/v1/access-requests/${id}/reserve-confirmation`)
+      .set(this.as(account))
+      .send(this.checklists.withYes('1.6', body));
   batchList = (account: ApiAccount, query: Record<string, string | number> = {}) =>
     request(this.server()).get('/api/v1/spend-batches').query(query).set(this.as(account));
   batchOf = (id: string, account: ApiAccount) =>

@@ -134,6 +134,7 @@ cùng cần; phần ghi nằm ở `assessment/assessment.repo.ts`.
   - `outcome/` — `RequestOutcomeService`: mọi service kết thúc request phát `requests.outcome` qua đây.
   - `request-view/` — `AccessRequestView`: `access-request-query.service.ts`, `access-request.mapper.ts`, `pricing-view.service.ts`.
   - `request-intake/` — `AccessRequestService`: gửi một request cá nhân (draft, gia hạn và controller cùng gọi).
+  - `checklist/` — `checklist.http-errors.ts`: lỗi của checklist khi quyết định (`QĐ-111ap`; `PolicyChecklistApi` của `policies`) thành câu trả lời HTTP: 409 `POLICY.VERSION_CHANGED`, 422 `POLICY.CHECKLIST_INCOMPLETE`, `POLICY.CHECKLIST_HAS_NO`, và lý do thiếu thành `VALIDATION_ERROR`. Bước nhu cầu (`need-decision/`, `group-line-decisions/`) và xác nhận dùng dự phòng (`reserve-confirmation/`) nhận `checklist` trong body; `RETURN` đưa Request về người gửi (`AWAITING_REQUESTER_REVISION`, bản ghi phê duyệt `RETURNED`) và `request-intake/request-resubmission.service.ts` mở lại bước nhu cầu cho trưởng phòng (nhóm: các dòng chuyển sang bước mới).
   - `request-draft/` — kho bản nháp: `request-draft.repo.ts`, `request-draft.policy.ts`.
   - `request-end/` — `RequestEndService`: kết thúc request, trả cam kết ngân sách (cancellation, withdraw dùng).
   - `grant/` — `access-request-grant.listener.ts`, `grant.policy.ts`: cổng grant của licensing (`licensing.grant-request-gate`).

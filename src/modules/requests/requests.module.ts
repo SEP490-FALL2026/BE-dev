@@ -7,6 +7,7 @@ import { Module } from '@nestjs/common';
 import { DatabaseModule } from '../../infrastructure/database/database.module';
 import { AuditModule } from '../audit/audit.module';
 import { BudgetsModule } from '../budgets/budgets.module';
+import { PoliciesChecklistFacadeModule } from '../policies/policies-checklist-facade.module';
 import { BudgetsReadFacadeModule } from '../budgets/budgets-read-facade.module';
 import { CatalogModule } from '../catalog/catalog.module';
 import { LicensingModule } from '../licensing/licensing.module';
@@ -133,6 +134,7 @@ import { BudgetCheckController } from './budget-check/budget-check.controller';
 import { BudgetCheckViewService } from './budget-check/budget-check-view.service';
 import { BudgetCheckYearsViewService } from './budget-check/budget-check-years-view.service';
 import { ReserveConfirmationRepo } from './reserve-confirmation/reserve-confirmation.repo';
+import { ReserveConfirmationChecklist } from './reserve-confirmation/reserve-confirmation-checklist.service';
 import { ReserveConfirmationService } from './reserve-confirmation/reserve-confirmation.service';
 import { SpendApprovalQueueService } from './spend-approval-view/spend-approval-queue.service';
 import { SpendApprovalSourcesService } from './spend-approval-view/spend-approval-sources.service';
@@ -230,6 +232,7 @@ import { PurchaseInvoicesController } from './purchase-invoice/purchase-invoices
     CatalogModule,
     FinanceModule,
     BudgetsModule,
+    PoliciesChecklistFacadeModule,
     // What the spending approver reads of the approved budget of the year after (`NextYearBudgetService`).
     BudgetsReadFacadeModule,
     LicensingModule,
@@ -335,6 +338,7 @@ import { PurchaseInvoicesController } from './purchase-invoice/purchase-invoices
     BudgetCheckYearsViewService,
     ReserveConfirmationRepo,
     ReserveConfirmationService,
+    ReserveConfirmationChecklist,
     SpendWireViewService,
     SpendHeadService,
     SpendBatchRepo,

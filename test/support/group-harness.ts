@@ -76,7 +76,10 @@ export class GroupHarness extends StatusHarness {
   linesOf = (id: string, account: ApiAccount, query: Record<string, string | number> = {}) =>
     request(this.server()).get(`/api/v1/access-requests/${id}/lines`).query(query).set(this.as(account));
   decideLines = (id: string, body: object, account: ApiAccount) =>
-    request(this.server()).post(`/api/v1/access-requests/${id}/line-need-decisions`).set(this.as(account)).send(body);
+    request(this.server())
+      .post(`/api/v1/access-requests/${id}/line-need-decisions`)
+      .set(this.as(account))
+      .send(this.checklists.withYes('1.2', body));
   decideSpendLines = (id: string, body: object, account: ApiAccount) =>
     request(this.server()).post(`/api/v1/access-requests/${id}/line-spend-decisions`).set(this.as(account)).send(body);
   withdrawLine = (id: string, employeeId: string, body: object, account: ApiAccount) =>
@@ -96,7 +99,10 @@ export class GroupHarness extends StatusHarness {
   grantLine = (body: object, account: ApiAccount) =>
     request(this.server()).post('/api/v1/provisioning-tasks').set(this.as(account)).send(body);
   decideNeed = (id: string, body: object, account: ApiAccount) =>
-    request(this.server()).post(`/api/v1/access-requests/${id}/need-decision`).set(this.as(account)).send(body);
+    request(this.server())
+      .post(`/api/v1/access-requests/${id}/need-decision`)
+      .set(this.as(account))
+      .send(this.checklists.withYes('1.2', body));
 
   /** The person has left the company: the employee record is terminated, as the departure of a person leaves it. */
   async depart(person: Person): Promise<void> {

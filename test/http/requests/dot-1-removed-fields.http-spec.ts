@@ -9,6 +9,8 @@ import { bearer, createHttpContractApp, principal } from '../../support/http-con
  * that was removed answers 404. One valid body per route, then each dropped field sent on top of it.
  */
 const ID = '8a4d7c1e-2b3f-4c5d-9e6f-0a1b2c3d4e5f';
+/** The checklist every decision of the need step carries (`QĐ-111ap`): the shape is judged here, not the answers. */
+const CHECKLIST = { policyVersionId: ID, answers: [] };
 
 type Call = {
   name: string;
@@ -156,7 +158,7 @@ const DROPPED: Call[] = [
     method: 'post',
     path: `/api/v1/access-requests/${ID}/need-decision`,
     role: 'MANAGER',
-    body: { decision: 'APPROVE' },
+    body: { decision: 'APPROVE', checklist: CHECKLIST },
     dropped: { termConfirmation: { reason: 'Long' } },
   },
   {
@@ -164,7 +166,7 @@ const DROPPED: Call[] = [
     method: 'post',
     path: `/api/v1/access-requests/${ID}/line-need-decisions`,
     role: 'MANAGER',
-    body: { lines: [{ employeeId: ID, decision: 'APPROVE' }] },
+    body: { lines: [{ employeeId: ID, decision: 'APPROVE' }], checklist: CHECKLIST },
     dropped: { termConfirmation: { reason: 'Long' } },
   },
   ...[
@@ -212,7 +214,7 @@ const DROPPED: Call[] = [
     method: 'post',
     path: `/api/v1/access-requests/${ID}/need-decision`,
     role: 'MANAGER',
-    body: { decision: 'APPROVE' },
+    body: { decision: 'APPROVE', checklist: CHECKLIST },
     dropped: { spend: { offPlan: true, expectedSpendOn: '2027-01-01' } },
   },
   {
@@ -346,7 +348,7 @@ const DROPPED: Call[] = [
     method: 'post',
     path: `/api/v1/access-requests/${ID}/need-decision`,
     role: 'MANAGER',
-    body: { decision: 'APPROVE' },
+    body: { decision: 'APPROVE', checklist: CHECKLIST },
     dropped: { spend: { planLine: { position: 1 } } },
   },
   {
@@ -354,7 +356,7 @@ const DROPPED: Call[] = [
     method: 'post',
     path: `/api/v1/access-requests/${ID}/need-decision`,
     role: 'MANAGER',
-    body: { decision: 'APPROVE' },
+    body: { decision: 'APPROVE', checklist: CHECKLIST },
     dropped: { spend: { offPlan: true } },
   },
   {
@@ -362,7 +364,7 @@ const DROPPED: Call[] = [
     method: 'post',
     path: `/api/v1/access-requests/${ID}/line-need-decisions`,
     role: 'MANAGER',
-    body: { lines: [{ employeeId: ID, decision: 'APPROVE' }] },
+    body: { lines: [{ employeeId: ID, decision: 'APPROVE' }], checklist: CHECKLIST },
     dropped: { spend: { offPlan: true } },
   },
 ];

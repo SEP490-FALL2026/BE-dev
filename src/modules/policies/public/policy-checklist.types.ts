@@ -64,4 +64,6 @@ export interface ChecklistSubject {
   id: string;
   /** The person of a line of a group: the checklist of the group is kept once for each of its lines. */
   lineEmployeeId?: string;
+  /** What was decided of this one, when it is not the decision of the whole (a group approves some of its people and refuses others). */
+  decision?: ChecklistDecision;
 }
