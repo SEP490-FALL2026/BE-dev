@@ -76,7 +76,7 @@ async function contracts(ctx: DemoRunContext): Promise<StepOutcome> {
  */
 const INVOICES = [
   { number: 'SV-INV-001', subscription: 'jira', quantity: 10, target: 'SUBMITTED' },
-  { number: 'SV-INV-002', subscription: 'slack', quantity: 8, target: 'CONFIRMED' },
+  { number: 'SV-INV-002', subscription: 'slack', quantity: 9, target: 'CONFIRMED' },
   { number: 'SV-INV-003', subscription: 'github', quantity: 9, target: 'RETURNED' },
   { number: 'SV-INV-004', subscription: 'postman', quantity: 12, target: 'CONFIRMED' },
 ] as const;
