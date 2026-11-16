@@ -45,12 +45,23 @@ export ra ngoài `ai-assist`), chỉ là chỗ thay kho.
 | Super Admin đọc nội dung                               | `find(tx, invocationId)` → bản ghi hoặc `null`                                                         | `invocation-content-query.service.ts` (audit `CONTENT_READ`) |
 | Purge: đếm / xóa                                       | `countPurgeable(before)` / `purge(tx, before)` (lần gọi `COMPLETED` có nội dung bị xóa chuyển `STALE`) | `public/ai-purge.api.ts` (audit `PURGED`)                    |
 
-`result` cho chủ lần gọi (`AiInvocationRepo.findOwned`) ở lại PostgreSQL ngoài port (QĐ-79a, `content: { isNot: null }` là dấu đã purge).
+**Ranh giới đọc/ghi (đọc ngoài port, ghi trong port).** `AiInvocationRepo.findOwned` (chủ lần gọi đọc `result`, QĐ-79a) nằm
+ngoài port và đọc PostgreSQL: nó lấy **sự tồn tại của hàng `ai_invocation_contents`** làm dấu "chưa purge" (`content: { isNot: null }`)
+và đọc cột `result` của hàng đó. Hai thứ này do bản PostgreSQL của port ghi trong cùng transaction: hàng do `recordAdmitted`, cột
+`result` do `recordAnswered`. Hệ quả cho adapter khác: chỉ đổi `provide` thì **không đủ** — không ai tạo hàng PG ⇒ mọi
+`GET /ai/access-request-summaries/{invocationId}` trả 404 `AI.NOT_FOUND`, kể cả lần gọi `COMPLETED`. Adapter khác phải **hoặc** vẫn
+ghi vào PostgreSQL phần `findOwned` cần (ít nhất `invocation_id`, `created_at`, `result`), **hoặc** sửa `findOwned` và `purge` sang
+dấu của kho đó (WDP: bảng `ai_invocation_results`). Mọi lần gọi vẫn đọc `organizationId` và `providerMode` của lần gọi qua `find` từ
+`ai_invocations` (PostgreSQL), nên adapter cũng đọc hai trường đó từ PostgreSQL bằng `tx`.
 
 Thêm kho khác (ví dụ MongoDB ở repo WDP): viết một class `extends`/`implements AiInvocationHistoryStore`, đổi `provide: AiInvocationHistoryStore`
 trong hai `*.module.ts` (chọn theo env), **không sửa** `queue-summary.service.ts`, `queue-summary-run.service.ts`,
 `invocation-content-query.service.ts`. `find` trả `null` khi không có; trạng thái riêng của kho (đang ghi, kho lỗi) là lỗi do adapter
 ném và map ở `invocation-content.http-errors.ts` của nhánh đó — không thêm mã lỗi vào API đồ án.
+
+Mọi method chạy trong transaction PostgreSQL của nơi gọi, và transaction đó có thể rollback sau khi method đã trả về (ví dụ ghi audit
+lỗi). Vì vậy adapter **không ghi thẳng vào kho ngoài** trong method: ghi một bản ghi chờ (outbox) vào PostgreSQL bằng `tx`, rồi một
+worker đẩy sang kho ngoài sau khi commit (cách WDP đang làm) — nếu không, rollback để lại tài liệu mồ côi ở kho ngoài.
 
 ## Cấu hình
 
