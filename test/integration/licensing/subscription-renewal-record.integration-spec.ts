@@ -252,6 +252,56 @@ describe('the one-write renewal at the point of adjustment (integration, real Po
     expect((await h.deadlineEvents('', h.finance)).status).toBe(200);
   });
 
+  it('records the result of a K2 pool subscription by the month at its payment day, the period continuing on the same line of seats (S20-T4 checkpoint)', async () => {
+    const unit = await h.unit(2);
+    // A plan by the month: paid on a day 5 days away, so today is inside the 7 days of its point of adjustment.
+    const subscriptionId = await h.term({
+      quantity: 10,
+      billingCycle: 'MONTHLY',
+      startDate: h.inDays(-25),
+      renewalDate: h.inDays(5),
+      endDate: h.inDays(5),
+      autoRenew: true,
+      ownerDepartmentId: unit.department.id,
+    });
+    const seats: string[] = [];
+    for (const member of unit.members) seats.push(await h.seatOf(member, { subscriptionId }));
+    await takeOwnerOff(h, subscriptionId);
+
+    const response = await record({
+      subscriptionId,
+      choice: 'REDUCE',
+      proposedQuantity: 2,
+      outcome: 'AS_DECIDED',
+      nextPeriod: {
+        purchasedQuantity: 2,
+        unitPrice: { amount: '1000000', currency: 'VND' },
+        billingCycle: 'MONTHLY',
+        startDate: h.inDays(5),
+        endDate: h.inDays(35),
+        renewalDate: h.inDays(35),
+        autoRenew: true,
+        allowsMidTermReduction: false,
+      },
+    });
+
+    expect(response.status).toBe(201);
+    const renewal = h.dataOf<{ renewal: CaseWire }>(response).renewal;
+    expect(renewal).toMatchObject({
+      state: 'OUTCOME_RECORDED',
+      subscription: { ownerDepartmentId: null },
+      proposal: { choice: 'REDUCE', quantity: 2, seatsNeeded: 2 },
+      decision: { deciderRole: 'IT_ADMIN_IN_CHARGE' },
+      outcomeDetail: { kind: 'AS_DECIDED', lateRenewal: false },
+    });
+    const next = renewal.outcomeDetail?.nextSubscriptionId as string;
+    const { rows: carried } = await h.ctx.sql.query<{ predecessor_id: string }>(
+      `SELECT predecessor_id FROM license_assignments WHERE subscription_id = $1 AND source = 'RENEWAL_CARRY'`,
+      [next],
+    );
+    expect(carried.map((row) => row.predecessor_id).sort()).toEqual([...seats].sort());
+  });
+
   it('records an increase to the vendor minimum with its evidence, and the outcome as decided matches it (R2-3, QĐ-103q)', async () => {
     const unit = await h.unit(2);
     const { subscriptionId } = await h.termWithSeats(unit, 20, { quantity: 3, ...year() });

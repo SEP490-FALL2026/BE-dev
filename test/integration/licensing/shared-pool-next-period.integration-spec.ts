@@ -1,4 +1,7 @@
+import type { ApiAccount } from '../../support/api-accounts';
+import { buildActivatedAccount } from '../../support/builders/account.builder';
 import { RevocationHarness } from '../../support/revocation-harness';
+import { takeOwnerOff } from '../../support/shared-pool-subscription';
 import { carry, nextPeriod } from '../../support/subscription-periods';
 
 const h = new RevocationHarness();
@@ -14,12 +17,18 @@ describe('G9-01 the shared pool between a renewal recorded and the next period (
   let counter = 0;
   const code = () => `E-NP-${(counter += 1)}`;
   let people: string[] = [];
+  let answering: ApiAccount;
   const person = (): string => people.shift() as string;
 
   beforeAll(async () => {
     await h.start();
     people = [];
     for (let i = 0; i < 16; i += 1) people.push(await h.person(`E-NPX-${i}`));
+    answering = await buildActivatedAccount(h.ctx, h.seed, {
+      code: 'E-IT-NP',
+      email: 'it-np@acme.vn',
+      role: 'IT_ADMIN',
+    });
   }, 300000);
 
   afterAll(async () => {
@@ -246,6 +255,75 @@ describe('G9-01 the shared pool between a renewal recorded and the next period (
     expect(h.codeOf(refused)).toBe('PROVISIONING.SUBSCRIPTION_NEXT_PERIOD_SEATS');
     expect(await heldOn(running, h.today())).toBe(4);
     expect(await heldOn(next, startsOn)).toBe(4);
+    // A next period a department owns is no pool: no seat is bought on it, the grant is refused as before (S20-T4c).
+    expect(await purchasedOf(next)).toBe(4);
+  });
+
+  const purchasedOf = async (subscriptionId: string): Promise<number> =>
+    (
+      await h.ctx.sql.query<{ q: number }>(`SELECT purchased_quantity AS q FROM subscriptions WHERE id = $1`, [
+        subscriptionId,
+      ])
+    ).rows[0].q;
+  /** The notices of a rise of the seats bought of a subscription (`QĐ-110v`). */
+  const risesOf = async (subscriptionId: string) =>
+    (
+      await h.ctx.sql.query<{ recipient_employee_id: string; params: Record<string, unknown> }>(
+        `SELECT recipient_employee_id, params FROM in_app_notifications
+          WHERE code = 'SUBSCRIPTION_SEATS_INCREASED' AND subject_id = $1 ORDER BY created_at, id`,
+        [subscriptionId],
+      )
+    ).rows;
+
+  it('S20-T4c (R2-8) a request granted after the IT Admin recorded the adjustment: the next period of the pool is full, the old one has a free seat, the grant succeeds and buys one more seat for the next period', async () => {
+    const running = await h.subscription(10, 'K2');
+    await takeOwnerOff(h, running);
+    await h.ctx.sql.query(`UPDATE subscriptions SET responsible_it_admin_employee_id = $2 WHERE id = $1`, [
+      running,
+      answering.employeeId,
+    ]);
+    const planId = await h.planOf(running);
+    for (let index = 0; index < 4; index += 1) await h.seat({ subscriptionId: running }, code());
+    const startsOn = h.inDays(30);
+    const next = await nextPeriod(h, running, 'ACTIVE', startsOn);
+    await carry(h, running, next, startsOn);
+    // The adjustment bought exactly the 4 seats needed, so the next period is full while the period that runs has 6 free.
+    await sizeNext(next, 4);
+    const requestId = h.gate.grantable(person(), planId);
+
+    const created = await h.grant({ requestId }).expect(201);
+
+    const { assignmentId } = taskOf(created);
+    expect(await successorsOf(assignmentId)).toEqual([
+      { subscription_id: next, source: 'RENEWAL_CARRY', valid_from: startsOn },
+    ]);
+    expect(await purchasedOf(next)).toBe(5);
+    expect(await purchasedOf(running)).toBe(10);
+    expect(await heldOn(running, h.today())).toBe(5);
+    expect(await heldOn(next, startsOn)).toBe(5);
+    // The IT Admin who answers for the pool is told of the seat bought for the next period, with the request it was bought for.
+    const notices = await risesOf(next);
+    expect(notices).toHaveLength(1);
+    expect(notices[0].recipient_employee_id).toBe(answering.employeeId);
+    expect(notices[0].params).toMatchObject({ subscriptionId: next, fromQuantity: 4, toQuantity: 5, requestId });
+    expect(await risesOf(running)).toEqual([]);
+  });
+
+  it('S20-T4c a next period of the pool with room buys nothing: the seat carried takes the free one', async () => {
+    const running = await h.subscription(10, 'K2');
+    await takeOwnerOff(h, running);
+    const planId = await h.planOf(running);
+    for (let index = 0; index < 4; index += 1) await h.seat({ subscriptionId: running }, code());
+    const startsOn = h.inDays(30);
+    const next = await nextPeriod(h, running, 'ACTIVE', startsOn);
+    await carry(h, running, next, startsOn);
+    await sizeNext(next, 6);
+
+    await h.grant({ requestId: h.gate.grantable(person(), planId) }).expect(201);
+
+    expect(await purchasedOf(next)).toBe(6);
+    expect(await heldOn(next, startsOn)).toBe(5);
+    expect(await risesOf(next)).toEqual([]);
   });
 
   it('FX2-R1 a grant closed as failed gives back the seat of both periods: the right on the next period goes with it', async () => {
