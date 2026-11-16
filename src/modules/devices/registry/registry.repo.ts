@@ -195,6 +195,17 @@ export class RegistryRepo {
        WHERE id = ${id}::uuid`;
   }
 
+  /**
+   * Collection of the registration stops at `at`. One `UPDATE` sets both columns: the table never lets the head of acknowledgements and
+   * the stop be set together, so the head is cleared with it (the next acknowledgement starts a new one at its own instant).
+   */
+  async setCollectionStopped(tx: DbTx, id: string, at: Date): Promise<void> {
+    await tx.$executeRaw`
+      UPDATE device_registrations
+         SET collection_stopped_at = ${at}, acknowledged_from = NULL
+       WHERE id = ${id}::uuid`;
+  }
+
   async hasSignatureRecord(registrationId: string, tx?: DbTx): Promise<boolean> {
     return (await (tx ?? this.prisma).deviceSignatureRecord.count({ where: { registrationId }, take: 1 })) > 0;
   }
