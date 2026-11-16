@@ -289,6 +289,7 @@ Find a route, open its controller, then the service it calls. Module of a file =
 | GET | `/budget-review-periods` | [budgets/review/budget-review.controller.ts](../../src/modules/budgets/review/budget-review.controller.ts) → `list` | [BudgetReviewQueryService](../../src/modules/budgets/review/budget-review-query.service.ts) |
 | GET | `/budget-review-periods/{id}` | [budgets/review/budget-review.controller.ts](../../src/modules/budgets/review/budget-review.controller.ts) → `get` | [BudgetReviewQueryService](../../src/modules/budgets/review/budget-review-query.service.ts) |
 | POST | `/budget-review-periods/{id}/signature` | [budgets/review/budget-review.controller.ts](../../src/modules/budgets/review/budget-review.controller.ts) → `sign` | [BudgetReviewSignatureService](../../src/modules/budgets/review/budget-review-signature.service.ts) |
+| PUT | `/budget-review-periods/{id}/lines/{costCenterId}/explanation` | [budgets/review/budget-review-explanation.controller.ts](../../src/modules/budgets/review/budget-review-explanation.controller.ts) → `explain` | [BudgetReviewExplanationService](../../src/modules/budgets/review/budget-review-explanation.service.ts) |
 | POST | `/budget-adjustments` | [budgets/adjustment/budget-adjustment.controller.ts](../../src/modules/budgets/adjustment/budget-adjustment.controller.ts) → `create` | [BudgetAdjustmentCreateService](../../src/modules/budgets/adjustment/budget-adjustment-create.service.ts) |
 | GET | `/budget-adjustments` | [budgets/adjustment/budget-adjustment.controller.ts](../../src/modules/budgets/adjustment/budget-adjustment.controller.ts) → `list` | [BudgetAdjustmentQueryService](../../src/modules/budgets/adjustment/budget-adjustment-query.service.ts) |
 | POST | `/budget-adjustments/{id}/decision` | [budgets/adjustment/budget-adjustment.controller.ts](../../src/modules/budgets/adjustment/budget-adjustment.controller.ts) → `decide` | [BudgetAdjustmentDecisionService](../../src/modules/budgets/adjustment/budget-adjustment-decision.service.ts) |
@@ -428,4 +429,4 @@ Find a route, open its controller, then the service it calls. Module of a file =
 | GET | `/dashboards/super-admin` | [dashboards/super-admin/super-admin-dashboard.controller.ts](../../src/modules/dashboards/super-admin/super-admin-dashboard.controller.ts) → `get` | [SuperAdminDashboardService](../../src/modules/dashboards/super-admin/super-admin-dashboard.service.ts) |
 | GET | `/reports/revocation-sla` | [dashboards/revocation-sla/revocation-sla.controller.ts](../../src/modules/dashboards/revocation-sla/revocation-sla.controller.ts) → `get` | [RevocationSlaQueryService](../../src/modules/dashboards/revocation-sla/revocation-sla-query.service.ts) |
 
-422 operations.
+423 operations.

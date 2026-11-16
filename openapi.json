@@ -68910,6 +68910,306 @@
         "tags": ["budget-review-periods"]
       }
     },
+    "/api/v1/budget-review-periods/{id}/lines/{costCenterId}/explanation": {
+      "put": {
+        "operationId": "budgetReviewLineExplain",
+        "parameters": [
+          {
+            "name": "id",
+            "required": true,
+            "in": "path",
+            "description": "The id of the review period.",
+            "schema": { "format": "uuid", "type": "string" }
+          },
+          {
+            "name": "costCenterId",
+            "required": true,
+            "in": "path",
+            "description": "The Cost Center the head explains.",
+            "schema": { "format": "uuid", "type": "string" }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": { "application/json": { "schema": { "$ref": "#/components/schemas/ExplainLineBodyDto" } } }
+        },
+        "responses": {
+          "200": {
+            "description": "The head of the department of the Cost Center explains a line of a quarter that waits for explanations and was asked (yellow, red or under): the cause, once or ongoing, the action and what is already known of the need to the end of the year. It can be written again until Finance signs. The deadline is five working days from the close and only reminds: an explanation is never refused for being late.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "allOf": [
+                    { "$ref": "#/components/schemas/ExplainedLineResponseDto" },
+                    { "properties": { "message": { "example": "BUDGET_REVIEW.LINE_EXPLAINED" } } }
+                  ]
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "The JSON body cannot be read: it is not valid JSON, it does not match its declared length, or its compressed content is corrupt (HTTP_BAD_REQUEST).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_BAD_REQUEST": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_BAD_REQUEST",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Authentication is required or the token is no longer valid.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHENTICATION_REQUIRED": {
+                    "summary": "A Bearer access token is required.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHENTICATION_REQUIRED",
+                        "message": "A Bearer access token is required.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "INVALID_ACCESS_TOKEN": {
+                    "summary": "The access token is invalid.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "INVALID_ACCESS_TOKEN",
+                        "message": "The access token is invalid.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "The caller is not the head of the department of this Cost Center (BUDGET.NOT_YOUR_COST_CENTER); only the head explains.",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "AUTHORIZATION.FORBIDDEN": {
+                    "summary": "You do not have permission to perform this action.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "AUTHORIZATION.FORBIDDEN",
+                        "message": "You do not have permission to perform this action.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "The review period does not exist (BUDGET_REVIEW.NOT_FOUND), or it has no line for the Cost Center (BUDGET_REVIEW.LINE_NOT_FOUND).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "BUDGET_REVIEW.NOT_FOUND": {
+                    "summary": "The review period does not exist.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "BUDGET_REVIEW.NOT_FOUND",
+                        "message": "The review period does not exist.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "BUDGET_REVIEW.LINE_NOT_FOUND": {
+                    "summary": "The review period has no line for this Cost Center.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "BUDGET_REVIEW.LINE_NOT_FOUND",
+                        "message": "The review period has no line for this Cost Center.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "The period is not waiting for explanations: a month, or a quarter that Finance signed (BUDGET_REVIEW.NOT_AWAITING_EXPLANATIONS).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "BUDGET_REVIEW.NOT_AWAITING_EXPLANATIONS": {
+                    "summary": "The review period is SIGNED, not waiting for explanations.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "BUDGET_REVIEW.NOT_AWAITING_EXPLANATIONS",
+                        "message": "The review period is SIGNED, not waiting for explanations.",
+                        "details": { "state": "SIGNED" },
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "The JSON body is larger than 100 KiB; it is refused before it is read (HTTP_PAYLOAD_TOO_LARGE).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_PAYLOAD_TOO_LARGE": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_PAYLOAD_TOO_LARGE",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "415": {
+            "description": "The JSON body declares a charset other than UTF, or a Content-Encoding other than gzip, deflate or br (HTTP_UNSUPPORTED_MEDIA_TYPE).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_UNSUPPORTED_MEDIA_TYPE": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_UNSUPPORTED_MEDIA_TYPE",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "The body is invalid (VALIDATION_ERROR), or the line was not asked for an explanation because it is green (BUDGET_REVIEW.EXPLANATION_NOT_REQUIRED).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "VALIDATION_ERROR": {
+                    "summary": "Request validation failed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "VALIDATION_ERROR",
+                        "message": "Request validation failed.",
+                        "details": { "issues": [{ "code": "invalid_type", "path": "<field>" }] },
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "BUDGET_REVIEW.EXPLANATION_NOT_REQUIRED": {
+                    "summary": "The line is NOT_REQUIRED: it is not asked for an explanation.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "BUDGET_REVIEW.EXPLANATION_NOT_REQUIRED",
+                        "message": "The line is NOT_REQUIRED: it is not asked for an explanation.",
+                        "details": { "explanationStatus": "NOT_REQUIRED" },
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "Too many requests to this route from this address (HTTP_TOO_MANY_REQUESTS).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "HTTP_TOO_MANY_REQUESTS": {
+                    "summary": "The request could not be processed.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "HTTP_TOO_MANY_REQUESTS",
+                        "message": "The request could not be processed.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "Authentication or the service is temporarily unavailable (TOKEN_VERIFICATION_UNAVAILABLE from the guard, SERVICE_UNAVAILABLE after it).",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/ErrorEnvelopeDto" },
+                "examples": {
+                  "TOKEN_VERIFICATION_UNAVAILABLE": {
+                    "summary": "Authentication is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "TOKEN_VERIFICATION_UNAVAILABLE",
+                        "message": "Authentication is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  },
+                  "SERVICE_UNAVAILABLE": {
+                    "summary": "The service is temporarily unavailable. Retry shortly.",
+                    "value": {
+                      "success": false,
+                      "error": {
+                        "code": "SERVICE_UNAVAILABLE",
+                        "message": "The service is temporarily unavailable. Retry shortly.",
+                        "requestId": "req_example"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        },
+        "security": [{ "bearer": [] }],
+        "summary": "Explain a Cost Center of a quarterly review",
+        "tags": ["budget-review-periods"]
+      }
+    },
     "/api/v1/budget-adjustments": {
       "post": {
         "operationId": "budgetAdjustmentCreate",
@@ -123320,6 +123620,12 @@
                 "nullable": true
               },
               "closedAt": { "type": "string", "format": "date-time" },
+              "explanationsDueOn": {
+                "type": "string",
+                "format": "date",
+                "description": "For a quarter, the last day the heads of departments are asked to explain by (the fifth working day from the close); null for a month. Past it an explanation is still taken: the heads are reminded on that day and every Monday until they explain or Finance signs.",
+                "nullable": true
+              },
               "signedBy": {
                 "type": "object",
                 "properties": {
@@ -123404,6 +123710,7 @@
               "currency",
               "closedBy",
               "closedAt",
+              "explanationsDueOn",
               "signedBy",
               "signedAt",
               "note",
@@ -123456,6 +123763,12 @@
                       "nullable": true
                     },
                     "closedAt": { "type": "string", "format": "date-time" },
+                    "explanationsDueOn": {
+                      "type": "string",
+                      "format": "date",
+                      "description": "For a quarter, the last day the heads of departments are asked to explain by (the fifth working day from the close); null for a month. Past it an explanation is still taken: the heads are reminded on that day and every Monday until they explain or Finance signs.",
+                      "nullable": true
+                    },
                     "signedBy": {
                       "type": "object",
                       "properties": {
@@ -123540,6 +123853,7 @@
                     "currency",
                     "closedBy",
                     "closedAt",
+                    "explanationsDueOn",
                     "signedBy",
                     "signedAt",
                     "note",
@@ -123611,6 +123925,12 @@
                     "nullable": true
                   },
                   "closedAt": { "type": "string", "format": "date-time" },
+                  "explanationsDueOn": {
+                    "type": "string",
+                    "format": "date",
+                    "description": "For a quarter, the last day the heads of departments are asked to explain by (the fifth working day from the close); null for a month. Past it an explanation is still taken: the heads are reminded on that day and every Monday until they explain or Finance signs.",
+                    "nullable": true
+                  },
                   "signedBy": {
                     "type": "object",
                     "properties": {
@@ -123695,6 +124015,7 @@
                   "currency",
                   "closedBy",
                   "closedAt",
+                  "explanationsDueOn",
                   "signedBy",
                   "signedAt",
                   "note",
@@ -123806,6 +124127,62 @@
                       "type": "string",
                       "enum": ["GREEN", "YELLOW", "RED", "UNDER"],
                       "description": "The light of the Cost Center at the close: RED when the forecast is above the base and the reserve; YELLOW when it is above the base or the pace is above 110 % of the schedule; UNDER from June when the forecast is under 70 % of the base; GREEN otherwise. It only warns: it blocks no request."
+                    },
+                    "explanationStatus": {
+                      "type": "string",
+                      "enum": ["NOT_REQUIRED", "PENDING", "EXPLAINED", "UNEXPLAINED", "NO_HEAD"],
+                      "description": "NOT_REQUIRED: a month, or a Cost Center that is green, is not asked. PENDING: asked and waiting for the head of the department. EXPLAINED: the head explained. UNEXPLAINED: Finance signed the quarter before the head explained. NO_HEAD: Finance signed and the department had no head to ask (not held against it)."
+                    },
+                    "explanation": {
+                      "type": "object",
+                      "properties": {
+                        "cause": { "type": "string" },
+                        "persistence": {
+                          "type": "string",
+                          "enum": ["ONE_OFF", "ONGOING"],
+                          "description": "ONE_OFF: it happened once. ONGOING: it goes on and will weigh on the months to come."
+                        },
+                        "action": { "type": "string", "description": "What the department does about it." },
+                        "knownNeedsToYearEnd": {
+                          "type": "object",
+                          "properties": {
+                            "amount": {
+                              "type": "object",
+                              "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                              "required": ["amount", "currency"],
+                              "additionalProperties": false,
+                              "description": "What the department already knows it will need to the end of the year, when it can say.",
+                              "nullable": true
+                            },
+                            "note": { "type": "string" }
+                          },
+                          "required": ["amount", "note"],
+                          "additionalProperties": false
+                        },
+                        "explainedBy": {
+                          "type": "object",
+                          "properties": {
+                            "employeeId": { "type": "string", "format": "uuid" },
+                            "employeeCode": { "type": "string" },
+                            "fullName": { "type": "string" }
+                          },
+                          "required": ["employeeId", "employeeCode", "fullName"],
+                          "additionalProperties": false,
+                          "nullable": true
+                        },
+                        "explainedAt": { "type": "string", "format": "date-time" }
+                      },
+                      "required": [
+                        "cause",
+                        "persistence",
+                        "action",
+                        "knownNeedsToYearEnd",
+                        "explainedBy",
+                        "explainedAt"
+                      ],
+                      "additionalProperties": false,
+                      "description": "What the head of the department explained of the line; null until they do.",
+                      "nullable": true
                     }
                   },
                   "required": [
@@ -123823,7 +124200,9 @@
                     "priceIncrease",
                     "forecast",
                     "paceBasisPoints",
-                    "light"
+                    "light",
+                    "explanationStatus",
+                    "explanation"
                   ],
                   "additionalProperties": false
                 },
@@ -123864,6 +124243,118 @@
             "maxLength": 2000
           }
         },
+        "additionalProperties": false
+      },
+      "ExplainLineBodyDto": {
+        "type": "object",
+        "properties": {
+          "cause": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000,
+            "description": "Why the Cost Center is yellow, red or under what it should have used."
+          },
+          "persistence": {
+            "type": "string",
+            "enum": ["ONE_OFF", "ONGOING"],
+            "description": "Whether the cause happened once or goes on."
+          },
+          "action": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000,
+            "description": "What the department does about it."
+          },
+          "knownNeedsToYearEnd": {
+            "type": "object",
+            "properties": {
+              "amount": {
+                "description": "What the department already knows it will need to the end of the year, above nothing, when it can say.",
+                "type": "object",
+                "properties": { "amount": { "type": "string", "maxLength": 40 } },
+                "required": ["amount"],
+                "additionalProperties": false
+              },
+              "note": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 1000,
+                "description": "What is known of the need to the end of the year, in words."
+              }
+            },
+            "required": ["note"],
+            "additionalProperties": false,
+            "description": "What the department already knows it will need to the end of the year."
+          }
+        },
+        "required": ["cause", "persistence", "action", "knownNeedsToYearEnd"],
+        "additionalProperties": false
+      },
+      "ExplainedLineResponseDto": {
+        "type": "object",
+        "properties": {
+          "success": { "type": "boolean", "enum": [true] },
+          "message": { "type": "string", "pattern": "^[A-Z][A-Z0-9_]*(\\.[A-Z0-9_]+)+$" },
+          "data": {
+            "type": "object",
+            "properties": {
+              "periodId": { "type": "string", "format": "uuid" },
+              "costCenterId": { "type": "string", "format": "uuid" },
+              "explanationStatus": {
+                "type": "string",
+                "enum": ["NOT_REQUIRED", "PENDING", "EXPLAINED", "UNEXPLAINED", "NO_HEAD"],
+                "description": "NOT_REQUIRED: a month, or a Cost Center that is green, is not asked. PENDING: asked and waiting for the head of the department. EXPLAINED: the head explained. UNEXPLAINED: Finance signed the quarter before the head explained. NO_HEAD: Finance signed and the department had no head to ask (not held against it)."
+              },
+              "explanation": {
+                "type": "object",
+                "properties": {
+                  "cause": { "type": "string" },
+                  "persistence": {
+                    "type": "string",
+                    "enum": ["ONE_OFF", "ONGOING"],
+                    "description": "ONE_OFF: it happened once. ONGOING: it goes on and will weigh on the months to come."
+                  },
+                  "action": { "type": "string", "description": "What the department does about it." },
+                  "knownNeedsToYearEnd": {
+                    "type": "object",
+                    "properties": {
+                      "amount": {
+                        "type": "object",
+                        "properties": { "amount": { "type": "string" }, "currency": { "type": "string" } },
+                        "required": ["amount", "currency"],
+                        "additionalProperties": false,
+                        "description": "What the department already knows it will need to the end of the year, when it can say.",
+                        "nullable": true
+                      },
+                      "note": { "type": "string" }
+                    },
+                    "required": ["amount", "note"],
+                    "additionalProperties": false
+                  },
+                  "explainedBy": {
+                    "type": "object",
+                    "properties": {
+                      "employeeId": { "type": "string", "format": "uuid" },
+                      "employeeCode": { "type": "string" },
+                      "fullName": { "type": "string" }
+                    },
+                    "required": ["employeeId", "employeeCode", "fullName"],
+                    "additionalProperties": false,
+                    "nullable": true
+                  },
+                  "explainedAt": { "type": "string", "format": "date-time" }
+                },
+                "required": ["cause", "persistence", "action", "knownNeedsToYearEnd", "explainedBy", "explainedAt"],
+                "additionalProperties": false,
+                "nullable": true
+              }
+            },
+            "required": ["periodId", "costCenterId", "explanationStatus", "explanation"],
+            "additionalProperties": false,
+            "nullable": true
+          }
+        },
+        "required": ["success", "message", "data"],
         "additionalProperties": false
       },
       "CreateAdjustmentBodyDto": {
