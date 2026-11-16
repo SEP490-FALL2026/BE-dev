@@ -190,14 +190,35 @@ describe('the heads of departments explain a quarterly review and Finance signs 
       persistence: 'ONE_OFF',
       knownNeedsToYearEnd: { amount: { amount: String(5 * M) }, note: 'Two more seats in the autumn' },
     });
+    // RV3-03 (US-12-21 AC-5): the need to the end of the year is one of the four things the head says, and nothing (0) is an answer.
     await explaining(answering, answering, {
       persistence: 'ONGOING',
-      knownNeedsToYearEnd: { note: 'Nothing known yet' },
+      knownNeedsToYearEnd: { amount: h.money(0), note: 'Nothing known yet' },
     }).expect(200);
     expect(await lineOf(answering)).toMatchObject({
       explanationStatus: 'EXPLAINED',
-      explanation: { persistence: 'ONGOING', knownNeedsToYearEnd: { amount: null, note: 'Nothing known yet' } },
+      explanation: {
+        persistence: 'ONGOING',
+        knownNeedsToYearEnd: { amount: { amount: '0' }, note: 'Nothing known yet' },
+      },
     });
+    const noAmount = await explaining(answering, answering, {
+      knownNeedsToYearEnd: { note: 'No figure given' },
+    }).expect(422);
+    expect((noAmount.body as { error: { code: string } }).error.code).toBe('VALIDATION_ERROR');
+    await explaining(answering, answering, {
+      knownNeedsToYearEnd: { amount: { amount: '-5' }, note: 'Below nothing' },
+    }).expect(422);
+    // A refused explanation changes nothing: the one before it stands.
+    expect(await lineOf(answering)).toMatchObject({
+      explanation: { knownNeedsToYearEnd: { amount: { amount: '0' }, note: 'Nothing known yet' } },
+    });
+    await expect(
+      h.ctx.sql.query(
+        `UPDATE budget_review_lines SET explanation_needs_amount_minor = NULL WHERE period_id = $1 AND cost_center_id = $2`,
+        [quarter.id, costCenterOf(answering)],
+      ),
+    ).rejects.toThrow(/budget_review_lines_explanation_amount_check/);
     const notAsked = await explaining(green).expect(422);
     expect((notAsked.body as { error: { code: string } }).error.code).toBe('BUDGET_REVIEW.EXPLANATION_NOT_REQUIRED');
     await explaining(answering, answering, { cause: '' }).expect(422);

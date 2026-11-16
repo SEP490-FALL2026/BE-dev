@@ -16,7 +16,7 @@ import { BudgetReviewRepo, type ReviewLineRecord } from './budget-review.repo';
 
 /**
  * The head of a department explains a Cost Center of a quarterly review that is yellow, red or under what it should have used (`RV-3`, `QĐ-111ah`): the cause,
- * whether it happened once or goes on, the action, and what the department already knows it will need to the end of the year. Only the head of the department of
+ * whether it happened once or goes on, the action, and the amount the department already knows it will need to the end of the year (with a note; all four are required). Only the head of the department of
  * that Cost Center explains it; the quarter must still wait for explanations and the line must have been asked. The explanation can be written again until Finance signs.
  * It is never refused for being late: the deadline of five working days only reminds (`B-7`).
  */
@@ -42,10 +42,8 @@ export class BudgetReviewExplanationService {
       throw new BudgetNotYourCostCenterError();
     }
     const currency = await this.facts.reportingCurrency();
-    const needsAmountMinor =
-      body.knownNeedsToYearEnd.amount === undefined
-        ? null
-        : await this.facts.positiveMoney(body.knownNeedsToYearEnd.amount, currency);
+    // The need to the end of the year is one of the four things the head says (US-12-21 AC-5): an amount, and nothing (0) is an answer.
+    const needsAmountMinor = await this.facts.money(body.knownNeedsToYearEnd.amount, currency);
     const written = await this.runner.run(async (tx) => {
       const period = await this.repo.findSharedLocked(tx, periodId);
       if (!period) throw new BudgetReviewNotFoundError();

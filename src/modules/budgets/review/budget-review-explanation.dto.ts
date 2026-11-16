@@ -20,9 +20,10 @@ export const explanationViewSchema = z.strictObject({
     .meta({ description: 'ONE_OFF: it happened once. ONGOING: it goes on and will weigh on the months to come.' }),
   action: z.string().meta({ description: 'What the department does about it.' }),
   knownNeedsToYearEnd: z.strictObject({
-    amount: moneyView
-      .nullable()
-      .meta({ description: 'What the department already knows it will need to the end of the year, when it can say.' }),
+    amount: moneyView.nullable().meta({
+      description:
+        'What the department already knows it will need to the end of the year (nothing is 0); null only on an explanation written before the amount was asked for.',
+    }),
     note: z.string(),
   }),
   explainedBy: person.nullable(),
@@ -45,9 +46,9 @@ export const explainLineBodySchema = z.strictObject({
   action: z.string().trim().min(1).max(2000).meta({ description: 'What the department does about it.' }),
   knownNeedsToYearEnd: z
     .strictObject({
-      amount: amountInput.optional().meta({
+      amount: amountInput.meta({
         description:
-          'What the department already knows it will need to the end of the year, above nothing, when it can say.',
+          'What the department already knows it will need to the end of the year, in the reporting currency: required, and 0 when it knows of no need.',
       }),
       note: z
         .string()
