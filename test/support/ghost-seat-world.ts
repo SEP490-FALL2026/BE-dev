@@ -7,6 +7,7 @@ import { DecisionFollowUpService } from '../../src/modules/optimization/decision
 import { InternalRulesService } from '../../src/modules/optimization/internal-rules/internal-rules.service';
 import type { RuleRunRecord } from '../../src/modules/optimization/rule-run/rule-run.repo';
 import type { GhostRow } from './ghost-seat-row';
+import { DecisionChecklists } from './decision-checklist';
 import { seedUsageColumns, seedUsageEvidence } from './ghost-seat-usage-evidence';
 import { RevocationHarness } from './revocation-harness';
 
@@ -18,6 +19,7 @@ export type { GhostRow } from './ghost-seat-row';
  * rules on a day the test names (`nextDay` makes each run claim its own period). No assertion lives here.
  */
 export class GhostSeatWorld extends RevocationHarness {
+  readonly checklists = new DecisionChecklists();
   private day = 0;
   private bulk = 0;
   worldDepartment = '';
@@ -28,6 +30,7 @@ export class GhostSeatWorld extends RevocationHarness {
   /** Boots the application and an IT Admin in charge of a department that owns the subscriptions of the world. */
   async startWorld(): Promise<void> {
     await this.start();
+    await this.checklists.load(this.ctx.sql, this.seed.organizationId);
     const itAdminEmployee = await this.person('E-WORLD-IT');
     const account = await this.account('E-WORLD-IT', itAdminEmployee, 'IT_ADMIN');
     // Named before its first department is made, so that department counts among the four it answers for.

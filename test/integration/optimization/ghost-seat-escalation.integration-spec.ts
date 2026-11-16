@@ -25,7 +25,9 @@ const key = (): string => `escalation-${randomUUID()}`;
 const post = (body: object, idempotencyKey: string | null = key(), account: ApiAccount = w.it1) => {
   const call = request(w.server()).post('/api/v1/ghost-seat-recommendations/escalations').set(w.as(account));
 
-  return (idempotencyKey === null ? call : call.set('Idempotency-Key', idempotencyKey)).send(body);
+  return (idempotencyKey === null ? call : call.set('Idempotency-Key', idempotencyKey)).send(
+    w.checklists.withYes('5.3', body),
+  );
 };
 const batchOf = (response: request.Response): BatchWire => w.dataOf<BatchWire>(response);
 

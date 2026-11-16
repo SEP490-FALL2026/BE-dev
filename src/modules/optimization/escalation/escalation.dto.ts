@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import { successEnvelopeSchema } from '../../../infrastructure/http/dto/success-envelope.dto';
 import { createZodDto } from '../../../infrastructure/http/dto/zod-dto';
+import { checklistBodySchema } from '../../policies/public/policy-checklist.types';
 import { ESCALATION_SKIP_REASONS } from './escalation.types';
 
 /** The most recommendations one batch names. */
@@ -17,6 +18,7 @@ export const escalationBodySchema = z.strictObject({
   note: z.string().trim().min(1).max(500).optional().meta({
     description: 'A word of the IT Admin for the batch, kept with it; the head does not read it.',
   }),
+  checklist: checklistBodySchema,
 });
 
 const itemSchema = z.strictObject({

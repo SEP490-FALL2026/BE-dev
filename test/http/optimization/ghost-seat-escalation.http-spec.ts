@@ -14,6 +14,7 @@ const OTHER = '9a1b2c3d-4e5f-4a6b-8c7d-0e1f2a3b4c5d';
 const PATH = '/api/v1/ghost-seat-recommendations/escalations';
 const KEY = 'escalation-key-0123456789';
 const ROLES = ['EMPLOYEE', 'MANAGER', 'FINANCE', 'SPENDING_APPROVER', 'SUPER_ADMIN'];
+const CHECKLIST = { policyVersionId: ID, answers: [{ itemCode: '5.3-01', answer: 'YES' }] };
 
 /**
  * `QĐ-111ay`: the contract of the early push, its service replaced: who may call it, what it refuses before it reaches the use case (the key, the
@@ -30,7 +31,7 @@ describe('ghost seat escalation route (no database)', () => {
       .post(PATH)
       .set(as(...roles));
 
-    return (key === null ? call : call.set('Idempotency-Key', key)).send(body);
+    return (key === null ? call : call.set('Idempotency-Key', key)).send({ checklist: CHECKLIST, ...body });
   };
 
   beforeAll(async () => {
@@ -70,6 +71,7 @@ describe('ghost seat escalation route (no database)', () => {
     expect(escalations.escalate).toHaveBeenCalledWith(expect.objectContaining({ roles: ['IT_ADMIN'] }), {
       recommendationIds: [ID, OTHER],
       note: 'Not used.',
+      checklist: CHECKLIST,
       idempotencyKey: KEY,
     });
   });
@@ -88,6 +90,8 @@ describe('ghost seat escalation route (no database)', () => {
       () => post({ recommendationIds: [ID] }, 'short'),
       () => post({ recommendationIds: [ID] }, 'a key with spaces in it!!'),
       () => post({}),
+      () => post({ recommendationIds: [ID], checklist: undefined }),
+      () => post({ recommendationIds: [ID], checklist: { policyVersionId: 'not-a-uuid', answers: [] } }),
       () => post({ recommendationIds: [] }),
       () => post({ recommendationIds: ['not-a-uuid'] }),
       () => post({ recommendationIds: Array.from({ length: 101 }, () => ID) }),
@@ -127,15 +131,15 @@ describe('ghost seat escalation route (no database)', () => {
       return found;
     };
 
-    it('takes exactly the ids and the note, asks for the key as a header, and names the operation', () => {
+    it('takes exactly the ids, the note and the checklist, asks for the key as a header, and names the operation', () => {
       const body = schema('EscalationBodyDto');
       const headers = ((operation()?.parameters ?? []) as { name: string; in: string; required?: boolean }[]).filter(
         (parameter) => parameter.in === 'header',
       );
 
       expect(operation()?.operationId).toBe('ghostSeatEscalationCreate');
-      expect(Object.keys(body.properties ?? {}).sort()).toEqual(['note', 'recommendationIds']);
-      expect(body.required).toEqual(['recommendationIds']);
+      expect(Object.keys(body.properties ?? {}).sort()).toEqual(['checklist', 'note', 'recommendationIds']);
+      expect(body.required?.sort()).toEqual(['checklist', 'recommendationIds']);
       expect(body.additionalProperties).toBe(false);
       expect(headers.map((header) => [header.name, header.required])).toEqual([['Idempotency-Key', true]]);
     });

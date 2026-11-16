@@ -8,6 +8,7 @@ import { NotificationsModule } from '../notifications/notifications.module';
 import { OperatingParametersModule } from '../operating-parameters/operating-parameters.module';
 import { OrganizationModule } from '../organization/organization.module';
 import { PersonnelModule } from '../personnel/personnel.module';
+import { PoliciesChecklistFacadeModule } from '../policies/policies-checklist-facade.module';
 import { UsageModule } from '../usage/usage.module';
 import { BoardController } from './board/board.controller';
 import { BoardKpiService } from './board/board-kpi.service';
@@ -71,6 +72,7 @@ import { UsageRulesService } from './usage-rules/usage-rules.service';
     IdentityAccessFacadeModule,
     PersonnelModule,
     UsageModule,
+    PoliciesChecklistFacadeModule,
   ],
   controllers: [BoardController, DecisionController, EscalationController, UsageRulesThresholdController],
   providers: [

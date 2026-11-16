@@ -23,7 +23,7 @@ const decide = (
   request(w.server())
     .post('/api/v1/ghost-seat-decisions')
     .set(w.as(account))
-    .send({ items: [{ recommendationId }], choice, reason, ...extra });
+    .send(w.checklists.withYes('5.4', { items: [{ recommendationId }], choice, reason, ...extra }));
 const giveBack = (account: ApiAccount, id: string, reason: unknown = 'Chưa gỡ được') =>
   request(w.server())
     .post(`/api/v1/ghost-seat-recommendations/${id}/return`)

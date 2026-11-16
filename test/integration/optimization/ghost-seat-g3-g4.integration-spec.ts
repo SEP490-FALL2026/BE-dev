@@ -233,7 +233,7 @@ describe('G3 / G4: the weekly pass, gates 2-7, the three states, days over the c
       .post('/api/v1/ghost-seat-recommendations/escalations')
       .set(h.as(h.it1))
       .set('Idempotency-Key', `b3a01-${randomUUID()}`)
-      .send({ recommendationIds: [watch.id] })
+      .send(h.checklists.withYes('5.3', { recommendationIds: [watch.id] }))
       .expect(201);
     const [result] = h.dataOf<{ results: { outcome: string; reason: string | null }[] }>(pushed).results;
     expect(result).toMatchObject({ outcome: 'ESCALATED' });

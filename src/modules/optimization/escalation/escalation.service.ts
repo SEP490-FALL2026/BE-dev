@@ -5,6 +5,8 @@ import type { AuthenticatedPrincipal } from '../../../infrastructure/security/to
 import { DecisionFollowUpService } from '../decision/decision-follow-up.service';
 import { DecisionRoutingService } from '../decision/decision-routing.service';
 import type { FollowUpDay } from '../decision/decision.types';
+import { PolicyChecklistApi } from '../../policies/public/policy-checklist.api';
+import type { ChecklistBody, ChecklistVerdict } from '../../policies/public/policy-checklist.types';
 import { GhostSeatRepo } from '../ghost-seat/ghost-seat.repo';
 import { GhostSeatService } from '../ghost-seat/ghost-seat.service';
 import type { GhostSeatRecord } from '../ghost-seat/ghost-seat.types';
@@ -19,6 +21,8 @@ const sha256 = (text: string): string => createHash('sha256').update(text).diges
 export interface EscalationInput {
   recommendationIds: readonly string[];
   note?: string | undefined;
+  /** The answers to the questions of the step of the policy in force (`QĐ-111ap`): a No refuses the whole batch. */
+  checklist: ChecklistBody;
   idempotencyKey: string;
 }
 
@@ -28,7 +32,9 @@ export interface EscalationInput {
  * one), the way the routing of the hour would have put it; the others are named with their reason and nothing is refused for them. One batch is one
  * transaction: the key is taken first (so the same key again answers the same result and never acts twice), the recommendations are locked by id,
  * then licensing and personnel are read. Any IT Admin may push; the audit says whether it was the one in charge.
- * Throws GhostSeatEscalationKeyReusedError.
+ * The checklist of the step is judged first, before the key is taken (`US-2-O6`): a batch refused for an answer No holds no key, the watch stays
+ * as it was, and the answers are kept for each recommendation that was pushed. Throws GhostSeatEscalationKeyReusedError and what the checklist
+ * refuses (`PolicyVersionChangedError`, `PolicyChecklistIncompleteError`, `PolicyChecklistHasNoError`).
  */
 @Injectable()
 export class EscalationService {
@@ -40,6 +46,7 @@ export class EscalationService {
     private readonly routing: DecisionRoutingService,
     private readonly followUp: DecisionFollowUpService,
     private readonly facts: EscalationFactsService,
+    private readonly checklists: PolicyChecklistApi,
   ) {}
 
   async escalate(
@@ -59,6 +66,12 @@ export class EscalationService {
     const requestHash = sha256(JSON.stringify({ ids: [...ids].sort(), note }));
 
     return this.runner.run(async (tx) => {
+      const { verdict } = await this.checklists.judge(tx, {
+        organizationId: day.organizationId,
+        stepCode: '5.3',
+        checklist: input.checklist,
+        decision: 'ESCALATE',
+      });
       const id = await this.batches.claim(tx, key, { requestHash, note });
       if (id === null) return this.replay(tx, key, requestHash);
       const records = await this.repo.lockMany(tx, ids);
@@ -90,8 +103,30 @@ export class EscalationService {
         );
       }
       await this.batches.saveResults(tx, id, results);
+      await this.keepChecklist(tx, actor, day, { verdict, results });
 
       return { id, results, replayed: false };
+    });
+  }
+
+  /** The answers of the IT Admin, kept once for each recommendation that was pushed; nothing is kept for a batch that pushed none. */
+  private async keepChecklist(
+    tx: DbTx,
+    actor: AuthenticatedPrincipal,
+    day: FollowUpDay,
+    kept: { verdict: ChecklistVerdict; results: readonly EscalationItemResult[] },
+  ): Promise<void> {
+    const subjects = kept.results
+      .filter((result) => result.outcome === 'ESCALATED')
+      .map((result) => ({ kind: 'GHOST_SEAT_RECOMMENDATION' as const, id: result.recommendationId }));
+    if (subjects.length === 0) return;
+    await this.checklists.record(tx, {
+      organizationId: day.organizationId,
+      verdict: kept.verdict,
+      decision: 'ESCALATE',
+      decidedByEmployeeId: actor.employeeId,
+      decidedAt: new Date(),
+      subjects,
     });
   }
 

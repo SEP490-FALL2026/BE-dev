@@ -4,8 +4,9 @@ import type { BusinessDate } from '../../../core/business-date';
 import { TransactionRunner, type DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import type { RuleSeat } from '../../licensing/public/licensing-ghost-seat.types';
-import { NotificationsApi } from '../../notifications/public/notifications.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
+import { PolicyChecklistApi } from '../../policies/public/policy-checklist.api';
+import type { ChecklistBody, ChecklistVerdict } from '../../policies/public/policy-checklist.types';
 import { GhostSeatDecisionRepo, type GhostSeatChoice } from '../ghost-seat/ghost-seat-decision.repo';
 import { GhostSeatRepo } from '../ghost-seat/ghost-seat.repo';
 import { GhostSeatService } from '../ghost-seat/ghost-seat.service';
@@ -20,6 +21,8 @@ export interface DecisionInput {
   choice: GhostSeatChoice;
   reason: string;
   exemptUntil?: BusinessDate;
+  /** The answers to the questions of the step of the policy in force (`QĐ-111ap`): a No leaves the head only the reclaim. */
+  checklist: ChecklistBody;
 }
 
 /** How one recommendation of a batch ended. */
@@ -52,12 +55,15 @@ export class DecisionService {
     private readonly decisions: GhostSeatDecisionRepo,
     private readonly ghostSeats: GhostSeatService,
     private readonly organizationReads: OrganizationReadApi,
-    private readonly notifications: NotificationsApi,
     private readonly transfers: DecisionTransferService,
     private readonly reclaims: DecisionReclaimService,
+    private readonly checklists: PolicyChecklistApi,
   ) {}
 
-  /** Throws GhostSeatDecisionRefusedError (nothing saved) and the errors of the gate of the revocation it maps. */
+  /**
+   * Throws GhostSeatDecisionRefusedError (nothing saved), the errors of the checklist of the step (a version left behind, answers missing, an
+   * answer No for a keep or an exemption) and the errors of the gate of the revocation it maps.
+   */
   async decide(
     actor: AuthenticatedPrincipal,
     input: DecisionInput,
@@ -89,6 +95,13 @@ export class DecisionService {
       input.choice === 'RECLAIM' ? await this.reclaims.openSeatsOf(tx, day.today, found) : new Map<string, RuleSeat>();
     const problems = this.problemsOf(ids, records, headed?.departmentId ?? null, input, day, seats);
     if (problems.length > 0) throw new GhostSeatDecisionRefusedError(problems);
+    const { verdict } = await this.checklists.judge(tx, {
+      organizationId: day.organizationId,
+      stepCode: '5.4',
+      checklist: input.checklist,
+      decision: input.choice,
+      reason: input.reason,
+    });
     const graceDays = input.choice === 'RECLAIM' ? await this.reclaims.graceDays() : 0;
     const batchId = ids.length > 1 ? randomUUID() : null;
     const outcomes: DecisionOutcome[] = [];
@@ -104,8 +117,26 @@ export class DecisionService {
         ),
       );
     }
+    await this.keepChecklist(tx, actor, found, { verdict, choice: input.choice, decidedAt: day.now });
 
     return outcomes;
+  }
+
+  /** The answers of the head, kept once for each recommendation decided (one batch answers once). */
+  private keepChecklist(
+    tx: DbTx,
+    actor: AuthenticatedPrincipal,
+    records: readonly GhostSeatRecord[],
+    kept: { verdict: ChecklistVerdict; choice: GhostSeatChoice; decidedAt: Date },
+  ): Promise<void> {
+    return this.checklists.record(tx, {
+      organizationId: records[0].organizationId,
+      verdict: kept.verdict,
+      decision: kept.choice,
+      decidedByEmployeeId: actor.employeeId,
+      decidedAt: kept.decidedAt,
+      subjects: records.map((record) => ({ kind: 'GHOST_SEAT_RECOMMENDATION' as const, id: record.id })),
+    });
   }
 
   private problemsOf(
@@ -161,7 +192,7 @@ export class DecisionService {
         expectedEndDate: seat.expectedEndDate,
         selfDecided,
       });
-      await this.tellCancelled(tx, record, ctx.organizationId);
+      await this.reclaims.tellCancelled(tx, record, ctx.organizationId);
 
       return { ...base, outcome: 'LEFT_TO_EXPIRE', revocationTaskId: null, notBefore: null };
     }
@@ -236,24 +267,8 @@ export class DecisionService {
       });
     }
     await this.ghostSeats.close(tx, record, exempt ? 'EXEMPTED' : 'KEPT', { kind: 'USER', principal: actor }, ctx.now);
-    await this.tellCancelled(tx, record, ctx.organizationId);
+    await this.reclaims.tellCancelled(tx, record, ctx.organizationId);
 
     return { ...base, outcome: exempt ? 'EXEMPTED' : 'KEPT', revocationTaskId: null, notBefore: null };
-  }
-
-  /**
-   * A reclaim the IT Admin returned and the head now does not make: the holder, told once that it was coming, is told it is cancelled
-   * (`QĐ-62p`(1)). A recommendation never returned told the holder nothing, so there is nothing to cancel.
-   */
-  private async tellCancelled(tx: DbTx, record: GhostSeatRecord, organizationId: string): Promise<void> {
-    if (record.returnCount !== 1 || record.employeeId === null) return;
-    await this.notifications.notifyInApp(tx, {
-      organizationId,
-      recipientEmployeeId: record.employeeId,
-      code: 'REVOCATION_CANCELLED',
-      subject: { type: 'GHOST_SEAT_RECOMMENDATION', id: record.id },
-      params: { planId: record.planId, applicationId: record.applicationId, source: 'GHOST_SEAT' },
-      eventKey: `REVOCATION_CANCELLED:${record.id}`,
-    });
   }
 }
