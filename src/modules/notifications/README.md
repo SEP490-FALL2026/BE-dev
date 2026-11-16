@@ -34,8 +34,12 @@ organization, personnel, requests ([module-graph](../../../docs/generated/module
 
 ## Extension point
 
-- Mở: không có.
-- Đăng ký vào: không có. "Link còn dùng được không" là tham số `TokenUsability` của `dispatchDue`: worker truyền
+- Mở: `notifications.name-sources` — `NotificationNameContributions` ([public/notifications.extension-points.ts](public/notifications.extension-points.ts)),
+  mỗi bên đăng ký là một `NotificationNameSource` (`kinds` + `names(kind, ids)` → `Map<id, tên hiển thị>`; id không có thì vắng, không ném).
+  Cũng ở đó: kiểu `NameKind` (bảy loại tên một câu thông báo có thể gọi). Provider nằm ở `NotificationsModule` (mọi graph: API, worker, CLI).
+- Đăng ký vào: không có ở module này; bên đăng ký dự kiến của điểm mở trên (làm ở N5b, chưa có listener): `organization`
+  (EMPLOYEE, DEPARTMENT, COST_CENTER), `catalog` (APPLICATION, PLAN, SUBSCRIPTION), `requests` (REQUEST).
+  "Link còn dùng được không" là tham số `TokenUsability` của `dispatchDue`: worker truyền
   `IdentityAccessApi.isActionLinkUsable`, nên module không đọc bảng của identity-access.
 
 ## Capability → file chính
