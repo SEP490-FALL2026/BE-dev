@@ -61,7 +61,7 @@ export class SpendRoutingService {
           'ACCESS_REQUEST.ASSESSMENT_REQUESTED',
           'ACCESS_REQUEST',
           request.id,
-          { requestId: request.id, itAdminEmployeeId: assignee },
+          { requestId: request.id, itAdminEmployeeId: assignee, routingMode: 'ONE_STEP' },
         ),
       );
     }
