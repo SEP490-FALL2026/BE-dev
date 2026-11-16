@@ -28,13 +28,6 @@ const pagination = z.strictObject({
 });
 const money = z.strictObject({ amount: z.string().max(40), currency: z.string().regex(/^[A-Z]{3}$/) });
 
-/** The head of the owner department confirms the proposal as it is; nothing of it is changed here (`QĐ-94d`(2)). */
-export const decideRenewalBodySchema = z.strictObject({
-  decision: z.literal('CONFIRM'),
-  reason: text.optional(),
-  acknowledgeActiveUsers: z.boolean().optional(),
-});
-
 const nextPeriodSchema = z.strictObject({
   purchasedQuantity: quantity,
   unitPrice: money,
@@ -125,7 +118,8 @@ const subscriptionBrief = z.strictObject({
   planName: z.string(),
   applicationId: z.uuid(),
   applicationName: z.string(),
-  ownerDepartmentId: z.uuid(),
+  /** Null for a subscription of the shared pool (a K2 workspace no department owns). */
+  ownerDepartmentId: z.uuid().nullable(),
 });
 
 export const renewalSummarySchema = z.strictObject({
@@ -143,7 +137,7 @@ export const renewalSummarySchema = z.strictObject({
   executionPoint: executionPoint.nullable(),
   outcome: outcome.nullable(),
   lateFlagged: z.boolean(),
-  /** Set while the case waits to be confirmed and the department that owns the subscription has no head today: nobody else confirms it (`QĐ-93c`). */
+  /** Always null now: no case waits for a head (`QĐ-103e`); kept so a reader of the earlier contract still finds it. */
   waitingReason: z.enum(['NO_HEAD']).nullable(),
   proposedAt: z.iso.datetime(),
 });
@@ -187,7 +181,9 @@ export const renewalDetailSchema = renewalSummarySchema.extend({
     note: z.string().nullable(),
     proposedByEmployeeId: z.uuid(),
     proposedAt: z.iso.datetime(),
-    /** How many seats the IT Admin proposed to take back. */
+    /** The seats the system counted for the next period when the result was recorded; null on a case of before. */
+    seatsNeeded: z.number().int().nonnegative().nullable(),
+    /** How many seats the IT Admin proposed to take back (a case of before; none is chosen now). */
     releasedSeatCount: z.number().int().nonnegative(),
   }),
   decision: z
@@ -196,7 +192,7 @@ export const renewalDetailSchema = renewalSummarySchema.extend({
       quantity: z.number().int().nullable(),
       reason: z.string().nullable(),
       decidedByEmployeeId: z.uuid(),
-      /** `SPENDING_APPROVER` and `CONFLICT_SUBSTITUTE` are historical: a decision of before `QĐ-94d`(2); none is written now. */
+      /** `IT_ADMIN_IN_CHARGE` is the one written now; the others are historical: a decision of before the one-write renewal (`QĐ-103e`). */
       deciderRole: z.enum(['OWNER_DEPARTMENT_HEAD', 'SPENDING_APPROVER', 'CONFLICT_SUBSTITUTE', 'IT_ADMIN_IN_CHARGE']),
       decidedAt: z.iso.datetime(),
       decidedOn: z.string(),
@@ -219,6 +215,8 @@ export const renewalDetailSchema = renewalSummarySchema.extend({
       vendorFollowUpOpen: z.boolean(),
       nextSubscriptionId: z.uuid().nullable(),
       realisedSavings: money.nullable(),
+      /** The outcome was recorded after the renewal day of the period (`QĐ-98e`). */
+      lateRenewal: z.boolean(),
     })
     .nullable(),
 });
@@ -251,7 +249,6 @@ export type RankedSeatWire = z.infer<typeof rankedSeatSchema>;
 export type DeadlineEventWire = z.infer<typeof deadlineEventSchema>;
 
 export class SubscriptionRenewalProposeBodyDto extends createZodDto(proposeRenewalBodySchema) {}
-export class SubscriptionRenewalDecideBodyDto extends createZodDto(decideRenewalBodySchema) {}
 export class SubscriptionRenewalOutcomeBodyDto extends createZodDto(recordOutcomeBodySchema) {}
 export class SubscriptionRenewalListQueryDto extends createZodDto(listQuerySchema) {}
 export class SubscriptionDeadlineEventListQueryDto extends createZodDto(deadlineEventsQuerySchema) {}

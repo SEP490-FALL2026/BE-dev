@@ -159,15 +159,16 @@ dịch vụ nào đọc cả ghế lẫn thu hồi thì đứng trên cả hai (
   `DashboardFactsRepo`; chỉ trả số, không dòng, giá, key hay định danh.
 - `saas-issue/` — báo lỗi quyền SaaS (BM-11, US-07-10, US-07-11); `saas-issues.controller.ts`; `SaasIssueService`,
   `SaasIssueHandlingService`; `saas-issue.job.ts`.
-- `subscription-renewal/` — gia hạn subscription theo kỳ (EP-11): `subscription-renewals.controller.ts`
-  (`/subscription-renewals*`, `/subscription-deadline-events`); nhóm `proposal/` (IT Admin đề xuất, kèm danh sách ghế thu hồi),
-  `decision/` (trưởng phòng sở hữu xác nhận `CONFIRM` đề xuất đúng như đã lập, mở thu hồi; Finance chỉ đọc; đọc theo vai ở
-  `subscription-renewal-view.service.ts` + `readScopeOf`), `outcome/` (IT Admin ghi kết quả, kỳ mới nối chuỗi qua `SubscriptionPeriodApi`, chuyển ghế
-  `RENEWAL_CARRY`, tiết kiệm `QĐ-66w`), `alerts/` (mốc T−15/T−7, chất lượng dữ liệu), `deadline/` (cờ thực hiện trễ, sự cố tự gia
-  hạn/đánh dấu hết hạn); `subscription-renewal.job.ts` chạy mỗi giờ qua `SubscriptionRenewalSweepService`; xếp ghế ở
-  `subscription-renewal-ranking.policy.ts`. Quyết định không tạo khoản cam kết ngân sách (`QĐ-62s`). Cột JSON
-  `subscription_renewals.decision_snapshot` đi qua codec `subscription-renewal-decision-snapshot.json.ts` (spec cạnh file); audit và thông báo
-  của một quyết định ghi ở `decision/renewal-decision-trail.service.ts`.
+- `subscription-renewal/` — điều chỉnh/gia hạn thuê bao kho `K2` theo kỳ (EP-11, `SBF-20`): `subscription-renewals.controller.ts`
+  (`/subscription-renewals*`, `/subscription-deadline-events`); nhóm `record/` (IT Admin ghi kết quả **một lần** tại điểm điều chỉnh: ca,
+  quyết định `IT_ADMIN_IN_CHARGE` và kết quả trong một transaction; ghi audit `substitute` và báo Finance ở `renewal-record-trail.service.ts`),
+  `seats-needed/` (số seat cần của kỳ sau, `QĐ-103e`), `outcome/` (lõi ghi kết quả: kỳ mới nối chuỗi qua `SubscriptionPeriodApi`, chuyển ghế
+  `RENEWAL_CARRY`, tiết kiệm `QĐ-66w`; route `/{id}/outcome` chỉ còn cho ca `DECIDED` cũ), `alerts/` (mốc, chất lượng dữ liệu), `deadline/`
+  (sự cố tự gia hạn/đánh dấu hết hạn); không còn bước trưởng phòng xác nhận (route `decision` đã gỡ). Đọc theo vai ở
+  `subscription-renewal-view.service.ts` + `readScopeOf` (IT Admin, Finance đọc mọi ca kể cả thuê bao kho không phòng sở hữu; trưởng phòng chỉ
+  ca của phòng mình); `subscription-renewal.job.ts` chạy mỗi giờ qua `SubscriptionRenewalSweepService`; `subscription-renewal-ranking.policy.ts`
+  còn cho route `seat-ranking` (deprecated). Ghi kết quả không tạo khoản cam kết ngân sách (`QĐ-62s`). Cột JSON
+  `subscription_renewals.decision_snapshot` đi qua codec `subscription-renewal-decision-snapshot.json.ts` (spec cạnh file).
 - Gốc module (dùng chung nhiều capability): `licensing-audit-event.mapper.ts`, `licensing.http-errors.ts`;
   `licensing-alerts.policy.ts` + `licensing-alerts.service.ts` (`LicensingAlerts`) — cảnh báo license `FR-5.14` vào hộp thông báo
   (dòng 3 T−7 ở `expiry/`, dòng 12 bàn giao đã bỏ theo `QĐ-110g`, dòng 13 tài khoản dịch vụ đã bỏ theo `QĐ-110m`, dòng 38 `K1` của

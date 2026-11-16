@@ -136,8 +136,6 @@ import { StockSummaryController } from './stock-summary/stock-summary.controller
 import { StockSummaryQueryService } from './stock-summary/stock-summary-query.service';
 import { RenewalAlertsService } from './subscription-renewal/alerts/renewal-alerts.service';
 import { RenewalDeadlineService } from './subscription-renewal/deadline/renewal-deadline.service';
-import { RenewalDecisionTrail } from './subscription-renewal/decision/renewal-decision-trail.service';
-import { RenewalDecisionService } from './subscription-renewal/decision/renewal-decision.service';
 import { RenewalOutcomeService } from './subscription-renewal/outcome/renewal-outcome.service';
 import { RenewalRecordService } from './subscription-renewal/record/renewal-record.service';
 import { RenewalRecordTrail } from './subscription-renewal/record/renewal-record-trail.service';
@@ -284,8 +282,6 @@ import { LicenseKeyTemplateListener } from './license-key/license-key-template.l
     RenewalNotifier,
     RenewalRecordTrail,
     RenewalRecordService,
-    RenewalDecisionTrail,
-    RenewalDecisionService,
     RenewalOutcomeService,
     RenewalAlertsService,
     RenewalDeadlineService,

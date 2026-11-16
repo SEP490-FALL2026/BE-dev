@@ -151,3 +151,27 @@ export function unintendedRenewalOf(input: {
 
   return input.choice === 'REDUCE' && input.nextQuantity > (input.quantity ?? 0);
 }
+
+/**
+ * The renewal day of the period a case was recorded against (`QĐ-106i`(2)): a plan by the month renews on its payment day, which is the day the
+ * case counts from; a plan by the year renews on its renewal day (else its end day) when that is not before the deadline, else on the deadline.
+ * It is read back from the case and the dates of the subscription, so no day is stored twice.
+ */
+function renewalDayOf(
+  record: Pick<RenewalRecord, 'noticeBasis' | 'noticeBaseDate'>,
+  period: Pick<RenewalPeriodFacts, 'renewalDate' | 'endDate'>,
+): BusinessDate {
+  if (record.noticeBasis === 'BY_PAYMENT_DATE') return record.noticeBaseDate;
+  const last = period.renewalDate ?? period.endDate;
+
+  return last !== null && last >= record.noticeBaseDate ? last : record.noticeBaseDate;
+}
+
+/** Whether the result was recorded after the renewal day of the period: a late renewal, told with the case (`QĐ-98e`, `SBF-20` §4.4 step 4). */
+export function lateRenewalOf(
+  record: Pick<RenewalRecord, 'noticeBasis' | 'noticeBaseDate'>,
+  period: Pick<RenewalPeriodFacts, 'renewalDate' | 'endDate'>,
+  recordedOn: BusinessDate,
+): boolean {
+  return recordedOn > renewalDayOf(record, period);
+}

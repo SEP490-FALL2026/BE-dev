@@ -4,6 +4,7 @@ import type { RenewalChoice, RenewalRecord } from '../subscription-renewal.types
 import {
   countsRefusal,
   existingCaseOf,
+  lateRenewalOf,
   noticeBasisOf,
   preflightOf,
   unintendedRenewalOf,
@@ -271,5 +272,25 @@ describe('a renewal the vendor made that the company did not choose (QĐ-106i(4)
     expect(incident({ choice: 'REDUCE', quantity: 8, outcome: 'AS_DECIDED', nextQuantity: 8 })).toBe(false);
     expect(incident({ choice: 'RENEW', quantity: 10, outcome: 'DIFFERENT', nextQuantity: 12 })).toBe(false);
     expect(incident({ choice: 'INCREASE', quantity: 12, outcome: 'DIFFERENT', nextQuantity: 14 })).toBe(false);
+  });
+});
+
+describe('whether a result was recorded after the renewal day (lateRenewal, QĐ-98e)', () => {
+  const late = (noticeBasis: RenewalRecord['noticeBasis'], baseDate: string, recordedOn: string, extra = {}) =>
+    lateRenewalOf({ noticeBasis, noticeBaseDate: baseDate }, period(extra), recordedOn);
+
+  it('counts a plan by the year to its renewal day, which is the deadline itself when no later day is declared', () => {
+    expect(late('DECLARED', '2026-12-01', '2027-01-01')).toBe(false);
+    expect(late('DECLARED', '2026-12-01', '2027-01-02')).toBe(true);
+    expect(late('BY_END_DATE', '2026-12-31', '2026-12-31', { renewalDate: null, endDate: '2026-12-31' })).toBe(false);
+    expect(late('BY_END_DATE', '2026-12-31', '2027-01-01', { renewalDate: null, endDate: '2026-12-31' })).toBe(true);
+    expect(late('BY_RENEWAL_DATE', '2027-01-01', '2027-01-02', { renewalDate: '2027-01-01', endDate: null })).toBe(
+      true,
+    );
+  });
+
+  it('counts a plan by the month to its payment day, which the date of the subscription does not say', () => {
+    expect(late('BY_PAYMENT_DATE', '2026-12-01', '2026-12-01', { renewalDate: '2026-08-01' })).toBe(false);
+    expect(late('BY_PAYMENT_DATE', '2026-12-01', '2026-12-02', { renewalDate: '2026-08-01' })).toBe(true);
   });
 });

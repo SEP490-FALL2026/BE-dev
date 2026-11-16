@@ -5,6 +5,7 @@ import { formatAmount } from '../../../core/money/money';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { CatalogApi } from '../../catalog/public/catalog.api';
 import { SubscriptionPeriodApi } from '../../catalog/public/subscription-period.api';
+import type { RenewalPeriodFacts } from '../../catalog/public/subscription-period.types';
 import { FinanceApi } from '../../finance/public/finance.api';
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import type {
@@ -14,27 +15,21 @@ import type {
   RenewalSummaryWire,
 } from './subscription-renewal.dto';
 import { RenewalError } from './subscription-renewal.errors';
-import { renewalWaitingReason } from './decision/renewal-decision.policy';
+import { lateRenewalOf } from './record/renewal-record.policy';
 import { toDeadlineEvent, toRenewalDetail, toRenewalSummary } from './subscription-renewal.mapper';
 import { RenewalPartiesService, type RenewalReadScope } from './subscription-renewal-parties.service';
 import { RenewalRankingService } from './subscription-renewal-ranking.service';
 import { SubscriptionRenewalRepo } from './subscription-renewal.repo';
-import {
-  isOwnedPeriod,
-  type DeadlineOutcome,
-  type OwnedPeriod,
-  type RenewalRecord,
-  type RenewalState,
-} from './subscription-renewal.types';
+import type { DeadlineOutcome, RenewalRecord, RenewalState } from './subscription-renewal.types';
 
 type PageQuery = { page: number; pageSize: number };
 
 /**
- * The reads of the renewals (`US-11-02`, `US-11-05`): the queue of the cases and their pages, the ranked seats a reduction is
- * chosen from, and the events of milestones passed with no decision. The IT Admin and Finance read every case (Finance only reads);
- * the head of a department reads the cases of the subscriptions that department owns and no other, a case of another department
- * being as good as absent; an employee and the person who decides spending never read them (`SoD-2`). A fixed number of statements
- * per page.
+ * The reads of the renewals (`US-11-02`, `US-11-05`): the queue of the cases and their pages, the ranked seats of a case of before, and the
+ * events of renewal days passed with no result recorded. The IT Admin and Finance read every case (Finance only reads), of a subscription
+ * a department owns and of one of the shared pool (no owner department) alike; the head of a department reads the cases of the subscriptions
+ * that department owns and no other, a case of another department or of the pool being as good as absent; an employee and the person who
+ * decides spending never read them (`SoD-2`). A fixed number of statements per page.
  */
 @Injectable()
 export class RenewalViewService {
@@ -67,27 +62,12 @@ export class RenewalViewService {
       query.pageSize,
     );
     const periods = await this.periodsOf(items.map((item) => item.subscriptionId));
-    // Read once for the page, and only when some case waits to be confirmed.
-    const heads = items.some((item) => item.state === 'PROPOSED')
-      ? await this.parties.ownerHeadsOf(
-          [...periods.values()].map((period) => period.ownerDepartmentId),
-          today,
-        )
-      : new Map<string, string>();
 
     return pageOf(
       items.flatMap((item) => {
         const period = periods.get(item.subscriptionId);
 
-        return period
-          ? [
-              toRenewalSummary(
-                item,
-                period,
-                renewalWaitingReason(item.state, heads.get(period.ownerDepartmentId) ?? null),
-              ),
-            ]
-          : [];
+        return period ? [toRenewalSummary(item, period)] : [];
       }),
       total,
       query.page,
@@ -119,10 +99,9 @@ export class RenewalViewService {
       usageAvailable: seats.usageAvailable,
       released: await this.repo.releasedOf(record.id),
       savings: await this.savingsOf(record),
-      waitingReason: renewalWaitingReason(
-        record.state,
-        record.state === 'PROPOSED' ? await this.parties.ownerHeadOf(period.ownerDepartmentId, today) : null,
-      ),
+      lateRenewal: record.outcome
+        ? lateRenewalOf(record, period, await this.organizationReads.businessToday(record.outcome.recordedAt))
+        : false,
       showSnapshot: !actor.roles.includes('IT_ADMIN'),
     });
   }
@@ -180,7 +159,7 @@ export class RenewalViewService {
     };
   }
 
-  /** The events of milestones passed with no decision, newest first: the incidents counted by `KPI-4` and the marks of an end. */
+  /** The events of renewal days passed with no result recorded, newest first: the incidents counted by `KPI-4` and the marks of an end. */
   async deadlineEvents(
     query: PageQuery & { kind?: DeadlineOutcome; from?: string; to?: string },
   ): Promise<Page<DeadlineEventWire>> {
@@ -210,15 +189,15 @@ export class RenewalViewService {
     return scope;
   }
 
-  /** A case of another department is as good as absent to the head who asks for it. */
-  private inScope(scope: RenewalReadScope, period: OwnedPeriod): boolean {
+  /** A case of another department, or of the shared pool (no owner), is as good as absent to the head who asks for it. */
+  private inScope(scope: RenewalReadScope, period: RenewalPeriodFacts): boolean {
     return scope.kind === 'ALL' || scope.departmentId === period.ownerDepartmentId;
   }
 
-  private async periodsOf(ids: readonly string[]): Promise<Map<string, OwnedPeriod>> {
+  private async periodsOf(ids: readonly string[]): Promise<Map<string, RenewalPeriodFacts>> {
     const periods = await this.periods.getPeriods([...new Set(ids)]);
 
-    return new Map(periods.filter(isOwnedPeriod).map((period) => [period.subscriptionId, period]));
+    return new Map(periods.map((period) => [period.subscriptionId, period]));
   }
 
   private async savingsOf(record: RenewalRecord): Promise<{ amount: string; currency: string } | null> {

@@ -1,7 +1,9 @@
+import type { RenewalPeriodFacts } from '../../catalog/public/subscription-period.types';
 import type { DeadlineEventWire, RenewalDetailWire, RenewalSummaryWire } from './subscription-renewal.dto';
-import type { DeadlineEventRecord, OwnedPeriod, ReleasedSeat, RenewalRecord } from './subscription-renewal.types';
+import type { DeadlineEventRecord, ReleasedSeat, RenewalRecord } from './subscription-renewal.types';
 
-const briefOf = (period: OwnedPeriod) => ({
+/** The subscription of a case; `ownerDepartmentId` is null for one of the shared pool (a K2 workspace no department owns). */
+const briefOf = (period: RenewalPeriodFacts) => ({
   id: period.subscriptionId,
   planId: period.planId,
   planName: period.planName,
@@ -11,11 +13,7 @@ const briefOf = (period: OwnedPeriod) => ({
 });
 
 /** A case as a list shows it: the period it is about, the milestone, the choice proposed and where the case stands. */
-export function toRenewalSummary(
-  record: RenewalRecord,
-  period: OwnedPeriod,
-  waitingReason: RenewalSummaryWire['waitingReason'],
-): RenewalSummaryWire {
+export function toRenewalSummary(record: RenewalRecord, period: RenewalPeriodFacts): RenewalSummaryWire {
   return {
     id: record.id,
     state: record.state,
@@ -27,7 +25,8 @@ export function toRenewalSummary(
     executionPoint: record.decision?.executionPoint ?? null,
     outcome: record.outcome?.kind ?? null,
     lateFlagged: record.lateFlaggedAt !== null,
-    waitingReason,
+    // No case waits for a head any more (QĐ-103e): the field stays null for the readers that still have it.
+    waitingReason: null,
     proposedAt: record.proposedAt.toISOString(),
   };
 }
@@ -58,12 +57,13 @@ function decisionWire(
 export function toRenewalDetail(
   record: RenewalRecord,
   context: {
-    period: OwnedPeriod;
+    period: RenewalPeriodFacts;
     seatsInUse: number;
     usageAvailable: boolean;
     released: readonly ReleasedSeat[];
     savings: { amount: string; currency: string } | null;
-    waitingReason: RenewalSummaryWire['waitingReason'];
+    /** Whether the outcome was recorded after the renewal day of the period (a late renewal, `QĐ-98e`). */
+    lateRenewal: boolean;
     /** False for the IT Admin: the money the head saw is not theirs to read (`L-617`). */
     showSnapshot: boolean;
   },
@@ -72,7 +72,7 @@ export function toRenewalDetail(
   const { decision, outcome } = record;
 
   return {
-    ...toRenewalSummary(record, period, context.waitingReason),
+    ...toRenewalSummary(record, period),
     period: {
       purchasedQuantity: period.purchasedQuantity,
       billingCycle: period.billingCycle,
@@ -90,6 +90,7 @@ export function toRenewalDetail(
       note: record.proposalNote,
       proposedByEmployeeId: record.proposedByEmployeeId,
       proposedAt: record.proposedAt.toISOString(),
+      seatsNeeded: record.seatsNeeded,
       releasedSeatCount: released.length,
     },
     decision: decision && decisionWire(decision, released.length, context.showSnapshot),
@@ -102,11 +103,12 @@ export function toRenewalDetail(
       vendorFollowUpOpen: outcome.vendorFollowUpOpen,
       nextSubscriptionId: outcome.nextSubscriptionId,
       realisedSavings: context.savings,
+      lateRenewal: context.lateRenewal,
     },
   };
 }
 
-export function toDeadlineEvent(event: DeadlineEventRecord, period: OwnedPeriod): DeadlineEventWire {
+export function toDeadlineEvent(event: DeadlineEventRecord, period: RenewalPeriodFacts): DeadlineEventWire {
   return {
     id: event.id,
     subscription: briefOf(period),

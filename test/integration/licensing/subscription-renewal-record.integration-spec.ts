@@ -1,13 +1,19 @@
-import { handOthersToSecondItAdmin } from '../../support/second-it-admin';
+import { TransactionRunner } from '../../../src/infrastructure/database/transaction-runner';
+import { SubscriptionRenewalRepo } from '../../../src/modules/licensing/subscription-renewal/subscription-renewal.repo';
 import { RenewalHarness } from '../../support/renewal-harness';
+import { handOthersToSecondItAdmin } from '../../support/second-it-admin';
+import { takeOwnerOff } from '../../support/shared-pool-subscription';
 
 const h = new RenewalHarness();
 
 interface CaseWire {
   id: string;
   state: string;
-  decision: { deciderRole: string } | null;
-  outcomeDetail: { kind: string; nextSubscriptionId: string | null } | null;
+  subscription: { ownerDepartmentId: string | null };
+  waitingReason: string | null;
+  proposal: { choice: string; quantity: number | null; seatsNeeded: number | null };
+  decision: { choice: string; deciderRole: string } | null;
+  outcomeDetail: { kind: string; nextSubscriptionId: string | null; lateRenewal: boolean } | null;
 }
 
 /**
@@ -206,5 +212,115 @@ describe('the one-write renewal at the point of adjustment (integration, real Po
       [next],
     );
     expect(rows.map((row) => row.predecessor_id)).toEqual([seats[1]]);
+  });
+
+  it('records and reads back a K2 subscription no department owns: the case never hides behind an owner (H1, S20-T7)', async () => {
+    const unit = await h.unit(2);
+    const { subscriptionId } = await h.termWithSeats(unit, 20, { quantity: 10, ...year() });
+    await takeOwnerOff(h, subscriptionId);
+
+    const response = await record({
+      subscriptionId,
+      choice: 'REDUCE',
+      proposedQuantity: 2,
+      outcome: 'AS_DECIDED',
+      nextPeriod: nextYear(2),
+    });
+
+    expect(response.status).toBe(201);
+    const renewal = h.dataOf<{ renewal: CaseWire }>(response).renewal;
+    expect(renewal).toMatchObject({
+      state: 'OUTCOME_RECORDED',
+      subscription: { ownerDepartmentId: null },
+      waitingReason: null,
+      proposal: { choice: 'REDUCE', quantity: 2, seatsNeeded: 2 },
+      decision: { choice: 'REDUCE', deciderRole: 'IT_ADMIN_IN_CHARGE' },
+      outcomeDetail: { kind: 'AS_DECIDED', lateRenewal: false },
+    });
+    // Every reader of the cases finds it: the IT Admin and Finance; the head of a department sees none of a pool subscription.
+    const asIt = await h.read(renewal.id);
+    expect(asIt.status).toBe(200);
+    expect(h.dataOf<{ renewal: CaseWire }>(asIt).renewal.subscription.ownerDepartmentId).toBeNull();
+    expect((await h.read(renewal.id, h.finance)).status).toBe(200);
+    expect((await h.read(renewal.id, unit.head.account)).status).toBe(404);
+    const listed = await h.renewals(`?subscriptionId=${subscriptionId}`, h.finance);
+    expect(listed.status).toBe(200);
+    expect(h.dataOf<{ items: Array<{ id: string }> }>(listed).items.map((item) => item.id)).toEqual([renewal.id]);
+    // Finance is told of the new period (QĐ-106i(3)), and nobody else is asked.
+    const told = await h.notices('SUBSCRIPTION_RENEWAL_OUTCOME_RECORDED', subscriptionId);
+    expect(told.map((notice) => notice.recipient_employee_id)).toContain(h.finance.employeeId);
+    expect((await h.deadlineEvents('', h.finance)).status).toBe(200);
+  });
+
+  it('records an increase to the vendor minimum with its evidence, and the outcome as decided matches it (R2-3, QĐ-103q)', async () => {
+    const unit = await h.unit(2);
+    const { subscriptionId } = await h.termWithSeats(unit, 20, { quantity: 3, ...year() });
+    await h.ctx.sql.query(`UPDATE subscriptions SET vendor_minimum_seats = 5 WHERE id = $1`, [subscriptionId]);
+
+    const response = await record({
+      subscriptionId,
+      choice: 'INCREASE',
+      proposedQuantity: 5,
+      note: 'The vendor sells nothing under five seats (contract 4.2).',
+      outcome: 'AS_DECIDED',
+      nextPeriod: nextYear(5),
+    });
+
+    expect(response.status).toBe(201);
+    expect(h.dataOf<{ renewal: CaseWire }>(response).renewal).toMatchObject({
+      state: 'OUTCOME_RECORDED',
+      proposal: { choice: 'INCREASE', quantity: 5, seatsNeeded: 2 },
+      decision: { choice: 'INCREASE' },
+      outcomeDetail: { kind: 'AS_DECIDED' },
+    });
+  });
+
+  it('refuses a new result while a case decided before this rule still waits for its outcome (R2-1)', async () => {
+    const unit = await h.unit(2);
+    const { subscriptionId } = await h.termWithSeats(unit, 20, { quantity: 10, ...year() });
+    const repo = h.ctx.app.get(SubscriptionRenewalRepo, { strict: false });
+    const legacy = await h.ctx.app.get(TransactionRunner).run(async (tx) => {
+      const proposed = await repo.insert(tx, {
+        organizationId: h.seed.organizationId,
+        subscriptionId,
+        noticeBasis: 'DECLARED',
+        noticeBaseDate: h.inDays(60),
+        proposedChoice: 'REDUCE',
+        proposedQuantity: 4,
+        proposalNote: null,
+        seatsNeeded: null,
+        proposedByEmployeeId: h.it1.employeeId,
+        proposedByAppUserId: h.it1.appUserId,
+      });
+      if (!proposed) throw new Error('the legacy case was not written');
+      await repo.recordDecision(tx, proposed.id, {
+        choice: 'REDUCE',
+        quantity: 4,
+        reason: null,
+        decidedByEmployeeId: unit.head.employeeId,
+        decidedByAppUserId: unit.head.account.appUserId,
+        deciderRole: 'OWNER_DEPARTMENT_HEAD',
+        decidedAt: new Date(),
+        decidedOn: h.inDays(0),
+        decidedAfterDeadline: false,
+        executionPoint: 'AS_PLANNED',
+        activeSeatsAtDecision: 2,
+        snapshot: { source: 'NOT_CONNECTED', takenAt: new Date().toISOString() },
+      });
+
+      return proposed.id;
+    });
+
+    const response = await record({
+      subscriptionId,
+      choice: 'REDUCE',
+      proposedQuantity: 2,
+      outcome: 'AS_DECIDED',
+      nextPeriod: nextYear(2),
+    });
+
+    expect(response.status).toBe(409);
+    expect(h.codeOf(response)).toBe('SUBSCRIPTION_RENEWAL.ALREADY_PROPOSED');
+    expect(detailsOf(response)).toEqual({ renewalId: legacy });
   });
 });

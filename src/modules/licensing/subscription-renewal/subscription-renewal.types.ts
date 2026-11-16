@@ -1,18 +1,8 @@
 import type { BusinessDate } from '../../../core/business-date';
-import type { RenewalPeriodFacts } from '../../catalog/public/subscription-period.types';
 import type { RenewalFinancialSnapshot } from '../public/licensing-subscription-renewal.types';
 
-/**
- * A period a department owns. The renewal of the shared pool's subscriptions (no owner department) is rewritten by S20-T3/T4; until then the
- * routes that need an owner department read only these, as they always have.
- */
-export type OwnedPeriod = RenewalPeriodFacts & { ownerDepartmentId: string };
-
-export const isOwnedPeriod = (period: RenewalPeriodFacts | undefined): period is OwnedPeriod =>
-  period !== undefined && period.ownerDepartmentId !== null;
-
 export type RenewalChoice = 'RENEW' | 'REDUCE' | 'CANCEL' | 'INCREASE';
-/** `STALE`: a proposal closed because it was out of date when the head confirmed it; the IT Admin proposes again. */
+/** `STALE`: a case closed without an outcome: one waiting for the head when the one-write renewal came, or one out of date. */
 export type RenewalState = 'PROPOSED' | 'DECIDED' | 'OUTCOME_RECORDED' | 'STALE';
 export type ExecutionPoint = 'AS_PLANNED' | 'MID_TERM' | 'NEXT_RENEWAL';
 export type RenewalOutcomeKind = 'AS_DECIDED' | 'VENDOR_REFUSED' | 'DIFFERENT' | 'UNCONFIRMED';
