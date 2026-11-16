@@ -199,6 +199,17 @@ export class DepartmentRepo {
     return rows.map(toRecord);
   }
 
+  /** The name of each of these departments, by id, in one read; an id that does not exist is absent (the notification text names a department by it). */
+  async namesOf(ids: readonly string[], tx?: DbTx): Promise<Map<string, string>> {
+    if (ids.length === 0) return new Map();
+    const rows = await (tx ?? this.prisma).department.findMany({
+      where: { id: { in: [...ids] } },
+      select: { id: true, name: true },
+    });
+
+    return new Map(rows.map((row) => [row.id, row.name]));
+  }
+
   async findById(id: string, tx?: DbTx): Promise<DepartmentRecord | null> {
     const rows = await (tx ?? this.prisma).$queryRaw<DepartmentRow[]>`${SELECT_DEPARTMENT} WHERE d.id = ${id}::uuid`;
 
