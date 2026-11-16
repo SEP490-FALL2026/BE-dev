@@ -61,7 +61,7 @@ export class DecisionReminderService {
     const inCharge = await this.organizationReads.getItAdminInChargeOfDepartment(departmentId, tx);
     const params = {
       recommendationId: record.id,
-      employeeId: record.employeeId ?? '',
+      employeeId: record.employeeId ?? null,
       applicationId: record.applicationId,
       decisionDueOn: record.decisionDueOn,
     };
@@ -129,7 +129,7 @@ export class DecisionReminderService {
       subject: { type: SUBJECT, id: record.id },
       params: {
         recommendationId: record.id,
-        employeeId: record.employeeId ?? '',
+        employeeId: record.employeeId ?? null,
         applicationId: record.applicationId,
         exemptUntil: exemption.exemptUntil,
       },

@@ -290,6 +290,39 @@ describe('renderNotificationText', () => {
   });
 });
 
+describe('the reminder of a late step (A8 #3)', () => {
+  const base = { requestId: UUID, stepKind: 'NEED', reminderNumber: 1, overdueWorkingDays: 2 };
+  const names = new Map([[nameLookupKey('REQUEST', UUID), 'Figma Pro']]);
+
+  it.each(['vi', 'en'] as const)(
+    'tells the requester the step waits for someone else, not to handle it (%s)',
+    (locale) => {
+      const holder = renderNotificationText('STEP_SLA_REMINDER', { ...base, recipientRole: 'HOLDER' }, locale, names);
+      const requester = renderNotificationText(
+        'STEP_SLA_REMINDER',
+        { ...base, recipientRole: 'REQUESTER' },
+        locale,
+        names,
+      );
+      const absent = renderNotificationText('STEP_SLA_REMINDER', base, locale, names);
+
+      expect(requester.message).not.toBe(holder.message);
+      expect(requester.message).toContain('Figma Pro');
+      expect(requester.message).toContain('2');
+      expect(holder.message).toContain('Figma Pro');
+      // Rows written before the key existed read as the holder's sentence.
+      expect(absent).toEqual(holder);
+    },
+  );
+
+  it('keeps the sentence of the holder: please handle it', () => {
+    const holder = renderNotificationText('STEP_SLA_REMINDER', { ...base, recipientRole: 'HOLDER' }, 'en', names);
+    expect(holder.message).toContain('Please handle it soon.');
+    const requester = renderNotificationText('STEP_SLA_REMINDER', { ...base, recipientRole: 'REQUESTER' }, 'en', names);
+    expect(requester.message).not.toContain('Please handle it');
+  });
+});
+
 describe('nameRefsOf', () => {
   it('lists the kind and id of every name a code prints, once, for the chosen branch', () => {
     const refs = nameRefsOf('REQUEST_SUBMITTED', { requestId: UUID, stage: 'CONFIRMED' }, 'vi');

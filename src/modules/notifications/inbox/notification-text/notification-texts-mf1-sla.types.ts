@@ -31,13 +31,27 @@ export const MF1_SLA_TEXTS = {
   STEP_SLA_REMINDER: {
     vi: {
       title: 'Bước xử lý đã quá hạn',
-      message:
-        'Bước {stepKind:enum} của yêu cầu {requestId:name} đã quá hạn[ {overdueWorkingDays} ngày làm việc] (nhắc lần {reminderNumber}). Vui lòng xử lý sớm.',
+      message: {
+        by: 'recipientRole',
+        cases: {
+          REQUESTER:
+            'Bước {stepKind:enum} của yêu cầu {requestId:name} của bạn đã quá hạn[ {overdueWorkingDays} ngày làm việc] (nhắc lần {reminderNumber}). Người xử lý đã được nhắc; bạn không cần làm thêm gì.',
+        },
+        otherwise:
+          'Bước {stepKind:enum} của yêu cầu {requestId:name} đã quá hạn[ {overdueWorkingDays} ngày làm việc] (nhắc lần {reminderNumber}). Vui lòng xử lý sớm.',
+      },
     },
     en: {
       title: 'A step is overdue',
-      message:
-        'The {stepKind:enum} step of request {requestId:name} is overdue[ by {overdueWorkingDays} working days] (reminder {reminderNumber}). Please handle it soon.',
+      message: {
+        by: 'recipientRole',
+        cases: {
+          REQUESTER:
+            'The {stepKind:enum} step of your request {requestId:name} is overdue[ by {overdueWorkingDays} working days] (reminder {reminderNumber}). The person handling it has been reminded; nothing more is needed from you.',
+        },
+        otherwise:
+          'The {stepKind:enum} step of request {requestId:name} is overdue[ by {overdueWorkingDays} working days] (reminder {reminderNumber}). Please handle it soon.',
+      },
     },
   },
   STEP_SLA_ESCALATION: {

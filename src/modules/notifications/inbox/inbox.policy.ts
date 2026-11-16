@@ -47,7 +47,7 @@ export const PARAM_KEYS_BY_CODE: Readonly<Record<InAppNotificationCode, readonly
   GRANT_TASK_CANCELLED: ['requestId', 'taskId'],
   // The reminders of a late step and of the queue of the head, and the alert of a backlog (`g5-step-sla-and-alerts`): ids, the kind
   // of step, how many reminders, how old and how late in working days, and the cause when the Super Admin is told. No figure of money.
-  STEP_SLA_REMINDER: [...STEP, ...REMINDER_NUMBERS],
+  STEP_SLA_REMINDER: [...STEP, ...REMINDER_NUMBERS, 'recipientRole'],
   STEP_SLA_ESCALATION: [...STEP, ...REMINDER_NUMBERS, 'holderEmployeeId'],
   STEP_SLA_NO_SUPERIOR: [...STEP, ...REMINDER_NUMBERS, 'holderEmployeeId', 'cause'],
   SPEND_QUEUE_REMINDER: ['requestId', ...REMINDER_NUMBERS, 'cause'],

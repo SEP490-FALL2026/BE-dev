@@ -101,6 +101,11 @@ describe('the closed table of in-app notices', () => {
         notice({ code: 'STEP_SLA_REMINDER', params: { requestId: REQUEST, overdueWorkingDays: 2 } }),
       ),
     ).toBeNull();
+    expect(
+      refuseInAppNotification(
+        notice({ code: 'STEP_SLA_REMINDER', params: { requestId: REQUEST, recipientRole: 'REQUESTER' } }),
+      ),
+    ).toBeNull();
   });
 
   it('refuses parameters over 4 096 bytes, counted in bytes and not in characters', () => {
