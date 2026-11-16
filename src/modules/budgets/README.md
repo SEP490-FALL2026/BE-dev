@@ -75,7 +75,7 @@ attachmentIds[1..10] }`, không có dòng (`requestedAmount` lưu ở `total_min
   (`proposalWorkRefusal` ở `cycle/cycle.policy.ts`: nháp/không có kỳ ⟹ 409 `BUDGET_CYCLE.NOT_OPEN`, từ ngày sau hạn nộp ⟹ 409
   `BUDGET_CYCLE.LOCKED`).
 - `version/` — phiên bản: tạo, sửa số, gửi duyệt, quyết định, lịch sử (US-06-09, US-06-11); `budget-versions.controller.ts`;
-  `VersionService`, `VersionDecisionService` (`VersionDecisionJudge` + `VersionDecisionWriter`; `decision` nhận `checklist` của bước `4.7`, `QĐ-111ap`: _Không_ khóa `APPROVE`, `RETURN` lấy lý do từ các mục _Không_ khi không gõ), `VersionCreationService`,
+  `VersionService`, `VersionDecisionService` (`VersionDecisionJudge` + `VersionDecisionWriter`; `decision` nhận `checklist` của bước `4.7`, `QĐ-111ap`: _Không_ khóa `APPROVE`, `RETURN` lấy lý do từ các mục _Không_ khi không gõ; `APPROVE` kiểm lại Trần năm trừ dự phòng kho, mục `4.7-02`, trước khi duyệt: 409 `BUDGET_VERSION.OVER_CEILING`), `VersionCreationService`,
   `VersionBaselineCreationService`, `VersionFigures`, `VersionTrail`, `VersionAccessService`. Một số cho cả năm, không dòng (`QĐ-111ac`,
   B-6): `base` bỏ trống ⟹ điền số chạy sang của Cost Center (`CarriedOverContributions`, `requests` bind bằng một lần chạy thử khoản 01/01; không ai bind ⟹ 0), dự phòng là
   `reservePercent` (mặc định `BUDGET_RESERVE_DEFAULT_PERCENT`) hoặc `reserve` (số tiền); dự phòng khác mặc định của tổ chức (đọc lúc gửi), dù
