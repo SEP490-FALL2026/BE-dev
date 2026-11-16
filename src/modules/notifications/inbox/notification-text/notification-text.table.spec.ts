@@ -242,7 +242,7 @@ describe('renderNotificationText', () => {
     const params = { requestId: UUID, stage: 'CONFIRMED' };
     expect(renderNotificationText('REQUEST_SUBMITTED', params, 'vi', new Map())).toEqual({
       title: 'Đã gửi yêu cầu',
-      message: 'Yêu cầu một yêu cầu đã được gửi và nhu cầu được xác nhận ngay khi gửi.',
+      message: 'Yêu cầu (không rõ tên) đã được gửi và nhu cầu được xác nhận ngay khi gửi.',
     });
     expect(renderNotificationText('REQUEST_SUBMITTED', params, 'en', new Map()).title).toBe('Request sent');
   });
@@ -253,7 +253,7 @@ describe('renderNotificationText', () => {
     expect(renderNotificationText('REQUEST_SUBMITTED', params, 'en', names).message).toContain(
       'Figma – Pro cho Design',
     );
-    expect(renderNotificationText('REQUEST_SUBMITTED', params, 'en', new Map()).message).toContain('a request');
+    expect(renderNotificationText('REQUEST_SUBMITTED', params, 'en', new Map()).message).toContain('(unnamed)');
   });
 
   it('reads a label of the code before the shared label of the same key and value', () => {

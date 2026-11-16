@@ -194,7 +194,7 @@ describe('renderTemplate: {key:name}', () => {
   });
 
   it('looks a name up by the kind of the key, not by the id alone', () => {
-    expect(renderTemplate('{departmentId:name}', ctx('en', { departmentId: UUID }, { names }))).toBe('a department');
+    expect(renderTemplate('{departmentId:name}', ctx('en', { departmentId: UUID }, { names }))).toBe('(unnamed)');
   });
 
   it.each(Object.entries(NAME_KIND_BY_KEY))(
@@ -234,7 +234,7 @@ describe('renderTemplate: [ optional groups ]', () => {
   it('hides a group for a null, absent or empty variable and leaves no stray space', () => {
     expect(render(TEMPLATE, 'vi', { reason: null, suggestedPlanId: null })).toBe('Bị từ chối.');
     expect(render(TEMPLATE, 'vi', {})).toBe('Bị từ chối.');
-    expect(render(TEMPLATE, 'vi', { reason: '', suggestedPlanId: UUID })).toBe('Bị từ chối. Gói thay thế: một gói.');
+    expect(render(TEMPLATE, 'vi', { reason: '', suggestedPlanId: UUID })).toMatch(/^Bị từ chối\. Gói thay thế: \(.+/);
   });
 
   it('needs every variable inside a group, not just one', () => {
@@ -251,7 +251,7 @@ describe('renderTemplate: [ optional groups ]', () => {
   });
 
   it('keeps an id-backed name visible when the name is unknown', () => {
-    expect(render('Xong.[ Gói {planId:name}.]', 'vi', { planId: UUID })).toBe('Xong. Gói một gói.');
+    expect(render('Xong.[ Gói {planId:name}.]', 'vi', { planId: UUID })).toBe('Xong. Gói (không rõ tên).');
   });
 
   it('treats nested, stray or unclosed brackets as literal text without throwing', () => {

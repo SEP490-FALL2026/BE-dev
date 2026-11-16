@@ -10,8 +10,8 @@ import { MyRequestsRepo } from './my-requests.repo';
 
 /**
  * What a notification sentence calls a Request: the application and plan it asks for ("Figma – Professional"), or the name of the software
- * proposed when it is not in the catalog or its plan is not linked yet. A Request that names neither (a group Request) is absent, so the
- * sentence says "a request". The plans are named by the catalog, through its facade, in one read for the page; this module reads no
+ * proposed when it is not in the catalog or its plan is not linked yet. A group Request has a plan too, so it is named like any other. A
+ * Request that is gone, or that names neither, is absent, so the sentence says "(không rõ tên)" / "(unnamed)". The plans are named by the catalog, through its facade, in one read for the page; this module reads no
  * catalog table. It hands itself to the notification inbox when the module starts, so `notifications` never imports `requests`.
  */
 @Injectable()

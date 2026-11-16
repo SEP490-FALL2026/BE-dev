@@ -382,8 +382,8 @@ describe('the inbox of the application over PostgreSQL (FR-3.11, US-05-15 AC-7, 
       const vi = (await list(hana.account)).items[0];
       const en = h.dataOf<{ items: NoticeWire[] }>(await asEnglish(hana.account).expect(200)).items[0];
 
-      expect(vi.message).toContain('một yêu cầu');
-      expect(en.message).toContain('a request');
+      expect(vi.message).toContain('(không rõ tên)');
+      expect(en.message).toContain('(unnamed)');
     });
 
     it('keeps the six old fields as they are stored, and reads the old spelling of a subject type in UPPER_SNAKE', async () => {

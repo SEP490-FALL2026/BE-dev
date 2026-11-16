@@ -133,7 +133,7 @@ describe('InboxViewService', () => {
   it('uses the generic phrase for an id nobody knows, and logs nothing', async () => {
     const [view] = await serviceWith(sourceOf(['REQUEST'], {})).view([record()], 'vi');
 
-    expect(view.message).toContain('một yêu cầu');
+    expect(view.message).toContain('(không rõ tên)');
     expect(warn).not.toHaveBeenCalled();
   });
 
@@ -143,7 +143,7 @@ describe('InboxViewService', () => {
 
     const [view] = await serviceWith(failing).view([record()], 'en');
 
-    expect(view.message).toContain('a request');
+    expect(view.message).toContain('(unnamed)');
     expect(warn).toHaveBeenCalledTimes(1);
     const line = warn.mock.calls[0][0];
     expect(line).toContain('REQUEST');
@@ -172,7 +172,7 @@ describe('InboxViewService', () => {
   it('uses the generic phrase and logs one line for a kind nobody registered', async () => {
     const [view] = await serviceWith().view([record()], 'vi');
 
-    expect(view.message).toContain('một yêu cầu');
+    expect(view.message).toContain('(không rõ tên)');
     expect(warn).toHaveBeenCalledTimes(1);
     expect(warn.mock.calls[0][0]).toContain('REQUEST');
   });

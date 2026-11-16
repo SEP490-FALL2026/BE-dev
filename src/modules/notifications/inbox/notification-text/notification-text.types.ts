@@ -38,13 +38,17 @@ export const NAME_KIND_BY_KEY: Readonly<Record<string, NameKind>> = {
   subscriptionId: 'SUBSCRIPTION',
 };
 
-/** What a name becomes when its id is unknown, deleted or unreadable. Same words as the catalogue's generic phrases. */
+/**
+ * What a name becomes when its id is unknown, deleted or unreadable. A kind a sentence names after its own noun ("Yêu cầu {requestId:name}",
+ * "phòng {departmentId:name}", "gói {planId:name}") gets a neutral phrase that is not that noun: "Yêu cầu một yêu cầu" reads badly. A person
+ * has no noun in front of the name, so "một nhân viên" stays.
+ */
 export const NAME_FALLBACK: Readonly<Record<NameKind, Readonly<Record<NotificationLocale, string>>>> = {
-  REQUEST: { vi: 'một yêu cầu', en: 'a request' },
+  REQUEST: { vi: '(không rõ tên)', en: '(unnamed)' },
   EMPLOYEE: { vi: 'một nhân viên', en: 'an employee' },
-  DEPARTMENT: { vi: 'một phòng', en: 'a department' },
-  COST_CENTER: { vi: 'một Cost Center', en: 'a Cost Center' },
-  APPLICATION: { vi: 'một ứng dụng', en: 'an application' },
-  PLAN: { vi: 'một gói', en: 'a plan' },
-  SUBSCRIPTION: { vi: 'một thuê bao', en: 'a subscription' },
+  DEPARTMENT: { vi: '(không rõ tên)', en: '(unnamed)' },
+  COST_CENTER: { vi: '(không rõ tên)', en: '(unnamed)' },
+  APPLICATION: { vi: '(không rõ tên)', en: '(unnamed)' },
+  PLAN: { vi: '(không rõ tên)', en: '(unnamed)' },
+  SUBSCRIPTION: { vi: '(không rõ tên)', en: '(unnamed)' },
 };
