@@ -84,12 +84,12 @@ export const MF1_SLA_TEXTS = {
       message: {
         by: 'cause',
         cases: {
-          null: 'Yêu cầu {requestId:name} đã chờ trong hàng đợi của bạn quá hạn[ {overdueWorkingDays} ngày làm việc] (nhắc lần {reminderNumber}). Vui lòng trình duyệt chi.',
           NO_HOLDER:
             'Yêu cầu {requestId:name} chờ trình duyệt chi quá hạn[ {overdueWorkingDays} ngày làm việc] nhưng phòng chưa có trưởng phòng đang làm việc. Vui lòng bổ nhiệm trưởng phòng.',
         },
+        // `cause` null or absent is the head of the department (the queue's own recipient), and so is a row without it.
         otherwise:
-          'Yêu cầu {requestId:name} chờ trình duyệt chi quá hạn[ {overdueWorkingDays} ngày làm việc] (nhắc lần {reminderNumber}).',
+          'Yêu cầu {requestId:name} đã chờ trong hàng đợi của bạn quá hạn[ {overdueWorkingDays} ngày làm việc] (nhắc lần {reminderNumber}). Vui lòng trình duyệt chi.',
       },
     },
     en: {
@@ -97,12 +97,11 @@ export const MF1_SLA_TEXTS = {
       message: {
         by: 'cause',
         cases: {
-          null: 'Request {requestId:name} has waited in your queue past its limit[ by {overdueWorkingDays} working days] (reminder {reminderNumber}). Please send it for spend approval.',
           NO_HOLDER:
             'Request {requestId:name} has waited to be sent for spend approval past its limit[ by {overdueWorkingDays} working days], but the department has no head at work. Please appoint one.',
         },
         otherwise:
-          'Request {requestId:name} has waited to be sent for spend approval past its limit[ by {overdueWorkingDays} working days] (reminder {reminderNumber}).',
+          'Request {requestId:name} has waited in your queue past its limit[ by {overdueWorkingDays} working days] (reminder {reminderNumber}). Please send it for spend approval.',
       },
     },
   },

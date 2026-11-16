@@ -80,6 +80,11 @@ function problemsOf(code: InAppNotificationCode): string[] {
     for (const issue of templateSyntaxIssues(template)) problems.push(`${part}: ${issue}`);
     if (typeof template !== 'string') {
       if (!allowedKeys.has(template.by)) problems.push(`${part}: by "${template.by}" is not a param of the code`);
+      for (const key of Object.keys(template.cases)) {
+        if (key === 'null' || key === 'undefined') {
+          problems.push(`${part}: case "${key}" is unreachable: params null/absent select \`otherwise\``);
+        }
+      }
       usedBy[locale].add(template.by);
     }
     for (const { key, format } of templateVariables(template)) {
@@ -157,6 +162,10 @@ function sampleParamSets(code: InAppNotificationCode): Record<string, unknown>[]
   for (const key of PARAM_KEYS_BY_CODE[code]) if (/(Days|Count|Number|Version)/.test(key)) numeric[key] = 1;
   const sets: Record<string, unknown>[] = [{}, base, numeric];
   for (const [key, values] of domainsOf(code)) for (const value of values) sets.push({ ...base, [key]: value });
+  for (const { template } of templatesOf(NOTIFICATION_TEXTS[code])) {
+    if (typeof template === 'string') continue;
+    sets.push({ ...base, [template.by]: null }, { ...base, [template.by]: undefined });
+  }
   return sets;
 }
 
@@ -320,6 +329,26 @@ describe('the reminder of a late step (A8 #3)', () => {
     expect(holder.message).toContain('Please handle it soon.');
     const requester = renderNotificationText('STEP_SLA_REMINDER', { ...base, recipientRole: 'REQUESTER' }, 'en', names);
     expect(requester.message).not.toContain('Please handle it');
+  });
+});
+
+describe('the spend queue reminder (R-2)', () => {
+  const base = { requestId: UUID, reminderNumber: 2, overdueWorkingDays: 1 };
+  const names = new Map([[nameLookupKey('REQUEST', UUID), 'Figma Pro']]);
+  const message = (params: Record<string, unknown>, locale: NotificationLocale): string =>
+    renderNotificationText('SPEND_QUEUE_REMINDER', params, locale, names).message;
+
+  it('tells the head to send it for spend approval when cause is null, absent or an old row', () => {
+    for (const params of [{ ...base, cause: null }, base, { ...base, cause: undefined }]) {
+      expect(message(params, 'vi')).toContain('Vui lòng trình duyệt chi.');
+      expect(message(params, 'vi')).toContain('của bạn');
+      expect(message(params, 'en')).toContain('Please send it for spend approval.');
+    }
+  });
+
+  it('still asks the Super Admin to appoint a head when there is none', () => {
+    expect(message({ ...base, cause: 'NO_HOLDER' }, 'vi')).toContain('bổ nhiệm trưởng phòng');
+    expect(message({ ...base, cause: 'NO_HOLDER' }, 'en')).toContain('Please appoint one.');
   });
 });
 
