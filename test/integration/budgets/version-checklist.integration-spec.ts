@@ -59,6 +59,21 @@ describe('the checklist of the decision on a version of a budget (integration, r
     ]);
   });
 
+  it('keeps the answers at the hour of the decision', async () => {
+    const version = await sent();
+
+    await h.decideVersion(version.id, { decision: 'APPROVE' }, boss.account).expect(200);
+
+    const decided = await h.ctx.sql.query<{ decision_at: Date; checklist_at: Date }>(
+      `SELECT d.decided_at AS decision_at, c.decided_at AS checklist_at
+         FROM budget_version_decisions d JOIN decision_checklists c ON c.subject_id = d.version_id AND c.step_code = '4.7'
+        WHERE d.version_id = $1`,
+      [version.id],
+    );
+    expect(decided.rows).toHaveLength(1);
+    expect(decided.rows[0].checklist_at.toISOString()).toBe(decided.rows[0].decision_at.toISOString());
+  });
+
   it('locks the approval when an answer is No, and decides nothing', async () => {
     const version = await sent();
 

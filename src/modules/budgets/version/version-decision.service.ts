@@ -42,13 +42,15 @@ export class VersionDecisionService {
         decision: body.decision,
         reason: body.reason,
       });
-      const written = await this.writer.write(tx, actor, judged, { ...body, reason: reason ?? undefined });
+      // One hour for the decision and for the answers kept with it.
+      const now = new Date();
+      const written = await this.writer.write(tx, actor, judged, { ...body, reason: reason ?? undefined }, now);
       await this.checklists.record(tx, {
         organizationId: judged.version.organizationId,
         verdict,
         decision: body.decision,
         decidedByEmployeeId: actor.employeeId,
-        decidedAt: new Date(),
+        decidedAt: now,
         subjects: [{ kind: 'BUDGET_VERSION', id }],
       });
 

@@ -1,6 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import request from 'supertest';
 import { addDays } from '../../../src/core/business-date';
+import { EscalationService } from '../../../src/modules/optimization/escalation/escalation.service';
 import type { ApiAccount } from '../../support/api-accounts';
 import { GhostSeatWorld } from '../../support/ghost-seat-world';
 
@@ -209,6 +210,26 @@ describe('the checklist of the wasted seats (integration, real PostgreSQL)', () 
         escalated: 2,
       });
       expect(await tierOf(first)).toBe('REVIEW');
+    });
+
+    it('keeps the answers at the hour of the push it was given', async () => {
+      const id = await watch('CE5');
+      const at = new Date('2026-03-10T08:15:00.000Z');
+      const actor = w.actorOf(w.it1);
+
+      await w.ctx.app
+        .get(EscalationService)
+        .escalate(
+          actor,
+          { recommendationIds: [id], checklist: w.checklists.yes('5.3'), idempotencyKey: `escalation-${randomUUID()}` },
+          at,
+        );
+
+      const kept = await w.ctx.sql.query<{ decided_at: Date }>(
+        `SELECT decided_at FROM decision_checklists WHERE subject_id = $1 AND step_code = '5.3'`,
+        [id],
+      );
+      expect(kept.rows.map((row) => row.decided_at.toISOString())).toEqual([at.toISOString()]);
     });
 
     it('asks for the checklist and for an answer to every question', async () => {

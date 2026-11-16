@@ -35,11 +35,11 @@ export class VersionDecisionWriter {
     actor: AuthenticatedPrincipal,
     judged: JudgedDecision,
     body: DecisionBodyDto,
+    now: Date,
   ): Promise<VersionRecord> {
     const { version, today } = judged;
     const id = version.id;
     const outcome = decisionOutcomeOf(body.decision);
-    const now = new Date();
     // One current version at a time (INV-21) is kept by `BUDGET.CURRENT_EXISTS` before a version is sent: an approval replaces nothing
     // (`QĐ-97b`, `QĐ-104e`(1)), so nothing is superseded and there is no previous total.
     await this.versions.setState(tx, id, outcome.state);
