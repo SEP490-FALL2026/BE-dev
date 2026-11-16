@@ -4,6 +4,7 @@ import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { VersionRepo } from '../budget/version.repo';
 import { CycleRepo, type CycleRecord } from '../cycle/cycle.repo';
+import { ThresholdAlertService } from '../threshold/threshold-alert.service';
 import { VersionAdjustmentCreationService } from '../version/version-adjustment-creation.service';
 import { BudgetAdjustmentVersionInFlightError } from './budget-adjustment.errors';
 import type { AdjustmentRecord } from './budget-adjustment.repo';
@@ -22,6 +23,7 @@ export class BudgetAdjustmentApplyService {
     private readonly cycles: CycleRepo,
     private readonly versions: VersionRepo,
     private readonly versionMaker: VersionAdjustmentCreationService,
+    private readonly thresholds: ThresholdAlertService,
   ) {}
 
   /**
@@ -48,7 +50,10 @@ export class BudgetAdjustmentApplyService {
       throw new BudgetAdjustmentVersionInFlightError(receiver);
     }
 
-    return this.versionMaker.make(tx, actor, {
+    // The version takes the commitments that waited for a budget (R-48): the use of the Cost Center now counts them against a base that did not exist, which is the one change
+    // of the use an approval makes, and so the one place it tells a threshold (`RV-2`). The base of another adjustment of a Cost Center that has a budget moves no use and tells nothing (R-28).
+    const watch = await this.thresholds.watch(tx, [{ costCenterId: receiver, year: adjustment.year }]);
+    const versionId = await this.versionMaker.make(tx, actor, {
       organizationId: adjustment.organizationId,
       costCenterId: receiver,
       year: adjustment.year,
@@ -57,5 +62,8 @@ export class BudgetAdjustmentApplyService {
       madeByEmployeeId: adjustment.createdByEmployeeId,
       now,
     });
+    await this.thresholds.settle(tx, watch, now);
+
+    return versionId;
   }
 }

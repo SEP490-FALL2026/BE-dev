@@ -104,6 +104,9 @@ import { BudgetReviewReminderService } from './review/budget-review-reminder.ser
 import { BudgetReviewSweeper } from './review/budget-review.job';
 import { SeatMonthChargesController } from './seat-month/seat-month-charges.controller';
 import { SeatMonthPoolService } from './seat-month/seat-month-pool.service';
+import { ThresholdAlertService } from './threshold/threshold-alert.service';
+import { ThresholdNotifierService } from './threshold/threshold-notifier.service';
+import { ThresholdRepo } from './threshold/threshold.repo';
 import { SeatMonthQueryService } from './seat-month/seat-month-query.service';
 import { SeatMonthService } from './seat-month/seat-month.service';
 import { SeatMonthSubscriptionService } from './seat-month/seat-month-subscription.service';
@@ -221,6 +224,9 @@ import { BudgetProposalTemplateListener } from './proposal/budget-proposal-templ
     SeatMonthSubscriptionService,
     SeatMonthService,
     SeatMonthPoolService,
+    ThresholdAlertService,
+    ThresholdNotifierService,
+    ThresholdRepo,
     SeatMonthQueryService,
     SeatMonthSweeper,
     CommitmentReleaseGuardHook,

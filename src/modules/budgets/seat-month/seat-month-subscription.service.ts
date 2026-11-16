@@ -8,9 +8,20 @@ import { OrganizationHistoryApi } from '../../organization/public/organization-h
 import { OrganizationReadApi } from '../../organization/public/organization-read.api';
 import { BudgetYearLockRepo } from '../budget/budget-year-lock.repo';
 import { CommitmentRepo, type LockedCommitmentOfRequest } from '../budget/commitment.repo';
+import { ThresholdAlertService } from '../threshold/threshold-alert.service';
 import { planSeatMonth, type ReturnedApplication, type SeatToCharge } from './seat-month-plan.policy';
 import { SeatMonthRepo, type NewSeatMonthCharge, type SeatMonthChargeRecord } from './seat-month.repo';
 import type { PlacementPeriod } from './seat-month.types';
+
+/** The Cost Centers whose use the rows of before and the rows written touch, in the year of the month. */
+const costCentersOf = (
+  year: number,
+  before: readonly SeatMonthChargeRecord[],
+  written: readonly NewSeatMonthCharge[],
+): { costCenterId: string; year: number }[] =>
+  [...before, ...written].flatMap((row) =>
+    row.costCenterId === null ? [] : [{ costCenterId: row.costCenterId, year }],
+  );
 
 const byId = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0);
 const daysBetween = (from: BusinessDate, to: BusinessDate): number =>
@@ -43,6 +54,7 @@ export class SeatMonthSubscriptionService {
     private readonly commitments: CommitmentRepo,
     private readonly yearLock: BudgetYearLockRepo,
     private readonly audit: AuditApi,
+    private readonly thresholds: ThresholdAlertService,
   ) {}
 
   /** Returns the number of rows the month of the subscription has now. */
@@ -86,9 +98,13 @@ export class SeatMonthSubscriptionService {
       daysInMonth,
       computedAt: now,
     }));
+    // What each Cost Center uses is read before the rows are replaced and after the commitments took what they apply, to tell the threshold the month crosses (`RV-2`): the rows replace
+    // the ones of before, so the use goes by what changed and never by the whole month again.
+    const watch = await this.thresholds.watch(tx, costCentersOf(year, before, written));
     await this.replace(tx, year, before, written);
     await this.giveBack(tx, { organizationId: organization.id, subscriptionId, month, now }, plan.returned);
     await this.takeDown(tx, plan.takenByCommitment);
+    await this.thresholds.settle(tx, watch, now);
     if (before.length > 0 || written.length > 0)
       await this.record(tx, organization.id, subscriptionId, month, written, plan.returned);
     // The mark is written in the transaction of the rows: it exists if and only if this subscription was charged for the month (`SM1-03`).

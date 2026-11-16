@@ -8,6 +8,7 @@ import {
   CommitmentRequestFactsHook,
   type CommitmentRequestView,
 } from '../public/budgets.extension-points';
+import type { ThresholdAlertService } from '../threshold/threshold-alert.service';
 import { CommitmentService } from './commitment.service';
 
 const COST_CENTER = '0a1b2c3d-0000-4000-8000-000000000001';
@@ -66,6 +67,7 @@ function build(
     new CommitmentReleaseGuardHook(),
     requestFacts,
     { figuresOf } as unknown as InvoiceRepo,
+    {} as ThresholdAlertService,
   );
 
   return { service, page, factsOf, figuresOf };

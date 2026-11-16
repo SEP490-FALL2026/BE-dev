@@ -5,10 +5,10 @@ import type { DbTx } from '../../../infrastructure/database/transaction-runner';
 import type { AuthenticatedPrincipal } from '../../../infrastructure/security/tokens/access-token-verifier.port';
 import { AuditApi } from '../../audit/public/audit.api';
 import { budgetAuditEvent } from '../budget/budget-facts.service';
-import { BudgetYearLockRepo } from '../budget/budget-year-lock.repo';
 import { InvoiceRepo } from '../budget/invoice.repo';
 import { OutOfProcessSpendRefusedError } from '../public/budgets.errors';
 import type { OutOfProcessSpendInput, OutOfProcessSpendRecorded } from '../public/budgets.types';
+import { ThresholdAlertService } from '../threshold/threshold-alert.service';
 
 /** The number the one invoice of a case outside the process carries: the vendor has it once, so the case is recorded once. */
 export const outOfProcessInvoiceNumber = (caseId: string): string => `OOP-${caseId}`;
@@ -16,14 +16,14 @@ export const outOfProcessInvoiceNumber = (caseId: string): string => `OOP-${case
 /**
  * Writes the money of a case outside the process (`SBF-07a`, R-45): what was already spent, with a proof of payment, as an actual expense in dong with
  * no commitment behind it, booked to the month the money was recorded in and to the Cost Center that bears it, or to none yet. The budget year of the
- * Cost Center is locked first, as the expense of a purchase invoice does. The price is never judged against the budget (`C-08`): it was spent.
+ * Cost Center is locked first (by the watch of the threshold of its use, `RV-2`), as the expense of a purchase invoice does. The price is never judged against the budget (`C-08`): it was spent.
  */
 @Injectable()
 export class OutOfProcessSpendRecorderService {
   constructor(
     private readonly invoices: InvoiceRepo,
-    private readonly yearLock: BudgetYearLockRepo,
     private readonly audit: AuditApi,
+    private readonly thresholds: ThresholdAlertService,
   ) {}
 
   /** Throws OutOfProcessSpendRefusedError. */
@@ -38,9 +38,12 @@ export class OutOfProcessSpendRecorderService {
       throw new OutOfProcessSpendRefusedError('DUPLICATE_NUMBER');
     }
     const serviceMonth = `${input.recordedOn.slice(0, 7)}-01`;
-    if (input.costCenterId !== null) {
-      await this.yearLock.lock(tx, input.costCenterId, [Number(input.recordedOn.slice(0, 4))]);
-    }
+    const watch =
+      input.costCenterId === null
+        ? null
+        : await this.thresholds.watch(tx, [
+            { costCenterId: input.costCenterId, year: Number(input.recordedOn.slice(0, 4)) },
+          ]);
     let invoice;
     try {
       invoice = await this.invoices.insert(tx, {
@@ -69,6 +72,7 @@ export class OutOfProcessSpendRecorderService {
       }
       throw error;
     }
+    if (watch !== null) await this.thresholds.settle(tx, watch, input.now);
     await this.audit.record(
       tx,
       budgetAuditEvent(actor, input.organizationId, 'INVOICE.RECORDED', 'INVOICE', invoice.id, {

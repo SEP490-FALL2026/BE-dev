@@ -6,6 +6,7 @@ import type { CommitmentRepo } from '../budget/commitment.repo';
 import type { InvoiceRecord, InvoiceRepo } from '../budget/invoice.repo';
 import { PurchaseInvoiceRecordRefusedError } from '../public/budgets.errors';
 import type { PurchaseInvoiceRecordInput } from '../public/budgets.types';
+import type { ThresholdAlertService } from '../threshold/threshold-alert.service';
 import { PurchaseInvoiceRecorderService } from './purchase-invoice-recorder.service';
 
 const ACTOR = { employeeId: 'finance-1', appUserId: 'u-1', roles: ['FINANCE'] } as unknown as AuthenticatedPrincipal;
@@ -78,6 +79,10 @@ function build(opts: { commitments?: ReturnType<typeof commitment>[]; exists?: b
     } as unknown as InvoiceRepo,
     { lock },
     { record } as unknown as AuditApi,
+    {
+      watch: jest.fn().mockResolvedValue({ pairs: [], usedBefore: new Map() }),
+      settle: jest.fn().mockResolvedValue(0),
+    } as unknown as ThresholdAlertService,
   );
 
   return { service, calls, lockOfRequest, applyInvoice, insert, lock, record };

@@ -116,6 +116,8 @@ export const PARAM_KEYS_BY_CODE: Readonly<Record<InAppNotificationCode, readonly
   BUDGET_REVIEW_DUE: ['year', 'month'],
   BUDGET_REVIEW_SUMMARY: ['periodId', 'year', 'month', 'kind', 'greenCount', 'yellowCount', 'redCount', 'underCount'],
   BUDGET_SHARED_POOL_OVER_RESERVE: ['year', 'month'],
+  // The use of the budget of a Cost Center reached 80 or 100 percent of its base (`QĐ-111af`, RV-2): the Cost Center, the year and the threshold, never a figure.
+  BUDGET_THRESHOLD_REACHED: ['costCenterId', 'year', 'threshold'],
   // An adjustment of the budget in the year (`QĐ-111ag`): asked of the spending approver, and decided for Finance and the head of a Cost Center it concerns; the id, the year, the kind and the decision, never a figure.
   BUDGET_ADJUSTMENT_REQUESTED: ['adjustmentId', 'year', 'kind'],
   BUDGET_ADJUSTMENT_DECIDED: ['adjustmentId', 'year', 'kind', 'decision', 'costCenterId'],

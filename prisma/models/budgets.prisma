@@ -741,3 +741,18 @@ model BudgetAdjustment {
   @@index([fromCostCenterId, year])
   @@map("budget_adjustments")
 }
+
+/// RV-2 (QĐ-111af, R-5, R-28): an alert of 80 or 100 percent of the base of a budget that was told. One row for a Cost Center, a year, a threshold and the EFFECTIVE base the use went over: the use
+/// going over the same base again is told once, the use going over a base that an adjustment raised is told again. Written `ON CONFLICT DO NOTHING` (MAJ-10). The id of the Cost Center is a value of
+/// another context, not a foreign key.
+model BudgetThresholdAlert {
+  id           String   @id @default(uuid(7)) @db.Uuid
+  costCenterId String   @map("cost_center_id") @db.Uuid
+  year         Int
+  threshold    Int
+  baseMinor    BigInt   @map("base_minor")
+  createdAt    DateTime @map("created_at") @db.Timestamptz(3)
+
+  @@unique([costCenterId, year, threshold, baseMinor], map: "budget_threshold_alerts_key")
+  @@map("budget_threshold_alerts")
+}

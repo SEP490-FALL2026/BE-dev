@@ -11,6 +11,7 @@ import { bookPurchaseInvoice, planInvoice, type PurchaseBooking } from '../budge
 import { InvoiceRepo } from '../budget/invoice.repo';
 import { PurchaseInvoiceRecordRefusedError } from '../public/budgets.errors';
 import type { PurchaseInvoiceRecordInput, PurchaseInvoiceRecorded } from '../public/budgets.types';
+import { ThresholdAlertService, type ThresholdWatch } from '../threshold/threshold-alert.service';
 
 /**
  * Writes the one invoice of a purchase invoice Finance signed (`PI-1`, `D3`), in the transaction of the signature. It is booked to the month the
@@ -26,6 +27,7 @@ export class PurchaseInvoiceRecorderService {
     private readonly invoices: InvoiceRepo,
     private readonly yearLock: BudgetYearLockRepo,
     private readonly audit: AuditApi,
+    private readonly thresholds: ThresholdAlertService,
   ) {}
 
   /** Throws PurchaseInvoiceRecordRefusedError. */
@@ -54,6 +56,7 @@ export class PurchaseInvoiceRecorderService {
       throw new PurchaseInvoiceRecordRefusedError('DUPLICATE_NUMBER');
     }
 
+    const watch = await this.watchUse(tx, rows, booking, serviceYear);
     const placed = await this.place(tx, input, rows, booking, serviceYear);
     const actualCostMinor = input.netMinor + input.nonDeductibleTaxMinor;
     const subscriptionId = booking.kind === 'SUBSCRIPTION' ? booking.subscriptionId : null;
@@ -79,9 +82,32 @@ export class PurchaseInvoiceRecorderService {
       costCenterId: placed.costCenterId,
       unallocated: booking.kind === 'UNALLOCATED' ? input.unallocated : null,
     });
+    if (watch !== null) await this.thresholds.settle(tx, watch, input.now);
     await this.log(tx, actor, input, invoice.id, booking.kind, placed, actualCostMinor);
 
     return { invoiceId: invoice.id, booking: booking.kind, subscriptionId, actualCostMinor, ...placed };
+  }
+
+  /**
+   * Locks the budget year and reads the use of the Cost Center and year the invoice moves, to tell the threshold it crosses (`RV-2`): the Cost Center of the commitment it takes down, or the one that bears the
+   * expense. A line of the subscription or of no Cost Center moves the use of none, and nothing is watched.
+   */
+  private async watchUse(
+    tx: DbTx,
+    rows: Awaited<ReturnType<CommitmentRepo['lockOfRequest']>>,
+    booking: Exclude<PurchaseBooking, { kind: 'UNPLACED' }>,
+    serviceYear: number,
+  ): Promise<ThresholdWatch | null> {
+    const row =
+      booking.kind === 'COMMITMENT' ? rows.find((candidate) => candidate.id === booking.commitmentId) : undefined;
+    const pair =
+      booking.kind === 'COST_CENTER'
+        ? { costCenterId: booking.costCenterId, year: serviceYear }
+        : row
+          ? { costCenterId: row.costCenterId, year: row.year }
+          : null;
+
+    return pair === null ? null : this.thresholds.watch(tx, [pair]);
   }
 
   private async log(

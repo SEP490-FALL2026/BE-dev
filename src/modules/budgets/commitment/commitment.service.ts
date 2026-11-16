@@ -36,6 +36,7 @@ import {
 import { budgetAuditEvent, BudgetFactsService } from '../budget/budget-facts.service';
 import { CommitmentRepo } from '../budget/commitment.repo';
 import { InvoiceRepo } from '../budget/invoice.repo';
+import { ThresholdAlertService } from '../threshold/threshold-alert.service';
 import type { CommittedAmount, HeldAmount, RequestCommitment } from '../public/budgets.types';
 import type { CommitmentWire, ReleaseWire } from './commitment.dto';
 
@@ -56,6 +57,7 @@ export class CommitmentService {
     private readonly releaseGuard: CommitmentReleaseGuardHook,
     private readonly requestFacts: CommitmentRequestFactsHook,
     private readonly invoices: InvoiceRepo,
+    private readonly thresholds: ThresholdAlertService,
   ) {}
 
   /**
@@ -217,7 +219,13 @@ export class CommitmentService {
     );
     if (taken.length > 0) throw new BudgetCommitmentExistsError(taken[0]);
 
+    // What the Cost Center uses is read before and after the commitment, with the year locked, to tell the threshold the commitment crosses (`RV-2`).
+    const watch = await this.thresholds.watch(
+      tx,
+      input.items.map((item) => ({ costCenterId: input.costCenterId, year: item.year })),
+    );
     const held = await this.commitments.hold(tx, input);
+    await this.thresholds.settle(tx, watch, input.now);
     for (const commitment of held) {
       await this.audit.record(
         tx,
@@ -255,6 +263,13 @@ export class CommitmentService {
     const ordered = [...input.items].sort(
       (a, b) => a.costCenterId.localeCompare(b.costCenterId) || a.requestId.localeCompare(b.requestId),
     );
+    // The threshold the commitments of the pass cross is told once for each Cost Center, on what it used before the pass and after it (`RV-2`).
+    const watch = await this.thresholds.watch(
+      tx,
+      ordered
+        .filter((item) => !already.has(item.requestId))
+        .map((item) => ({ costCenterId: item.costCenterId, year: input.year })),
+    );
     for (const item of ordered) {
       if (already.has(item.requestId)) {
         result.alreadyHeld.push(item.requestId);
@@ -280,28 +295,39 @@ export class CommitmentService {
         costCenterId: item.costCenterId,
         attachedVersionId: held.attachedVersionId,
       });
-      await this.audit.record(tx, {
-        organizationId: input.organizationId,
-        actorKind: 'SYSTEM',
-        action: 'BUDGET_COMMITMENT.CREATED',
-        resourceType: 'BUDGET_COMMITMENT',
-        resourceId: held.id,
-        before: null,
-        after: {
-          requestId: item.requestId,
-          costCenterId: item.costCenterId,
-          year: input.year,
-          amountMinor: item.amountMinor.toString(),
-          seatMonthlyMinor: item.seatMonthlyMinor.toString(),
-          origin: 'YEAR_START',
-          attachedVersionId: held.attachedVersionId,
-          unattachedReason: held.attachedVersionId === null ? 'NO_BUDGET' : null,
-        },
-        correlationId: item.requestId,
-      });
+      await this.recordYearStart(tx, input, item, held);
     }
+    await this.thresholds.settle(tx, watch, input.now);
 
     return result;
+  }
+
+  /** The audit of one commitment of 01/01, written by the system. */
+  private recordYearStart(
+    tx: DbTx,
+    input: YearStartHoldInput,
+    item: YearStartHoldInput['items'][number],
+    held: { id: string; attachedVersionId: string | null },
+  ): Promise<void> {
+    return this.audit.record(tx, {
+      organizationId: input.organizationId,
+      actorKind: 'SYSTEM',
+      action: 'BUDGET_COMMITMENT.CREATED',
+      resourceType: 'BUDGET_COMMITMENT',
+      resourceId: held.id,
+      before: null,
+      after: {
+        requestId: item.requestId,
+        costCenterId: item.costCenterId,
+        year: input.year,
+        amountMinor: item.amountMinor.toString(),
+        seatMonthlyMinor: item.seatMonthlyMinor.toString(),
+        origin: 'YEAR_START',
+        attachedVersionId: held.attachedVersionId,
+        unattachedReason: held.attachedVersionId === null ? 'NO_BUDGET' : null,
+      },
+      correlationId: item.requestId,
+    });
   }
 
   /** The requests, among these, that hold a commitment for the year already, in one read. */

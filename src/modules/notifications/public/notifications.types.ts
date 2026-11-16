@@ -130,6 +130,8 @@ export const IN_APP_NOTIFICATION_CODES = [
   'BUDGET_REVIEW_DUE',
   'BUDGET_REVIEW_SUMMARY',
   'BUDGET_SHARED_POOL_OVER_RESERVE',
+  // The use of the budget of a Cost Center reached 80 or 100 percent of its base (`QĐ-111af`, RV-2): told once each time to the head of the department and Finance; the Cost Center, the year and the threshold, never a figure.
+  'BUDGET_THRESHOLD_REACHED',
   // An adjustment of the budget in the year (`QĐ-111ag`): the spending approver is asked to decide it; Finance who made it and the head of each Cost Center it concerns are told how it was decided. The id, the year and the kind, never a figure.
   'BUDGET_ADJUSTMENT_REQUESTED',
   'BUDGET_ADJUSTMENT_DECIDED',
